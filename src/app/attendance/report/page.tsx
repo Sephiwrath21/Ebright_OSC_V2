@@ -31,6 +31,10 @@ const DAY_KEYS: DayKey[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // without scheduled hours don't see the whole week as "no_record").
 const WEEKEND_FALLBACK_DAY_NUMBERS = new Set([0, 1]);
 
+// TODO: confirm these match the intended business rule.
+const LATE_GRACE_MINUTES = 15;
+const CHECKOUT_EARLIEST_MYT = "14:00:00";
+
 const TIME_FMT = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Kuala_Lumpur",
   hour: "2-digit",
@@ -403,17 +407,10 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
     name: b.branch_name,
   }));
 
-
-  const hqDeptCodes = new Set<string>();
-  for (const u of employeesSorted) {
-    const emp = u.employment[0];
-    if (emp?.branch?.branch_code === "HQ" && emp?.department?.department_code) {
-      hqDeptCodes.add(emp.department.department_code);
-    }
-  }
-  const departmentOptions: DepartmentOption[] = departments
-    .filter((d) => hqDeptCodes.has(d.department_code))
-    .map((d) => ({ code: d.department_code, name: d.department_name }));
+  const departmentOptions: DepartmentOption[] = departments.map((d) => ({
+    code: d.department_code,
+    name: d.department_name,
+  }));
 
   const monthOptions: MonthOption[] = [];
   const baseYear = nowMyt.getFullYear();

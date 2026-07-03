@@ -292,6 +292,15 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
     scheduledStaff.push({ staff: s, schedule: day, branchForDay });
   }
 
+  // Employee codes of everyone in scope today — used below to separate
+  // "visitor" scans (people who scanned but weren't expected) from the
+  // expected/scheduled population.
+  const scheduledEmpNos = new Set(
+    scheduledStaff
+      .map(({ staff }) => staff.employeeId)
+      .filter((id): id is string => !!id),
+  );
+
   // ── HRFS: aggregate today's Hikvision events ─────────────────────────────
   // - LEFT JOIN hikvision_id_map to translate "wrong" person_ids to true ids.
   // - Group by translated empNo so the same person across both scanners
@@ -412,36 +421,21 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
     }
   }
 
-  const visitors = visitorIds.length
-    ? await prisma.users.findMany({
-        where: { user_id: { in: visitorIds } },
-        select: {
-          user_id: true,
-          role_id: true,
-          user_profile: { select: { full_name: true } },
-          employment: {
-            take: 1,
-            orderBy: { employment_id: "desc" },
-            select: {
-              employee_id: true,
-              position: true,
-              department: { select: { department_name: true } },
-              branch: { select: { branch_name: true, branch_code: true } },
-            },
-          },
-        },
-      })
-    : [];
+  // ── Expected rows ──────────────────────────────────────────────────────
+  // One row per staff member who is scheduled to work today (scheduledStaff,
+  // built above from BranchStaff + BranchStaffSchedule + rotation).
+  const expectedRows: AttendanceRow[] = scheduledStaff.map(({ staff: s, schedule: sched, branchForDay }) => {
+    const scan = s.employeeId ? scanByEmpNo.get(s.employeeId) ?? null : null;
+    const checkInDate = scan?.first_event ?? null;
+    const checkOutDate =
+      scan
+      && scan.last_event.getTime() > scan.first_event.getTime()
+      && utcToMytHm(scan.last_event) >= CHECKOUT_EARLIEST_MYT
+        ? scan.last_event
+        : null;
 
-  const expectedRows: AttendanceRow[] = employees.map((e) => {
-    const att = attMap.get(e.user_id);
-    const checkIn = att?.check_in ?? null;
-    const checkOut = att?.check_out ?? null;
-
-    const inStatus: AttendanceRow["in_status"] = checkIn
-      ? mytHour(checkIn) >= LATE_HOUR_MYT
-        ? "late"
-        : "on_time"
+    const inStatus: AttendanceRow["in_status"] = checkInDate
+      ? classifyLate(utcToMytHm(checkInDate), sched.start, LATE_GRACE_MINUTES)
       : null;
     const outStatus: AttendanceRow["out_status"] = checkOutDate
       ? classifyEarly(utcToMytHm(checkOutDate), sched.end)
