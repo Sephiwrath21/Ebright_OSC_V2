@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Home as HomeIcon,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   CircleAlert,
   CheckCircle2,
   Loader2,
+  type LucideIcon,
 } from "lucide-react";
 import { submitLeaveRequest } from "@/app/attendance/leave/actions";
 
@@ -59,11 +61,98 @@ function formatDays(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-// Today's date as YYYY-MM-DD in local time — used as the earliest selectable leave date.
-function todayISO(): string {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+// A single ISO date in a human-friendly form, e.g. "Fri, 3 Jul 2026".
+function fmtFriendly(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// Compact date form for the review / success screens, e.g. "3 Jul 2026".
+function fmt(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fmtFriendlyRange(startISO: string, endISO: string | null): string {
+  if (!endISO || endISO === startISO) return fmtFriendly(startISO);
+  return `${fmtFriendly(startISO)} → ${fmtFriendly(endISO)}`;
+}
+
+// ─── Per-type icon & accent ──────────────────────────────────────────────────
+
+interface Accent {
+  ring: string;
+  border: string;
+  tile: string;
+  icon: string;
+}
+
+// Full literal class strings so Tailwind's scanner picks them up.
+const ACCENTS: Record<string, Accent> = {
+  blue: {
+    ring: "focus-visible:ring-blue-500",
+    border: "border-blue-500",
+    tile: "bg-blue-50",
+    icon: "text-blue-600",
+  },
+  emerald: {
+    ring: "focus-visible:ring-emerald-500",
+    border: "border-emerald-500",
+    tile: "bg-emerald-50",
+    icon: "text-emerald-600",
+  },
+  amber: {
+    ring: "focus-visible:ring-amber-500",
+    border: "border-amber-500",
+    tile: "bg-amber-50",
+    icon: "text-amber-600",
+  },
+  violet: {
+    ring: "focus-visible:ring-violet-500",
+    border: "border-violet-500",
+    tile: "bg-violet-50",
+    icon: "text-violet-600",
+  },
+  slate: {
+    ring: "focus-visible:ring-slate-500",
+    border: "border-slate-500",
+    tile: "bg-slate-100",
+    icon: "text-slate-600",
+  },
+};
+
+function classify(code: string, name: string): keyof typeof ACCENTS {
+  const key = `${code} ${name}`.toLowerCase();
+  if (/medical|sick|health|\bml\b/.test(key)) return "emerald";
+  if (/emerg|urgent|\bel\b/.test(key)) return "amber";
+  if (/unpaid|\bul\b/.test(key)) return "slate";
+  if (/annual|vacation|\bal\b|leave/.test(key)) return "blue";
+  return "violet";
+}
+
+function pickIcon(code: string, name: string): LucideIcon {
+  const key = `${code} ${name}`.toLowerCase();
+  if (/medical|sick|health|\bml\b/.test(key)) return Stethoscope;
+  if (/emerg|urgent|\bel\b/.test(key)) return AlertTriangle;
+  if (/unpaid|\bul\b/.test(key)) return Wallet;
+  if (/annual|vacation|\bal\b|leave/.test(key)) return Umbrella;
+  return Tag;
+}
+
+function pickAccent(code: string, name: string): Accent {
+  return ACCENTS[classify(code, name)];
 }
 
 export default function LeaveFormView({
@@ -72,56 +161,55 @@ export default function LeaveFormView({
   leaveTypes: LeaveTypeOption[];
 }) {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const minDate = useMemo(() => todayISO(), []);
 
-  const [leaveTypeId, setLeaveTypeId] = useState<string>("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [step, setStep] = useState<Step>(1);
+  const [typeId, setTypeId] = useState<number | null>(null);
+  const [startISO, setStartISO] = useState<string | null>(null);
+  const [endISO, setEndISO] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [halfDay, setHalfDay] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [notifyManager, setNotifyManager] = useState(true);
+  const [notifyTeam, setNotifyTeam] = useState(false);
+
   const [submitted, setSubmitted] = useState(false);
   const [submittedDays, setSubmittedDays] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Half day only applies to a single-day request (From and To are the same day).
-  const isSingleDay = !!startDate && !!endDate && startDate === endDate;
-  const halfDayActive = halfDay && isSingleDay;
-
-  const totalDays = useMemo(() => {
-    if (halfDayActive) return 0.5;
-    return daysInclusive(startDate, endDate);
-  }, [startDate, endDate, halfDayActive]);
-
-  const dateRangeValid =
-    !!startDate &&
-    !!endDate &&
-    startDate >= minDate &&
-    new Date(endDate) >= new Date(startDate);
-  const canSubmit = !!leaveTypeId && dateRangeValid;
-
   const selectedType = useMemo(
     () => leaveTypes.find((t) => t.id === typeId) ?? null,
     [leaveTypes, typeId],
   );
-  const workingDays = workingDaysBetween(startISO ?? "", endISO ?? startISO ?? "");
+  const workingDays = workingDaysBetween(
+    startISO ?? "",
+    endISO ?? startISO ?? "",
+  );
 
   // Step gating
   const canContinue1 = typeId !== null;
   const canContinue2 = startISO !== null;
 
+  function resetForm() {
+    setStep(1);
+    setTypeId(null);
+    setStartISO(null);
+    setEndISO(null);
+    setReason("");
+    setNotifyManager(true);
+    setNotifyTeam(false);
+    setErrorMsg(null);
+    setSubmitted(false);
+    setSubmittedDays(0);
+  }
+
   function handleSubmit() {
-    if (!selectedType || !startISO) return;
+    if (!selectedType || !startISO || isPending) return;
+    setErrorMsg(null);
+
     const fd = new FormData();
-    fd.append("leave_type_id", leaveTypeId);
-    fd.append("start_date", startDate);
-    fd.append("end_date", endDate);
+    fd.append("leave_type_id", String(selectedType.id));
+    fd.append("start_date", startISO);
+    fd.append("end_date", endISO ?? startISO);
     fd.append("reason", reason);
-    if (halfDayActive) fd.append("half_day", "1");
-    if (file) fd.append("attachment_file", file);
 
     startTransition(async () => {
       const result = await submitLeaveRequest(null, fd);
@@ -129,30 +217,21 @@ export default function LeaveFormView({
         setErrorMsg(result.error ?? "Failed to submit leave request.");
         return;
       }
-      setSubmittedDays(result.totalDays ?? totalDays);
+      setSubmittedDays(result.totalDays ?? workingDays);
       setSubmitted(true);
       router.refresh();
     });
-  };
+  }
 
-  // ── Success screen ────────────────────────────────────────────────────────
-  if (state?.ok) {
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (submitted) {
     return (
       <SuccessScreen
-        typeName={selectedTypeName}
+        typeName={selectedType?.name ?? "Leave"}
         days={submittedDays}
-        startDate={startDate}
-        endDate={endDate}
-        onAnother={() => {
-          setSubmitted(false);
-          setLeaveTypeId("");
-          setStartDate("");
-          setEndDate("");
-          setReason("");
-          setHalfDay(false);
-          setFile(null);
-          setErrorMsg(null);
-        }}
+        startISO={startISO}
+        endISO={endISO}
+        onAnother={resetForm}
       />
     );
   }
@@ -181,18 +260,13 @@ export default function LeaveFormView({
           <p className="mt-1 text-sm text-slate-500">Step {step} of 4</p>
         </header>
 
-        <div>
         {/* Progress bar */}
         <ProgressBar currentStep={step} />
 
         {/* Step content */}
         <div className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
           {step === 1 && (
-            <Step1
-              leaveTypes={leaveTypes}
-              typeId={typeId}
-              onSelect={setTypeId}
-            />
+            <Step1 leaveTypes={leaveTypes} typeId={typeId} onSelect={setTypeId} />
           )}
           {step === 2 && (
             <Step2
@@ -202,125 +276,64 @@ export default function LeaveFormView({
                 setStartISO(s);
                 setEndISO(e);
               }}
-            >
-              <FieldBlock
-                icon={<CalendarDays size={13} strokeWidth={2.5} />}
-                label="From Date"
-                required
-              >
-                <input
-                  type="date"
-                  required
-                  value={startDate}
-                  min={minDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={inputStyle}
-                  onFocus={handleFocus}
-                  onBlur={handleBlur}
-                />
-              </FieldBlock>
-
-              <FieldBlock
-                icon={<CalendarDays size={13} strokeWidth={2.5} />}
-                label="To Date"
-                required
-              >
-                <input
-                  type="date"
-                  required
-                  value={endDate}
-                  min={startDate || minDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={inputStyle}
-                  onFocus={handleFocus}
-                  onBlur={handleBlur}
-                />
-              </FieldBlock>
-            </div>
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              reason={reason}
+              setReason={setReason}
+              notifyManager={notifyManager}
+              setNotifyManager={setNotifyManager}
+              notifyTeam={notifyTeam}
+              setNotifyTeam={setNotifyTeam}
+            />
+          )}
+          {step === 4 && (
+            <Step4
+              type={selectedType}
+              startISO={startISO}
+              endISO={endISO}
+              workingDays={workingDays}
+              reason={reason}
+              notifyManager={notifyManager}
+              notifyTeam={notifyTeam}
+            />
           )}
         </div>
 
-            {/* Half day toggle — only for a single-day request */}
-            {isSingleDay && (
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  borderRadius: "12px",
-                  padding: "14px 16px",
-                  border: `1px solid ${halfDay ? ACCENT_BORDER : "#E5E7EB"}`,
-                  backgroundColor: halfDay ? ACCENT_SOFT : "#fff",
-                  cursor: "pointer",
-                  transition: "background-color 0.15s, border-color 0.15s",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={halfDay}
-                  onChange={(e) => setHalfDay(e.target.checked)}
-                  style={{ width: "18px", height: "18px", accentColor: ACCENT, cursor: "pointer" }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: "13.5px", fontWeight: 600, color: "#262626" }}>
-                    Half day
-                  </p>
-                  <p style={{ fontSize: "12px", color: "#737373", marginTop: "2px" }}>
-                    Apply for half a day (0.5) on this date.
-                  </p>
-                </div>
-              </label>
-            )}
-
-            {/* Total days preview */}
-            <div
-              style={{
-                borderRadius: "14px",
-                padding: "16px 20px",
-                backgroundColor: ACCENT_SOFT,
-                border: `1px solid ${ACCENT_BORDER}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <div>
-                <p
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    color: ACCENT_TEXT,
-                    marginBottom: "4px",
-                  }}
-                >
-                  Total Days
-                </p>
-                <p style={{ fontSize: "13px", color: ACCENT_TEXT }}>
-                  {!dateRangeValid
-                    ? "Select a valid date range to calculate"
-                    : halfDayActive
-                      ? "Half day on the selected date"
-                      : "Inclusive of start and end date"}
-                </p>
-              </div>
-              <div
-                style={{
-                  fontSize: "28px",
-                  fontWeight: 700,
-                  color: ACCENT_TEXT,
-                  tabSize: "2",
-                }}
-              >
-                {formatDays(totalDays)}
-                <span style={{ fontSize: "13px", fontWeight: 600, marginLeft: "6px" }}>
-                  {totalDays === 1 ? "day" : "days"}
-                </span>
-              </div>
+        {/* Error */}
+        {errorMsg && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+          >
+            <CircleAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Could not submit request</p>
+              <p className="text-xs text-red-700 leading-relaxed">{errorMsg}</p>
             </div>
+          </div>
+        )}
 
-            <Divider />
+        {/* Footer actions */}
+        <div className="mt-6 flex items-center justify-between gap-3">
+          {step > 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => (s - 1) as Step)}
+              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+              Back
+            </button>
+          ) : (
+            <Link
+              href="/attendance/leave"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </Link>
+          )}
 
           {step < 4 ? (
             <button
@@ -336,10 +349,10 @@ export default function LeaveFormView({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={pending}
+              disabled={isPending}
               className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
             >
-              {pending ? (
+              {isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                   Submitting…
@@ -349,7 +362,6 @@ export default function LeaveFormView({
               )}
             </button>
           )}
-        </div>
         </div>
       </div>
     </div>
@@ -439,7 +451,7 @@ function Step1({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 aria-pressed={isSelected}
-                className={`text-left bg-white border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:${accent.ring} ${
+                className={`text-left bg-white border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.ring} ${
                   isSelected
                     ? `${accent.border} shadow-sm`
                     : "border-slate-200 hover:border-slate-300"
@@ -752,99 +764,99 @@ function Step4({
   notifyManager: boolean;
   notifyTeam: boolean;
 }) {
+  const notify =
+    notifyManager && notifyTeam
+      ? "Manager and team"
+      : notifyManager
+        ? "Manager"
+        : notifyTeam
+          ? "Team"
+          : "No one";
+
   return (
-    <div
-      style={{
-        minHeight: "100%",
-        backgroundColor: "#FAFAFA",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "80px 24px",
-      }}
-    >
-      <div style={{ textAlign: "center", maxWidth: "440px" }}>
-        <div
-          style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "9999px",
-            backgroundColor: "#ECFDF5",
-            display: "grid",
-            placeItems: "center",
-            margin: "0 auto 20px",
-          }}
-        >
-          <CheckCircle2 size={32} strokeWidth={1.75} style={{ color: "#10B981" }} />
+    <section>
+      <h2 className="text-base font-semibold text-slate-900">Review your request</h2>
+      <p className="text-sm text-slate-500 mb-5">Check the details before submitting.</p>
+
+      <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+        <ReviewRow label="Leave type" value={type?.name ?? "—"} />
+        <ReviewRow
+          label="Dates"
+          value={
+            startISO
+              ? endISO && endISO !== startISO
+                ? `${fmt(startISO)} → ${fmt(endISO)}`
+                : fmt(startISO)
+              : "—"
+          }
+        />
+        <ReviewRow
+          label="Working days"
+          value={`${formatDays(workingDays)} day${workingDays === 1 ? "" : "s"}`}
+        />
+        <ReviewRow label="Notify" value={notify} />
+        <ReviewRow label="Reason" value={reason.trim() || "—"} />
+      </dl>
+    </section>
+  );
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-3 bg-white">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 shrink-0 pt-0.5">
+        {label}
+      </dt>
+      <dd className="text-sm text-slate-900 text-right break-words">{value}</dd>
+    </div>
+  );
+}
+
+// ─── Success screen ──────────────────────────────────────────────────────────
+
+function SuccessScreen({
+  typeName,
+  days,
+  startISO,
+  endISO,
+  onAnother,
+}: {
+  typeName: string;
+  days: number;
+  startISO: string | null;
+  endISO: string | null;
+  onAnother: () => void;
+}) {
+  return (
+    <div className="min-h-full bg-slate-50 flex items-center justify-center px-6 py-20">
+      <div className="text-center max-w-md">
+        <div className="w-16 h-16 rounded-full bg-emerald-50 grid place-items-center mx-auto mb-5">
+          <CheckCircle2 className="w-8 h-8 text-emerald-500" strokeWidth={1.75} aria-hidden="true" />
         </div>
-        <h2
-          style={{
-            fontSize: "24px",
-            fontWeight: 700,
-            color: "#171717",
-            marginBottom: "8px",
-          }}
-        >
-          Leave Request Submitted
-        </h2>
-        <p
-          style={{
-            fontSize: "13.5px",
-            color: "#737373",
-            lineHeight: 1.55,
-            marginBottom: "4px",
-          }}
-        >
-          Your{" "}
-          <span style={{ fontWeight: 600, color: "#262626" }}>
-            {typeName || "leave"}
-          </span>{" "}
-          of{" "}
-          <span style={{ fontWeight: 600, color: "#262626" }}>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Leave Request Submitted</h2>
+        <p className="text-sm text-slate-500 leading-relaxed mb-1">
+          Your <span className="font-semibold text-slate-800">{typeName}</span> of{" "}
+          <span className="font-semibold text-slate-800">
             {formatDays(days)} {days === 1 ? "day" : "days"}
           </span>{" "}
-          from{" "}
-          <span style={{ fontWeight: 600, color: "#262626" }}>{fmt(startDate)}</span>{" "}
-          to <span style={{ fontWeight: 600, color: "#262626" }}>{fmt(endDate)}</span>{" "}
-          has been sent for approval.
+          from <span className="font-semibold text-slate-800">{fmt(startISO)}</span> to{" "}
+          <span className="font-semibold text-slate-800">{fmt(endISO ?? startISO)}</span> has been
+          sent for approval.
         </p>
-        <p style={{ fontSize: "12px", color: "#A3A3A3", marginBottom: "32px" }}>
+        <p className="text-xs text-slate-400 mb-8">
           You&apos;ll receive a notification once it&apos;s reviewed.
         </p>
-        <div
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}
-        >
+        <div className="flex items-center justify-center gap-3">
           <Link
             href="/attendance/leave"
-            style={{
-              height: "44px",
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "0 20px",
-              borderRadius: "10px",
-              border: "1px solid #E5E7EB",
-              backgroundColor: "#fff",
-              fontSize: "13.5px",
-              fontWeight: 500,
-              color: "#404040",
-            }}
+            className="inline-flex items-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Back to Leaves
           </Link>
           <button
+            type="button"
             onClick={onAnother}
-            style={{
-              height: "44px",
-              padding: "0 24px",
-              borderRadius: "10px",
-              backgroundColor: ACCENT,
-              color: "#fff",
-              fontSize: "13.5px",
-              fontWeight: 600,
-              boxShadow: `0 4px 12px ${ACCENT_RING}`,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = ACCENT_DARK)}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = ACCENT)}
+            className="inline-flex items-center h-11 px-6 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             Apply Another
           </button>
