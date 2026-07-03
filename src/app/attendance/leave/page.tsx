@@ -94,11 +94,8 @@ export default async function LeavePage({
   }
 
   const userEmail = session.user?.email ?? "";
-  const userRole = (session.user as { role?: string } | undefined)?.role ?? "";
-  const userPosition = (session.user as { position?: string } | undefined)?.position ?? "";
   const userName = session.user?.name ?? null;
 
- 
   const isHod = userPosition === HOD_POSITION;
   const departmentId = isHod ? await getActiveDepartmentId(me.user_id) : null;
   const approvalItems = departmentId != null ? await loadHodPending(departmentId) : [];

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/nextauth";
+import { auth } from "@/auth";
 import {
   getSpaceTasks,
   operationalDay,
@@ -21,7 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = await params;
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   const role = (session?.user as { role?: string } | undefined)?.role;
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (role !== "superadmin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });

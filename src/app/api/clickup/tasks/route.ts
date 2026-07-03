@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/nextauth";
+import { auth } from "@/auth";
 import { getActiveDepartmentId } from "@/app/attendance/leave/approval-queries";
 import { resolveTaskScope } from "@/lib/clickup-access";
 import {
@@ -17,7 +16,7 @@ import { getEmployeeRoster, getDepartmentName } from "@/lib/clickup-queries";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   const user = session?.user as
     | { id?: string; email?: string; name?: string; role?: string; position?: string }
     | undefined;

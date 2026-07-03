@@ -16,6 +16,7 @@ import {
   CalendarCheck,
   ShieldCheck,
   ListChecks,
+  ChevronDown,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
