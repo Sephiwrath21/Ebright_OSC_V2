@@ -10,6 +10,8 @@ import {
   Umbrella,
   Inbox,
   Hourglass,
+  User,
+  Users,
 } from "lucide-react";
 import HodApprovalTable, { type HodApprovalItem } from "@/app/components/HodApprovalTable";
 import LeaveDetailButton from "@/app/components/LeaveDetailButton";
@@ -126,6 +128,12 @@ export default function LeaveRequestsView({
   viewerIsHod?: boolean;
   approvalItems?: HodApprovalItem[];
 }) {
+  // True when the row set spans multiple employees (e.g. HR/superadmin
+  // "view all" mode) rather than just the current user's own requests.
+  // ASSUMPTION: derived from row shape since no explicit prop is passed in —
+  // confirm this matches intent, or wire an explicit `viewOnly` prop instead.
+  const viewOnly = rows.some((r) => r.employeeName != null);
+
   // A HOD's own request skips the HOD stage and goes straight to HR, so the
   // "HOD Approved" state never reflects a real HOD approval for them — show it
   // as awaiting HR instead.
@@ -191,16 +199,16 @@ export default function LeaveRequestsView({
           <span className="text-slate-900 font-medium">Leave</span>
         </nav>
 
-        {/* Unified header: title + tabs/CTA in one row */}
+        {/* Unified header: title + CTA in one row */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              {tab === "team" && canApprove
+              {tab === "approve" && canApprove
                 ? "Leave Approvals"
                 : viewOnly ? "All Leave Requests" : "Leave Requests"}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              {tab === "team" && canApprove
+              {tab === "approve" && canApprove
                 ? "Review and respond to leave requests from your team."
                 : viewOnly
                   ? "Read-only view of every employee's leave requests."
@@ -208,48 +216,6 @@ export default function LeaveRequestsView({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {canApprove && (
-              <div
-                role="tablist"
-                aria-label="Leave view"
-                className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1"
-              >
-                <button
-                  role="tab"
-                  aria-selected={tab === "mine"}
-                  onClick={() => setTab("mine")}
-                  className={[
-                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer",
-                    tab === "mine"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <User className="w-4 h-4" aria-hidden="true" />
-                  {viewOnly ? "All Requests" : "My Requests"}
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={tab === "team"}
-                  onClick={() => setTab("team")}
-                  className={[
-                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer",
-                    tab === "team"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <Users className="w-4 h-4" aria-hidden="true" />
-                  Team Approvals
-                </button>
-              </div>
-            )}
-            {tab === "team" && canApprove && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
-                <Clock3 className="w-3.5 h-3.5" aria-hidden="true" />
-                {approvalRows.filter(r => r.status === "pending").length} pending
-              </span>
-            )}
             {tab === "mine" && !viewOnly && (
               <Link
                 href="/attendance/leave/new"
@@ -268,19 +234,21 @@ export default function LeaveRequestsView({
             <button
               type="button"
               onClick={() => setTab("mine")}
-              className={`px-4 py-1.5 rounded-lg transition-colors ${
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
                 tab === "mine" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
               }`}
             >
-              My Requests
+              <User className="w-4 h-4" aria-hidden="true" />
+              {viewOnly ? "All Requests" : "My Requests"}
             </button>
             <button
               type="button"
               onClick={() => setTab("approve")}
-              className={`px-4 py-1.5 rounded-lg transition-colors ${
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
                 tab === "approve" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
               }`}
             >
+              <Users className="w-4 h-4" aria-hidden="true" />
               To Approve{approvalItems.length > 0 ? ` (${approvalItems.length})` : ""}
             </button>
             </div>

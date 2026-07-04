@@ -298,7 +298,7 @@ export async function advanceClaim(
   _prev: ReviewClaimResult | null,
   formData: FormData,
 ): Promise<ReviewClaimResult> {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
 
   const me = await prisma.users.findUnique({

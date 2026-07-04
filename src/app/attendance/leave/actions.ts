@@ -148,7 +148,7 @@ async function resolveActor(): Promise<
   | { ok: true; userId: number; position: string | null; email: string; departmentId: number | null }
   | { ok: false; error: string }
 > {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
   const position = (session.user as { position?: string | null }).position ?? null;
   const email = session.user.email;

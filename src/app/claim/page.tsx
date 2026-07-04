@@ -16,7 +16,7 @@ export default async function ClaimsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const { status: initialStatus } = await searchParams;

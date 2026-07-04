@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/nextauth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
 import LeaveApprovalsView from "@/app/components/LeaveApprovalsView";
@@ -11,7 +10,7 @@ import { HOD_POSITION, HR_OVERVIEW_EMAIL } from "../approval-logic";
 export const dynamic = "force-dynamic";
 
 export default async function LeaveApprovalsPage() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const email = session.user.email;

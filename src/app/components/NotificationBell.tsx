@@ -41,10 +41,10 @@ export default function NotificationBell({ role }: { role?: string }) {
             : Promise.resolve({ count: 0 }),
         ]);
         if (cancelled) return;
-        setCounts({
-          approvals: typeof a.count === "number" ? a.count : 0,
-          inductionRequests: typeof b.count === "number" ? b.count : 0,
-        });
+        // NOTE: induction-request count (`b`) is fetched but not currently
+        // surfaced in the UI below — only the approvals count is rendered.
+        // Wire up an induction notification card here if/when that's needed.
+        setCount(typeof a.count === "number" ? a.count : 0);
       } catch {
         // network flake — no-op
       }
@@ -174,7 +174,7 @@ export default function NotificationBell({ role }: { role?: string }) {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {isSuperadmin && count > 0 && (
+              {showApprovals && count > 0 && (
                 <div className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0 ring-1 ring-inset ring-amber-200">
