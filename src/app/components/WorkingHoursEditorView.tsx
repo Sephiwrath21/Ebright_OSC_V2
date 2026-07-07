@@ -151,12 +151,7 @@ export default function WorkingHoursEditorView({
         </nav>
 
         <header className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
-              Versioned schedule
-            </p>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Working Hours</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Working Hours</h1>
           <p className="mt-1.5 text-sm font-medium text-slate-500">
             Each save creates a dated version. Past weeks keep the hours that were active then.
           </p>

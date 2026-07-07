@@ -82,7 +82,7 @@ function SummaryTable({
   return (
     <div className="mt-12 bg-white p-8 rounded-2xl border border-slate-200 shadow-md overflow-hidden text-slate-800">
       <header className="border-b border-slate-200 pb-4 mb-4 text-center">
-        <h2 className="m-0 text-xl font-black uppercase tracking-widest text-slate-800">
+        <h2 className="m-0 text-lg font-bold text-slate-800">
           {title}
         </h2>
       </header>
@@ -90,11 +90,11 @@ function SummaryTable({
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="w-[60px] border border-slate-300 bg-[#2D3F50] p-3 text-white font-bold text-center">No.</th>
-              <th className="w-[250px] border border-slate-300 bg-[#2D3F50] p-3 text-white font-bold text-left">Name</th>
-              <th className="w-[240px] border border-slate-300 bg-[#2D3F50] p-3 text-white font-bold text-center">Class (Coach)</th>
-              <th className="w-[240px] border border-slate-300 bg-[#2D3F50] p-3 text-white font-bold text-center">Executive</th>
-              <th className="w-[240px] border border-slate-300 bg-[#2D3F50] p-3 text-white font-bold text-center">Total (hrs:min)</th>
+              <th className="w-[60px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">No.</th>
+              <th className="w-[250px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-left">Name</th>
+              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Class (Coach)</th>
+              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Executive</th>
+              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Total (hrs:min)</th>
             </tr>
           </thead>
           <tbody>
@@ -430,10 +430,10 @@ function PlanNewWeekGridContent() {
                 <button
                   key={d}
                   onClick={() => setSelectedDay(d)}
-                  className={`px-6 py-3 rounded-xl font-black uppercase text-sm tracking-wide transition-all shadow-sm ${
+                  className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${
                     active
-                      ? "bg-[#2D3F50] text-white shadow-lg scale-105"
-                      : "bg-white text-slate-500 border-2 border-slate-200 hover:bg-slate-50"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   {d.slice(0, 3)}
@@ -448,7 +448,7 @@ function PlanNewWeekGridContent() {
               setNewEmployeePosition("Part Time");
               setShowAddEmployeeModal(true);
             }}
-            className="bg-green-600 text-white px-5 py-3 rounded-xl font-black uppercase text-sm tracking-wide hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2"
           >
             + Add Employee
           </button>
@@ -458,7 +458,7 @@ function PlanNewWeekGridContent() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
           <header className="bg-white p-4 border-b flex justify-between items-center relative">
             <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-              <h2 className="text-xl font-black uppercase text-slate-800 m-0 leading-none">
+              <h2 className="text-base font-bold text-slate-800 m-0 leading-none">
                 {day}
               </h2>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
@@ -480,7 +480,7 @@ function PlanNewWeekGridContent() {
               {isEditing ? (
                 <button
                   onClick={() => setEditingDays(p => ({ ...p, [day]: false }))}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-xs uppercase shadow-sm transition-colors"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold text-xs transition-colors"
                 >
                   Save Day
                 </button>
@@ -497,9 +497,9 @@ function PlanNewWeekGridContent() {
 
           <div className="overflow-x-auto relative">
             <table className="w-full border-collapse" style={{ minWidth: "2100px" }}>
-              <thead className="bg-[#2D3F50] text-white text-[10px] uppercase tracking-widest">
+              <thead className="bg-slate-800 text-white text-[10px] uppercase tracking-widest">
                 <tr>
-                  <th className="p-3 text-left w-[180px] sticky left-0 z-20 bg-[#2D3F50] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] border-r border-slate-600">
+                  <th className="p-3 text-left w-[180px] sticky left-0 z-20 bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] border-r border-slate-600">
                     Time Slot
                   </th>
                   <th className="p-3 text-center border-l border-slate-600 w-[180px] bg-slate-700 border-b-4 border-b-emerald-400">
@@ -657,7 +657,7 @@ function PlanNewWeekGridContent() {
 
                       {isOpenClose ? (
                         <td colSpan={COLUMNS.length + 2} className="p-2 border-l text-center">
-                          <span className="inline-flex items-center gap-2 bg-blue-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
+                          <span className="inline-flex items-center gap-2 bg-indigo-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full">
                             All Staff — Executive ({slotIdx === 0 ? "Opening" : "Closing"})
                           </span>
                         </td>
@@ -751,24 +751,24 @@ function PlanNewWeekGridContent() {
             <button
               onClick={handleFinalSubmit}
               disabled={saveState === "saving" || saveState === "saved"}
-              className={`px-20 py-5 rounded-2xl text-xl font-black shadow-xl uppercase tracking-widest transition-transform hover:scale-105 ${
+              className={`px-10 py-3.5 rounded-xl text-sm font-semibold shadow-sm transition-colors ${
                 saveState === "saved"
                   ? "bg-emerald-600 text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               }`}
             >
-              {saveState === "saving" && "Saving..."}
-              {saveState === "saved" && "✓ Saved — Redirecting..."}
+              {saveState === "saving" && "Saving…"}
+              {saveState === "saved" && "Saved — Redirecting…"}
               {(saveState === "idle" || saveState === "error") &&
-                (mode === "update" ? "💾 Save Adjustments" : "🚀 Final Submit & Archive")}
+                (mode === "update" ? "Save Adjustments" : "Final Submit & Archive")}
             </button>
           </div>
         )}
 
         {isReadOnly && (
-          <div className="mt-12 mx-auto max-w-md text-center bg-slate-800 text-white px-6 py-4 rounded-xl shadow-sm">
-            <span className="font-bold uppercase tracking-widest text-sm">
-              🔒 Read-Only View
+          <div className="mt-12 mx-auto max-w-md text-center bg-slate-100 border border-slate-200 px-6 py-4 rounded-xl">
+            <span className="font-semibold text-slate-500 text-sm">
+              Read-only view
             </span>
           </div>
         )}
@@ -784,14 +784,14 @@ function PlanNewWeekGridContent() {
       {showAddEmployeeModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-sm flex flex-col gap-5">
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight text-center">
+            <h2 className="text-lg font-bold text-slate-800 text-center">
               Add Employee
             </h2>
-            <div className="text-xs text-slate-500 text-center font-bold uppercase tracking-widest bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-              Branch: {branch}
+            <div className="text-xs text-slate-500 text-center font-medium bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+              Branch: <span className="font-semibold text-slate-700">{branch}</span>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black uppercase text-slate-500">Full Name</label>
+              <label className="text-xs font-semibold text-slate-600">Full Name</label>
               <input
                 type="text"
                 value={newEmployeeName}
@@ -802,7 +802,7 @@ function PlanNewWeekGridContent() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black uppercase text-slate-500">Role</label>
+              <label className="text-xs font-semibold text-slate-600">Role</label>
               <select
                 value={newEmployeePosition}
                 onChange={e => setNewEmployeePosition(e.target.value)}
@@ -816,13 +816,13 @@ function PlanNewWeekGridContent() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAddEmployeeModal(false)}
-                className="flex-1 py-3 bg-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-300 uppercase tracking-widest text-sm transition-colors"
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setShowAddEmployeeModal(false)}
-                className="flex-1 py-3 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 uppercase tracking-widest text-sm transition-colors"
+                className="flex-1 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 text-sm transition-colors"
               >
                 Add
               </button>

@@ -50,12 +50,12 @@ export default function CrmDashboard() {
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">CRM</span>
+          <span className="text-slate-900 font-medium">CNS</span>
         </nav>
 
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-            Customer Relationship Management
+            Client Nexus System
           </h1>
         </header>
 

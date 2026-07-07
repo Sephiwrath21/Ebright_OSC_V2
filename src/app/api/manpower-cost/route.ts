@@ -12,8 +12,13 @@ import {
 // Executive rate is fixed for all PT staff. Mirrors the old project.
 const EXECUTIVE_RATE = 11;
 
-// Positions to exclude from the cost report entirely.
-const EXCLUDE_POSITION_KEYWORDS = ["BRANCH MANAGER", "INTERN"];
+// The report is coach-pay only — everything that isn't a PT/FT Coach
+// (BM, CEO, HOD, EXEC, INTERN, ...) must never end up in it. A deny-list of
+// exclusion keywords drifts out of sync with actual position strings (e.g.
+// branch managers are stored as "BM", not "BRANCH MANAGER"), so require the
+// position to actually say "COACH" instead of trying to exclude everything
+// that isn't one.
+const COACH_POSITION_KEYWORD = "COACH";
 
 interface DailyHour {
   day: string;
@@ -26,6 +31,7 @@ interface DailyHour {
 
 interface StaffResult {
   name: string;
+  nickName: string | null;
   employeeId: string | null;
   branch: string;
   position: string | null;
@@ -230,13 +236,23 @@ export async function GET(req: Request) {
     // typically the nickname).
     interface EmpInfo {
       displayName: string; // full_name, always
+      nickName: string | null;
       employeeId: string | null;
       branch: string;
       position: string | null;
       employmentType: string | null;
       rate: number | null;
     }
-    const empByName = new Map<string, EmpInfo>();
+    // Multiple employees can share a nickname or even a full name, so each key
+    // maps to a LIST of candidates rather than a single record. Blindly
+    // overwriting on collision (previous behaviour) silently merged one
+    // employee's hours into an unrelated namesake's row.
+    const empByName = new Map<string, EmpInfo[]>();
+    const addCandidate = (key: string, info: EmpInfo) => {
+      const list = empByName.get(key);
+      if (list) list.push(info);
+      else empByName.set(key, [info]);
+    };
     employees.forEach(u => {
       const emp = u.employment[0];
       if (!emp?.branch?.branch_name) return;
@@ -246,17 +262,30 @@ export async function GET(req: Request) {
       const rateNum = emp.rate ? Number(emp.rate) : null;
       const info: EmpInfo = {
         displayName: fullName || nickName || "",
+        nickName: nickName || null,
         employeeId: emp.employee_id ?? null,
         branch: emp.branch.branch_name,
         position: emp.position ?? null,
         employmentType: emp.employment_type ?? null,
         rate: rateNum && !Number.isNaN(rateNum) ? rateNum : null,
       };
-      if (fullName) empByName.set(fullName.toLowerCase(), info);
+      if (fullName) addCandidate(fullName.toLowerCase(), info);
       if (nickName && nickName.toLowerCase() !== fullName?.toLowerCase()) {
-        empByName.set(nickName.toLowerCase(), info);
+        addCandidate(nickName.toLowerCase(), info);
       }
     });
+    // Resolve a schedule selection name to a single employee, disambiguating
+    // collisions by preferring whichever candidate's home branch matches the
+    // branch the schedule itself belongs to (dropdown picks are branch-scoped).
+    function resolveEmployee(name: string, scheduleBranch: string): EmpInfo | undefined {
+      const candidates = empByName.get(name.toLowerCase());
+      if (!candidates || candidates.length === 0) return undefined;
+      if (candidates.length === 1) return candidates[0];
+      const branchLc = scheduleBranch.toLowerCase();
+      return (
+        candidates.find(c => c.branch.toLowerCase() === branchLc) ?? candidates[0]
+      );
+    }
 
     // 3. Walk every schedule, compute hours per employee per day
     const aggregated = new Map<string, StaffResult>();
@@ -282,13 +311,14 @@ export async function GET(req: Request) {
         const filteredExec = daysInMonth.reduce((s, d) => s + d.execHrs, 0);
 
         // Resolve employee from selection name
-        const info = empByName.get(name.toLowerCase());
+        const info = resolveEmployee(name, branchName);
         const homeBranch = info?.branch ?? branchName;
         const key = `${(info?.displayName ?? name).toLowerCase()}:::${homeBranch.toLowerCase()}`;
 
         if (!aggregated.has(key)) {
           aggregated.set(key, {
             name: info?.displayName ?? name,
+            nickName: info?.nickName ?? null,
             employeeId: info?.employeeId ?? null,
             branch: homeBranch,
             position: info?.position ?? null,
@@ -320,12 +350,13 @@ export async function GET(req: Request) {
       });
     });
 
-    // 4. Filter out excluded positions (BMs, interns, training)
+    // 4. Keep only PT/FT Coach positions (drops BM, CEO, HOD, EXEC, INTERN,
+    //    unmatched/blank positions, and training rows).
     const allResults: StaffResult[] = [];
     aggregated.forEach(r => {
       const pos = (r.position ?? "").toUpperCase();
       const name = r.name.toUpperCase();
-      if (EXCLUDE_POSITION_KEYWORDS.some(k => pos.includes(k))) return;
+      if (!pos.includes(COACH_POSITION_KEYWORD)) return;
       if (name.includes("(TRAINING)")) return;
       allResults.push(r);
     });

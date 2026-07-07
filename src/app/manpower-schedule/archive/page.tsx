@@ -141,21 +141,9 @@ function ArchiveOverviewContent() {
         </nav>
 
         {/* Page heading */}
-        <header className="mb-8 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-sky-100 flex items-center justify-center shrink-0">
-            <ArchiveIcon className="w-6 h-6 text-sky-600" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-600 mb-1">
-              Manpower
-            </p>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              Archive Overview
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-              Browse historical schedules and past rosters.
-            </p>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">Archive Overview</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Browse historical schedules and past rosters.</p>
         </header>
 
         {/* Branch filter */}

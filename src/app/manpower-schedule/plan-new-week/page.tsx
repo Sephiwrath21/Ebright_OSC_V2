@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CheckCircle2,
   Home,
-  CalendarPlus,
   Building2,
   CalendarDays,
 } from "lucide-react";
@@ -60,14 +59,21 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
+// Local timezone ISO date string (avoids UTC-offset shift on toISOString)
+function toLocalISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // ─── WeekPicker ───────────────────────────────────────────────────────────────
 
 interface WeekPickerProps {
   selectedMonday: Date | null;
   onSelect: (monday: Date) => void;
+  /** ISO Monday → status map for weeks that already have a schedule */
+  scheduledWeeks?: Record<string, string>;
 }
 
-function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
+function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPickerProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -80,7 +86,6 @@ function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
     ? new Date(hoveredMonday.getTime() + 6 * 86_400_000)
     : null;
 
-  // Build calendar grid
   const firstDay = new Date(viewYear, viewMonth, 1);
   const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -90,10 +95,7 @@ function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
   const cells: Cell[] = [];
 
   for (let i = startOffset - 1; i >= 0; i--) {
-    cells.push({
-      date: new Date(viewYear, viewMonth - 1, daysInPrevMonth - i),
-      current: false,
-    });
+    cells.push({ date: new Date(viewYear, viewMonth - 1, daysInPrevMonth - i), current: false });
   }
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ date: new Date(viewYear, viewMonth, d), current: true });
@@ -105,11 +107,8 @@ function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
     });
   }
 
-  // Rows
   const rows: Cell[][] = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    rows.push(cells.slice(i, i + 7));
-  }
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -120,37 +119,22 @@ function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
     else setViewMonth(m => m + 1);
   }
 
-  function handleDayClick(date: Date) {
-    onSelect(getMondayOfWeek(date));
-  }
+  function handleDayClick(date: Date) { onSelect(getMondayOfWeek(date)); }
 
   function getDigitClasses(cell: Cell, inSelectedWeek: boolean): string {
     const { date, current } = cell;
     const isToday = isSameDay(date, today);
-    let cls = "relative z-10 w-9 h-9 inline-flex items-center justify-center text-sm rounded-full transition-colors pointer-events-none ";
-    if (!current) {
-      cls += "text-slate-300";
-    } else if (inSelectedWeek) {
-      cls += "text-white font-semibold";
-    } else if (isToday) {
-      cls += "text-blue-600 font-semibold underline";
-    } else {
-      cls += "text-slate-700";
-    }
+    let cls = "relative z-10 w-8 h-8 inline-flex items-center justify-center text-sm rounded-full transition-colors pointer-events-none ";
+    if (!current) cls += "text-slate-300";
+    else if (inSelectedWeek) cls += "text-white font-semibold";
+    else if (isToday) cls += "text-indigo-600 font-semibold underline";
+    else cls += "text-slate-700";
     return cls;
   }
 
-  // For a given row, return [startCol, endCol] of the selected (or hovered)
-  // week intersected with that row, or null if none. Used to position the
-  // pill as a single element spanning grid columns.
-  function rangeInRow(
-    row: Cell[],
-    rangeStart: Date | null,
-    rangeEnd: Date | null,
-  ): { startCol: number; endCol: number } | null {
+  function rangeInRow(row: Cell[], rangeStart: Date | null, rangeEnd: Date | null) {
     if (!rangeStart || !rangeEnd) return null;
-    let startCol = -1;
-    let endCol = -1;
+    let startCol = -1, endCol = -1;
     for (let i = 0; i < row.length; i++) {
       const d = row[i].date;
       if (d >= rangeStart && d <= rangeEnd) {
@@ -161,152 +145,127 @@ function WeekPicker({ selectedMonday, onSelect }: WeekPickerProps) {
     return startCol === -1 ? null : { startCol, endCol };
   }
 
-  // Year options
   const curYear = today.getFullYear();
   const yearOptions = Array.from({ length: 7 }, (_, i) => curYear - 3 + i);
 
+  const hasAnySchedule = Object.keys(scheduledWeeks).length > 0;
+
   return (
-    <div className="w-full max-w-sm mx-auto">
-      {/* Date range inputs */}
-      <div className="flex gap-2 mb-5">
-        <div
-          className={`flex-1 text-center text-sm py-2.5 px-3 rounded-lg border transition-colors ${
-            selectedMonday
-              ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
-              : "border-slate-200 text-slate-400 bg-white"
-          }`}
-        >
+    <div className="w-full">
+      {/* Date range display */}
+      <div className="flex gap-2 mb-3">
+        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedMonday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
           {selectedMonday ? formatDate(selectedMonday) : "Start date"}
         </div>
-        <div
-          className={`flex-1 text-center text-sm py-2.5 px-3 rounded-lg border transition-colors ${
-            selectedSunday
-              ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
-              : "border-slate-200 text-slate-400 bg-white"
-          }`}
-        >
+        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedSunday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
           {selectedSunday ? formatDate(selectedSunday) : "End date"}
         </div>
       </div>
 
-      {/* Month / Year navigation */}
-      <div className="flex items-center justify-between mb-1">
-        <button
-          onClick={prevMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
-          aria-label="Previous month"
-        >
-          <ChevronLeft className="w-4 h-4" />
+      {/* Month/Year nav */}
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Previous month">
+          <ChevronLeft className="w-3.5 h-3.5" />
         </button>
-
-        <div className="flex gap-2">
-          <select
-            value={viewMonth}
-            onChange={e => setViewMonth(Number(e.target.value))}
-            className="text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
-            ))}
+        <div className="flex gap-1.5">
+          <select value={viewMonth} onChange={e => setViewMonth(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select
-            value={viewYear}
-            onChange={e => setViewYear(Number(e.target.value))}
-            className="text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {yearOptions.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+          <select value={viewYear} onChange={e => setViewYear(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-
-        <button
-          onClick={nextMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
-          aria-label="Next month"
-        >
-          <ChevronRight className="w-4 h-4" />
+        <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Next month">
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Month label */}
-      <p className="text-xs text-slate-400 mb-3 pl-1">
-        {MONTHS[viewMonth].slice(0, 3)} {viewYear}
-      </p>
+      {/* Day-of-week header */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS_SHORT.map(d => (
+          <div key={d} className="text-center text-[10px] font-medium text-slate-400">{d}</div>
+        ))}
+      </div>
 
-      {/* Calendar grid */}
-      <div className="w-full">
-        {/* Day-of-week header */}
-        <div className="grid grid-cols-7 mb-2">
-          {DAYS_SHORT.map(d => (
+      {/* Week rows */}
+      <div onMouseLeave={() => setHoveredMonday(null)}>
+        {rows.map((row, rIdx) => {
+          const rowMondayISO = toLocalISO(row[0].date);
+          const rowStatus = scheduledWeeks[rowMondayISO];
+          const selRange = rangeInRow(row, selectedMonday, selectedSunday);
+          const hovRange = rangeInRow(row, hoveredMonday, hoveredSunday);
+          const showHover = !selRange && !!hovRange;
+
+          return (
             <div
-              key={d}
-              className="text-center text-xs font-medium text-slate-400"
+              key={rIdx}
+              className={`relative grid grid-cols-7 h-8 rounded-sm ${
+                rowStatus === "Finalized"
+                  ? "bg-emerald-50/70"
+                  : rowStatus === "Updated"
+                  ? "bg-amber-50/70"
+                  : ""
+              }`}
             >
-              {d}
+              {/* Selected week pill */}
+              {selRange && (
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 h-7 bg-indigo-600 rounded-full pointer-events-none z-0"
+                  style={{
+                    left:  `${(selRange.startCol / 7) * 100}%`,
+                    right: `${((6 - selRange.endCol) / 7) * 100}%`,
+                  }}
+                />
+              )}
+              {/* Hover outline pill */}
+              {showHover && hovRange && (
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 h-7 border-2 border-indigo-400 rounded-full pointer-events-none z-0"
+                  style={{
+                    left:  `${(hovRange.startCol / 7) * 100}%`,
+                    right: `${((6 - hovRange.endCol) / 7) * 100}%`,
+                  }}
+                />
+              )}
+              {/* Status dot — right edge of row, hidden when this week is selected */}
+              {rowStatus && !selRange && (
+                <div className="absolute right-0.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                  <div className={`w-1.5 h-1.5 rounded-full ${rowStatus === "Finalized" ? "bg-emerald-500" : "bg-amber-400"}`} />
+                </div>
+              )}
+              {/* Day cells */}
+              {row.map((cell, cIdx) => {
+                const inSelectedWeek = !!selRange && cIdx >= selRange.startCol && cIdx <= selRange.endCol;
+                return (
+                  <div
+                    key={cIdx}
+                    className="relative flex items-center justify-center cursor-pointer"
+                    onMouseEnter={() => setHoveredMonday(getMondayOfWeek(cell.date))}
+                    onClick={() => handleDayClick(cell.date)}
+                  >
+                    <span className={getDigitClasses(cell, inSelectedWeek)}>{cell.date.getDate()}</span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-
-        {/* Week rows */}
-        <div onMouseLeave={() => setHoveredMonday(null)}>
-          {rows.map((row, rIdx) => {
-            const selRange = rangeInRow(row, selectedMonday, selectedSunday);
-            const hovRange = rangeInRow(row, hoveredMonday, hoveredSunday);
-            // Selected week takes precedence over hover.
-            const showHover = !selRange && !!hovRange;
-
-            return (
-              <div
-                key={rIdx}
-                className="relative grid grid-cols-7 h-10"
-              >
-                {/* Selected pill — single element spanning the matching columns */}
-                {selRange && (
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 h-9 bg-blue-600 rounded-full pointer-events-none z-0"
-                    style={{
-                      left:  `${(selRange.startCol / 7) * 100}%`,
-                      right: `${((6 - selRange.endCol) / 7) * 100}%`,
-                    }}
-                  />
-                )}
-
-                {/* Hover outline pill */}
-                {showHover && hovRange && (
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 h-9 border-2 border-blue-400 rounded-full pointer-events-none z-0"
-                    style={{
-                      left:  `${(hovRange.startCol / 7) * 100}%`,
-                      right: `${((6 - hovRange.endCol) / 7) * 100}%`,
-                    }}
-                  />
-                )}
-
-                {/* Day cells — clickable, cursor-pointer over the whole cell */}
-                {row.map((cell, cIdx) => {
-                  const inSelectedWeek =
-                    !!selRange &&
-                    cIdx >= selRange.startCol &&
-                    cIdx <= selRange.endCol;
-                  return (
-                    <div
-                      key={cIdx}
-                      className="relative flex items-center justify-center cursor-pointer"
-                      onMouseEnter={() => setHoveredMonday(getMondayOfWeek(cell.date))}
-                      onClick={() => handleDayClick(cell.date)}
-                    >
-                      <span className={getDigitClasses(cell, inSelectedWeek)}>
-                        {cell.date.getDate()}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
+
+      {/* Legend — only shown when branch has any schedules */}
+      {hasAnySchedule && (
+        <div className="mt-2.5 flex items-center gap-3 pt-2 border-t border-slate-100">
+          <span className="text-[10px] text-slate-400 font-medium">Schedule:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-medium text-slate-500">Finalized</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-[10px] font-medium text-slate-500">Updated</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -330,12 +289,13 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   const [selectedMonday, setSelectedMonday] = useState<Date | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
+  // Existing schedules for the selected branch: ISO Monday → status
+  const [scheduledWeeks, setScheduledWeeks] = useState<Record<string, string>>({});
+
   const selectedSunday = selectedMonday
     ? new Date(selectedMonday.getTime() + 6 * 86_400_000)
     : null;
 
-  // Derive distinct regions and the branch list filtered by region.
-  // Branches without a region land in an "Other" bucket so they remain pickable.
   const OTHER_REGION = "Other";
   const regions = Array.from(
     new Set(branches.map(b => b.region?.trim() || OTHER_REGION))
@@ -344,6 +304,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
     ? branches.filter(b => (b.region?.trim() || OTHER_REGION) === selectedRegion)
     : [];
 
+  // Load branches
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -353,8 +314,6 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
         const data: Branch[] = await res.json();
         if (cancelled) return;
         setBranches(data);
-        // Non-admin users get the first available branch auto-selected so
-        // step 2 isn't gated for them.
         if (!isAdmin && data.length > 0) {
           const first = data[0];
           setSelectedRegion(first.region?.trim() || OTHER_REGION);
@@ -367,10 +326,31 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
         if (!cancelled) setBranchesLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isAdmin]);
+
+  // Load existing schedule indicators when branch changes
+  useEffect(() => {
+    if (!selectedBranch) { setScheduledWeeks({}); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/schedules");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.schedules)) return;
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        (data.schedules as { branch: string; startDate: string; status?: string }[]).forEach(s => {
+          if (s.branch === selectedBranch.branch_name) {
+            map[s.startDate] = s.status ?? "Finalized";
+          }
+        });
+        setScheduledWeeks(map);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [selectedBranch]);
 
   function handleRegionChange(value: string) {
     setSelectedRegion(value);
@@ -395,8 +375,8 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   function handleConfirm() {
     if (!selectedBranch || !selectedMonday || !selectedSunday) return;
     setConfirmed(true);
-    const startISO = selectedMonday.toISOString().slice(0, 10);
-    const endISO   = selectedSunday.toISOString().slice(0, 10);
+    const startISO = toLocalISO(selectedMonday);
+    const endISO   = toLocalISO(selectedSunday);
     const params = new URLSearchParams({
       branch: selectedBranch.branch_name,
       branch_id: String(selectedBranch.branch_id),
@@ -406,218 +386,203 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
     router.push(`/manpower-schedule/plan-new-week/grid?${params.toString()}`);
   }
 
+  const selectedWeekStatus = selectedMonday ? scheduledWeeks[toLocalISO(selectedMonday)] : null;
+
+  const selectCls =
+    "w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-white " +
+    "focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors " +
+    "appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400";
+  const selectStyle = {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: "no-repeat" as const,
+    backgroundPosition: "right 10px center" as const,
+    paddingRight: "32px",
+  };
+
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
+      <div className="max-w-7xl mx-auto px-6 pt-4 pb-6">
         {/* Breadcrumb */}
-        <nav
-          aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500 mb-6"
-        >
-          <Link
-            href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors"
-          >
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-5">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link
-            href="/dashboards/hrms"
-            className="hover:text-slate-900 transition-colors"
-          >
-            HRMS
-          </Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link
-            href="/manpower-schedule"
-            className="hover:text-slate-900 transition-colors"
-          >
-            Manpower Planning
-          </Link>
+          <Link href="/manpower-schedule" className="hover:text-slate-900 transition-colors">Manpower Planning</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <span className="text-slate-900 font-medium">Plan New Week</span>
         </nav>
 
-        {/* Page heading — left-aligned like other pages */}
-        <header className="mb-8 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0">
-            <CalendarPlus className="w-6 h-6 text-emerald-600" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600 mb-1">
-              Manpower
-            </p>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              Plan New Week
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
+        <div className="max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          {/* ── Title header spanning both columns ── */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h1 className="text-xl font-bold text-slate-900">Plan New Week</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
               Pick a branch and the upcoming week to build the new manpower roster.
             </p>
           </div>
-        </header>
 
-        {/* Centered card */}
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-
-        {/* ── Step 1: Branch ── */}
-        <div className="p-6 md:p-8">
-          <div className="flex items-start gap-4 mb-5">
-            <span className="w-9 h-9 rounded-full bg-blue-600 text-white text-sm font-semibold inline-flex items-center justify-center shrink-0 ring-4 ring-blue-100">
-              1
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-slate-500" aria-hidden="true" />
-                <p className="text-sm font-semibold text-slate-900">Select branch</p>
+          {/* ── 2-column content ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+          {/* ── Step 1: Branch ── */}
+          <div>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-semibold inline-flex items-center justify-center shrink-0">1</span>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900">Select branch</p>
+                </div>
+                <p className="text-xs text-slate-500">Choose the branch to plan manpower for</p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Choose the branch you want to plan manpower for
-              </p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Region */}
-            <select
-              value={selectedRegion}
-              onChange={e => handleRegionChange(e.target.value)}
-              disabled={branchesLoading || !!branchesError}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 12px center",
-                paddingRight: "36px",
-              }}
-            >
-              <option value="">
-                {branchesLoading
-                  ? "Loading..."
-                  : branchesError
-                  ? "Failed to load"
-                  : "Region"}
-              </option>
-              {regions.map(r => (
-                <option key={r} value={r}>
-                  {r}
+            <div className="p-5 space-y-2.5">
+              <select
+                value={selectedRegion}
+                onChange={e => handleRegionChange(e.target.value)}
+                disabled={branchesLoading || !!branchesError}
+                className={selectCls}
+                style={selectStyle}
+              >
+                <option value="">
+                  {branchesLoading ? "Loading…" : branchesError ? "Failed to load" : "Region"}
                 </option>
-              ))}
-            </select>
+                {regions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
 
-            {/* Branch */}
-            <select
-              value={selectedBranch?.branch_id ?? ""}
-              onChange={e => handleBranchChange(e.target.value)}
-              disabled={
-                branchesLoading || !!branchesError || !selectedRegion
-              }
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 12px center",
-                paddingRight: "36px",
-              }}
-            >
-              <option value="">
-                {selectedRegion ? "Branch" : "Pick region first"}
-              </option>
-              {filteredBranches.map(b => (
-                <option key={b.branch_id} value={b.branch_id}>
-                  {b.branch_name}
-                  {b.location ? ` — ${b.location}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+              <select
+                value={selectedBranch?.branch_id ?? ""}
+                onChange={e => handleBranchChange(e.target.value)}
+                disabled={branchesLoading || !!branchesError || !selectedRegion}
+                className={selectCls}
+                style={selectStyle}
+              >
+                <option value="">{selectedRegion ? "Branch" : "Pick region first"}</option>
+                {filteredBranches.map(b => (
+                  <option key={b.branch_id} value={b.branch_id}>
+                    {b.branch_name}{b.location ? ` — ${b.location}` : ""}
+                  </option>
+                ))}
+              </select>
 
-          {branchesError && (
-            <p className="mt-2 text-xs text-rose-600">{branchesError}</p>
-          )}
+              {branchesError && <p className="text-xs text-rose-600">{branchesError}</p>}
 
-          {selectedBranch && (
-            <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-              <span className="text-xs text-blue-700">
-                {selectedBranch.region
-                  ? `Region ${selectedBranch.region} - `
-                  : ""}
-                {selectedBranch.branch_name} ({selectedBranch.staff_count}{" "}
-                {selectedBranch.staff_count === 1 ? "staff" : "staffs"})
-              </span>
-            </div>
-          )}
-        </div>
+              {selectedBranch ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
+                  <span className="text-xs text-indigo-700">
+                    {selectedBranch.region ? `Region ${selectedBranch.region} · ` : ""}
+                    <span className="font-semibold">{selectedBranch.branch_name}</span>
+                    {" "}· {selectedBranch.staff_count}{" "}
+                    {selectedBranch.staff_count === 1 ? "staff" : "staffs"}
+                  </span>
+                </div>
+              ) : (
+                <div className="h-9 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                  <p className="text-xs text-slate-400">No branch selected</p>
+                </div>
+              )}
 
-        <div className="border-t border-slate-100" />
-
-        {/* ── Step 2: Week ── */}
-        <div
-          className={`p-6 md:p-8 bg-slate-50/50 transition-opacity duration-200 ${
-            selectedBranch ? "opacity-100" : "opacity-40 pointer-events-none"
-          }`}
-        >
-          <div className="flex items-start gap-4 mb-6">
-            <span
-              className={`w-9 h-9 rounded-full text-white text-sm font-semibold inline-flex items-center justify-center shrink-0 ring-4 transition-colors ${
-                selectedBranch
-                  ? "bg-blue-600 ring-blue-100"
-                  : "bg-slate-300 ring-slate-100"
-              }`}
-            >
-              2
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-slate-500" aria-hidden="true" />
-                <p className="text-sm font-semibold text-slate-900">Select a week</p>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Click any day — the full Mon – Sun week will be highlighted
-              </p>
+              {/* Schedule summary for selected branch */}
+              {selectedBranch && Object.keys(scheduledWeeks).length > 0 && (
+                <div className="pt-1 flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-medium text-slate-400">Existing:</span>
+                  {Object.entries(scheduledWeeks)
+                    .sort(([a], [b]) => b.localeCompare(a))
+                    .slice(0, 3)
+                    .map(([date, status]) => (
+                      <span
+                        key={date}
+                        className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          status === "Finalized"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        <span className={`w-1 h-1 rounded-full inline-block ${status === "Finalized" ? "bg-emerald-500" : "bg-amber-400"}`} />
+                        {date.slice(5)} {/* MM-DD */}
+                      </span>
+                    ))}
+                  {Object.keys(scheduledWeeks).length > 3 && (
+                    <span className="text-[10px] text-slate-400">+{Object.keys(scheduledWeeks).length - 3} more</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          <WeekPicker
-            selectedMonday={selectedMonday}
-            onSelect={handleWeekSelect}
-          />
-
-          {/* Confirm button */}
-          <button
-            onClick={handleConfirm}
-            disabled={!selectedMonday}
-            className={`mt-6 block w-full py-4 rounded-full text-sm font-semibold uppercase tracking-wider transition-colors ${
-              selectedMonday
-                ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm"
-                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+          {/* ── Step 2: Week ── */}
+          <div
+            className={`transition-opacity duration-200 ${
+              selectedBranch ? "opacity-100" : "opacity-40 pointer-events-none"
             }`}
           >
-            {selectedMonday && selectedSunday
-              ? `Confirm week: ${formatDate(selectedMonday)} – ${formatDate(selectedSunday)}`
-              : "Select a week to continue"}
-          </button>
-        </div>
-      </div>
-
-          {/* Confirmed banner */}
-          {confirmed && selectedBranch && selectedMonday && selectedSunday && (
-            <div className="mt-5 flex items-center gap-3 px-4 py-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+              <span className={`w-6 h-6 rounded-full text-white text-xs font-semibold inline-flex items-center justify-center shrink-0 transition-colors ${selectedBranch ? "bg-indigo-600" : "bg-slate-300"}`}>2</span>
               <div>
-                <p className="text-sm font-medium text-emerald-800">
-                  Planning new week for{" "}
-                  <span className="font-semibold">{selectedBranch.branch_name}</span>
-                </p>
-                <p className="text-xs text-emerald-700 mt-0.5">
-                  {formatDate(selectedMonday)} – {formatDate(selectedSunday)}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900">Select a week</p>
+                </div>
+                <p className="text-xs text-slate-500">Click any day — the full Mon–Sun week is selected</p>
               </div>
             </div>
-          )}
+
+            <div className="p-5">
+              <WeekPicker
+                selectedMonday={selectedMonday}
+                onSelect={handleWeekSelect}
+                scheduledWeeks={scheduledWeeks}
+              />
+
+              {/* Re-plan warning */}
+              {selectedWeekStatus && (
+                <div className={`mt-2.5 flex items-start gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                  selectedWeekStatus === "Finalized"
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                    : "bg-amber-50 border border-amber-200 text-amber-700"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${selectedWeekStatus === "Finalized" ? "bg-emerald-500" : "bg-amber-400"}`} />
+                  <span>
+                    This week already has a <strong>{selectedWeekStatus}</strong> schedule.
+                    Continuing will let you update it.
+                  </span>
+                </div>
+              )}
+
+              <button
+                onClick={handleConfirm}
+                disabled={!selectedMonday}
+                className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  selectedMonday
+                    ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                }`}
+              >
+                {selectedMonday && selectedSunday
+                  ? `Continue: ${formatDate(selectedMonday)} – ${formatDate(selectedSunday)}`
+                  : "Select a week to continue"}
+              </button>
+            </div>
+          </div>
         </div>
+        </div>
+
+        {/* Confirmed banner */}
+        {confirmed && selectedBranch && selectedMonday && selectedSunday && (
+          <div className="mt-4 max-w-5xl flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <p className="text-sm font-medium text-emerald-800">
+              Planning new week for{" "}
+              <span className="font-semibold">{selectedBranch.branch_name}</span>
+              <span className="font-normal text-emerald-700"> · {formatDate(selectedMonday)} – {formatDate(selectedSunday)}</span>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -636,8 +601,8 @@ export default function PlanNewWeekPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
-          Loading...
+        <div className="flex items-center justify-center h-full text-indigo-600 font-semibold text-lg">
+          Loading…
         </div>
       </AppShell>
     );

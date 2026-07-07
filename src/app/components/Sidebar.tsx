@@ -59,12 +59,34 @@ const primaryNav: NavItem[] = [
     ],
   },
   {
-    name: "CRM",
+    name: "CNS",
+    href: "/dashboards/crm",
     Icon: Newspaper,
     children: [
-      { name: "Overview", href: "/dashboards/crm" },
-      { name: "Lead", href: "/crm/lead" },
-      { name: "Ticket", href: "/crm/ticket" },
+      {
+        name: "Lead",
+        children: [
+          { name: "Dashboard", href: "/crm/dashboard", exact: true },
+          { name: "Contacts", href: "/crm/contacts" },
+          { name: "Opportunities", href: "/crm/opportunities" },
+          { name: "Forms", href: "/crm/forms" },
+          { name: "Branches", href: "/crm/branches" },
+          { name: "Region", href: "/crm/region" },
+          { name: "Automations", href: "/crm/automations" },
+          { name: "Analytics", href: "/crm/analytics" },
+          { name: "Integrations", href: "/crm/integrations" },
+        ],
+      },
+      {
+        name: "Ticket",
+        children: [
+          { name: "Dashboard", href: "/crm/ticket/dashboard", exact: true },
+          { name: "Opportunities", href: "/crm/ticket/opportunities" },
+          { name: "My Tickets", href: "/crm/ticket/my-tickets" },
+          { name: "New Ticket", href: "/crm/ticket/new" },
+          { name: "Platforms", href: "/crm/ticket/platforms" },
+        ],
+      },
     ],
   },
   { name: "SMS", href: "/dashboards/sms", Icon: BookUser },
