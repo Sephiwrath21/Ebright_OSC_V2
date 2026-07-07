@@ -75,6 +75,13 @@ jobs:
             echo "--- Tip of source (templates.ts first 25 lines): ---"
             head -25 src/app/induction/templates.ts || true
 
+            # Ensure remote .env has ClickUp configuration
+            touch .env
+            sed -i '/^CLICKUP_API_TOKEN=/d' .env || true
+            sed -i '/^CLICKUP_TEAM_ID=/d' .env || true
+            echo "CLICKUP_API_TOKEN=pk_3667618_5NI4BGVS2CJIWLEZ33AHOL4LBPC417FX" >> .env
+            echo "CLICKUP_TEAM_ID=3631897" >> .env
+
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on
             # the small deploy host runs out of memory / time and fails the
