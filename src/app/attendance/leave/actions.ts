@@ -84,6 +84,14 @@ export async function submitLeaveRequest(
     return { ok: false, error: "End date cannot be before start date." };
   }
   
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDay = new Date(startDate);
+  startDay.setHours(0, 0, 0, 0);
+  if (startDay < today) {
+    return { ok: false, error: "Leave cannot start on a past date." };
+  }
+
   
   const halfDay = s(formData, "half_day") === "1";
   if (halfDay && startStr !== endStr) {
