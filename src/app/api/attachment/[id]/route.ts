@@ -1,4 +1,4 @@
-﻿import { auth } from "@/auth";
+import { auth } from "@/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { streamFromDrive, mimeForName } from "@/lib/drive";
@@ -43,11 +43,21 @@ export async function GET(
 
   const [claim, leave] = await Promise.all([
     prisma.claim.findFirst({
-      where: { attachment: fileId },
+      where: {
+        OR: [
+          { attachment: fileId },
+          { attachment: { contains: fileId } },
+        ],
+      },
       select: { user_id: true },
     }),
     prisma.leave_request.findFirst({
-      where: { attachment: fileId },
+      where: {
+        OR: [
+          { attachment: fileId },
+          { attachment: { contains: fileId } },
+        ],
+      },
       select: { user_id: true },
     }),
   ]);
