@@ -104,9 +104,8 @@ jobs:
             echo "=== COMPOSE PS ===" >> ~/deploy.log
             docker compose ps >> ~/deploy.log 2>&1
             echo "=== NGINX PORTS ===" >> ~/deploy.log
-            docker exec nginx-proxy-manager grep -rn "staging-portal2.ebright.my" /etc/nginx/ >> ~/deploy.log 2>&1 || true
-            docker exec nginx-proxy-manager grep -rn "3003" /etc/nginx/ >> ~/deploy.log 2>&1 || true
-            docker exec nginx-proxy-manager grep -rn "3004" /etc/nginx/ >> ~/deploy.log 2>&1 || true
+            docker exec nginx-proxy-manager grep -rn "300" /data/nginx/proxy_host/ >> ~/deploy.log 2>&1 || true
+            docker exec nginx-proxy-manager ls -la /data/nginx/proxy_host/ >> ~/deploy.log 2>&1 || true
             echo "=== TAIL LOGS ===" >> ~/deploy.log
             docker compose logs --tail 100 osc >> ~/deploy.log 2>&1
 
