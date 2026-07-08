@@ -59,21 +59,24 @@ jobs:
             set -euo pipefail
             cd ~/Ebright_OSC_V2
 
-            echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ==="
-            echo "Branch: ${{ github.ref_name }}    Commit: ${{ github.sha }}"
+            echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ===" > ~/deploy.log 2>&1
+            echo "Branch: ${{ github.ref_name }}    Commit: ${{ github.sha }}" >> ~/deploy.log 2>&1
 
             # Stash any local drift so git checkout/pull never blocks
-            git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" 2>/dev/null || true
+            git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
             # Refresh refs and hard-sync local branch to remote
-            git fetch origin
-            git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}"
+            git fetch origin >> ~/deploy.log 2>&1
+            git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 
             # Diagnostic: confirm we actually have the latest commit on disk
-            echo "--- HEAD commit on server: ---"
-            git log --oneline -1
-            echo "--- Tip of source (templates.ts first 25 lines): ---"
-            head -25 src/app/induction/templates.ts || true
+            echo "--- HEAD commit on server: ---" >> ~/deploy.log 2>&1
+            git log --oneline -5 >> ~/deploy.log 2>&1
+            echo "--- Git Remote and Branches: ---" >> ~/deploy.log 2>&1
+            git remote -v >> ~/deploy.log 2>&1
+            git branch -a >> ~/deploy.log 2>&1
+            echo "--- Tip of source (templates.ts first 25 lines): ---" >> ~/deploy.log 2>&1
+            head -25 src/app/induction/templates.ts >> ~/deploy.log 2>&1 || true
 
             # Ensure remote .env has ClickUp configuration
             touch .env
@@ -96,7 +99,7 @@ jobs:
             # CI (~10min). If a deploy fails to pick up new code, SSH in and
             # run `docker compose build --no-cache osc` manually, then
             # `docker compose up -d --force-recreate`.
-            echo "--- Starting Docker Build ---" > ~/deploy.log 2>&1
+            echo "--- Starting Docker Build ---" >> ~/deploy.log 2>&1
             docker build --build-arg BUILD_DATE=$(date +%s) -t ebright-osc-v2:latest . >> ~/deploy.log 2>&1
             docker compose up -d --force-recreate >> ~/deploy.log 2>&1 || echo "Docker compose up failed" >> ~/deploy.log 2>&1
 
