@@ -166,6 +166,7 @@ export default function LeaveFormView({
   const [typeId, setTypeId] = useState<number | null>(null);
   const [startISO, setStartISO] = useState<string | null>(null);
   const [endISO, setEndISO] = useState<string | null>(null);
+  const [halfDay, setHalfDay] = useState(false);
   const [reason, setReason] = useState("");
   const [notifyManager, setNotifyManager] = useState(true);
   const [notifyTeam, setNotifyTeam] = useState(false);
@@ -193,6 +194,7 @@ export default function LeaveFormView({
     setTypeId(null);
     setStartISO(null);
     setEndISO(null);
+    setHalfDay(false);
     setReason("");
     setNotifyManager(true);
     setNotifyTeam(false);
@@ -209,6 +211,7 @@ export default function LeaveFormView({
     fd.append("leave_type_id", String(selectedType.id));
     fd.append("start_date", startISO);
     fd.append("end_date", endISO ?? startISO);
+    fd.append("half_day", halfDay ? "1" : "0");
     fd.append("reason", reason);
 
     startTransition(async () => {
@@ -217,7 +220,7 @@ export default function LeaveFormView({
         setErrorMsg(result.error ?? "Failed to submit leave request.");
         return;
       }
-      setSubmittedDays(result.totalDays ?? workingDays);
+      setSubmittedDays(result.totalDays ?? (halfDay ? 0.5 : workingDays));
       setSubmitted(true);
       router.refresh();
     });
@@ -272,9 +275,14 @@ export default function LeaveFormView({
             <Step2
               startISO={startISO}
               endISO={endISO}
+              halfDay={halfDay}
+              setHalfDay={setHalfDay}
               onChange={(s, e) => {
                 setStartISO(s);
                 setEndISO(e);
+                if (s && e && s !== e) {
+                  setHalfDay(false);
+                }
               }}
             />
           )}
@@ -294,6 +302,7 @@ export default function LeaveFormView({
               startISO={startISO}
               endISO={endISO}
               workingDays={workingDays}
+              halfDay={halfDay}
               reason={reason}
               notifyManager={notifyManager}
               notifyTeam={notifyTeam}
@@ -480,10 +489,14 @@ function Step1({
 function Step2({
   startISO,
   endISO,
+  halfDay,
+  setHalfDay,
   onChange,
 }: {
   startISO: string | null;
   endISO: string | null;
+  halfDay: boolean;
+  setHalfDay: (val: boolean) => void;
   onChange: (start: string | null, end: string | null) => void;
 }) {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
@@ -516,9 +529,11 @@ function Step2({
     }
   }
 
+  const showHalfDayToggle = startISO !== null && (endISO === null || endISO === startISO);
+  const days = halfDay ? 0.5 : workingDaysBetween(startISO ?? "", endISO ?? startISO ?? "");
   const summary = startISO
-    ? `${fmtFriendlyRange(startISO, endISO)} · ${workingDaysBetween(startISO, endISO ?? startISO)} working day${
-        workingDaysBetween(startISO, endISO ?? startISO) === 1 ? "" : "s"
+    ? `${fmtFriendlyRange(startISO, endISO)} · ${formatDays(days)} working day${
+        days === 1 ? "" : "s"
       }`
     : "Pick a start date to begin.";
 
@@ -545,6 +560,21 @@ function Step2({
           {summary}
         </span>
       </div>
+
+      {showHalfDayToggle && (
+        <div className="mt-3 max-w-sm mx-auto flex items-center gap-2.5 px-1">
+          <input
+            id="half-day-checkbox"
+            type="checkbox"
+            checked={halfDay}
+            onChange={(e) => setHalfDay(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+          />
+          <label htmlFor="half-day-checkbox" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+            Apply as half day leave (0.5 days)
+          </label>
+        </div>
+      )}
     </section>
   );
 }
@@ -752,6 +782,7 @@ function Step4({
   startISO,
   endISO,
   workingDays,
+  halfDay,
   reason,
   notifyManager,
   notifyTeam,
@@ -760,6 +791,7 @@ function Step4({
   startISO: string | null;
   endISO: string | null;
   workingDays: number;
+  halfDay: boolean;
   reason: string;
   notifyManager: boolean;
   notifyTeam: boolean;
@@ -772,6 +804,8 @@ function Step4({
         : notifyTeam
           ? "Team"
           : "No one";
+
+  const displayDays = halfDay ? 0.5 : workingDays;
 
   return (
     <section>
@@ -792,7 +826,7 @@ function Step4({
         />
         <ReviewRow
           label="Working days"
-          value={`${formatDays(workingDays)} day${workingDays === 1 ? "" : "s"}`}
+          value={`${formatDays(displayDays)} day${displayDays === 1 ? "" : "s"}`}
         />
         <ReviewRow label="Notify" value={notify} />
         <ReviewRow label="Reason" value={reason.trim() || "—"} />
