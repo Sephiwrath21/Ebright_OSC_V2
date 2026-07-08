@@ -645,6 +645,7 @@ function Calendar({
           if (d === null) return <div key={i} />;
           const iso = isoDate(d);
           const weekend = isWeekend(d);
+          const isPast = iso < today;
           const isStart = iso === startISO;
           const isEnd = iso === endISO;
           const inRange =
@@ -653,7 +654,7 @@ function Calendar({
 
           let cls =
             "aspect-square flex items-center justify-center text-xs rounded-md transition-colors select-none";
-          if (weekend) {
+          if (weekend || isPast) {
             cls += " text-slate-300 cursor-not-allowed bg-slate-50";
           } else if (isStart || isEnd) {
             cls += " bg-blue-600 text-white font-semibold";
@@ -668,7 +669,7 @@ function Calendar({
             <button
               key={i}
               type="button"
-              disabled={weekend}
+              disabled={weekend || isPast}
               onClick={() => onDayClick(d)}
               className={cls}
               aria-label={iso}
