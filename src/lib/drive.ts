@@ -7,7 +7,7 @@ let cachedClient: drive_v3.Drive | null = null;
 function getDriveClient(): drive_v3.Drive {
   if (cachedClient) return cachedClient;
 
-  const email = process.env.GOOGLE_DRIVE_SA_EMAIL?.replace(/^"|"$/g, "");
+  const email = process.env.GOOGLE_DRIVE_SA_EMAIL?.trim().replace(/^"|"$/g, "").trim();
   const rawKey = process.env.GOOGLE_DRIVE_SA_PRIVATE_KEY;
   if (!email || !rawKey) {
     throw new Error(
@@ -17,7 +17,7 @@ function getDriveClient(): drive_v3.Drive {
 
   const auth = new google.auth.JWT({
     email,
-    key: rawKey.replace(/^"|"$/g, "").replace(/\\n/g, "\n"),
+    key: rawKey.trim().replace(/^"|"$/g, "").trim().replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/drive.file"],
   });
 
@@ -26,7 +26,7 @@ function getDriveClient(): drive_v3.Drive {
 }
 
 function getFolderId(): string {
-  const id = process.env.GOOGLE_DRIVE_FOLDER_ID?.replace(/^"|"$/g, "");
+  const id = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim().replace(/^"|"$/g, "").trim();
   if (!id) throw new Error("GOOGLE_DRIVE_FOLDER_ID is not configured.");
   return id;
 }
