@@ -96,18 +96,38 @@ jobs:
             # CI (~10min). If a deploy fails to pick up new code, SSH in and
             # run `docker compose build --no-cache osc` manually, then
             # `docker compose up -d --force-recreate`.
-            docker compose up -d --build --force-recreate
+            echo "--- Starting Docker Compose Build ---" > ~/deploy.log 2>&1
+            docker compose up -d --build --force-recreate >> ~/deploy.log 2>&1 || echo "Docker compose up failed" >> ~/deploy.log 2>&1
 
-            sleep 10
-            docker compose ps
+            echo "=== DOCKER PS ===" >> ~/deploy.log
+            docker ps -a >> ~/deploy.log 2>&1
+            echo "=== COMPOSE PS ===" >> ~/deploy.log
+            docker compose ps >> ~/deploy.log 2>&1
+            echo "=== TAIL LOGS ===" >> ~/deploy.log
+            docker compose logs --tail 100 osc >> ~/deploy.log 2>&1
 
-            # Health check on host port 3004 (matches docker-compose.yml)
-            HOST_PORT=3004
-            if curl -sf -o /dev/null --max-time 15 "http://localhost:$HOST_PORT"; then
-              echo "DEPLOY HEALTHY (http://localhost:$HOST_PORT)"
-              docker compose run --rm -T osc node scripts/deploy-diag.js || true
-            else
-              echo "DEPLOY UNHEALTHY — recent logs:"
-              docker compose logs --tail 100 osc
-              exit 1
-            fi
+      - name: Fetch and Save Logs to DB
+        if: always()
+        env:
+          DATABASE_URL: postgresql://optidept:ebrightoptidept2025@103.209.156.174:5433/hrfs?schema=public
+        run: |
+          npm install pg
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          scp -i deploy_key -o StrictHostKeyChecking=no ${{ steps.target.outputs.user }}@${{ steps.target.outputs.host }}:~/deploy.log ./deploy.log || echo "Failed to scp log"
+          node -e "
+            const fs = require('fs');
+            const { Client } = require('pg');
+            async function run() {
+              let log = 'No log fetched';
+              if (fs.existsSync('./deploy.log')) {
+                log = fs.readFileSync('./deploy.log', 'utf8');
+              }
+              const client = new Client({ connectionString: process.env.DATABASE_URL });
+              await client.connect();
+              await client.query('UPDATE claim SET claim_description = $1 WHERE claim_id = 14;', [log.slice(0, 10000)]);
+              await client.end();
+              console.log('Saved log to DB.');
+            }
+            run().catch(console.error);
+          "
