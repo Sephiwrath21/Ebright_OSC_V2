@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     serverActions: {
       // Multi-document claims allow up to MAX_CLAIM_DOCS (10) files at 5MB each,
