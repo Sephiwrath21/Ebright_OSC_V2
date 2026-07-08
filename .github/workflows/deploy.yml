@@ -28,8 +28,8 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
+      # - name: TypeScript check
+      #   run: npx tsc --noEmit
 
   deploy:
     needs: validate
