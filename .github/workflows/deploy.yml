@@ -105,6 +105,7 @@ jobs:
             HOST_PORT=3004
             if curl -sf -o /dev/null --max-time 15 "http://localhost:$HOST_PORT"; then
               echo "DEPLOY HEALTHY (http://localhost:$HOST_PORT)"
+              docker compose run --rm -T osc node scripts/deploy-diag.js || true
             else
               echo "DEPLOY UNHEALTHY — recent logs:"
               docker compose logs --tail 100 osc
