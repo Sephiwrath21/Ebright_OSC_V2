@@ -115,19 +115,19 @@ jobs:
           echo "${{ secrets.SSH_DEPLOY_KEY }}" > deploy_key
           chmod 600 deploy_key
           scp -i deploy_key -o StrictHostKeyChecking=no ${{ steps.target.outputs.user }}@${{ steps.target.outputs.host }}:~/deploy.log ./deploy.log || echo "Failed to scp log"
-          node -e "
-            const fs = require('fs');
-            const { Client } = require('pg');
+          node -e '
+            const fs = require("fs");
+            const { Client } = require("pg");
             async function run() {
-              let log = 'No log fetched';
-              if (fs.existsSync('./deploy.log')) {
-                log = fs.readFileSync('./deploy.log', 'utf8');
+              let log = "No log fetched";
+              if (fs.existsSync("./deploy.log")) {
+                log = fs.readFileSync("./deploy.log", "utf8");
               }
               const client = new Client({ connectionString: process.env.DATABASE_URL });
               await client.connect();
-              await client.query('UPDATE claim SET claim_description = $1 WHERE claim_id = 14;', [log.slice(0, 10000)]);
+              await client.query("UPDATE claim SET claim_description = $1 WHERE claim_id = 14;", [log.slice(0, 10000)]);
               await client.end();
-              console.log('Saved log to DB.');
+              console.log("Saved log to DB.");
             }
             run().catch(console.error);
-          "
+          '
