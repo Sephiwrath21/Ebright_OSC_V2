@@ -14,6 +14,7 @@ COPY prisma ./prisma/
 RUN npx prisma generate
 
 # Source + build
+ARG BUILD_DATE
 COPY . .
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
