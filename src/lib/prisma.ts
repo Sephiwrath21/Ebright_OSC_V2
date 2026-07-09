@@ -30,7 +30,7 @@ function createClient() {
     // is for raw pg queries via @/lib/ebright-hrfs (hikvision_attendance_all,
     // LeaveTransaction, BranchStaff). Inverting the priority on Jun 23 to
     // unbreak staging login — see /attendance/summary investigation.
-    connectionString: process.env.HRFS_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL ?? process.env.HRFS_DATABASE_URL,
     options:
       "-c TimeZone=UTC " +
       "-c statement_timeout=60000 " +
