@@ -199,15 +199,141 @@ export async function GET(req: Request) {
     const monthStart = new Date(`${monthStartISO}T00:00:00Z`);
     const nextMonth = new Date(`${nextMonthISO}T00:00:00Z`);
 
-    // 1. Fetch schedules whose start_date falls within the requested month
-    const schedules = await prisma.manpower_schedule.findMany({
+    // 1. Fetch manpower schedules whose date falls within the requested month
+    const rows = await prisma.manpower_schedule.findMany({
       where: {
-        start_date: { gte: monthStart, lt: nextMonth },
-        status: "Finalized",
+        date: { gte: monthStart, lt: nextMonth },
       },
-      include: { branch: { select: { branch_name: true } } },
-      orderBy: { start_date: "asc" },
+      include: {
+        slot: {
+          include: {
+            branch_operating_day: {
+              include: {
+                branch: { select: { branch_name: true } },
+              },
+            },
+          },
+        },
+        branch_duty_position: true,
+        user_profile: true,
+      },
     });
+
+    const groups = new Map<string, {
+      branchName: string;
+      mondayISO: string;
+      sundayISO: string;
+      start_date: Date;
+      end_date: Date;
+      selections: Record<string, string>;
+      branch: { branch_name: string };
+    }>();
+
+    const DAYS_LIST = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    function parseSingleTime(t: string) {
+      const clean = t.toUpperCase().replace(/\s+/g, "");
+      const isPM = clean.includes("PM");
+      const timePart = clean.replace("AM", "").replace("PM", "");
+      const sep = timePart.includes(".") ? "." : ":";
+      const parts = timePart.split(sep);
+      if (parts.length === 0) return null;
+      let h = Number(parts[0]);
+      const m = parts.length > 1 ? Number(parts[1]) : 0;
+      if (isPM && h < 12) h += 12;
+      if (!isPM && h === 12) h = 0;
+      return { h, m };
+    }
+
+    function formatSlotTime(start: Date, end: Date): string {
+      const fmt = (d: Date) => {
+        const hours = d.getUTCHours();
+        const minutes = d.getUTCMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+        const displayMinutes = String(minutes).padStart(2, '0');
+        return `${displayHours}:${displayMinutes} ${ampm}`;
+      };
+      return `${fmt(start)} - ${fmt(end)}`;
+    }
+
+    function parseWireSlotTimeRange(wireSlot: string) {
+      const parts = wireSlot.split(/[-–—]/).map(s => s.trim());
+      if (parts.length !== 2) return null;
+      const start = parseSingleTime(parts[0]);
+      const end = parseSingleTime(parts[1]);
+      if (!start || !end) return null;
+      return {
+        startH: start.h,
+        startM: start.m,
+        endH: end.h,
+        endM: end.m,
+      };
+    }
+
+    function matchDbSlotToWireString(slotStart: Date, slotEnd: Date, branchName: string, dayName: string): string {
+      const startH = slotStart.getUTCHours();
+      const startM = slotStart.getUTCMinutes();
+      const endH = slotEnd.getUTCHours();
+      const endM = slotEnd.getUTCMinutes();
+
+      const availableSlots = getTimeSlotsForDay(dayName, branchName);
+      for (const wireSlot of availableSlots) {
+        const parsed = parseWireSlotTimeRange(wireSlot);
+        if (
+          parsed &&
+          parsed.startH === startH &&
+          parsed.startM === startM &&
+          parsed.endH === endH &&
+          parsed.endM === endM
+        ) {
+          return wireSlot;
+        }
+      }
+      return formatSlotTime(slotStart, slotEnd);
+    }
+
+    function normalizePositionToColId(label: string): string {
+      const clean = label.toLowerCase().replace(/\s+/g, "");
+      if (clean.includes("manager")) return "MANAGER";
+      return clean;
+    }
+
+    rows.forEach(r => {
+      const branchName = r.slot.branch_operating_day.branch.branch_name;
+      const rowDate = r.date;
+      
+      const dayOfWeek = rowDate.getUTCDay(); // 0 is Sunday, 1 is Monday...
+      const diff = rowDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(Date.UTC(rowDate.getUTCFullYear(), rowDate.getUTCMonth(), diff));
+      const mondayISO = monday.toISOString().slice(0, 10);
+
+      const sunday = new Date(monday);
+      sunday.setUTCDate(sunday.getUTCDate() + 6);
+
+      const key = `${branchName}:::${mondayISO}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          branchName,
+          mondayISO,
+          sundayISO: sunday.toISOString().slice(0, 10),
+          start_date: monday,
+          end_date: sunday,
+          selections: {},
+          branch: { branch_name: branchName },
+        });
+      }
+
+      const g = groups.get(key)!;
+      const dayName = DAYS_LIST[rowDate.getUTCDay()];
+      const slotText = matchDbSlotToWireString(r.slot.slot_start, r.slot.slot_end, branchName, dayName);
+      const colId = normalizePositionToColId(r.branch_duty_position.position_label);
+      
+      const selectionKey = `${dayName}-${slotText}-${colId}`;
+      g.selections[selectionKey] = r.user_profile.nick_name || r.user_profile.full_name;
+    });
+
+    const schedules = Array.from(groups.values());
 
     // 2. Fetch all active employees with employment + profile, build name lookup
     const employees = await prisma.users.findMany({

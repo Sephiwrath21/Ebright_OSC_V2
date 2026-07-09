@@ -1,15 +1,15 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import StudentListClient from "@/app/components/StudentListClient";
 import AppShell from "@/app/components/AppShell";
-import SmsDashboard from "@/app/components/SmsDashboard";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "SMS",
+  title: "Student | SMS",
 };
 
-export default async function SmsPage() {
+export default async function StudentPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
@@ -19,7 +19,7 @@ export default async function SmsPage() {
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <SmsDashboard />
+      <StudentListClient />
     </AppShell>
   );
 }

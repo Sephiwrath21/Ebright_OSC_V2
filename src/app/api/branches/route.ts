@@ -2,41 +2,39 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const EXCLUDED_BRANCH_IDS = [22];
-
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+    return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
   }
 
   try {
     const branches = await prisma.branch.findMany({
-      where: { branch_id: { notIn: EXCLUDED_BRANCH_IDS } },
-      select: {
-        branch_id: true,
-        branch_name: true,
-        branch_code: true,
-        location: true,
-        region: true,
-        _count: { select: { employment: true } },
+      include: {
+        employment: {
+          where: {
+            status: "active",
+          },
+          select: {
+            employment_id: true,
+          },
+        },
       },
       orderBy: { branch_name: "asc" },
     });
 
-    // Flatten _count into a plain `staff_count` field for easier consumption.
-    const payload = branches.map(b => ({
-      branch_id: b.branch_id,
+    const mappedBranches = branches.map((b) => ({
+      branch_id:   b.branch_id,
       branch_name: b.branch_name,
+      location:    b.location,
       branch_code: b.branch_code,
-      location: b.location,
-      region: b.region,
-      staff_count: b._count.employment,
+      region:      b.region,
+      staff_count: b.employment.length,
     }));
 
-    return NextResponse.json(payload);
+    return NextResponse.json({ success: true, branches: mappedBranches });
   } catch (err) {
     console.error("[GET /api/branches]", err);
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to list branches" }, { status: 500 });
   }
 }

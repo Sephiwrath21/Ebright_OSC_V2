@@ -311,13 +311,18 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
       try {
         const res = await fetch("/api/branches");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: Branch[] = await res.json();
+        const json = await res.json();
         if (cancelled) return;
-        setBranches(data);
-        if (!isAdmin && data.length > 0) {
-          const first = data[0];
-          setSelectedRegion(first.region?.trim() || OTHER_REGION);
-          setSelectedBranch(first);
+        
+        if (json.success && Array.isArray(json.branches)) {
+          setBranches(json.branches);
+          if (!isAdmin && json.branches.length > 0) {
+            const first = json.branches[0];
+            setSelectedRegion(first.region?.trim() || OTHER_REGION);
+            setSelectedBranch(first);
+          }
+        } else {
+          throw new Error(json.error || "Failed to load branches");
         }
       } catch (err) {
         if (cancelled) return;
@@ -416,7 +421,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
           <span className="text-slate-900 font-medium">Plan New Week</span>
         </nav>
 
-        <div className="max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="max-w-5xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           {/* ── Title header spanning both columns ── */}
           <div className="px-6 py-4 border-b border-slate-100">
             <h1 className="text-xl font-bold text-slate-900">Plan New Week</h1>
@@ -574,7 +579,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
 
         {/* Confirmed banner */}
         {confirmed && selectedBranch && selectedMonday && selectedSunday && (
-          <div className="mt-4 max-w-5xl flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="mt-4 max-w-5xl mx-auto flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <p className="text-sm font-medium text-emerald-800">
               Planning new week for{" "}
