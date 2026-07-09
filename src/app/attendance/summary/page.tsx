@@ -292,6 +292,15 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
     scheduledStaff.push({ staff: s, schedule: day, branchForDay });
   }
 
+  // Employee codes of everyone in scope today — used below to separate
+  // "visitor" scans (people who scanned but weren't expected) from the
+  // expected/scheduled population.
+  const scheduledEmpNos = new Set(
+    scheduledStaff
+      .map(({ staff }) => staff.employeeId)
+      .filter((id): id is string => !!id),
+  );
+
   // ── HRFS: aggregate today's Hikvision events ─────────────────────────────
   // - LEFT JOIN hikvision_id_map to translate "wrong" person_ids to true ids.
   // - Group by translated empNo so the same person across both scanners
@@ -412,15 +421,12 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
     }
   }
 
-  // ── Expected rows (scheduled today, in scope) ────────────────────────────
-  const scheduledEmpNos = new Set<string>();
+  // ── Expected rows ──────────────────────────────────────────────────────
+  // One row per staff member who is scheduled to work today (scheduledStaff,
+  // built above from BranchStaff + BranchStaffSchedule + rotation).
   const expectedRows: AttendanceRow[] = scheduledStaff.map(({ staff: s, schedule: sched, branchForDay }) => {
-    if (s.employeeId) scheduledEmpNos.add(s.employeeId);
     const scan = s.employeeId ? scanByEmpNo.get(s.employeeId) ?? null : null;
-
     const checkInDate = scan?.first_event ?? null;
-    // Check-out must be strictly later than check-in AND at/after the
-    // CHECKOUT_EARLIEST_MYT cutoff. Earlier "second scans" are duplicates.
     const checkOutDate =
       scan
       && scan.last_event.getTime() > scan.first_event.getTime()

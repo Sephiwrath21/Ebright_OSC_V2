@@ -88,6 +88,16 @@ const dashboards: DashboardCard[] = [
       { name: "Courses", href: "#", icon: "📖" },
     ],
   },
+  {
+    id: "clickup",
+    title: "ClickUp Tasks",
+    icon: "✅",
+    color: "bg-teal-500",
+    items: [
+      { name: "Branch Dashboards", href: "/clickup-dashboard", icon: "🏢" },
+      { name: "Operations by Day", href: "/clickup-dashboard/operations", icon: "📅" },
+    ],
+  },
 ];
 
 export default function DashboardHome({ userRole }: { userRole?: string; userEmail?: string }) {
@@ -116,7 +126,7 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {dashboards.map((dashboard) => {
             const isDisabled = isLocked(dashboard.id);
-            const targetHref = dashboard.id === "academy" ? "/academy" : `/dashboards/${dashboard.id}`;
+            const targetHref = dashboard.id === "academy" ? "/academy" : dashboard.id === "sms" ? "/sms" : dashboard.id === "clickup" ? "/clickup-dashboard" : `/dashboards/${dashboard.id}`;
             const href = isDisabled ? "#" : targetHref;
 
             return (

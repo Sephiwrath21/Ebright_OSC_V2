@@ -11,9 +11,15 @@ import { canReviewClaims } from "@/app/claim/roles";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClaimsPage() {
+export default async function ClaimsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
+
+  const { status: initialStatus } = await searchParams;
 
   const me = await prisma.users.findUnique({
     where: { email: session.user.email },
@@ -130,6 +136,7 @@ export default async function ClaimsPage() {
         isFinance={isFinance}
         isSuperadmin={isSuperadmin}
         orgOptions={orgOptions}
+        initialStatus={initialStatus ?? ""}
       />
     </AppShell>
   );

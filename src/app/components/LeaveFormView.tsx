@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Home as HomeIcon,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   CircleAlert,
   CheckCircle2,
   Loader2,
+  type LucideIcon,
 } from "lucide-react";
 import { submitLeaveRequest } from "@/app/attendance/leave/actions";
 
@@ -55,113 +57,185 @@ function workingDaysBetween(startISO: string, endISO: string): number {
   return count;
 }
 
-function fmtFriendlyRange(startISO: string, endISO: string | null): string {
-  if (!startISO) return "";
-  const s = new Date(startISO + "T00:00:00");
-  const fmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
-  if (!endISO || endISO === startISO) return fmt.format(s);
-  const e = new Date(endISO + "T00:00:00");
-  return `${fmt.format(s)} – ${fmt.format(e)}`;
+function formatDays(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-// Pick an icon by leave type code (best-effort) or name keyword.
-function pickIcon(code: string, name: string) {
-  const k = (code + " " + name).toLowerCase();
-  if (/annual|al\b|vacation/.test(k)) return Umbrella;
-  if (/medic|sick|ml\b/.test(k)) return Stethoscope;
-  if (/emerg|el\b/.test(k)) return AlertTriangle;
-  if (/unpaid|ul\b|no.?pay/.test(k)) return Wallet;
+// A single ISO date in a human-friendly form, e.g. "Fri, 3 Jul 2026".
+function fmtFriendly(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// Compact date form for the review / success screens, e.g. "3 Jul 2026".
+function fmt(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fmtFriendlyRange(startISO: string, endISO: string | null): string {
+  if (!endISO || endISO === startISO) return fmtFriendly(startISO);
+  return `${fmtFriendly(startISO)} → ${fmtFriendly(endISO)}`;
+}
+
+// ─── Per-type icon & accent ──────────────────────────────────────────────────
+
+interface Accent {
+  ring: string;
+  border: string;
+  tile: string;
+  icon: string;
+}
+
+// Full literal class strings so Tailwind's scanner picks them up.
+const ACCENTS: Record<string, Accent> = {
+  blue: {
+    ring: "focus-visible:ring-blue-500",
+    border: "border-blue-500",
+    tile: "bg-blue-50",
+    icon: "text-blue-600",
+  },
+  emerald: {
+    ring: "focus-visible:ring-emerald-500",
+    border: "border-emerald-500",
+    tile: "bg-emerald-50",
+    icon: "text-emerald-600",
+  },
+  amber: {
+    ring: "focus-visible:ring-amber-500",
+    border: "border-amber-500",
+    tile: "bg-amber-50",
+    icon: "text-amber-600",
+  },
+  violet: {
+    ring: "focus-visible:ring-violet-500",
+    border: "border-violet-500",
+    tile: "bg-violet-50",
+    icon: "text-violet-600",
+  },
+  slate: {
+    ring: "focus-visible:ring-slate-500",
+    border: "border-slate-500",
+    tile: "bg-slate-100",
+    icon: "text-slate-600",
+  },
+};
+
+function classify(code: string, name: string): keyof typeof ACCENTS {
+  const key = `${code} ${name}`.toLowerCase();
+  if (/medical|sick|health|\bml\b/.test(key)) return "emerald";
+  if (/emerg|urgent|\bel\b/.test(key)) return "amber";
+  if (/unpaid|\bul\b/.test(key)) return "slate";
+  if (/annual|vacation|\bal\b|leave/.test(key)) return "blue";
+  return "violet";
+}
+
+function pickIcon(code: string, name: string): LucideIcon {
+  const key = `${code} ${name}`.toLowerCase();
+  if (/medical|sick|health|\bml\b/.test(key)) return Stethoscope;
+  if (/emerg|urgent|\bel\b/.test(key)) return AlertTriangle;
+  if (/unpaid|\bul\b/.test(key)) return Wallet;
+  if (/annual|vacation|\bal\b|leave/.test(key)) return Umbrella;
   return Tag;
 }
 
-// Pick a per-type accent palette; falls back to slate.
-function pickAccent(code: string, name: string): { tile: string; icon: string; ring: string; border: string } {
-  const k = (code + " " + name).toLowerCase();
-  if (/annual|vacation/.test(k))
-    return { tile: "bg-blue-50", icon: "text-blue-600", ring: "ring-blue-400", border: "border-blue-500" };
-  if (/medic|sick/.test(k))
-    return { tile: "bg-rose-50", icon: "text-rose-600", ring: "ring-rose-400", border: "border-blue-500" };
-  if (/emerg/.test(k))
-    return { tile: "bg-amber-50", icon: "text-amber-600", ring: "ring-amber-400", border: "border-blue-500" };
-  if (/unpaid|no.?pay/.test(k))
-    return { tile: "bg-slate-100", icon: "text-slate-600", ring: "ring-slate-400", border: "border-blue-500" };
-  return { tile: "bg-slate-100", icon: "text-slate-600", ring: "ring-slate-400", border: "border-blue-500" };
+function pickAccent(code: string, name: string): Accent {
+  return ACCENTS[classify(code, name)];
 }
-
-// ─── Main component ──────────────────────────────────────────────────────────
 
 export default function LeaveFormView({
   leaveTypes,
 }: {
   leaveTypes: LeaveTypeOption[];
 }) {
+  const router = useRouter();
+
   const [step, setStep] = useState<Step>(1);
   const [typeId, setTypeId] = useState<number | null>(null);
   const [startISO, setStartISO] = useState<string | null>(null);
   const [endISO, setEndISO] = useState<string | null>(null);
+  const [halfDay, setHalfDay] = useState(false);
   const [reason, setReason] = useState("");
   const [notifyManager, setNotifyManager] = useState(true);
   const [notifyTeam, setNotifyTeam] = useState(false);
 
-  const [state, formAction, pending] = useActionState(submitLeaveRequest, null);
+  const [submitted, setSubmitted] = useState(false);
+  const [submittedDays, setSubmittedDays] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const selectedType = useMemo(
     () => leaveTypes.find((t) => t.id === typeId) ?? null,
     [leaveTypes, typeId],
   );
-  const workingDays = workingDaysBetween(startISO ?? "", endISO ?? startISO ?? "");
+  const workingDays = workingDaysBetween(
+    startISO ?? "",
+    endISO ?? startISO ?? "",
+  );
 
   // Step gating
   const canContinue1 = typeId !== null;
   const canContinue2 = startISO !== null;
 
-  function handleSubmit() {
-    if (!selectedType || !startISO) return;
-    const fd = new FormData();
-    fd.set("leave_type_id", String(selectedType.id));
-    fd.set("start_date", startISO);
-    fd.set("end_date", endISO ?? startISO);
-    if (reason.trim()) fd.set("reason", reason.trim());
-    formAction(fd);
+  function resetForm() {
+    setStep(1);
+    setTypeId(null);
+    setStartISO(null);
+    setEndISO(null);
+    setHalfDay(false);
+    setReason("");
+    setNotifyManager(true);
+    setNotifyTeam(false);
+    setErrorMsg(null);
+    setSubmitted(false);
+    setSubmittedDays(0);
   }
 
-  // ── Success screen ────────────────────────────────────────────────────────
-  if (state?.ok) {
+  function handleSubmit() {
+    if (!selectedType || !startISO || isPending) return;
+    setErrorMsg(null);
+
+    const fd = new FormData();
+    fd.append("leave_type_id", String(selectedType.id));
+    fd.append("start_date", startISO);
+    fd.append("end_date", endISO ?? startISO);
+    fd.append("half_day", halfDay ? "1" : "0");
+    fd.append("reason", reason);
+
+    startTransition(async () => {
+      const result = await submitLeaveRequest(null, fd);
+      if (!result.ok) {
+        setErrorMsg(result.error ?? "Failed to submit leave request.");
+        return;
+      }
+      setSubmittedDays(result.totalDays ?? (halfDay ? 0.5 : workingDays));
+      setSubmitted(true);
+      router.refresh();
+    });
+  }
+
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (submitted) {
     return (
-      <div className="min-h-full bg-slate-50">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 mb-4">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600" aria-hidden="true" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Application submitted</h1>
-            <p className="text-sm text-slate-600 mb-6">
-              Your leave request has been received and is now pending approval.
-              You&apos;ll be notified once it&apos;s reviewed.
-            </p>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-left">
-              <SummaryRow label="Reference" value={state.leaveId ? `LV-${String(state.leaveId).padStart(3, "0")}` : "—"} />
-              <SummaryRow label="Type" value={selectedType?.name ?? "—"} />
-              <SummaryRow label="Dates" value={fmtFriendlyRange(startISO ?? "", endISO)} />
-              <SummaryRow label="Working days" value={String(state.totalDays ?? workingDays)} />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <Link
-                href="/attendance/leave"
-                className="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
-              >
-                View my requests
-              </Link>
-              <Link
-                href="/home"
-                className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Back to home
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SuccessScreen
+        typeName={selectedType?.name ?? "Leave"}
+        days={submittedDays}
+        startISO={startISO}
+        endISO={endISO}
+        onAnother={resetForm}
+      />
     );
   }
 
@@ -189,26 +263,26 @@ export default function LeaveFormView({
           <p className="mt-1 text-sm text-slate-500">Step {step} of 4</p>
         </header>
 
-        <div>
         {/* Progress bar */}
         <ProgressBar currentStep={step} />
 
         {/* Step content */}
         <div className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
           {step === 1 && (
-            <Step1
-              leaveTypes={leaveTypes}
-              typeId={typeId}
-              onSelect={setTypeId}
-            />
+            <Step1 leaveTypes={leaveTypes} typeId={typeId} onSelect={setTypeId} />
           )}
           {step === 2 && (
             <Step2
               startISO={startISO}
               endISO={endISO}
+              halfDay={halfDay}
+              setHalfDay={setHalfDay}
               onChange={(s, e) => {
                 setStartISO(s);
                 setEndISO(e);
+                if (s && e && s !== e) {
+                  setHalfDay(false);
+                }
               }}
             />
           )}
@@ -228,34 +302,46 @@ export default function LeaveFormView({
               startISO={startISO}
               endISO={endISO}
               workingDays={workingDays}
+              halfDay={halfDay}
               reason={reason}
               notifyManager={notifyManager}
               notifyTeam={notifyTeam}
             />
           )}
-
-          {state?.ok === false && state.error && (
-            <div role="alert" className="mt-4 flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm py-2 px-3 rounded-lg">
-              <CircleAlert className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{state.error}</span>
-            </div>
-          )}
         </div>
 
-        {/* Nav buttons */}
-        <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
+        {/* Error */}
+        {errorMsg && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+          >
+            <CircleAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Could not submit request</p>
+              <p className="text-xs text-red-700 leading-relaxed">{errorMsg}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Footer actions */}
+        <div className="mt-6 flex items-center justify-between gap-3">
           {step > 1 ? (
             <button
               type="button"
               onClick={() => setStep((s) => (s - 1) as Step)}
-              disabled={pending}
-              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
               Back
             </button>
           ) : (
-            <div />
+            <Link
+              href="/attendance/leave"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </Link>
           )}
 
           {step < 4 ? (
@@ -272,10 +358,10 @@ export default function LeaveFormView({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={pending}
+              disabled={isPending}
               className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
             >
-              {pending ? (
+              {isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                   Submitting…
@@ -285,7 +371,6 @@ export default function LeaveFormView({
               )}
             </button>
           )}
-        </div>
         </div>
       </div>
     </div>
@@ -375,7 +460,7 @@ function Step1({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 aria-pressed={isSelected}
-                className={`text-left bg-white border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:${accent.ring} ${
+                className={`text-left bg-white border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.ring} ${
                   isSelected
                     ? `${accent.border} shadow-sm`
                     : "border-slate-200 hover:border-slate-300"
@@ -404,10 +489,14 @@ function Step1({
 function Step2({
   startISO,
   endISO,
+  halfDay,
+  setHalfDay,
   onChange,
 }: {
   startISO: string | null;
   endISO: string | null;
+  halfDay: boolean;
+  setHalfDay: (val: boolean) => void;
   onChange: (start: string | null, end: string | null) => void;
 }) {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
@@ -440,9 +529,11 @@ function Step2({
     }
   }
 
+  const showHalfDayToggle = startISO !== null && (endISO === null || endISO === startISO);
+  const days = halfDay ? 0.5 : workingDaysBetween(startISO ?? "", endISO ?? startISO ?? "");
   const summary = startISO
-    ? `${fmtFriendlyRange(startISO, endISO)} · ${workingDaysBetween(startISO, endISO ?? startISO)} working day${
-        workingDaysBetween(startISO, endISO ?? startISO) === 1 ? "" : "s"
+    ? `${fmtFriendlyRange(startISO, endISO)} · ${formatDays(days)} working day${
+        days === 1 ? "" : "s"
       }`
     : "Pick a start date to begin.";
 
@@ -469,6 +560,21 @@ function Step2({
           {summary}
         </span>
       </div>
+
+      {showHalfDayToggle && (
+        <div className="mt-3 max-w-sm mx-auto flex items-center gap-2.5 px-1">
+          <input
+            id="half-day-checkbox"
+            type="checkbox"
+            checked={halfDay}
+            onChange={(e) => setHalfDay(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+          />
+          <label htmlFor="half-day-checkbox" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+            Apply as half day leave (0.5 days)
+          </label>
+        </div>
+      )}
     </section>
   );
 }
@@ -539,6 +645,7 @@ function Calendar({
           if (d === null) return <div key={i} />;
           const iso = isoDate(d);
           const weekend = isWeekend(d);
+          const isPast = iso < today;
           const isStart = iso === startISO;
           const isEnd = iso === endISO;
           const inRange =
@@ -547,7 +654,7 @@ function Calendar({
 
           let cls =
             "aspect-square flex items-center justify-center text-xs rounded-md transition-colors select-none";
-          if (weekend) {
+          if (weekend || isPast) {
             cls += " text-slate-300 cursor-not-allowed bg-slate-50";
           } else if (isStart || isEnd) {
             cls += " bg-blue-600 text-white font-semibold";
@@ -562,7 +669,7 @@ function Calendar({
             <button
               key={i}
               type="button"
-              disabled={weekend}
+              disabled={weekend || isPast}
               onClick={() => onDayClick(d)}
               className={cls}
               aria-label={iso}
@@ -676,6 +783,7 @@ function Step4({
   startISO,
   endISO,
   workingDays,
+  halfDay,
   reason,
   notifyManager,
   notifyTeam,
@@ -684,37 +792,111 @@ function Step4({
   startISO: string | null;
   endISO: string | null;
   workingDays: number;
+  halfDay: boolean;
   reason: string;
   notifyManager: boolean;
   notifyTeam: boolean;
 }) {
+  const notify =
+    notifyManager && notifyTeam
+      ? "Manager and team"
+      : notifyManager
+        ? "Manager"
+        : notifyTeam
+          ? "Team"
+          : "No one";
+
+  const displayDays = halfDay ? 0.5 : workingDays;
+
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Review your application</h2>
-      <p className="text-sm text-slate-500 mb-5">Double-check the details below before submitting.</p>
+      <h2 className="text-base font-semibold text-slate-900">Review your request</h2>
+      <p className="text-sm text-slate-500 mb-5">Check the details before submitting.</p>
 
-      <dl className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-        <SummaryRow label="Type" value={type?.name ?? "—"} />
-        <SummaryRow label="Dates" value={fmtFriendlyRange(startISO ?? "", endISO)} />
-        <SummaryRow
-          label="Working days"
-          value={`${workingDays} day${workingDays === 1 ? "" : "s"}`}
+      <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+        <ReviewRow label="Leave type" value={type?.name ?? "—"} />
+        <ReviewRow
+          label="Dates"
+          value={
+            startISO
+              ? endISO && endISO !== startISO
+                ? `${fmt(startISO)} → ${fmt(endISO)}`
+                : fmt(startISO)
+              : "—"
+          }
         />
-        <SummaryRow label="Reason" value={reason.trim() || "—"} />
-        <SummaryRow label="Notify manager" value={notifyManager ? "Yes" : "No"} />
-        <SummaryRow label="Notify team" value={notifyTeam ? "Yes" : "No"} />
+        <ReviewRow
+          label="Working days"
+          value={`${formatDays(displayDays)} day${displayDays === 1 ? "" : "s"}`}
+        />
+        <ReviewRow label="Notify" value={notify} />
+        <ReviewRow label="Reason" value={reason.trim() || "—"} />
       </dl>
     </section>
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 px-4 py-3">
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:col-span-1">
+    <div className="flex items-start justify-between gap-4 px-4 py-3 bg-white">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 shrink-0 pt-0.5">
         {label}
       </dt>
-      <dd className="text-sm text-slate-900 sm:col-span-2 whitespace-pre-wrap break-words">{value}</dd>
+      <dd className="text-sm text-slate-900 text-right break-words">{value}</dd>
+    </div>
+  );
+}
+
+// ─── Success screen ──────────────────────────────────────────────────────────
+
+function SuccessScreen({
+  typeName,
+  days,
+  startISO,
+  endISO,
+  onAnother,
+}: {
+  typeName: string;
+  days: number;
+  startISO: string | null;
+  endISO: string | null;
+  onAnother: () => void;
+}) {
+  return (
+    <div className="min-h-full bg-slate-50 flex items-center justify-center px-6 py-20">
+      <div className="text-center max-w-md">
+        <div className="w-16 h-16 rounded-full bg-emerald-50 grid place-items-center mx-auto mb-5">
+          <CheckCircle2 className="w-8 h-8 text-emerald-500" strokeWidth={1.75} aria-hidden="true" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Leave Request Submitted</h2>
+        <p className="text-sm text-slate-500 leading-relaxed mb-1">
+          Your <span className="font-semibold text-slate-800">{typeName}</span> of{" "}
+          <span className="font-semibold text-slate-800">
+            {formatDays(days)} {days === 1 ? "day" : "days"}
+          </span>{" "}
+          from <span className="font-semibold text-slate-800">{fmt(startISO)}</span> to{" "}
+          <span className="font-semibold text-slate-800">{fmt(endISO ?? startISO)}</span> has been
+          sent for approval.
+        </p>
+        <p className="text-xs text-slate-400 mb-8">
+          You&apos;ll receive a notification once it&apos;s reviewed.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            href="/attendance/leave"
+            className="inline-flex items-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Back to Leaves
+          </Link>
+          <button
+            type="button"
+            onClick={onAnother}
+            className="inline-flex items-center h-11 px-6 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Apply Another
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

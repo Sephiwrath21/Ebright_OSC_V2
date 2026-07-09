@@ -2,13 +2,10 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
-import ClaimFormView, {
-  type ClaimFormType,
-} from "@/app/components/ClaimFormView";
+import ClaimFormView from "@/app/components/ClaimFormView";
+import { type ClaimType, isClaimType, canAccessClaimType } from "@/app/claim/claim-types";
 
 export const dynamic = "force-dynamic";
-
-const VALID_TYPES: ClaimFormType[] = ["sales", "health", "transport"];
 
 async function getHealthUsedThisYear(userId: number): Promise<number> {
   const now = new Date();
@@ -35,7 +32,29 @@ export default async function NewClaimTypePage({
   if (!session?.user?.email) redirect("/login");
 
   const { type } = await params;
-  if (!VALID_TYPES.includes(type as ClaimFormType)) notFound();
+  if (!isClaimType(type)) notFound();
+
+  // Some claim types are restricted to specific positions (e.g. Class → coaches
+  // & executives; Branch Ranking Reward / Jackpot → branch managers).
+  const position =
+    (session.user as { position?: string | null } | undefined)?.position ?? null;
+  const roleType = (session.user as { role?: string } | undefined)?.role ?? null;
+  const email = session.user.email;
+  // Resolve department for access checks
+  let department: string | null = null;
+  const me = await prisma.users.findUnique({
+    where: { email },
+    select: {
+      employment: {
+        take: 1,
+        orderBy: { employment_id: "desc" },
+        select: { department: { select: { department_name: true } } },
+      },
+    },
+  });
+  department = me?.employment?.[0]?.department?.department_name ?? null;
+
+  if (!canAccessClaimType(type, { position, roleType, email, department })) notFound();
 
   let healthUsed = 0;
   if (type === "health") {
@@ -52,7 +71,7 @@ export default async function NewClaimTypePage({
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <ClaimFormView type={type as ClaimFormType} healthUsed={healthUsed} />
+      <ClaimFormView type={type as ClaimType} healthUsed={healthUsed} />
     </AppShell>
   );
 }

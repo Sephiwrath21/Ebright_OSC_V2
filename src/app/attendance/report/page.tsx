@@ -19,19 +19,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Only staff (role_id 6) appears on the attendance report.
-const STAFF_ROLE_ID = 6;
-// Same grace as the Summary — keep them in lockstep.
-const LATE_GRACE_MINUTES = 1;
-// Scans before this MYT time don't count as check-out (duplicate / quick step-out).
-const CHECKOUT_EARLIEST_MYT = "14:00";
+const REPORT_ROLE_IDS = [2, 4];
+const STAFF_ROLE_ID = 4;
 
+
+const WEEKEND_DAY_NUMBERS = new Set([0, 1]);
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_KEYS: DayKey[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Company convention preserved from the legacy report — Sun/Mon are
 // "weekend" days when no schedule covers them (kept as a fallback so people
 // without scheduled hours don't see the whole week as "no_record").
 const WEEKEND_FALLBACK_DAY_NUMBERS = new Set([0, 1]);
+
+// TODO: confirm these match the intended business rule.
+const LATE_GRACE_MINUTES = 15;
+const CHECKOUT_EARLIEST_MYT = "14:00:00";
 
 const TIME_FMT = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Kuala_Lumpur",
@@ -146,8 +148,9 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   }
   const departments = [...hqDepts].sort().map((d) => ({ department_code: d, department_name: d }));
 
-  // Staff can never override the filter — only their own row is in scope.
+ 
   const branchFilter = restrictToSelf ? "" : (sp.branch ?? "");
+  
   const deptFilter =
     !restrictToSelf && branchFilter === "HQ" ? (sp.dept ?? "") : "";
   const staffForDropdown = restrictToSelf
@@ -164,10 +167,8 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
     branchCode: s.branch,
   }));
 
-  // Resolve selected employee — staff role pinned to themselves; otherwise
-  // honor URL param, fall back to "my own BranchStaff" if I have one in
-  // scope, else the first in the dropdown.
-  let selectedId: number | null;
+  
+  let selectedId: number;
   if (restrictToSelf) {
     selectedId = staffForDropdown[0]?.id ?? null;
   } else {
@@ -182,13 +183,13 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   const selected = selectedId !== null ? allStaff.find((s) => s.id === selectedId) ?? null : null;
   const selectedEmployeeCode = selected?.employeeId ?? null;
 
-  // Resolve month — default to current month in MYT
+  
   const nowMyt = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }),
   );
   const defaultMonth = `${nowMyt.getFullYear()}-${String(nowMyt.getMonth() + 1).padStart(2, "0")}`;
 
-  // Optional single-day filter (?date=YYYY-MM-DD).
+
   let dateStr = "";
   if (sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date)) {
     const probe = new Date(sp.date + "T00:00:00Z");
@@ -406,8 +407,6 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
     name: b.branch_name,
   }));
 
-  // HQ-only department options — derived above from BranchStaff.department
-  // values on HQ rows (free-text from HRFS). Just pass through.
   const departmentOptions: DepartmentOption[] = departments.map((d) => ({
     code: d.department_code,
     name: d.department_name,

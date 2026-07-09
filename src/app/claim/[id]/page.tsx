@@ -6,13 +6,13 @@ import ClaimDetailView from "@/app/components/ClaimDetailView";
 import { canReviewClaims } from "@/app/claim/roles";
 import { getDriveMeta, looksLikeDriveId } from "@/lib/drive";
 
-async function resolveAttachment(stored: string | null): Promise<{
+interface ResolvedAttachment {
   url: string | null;
   name: string | null;
   exists: boolean;
-}> {
-  if (!stored) return { url: null, name: null, exists: false };
+}
 
+async function resolveOne(stored: string): Promise<ResolvedAttachment> {
   // New rows: Drive file IDs (no slashes, no dots, 20+ chars).
   if (looksLikeDriveId(stored)) {
     const meta = await getDriveMeta(stored);
@@ -22,6 +22,13 @@ async function resolveAttachment(stored: string | null): Promise<{
 
   // Legacy rows: filesystem paths or bare filenames — file is gone.
   return { url: null, name: stored, exists: false };
+}
+
+// claim.attachment holds one Drive ID, or several comma-separated (multi-doc claims).
+async function resolveAttachments(stored: string | null): Promise<ResolvedAttachment[]> {
+  if (!stored) return [];
+  const ids = stored.split(",").map((s) => s.trim()).filter(Boolean);
+  return Promise.all(ids.map(resolveOne));
 }
 
 export const dynamic = "force-dynamic";
@@ -83,6 +90,9 @@ export default async function ClaimDetailPage({
   // Employees can only view their own claims
   if (!isFinance && claim.user_id !== me.user_id) notFound();
 
+  // Only the requester can confirm receipt of their own claim.
+  const isOwner = claim.user_id === me.user_id;
+
   const profile = claim.users.user_profile;
   const employment = claim.users.employment[0];
   const branchLabel =
@@ -91,7 +101,7 @@ export default async function ClaimDetailPage({
       ? employment?.department?.department_name ?? null
       : null);
 
-  const attachment = await resolveAttachment(claim.attachment);
+  const attachments = await resolveAttachments(claim.attachment);
 
   const userEmail = session.user?.email ?? "";
   const userRole = (session.user as { role?: string } | undefined)?.role ?? "";
@@ -101,6 +111,7 @@ export default async function ClaimDetailPage({
     <AppShell email={userEmail} role={userRole} name={userName}>
       <ClaimDetailView
         isFinance={isFinance}
+        isOwner={isOwner}
         claim={{
           claimId: claim.claim_id,
           displayId: `CLM-${String(claim.claim_id).padStart(3, "0")}`,
@@ -111,9 +122,11 @@ export default async function ClaimDetailPage({
             claim.approved_amount !== null ? Number(claim.approved_amount) : null,
           claimDate: claim.claim_date.toISOString().slice(0, 10),
           status: claim.status,
-          attachment: attachment.url,
-          attachmentExists: attachment.exists,
-          attachmentName: attachment.name ?? claim.attachment,
+          attachments: attachments.map((a) => ({
+            url: a.url,
+            exists: a.exists,
+            name: a.name ?? "attachment",
+          })),
           remarks: claim.remarks,
           submittedOn: claim.submitted_on.toISOString(),
           updatedAt: claim.updated_at.toISOString(),

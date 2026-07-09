@@ -11,6 +11,9 @@ import {
   Inbox,
   Eye,
 } from "lucide-react";
+import DonutChart, { type DonutSegment } from "@/app/components/DonutChart";
+import BarChart, { type BarDatum } from "@/app/components/BarChart";
+import { CLAIM_TYPES, CLAIM_TYPE_LABELS, CLAIM_TYPE_SHORT_LABELS } from "@/app/claim/claim-types";
 
 export interface ClaimRow {
   claimId: number;
@@ -46,11 +49,7 @@ const STATUS_OPTIONS = [
   { value: "received", label: "Received" },
 ] as const;
 
-const TYPE_OPTIONS = [
-  { value: "sales", label: "Sales" },
-  { value: "health", label: "Health" },
-  { value: "transport", label: "Transport" },
-] as const;
+const TYPE_OPTIONS = CLAIM_TYPES.map((t) => ({ value: t.id, label: t.shortLabel }));
 
 const cycleSteps = [
   { day: 2, date: "2nd", label: "Submission" },
@@ -60,14 +59,36 @@ const cycleSteps = [
   { day: 22, date: "22nd", label: "Disbursement" },
 ];
 
-const statCards = [
-  { key: "submitted", label: "SUBMITTED", dot: "bg-blue-500", text: "text-blue-600", activeRing: "ring-blue-300 bg-blue-50/50 border-blue-200" },
-  { key: "pending", label: "PENDING", dot: "bg-amber-500", text: "text-amber-600", activeRing: "ring-amber-300 bg-amber-50/50 border-amber-200" },
-  { key: "approved", label: "APPROVED", dot: "bg-emerald-500", text: "text-emerald-600", activeRing: "ring-emerald-300 bg-emerald-50/50 border-emerald-200" },
-  { key: "rejected", label: "REJECTED", dot: "bg-red-500", text: "text-red-600", activeRing: "ring-red-300 bg-red-50/50 border-red-200" },
-  { key: "disbursed", label: "DISBURSED", dot: "bg-purple-500", text: "text-purple-600", activeRing: "ring-purple-300 bg-purple-50/50 border-purple-200" },
-  { key: "received", label: "RECEIVED", dot: "bg-emerald-500", text: "text-emerald-600", activeRing: "ring-emerald-300 bg-emerald-50/50 border-emerald-200" },
+// Status breakdown drives the donut slices and the interactive legend.
+// "submitted" is the total (all claims) shown in the donut center, not a slice.
+const STATUS_META = [
+  { key: "pending", label: "Pending", color: "#F59E0B", text: "text-amber-600" },
+  { key: "approved", label: "Approved", color: "#10B981", text: "text-emerald-600" },
+  { key: "rejected", label: "Rejected", color: "#EF4444", text: "text-red-600" },
+  { key: "disbursed", label: "Disbursed", color: "#A855F7", text: "text-purple-600" },
+  { key: "received", label: "Received", color: "#14B8A6", text: "text-teal-600" },
 ] as const;
+
+// Stable color per claim type for the "Claims by Type" bar chart.
+const TYPE_COLORS: Record<string, string> = {
+  sales: "#3B82F6",
+  health: "#10B981",
+  transport: "#F59E0B",
+  sales_incentive: "#8B5CF6",
+  renewal_incentive: "#EC4899",
+  ot: "#14B8A6",
+  branch_rank_reward: "#F97316",
+  jackpot: "#EAB308",
+  class: "#6366F1",
+  roadshow: "#D946EF",
+  showcase: "#0EA5E9",
+  internship: "#84CC16",
+  part_time: "#06B6D4",
+  rm_incentive: "#7C3AED",
+  trainer: "#F43F5E",
+  referral: "#16A34A",
+};
+const TYPE_FALLBACK_COLOR = "#64748B";
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
@@ -77,11 +98,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; labe
   received: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Received" },
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  sales: "Sales Claim",
-  health: "Health Claim",
-  transport: "Transport Claim",
-};
+const TYPE_LABEL: Record<string, string> = CLAIM_TYPE_LABELS;
 
 export default function ClaimsView({
   claims = [],
@@ -89,17 +106,24 @@ export default function ClaimsView({
   isFinance = false,
   isSuperadmin = false,
   orgOptions = [],
+  initialStatus = "",
 }: {
   claims?: ClaimRow[];
   counts?: StatusCounts;
   isFinance?: boolean;
   isSuperadmin?: boolean;
   orgOptions?: OrgOption[];
+  initialStatus?: string;
 }) {
+  // Only honour a status that maps to a real filter option (deep-link safety).
+  const validInitialStatus = STATUS_OPTIONS.some((s) => s.value === initialStatus)
+    ? initialStatus
+    : "";
+
   const [query, setQuery] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(validInitialStatus);
   const [typeFilter, setTypeFilter] = useState("");
 
   const monthOptions = useMemo(() => {
@@ -131,11 +155,91 @@ export default function ClaimsView({
     disbursed: counts?.disbursed ?? 0,
     received: counts?.received ?? 0,
   };
+  const totalClaims = displayCounts.submitted;
+  const donutSegments: DonutSegment[] = STATUS_META.filter(
+    (s) => displayCounts[s.key] > 0
+  ).map((s) => ({ label: s.key, value: displayCounts[s.key], color: s.color }));
+
+  // Claims by type — total RM amount and count per type, descending by amount.
+  // Only counts approved-onward claims (approved → disbursed → received);
+  // pending and rejected requests are excluded. Clicking a bar filters the table.
+  const typeBars: BarDatum[] = useMemo(() => {
+    const APPROVED_ONWARD = new Set(["approved", "disbursed", "received"]);
+    const agg = new Map<string, { amount: number; count: number }>();
+    for (const c of claims) {
+      if (!APPROVED_ONWARD.has(c.status)) continue;
+      const cur = agg.get(c.claimType) ?? { amount: 0, count: 0 };
+      cur.amount += c.amount;
+      cur.count += 1;
+      agg.set(c.claimType, cur);
+    }
+    return Array.from(agg.entries())
+      .map(([type, { amount, count }]) => ({
+        key: type,
+        label: CLAIM_TYPE_SHORT_LABELS[type as keyof typeof CLAIM_TYPE_SHORT_LABELS] ?? type,
+        value: amount,
+        meta: `${count} ${count === 1 ? "claim" : "claims"}`,
+        color: TYPE_COLORS[type] ?? TYPE_FALLBACK_COLOR,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [claims]);
+
+  // Claims made by month — count of all claims (any status) per submission month,
+  // broken down by claim type (stacked) and ordered chronologically. Clicking a
+  // bar filters the table to that month.
+  const monthBars: BarDatum[] = useMemo(() => {
+    const agg = new Map<string, { count: number; byType: Map<string, number> }>();
+    for (const c of claims) {
+      const ym = c.claimDate.slice(0, 7);
+      const cur = agg.get(ym) ?? { count: 0, byType: new Map<string, number>() };
+      cur.count += 1;
+      cur.byType.set(c.claimType, (cur.byType.get(c.claimType) ?? 0) + 1);
+      agg.set(ym, cur);
+    }
+    return Array.from(agg.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ym, { count, byType }]) => ({
+        key: ym,
+        label: new Date(ym + "-01").toLocaleString("en-US", {
+          month: "short",
+          year: "numeric",
+        }),
+        value: count,
+        color: "#3B82F6",
+        segments: CLAIM_TYPES.filter((t) => (byType.get(t.id) ?? 0) > 0).map((t) => ({
+          key: t.id,
+          label: t.shortLabel,
+          value: byType.get(t.id)!,
+          color: TYPE_COLORS[t.id] ?? TYPE_FALLBACK_COLOR,
+        })),
+      }));
+  }, [claims]);
+
+  // Claim types present across all claims — drives the month chart's legend.
+  const typesPresent = useMemo(() => {
+    const set = new Set(claims.map((c) => c.claimType));
+    return CLAIM_TYPES.filter((t) => set.has(t.id)).map((t) => ({
+      label: t.shortLabel,
+      color: TYPE_COLORS[t.id] ?? TYPE_FALLBACK_COLOR,
+    }));
+  }, [claims]);
+
   const today = new Date();
   const monthLabel = today.toLocaleString("en-US", { month: "long", year: "numeric" });
   const currentDay = today.getDate();
   const activeStep =
     cycleSteps.find((s) => s.day >= currentDay)?.day ?? cycleSteps[cycleSteps.length - 1].day;
+  const isSubmissionDeadlineStep = currentDay <= 2;
+  
+  // During submission days (1-2), show last month's label for the reminder
+  const lastMonth = new Date(today);
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  const lastMonthLabel = lastMonth.toLocaleString("en-US", { month: "long", year: "numeric" });
+  const reminderMonthLabel = isSubmissionDeadlineStep ? lastMonthLabel : monthLabel;
+  
+  const cycleCardClass = isSubmissionDeadlineStep
+    ? "bg-red-50 border-red-200"
+    : "bg-white border-slate-200";
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -183,7 +287,7 @@ export default function ClaimsView({
         {/* Monthly Claim Cycle */}
         <section
           aria-labelledby="cycle-heading"
-          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+          className={`${cycleCardClass} rounded-2xl px-6 py-6`}
         >
           <div className="flex items-center justify-center flex-wrap gap-3 mb-6">
             <h2
@@ -193,37 +297,54 @@ export default function ClaimsView({
               Monthly Claim Cycle
             </h2>
             <span className="text-slate-300">—</span>
-            <p className="text-sm font-semibold text-slate-800">{monthLabel}</p>
+            <p className="text-sm font-semibold text-slate-800">
+              {isSubmissionDeadlineStep ? `${reminderMonthLabel} Claims` : monthLabel}
+            </p>
             {cycleSteps.some((s) => s.day === currentDay) && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">
+              <span
+                className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-3 py-1 text-xs font-semibold"
+              >
                 Deadline today!
               </span>
             )}
           </div>
+          {isSubmissionDeadlineStep && (
+            <p className="text-xs text-slate-500 text-center mb-4">
+              Timeline below shows {monthLabel} schedule
+            </p>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
             {cycleSteps.map((step, i) => {
               const isPast = currentDay > step.day;
-              const isActive = step.day === activeStep;
+              const isSubmissionStep = step.day === 2;
               return (
                 <Fragment key={step.label}>
                   <div
                     style={{ flexShrink: 0 }}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border whitespace-nowrap transition-all ${
-                      isActive
+                      isSubmissionStep
+                        ? "bg-red-50 border-red-300 ring-2 ring-red-200"
+                        : isPast
                         ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200"
                         : "bg-slate-50 border-slate-200"
                     }`}
                   >
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
-                        isActive ? "bg-emerald-500" : isPast ? "bg-blue-400" : "bg-slate-400"
+                        isSubmissionStep
+                          ? "bg-red-500"
+                          : isPast
+                          ? "bg-emerald-500"
+                          : "bg-slate-400"
                       }`}
                       aria-hidden="true"
                     />
                     <p
                       className={`text-sm ${
-                        isActive
+                        isSubmissionStep
+                          ? "text-red-700 font-semibold"
+                          : isPast
                           ? "text-emerald-700 font-semibold"
                           : "text-slate-600"
                       }`}
@@ -250,48 +371,219 @@ export default function ClaimsView({
           </div>
         </section>
 
-        {/* Stat cards */}
+        {/* Analytics — status donut beside stacked bar charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Status overview — donut + interactive legend */}
         <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-            gap: "1rem",
-          }}
+          aria-labelledby="status-heading"
+          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
         >
-          {statCards.map((card) => {
-            const value = displayCounts[card.key];
-            const isActive =
-              card.key === "submitted" ? statusFilter === "" : statusFilter === card.key;
-            const onClick = () => {
-              if (card.key === "submitted") {
-                setStatusFilter("");
-              } else {
-                setStatusFilter(statusFilter === card.key ? "" : card.key);
-              }
-            };
-            return (
+          <div className="flex items-center justify-between mb-5">
+            <h2
+              id="status-heading"
+              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+            >
+              Claims by Status
+            </h2>
+            {statusFilter && (
               <button
-                key={card.key}
                 type="button"
-                onClick={onClick}
-                aria-pressed={isActive}
-                className={`text-left bg-white border rounded-2xl px-5 py-4 transition-all hover:border-slate-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-                  isActive
-                    ? `ring-2 ring-offset-1 shadow-sm ${card.activeRing}`
-                    : "border-slate-200"
-                }`}
+                onClick={() => setStatusFilter("")}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${card.dot}`} aria-hidden="true" />
-                  <p className="text-[11px] font-semibold tracking-widest text-slate-500">
-                    {card.label}
-                  </p>
-                </div>
-                <p className={`mt-2 text-3xl font-bold ${card.text}`}>{value}</p>
+                Clear filter
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center gap-8">
+            {/* Donut */}
+            <div className="flex items-center justify-center shrink-0">
+              {totalClaims > 0 ? (
+                <DonutChart
+                  data={donutSegments}
+                  size={168}
+                  thickness={20}
+                  centerLabel="CLAIMS"
+                  onSliceClick={(label) =>
+                    setStatusFilter(statusFilter === label ? "" : label)
+                  }
+                />
+              ) : (
+                <div className="w-[168px] h-[168px] rounded-full border-[20px] border-slate-100 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-slate-900">0</span>
+                  <span className="text-[11px] tracking-widest text-slate-400">CLAIMS</span>
+                </div>
+              )}
+            </div>
+
+            {/* Interactive legend — each row filters the table */}
+            <ul
+              className="flex-1 min-w-0 grid grid-cols-1 gap-2"
+              role="group"
+              aria-label="Filter claims by status"
+            >
+              {STATUS_META.map((s) => {
+                const value = displayCounts[s.key];
+                const pct =
+                  totalClaims > 0 ? Math.round((value / totalClaims) * 100) : 0;
+                const isActive = statusFilter === s.key;
+                return (
+                  <li key={s.key}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStatusFilter(isActive ? "" : s.key)
+                      }
+                      aria-pressed={isActive}
+                      className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 ${
+                        isActive
+                          ? "border-slate-300 bg-slate-50 ring-1 ring-slate-200"
+                          : "border-slate-200"
+                      }`}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: s.color }}
+                        aria-hidden="true"
+                      />
+                      <span className="text-sm font-medium text-slate-600 truncate">
+                        {s.label}
+                      </span>
+                      <span className="ml-auto flex items-baseline gap-1.5 shrink-0">
+                        <span className={`text-lg font-bold ${s.text}`}>{value}</span>
+                        <span className="text-xs text-slate-400 tabular-nums">{pct}%</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+
+              {/* Total / show-all reset */}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("")}
+                  aria-pressed={statusFilter === ""}
+                  className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-blue-300 hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 ${
+                    statusFilter === ""
+                      ? "border-blue-200 bg-blue-50/50 ring-1 ring-blue-200"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0 bg-blue-500"
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 truncate">
+                    All Submitted
+                  </span>
+                  <span className="ml-auto text-lg font-bold text-blue-600 shrink-0">
+                    {totalClaims}
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </div>
         </section>
+
+        {/* Right column: approved amount over claims by month */}
+        <div className="flex flex-col gap-6 min-w-0">
+        {/* Type overview — claim amount by type */}
+        <section
+          aria-labelledby="type-heading"
+          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <h2
+              id="type-heading"
+              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+            >
+              Approved Amount by Type
+            </h2>
+            {typeFilter && (
+              <button
+                type="button"
+                onClick={() => setTypeFilter("")}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+
+          {typeBars.length > 0 ? (
+            <BarChart
+              data={typeBars}
+              activeKey={typeFilter}
+              valueFormatter={(v) => `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              onBarClick={(key) => setTypeFilter(typeFilter === key ? "" : key)}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-sm font-semibold text-slate-700">No approved claims yet</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Approved claim amounts by type will appear here once available.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Claims made by month */}
+        <section
+          aria-labelledby="month-heading"
+          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <h2
+              id="month-heading"
+              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+            >
+              Claims Made by Month
+            </h2>
+            {monthFilter && (
+              <button
+                type="button"
+                onClick={() => setMonthFilter("")}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+
+          {monthBars.length > 0 ? (
+            <>
+              <BarChart
+                data={monthBars}
+                activeKey={monthFilter}
+                valueFormatter={(v) => `${v} ${v === 1 ? "claim" : "claims"}`}
+                onBarClick={(key) => setMonthFilter(monthFilter === key ? "" : key)}
+              />
+              <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2" aria-label="Claim types">
+                {typesPresent.map((t) => (
+                  <li key={t.label} className="flex items-center gap-1.5">
+                    <span
+                      className="w-2.5 h-2.5 rounded-sm shrink-0"
+                      style={{ backgroundColor: t.color }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs text-slate-600">{t.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-sm font-semibold text-slate-700">No claims yet</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Monthly claim activity will appear here once available.
+              </p>
+            </div>
+          )}
+        </section>
+        </div>
+        </div>
 
         {/* Filters + action — single row */}
         <section className="flex items-center gap-3">
@@ -331,7 +623,7 @@ export default function ClaimsView({
             aria-label="Filter by type"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
+            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
           >
             <option value="">All Types</option>
             {TYPE_OPTIONS.map((t) => (

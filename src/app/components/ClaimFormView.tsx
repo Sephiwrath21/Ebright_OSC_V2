@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { submitClaim } from "@/app/claim/actions";
 import {
+  type ClaimType,
+  usesMultiDoc,
+  MAX_CLAIM_DOCS,
+  requiresAttachment,
+} from "@/app/claim/claim-types";
+import {
   Home,
   ChevronRight,
   TrendingUp,
@@ -20,10 +26,24 @@ import {
   CheckCircle2,
   Paperclip,
   Info,
+  UserPlus,
+  RefreshCw,
+  Timer,
+  Trophy,
+  Sparkles,
+  GraduationCap,
+  Megaphone,
+  Store,
+  Backpack,
+  Hourglass,
+  Crown,
+  Presentation,
+  Share2,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
-export type ClaimFormType = "sales" | "health" | "transport";
+export type ClaimFormType = ClaimType;
 
 interface Theme {
   label: string;
@@ -71,6 +91,149 @@ const THEMES: Record<ClaimFormType, Theme> = {
     accentText: "#C2410C",
     Icon: Car,
   },
+  sales_incentive: {
+    label: "Salesperson Incentive",
+    subtitle: "Incentive for new business won",
+    accent: "#4F46E5",
+    accentDark: "#4338CA",
+    accentSoft: "#EEF2FF",
+    accentRing: "#E0E7FF",
+    accentBorder: "#C7D2FE",
+    accentText: "#4338CA",
+    Icon: UserPlus,
+  },
+  renewal_incentive: {
+    label: "Renewal Incentive",
+    subtitle: "Incentive for renewed policies",
+    accent: "#0891B2",
+    accentDark: "#0E7490",
+    accentSoft: "#ECFEFF",
+    accentRing: "#CFFAFE",
+    accentBorder: "#A5F3FC",
+    accentText: "#0E7490",
+    Icon: RefreshCw,
+  },
+  ot: {
+    label: "Overtime (OT)",
+    subtitle: "Overtime pay reimbursement",
+    accent: "#7C3AED",
+    accentDark: "#6D28D9",
+    accentSoft: "#F5F3FF",
+    accentRing: "#EDE9FE",
+    accentBorder: "#DDD6FE",
+    accentText: "#6D28D9",
+    Icon: Timer,
+  },
+  branch_rank_reward: {
+    label: "Branch Ranking Reward",
+    subtitle: "Reward for branch performance ranking",
+    accent: "#E11D48",
+    accentDark: "#BE123C",
+    accentSoft: "#FFF1F2",
+    accentRing: "#FFE4E6",
+    accentBorder: "#FECDD3",
+    accentText: "#BE123C",
+    Icon: Trophy,
+  },
+  jackpot: {
+    label: "Jackpot",
+    subtitle: "Jackpot reward payout",
+    accent: "#D97706",
+    accentDark: "#B45309",
+    accentSoft: "#FFFBEB",
+    accentRing: "#FEF3C7",
+    accentBorder: "#FDE68A",
+    accentText: "#B45309",
+    Icon: Sparkles,
+  },
+  class: {
+    label: "Class Claim",
+    subtitle: "For coaches & executives",
+    accent: "#6366F1",
+    accentDark: "#4F46E5",
+    accentSoft: "#EEF2FF",
+    accentRing: "#E0E7FF",
+    accentBorder: "#C7D2FE",
+    accentText: "#4338CA",
+    Icon: GraduationCap,
+  },
+  roadshow: {
+    label: "Roadshow Claim",
+    subtitle: "Marketing roadshow expenses",
+    accent: "#D946EF",
+    accentDark: "#C026D3",
+    accentSoft: "#FDF4FF",
+    accentRing: "#FAE8FF",
+    accentBorder: "#F5D0FE",
+    accentText: "#A21CAF",
+    Icon: Megaphone,
+  },
+  showcase: {
+    label: "Showcase Claim",
+    subtitle: "Marketing showcase expenses",
+    accent: "#0EA5E9",
+    accentDark: "#0284C7",
+    accentSoft: "#F0F9FF",
+    accentRing: "#E0F2FE",
+    accentBorder: "#BAE6FD",
+    accentText: "#0369A1",
+    Icon: Store,
+  },
+  internship: {
+    label: "Internship Claim",
+    subtitle: "For interns",
+    accent: "#84CC16",
+    accentDark: "#65A30D",
+    accentSoft: "#F7FEE7",
+    accentRing: "#ECFCCB",
+    accentBorder: "#D9F99D",
+    accentText: "#4D7C0F",
+    Icon: Backpack,
+  },
+  part_time: {
+    label: "Part Time Claim",
+    subtitle: "Part-time work reimbursement",
+    accent: "#06B6D4",
+    accentDark: "#0891B2",
+    accentSoft: "#ECFEFF",
+    accentRing: "#CFFAFE",
+    accentBorder: "#A5F3FC",
+    accentText: "#0E7490",
+    Icon: Hourglass,
+  },
+  rm_incentive: {
+    label: "Regional Manager Incentive",
+    subtitle: "Incentive for regional managers",
+    accent: "#7C3AED",
+    accentDark: "#6D28D9",
+    accentSoft: "#F5F3FF",
+    accentRing: "#EDE9FE",
+    accentBorder: "#DDD6FE",
+    accentText: "#6D28D9",
+    Icon: Crown,
+  },
+  trainer: {
+    label: "Trainer Claim",
+    subtitle: "For trainers",
+    accent: "#F43F5E",
+    accentDark: "#E11D48",
+    accentSoft: "#FFF1F2",
+    accentRing: "#FFE4E6",
+    accentBorder: "#FECDD3",
+    accentText: "#BE123C",
+    Icon: Presentation,
+  },
+  referral: {
+    label: "Referral Claim",
+    subtitle: "Referral reward claim",
+    accent: "#16A34A",
+    accentDark: "#15803D",
+    accentSoft: "#F0FDF4",
+    accentRing: "#DCFCE7",
+    accentBorder: "#BBF7D0",
+    accentText: "#15803D",
+    Icon: Share2,
+  },
 };
 
 const TRANSPORT_RATE = 0.7;
@@ -86,14 +249,31 @@ export default function ClaimFormView({
   healthUsed?: number;
 }) {
   const theme = THEMES[type];
+  const isMultiDoc = usesMultiDoc(type);
+  const isStudentClaim = type === "sales_incentive";
+  const attachmentRequired = requiresAttachment(type);
+
+  // Claim date window: today through the end of the current month — no backdating.
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const fmtDate = (d: Date) =>
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const nowForBounds = new Date();
+  const minDate = fmtDate(nowForBounds);
+  const maxDate = fmtDate(
+    new Date(nowForBounds.getFullYear(), nowForBounds.getMonth() + 1, 0),
+  );
+
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const docsRef = useRef<HTMLInputElement>(null);
 
   const [date, setDate] = useState("");
   const [amount, setAmount] = useState("");
   const [distance, setDistance] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [docFiles, setDocFiles] = useState<File[]>([]);
+  const [students, setStudents] = useState<string[]>([""]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -140,9 +320,45 @@ export default function ClaimFormView({
     return d * TRANSPORT_RATE * TRANSPORT_ROUND_TRIP;
   }, [distance]);
 
+  // Student names (Salesperson Incentive) — warn on duplicates within the form.
+  const duplicateStudentIdx = useMemo(() => {
+    const seen = new Map<string, number>();
+    const dups = new Set<number>();
+    students.forEach((s, i) => {
+      const key = s.trim().toLowerCase();
+      if (!key) return;
+      if (seen.has(key)) {
+        dups.add(i);
+        dups.add(seen.get(key)!);
+      } else {
+        seen.set(key, i);
+      }
+    });
+    return dups;
+  }, [students]);
+  const hasDuplicateStudents = duplicateStudentIdx.size > 0;
+  const filledStudents = useMemo(
+    () => students.map((s) => s.trim()).filter(Boolean),
+    [students],
+  );
+
+  const setStudent = (i: number, val: string) =>
+    setStudents((prev) => prev.map((s, idx) => (idx === i ? val : s)));
+  const addStudent = () =>
+    setStudents((prev) => (prev.length >= 20 ? prev : [...prev, ""]));
+  const removeStudent = (i: number) =>
+    setStudents((prev) =>
+      prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i),
+    );
+
   const primaryFieldValid =
     type === "transport" ? !!distance && parseFloat(distance) > 0 : !!amount;
-  const canSubmit = !!date && primaryFieldValid && !healthOverCap;
+  const studentsValid =
+    !isStudentClaim || (filledStudents.length > 0 && !hasDuplicateStudents);
+  const attachmentValid =
+    !attachmentRequired || docFiles.length > 0 || !!file;
+  const canSubmit =
+    !!date && primaryFieldValid && !healthOverCap && studentsValid && attachmentValid;
 
   const handleFile = (incoming: FileList | null) => {
     if (!incoming || incoming.length === 0) return;
@@ -150,6 +366,27 @@ export default function ClaimFormView({
   };
 
   const removeFile = () => setFile(null);
+
+  const addDocs = (incoming: FileList | null) => {
+    if (!incoming || incoming.length === 0) return;
+    setErrorMsg(null);
+    setDocFiles((prev) => {
+      const merged = [...prev];
+      for (const f of Array.from(incoming)) {
+        // Skip exact duplicates (same name + size) already queued.
+        if (merged.some((m) => m.name === f.name && m.size === f.size)) continue;
+        merged.push(f);
+      }
+      if (merged.length > MAX_CLAIM_DOCS) {
+        setErrorMsg(`You can attach at most ${MAX_CLAIM_DOCS} documents.`);
+        return merged.slice(0, MAX_CLAIM_DOCS);
+      }
+      return merged;
+    });
+  };
+
+  const removeDoc = (index: number) =>
+    setDocFiles((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,13 +396,22 @@ export default function ClaimFormView({
     const fd = new FormData();
     fd.append("claim_type", type);
     fd.append("claim_date", date);
-    fd.append("description", description);
+    // Persist student names alongside the description for Salesperson Incentive.
+    const finalDescription =
+      isStudentClaim && filledStudents.length > 0
+        ? [`Students: ${filledStudents.join(", ")}`, description].filter(Boolean).join("\n")
+        : description;
+    fd.append("description", finalDescription);
     if (type === "transport") {
       fd.append("distance", distance);
     } else {
       fd.append("amount", amount);
     }
-    if (file) fd.append("attachment_file", file);
+    if (isMultiDoc) {
+      docFiles.forEach((f) => fd.append("attachment_file", f));
+    } else if (file) {
+      fd.append("attachment_file", file);
+    }
 
     startTransition(async () => {
       const result = await submitClaim(null, fd);
@@ -194,6 +440,8 @@ export default function ClaimFormView({
           setDistance("");
           setDescription("");
           setFile(null);
+          setDocFiles([]);
+          setStudents([""]);
           setErrorMsg(null);
         }}
       />
@@ -351,13 +599,15 @@ export default function ClaimFormView({
                 hint={
                   <>
                     <Clock size={11} strokeWidth={2} aria-hidden="true" />
-                    Only current or previous month
+                    Today or later — no backdating
                   </>
                 }
               >
                 <input
                   type="date"
                   required
+                  min={minDate}
+                  max={maxDate}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   style={inputStyle}
@@ -445,6 +695,113 @@ export default function ClaimFormView({
                 </FieldBlock>
               )}
             </div>
+
+            {/* Student names — Salesperson Incentive */}
+            {isStudentClaim && (
+              <FieldBlock
+                icon={<Users size={13} strokeWidth={2.5} />}
+                label="Student Name(s)"
+                required
+                hint="Each student can only be claimed once"
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {students.map((s, i) => {
+                    const isDup = duplicateStudentIdx.has(i);
+                    return (
+                      <div
+                        key={i}
+                        style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                      >
+                        <div style={{ position: "relative", flex: 1 }}>
+                          <input
+                            type="text"
+                            value={s}
+                            onChange={(e) => setStudent(i, e.target.value)}
+                            placeholder={`Student ${i + 1} full name`}
+                            style={{
+                              ...inputStyle,
+                              borderColor: isDup ? ACCENT_RED : "#E5E7EB",
+                              paddingRight: isDup ? "104px" : "16px",
+                            }}
+                            onFocus={handleFocus}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = isDup
+                                ? ACCENT_RED
+                                : "#E5E7EB";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          />
+                          {isDup && (
+                            <span
+                              style={{
+                                position: "absolute",
+                                right: "12px",
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: ACCENT_RED,
+                                pointerEvents: "none",
+                              }}
+                            >
+                              Duplicate
+                            </span>
+                          )}
+                        </div>
+                        {students.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeStudent(i)}
+                            aria-label={`Remove student ${i + 1}`}
+                            style={{
+                              width: "44px",
+                              height: "44px",
+                              flexShrink: 0,
+                              display: "grid",
+                              placeItems: "center",
+                              borderRadius: "10px",
+                              border: "1px solid #E5E7EB",
+                              backgroundColor: "#fff",
+                              color: "#A3A3A3",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <button
+                      type="button"
+                      onClick={addStudent}
+                      disabled={students.length >= 20}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                        color: students.length >= 20 ? "#A3A3A3" : theme.accentText,
+                        background: "transparent",
+                        border: "none",
+                        cursor: students.length >= 20 ? "not-allowed" : "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      + Add student
+                    </button>
+                    {hasDuplicateStudents && (
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: ACCENT_RED }}>
+                        Duplicate student name — each student can only be claimed once.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </FieldBlock>
+            )}
 
             {/* Health annual cap */}
             {type === "health" && (() => {
@@ -630,9 +987,183 @@ export default function ClaimFormView({
             {/* Supporting Documents */}
             <FieldBlock
               icon={<Paperclip size={13} strokeWidth={2.5} />}
-              label="Supporting Documents"
+              label={isMultiDoc ? "Documents & Evidence" : "Supporting Documents"}
+              required={attachmentRequired}
+              hint={
+                attachmentRequired && !attachmentValid ? (
+                  <span style={{ color: ACCENT_RED, fontWeight: 600 }}>
+                    At least one document is required to submit this claim.
+                  </span>
+                ) : undefined
+              }
             >
-              {!file ? (
+              {isMultiDoc ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div
+                    onClick={() => docsRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      addDocs(e.dataTransfer.files);
+                    }}
+                    style={{
+                      cursor: "pointer",
+                      borderRadius: "14px",
+                      border: `2px dashed ${dragOver ? theme.accent : "#E5E7EB"}`,
+                      padding: "32px",
+                      textAlign: "center",
+                      transition: "all 0.2s",
+                      backgroundColor: dragOver ? theme.accentSoft : "#FAFAFA",
+                    }}
+                  >
+                    <input
+                      ref={docsRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        addDocs(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <div
+                      style={{
+                        margin: "0 auto 12px",
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "9999px",
+                        display: "grid",
+                        placeItems: "center",
+                        backgroundColor: dragOver ? theme.accentRing : "#F5F5F5",
+                      }}
+                    >
+                      <Upload
+                        size={18}
+                        strokeWidth={1.75}
+                        style={{ color: dragOver ? theme.accent : "#737373" }}
+                      />
+                    </div>
+                    <p
+                      style={{
+                        fontSize: "13.5px",
+                        color: "#404040",
+                        fontWeight: 500,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Click to upload{" "}
+                      <span style={{ color: theme.accent }}>documents and evidences</span>
+                    </p>
+                    <p style={{ fontSize: "11.5px", color: "#A3A3A3" }}>
+                      PDF, JPG or PNG · Up to {MAX_CLAIM_DOCS} files · Max 5MB each
+                    </p>
+                  </div>
+
+                  {docFiles.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span style={{ fontSize: "11.5px", fontWeight: 600, color: "#737373" }}>
+                          {docFiles.length} of {MAX_CLAIM_DOCS} file
+                          {docFiles.length === 1 ? "" : "s"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setDocFiles([])}
+                          style={{
+                            fontSize: "11.5px",
+                            fontWeight: 600,
+                            color: theme.accentText,
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <ul style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {docFiles.map((f, i) => (
+                          <li
+                            key={`${f.name}-${f.size}-${i}`}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              padding: "10px 12px",
+                              borderRadius: "10px",
+                              border: `1px solid ${theme.accentBorder}`,
+                              backgroundColor: theme.accentSoft,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                display: "grid",
+                                placeItems: "center",
+                                backgroundColor: "#fff",
+                                color: theme.accent,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Paperclip size={15} strokeWidth={2} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  fontWeight: 500,
+                                  color: "#262626",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {f.name}
+                              </p>
+                              <p style={{ fontSize: "11px", color: "#737373" }}>
+                                {(f.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeDoc(i)}
+                              aria-label={`Remove ${f.name}`}
+                              style={{
+                                width: "30px",
+                                height: "30px",
+                                display: "grid",
+                                placeItems: "center",
+                                borderRadius: "8px",
+                                color: "#A3A3A3",
+                                border: "1px solid transparent",
+                                background: "transparent",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ) : !file ? (
                 <div
                   onClick={() => fileRef.current?.click()}
                   onDragOver={(e) => {
@@ -872,6 +1403,29 @@ export default function ClaimFormView({
                 . Submit one claim per working day.
               </InfoNotice>
             )}
+            {type === "internship" && (
+              <InfoNotice theme={theme} title="How to calculate an internship claim">
+                Internship claims are prorated by your start date. Formula:{" "}
+                <b>(days worked in the month ÷ total days in the month) × monthly allowance</b>.
+                <br />
+                Example: starting on the 21st of May (May has 31 days) →{" "}
+                <b>(12 / 31) × RM750 = RM290.32</b>.
+                <br />
+                Enter the calculated amount in the <b>Total Amount</b> field above.
+              </InfoNotice>
+            )}
+            {type === "referral" && (
+              <InfoNotice theme={theme} title="Required attachment">
+                You <b>must attach a screenshot from the manpower schedule</b> showing
+                your training starting date before submitting this referral claim.
+              </InfoNotice>
+            )}
+            {(type === "sales_incentive" || type === "renewal_incentive") && (
+              <InfoNotice theme={theme} title="Required attachments">
+                You <b>must upload the invoice and the WhatsApp screenshot</b> before
+                submitting this claim.
+              </InfoNotice>
+            )}
 
             {errorMsg && (
               <div
@@ -928,7 +1482,7 @@ export default function ClaimFormView({
             }}
           >
             <Link
-              href="/claim"
+              href="/claim/new"
               style={{
                 height: "44px",
                 display: "inline-flex",

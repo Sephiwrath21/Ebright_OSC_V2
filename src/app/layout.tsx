@@ -40,7 +40,10 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
         />
       </head>
-      <body className="h-full overflow-hidden flex flex-col bg-slate-50">
+      <body
+        className="h-full overflow-hidden flex flex-col bg-slate-50"
+        suppressHydrationWarning
+      >
         <Providers>{children}</Providers>
       </body>
     </html>
