@@ -66,7 +66,7 @@ jobs:
             git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
             # Refresh refs and hard-sync local branch to remote
-            git remote set-url origin https://github.com/Sephiwrath21/Ebright_OSC_V2.git || true
+            git remote set-url origin https://github.com/EbrightOD/Ebright_OSC_V2.git || true
             git fetch origin >> ~/deploy.log 2>&1
             git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 

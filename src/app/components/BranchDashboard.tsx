@@ -79,7 +79,7 @@ const ANNOUNCEMENTS = [
 
 const DEFAULT_TASKS = [
   { id: "t1", title: "Submit weekly enrolment report", done: false },
-  { id: "t2", title: "Follow up 3 CRM opportunities", done: false },
+  { id: "t2", title: "Follow up 3 CNS opportunities", done: false },
   { id: "t3", title: "Approve staff MC application", done: true },
   { id: "t4", title: "Confirm townhall headcount", done: false },
 ];
@@ -323,11 +323,11 @@ export default function BranchDashboard({
         >
           {/* 1) CRM & SMS metrics */}
           <Panel
-            title="CRM & SMS Metrics"
+            title="CNS & SMS Metrics"
             icon={<i className="ti ti-layout-grid" />}
             bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
           >
-            <MetricRow rowLabel="CRM" metrics={CRM_METRICS} />
+            <MetricRow rowLabel="CNS" metrics={CRM_METRICS} />
             <div style={{ height: 0.5, background: "#EEF1F4" }} />
             <MetricRow rowLabel="SMS" metrics={SMS_METRICS} />
           </Panel>

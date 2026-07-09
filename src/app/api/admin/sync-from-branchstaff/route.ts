@@ -13,6 +13,7 @@ const ALLOWED_ROLES = new Set(["superadmin", "ceo", "hr"]);
 //
 // Fields synced per matched employment row:
 //   user_profile.full_name      ← BranchStaff.name (when present and non-empty)
+//   user_profile.nick_name      ← BranchStaff.nickname (when present and non-empty)
 //   employment.position         ← BranchStaff.position
 //   employment.branch_id        ← BranchStaff.branch  (lookup local branch by branch_code)
 //   employment.department_id    ← BranchStaff.department (lookup local department by name)
@@ -44,12 +45,13 @@ export async function POST() {
     id: number;
     employee_id: string | null;
     name: string | null;
+    nickname: string | null;
     branch: string | null;
     position: string | null;
     department: string | null;
     working_hours: unknown;
   }>(
-    `SELECT id, "employeeId" AS employee_id, name, branch, position, department,
+    `SELECT id, "employeeId" AS employee_id, name, nickname, branch, position, department,
             "workingHours" AS working_hours
        FROM public."BranchStaff"
       WHERE status = 'Active' AND "employeeId" IS NOT NULL`,
@@ -95,7 +97,7 @@ export async function POST() {
         branch_id: true,
         department_id: true,
         users: {
-          select: { user_profile: { select: { profile_id: true, full_name: true } } },
+          select: { user_profile: { select: { profile_id: true, full_name: true, nick_name: true } } },
         },
       },
     }),
@@ -124,6 +126,7 @@ export async function POST() {
   //    exactly what got synced.
   let updatedSchedule = 0;
   let updatedName = 0;
+  let updatedNickname = 0;
   let updatedPosition = 0;
   let updatedBranch = 0;
   let updatedDepartment = 0;
@@ -139,24 +142,33 @@ export async function POST() {
       continue;
     }
 
-    // ── name ────────────────────────────────────────────────────────
-    if (row.name && row.name.trim()) {
-      const newName = row.name.trim();
-      if (emp.users.user_profile) {
-        if ((emp.users.user_profile.full_name ?? "").trim() !== newName) {
-          await prisma.user_profile.update({
-            where: { profile_id: emp.users.user_profile.profile_id },
-            data: { full_name: newName },
-          });
-          updatedName += 1;
-        }
-      } else {
-        // No user_profile row yet — create one so the dashboard has a name.
-        await prisma.user_profile.create({
-          data: { user_id: emp.user_id, full_name: newName },
-        });
+    // ── name + nickname (single update/create so a missing profile row
+    // isn't created twice by two separate blocks) ──────────────────────
+    const newName = row.name?.trim() || undefined;
+    const newNick = row.nickname?.trim() || undefined;
+    if (emp.users.user_profile) {
+      const profileUpdate: Record<string, string> = {};
+      if (newName && (emp.users.user_profile.full_name ?? "").trim() !== newName) {
+        profileUpdate.full_name = newName;
         updatedName += 1;
       }
+      if (newNick && (emp.users.user_profile.nick_name ?? "").trim() !== newNick) {
+        profileUpdate.nick_name = newNick;
+        updatedNickname += 1;
+      }
+      if (Object.keys(profileUpdate).length > 0) {
+        await prisma.user_profile.update({
+          where: { profile_id: emp.users.user_profile.profile_id },
+          data: profileUpdate,
+        });
+      }
+    } else if (newName || newNick) {
+      // No user_profile row yet — create one so the dashboard has a name.
+      await prisma.user_profile.create({
+        data: { user_id: emp.user_id, full_name: newName || newNick!, nick_name: newNick },
+      });
+      if (newName) updatedName += 1;
+      if (newNick) updatedNickname += 1;
     }
 
     // ── employment fields (build a delta object so we issue one UPDATE) ─
@@ -243,6 +255,7 @@ export async function POST() {
     updated: {
       schedule: updatedSchedule,
       name: updatedName,
+      nickname: updatedNickname,
       position: updatedPosition,
       branch: updatedBranch,
       department: updatedDepartment,

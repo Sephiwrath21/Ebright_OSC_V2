@@ -58,6 +58,33 @@ export function getEmployeeColor(name: string): string {
   return COLOR_PALETTE[colorIndex];
 }
 
+const SOFT_STAFF_PALETTE = [
+  "bg-blue-50 text-blue-800 border-blue-200",
+  "bg-emerald-50 text-emerald-800 border-emerald-200",
+  "bg-purple-50 text-purple-800 border-purple-200",
+  "bg-pink-50 text-pink-800 border-pink-200",
+  "bg-amber-50 text-amber-800 border-amber-200",
+  "bg-rose-50 text-rose-800 border-rose-200",
+  "bg-cyan-50 text-cyan-800 border-cyan-200",
+  "bg-teal-50 text-teal-800 border-teal-200",
+  "bg-violet-50 text-violet-800 border-violet-200",
+  "bg-orange-50 text-orange-800 border-orange-200",
+  "bg-indigo-50 text-indigo-800 border-indigo-200",
+  "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200",
+];
+
+export function getSoftStaffColor(name: string): string {
+  if (!name || name === "None" || name === "-- Select --" || name === "Select staff") {
+    return "";
+  }
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % SOFT_STAFF_PALETTE.length;
+  return SOFT_STAFF_PALETTE[index];
+}
+
 export const STAFF_COLORS = [
   "bg-red-500 text-white", "bg-orange-500 text-white", "bg-amber-500 text-black",
   "bg-lime-600 text-white", "bg-green-600 text-white", "bg-emerald-500 text-white",

@@ -6,7 +6,7 @@ import CrmDashboard from "@/app/components/CrmDashboard";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "CRM",
+  title: "CNS",
 };
 
 export default async function CrmPage() {

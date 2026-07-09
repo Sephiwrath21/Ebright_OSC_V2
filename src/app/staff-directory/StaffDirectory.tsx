@@ -625,12 +625,7 @@ export default function StaffDirectory({
           >
             <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                  Meet the team
-                </p>
-                <h1 className="mt-1 text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-                  Staff Directory
-                </h1>
+                <h1 className="text-2xl font-bold text-slate-900">Staff Directory</h1>
               </div>
               <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>

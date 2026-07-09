@@ -12,8 +12,13 @@ import {
 // Executive rate is fixed for all PT staff. Mirrors the old project.
 const EXECUTIVE_RATE = 11;
 
-// Positions to exclude from the cost report entirely.
-const EXCLUDE_POSITION_KEYWORDS = ["BRANCH MANAGER", "INTERN"];
+// The report is coach-pay only — everything that isn't a PT/FT Coach
+// (BM, CEO, HOD, EXEC, INTERN, ...) must never end up in it. A deny-list of
+// exclusion keywords drifts out of sync with actual position strings (e.g.
+// branch managers are stored as "BM", not "BRANCH MANAGER"), so require the
+// position to actually say "COACH" instead of trying to exclude everything
+// that isn't one.
+const COACH_POSITION_KEYWORD = "COACH";
 
 interface DailyHour {
   day: string;
@@ -26,6 +31,7 @@ interface DailyHour {
 
 interface StaffResult {
   name: string;
+  nickName: string | null;
   employeeId: string | null;
   branch: string;
   position: string | null;
@@ -193,15 +199,141 @@ export async function GET(req: Request) {
     const monthStart = new Date(`${monthStartISO}T00:00:00Z`);
     const nextMonth = new Date(`${nextMonthISO}T00:00:00Z`);
 
-    // 1. Fetch schedules whose start_date falls within the requested month
-    const schedules = await prisma.manpower_schedule.findMany({
+    // 1. Fetch manpower schedules whose date falls within the requested month
+    const rows = await prisma.manpower_schedule.findMany({
       where: {
-        start_date: { gte: monthStart, lt: nextMonth },
-        status: "Finalized",
+        date: { gte: monthStart, lt: nextMonth },
       },
-      include: { branch: { select: { branch_name: true } } },
-      orderBy: { start_date: "asc" },
+      include: {
+        slot: {
+          include: {
+            branch_operating_day: {
+              include: {
+                branch: { select: { branch_name: true } },
+              },
+            },
+          },
+        },
+        branch_duty_position: true,
+        user_profile: true,
+      },
     });
+
+    const groups = new Map<string, {
+      branchName: string;
+      mondayISO: string;
+      sundayISO: string;
+      start_date: Date;
+      end_date: Date;
+      selections: Record<string, string>;
+      branch: { branch_name: string };
+    }>();
+
+    const DAYS_LIST = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    function parseSingleTime(t: string) {
+      const clean = t.toUpperCase().replace(/\s+/g, "");
+      const isPM = clean.includes("PM");
+      const timePart = clean.replace("AM", "").replace("PM", "");
+      const sep = timePart.includes(".") ? "." : ":";
+      const parts = timePart.split(sep);
+      if (parts.length === 0) return null;
+      let h = Number(parts[0]);
+      const m = parts.length > 1 ? Number(parts[1]) : 0;
+      if (isPM && h < 12) h += 12;
+      if (!isPM && h === 12) h = 0;
+      return { h, m };
+    }
+
+    function formatSlotTime(start: Date, end: Date): string {
+      const fmt = (d: Date) => {
+        const hours = d.getUTCHours();
+        const minutes = d.getUTCMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+        const displayMinutes = String(minutes).padStart(2, '0');
+        return `${displayHours}:${displayMinutes} ${ampm}`;
+      };
+      return `${fmt(start)} - ${fmt(end)}`;
+    }
+
+    function parseWireSlotTimeRange(wireSlot: string) {
+      const parts = wireSlot.split(/[-–—]/).map(s => s.trim());
+      if (parts.length !== 2) return null;
+      const start = parseSingleTime(parts[0]);
+      const end = parseSingleTime(parts[1]);
+      if (!start || !end) return null;
+      return {
+        startH: start.h,
+        startM: start.m,
+        endH: end.h,
+        endM: end.m,
+      };
+    }
+
+    function matchDbSlotToWireString(slotStart: Date, slotEnd: Date, branchName: string, dayName: string): string {
+      const startH = slotStart.getUTCHours();
+      const startM = slotStart.getUTCMinutes();
+      const endH = slotEnd.getUTCHours();
+      const endM = slotEnd.getUTCMinutes();
+
+      const availableSlots = getTimeSlotsForDay(dayName, branchName);
+      for (const wireSlot of availableSlots) {
+        const parsed = parseWireSlotTimeRange(wireSlot);
+        if (
+          parsed &&
+          parsed.startH === startH &&
+          parsed.startM === startM &&
+          parsed.endH === endH &&
+          parsed.endM === endM
+        ) {
+          return wireSlot;
+        }
+      }
+      return formatSlotTime(slotStart, slotEnd);
+    }
+
+    function normalizePositionToColId(label: string): string {
+      const clean = label.toLowerCase().replace(/\s+/g, "");
+      if (clean.includes("manager")) return "MANAGER";
+      return clean;
+    }
+
+    rows.forEach(r => {
+      const branchName = r.slot.branch_operating_day.branch.branch_name;
+      const rowDate = r.date;
+      
+      const dayOfWeek = rowDate.getUTCDay(); // 0 is Sunday, 1 is Monday...
+      const diff = rowDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(Date.UTC(rowDate.getUTCFullYear(), rowDate.getUTCMonth(), diff));
+      const mondayISO = monday.toISOString().slice(0, 10);
+
+      const sunday = new Date(monday);
+      sunday.setUTCDate(sunday.getUTCDate() + 6);
+
+      const key = `${branchName}:::${mondayISO}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          branchName,
+          mondayISO,
+          sundayISO: sunday.toISOString().slice(0, 10),
+          start_date: monday,
+          end_date: sunday,
+          selections: {},
+          branch: { branch_name: branchName },
+        });
+      }
+
+      const g = groups.get(key)!;
+      const dayName = DAYS_LIST[rowDate.getUTCDay()];
+      const slotText = matchDbSlotToWireString(r.slot.slot_start, r.slot.slot_end, branchName, dayName);
+      const colId = normalizePositionToColId(r.branch_duty_position.position_label);
+      
+      const selectionKey = `${dayName}-${slotText}-${colId}`;
+      g.selections[selectionKey] = r.user_profile.nick_name || r.user_profile.full_name;
+    });
+
+    const schedules = Array.from(groups.values());
 
     // 2. Fetch all active employees with employment + profile, build name lookup
     const employees = await prisma.users.findMany({
@@ -230,13 +362,23 @@ export async function GET(req: Request) {
     // typically the nickname).
     interface EmpInfo {
       displayName: string; // full_name, always
+      nickName: string | null;
       employeeId: string | null;
       branch: string;
       position: string | null;
       employmentType: string | null;
       rate: number | null;
     }
-    const empByName = new Map<string, EmpInfo>();
+    // Multiple employees can share a nickname or even a full name, so each key
+    // maps to a LIST of candidates rather than a single record. Blindly
+    // overwriting on collision (previous behaviour) silently merged one
+    // employee's hours into an unrelated namesake's row.
+    const empByName = new Map<string, EmpInfo[]>();
+    const addCandidate = (key: string, info: EmpInfo) => {
+      const list = empByName.get(key);
+      if (list) list.push(info);
+      else empByName.set(key, [info]);
+    };
     employees.forEach(u => {
       const emp = u.employment[0];
       if (!emp?.branch?.branch_name) return;
@@ -246,17 +388,30 @@ export async function GET(req: Request) {
       const rateNum = emp.rate ? Number(emp.rate) : null;
       const info: EmpInfo = {
         displayName: fullName || nickName || "",
+        nickName: nickName || null,
         employeeId: emp.employee_id ?? null,
         branch: emp.branch.branch_name,
         position: emp.position ?? null,
         employmentType: emp.employment_type ?? null,
         rate: rateNum && !Number.isNaN(rateNum) ? rateNum : null,
       };
-      if (fullName) empByName.set(fullName.toLowerCase(), info);
+      if (fullName) addCandidate(fullName.toLowerCase(), info);
       if (nickName && nickName.toLowerCase() !== fullName?.toLowerCase()) {
-        empByName.set(nickName.toLowerCase(), info);
+        addCandidate(nickName.toLowerCase(), info);
       }
     });
+    // Resolve a schedule selection name to a single employee, disambiguating
+    // collisions by preferring whichever candidate's home branch matches the
+    // branch the schedule itself belongs to (dropdown picks are branch-scoped).
+    function resolveEmployee(name: string, scheduleBranch: string): EmpInfo | undefined {
+      const candidates = empByName.get(name.toLowerCase());
+      if (!candidates || candidates.length === 0) return undefined;
+      if (candidates.length === 1) return candidates[0];
+      const branchLc = scheduleBranch.toLowerCase();
+      return (
+        candidates.find(c => c.branch.toLowerCase() === branchLc) ?? candidates[0]
+      );
+    }
 
     // 3. Walk every schedule, compute hours per employee per day
     const aggregated = new Map<string, StaffResult>();
@@ -282,13 +437,14 @@ export async function GET(req: Request) {
         const filteredExec = daysInMonth.reduce((s, d) => s + d.execHrs, 0);
 
         // Resolve employee from selection name
-        const info = empByName.get(name.toLowerCase());
+        const info = resolveEmployee(name, branchName);
         const homeBranch = info?.branch ?? branchName;
         const key = `${(info?.displayName ?? name).toLowerCase()}:::${homeBranch.toLowerCase()}`;
 
         if (!aggregated.has(key)) {
           aggregated.set(key, {
             name: info?.displayName ?? name,
+            nickName: info?.nickName ?? null,
             employeeId: info?.employeeId ?? null,
             branch: homeBranch,
             position: info?.position ?? null,
@@ -320,12 +476,13 @@ export async function GET(req: Request) {
       });
     });
 
-    // 4. Filter out excluded positions (BMs, interns, training)
+    // 4. Keep only PT/FT Coach positions (drops BM, CEO, HOD, EXEC, INTERN,
+    //    unmatched/blank positions, and training rows).
     const allResults: StaffResult[] = [];
     aggregated.forEach(r => {
       const pos = (r.position ?? "").toUpperCase();
       const name = r.name.toUpperCase();
-      if (EXCLUDE_POSITION_KEYWORDS.some(k => pos.includes(k))) return;
+      if (!pos.includes(COACH_POSITION_KEYWORD)) return;
       if (name.includes("(TRAINING)")) return;
       allResults.push(r);
     });

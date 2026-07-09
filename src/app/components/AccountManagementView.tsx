@@ -199,12 +199,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
 
         {/* Header */}
         <header className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600 mb-1.5">
-            Administrative
-          </p>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
-            Account Management
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-800">Account Management</h1>
           <p className="mt-1.5 text-sm font-medium text-slate-500">
             View and manage all user accounts across branches and departments.
           </p>
