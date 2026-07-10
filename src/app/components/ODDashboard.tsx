@@ -198,6 +198,29 @@ export default function ODDashboard({
   userName?: string | null;
   userEmail?: string | null;
 }) {
+  const dummyTickets = [
+    { name: "Aone", count: 3, total: 5 },
+    { name: "PS", count: 4, total: 8 },
+    { name: "Leads", count: 2, total: 6 },
+    { name: "Clickup", count: 5, total: 10 },
+    { name: "Others", count: 1, total: 4 },
+  ];
+
+  const dummyDistribution = {
+    PENDING: 343,
+    COMPLETE: 651,
+    "NOT APPLICABLE": 3,
+    "N/A": 9,
+  };
+
+  const dummyDailyTasks = [
+    { id: "86d3g0gcw", name: "1800: Update Daily Intern Logsheet", status: "PENDING", listName: "Management", url: "#" },
+    { id: "86d3g0gcy", name: "1730: Meet Iqbal to show the progress", status: "PENDING", listName: "Management", url: "#" },
+    { id: "86d3g0gcz", name: "AOne Task verify", status: "PENDING", listName: "AOne (SMS)", url: "#" },
+    { id: "86d3g0gd0", name: "Process Street SOP update", status: "COMPLETE", listName: "PS", url: "#" },
+    { id: "86d3g0gd1", name: "Daily check of CRM Leads", status: "COMPLETE", listName: "CNS (CRM)", url: "#" },
+  ];
+
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
@@ -426,18 +449,18 @@ export default function ODDashboard({
       <div className="max-w-7xl mx-auto px-6 pt-6 pb-12 space-y-6">
         
         {/* Header */}
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
-            <p className="text-sm text-slate-500 mt-2">
+        <div className="mb-6 w-full space-y-2">
+          <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <p className="text-sm text-slate-500">
               Hi, Optimization Department! Here is your custom executive workspace.
             </p>
+            {loading && (
+              <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
+                Syncing databases...
+              </span>
+            )}
           </div>
-          {loading && (
-            <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
-              Syncing databases...
-            </span>
-          )}
         </div>
 
         {/* --- MAIN GRID SECTION --- */}
@@ -507,37 +530,33 @@ export default function ODDashboard({
                   Tickets Counter
                 </span>
                 <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                  Database Active
+                  {tickets.length > 0 ? "Database Active" : "Demo Mode"}
                 </span>
               </h2>
               
               <div className="space-y-3">
-                {tickets.length === 0 ? (
-                  <div className="py-6 flex items-center justify-center"><div className="h-5 w-40 bg-slate-100 rounded animate-pulse" /></div>
-                ) : (
-                  tickets.map((t, idx) => {
-                    const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
-                    return (
-                      <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-500 font-mono">
-                              {t.count}/{t.total} ({percent}%)
-                            </span>
-                          </div>
-                        </div>
-                        {/* Progress Bar */}
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
-                            style={{ width: `${percent}%` }}
-                          />
+                {(tickets.length > 0 ? tickets : dummyTickets).map((t, idx) => {
+                  const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
+                  return (
+                    <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 font-mono">
+                            {t.count}/{t.total} ({percent}%)
+                          </span>
                         </div>
                       </div>
-                    );
-                  })
-                )}
+                      {/* Progress Bar */}
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -627,16 +646,15 @@ export default function ODDashboard({
                       Daily | Tue - Sat
                     </span>
                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                      API Connected
+                      {clickupConfigured ? "API Connected" : "Demo Mode"}
                     </span>
                   </h2>
 
                   <div className="flex justify-center items-center py-1">
-                    {!clickupConfigured ? (
-                      <div className="text-xs text-slate-400 text-center py-12">ClickUp integration is not configured.</div>
-                    ) : (
-                      <ClickUpPieChart distribution={dailyDistribution} onSliceClick={setSelectedStatus} />
-                    )}
+                    <ClickUpPieChart
+                      distribution={clickupConfigured ? dailyDistribution : dummyDistribution}
+                      onSliceClick={setSelectedStatus}
+                    />
                   </div>
                 </>
               ) : (
@@ -650,15 +668,15 @@ export default function ODDashboard({
                       Back to Chart
                     </button>
                     <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                      {selectedStatus} ({dailyTasks.filter((t) => t.status === selectedStatus).length})
+                      {selectedStatus} ({(clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length})
                     </span>
                   </div>
 
                   <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                    {dailyTasks.filter((t) => t.status === selectedStatus).length === 0 ? (
+                    {((clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length === 0) ? (
                       <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
                     ) : (
-                      dailyTasks
+                      (clickupConfigured ? dailyTasks : dummyDailyTasks)
                         .filter((t) => t.status === selectedStatus)
                         .map((t) => (
                           <a
