@@ -111,8 +111,8 @@ export async function GET() {
       "N/A": 0,
     };
 
-    const token = process.env.CLICKUP_API_TOKEN;
-    const teamId = process.env.CLICKUP_TEAM_ID;
+    const token = process.env.CLICKUP_API_TOKEN?.trim();
+    const teamId = process.env.CLICKUP_TEAM_ID?.trim();
 
     if (token && teamId) {
       try {
@@ -242,7 +242,7 @@ export async function POST(req: Request) {
     // B. Update ClickUp task status in ClickUp API
     if (type === "update_clickup_task") {
       const { taskId, completed } = body;
-      const token = process.env.CLICKUP_API_TOKEN;
+      const token = process.env.CLICKUP_API_TOKEN?.trim();
       if (!token) {
         return NextResponse.json({ error: "ClickUp is not configured" }, { status: 400 });
       }
