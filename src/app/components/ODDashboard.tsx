@@ -54,6 +54,133 @@ interface EventItem {
   status: "upcoming" | "ongoing" | "completed";
 }
 
+function ClickUpPieChart({
+  distribution,
+}: {
+  distribution: {
+    PENDING: number;
+    COMPLETE: number;
+    "NOT APPLICABLE": number;
+    "N/A": number;
+  };
+}) {
+  const data = [
+    { label: "PENDING", value: distribution.PENDING, color: "#EF4444" },
+    { label: "NOT APPLICABLE", value: distribution["NOT APPLICABLE"], color: "#EAB308" },
+    { label: "N/A", value: distribution["N/A"], color: "#F59E0B" },
+    { label: "COMPLETE", value: distribution.COMPLETE, color: "#10B981" },
+  ];
+
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center h-48 text-slate-400 text-xs font-medium">
+        No daily tasks found.
+      </div>
+    );
+  }
+
+  const size = 300;
+  const center = size / 2;
+  const radius = 64;
+
+  let currentPercent = 0;
+  const slices = data
+    .filter((d) => d.value > 0)
+    .map((d) => {
+      const startPercent = currentPercent;
+      const percent = d.value / total;
+      currentPercent += percent;
+
+      const startAngle = startPercent * 2 * Math.PI - Math.PI / 2;
+      const endAngle = currentPercent * 2 * Math.PI - Math.PI / 2;
+
+      const x1 = center + radius * Math.cos(startAngle);
+      const y1 = center + radius * Math.sin(startAngle);
+      const x2 = center + radius * Math.cos(endAngle);
+      const y2 = center + radius * Math.sin(endAngle);
+
+      const largeArcFlag = percent > 0.5 ? 1 : 0;
+      const path = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+
+      // Midpoint angle for pointing labels
+      const midAngle = (startAngle + endAngle) / 2;
+      const lx1 = center + radius * Math.cos(midAngle);
+      const ly1 = center + radius * Math.sin(midAngle);
+      const lx2 = center + (radius + 20) * Math.cos(midAngle);
+      const ly2 = center + (radius + 20) * Math.sin(midAngle);
+      
+      const isLeft = Math.cos(midAngle) < 0;
+      const lx3 = lx2 + (isLeft ? -15 : 15);
+      const ly3 = ly2;
+
+      return {
+        label: d.label,
+        value: d.value,
+        color: d.color,
+        path,
+        linePoints: `${lx1},${ly1} ${lx2},${ly2} ${lx3},${ly3}`,
+        textX: lx3 + (isLeft ? -5 : 5),
+        textY: ly3 + 4,
+        textAnchor: isLeft ? "end" : "start",
+      };
+    });
+
+  return (
+    <div className="flex flex-col items-center w-full">
+      <div className="relative w-full max-w-[280px] aspect-square flex items-center justify-center">
+        <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
+          {/* Pie Slices */}
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} className="transition-all duration-300 hover:opacity-90" />
+          ))}
+
+          {/* Pointer Lines & Labels */}
+          {slices.map((s, i) => (
+            <g key={`lbl-${i}`}>
+              <polyline
+                points={s.linePoints}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="1"
+                opacity="0.8"
+              />
+              <text
+                x={s.textX}
+                y={s.textY}
+                fill="#f8fafc"
+                fontSize="9"
+                fontWeight="700"
+                textAnchor={s.textAnchor}
+                className="font-mono tracking-tight"
+              >
+                {s.label} {s.value}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* Custom Dark Legend */}
+      <div className="flex justify-center gap-x-3 gap-y-1.5 text-[9px] font-bold text-slate-400 mt-2 flex-wrap max-w-xs uppercase tracking-wider">
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-[#EF4444] rounded-sm" /> PENDING
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-[#EAB308] rounded-sm" /> NOT APPLICABLE
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-[#F59E0B] rounded-sm" /> N/A
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-[#10B981] rounded-sm" /> COMPLETE
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ODDashboard({
   userName,
   userEmail,
@@ -82,6 +209,12 @@ export default function ODDashboard({
   // --- ClickUp Tasks State (ClickUp API-backed) ---
   const [clickupTasks, setClickupTasks] = useState<ClickUpTask[]>([]);
   const [clickupConfigured, setClickupConfigured] = useState(false);
+  const [dailyDistribution, setDailyDistribution] = useState({
+    PENDING: 0,
+    COMPLETE: 0,
+    "NOT APPLICABLE": 0,
+    "N/A": 0,
+  });
 
   // --- Project Rollout State (localStorage) ---
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
@@ -111,6 +244,9 @@ export default function ODDashboard({
           if (d.clickup) {
             setClickupConfigured(d.clickup.configured);
             setClickupTasks(d.clickup.tasks);
+            if (d.clickup.dailyDistribution) {
+              setDailyDistribution(d.clickup.dailyDistribution);
+            }
           }
         }
         setLoading(false);
@@ -466,77 +602,24 @@ export default function ODDashboard({
           </div>
 
           {/* 4. ClickUp Optimization Progress (Middle Right) - CLICKUP API BACKED */}
-          <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div className="lg:col-span-5 bg-[#090d16] border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-white">
             <div>
-              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-100 mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <ListTodo className="w-5 h-5 text-teal-500" />
-                  ClickUp (Weekly Optimisation)
+                  <ListTodo className="w-5 h-5 text-teal-400" />
+                  Daily | Tue - Sat
                 </span>
-                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                <span className="text-[9px] font-bold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded uppercase tracking-wide">
                   API Connected
                 </span>
               </h2>
 
-              <div className="flex flex-col md:flex-row items-center gap-6 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-                {/* SVG Radial Tracker */}
-                <div className="relative w-24 h-24 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r={radius}
-                      className="text-slate-200"
-                      strokeWidth="8"
-                      stroke="currentColor"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r={radius}
-                      className="text-teal-500 transition-all duration-500"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      stroke="currentColor"
-                      fill="transparent"
-                    />
-                  </svg>
-                  <span className="absolute text-base font-extrabold text-slate-700">{clickupPercentage}%</span>
-                </div>
-
-                {/* Subtask Toggles */}
-                <div className="flex-1 w-full space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                  {!clickupConfigured ? (
-                    <div className="text-xs text-slate-400 text-center py-4">ClickUp integration is not configured.</div>
-                  ) : clickupTasks.length === 0 ? (
-                    <div className="text-xs text-slate-400 text-center py-4">No weekly tasks due in ClickUp.</div>
-                  ) : (
-                    clickupTasks.map((t) => (
-                      <label
-                        key={t.id}
-                        className="flex items-start gap-2.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer select-none bg-white p-2 rounded-lg border border-slate-100 shadow-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={t.completed}
-                          onChange={() => toggleClickupTask(t.id, t.completed)}
-                          className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer mt-0.5"
-                        />
-                        <div className="flex-1 flex flex-col min-w-0">
-                          <span className={`font-medium ${t.completed ? "line-through text-slate-400" : "text-slate-700"}`}>
-                            {t.name}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                            List: {t.listName}
-                          </span>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
+              <div className="flex justify-center items-center py-1">
+                {!clickupConfigured ? (
+                  <div className="text-xs text-slate-400 text-center py-12">ClickUp integration is not configured.</div>
+                ) : (
+                  <ClickUpPieChart distribution={dailyDistribution} />
+                )}
               </div>
             </div>
           </div>

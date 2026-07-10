@@ -104,6 +104,12 @@ export async function GET() {
     // 3. Fetch ClickUp tasks from ClickUp API
     let clickupTasks: any[] = [];
     let clickupConfigured = false;
+    const dailyDistribution = {
+      PENDING: 0,
+      COMPLETE: 0,
+      "NOT APPLICABLE": 0,
+      "N/A": 0,
+    };
 
     const token = process.env.CLICKUP_API_TOKEN;
     const teamId = process.env.CLICKUP_TEAM_ID;
@@ -132,6 +138,28 @@ export async function GET() {
             completed: t.status.toLowerCase() === "complete" || t.status.toLowerCase() === "closed",
           }));
 
+        // Status aggregation for the Tue-Sat folders
+        const DAILY_FOLDERS = new Set([
+          "tuesday", "wednesday", "thursday", "friday", "saturday",
+          "tuesday (x)", "wednesday (x)", "thursday(x)", "friday(x)", "saturday(x)"
+        ]);
+
+        for (const t of rawTasks) {
+          const folderName = (t.folderName ?? "").trim().toLowerCase();
+          if (DAILY_FOLDERS.has(folderName)) {
+            const s = t.status.toUpperCase();
+            if (s === "COMPLETE" || s === "CLOSED") {
+              dailyDistribution.COMPLETE += 1;
+            } else if (s === "NOT APPLICABLE" || s === "NOT_APPLICABLE") {
+              dailyDistribution["NOT APPLICABLE"] += 1;
+            } else if (s === "N/A" || s === "NA") {
+              dailyDistribution["N/A"] += 1;
+            } else {
+              dailyDistribution.PENDING += 1;
+            }
+          }
+        }
+
         clickupConfigured = true;
       } catch (err) {
         console.error("Failed to fetch ClickUp tasks in OD API:", err);
@@ -150,6 +178,7 @@ export async function GET() {
       clickup: {
         configured: clickupConfigured,
         tasks: clickupTasks,
+        dailyDistribution,
       },
     });
   } catch (error) {
