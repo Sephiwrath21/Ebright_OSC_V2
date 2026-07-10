@@ -144,19 +144,32 @@ export async function GET() {
           "tuesday (x)", "wednesday (x)", "thursday(x)", "friday(x)", "saturday(x)"
         ]);
 
-        for (const t of rawTasks) {
-          const folderName = (t.folderName ?? "").trim().toLowerCase();
-          if (DAILY_FOLDERS.has(folderName)) {
-            const s = t.status.toUpperCase();
-            if (s === "COMPLETE" || s === "CLOSED") {
-              dailyDistribution.COMPLETE += 1;
-            } else if (s === "NOT APPLICABLE" || s === "NOT_APPLICABLE") {
-              dailyDistribution["NOT APPLICABLE"] += 1;
-            } else if (s === "N/A" || s === "NA") {
-              dailyDistribution["N/A"] += 1;
-            } else {
-              dailyDistribution.PENDING += 1;
-            }
+        const dailyTasks = rawTasks
+          .filter((t) => t.folderName && DAILY_FOLDERS.has(t.folderName.trim().toLowerCase()))
+          .map((t) => {
+            let s = t.status.toUpperCase();
+            if (s === "CLOSED") s = "COMPLETE";
+            if (s === "NA") s = "N/A";
+            if (s === "NOT_APPLICABLE") s = "NOT APPLICABLE";
+            return {
+              id: t.id,
+              name: t.name,
+              status: s,
+              listName: t.listName,
+              url: t.url,
+            };
+          });
+
+        for (const t of dailyTasks) {
+          const s = t.status;
+          if (s === "COMPLETE") {
+            dailyDistribution.COMPLETE += 1;
+          } else if (s === "NOT APPLICABLE") {
+            dailyDistribution["NOT APPLICABLE"] += 1;
+          } else if (s === "N/A") {
+            dailyDistribution["N/A"] += 1;
+          } else {
+            dailyDistribution.PENDING += 1;
           }
         }
 
@@ -179,6 +192,7 @@ export async function GET() {
         configured: clickupConfigured,
         tasks: clickupTasks,
         dailyDistribution,
+        dailyTasks,
       },
     });
   } catch (error) {

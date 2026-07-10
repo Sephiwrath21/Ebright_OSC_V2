@@ -16,6 +16,7 @@ import {
   FileText,
   ListTodo,
   TrendingUp,
+  ArrowLeft,
 } from "lucide-react";
 import GreetingHeader from "./GreetingHeader";
 
@@ -56,6 +57,7 @@ interface EventItem {
 
 function ClickUpPieChart({
   distribution,
+  onSliceClick,
 }: {
   distribution: {
     PENDING: number;
@@ -63,6 +65,7 @@ function ClickUpPieChart({
     "NOT APPLICABLE": number;
     "N/A": number;
   };
+  onSliceClick: (status: string) => void;
 }) {
   const data = [
     { label: "PENDING", value: distribution.PENDING, color: "#EF4444" },
@@ -133,7 +136,13 @@ function ClickUpPieChart({
         <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
           {/* Pie Slices */}
           {slices.map((s, i) => (
-            <path key={i} d={s.path} fill={s.color} className="transition-all duration-300 hover:opacity-90" />
+            <path
+              key={i}
+              d={s.path}
+              fill={s.color}
+              className="transition-all duration-300 hover:opacity-85 cursor-pointer"
+              onClick={() => onSliceClick(s.label)}
+            />
           ))}
 
           {/* Pointer Lines & Labels */}
@@ -149,11 +158,12 @@ function ClickUpPieChart({
               <text
                 x={s.textX}
                 y={s.textY}
-                fill="#f8fafc"
+                fill="#334155"
                 fontSize="9"
                 fontWeight="700"
                 textAnchor={s.textAnchor}
-                className="font-mono tracking-tight"
+                className="font-mono tracking-tight cursor-pointer hover:underline"
+                onClick={() => onSliceClick(s.label)}
               >
                 {s.label} {s.value}
               </text>
@@ -162,18 +172,18 @@ function ClickUpPieChart({
         </svg>
       </div>
 
-      {/* Custom Dark Legend */}
-      <div className="flex justify-center gap-x-3 gap-y-1.5 text-[9px] font-bold text-slate-400 mt-2 flex-wrap max-w-xs uppercase tracking-wider">
-        <div className="flex items-center gap-1">
+      {/* Custom Legend */}
+      <div className="flex justify-center gap-x-3 gap-y-1.5 text-[9px] font-bold text-slate-500 mt-2 flex-wrap max-w-xs uppercase tracking-wider">
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("PENDING")}>
           <span className="w-2 h-2 bg-[#EF4444] rounded-sm" /> PENDING
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("NOT APPLICABLE")}>
           <span className="w-2 h-2 bg-[#EAB308] rounded-sm" /> NOT APPLICABLE
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("N/A")}>
           <span className="w-2 h-2 bg-[#F59E0B] rounded-sm" /> N/A
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("COMPLETE")}>
           <span className="w-2 h-2 bg-[#10B981] rounded-sm" /> COMPLETE
         </div>
       </div>
@@ -215,6 +225,8 @@ export default function ODDashboard({
     "NOT APPLICABLE": 0,
     "N/A": 0,
   });
+  const [dailyTasks, setDailyTasks] = useState<any[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   // --- Project Rollout State (localStorage) ---
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
@@ -246,6 +258,9 @@ export default function ODDashboard({
             setClickupTasks(d.clickup.tasks);
             if (d.clickup.dailyDistribution) {
               setDailyDistribution(d.clickup.dailyDistribution);
+            }
+            if (d.clickup.dailyTasks) {
+              setDailyTasks(d.clickup.dailyTasks);
             }
           }
         }
@@ -602,25 +617,70 @@ export default function ODDashboard({
           </div>
 
           {/* 4. ClickUp Optimization Progress (Middle Right) - CLICKUP API BACKED */}
-          <div className="lg:col-span-5 bg-[#090d16] border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-white">
+          <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-slate-800">
             <div>
-              <h2 className="text-base font-semibold text-slate-100 mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <ListTodo className="w-5 h-5 text-teal-400" />
-                  Daily | Tue - Sat
-                </span>
-                <span className="text-[9px] font-bold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded uppercase tracking-wide">
-                  API Connected
-                </span>
-              </h2>
+              {selectedStatus === null ? (
+                <>
+                  <h2 className="text-base font-semibold text-slate-900 mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <ListTodo className="w-5 h-5 text-teal-500" />
+                      Daily | Tue - Sat
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                      API Connected
+                    </span>
+                  </h2>
 
-              <div className="flex justify-center items-center py-1">
-                {!clickupConfigured ? (
-                  <div className="text-xs text-slate-400 text-center py-12">ClickUp integration is not configured.</div>
-                ) : (
-                  <ClickUpPieChart distribution={dailyDistribution} />
-                )}
-              </div>
+                  <div className="flex justify-center items-center py-1">
+                    {!clickupConfigured ? (
+                      <div className="text-xs text-slate-400 text-center py-12">ClickUp integration is not configured.</div>
+                    ) : (
+                      <ClickUpPieChart distribution={dailyDistribution} onSliceClick={setSelectedStatus} />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                    <button
+                      onClick={() => setSelectedStatus(null)}
+                      className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to Chart
+                    </button>
+                    <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                      {selectedStatus} ({dailyTasks.filter((t) => t.status === selectedStatus).length})
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    {dailyTasks.filter((t) => t.status === selectedStatus).length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
+                    ) : (
+                      dailyTasks
+                        .filter((t) => t.status === selectedStatus)
+                        .map((t) => (
+                          <a
+                            key={t.id}
+                            href={t.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-start gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs transition-all duration-200"
+                          >
+                            <span className="font-mono text-[10px] text-slate-400 font-bold">#{t.id}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-700 leading-tight hover:underline">{t.name}</p>
+                              <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
+                                List: {t.listName}
+                              </p>
+                            </div>
+                          </a>
+                        ))
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
