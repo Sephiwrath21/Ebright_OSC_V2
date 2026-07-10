@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   UserPlus,
   UserMinus,
@@ -39,9 +39,12 @@ interface TicketCategory {
   total: number;
 }
 
-interface ClickUpSubtask {
+interface ClickUpTask {
   id: string;
-  text: string;
+  name: string;
+  status: string;
+  listName: string;
+  url: string;
   completed: boolean;
 }
 
@@ -63,7 +66,9 @@ export default function ODDashboard({
     userEmail?.split("@")[0] ||
     "optimization";
 
-  // --- Attendance State (API) ---
+  const [loading, setLoading] = useState(true);
+
+  // --- Attendance State (DB-backed) ---
   const [attendance, setAttendance] = useState<AttendanceData>({
     onboarding: 0,
     offboarding: 0,
@@ -71,38 +76,17 @@ export default function ODDashboard({
     al: 0,
   });
 
-  useEffect(() => {
-    fetch("/api/od/dashboard")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success && d.attendance) {
-          setAttendance(d.attendance);
-        }
-      })
-      .catch((err) => console.error("Error loading OD attendance:", err));
-  }, []);
+  // --- Tickets State (DB-backed) ---
+  const [tickets, setTickets] = useState<TicketCategory[]>([]);
+
+  // --- ClickUp Tasks State (ClickUp API-backed) ---
+  const [clickupTasks, setClickupTasks] = useState<ClickUpTask[]>([]);
+  const [clickupConfigured, setClickupConfigured] = useState(false);
 
   // --- Project Rollout State (localStorage) ---
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
-
-  // --- Tickets State (localStorage) ---
-  const [tickets, setTickets] = useState<TicketCategory[]>([
-    { name: "Aone", count: 3, total: 5 },
-    { name: "PS", count: 4, total: 8 },
-    { name: "Leads", count: 2, total: 6 },
-    { name: "Clickup", count: 5, total: 10 },
-    { name: "Others", count: 1, total: 4 },
-  ]);
-
-  // --- ClickUp Optimisation Subtasks (localStorage) ---
-  const [clickupSubtasks, setClickupSubtasks] = useState<ClickUpSubtask[]>([
-    { id: "1", text: "Database Caching & Indexing", completed: true },
-    { id: "2", text: "Docker Cache Invalidation", completed: true },
-    { id: "3", text: "CI/CD Pipeline Speedup", completed: false },
-    { id: "4", text: "Calendar Leave Performance", completed: false },
-  ]);
 
   // --- Braindump State (localStorage) ---
   const [braindump, setBraindump] = useState("");
@@ -116,16 +100,35 @@ export default function ODDashboard({
   const [newEventName, setNewEventName] = useState("");
   const [newEventStatus, setNewEventStatus] = useState<"upcoming" | "ongoing" | "completed">("upcoming");
 
-  // Load from localStorage
+  // Load backend stats
+  const loadBackend = useCallback(() => {
+    fetch("/api/od/dashboard", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          if (d.attendance) setAttendance(d.attendance);
+          if (d.tickets) setTickets(d.tickets);
+          if (d.clickup) {
+            setClickupConfigured(d.clickup.configured);
+            setClickupTasks(d.clickup.tasks);
+          }
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error loading OD data:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadBackend();
+  }, [loadBackend]);
+
+  // Load from localStorage (Local widgets)
   useEffect(() => {
     const savedTasks = localStorage.getItem("od_project_tasks");
     if (savedTasks) setProjectTasks(JSON.parse(savedTasks));
-
-    const savedTickets = localStorage.getItem("od_tickets");
-    if (savedTickets) setTickets(JSON.parse(savedTickets));
-
-    const savedSubtasks = localStorage.getItem("od_clickup_subtasks");
-    if (savedSubtasks) setClickupSubtasks(JSON.parse(savedSubtasks));
 
     const savedBraindump = localStorage.getItem("od_braindump");
     if (savedBraindump) setBraindump(savedBraindump);
@@ -134,20 +137,10 @@ export default function ODDashboard({
     if (savedEvents) setEvents(JSON.parse(savedEvents));
   }, []);
 
-  // Save triggers
+  // Save triggers for localStorage widgets
   const saveTasks = (tasks: ProjectTask[]) => {
     setProjectTasks(tasks);
     localStorage.setItem("od_project_tasks", JSON.stringify(tasks));
-  };
-
-  const saveTickets = (t: TicketCategory[]) => {
-    setTickets(t);
-    localStorage.setItem("od_tickets", JSON.stringify(t));
-  };
-
-  const saveSubtasks = (s: ClickUpSubtask[]) => {
-    setClickupSubtasks(s);
-    localStorage.setItem("od_clickup_subtasks", JSON.stringify(s));
   };
 
   const saveEvents = (evs: EventItem[]) => {
@@ -180,28 +173,74 @@ export default function ODDashboard({
     saveTasks(projectTasks.filter((t) => t.id !== id));
   };
 
-  // --- Ticket Actions ---
-  const adjustTicket = (index: number, type: "inc" | "dec", isTotal = false) => {
+  // --- Ticket Actions (Post to DB) ---
+  const adjustTicket = async (index: number, type: "inc" | "dec", isTotal = false) => {
     const updated = [...tickets];
     const item = updated[index];
+    
+    let nextCount = item.count;
+    let nextTotal = item.total;
+
     if (isTotal) {
-      item.total = Math.max(1, type === "inc" ? item.total + 1 : item.total - 1);
-      item.count = Math.min(item.count, item.total);
+      nextTotal = Math.max(1, type === "inc" ? item.total + 1 : item.total - 1);
+      nextCount = Math.min(item.count, nextTotal);
     } else {
-      item.count = type === "inc" ? Math.min(item.total, item.count + 1) : Math.max(0, item.count - 1);
+      nextCount = type === "inc" ? Math.min(item.total, item.count + 1) : Math.max(0, item.count - 1);
     }
-    saveTickets(updated);
+
+    // Optimistic update
+    item.count = nextCount;
+    item.total = nextTotal;
+    setTickets(updated);
+
+    try {
+      const res = await fetch("/api/od/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "update_ticket",
+          name: item.name,
+          count: nextCount,
+          total: nextTotal,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update ticket in database");
+    } catch (error) {
+      console.error(error);
+      // Reload from DB on failure
+      loadBackend();
+    }
   };
 
-  // --- ClickUp Optimisation Actions ---
-  const toggleSubtask = (id: string) => {
-    saveSubtasks(
-      clickupSubtasks.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s))
+  // --- ClickUp Actions (Post to ClickUp API) ---
+  const toggleClickupTask = async (taskId: string, currentCompleted: boolean) => {
+    const nextCompleted = !currentCompleted;
+
+    // Optimistic update
+    setClickupTasks(
+      clickupTasks.map((t) => (t.id === taskId ? { ...t, completed: nextCompleted } : t))
     );
+
+    try {
+      const res = await fetch("/api/od/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "update_clickup_task",
+          taskId,
+          completed: nextCompleted,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update task in ClickUp");
+    } catch (error) {
+      console.error(error);
+      // Reload on failure
+      loadBackend();
+    }
   };
 
-  const completedSubtasksCount = clickupSubtasks.filter((s) => s.completed).length;
-  const clickupPercentage = clickupSubtasks.length > 0 ? Math.round((completedSubtasksCount / clickupSubtasks.length) * 100) : 0;
+  const completedClickupTasksCount = clickupTasks.filter((t) => t.completed).length;
+  const clickupPercentage = clickupTasks.length > 0 ? Math.round((completedClickupTasksCount / clickupTasks.length) * 100) : 0;
 
   // Circular progress properties
   const radius = 40;
@@ -236,11 +275,18 @@ export default function ODDashboard({
       <div className="max-w-7xl mx-auto px-6 pt-6 pb-12 space-y-6">
         
         {/* Header */}
-        <div className="mb-6">
-          <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
-          <p className="text-sm text-slate-500 mt-2">
-            Hi, Optimization Department! Here is your custom executive workspace.
-          </p>
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
+            <p className="text-sm text-slate-500 mt-2">
+              Hi, Optimization Department! Here is your custom executive workspace.
+            </p>
+          </div>
+          {loading && (
+            <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
+              Syncing databases...
+            </span>
+          )}
         </div>
 
         {/* --- MAIN GRID SECTION --- */}
@@ -301,66 +347,76 @@ export default function ODDashboard({
             </div>
           </div>
 
-          {/* 2. Tickets Counter (Top Right) */}
+          {/* 2. Tickets Counter (Top Right) - DB BACKED */}
           <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
             <div>
-              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Ticket className="w-5 h-5 text-indigo-500" />
-                Tickets Counter
+              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-indigo-500" />
+                  Tickets Counter
+                </span>
+                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                  Database Active
+                </span>
               </h2>
+              
               <div className="space-y-3">
-                {tickets.map((t, idx) => {
-                  const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
-                  return (
-                    <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500 font-mono">
-                            {t.count}/{t.total} ({percent}%)
-                          </span>
-                          {/* Controls */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => adjustTicket(idx, "dec")}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
-                            >
-                              -
-                            </button>
-                            <button
-                              onClick={() => adjustTicket(idx, "inc")}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
-                            >
-                              +
-                            </button>
-                            <span className="w-[1px] h-3 bg-slate-200 mx-0.5" />
-                            <button
-                              onClick={() => adjustTicket(idx, "dec", true)}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-rose-500 font-black flex items-center justify-center text-[10px] shadow-sm"
-                              title="Decrease Total"
-                            >
-                              T-
-                            </button>
-                            <button
-                              onClick={() => adjustTicket(idx, "inc", true)}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-emerald-500 font-black flex items-center justify-center text-[10px] shadow-sm"
-                              title="Increase Total"
-                            >
-                              T+
-                            </button>
+                {tickets.length === 0 ? (
+                  <div className="py-6 flex items-center justify-center"><div className="h-5 w-40 bg-slate-100 rounded animate-pulse" /></div>
+                ) : (
+                  tickets.map((t, idx) => {
+                    const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
+                    return (
+                      <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500 font-mono">
+                              {t.count}/{t.total} ({percent}%)
+                            </span>
+                            {/* Controls */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => adjustTicket(idx, "dec")}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
+                              >
+                                -
+                              </button>
+                              <button
+                                onClick={() => adjustTicket(idx, "inc")}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
+                              >
+                                +
+                              </button>
+                              <span className="w-[1px] h-3 bg-slate-200 mx-0.5" />
+                              <button
+                                onClick={() => adjustTicket(idx, "dec", true)}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-rose-500 font-black flex items-center justify-center text-[10px] shadow-sm"
+                                title="Decrease Total"
+                              >
+                                T-
+                              </button>
+                              <button
+                                onClick={() => adjustTicket(idx, "inc", true)}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-emerald-500 font-black flex items-center justify-center text-[10px] shadow-sm"
+                                title="Increase Total"
+                              >
+                                T+
+                              </button>
+                            </div>
                           </div>
                         </div>
+                        {/* Progress Bar */}
+                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
                       </div>
-                      {/* Progress Bar */}
-                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-indigo-500 rounded-full transition-all duration-300"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -439,12 +495,17 @@ export default function ODDashboard({
             </div>
           </div>
 
-          {/* 4. ClickUp Optimization Progress (Middle Right) */}
+          {/* 4. ClickUp Optimization Progress (Middle Right) - CLICKUP API BACKED */}
           <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
             <div>
-              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <ListTodo className="w-5 h-5 text-teal-500" />
-                ClickUp (Weekly Optimisation)
+              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <ListTodo className="w-5 h-5 text-teal-500" />
+                  ClickUp (Weekly Optimisation)
+                </span>
+                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                  API Connected
+                </span>
               </h2>
 
               <div className="flex flex-col md:flex-row items-center gap-6 p-2 bg-slate-50 rounded-2xl border border-slate-100">
@@ -477,21 +538,34 @@ export default function ODDashboard({
                 </div>
 
                 {/* Subtask Toggles */}
-                <div className="flex-1 w-full space-y-2">
-                  {clickupSubtasks.map((sub) => (
-                    <label
-                      key={sub.id}
-                      className="flex items-center gap-2.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer select-none bg-white p-2 rounded-lg border border-slate-100 shadow-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={sub.completed}
-                        onChange={() => toggleSubtask(sub.id)}
-                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
-                      />
-                      <span className={sub.completed ? "line-through text-slate-400" : ""}>{sub.text}</span>
-                    </label>
-                  ))}
+                <div className="flex-1 w-full space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {!clickupConfigured ? (
+                    <div className="text-xs text-slate-400 text-center py-4">ClickUp integration is not configured.</div>
+                  ) : clickupTasks.length === 0 ? (
+                    <div className="text-xs text-slate-400 text-center py-4">No weekly tasks due in ClickUp.</div>
+                  ) : (
+                    clickupTasks.map((t) => (
+                      <label
+                        key={t.id}
+                        className="flex items-start gap-2.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer select-none bg-white p-2 rounded-lg border border-slate-100 shadow-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={t.completed}
+                          onChange={() => toggleClickupTask(t.id, t.completed)}
+                          className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer mt-0.5"
+                        />
+                        <div className="flex-1 flex flex-col min-w-0">
+                          <span className={`font-medium ${t.completed ? "line-through text-slate-400" : "text-slate-700"}`}>
+                            {t.name}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                            List: {t.listName}
+                          </span>
+                        </div>
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
