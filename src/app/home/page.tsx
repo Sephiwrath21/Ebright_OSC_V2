@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
+import ODDashboard from "@/app/components/ODDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 
@@ -36,12 +37,15 @@ export default function HomePage() {
   // role_type "staff" corresponds to role_id = 4 in the DB.
   const isStaff = userRole.toLowerCase() === "staff";
   const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
+  const isOD = userEmail.toLowerCase() === "od@ebright.my";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <HodPendingAlert position={userPosition} />
-      {isFinance ? (
-        <FinanceDashboard userName={userName} />
+      {isOD ? (
+        <ODDashboard userName={userName} userEmail={userEmail} />
+      ) : isFinance ? (
+        <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
       ) : (
