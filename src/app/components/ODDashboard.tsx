@@ -290,7 +290,7 @@ export default function ODDashboard({
         </div>
 
         {/* --- MAIN GRID SECTION --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
           {/* 1. Attendance Tracker (Top Left) */}
           <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -374,36 +374,6 @@ export default function ODDashboard({
                             <span className="text-slate-500 font-mono">
                               {t.count}/{t.total} ({percent}%)
                             </span>
-                            {/* Controls */}
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => adjustTicket(idx, "dec")}
-                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
-                              >
-                                -
-                              </button>
-                              <button
-                                onClick={() => adjustTicket(idx, "inc")}
-                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-600 font-black flex items-center justify-center text-[10px] shadow-sm"
-                              >
-                                +
-                              </button>
-                              <span className="w-[1px] h-3 bg-slate-200 mx-0.5" />
-                              <button
-                                onClick={() => adjustTicket(idx, "dec", true)}
-                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-rose-500 font-black flex items-center justify-center text-[10px] shadow-sm"
-                                title="Decrease Total"
-                              >
-                                T-
-                              </button>
-                              <button
-                                onClick={() => adjustTicket(idx, "inc", true)}
-                                className="w-5 h-5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-emerald-500 font-black flex items-center justify-center text-[10px] shadow-sm"
-                                title="Increase Total"
-                              >
-                                T+
-                              </button>
-                            </div>
                           </div>
                         </div>
                         {/* Progress Bar */}
