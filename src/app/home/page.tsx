@@ -7,6 +7,7 @@ import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDa
 import FinanceDashboard from "@/app/components/FinanceDashboard";
 import ODDashboard from "@/app/components/ODDashboard";
 import OperationsDashboard from "@/app/components/OperationsDashboard";
+import MarketingDashboard from "@/app/components/MarketingDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 
@@ -40,6 +41,7 @@ export default function HomePage() {
   const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
   const isOD = userEmail.toLowerCase() === "od@ebright.my";
   const isOperations = userEmail.toLowerCase() === "operations@ebright.my";
+  const isMarketing = userEmail.toLowerCase() === "marketing@ebright.my";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -48,6 +50,8 @@ export default function HomePage() {
         <ODDashboard userName={userName} userEmail={userEmail} />
       ) : isOperations ? (
         <OperationsDashboard userName={userName} userEmail={userEmail} />
+      ) : isMarketing ? (
+        <MarketingDashboard userName={userName} userEmail={userEmail} />
       ) : isFinance ? (
         <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (

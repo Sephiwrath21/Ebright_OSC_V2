@@ -478,7 +478,7 @@ export default function ODDashboard({
                     return (
                       <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name}</span>
+                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
                           <div className="flex items-center gap-2">
                             <span className="text-slate-500 font-mono">
                               {t.count}/{t.total} ({percent}%)
