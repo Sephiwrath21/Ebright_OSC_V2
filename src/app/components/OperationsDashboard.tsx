@@ -218,9 +218,9 @@ export default function OperationsDashboard({
                 </span>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
                 {leads.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-8">No CRM leads synced recently.</p>
+                  <p className="text-xs text-slate-400 text-center py-12">No CRM leads synced recently.</p>
                 ) : (
                   leads.map((lead) => (
                     <div
