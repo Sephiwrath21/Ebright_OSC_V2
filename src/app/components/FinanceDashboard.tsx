@@ -15,7 +15,6 @@ import DonutChart, { type DonutSegment } from "@/app/components/DonutChart";
 import BarChart, { type BarDatum } from "@/app/components/BarChart";
 import ToDoList from "@/app/components/ToDoList";
 import { CLAIM_TYPE_SHORT_LABELS } from "@/app/claim/claim-types";
-import GreetingHeader from "./GreetingHeader";
 
 interface ClaimRow {
   claimId: number;
@@ -89,17 +88,7 @@ const rm = (n: number) =>
 const typeLabel = (t: string) =>
   CLAIM_TYPE_SHORT_LABELS[t as keyof typeof CLAIM_TYPE_SHORT_LABELS] ?? t;
 
-export default function FinanceDashboard({
-  userName,
-  userEmail,
-}: {
-  userName?: string | null;
-  userEmail?: string | null;
-}) {
-  const greetName =
-    userName?.split(" ")[0] ||
-    userEmail?.split("@")[0] ||
-    "finance";
+export default function FinanceDashboard({ userName }: { userName?: string | null }) {
   const [data, setData] = useState<FinanceData | null>(null);
   const [error, setError] = useState(false);
 
@@ -203,26 +192,35 @@ export default function FinanceDashboard({
     <div className="min-h-full bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 pt-6 pb-10 space-y-6">
         {/* Header */}
-        <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
-        
-        {/* Sub-header */}
-        <div className="border-b border-slate-200 pb-4">
-          <p className="text-sm text-slate-500">
-            Overview of all expense claims.
-          </p>
-        </div>
+        <header className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">
+              Finance Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {userName ? `Welcome back, ${userName}. ` : ""}Overview of all expense claims.
+            </p>
+          </div>
+          <Link
+            href="/claim"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
+          >
+            <FileText className="w-4 h-4" aria-hidden="true" />
+            Review Claims
+          </Link>
+        </header>
 
         {/* Stat bar */}
-        <section className="rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3.5 shadow-sm">
+        <section className="rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-6 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {stats.map(({ label, value, Icon, href }) => {
               const inner = (
                 <>
-                  <Icon className="w-4 h-4 mx-auto mb-1 opacity-80" aria-hidden="true" />
-                  <p className="text-xl md:text-2xl font-bold leading-tight tabular-nums">
+                  <Icon className="w-5 h-5 mx-auto mb-2 opacity-80" aria-hidden="true" />
+                  <p className="text-2xl md:text-3xl font-bold leading-tight tabular-nums">
                     {value}
                   </p>
-                  <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80">
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-widest text-white/80">
                     {label}
                   </p>
                 </>
@@ -231,7 +229,7 @@ export default function FinanceDashboard({
                 <Link
                   key={label}
                   href={href}
-                  className="text-center text-white px-2 rounded-xl py-0.5 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  className="text-center text-white px-2 rounded-xl py-1 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                 >
                   {inner}
                 </Link>

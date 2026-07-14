@@ -7,7 +7,6 @@ import {
   MapPin, Home, ChevronRight, BarChart3,
 } from "lucide-react";
 import { useBreadcrumb } from "@/app/components/BreadcrumbContext";
-import GreetingHeader from "@/app/components/GreetingHeader";
 import {
   BRANCHES, MOCK_DASH_EVENTS, MOCK_DASH_SESSIONS, MOCK_DASH_QUOTAS, MOCK_DASH_INVS,
   countsAsConfirmed,
@@ -90,17 +89,7 @@ function TH({ children, center }: { children: React.ReactNode; center?: boolean 
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function FADashboardClient({
-  userName,
-  userEmail,
-}: {
-  userName?: string | null;
-  userEmail?: string | null;
-}) {
-  const greetName =
-    userName?.split(" ")[0] ||
-    userEmail?.split("@")[0] ||
-    "finance";
+export default function FADashboardClient() {
   useBreadcrumb([
     { label: "Home", href: "/home" },
     { label: "FA System", href: "/dashboards/fa" },
@@ -255,8 +244,9 @@ export default function FADashboardClient({
 
         {/* Header */}
         <div className="mb-6">
-          <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
-          <p className="text-sm text-slate-500 mt-3">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">FA System</p>
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">
             Overview of Foundation Appraisal performance across all events.
           </p>
         </div>
