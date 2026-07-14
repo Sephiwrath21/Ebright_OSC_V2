@@ -33,6 +33,11 @@ jobs:
 
   deploy:
     needs: validate
+    # Never let a fork's copy of this workflow SSH into our servers.
+    # A fork can delete this line, so it is a safety net, NOT the real
+    # lock — rotating SSH_DEPLOY_KEY (so forks lack the key) is what
+    # actually prevents fork deploys.
+    if: github.repository == 'EbrightOD/Ebright_OSC_V2'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve deploy target
