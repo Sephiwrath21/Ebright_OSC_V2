@@ -8,6 +8,7 @@ import {
   Layers,
   Home,
   ChevronRight,
+  Mail,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -49,6 +50,15 @@ const modules: SmsModule[] = [
     Icon: Layers,
     accent: "bg-emerald-600",
     accentHover: "group-hover:bg-emerald-700",
+  },
+  {
+    id: "cep",
+    title: "CEP",
+    description: "Manage parent communications and engagement",
+    href: "/dashboards/sms/cep",
+    Icon: Mail,
+    accent: "bg-red-600",
+    accentHover: "group-hover:bg-red-700",
   },
 ];
 
