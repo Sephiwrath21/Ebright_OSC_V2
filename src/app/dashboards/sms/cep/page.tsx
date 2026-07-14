@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/nextauth";
+import { auth } from "@/auth";
 import AppShell from "@/app/components/AppShell";
 import CepEmbed from "@/app/components/CepEmbed";
 
@@ -11,7 +10,7 @@ export const metadata = {
 };
 
 export default async function CepPage() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const userEmail = session.user.email;
