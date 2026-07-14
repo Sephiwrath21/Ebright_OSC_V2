@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   ListChecks,
   ChevronDown,
+  Award,
+  ClipboardList,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -38,6 +40,7 @@ const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
   {
     name: "HRMS",
+    href: "/dashboards/hrms",
     Icon: Users,
     children: [
       { name: "Overview", href: "/dashboards/hrms" },
@@ -59,15 +62,46 @@ const primaryNav: NavItem[] = [
     ],
   },
   {
-    name: "CRM",
+    name: "CNS",
+    href: "/dashboards/crm",
     Icon: Newspaper,
     children: [
-      { name: "Overview", href: "/dashboards/crm" },
-      { name: "Lead", href: "/crm/lead" },
-      { name: "Ticket", href: "/crm/ticket" },
+      {
+        name: "Lead",
+        children: [
+          { name: "Dashboard", href: "/crm/dashboard", exact: true },
+          { name: "Contacts", href: "/crm/contacts" },
+          { name: "Opportunities", href: "/crm/opportunities" },
+          { name: "Forms", href: "/crm/forms" },
+          { name: "Branches", href: "/crm/branches" },
+          { name: "Region", href: "/crm/region" },
+          { name: "Automations", href: "/crm/automations" },
+          { name: "Analytics", href: "/crm/analytics" },
+          { name: "Integrations", href: "/crm/integrations" },
+        ],
+      },
+      {
+        name: "Ticket",
+        children: [
+          { name: "Dashboard", href: "/crm/ticket/dashboard", exact: true },
+          { name: "Opportunities", href: "/crm/ticket/opportunities" },
+          { name: "My Tickets", href: "/crm/ticket/my-tickets" },
+          { name: "New Ticket", href: "/crm/ticket/new" },
+          { name: "Platforms", href: "/crm/ticket/platforms" },
+        ],
+      },
     ],
   },
-  { name: "SMS", href: "/dashboards/sms", Icon: BookUser },
+  {
+    name: "SMS",
+    href: "/dashboards/sms",
+    Icon: BookUser,
+    children: [
+      { name: "Student", href: "/dashboards/sms/student" },
+      { name: "Package", href: "/dashboards/sms/package" },
+      { name: "Age Group", href: "/dashboards/sms/age-group" },
+    ],
+  },
   {
     name: "Inventory",
     href: "https://inventory.ebright.my/",
@@ -75,6 +109,32 @@ const primaryNav: NavItem[] = [
     external: true,
   },
   { name: "Academy", href: "/academy", Icon: GraduationCap },
+  {
+    name: "FA System",
+    href: "/dashboards/fa",
+    Icon: Award,
+    children: [
+      { name: "Events", href: "/dashboards/fa/events" },
+      { name: "Inventory", href: "/dashboards/fa/inventory" },
+      { name: "Student List", href: "/dashboards/fa/student-list" },
+      { name: "Reports", href: "/dashboards/fa/reports" },
+      { name: "Attendance", href: "/dashboards/fa/attendance" },
+      { name: "Dashboard", href: "/dashboards/fa", exact: true },
+    ],
+  },
+  {
+    name: "PCM System",
+    href: "/dashboards/pcm",
+    Icon: ClipboardList,
+    children: [
+      { name: "Events", href: "/dashboards/pcm/events" },
+      { name: "Student List", href: "/dashboards/pcm/student-list" },
+      { name: "Invitations", href: "/dashboards/pcm/invitations" },
+      { name: "Reports", href: "/dashboards/pcm/reports" },
+      { name: "Attendance", href: "/dashboards/pcm/attendance" },
+      { name: "Dashboard", href: "/dashboards/pcm", exact: true },
+    ],
+  },
   { name: "ClickUp Tasks", href: "/clickup-dashboard", Icon: ListChecks },
 ];
 

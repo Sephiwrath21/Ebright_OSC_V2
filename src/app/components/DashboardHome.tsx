@@ -50,7 +50,7 @@ const dashboards: DashboardCard[] = [
   },
   {
     id: "crm",
-    title: "CRM",
+    title: "CNS",
     icon: "📰",
     color: "bg-yellow-500",
     items: [

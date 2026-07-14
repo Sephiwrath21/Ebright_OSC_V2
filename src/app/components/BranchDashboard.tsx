@@ -28,7 +28,7 @@ const card: React.CSSProperties = {
 
 const DEFAULT_TASKS = [
   { id: "t1", title: "Submit weekly enrolment report", done: false },
-  { id: "t2", title: "Follow up 3 CRM opportunities", done: false },
+  { id: "t2", title: "Follow up 3 CNS opportunities", done: false },
   { id: "t3", title: "Approve staff MC application", done: true },
   { id: "t4", title: "Confirm townhall headcount", done: false },
 ];
@@ -443,48 +443,16 @@ export default function BranchDashboard({
             alignItems: "stretch",
           }}
         >
-          {/* 1) Attendance Today (Left) */}
-          <Panel title="Attendance Today" icon={<Compass style={{ width: 14, height: 14 }} />}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-              }}
-            >
-              {attendance.map((a) => {
-                let bg = "#EFF6FF";
-                let border = "1px solid #DBEAFE";
-                let iconBg = "#3B82F6";
-                let iconColor = "#FFFFFF";
-                let labelColor = "#2563EB";
-                let IconComponent = UserCheck;
-
-                if (a.label === "Present") {
-                  bg = "#ECFDF5";
-                  border = "1px solid #D1FAE5";
-                  iconBg = "#10B981";
-                  labelColor = "#047857";
-                  IconComponent = UserCheck;
-                } else if (a.label === "Absent") {
-                  bg = "#FEF2F2";
-                  border = "1px solid #FECACA";
-                  iconBg = "#EF4444";
-                  labelColor = "#B91C1C";
-                  IconComponent = UserX;
-                } else if (a.label === "MC") {
-                  bg = "#FFFBEB";
-                  border = "1px solid #FDE68A";
-                  iconBg = "#F59E0B";
-                  labelColor = "#B45309";
-                  IconComponent = Activity;
-                } else if (a.label === "Annual Leave") {
-                  bg = "#EFF6FF";
-                  border = "1px solid #DBEAFE";
-                  iconBg = "#3B82F6";
-                  labelColor = "#1D4ED8";
-                  IconComponent = Calendar;
-                }
+          {/* 1) CRM & SMS metrics */}
+          <Panel
+            title="CNS & SMS Metrics"
+            icon={<i className="ti ti-layout-grid" />}
+            bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
+          >
+            <MetricRow rowLabel="CNS" metrics={CRM_METRICS} />
+            <div style={{ height: 0.5, background: "#EEF1F4" }} />
+            <MetricRow rowLabel="SMS" metrics={SMS_METRICS} />
+          </Panel>
 
                 return (
                   <div

@@ -123,16 +123,9 @@ export default function AttendanceDashboard() {
           <span className="text-slate-900 font-medium">Attendance</span>
         </nav>
 
-        <header className="mb-5">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-amber-600 mb-1.5">
-            Attendance
-          </p>
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-            Attendance Center
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-            Track time, manage leave, and review the day&rsquo;s activity in one place.
-          </p>
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Attendance Center</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Track time, manage leave, and review the day&rsquo;s activity in one place.</p>
         </header>
 
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -1,0 +1,270 @@
+// Ebright SMS + Email Marketing Portal — Prisma schema
+// Day-based automation (Part 2 authoritative)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model EbrightCepBranch {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parents   Parent[]
+}
+
+model Parent {
+  id                String    @id @default(cuid())
+  name              String
+  email             String
+  phone             String
+  branchId          String
+  branch            EbrightCepBranch @relation(fields: [branchId], references: [id])
+  studentName       String
+  program           String
+  programDur        Int
+  plan_type         String?   // '3mo', '6mo', '9mo', '12mo'
+  enrollDate        DateTime
+  birthday          DateTime?
+  status            String    @default("active") // active | trial | inactive
+  m1StartDate       DateTime
+  createdAt         DateTime  @default(now())
+
+  sendLogs          SendLog[]
+  notifications     EbrightCepNotification[]
+  sendSchedules     SendSchedule[]
+}
+
+model SendSchedule {
+  id           String    @id @default(cuid())
+  parentId     String
+  parent       Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  contentType  String
+  monthNumber  Int?
+  weekNumber   Int?
+  scheduledAt  DateTime
+  status       String    @default("queued") // queued | sent | skipped | pending
+  sentAt       DateTime?
+  skipReason   String?
+  createdAt    DateTime  @default(now())
+}
+
+enum EngagementStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  FAILED
+  SKIPPED
+}
+
+model SendLog {
+  id           String   @id @default(cuid())
+  parentId     String
+  parent       Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  contentType  String
+  monthNumber  Int?
+  weekNumber   Int?
+  status       EngagementStatus @default(QUEUED)
+  message      String
+  mediaUrl     String?
+  smsSent      Boolean  @default(true)
+  waSent       Boolean  @default(true)
+  smsStatus    String   @default("sent")
+  waStatus     String   @default("sent")
+  createdAt    DateTime @default(now())
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  openedAt     DateTime?
+  clickedAt    DateTime?
+  errorMessage String?
+  triggeredBy  String   @default("cron")
+  reason       String?
+}
+
+// ---------------------------------------------------------------------------
+// Festive rules: calendar-date sends shared by all parents (not enrollment-
+// relative, unlike AutomationRule/Trigger). Malaysian festival dates shift
+// yearly (Hijri/lunar), so `date`/`endDate` are admin-edited each year rather
+// than computed. `slug` feeds the SendLog/Content contentType convention:
+// `festive_<slug>` (on-day) and `festive_<slug>_pre` (pre-festival greeting).
+// ---------------------------------------------------------------------------
+model FestiveEvent {
+  id          String    @id @default(cuid())
+  name        String   // e.g. "Hari Raya Aidilfitri"
+  slug        String   @unique // e.g. "hari_raya_aidilfitri"
+  date        DateTime // this year's date (day 1, for multi-day festivals)
+  endDate     DateTime? // optional 2nd day, e.g. Chinese New Year
+  sendOnDay   Boolean   @default(true)
+  sendPreDays Int?      // e.g. 3 = also send H-3; null = on-day only
+  branch      String?   // optional branch filter; null = all branches
+  isActive    Boolean   @default(true)
+  // Cal.com sync (lib/festiveSync.ts): externalId is the Cal.com booking uid (titled
+  // "Festive: <name>"), used as the upsert key so re-syncing never duplicates and
+  // edits/cancellations on Cal.com propagate. source is "manual" (admin-entered,
+  // name/date freely editable) or "cal_com" (name/date are Cal.com-owned — admin only
+  // edits sendOnDay/sendPreDays/branch/isActive).
+  externalId  String?   @unique
+  source      String    @default("manual")
+  syncedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Showcase events: one-off branch/company showcases, date-sourced from Cal.com
+// the same way as FestiveEvent (see lib/showcaseSync.ts). Unlike festivals, a
+// showcase with no matching Content template does NOT get a generic fallback
+// send — see lib/cron.ts's showcase block — because a showcase needs real
+// logistics (venue/time/what-to-bring), not a placeholder greeting.
+// ---------------------------------------------------------------------------
+model ShowcaseEvent {
+  id          String    @id @default(cuid())
+  name        String   // e.g. "Puchong Branch Q3 Showcase"
+  slug        String   @unique
+  date        DateTime
+  branch      String?   // optional branch filter; null = all branches
+  isActive    Boolean   @default(true)
+  externalId  String?   @unique // Cal.com booking uid (titled "Showcase: <name>")
+  source      String    @default("manual") // "manual" | "cal_com"
+  syncedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model CalendarEvent {
+  id           String   @id @default(cuid())
+  type         String   // celebration | showcase | adhoc
+  title        String
+  date         DateTime
+  branch       String?
+  description  String?
+  createdAt    DateTime @default(now())
+  // Set only for rows mirrored from a Cal.com-synced FestiveEvent or ShowcaseEvent
+  // (lib/festiveSync.ts / lib/showcaseSync.ts), so the Calendars grid shows them as
+  // plain "celebration"/"showcase" events — same tag/color/modal as any other, no
+  // visual distinction. Format: "<calcomBookingUid>" (day 1) or "<uid>:end" (2nd
+  // day, e.g. CNY). Null for everything else (manually-added events).
+  externalId   String?  @unique
+}
+
+model EbrightCepNotification {
+  id           String   @id @default(cuid())
+  type         String
+  title        String
+  message      String
+  read         Boolean  @default(false)
+  parentId     String?
+  parent       Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  // Structured JSON, e.g. { counts, details } for cron_completed, or
+  // { festivalName, calendarEventId, usedFallback, sendLogId } for festive sends.
+  // Nullable/free-form on purpose — only the notification detail modal parses it.
+  metadata     String?
+}
+
+// ---------------------------------------------------------------------------
+// CMS: dynamic message templates managed via /content UI.
+// When cron/intake fires a trigger, it first looks for an active Content
+// with matching (triggerType, channel). If found -> use it. Otherwise it
+// falls back to the static templates in lib/email-templates.ts.
+// ---------------------------------------------------------------------------
+// channel:      "EMAIL" | "SMS" | "WHATSAPP"  (validated at the API layer)
+// triggerType:  "DAY0_WELCOME" | "DAY0_FOLLOWUP" | "DAY14_REMINDER" |
+//               "WEEKLY_VIDEO" | "DAY42_REVIEW" | "DAY56_REFERRAL" |
+//               "BIRTHDAY" | null  (null = manual-blast only)
+model Content {
+  id             String    @id @default(cuid())
+  title          String
+  channel        String
+  body           String
+  link           String?
+  imageUrl       String?   // optional poster/image, rendered in the email via wrapEmailShell
+  triggerType    String?
+  planTypes      String?   // JSON array of strings: '["3mo", "12mo"]' or '["all"]'
+  // Department that owns this message, for accountability/tracking (lib/departments.ts):
+  // 'CEO' | 'ACD' | 'MKT' | 'MKT_REFERRAL' | 'HR' | 'FNC' | 'OD' | 'OPS' | 'AD_HOC'.
+  // Null for content that predates the department import or isn't department-owned.
+  department     String?
+  // 1-48, week-since-enrollment this template belongs to (per-parent conveyer-belt
+  // Weekly rule, triggerType 'video'). Null for non-weekly content. Multiple rows can
+  // share a weekNumber (one per department that had content that week in the source
+  // spreadsheet) — only the highest-priority one is isActive; see lib/departments.ts.
+  weekNumber     Int?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  autoBlastJobs  AutoBlastJob[]
+}
+
+// ---------------------------------------------------------------------------
+// Auto-blast: recurring scheduled blasts.
+// A background loop (lib/autoblast.ts, kicked off by instrumentation.ts)
+// checks every 60s for jobs where isActive AND nextRunAt <= now, then fires
+// the linked Content to the matching parent segment.
+// ---------------------------------------------------------------------------
+model AutoBlastJob {
+  id               String    @id @default(cuid())
+  name             String
+  contentId        String
+  content          Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  segmentBranch    String?   // "all" or specific branch name
+  segmentStatus    String?   // "all" | "active" | "trial" | "inactive"
+  intervalMinutes  Int
+  isActive         Boolean   @default(true)
+  lastRunAt        DateTime?
+  nextRunAt        DateTime
+  createdAt        DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// New Automation Rule Engine
+// ---------------------------------------------------------------------------
+model AutomationRule {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g. 'followus_reminder', 'review', 'renewal'
+  description String?
+  isActive    Boolean  @default(true)
+  // Explicit classification for the Rules page's All/Weekly/Monthly/Promo filter
+  // pills (docs/architecture.md) — every current row is 'weekly' (per-parent
+  // conveyer-belt). Festive/Showcase ('monthly') aren't AutomationRule rows at
+  // all (see FestiveEvent/ShowcaseEvent) and Promo has no rule/trigger config
+  // (Part 2, manual-only) — those two are rendered as synthetic cards in
+  // app/automation/page.tsx rather than stored here.
+  layer       String   @default("weekly") // "weekly" | "monthly" | "promo"
+
+  triggers    AutomationRuleTrigger[]
+}
+
+// ---------------------------------------------------------------------------
+// Singleton row holding the real Start/Stop state for the day-based automation
+// scheduler (lib/cronScheduler.ts). Persisted so a server restart while OFF
+// stays OFF — the in-process cron.schedule tick checks this flag every minute
+// before calling runCron(), rather than an admin having to keep a browser tab open.
+// ---------------------------------------------------------------------------
+model AutomationSettings {
+  id              String    @id @default("singleton")
+  cronEnabled     Boolean   @default(false)
+  calcomSyncedAt  DateTime? // last successful Cal.com sync (festivals + showcases) — gates the ~daily re-sync
+  updatedAt       DateTime  @updatedAt
+}
+
+model AutomationRuleTrigger {
+  id                Int      @id @default(autoincrement())
+  ruleId            Int
+  planType          String   // e.g. '3mo', '6mo', '12mo'
+  triggerDay        Int      // Day after enrollment (if start) or days before expiry (if end)
+  triggerRelativeTo String   @default("start") // "start" or "end"
+  rule              AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, planType, triggerDay, triggerRelativeTo])
+}

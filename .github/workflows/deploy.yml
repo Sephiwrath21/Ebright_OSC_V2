@@ -33,6 +33,11 @@ jobs:
 
   deploy:
     needs: validate
+    # Never let a fork's copy of this workflow SSH into our servers.
+    # A fork can delete this line, so it is a safety net, NOT the real
+    # lock — rotating SSH_DEPLOY_KEY (so forks lack the key) is what
+    # actually prevents fork deploys.
+    if: github.repository == 'EbrightOD/Ebright_OSC_V2'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve deploy target
@@ -66,7 +71,7 @@ jobs:
             git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
             # Refresh refs and hard-sync local branch to remote
-            git remote set-url origin https://github.com/Sephiwrath21/Ebright_OSC_V2.git || true
+            git remote set-url origin https://github.com/EbrightOD/Ebright_OSC_V2.git || true
             git fetch origin >> ~/deploy.log 2>&1
             git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 
@@ -102,7 +107,16 @@ jobs:
             # `docker compose up -d --force-recreate`.
             echo "--- Starting Docker Build ---" >> ~/deploy.log 2>&1
             docker build --build-arg BUILD_DATE=$(date +%s) -t ebright-osc-v2:latest . >> ~/deploy.log 2>&1
-            docker compose up -d --force-recreate >> ~/deploy.log 2>&1 || echo "Docker compose up failed" >> ~/deploy.log 2>&1
+
+            # Remove any container squatting on our container_name (e.g. a
+            # manually-started container from before this compose setup
+            # existed) so `up --force-recreate` can never silently no-op
+            # with a "name already in use" conflict again.
+            docker rm -f ebright-osc-v2 >> ~/deploy.log 2>&1 || true
+
+            # No `|| echo ...` fallback here on purpose — if this fails the
+            # job must go red, not report success while serving stale code.
+            docker compose up -d --force-recreate >> ~/deploy.log 2>&1
 
             echo "=== DOCKER PS ===" >> ~/deploy.log
             docker ps -a >> ~/deploy.log 2>&1

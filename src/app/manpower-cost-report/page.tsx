@@ -43,6 +43,7 @@ const AVAILABLE_MONTHS = getAvailableMonths();
 
 interface StaffRow {
   name: string;
+  nickName: string | null;
   employeeId: string | null;
   branch: string;
   position: string | null;
@@ -99,6 +100,7 @@ function fmtHrs(h: number): string {
 function makeEmptyRow(viewer: Viewer | null): StaffRow {
   return {
     name: viewer?.name ?? "",
+    nickName: null,
     employeeId: viewer?.employeeId ?? null,
     branch: viewer?.branch ?? "",
     position: viewer?.position ?? null,
@@ -194,7 +196,12 @@ function ManpowerCostReportContent() {
       })
       .filter(s => {
         if (weekFilter && s.totalHrs === 0) return false;
-        if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matchesName = s.name.toLowerCase().includes(q);
+          const matchesNick = s.nickName?.toLowerCase().includes(q) ?? false;
+          if (!matchesName && !matchesNick) return false;
+        }
         if (viewTab === "pt" && !s.isPT) return false;
         if (viewTab === "ft" && s.isPT) return false;
         if (regionFilter) {
@@ -476,25 +483,15 @@ function ManpowerCostReportContent() {
         </nav>
 
         {/* Page heading */}
-        <header className="mb-8 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-teal-100 flex items-center justify-center shrink-0">
-            <Wallet className="w-6 h-6 text-teal-600" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-600 mb-1">
-              Manpower
-            </p>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              {isEmployeeView ? "My Manpower Report" : "Manpower Cost Report"}
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-              {isEmployeeView
-                ? `Your hours and pay for ${monthLabel}.${
-                    viewer?.position ? ` Position: ${viewer.position}.` : ""
-                  }`
-                : "Breakdown of labor costs across branches, with per-staff hours and pay."}
-            </p>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isEmployeeView ? "My Manpower Report" : "Manpower Cost Report"}
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {isEmployeeView
+              ? `Your hours and pay for ${monthLabel}.${viewer?.position ? ` Position: ${viewer.position}.` : ""}`
+              : "Breakdown of labor costs across branches, with per-staff hours and pay."}
+          </p>
         </header>
 
         {/* Toolbar — admin view only. In employee view the same controls live

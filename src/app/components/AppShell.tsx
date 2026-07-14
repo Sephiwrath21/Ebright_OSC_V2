@@ -12,12 +12,23 @@ interface AppShellProps {
   name?: string | null;
 }
 
+// In-memory global state so client-side navigation (remounts) can read the last state instantly
+let globalCollapsed = typeof window !== "undefined" ? localStorage.getItem("sidebar-collapsed") === "true" : false;
+let isFirstLoad = true;
+
 export default function AppShell({ children, email, role, name }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    return isFirstLoad ? false : globalCollapsed;
+  });
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem("sidebar-collapsed") === "true");
-  }, []);
+    isFirstLoad = false;
+    const isCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
+    if (isCollapsed !== collapsed) {
+      setCollapsed(isCollapsed);
+      globalCollapsed = isCollapsed;
+    }
+  }, [collapsed]);
 
   return (
     <BreadcrumbProvider>
@@ -29,6 +40,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
               setCollapsed((c) => {
                 const next = !c;
                 localStorage.setItem("sidebar-collapsed", String(next));
+                globalCollapsed = next;
                 return next;
               })
             }
