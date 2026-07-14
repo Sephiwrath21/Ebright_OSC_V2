@@ -129,15 +129,19 @@ export function renderPlaceholders(
 
 /**
  * Look up an active Content record matching (triggerType, channel).
+ * `weekNumber`, when given, additionally restricts to the matching per-parent
+ * Weekly conveyer-belt week (e.g. the 'video' trigger's imported week-N content) —
+ * omit it for triggers that aren't week-scoped.
  * Returns null if none found — caller should fall back to static template.
  */
 export async function findContentForTrigger(
   triggerType: TriggerType | string,
   channel: 'EMAIL' | 'SMS' | 'WHATSAPP',
   parentPlanType?: string | null,
+  weekNumber?: number | null,
 ) {
   const candidates = await prisma.content.findMany({
-    where: { triggerType, channel, isActive: true },
+    where: { triggerType, channel, isActive: true, ...(weekNumber != null ? { weekNumber } : {}) },
     orderBy: { updatedAt: 'desc' },
   });
   return candidates.find((c) => contentAppliesToPlan(c.planTypes, parentPlanType)) ?? null;
@@ -161,17 +165,18 @@ export async function fireRuleBasedSend(
     triggeredBy?: string;
     fallback?: { title: string; body: string };
     metadata?: Record<string, unknown>;
+    weekNumber?: number;
   } = {},
 ): Promise<SendResult & { usedFallback: boolean }> {
   const triggeredBy = opts.triggeredBy ?? 'cron';
 
   // 1. Look up CMS override for EMAIL channel
-  let cmsEmail = await findContentForTrigger(ruleName, 'EMAIL', parent.plan_type);
+  let cmsEmail = await findContentForTrigger(ruleName, 'EMAIL', parent.plan_type, opts.weekNumber);
 
   // Fallback for sequenced rules (e.g., 'renewal_30d_before_expiry' -> 'renewal')
   if (!cmsEmail && ruleName.includes('_')) {
     const baseRuleName = ruleName.split('_')[0];
-    cmsEmail = await findContentForTrigger(baseRuleName, 'EMAIL', parent.plan_type);
+    cmsEmail = await findContentForTrigger(baseRuleName, 'EMAIL', parent.plan_type, opts.weekNumber);
   }
 
   const usedFallback = !cmsEmail && Boolean(opts.fallback);
@@ -183,6 +188,7 @@ export async function fireRuleBasedSend(
       data: {
         parentId: parent.id,
         contentType: ruleName,
+        weekNumber: opts.weekNumber ?? null,
         status: 'SKIPPED',
         message: `No active content template found for trigger: ${ruleName}`,
         triggeredBy,
@@ -232,6 +238,7 @@ export async function fireRuleBasedSend(
       id: sendLogId,
       parentId: parent.id,
       contentType: ruleName,
+      weekNumber: opts.weekNumber ?? null,
       status: !emailAttempted ? 'SKIPPED' : emailSent ? 'SENT' : 'FAILED',
       message: text,
       triggeredBy,

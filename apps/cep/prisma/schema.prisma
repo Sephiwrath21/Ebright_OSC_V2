@@ -190,6 +190,15 @@ model Content {
   imageUrl       String?   // optional poster/image, rendered in the email via wrapEmailShell
   triggerType    String?
   planTypes      String?   // JSON array of strings: '["3mo", "12mo"]' or '["all"]'
+  // Department that owns this message, for accountability/tracking (lib/departments.ts):
+  // 'CEO' | 'ACD' | 'MKT' | 'MKT_REFERRAL' | 'HR' | 'FNC' | 'OD' | 'OPS' | 'AD_HOC'.
+  // Null for content that predates the department import or isn't department-owned.
+  department     String?
+  // 1-48, week-since-enrollment this template belongs to (per-parent conveyer-belt
+  // Weekly rule, triggerType 'video'). Null for non-weekly content. Multiple rows can
+  // share a weekNumber (one per department that had content that week in the source
+  // spreadsheet) — only the highest-priority one is isActive; see lib/departments.ts.
+  weekNumber     Int?
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

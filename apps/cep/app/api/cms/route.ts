@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { stringifyPlanTypes } from '@/lib/content';
+import { DEPARTMENTS } from '@/lib/departments';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,10 @@ export async function POST(req: NextRequest) {
   const triggerType = body.triggerType || null;
   const isActive = body.isActive === undefined ? true : Boolean(body.isActive);
   const planTypes = Array.isArray(body.planTypes) ? stringifyPlanTypes(body.planTypes) : stringifyPlanTypes(['all']);
+  const department = body.department || null;
+  const weekNumber = body.weekNumber === undefined || body.weekNumber === null || body.weekNumber === ''
+    ? null
+    : Number(body.weekNumber);
 
   if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
   if (!bodyText.trim()) return NextResponse.json({ error: 'body is required' }, { status: 400 });
@@ -62,9 +67,15 @@ export async function POST(req: NextRequest) {
   if (imageUrl && !isValidUrl(imageUrl)) {
     return NextResponse.json({ error: 'imageUrl must be a valid URL' }, { status: 400 });
   }
+  if (department && !(DEPARTMENTS as readonly string[]).includes(department)) {
+    return NextResponse.json({ error: `department must be one of ${DEPARTMENTS.join(', ')}` }, { status: 400 });
+  }
+  if (weekNumber !== null && (!Number.isInteger(weekNumber) || weekNumber < 1)) {
+    return NextResponse.json({ error: 'weekNumber must be a positive integer' }, { status: 400 });
+  }
 
   const created = await prisma.content.create({
-    data: { title, channel, body: bodyText, link, imageUrl, triggerType, isActive, planTypes },
+    data: { title, channel, body: bodyText, link, imageUrl, triggerType, isActive, planTypes, department, weekNumber },
   });
   return NextResponse.json(created);
 }

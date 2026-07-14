@@ -4,6 +4,13 @@ import { fireRuleBasedSend, findContentForTrigger, withBranchName } from '@/lib/
 import { getPlanDurationMonths } from '@/lib/plans';
 import { getFestiveFallbackContent } from '@/lib/festive';
 import { createNotification } from '@/lib/notifications';
+import { getCurrentWeek } from '@/lib/dates';
+
+// The imported Weekly conveyer-belt content calendar covers weeks 1-48 (see
+// prisma/importWeeklyContent.ts) — plans longer than 48 weeks (e.g. 12mo ~ 52wk)
+// simply stop getting a weekly video send once they run past week 48, rather than
+// repeating week 48's content indefinitely or falling back to generic filler.
+const MAX_WEEKLY_CONTENT_WEEK = 48;
 
 interface ParentDetail {
   id: string;
@@ -129,15 +136,16 @@ export async function runCron({ force = false }: { force?: boolean } = {}) {
       }
     }
 
-    // VIDEO — every Monday, once per week
+    // VIDEO — every Monday, once per week. weekNumber = weeks since parent's own
+    // m1StartDate, matching the "Credit / Week" column of the imported Weekly
+    // calendar — so each parent gets THEIR week's real content, not a shared generic.
     if (isMonday) {
+      const weekNumber = getCurrentWeek(new Date(parent.m1StartDate));
       const alreadySent = await prisma.sendLog.findFirst({
         where: { parentId: parent.id, contentType: { startsWith: 'video' }, sentAt: { gte: weekStart } },
       });
-      if (force || !alreadySent) {
-        // This logic can be customized. For now, we'll just use a generic 'video' trigger.
-        // To support monthly videos, you could calculate month number and use `video_m1`, `video_m2`, etc.
-        const result = await fireRuleBasedSend(parent, 'video', { triggeredBy: 'cron' });
+      if ((force || !alreadySent) && weekNumber <= MAX_WEEKLY_CONTENT_WEEK) {
+        const result = await fireRuleBasedSend(parent, 'video', { triggeredBy: 'cron', weekNumber });
         if (result.emailSent) recordSent('video', parent);
       }
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { stringifyPlanTypes } from '@/lib/content';
+import { DEPARTMENTS } from '@/lib/departments';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
   if (body.isActive !== undefined) {
     data.isActive = Boolean(body.isActive);
+  }
+  if (body.department !== undefined) {
+    const department = body.department || null;
+    if (department && !(DEPARTMENTS as readonly string[]).includes(department)) {
+      return NextResponse.json({ error: `department must be one of ${DEPARTMENTS.join(', ')}` }, { status: 400 });
+    }
+    data.department = department;
+  }
+  if (body.weekNumber !== undefined) {
+    const weekNumber = body.weekNumber === null || body.weekNumber === '' ? null : Number(body.weekNumber);
+    if (weekNumber !== null && (!Number.isInteger(weekNumber) || weekNumber < 1)) {
+      return NextResponse.json({ error: 'weekNumber must be a positive integer' }, { status: 400 });
+    }
+    data.weekNumber = weekNumber;
   }
 
   const updated = await prisma.content.update({ where: { id: params.id }, data });

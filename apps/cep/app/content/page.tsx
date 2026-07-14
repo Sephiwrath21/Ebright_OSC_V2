@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PLAN_TYPES, PLAN_TYPE_LABELS } from '@/lib/planTypes';
 import { parsePlanTypes } from '@/lib/content';
+import { DEPARTMENTS, DEPARTMENT_LABELS, type Department } from '@/lib/departments';
 import { ViewToggle, useViewPreference } from '@/components/shared/ViewToggle';
 
 interface Content {
@@ -14,6 +15,8 @@ interface Content {
   imageUrl: string | null;
   triggerType: string | null;
   planTypes: string | null;
+  department: string | null;
+  weekNumber: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +88,8 @@ interface FormState {
   imageUrl: string;
   triggerType: string;
   planTypes: string[];
+  department: string;
+  weekNumber: string;
   isActive: boolean;
 }
 
@@ -97,7 +102,21 @@ const EMPTY_FORM: FormState = {
   imageUrl: '',
   triggerType: '',
   planTypes: ['all'],
+  department: '',
+  weekNumber: '',
   isActive: true,
+};
+
+const DEPARTMENT_COLORS: Record<Department, string> = {
+  CEO: '#7c3aed',
+  ACD: '#2563eb',
+  MKT: '#dc2626',
+  MKT_REFERRAL: '#db2777',
+  HR: '#ca8a04',
+  FNC: '#16a34a',
+  OD: '#0891b2',
+  OPS: '#ea580c',
+  AD_HOC: '#6b7280',
 };
 
 export default function ContentCmsPage() {
@@ -169,6 +188,8 @@ export default function ContentCmsPage() {
       imageUrl: c.imageUrl ?? '',
       triggerType: c.triggerType ?? '',
       planTypes: parsePlanTypes(c.planTypes),
+      department: c.department ?? '',
+      weekNumber: c.weekNumber != null ? String(c.weekNumber) : '',
       isActive: c.isActive,
     });
     setError(null);
@@ -204,6 +225,8 @@ export default function ContentCmsPage() {
         imageUrl: form.imageUrl.trim() || null,
         triggerType: form.triggerType || null,
         planTypes: form.planTypes,
+        department: form.department || null,
+        weekNumber: form.weekNumber.trim() ? Number(form.weekNumber) : null,
         isActive: form.isActive,
       };
       const res = await fetch(form.id ? `/api/cms/${form.id}` : '/api/cms', {
@@ -333,6 +356,8 @@ export default function ContentCmsPage() {
                   {triggerCategory(c.triggerType)!.label}
                 </span>
               )}
+              <DepartmentBadge department={c.department} />
+              {c.weekNumber != null && <WeekBadge weekNumber={c.weekNumber} />}
               <span
                 style={{
                   fontSize: '10px',
@@ -380,7 +405,7 @@ export default function ContentCmsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{c.title}</div>
                     {triggerCategory(c.triggerType) && (
                       <span
@@ -399,6 +424,8 @@ export default function ContentCmsPage() {
                         {triggerCategory(c.triggerType)!.label}
                       </span>
                     )}
+                    <DepartmentBadge department={c.department} />
+                    {c.weekNumber != null && <WeekBadge weekNumber={c.weekNumber} />}
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
                     {c.triggerType ? triggerLabel(c.triggerType) : 'Manual blast only'}
@@ -584,7 +611,7 @@ export default function ContentCmsPage() {
                     </select>
                   </Field>
 
-                  <Field label="Body — merge fields: {{parent_name}}, {parent_first_name}, {{student_name}}, {{plan_type}}, {{expiry_date}}">
+                  <Field label="Body — merge fields: {{parent_name}}, {parent_first_name}, {{student_name}}, {{plan_type}}, {{expiry_date}}. Weekly-import tokens ({videoLink}, {facebookLink}, {instagramLink}, {tiktokLink}, {threadsLink}) are NOT auto-filled — they need a manual value entered here per week before sending.">
                     <textarea
                       value={form.body}
                       onChange={(e) => setForm({ ...form, body: e.target.value })}
@@ -650,6 +677,33 @@ export default function ContentCmsPage() {
                         ))}
                       </select>
                     )}
+                  </Field>
+
+                  <Field label="Department (owner, for accountability — not used for send-time filtering)">
+                    <select
+                      value={form.department}
+                      onChange={(e) => setForm({ ...form, department: e.target.value })}
+                      className="ebright-select"
+                    >
+                      <option value="">No department</option>
+                      {DEPARTMENTS.map((d) => (
+                        <option key={d} value={d}>
+                          {DEPARTMENT_LABELS[d]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Week number (1-48 — for the Weekly conveyer-belt 'video' trigger only)">
+                    <input
+                      type="number"
+                      min={1}
+                      max={48}
+                      value={form.weekNumber}
+                      onChange={(e) => setForm({ ...form, weekNumber: e.target.value })}
+                      placeholder="e.g. 3"
+                      style={inputStyle}
+                    />
                   </Field>
 
                   <Field label="Applicable plan types">
@@ -790,6 +844,49 @@ function ruleCategoryOf(t: string | null): Exclude<RuleCategoryFilter, 'all'> | 
   // DAY0_WELCOME/DAY14_REMINDER/WEEKLY_VIDEO/DAY42_REVIEW/DAY56_REFERRAL/BIRTHDAY
   // intake equivalents.
   return 'weekly';
+}
+
+/** Which department owns this template — accountability/tracking badge, not a
+ * filter dimension (the Rules-page filter pills stay derived from triggerType). */
+function DepartmentBadge({ department }: { department: string | null }) {
+  if (!department) return null;
+  const color = DEPARTMENT_COLORS[department as Department] ?? '#6b7280';
+  const label = DEPARTMENT_LABELS[department as Department] ?? department;
+  return (
+    <span
+      style={{
+        fontSize: '9px',
+        fontWeight: 700,
+        padding: '2px 6px',
+        borderRadius: '999px',
+        background: color + '18',
+        color,
+        textTransform: 'uppercase',
+        letterSpacing: '0.4px',
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function WeekBadge({ weekNumber }: { weekNumber: number }) {
+  return (
+    <span
+      style={{
+        fontSize: '9px',
+        fontWeight: 700,
+        padding: '2px 6px',
+        borderRadius: '999px',
+        background: '#f3f4f6',
+        color: '#374151',
+        flexShrink: 0,
+      }}
+    >
+      Week {weekNumber}
+    </span>
+  );
 }
 
 function ChannelBadge({ channel }: { channel: string }) {
