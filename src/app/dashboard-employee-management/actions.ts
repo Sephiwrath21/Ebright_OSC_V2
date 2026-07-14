@@ -160,8 +160,12 @@ export async function createEmployee(_: CreateEmployeeResult | null, formData: F
   if (existing) return { ok: false, error: `Email "${email}" is already registered.` };
 
   if (employeeId) {
-    const dupe = await prisma.employment.findUnique({ where: { employee_id: employeeId }, select: { employment_id: true } });
-    if (dupe) return { ok: false, error: `Employee ID "${employeeId}" is already taken.` };
+    const dupe = await prisma.employment.findUnique({ where: { employee_id: employeeId }, select: { employment_id: true, user_id: true } });
+    if (dupe) {
+      const dupeProfile = await prisma.user_profile.findUnique({ where: { user_id: dupe.user_id }, select: { full_name: true } });
+      const dupeName = dupeProfile?.full_name ? titleCaseName(dupeProfile.full_name) : `User #${dupe.user_id}`;
+      return { ok: false, error: `Employee ID "${employeeId}" is already taken by ${dupeName}.` };
+    }
   }
 
   // Pre-generate onboarding credential bits (only used when toggle is on).
@@ -368,7 +372,11 @@ export async function updateEmployee(_: CreateEmployeeResult | null, formData: F
 
   if (employeeId) {
     const dupe = await prisma.employment.findUnique({ where: { employee_id: employeeId }, select: { employment_id: true, user_id: true } });
-    if (dupe && dupe.user_id !== userId) return { ok: false, error: `Employee ID "${employeeId}" is already taken.` };
+    if (dupe && dupe.user_id !== userId) {
+      const dupeProfile = await prisma.user_profile.findUnique({ where: { user_id: dupe.user_id }, select: { full_name: true } });
+      const dupeName = dupeProfile?.full_name ? titleCaseName(dupeProfile.full_name) : `User #${dupe.user_id}`;
+      return { ok: false, error: `Employee ID "${employeeId}" is already taken by ${dupeName} (User #${dupe.user_id}). If this is the same person, a duplicate account may exist.` };
+    }
   }
 
   const existingEmploymentId = existing.employment[0]?.employment_id ?? null;

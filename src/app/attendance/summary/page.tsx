@@ -2,31 +2,54 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
 import AppShell from "@/app/components/AppShell";
 import AttendanceSummaryView, {
   type SummaryData,
   type AttendanceRow,
   type BranchOption,
+  type AbsenceKind,
 } from "@/app/components/AttendanceSummaryView";
 import { ShieldAlert } from "lucide-react";
-import { mytDateOnly, mytDayUtcBounds, mytHour } from "@/lib/myt";
-import { STAFF_ROLE_ID } from "@/lib/employeeQueries";
+import { mytDayUtcBounds } from "@/lib/myt";
+import { type WeeklySchedule } from "@/lib/schedule-history";
+import { assignedBranchOnDay, rotationFor } from "@/lib/staff-rotation";
+
+// Leave code that means "unpaid / unexplained" — anyone with this leave-type
+// for the day is bucketed as MIA; any other leave code is bucketed as On Leave.
+const MIA_LEAVE_CODE = "UL";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_ROLE_TYPES = new Set(["superadmin", "ceo", "hr"]);
+// Late = first scan > scheduled start + this grace.
+const LATE_GRACE_MINUTES = 1;
+// "Scanner online" if a scan came in within this many minutes.
+const SCANNER_ONLINE_WINDOW_MIN = 10;
+// Business rule: a scan strictly before this MYT time doesn't count as a
+// check-out — it's treated as a duplicate scan / quick step-out. The person
+// stays "Currently In" until a scan at or after the cutoff happens.
+const CHECKOUT_EARLIEST_MYT = "14:00";
 
-// Company schedule (MYT)
-const LATE_HOUR_MYT = 9;        // strictly after 09:00 MYT counts as late
-const EARLY_OUT_HOUR_MYT = 18;  // strictly before 18:00 MYT counts as early
-const SCANNER_ONLINE_WINDOW_MIN = 10; // any log in last N minutes ⇒ online
+const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+type DayKey = (typeof DAY_KEYS)[number];
+
+// Hikvision device_name → branch_code. Only HQ + ST have scanners synced into
+// hikvision_attendance_all today; everything else returns null (so visitor
+// detection only meaningfully runs for those branches). Extend as new
+// scanners come online.
+function deviceBranchCode(deviceName: string | null): string | null {
+  if (!deviceName) return null;
+  const lower = deviceName.toLowerCase();
+  if (lower.includes("scanner main") || lower.startsWith("hq ")) return "HQ";
+  if (lower.includes("scanner st")) return "ST";
+  return null;
+}
 
 interface PageProps {
   searchParams: Promise<{ branch?: string; date?: string }>;
 }
 
-// Parse "YYYY-MM-DD" as noon MYT (= 04:00 UTC) so the MYT helpers compute the
-// right calendar day regardless of the server's clock or DST.
 function parseMytDate(iso: string | undefined): Date {
   if (!iso) return new Date();
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -35,13 +58,76 @@ function parseMytDate(iso: string | undefined): Date {
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), 4, 0, 0));
 }
 
-// Format a Date as "YYYY-MM-DD" in MYT (matches the date input value).
 function formatMytIsoDate(d: Date): string {
   const myt = new Date(d.getTime() + 8 * 60 * 60_000);
-  const Y = myt.getUTCFullYear();
-  const M = String(myt.getUTCMonth() + 1).padStart(2, "0");
-  const D = String(myt.getUTCDate()).padStart(2, "0");
-  return `${Y}-${M}-${D}`;
+  return `${myt.getUTCFullYear()}-${String(myt.getUTCMonth() + 1).padStart(2, "0")}-${String(myt.getUTCDate()).padStart(2, "0")}`;
+}
+
+function dayKeyForMytDate(d: Date): DayKey {
+  const myt = new Date(d.getTime() + 8 * 60 * 60_000);
+  return DAY_KEYS[myt.getUTCDay()];
+}
+
+// `mytDayUtcBounds` lives in @/lib/myt and is imported above.
+
+// Convert a UTC Date to "HH:MM" in MYT.
+function utcToMytHm(d: Date): string {
+  const myt = new Date(d.getTime() + 8 * 60 * 60_000);
+  return `${String(myt.getUTCHours()).padStart(2, "0")}:${String(myt.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function classifyLate(
+  scanMytHm: string,
+  scheduledStart: string,
+  graceMin: number,
+): "late" | "on_time" {
+  const ms = /^(\d{2}):(\d{2})/.exec(scheduledStart);
+  const mc = /^(\d{2}):(\d{2})/.exec(scanMytHm);
+  if (!ms || !mc) return "on_time";
+  const startMin = Number(ms[1]) * 60 + Number(ms[2]);
+  const clockMin = Number(mc[1]) * 60 + Number(mc[2]);
+  return clockMin > startMin + graceMin ? "late" : "on_time";
+}
+
+function classifyEarly(
+  scanMytHm: string,
+  scheduledEnd: string,
+): "early" | "normal" {
+  const me = /^(\d{2}):(\d{2})/.exec(scheduledEnd);
+  const mc = /^(\d{2}):(\d{2})/.exec(scanMytHm);
+  if (!me || !mc) return "normal";
+  const endMin = Number(me[1]) * 60 + Number(me[2]);
+  const clockMin = Number(mc[1]) * 60 + Number(mc[2]);
+  return clockMin < endMin ? "early" : "normal";
+}
+
+// Flattened shape coming out of the LOCAL employment query. Field names kept
+// identical to the old BranchStaff version so the downstream classification
+// code didn't need to change.
+interface LocalStaffRow {
+  /** employment_id — used as the key into schedulesByDate (history rows). */
+  id: number;
+  user_id: number;
+  name: string | null;
+  /** branch.branch_code, e.g. "HQ", "ST", "AMP". */
+  branch: string | null;
+  role: string | null;
+  position: string | null;
+  department: string | null;
+  location: string | null;
+  /** employment.employee_id — same value as BranchStaff.employeeId on HRFS. */
+  employeeId: string | null;
+  workingHours: Record<string, { start: string; end: string } | null> | null;
+}
+
+// One aggregated row per person from hikvision_attendance_all (after id-map
+// translation). Times are UTC, computed by min/max over today's events.
+interface AggregatedScan {
+  emp_no: string;
+  first_event: Date;
+  last_event: Date;
+  scan_count: number;
+  sample_device_name: string | null;
 }
 
 export default async function AttendanceSummaryPage({ searchParams }: PageProps) {
@@ -50,11 +136,7 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
 
   const me = await prisma.users.findUnique({
     where: { email: session.user.email },
-    select: {
-      user_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
+    select: { role: { select: { role_type: true } } },
   });
 
   const userEmail = session.user.email;
@@ -62,9 +144,7 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
   const userRole = (session.user as { role?: string } | undefined)?.role ?? "USER";
 
   const roleType = me?.role?.role_type?.toLowerCase() ?? "";
-  const allowed = ALLOWED_ROLE_TYPES.has(roleType);
-
-  if (!allowed) {
+  if (!ALLOWED_ROLE_TYPES.has(roleType)) {
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
         <div className="min-h-full bg-slate-50 flex items-center justify-center p-8">
@@ -72,12 +152,9 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
             <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-5">
               <ShieldAlert className="w-7 h-7 text-rose-600" aria-hidden="true" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Restricted Access
-            </h1>
+            <h1 className="text-xl font-semibold text-slate-900">Restricted Access</h1>
             <p className="mt-2 text-sm text-slate-600">
-              The attendance summary is available to HR, CEO, and superadmin roles
-              only.
+              The attendance summary is available to HR, CEO, and superadmin roles only.
             </p>
             <Link
               href="/attendance"
@@ -93,291 +170,413 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
 
   const sp = await searchParams;
   const refDate = parseMytDate(sp.date);
-  const today = mytDateOnly(refDate);                          // for attendance.date (@db.Date)
-  const { start: dayStart, end: dayEnd } = mytDayUtcBounds(refDate); // for scan_time (@db.Timestamptz)
-  const selectedDate = formatMytIsoDate(refDate);              // "YYYY-MM-DD" for the UI
+  const selectedDate = formatMytIsoDate(refDate);
+  const dayKey = dayKeyForMytDate(refDate);
+  const { start: dayStart, end: dayEnd } = mytDayUtcBounds(refDate);
 
-  // All branches — used for the dropdown and for resolving home_branch_code
+  // Branch dropdown reads from local `branch` table; its branch_code matches
+  // BranchStaff.branch on HRFS.
   const branches = await prisma.branch.findMany({
     select: { branch_id: true, branch_name: true, branch_code: true },
     orderBy: { branch_name: "asc" },
   });
-
   const branchOptions: BranchOption[] = branches.map((b) => ({
     branch_id: b.branch_id,
     branch_name: b.branch_name,
     branch_code: b.branch_code,
   }));
 
-  // Default landing view = All branches. ?branch=<id> drills into one.
   const requestedBranchId =
     sp.branch && sp.branch !== "all" ? Number(sp.branch) : NaN;
   const selectedBranch = Number.isFinite(requestedBranchId)
     ? branchOptions.find((b) => b.branch_id === requestedBranchId) ?? null
     : null;
-  const isAllBranches = selectedBranch === null;
+  const branchCode = selectedBranch?.branch_code ?? null;
 
-  // Active employees in scope: staff only, with at least one
-  // employment row that has a non-null employee_id (and matches the selected
-  // branch when one is chosen).
-  const employees = await prisma.users.findMany({
-    where: {
-      status: "active",
-      deleted_at: null,
-      role_id: STAFF_ROLE_ID,
-      employment: selectedBranch
-        ? {
-            some: {
-              status: "active",
-              branch_id: selectedBranch.branch_id,
-              employee_id: { not: null },
-            },
-          }
-        : { some: { status: "active", employee_id: { not: null } } },
-    },
-    select: {
-      user_id: true,
-      user_profile: { select: { full_name: true } },
-      employment: {
-        where: selectedBranch
-          ? {
-              status: "active",
-              branch_id: selectedBranch.branch_id,
-              employee_id: { not: null },
-            }
-          : { status: "active", employee_id: { not: null } },
-        take: 1,
-        orderBy: { employment_id: "desc" },
-        select: {
-          employee_id: true,
-          position: true,
-          department: { select: { department_name: true } },
-          branch: { select: { branch_code: true } },
-        },
-      },
-    },
-    orderBy: { user_id: "asc" },
-  });
+  // ── HRFS: BranchStaff is the source of truth for "who exists" — same DB
+  //         the Hikvision scans live in. Switching back from local employment
+  //         (which only had 48/165 staff synced) so every active person
+  //         appears here, with no dependency on a local sync running first.
+  const branchStaffRes = await queryEbrightHrfs<{
+    id: number;
+    name: string | null;
+    branch: string | null;
+    role: string | null;
+    position: string | null;
+    department: string | null;
+    location: string | null;
+    employeeId: string | null;
+    workingHours: Record<string, { start: string; end: string } | null> | null;
+  }>(
+    `SELECT id, name, branch, role, position, department, location,
+            "employeeId", "workingHours"
+       FROM public."BranchStaff"
+      WHERE status = 'Active'
+      ORDER BY name ASC`,
+  );
+  const allStaff: LocalStaffRow[] = branchStaffRes.rows.map((s) => ({
+    id: s.id,
+    // user_id no longer applies (no local row guaranteed) — use BranchStaff.id
+    // as a stable numeric identifier for React keys / urls.
+    user_id: s.id,
+    name: s.name,
+    branch: s.branch,
+    role: s.role,
+    position: s.position,
+    department: s.department,
+    location: s.location,
+    employeeId: s.employeeId,
+    workingHours: s.workingHours,
+  }));
+  const staffByEmpNo = new Map<string, LocalStaffRow>();
+  for (const s of allStaff) {
+    if (s.employeeId) staffByEmpNo.set(s.employeeId, s);
+  }
 
-  const employeeIds = employees.map((e) => e.user_id);
-  const expectedSet = new Set(employeeIds);
+  // ── HRFS BranchStaffSchedule: resolved schedule per BranchStaff.id for
+  //    selectedDate. Picks the row with the greatest effectiveFrom that is
+  //    <= selectedDate. Keyed by BranchStaff.id so it lines up with the
+  //    staff records we just fetched.
+  const scheduleVersionRes = await queryEbrightHrfs<{
+    branch_staff_id: number;
+    schedule: Record<string, { start: string; end: string } | null>;
+  }>(
+    `SELECT DISTINCT ON ("branchStaffId")
+       "branchStaffId" AS branch_staff_id,
+       schedule
+     FROM public."BranchStaffSchedule"
+     WHERE "effectiveFrom" <= $1::date
+     ORDER BY "branchStaffId", "effectiveFrom" DESC`,
+    [selectedDate],
+  );
+  const schedulesByDate: Record<number, WeeklySchedule> = {};
+  for (const v of scheduleVersionRes.rows) {
+    schedulesByDate[v.branch_staff_id] = v.schedule as WeeklySchedule;
+  }
 
-  // Today's attendance + log activity for assigned employees + branch device list
-  const [attendanceToday, logsToday, devices] = await Promise.all([
-    employeeIds.length
-      ? prisma.attendance.findMany({
-          where: {
-            user_id: { in: employeeIds },
-            date: today,
-          },
-          select: {
-            user_id: true,
-            check_in: true,
-            check_out: true,
-          },
-        })
-      : Promise.resolve([]),
-    employeeIds.length
-      ? prisma.attendance_log.groupBy({
-          by: ["user_id"],
-          where: {
-            user_id: { in: employeeIds },
-            scan_time: { gte: dayStart, lt: dayEnd },
-          },
-          _count: { _all: true },
-          _max: { scan_time: true },
-        })
-      : Promise.resolve(
-          [] as Array<{
-            user_id: number;
-            _count: { _all: number };
-            _max: { scan_time: Date | null };
-          }>,
-        ),
-    selectedBranch
-      ? prisma.devices.findMany({
-          where: { branch_id: selectedBranch.branch_id },
-          select: { device_id: true },
-        })
-      : Promise.resolve([] as Array<{ device_id: number }>),
-  ]);
+  // Resolve every staff's effective schedule for selectedDate, then keep only
+  // those whose schedule has a non-null entry for today's dayKey. Rotation
+  // (Feature 5) can also pull a staff in even if their schedule lives at a
+  // different branch.
+  function resolvedDayScheduleFor(s: LocalStaffRow): WeeklySchedule | null {
+    if (s.id in schedulesByDate) {
+      // History exists for this staff — schedulesByDate is authoritative.
+      // (object → use it, null → no version covers selectedDate → no schedule)
+      return schedulesByDate[s.id];
+    }
+    // No history → fall back to the cached current workingHours.
+    return (s.workingHours as WeeklySchedule | null) ?? null;
+  }
 
-  const attMap = new Map(attendanceToday.map((a) => [a.user_id, a]));
-  const logCountMap = new Map(
-    logsToday.map((l) => [l.user_id, l._count._all]),
+  // Staff who are "expected" at the selected branch on this date.
+  // - If a branch is selected, include staff whose BranchStaff.branch matches
+  //   OR whose rotation puts them at the selected branch today.
+  // - If no branch selected (All branches), include every active staff that
+  //   has a schedule for today.
+  const scheduledStaff: Array<{
+    staff: LocalStaffRow;
+    schedule: { start: string; end: string };
+    /** Effective branch for today (rotation can override BranchStaff.branch). */
+    branchForDay: string | null;
+  }> = [];
+  for (const s of allStaff) {
+    const resolved = resolvedDayScheduleFor(s);
+    const day = resolved?.[dayKey] ?? null;
+    if (!day) continue; // off-day or no schedule yet → not in scope
+
+    const rotationBranch = assignedBranchOnDay(s.employeeId, dayKey);
+    const branchForDay = rotationBranch ?? s.branch ?? null;
+
+    if (branchCode && branchForDay !== branchCode) continue;
+
+    scheduledStaff.push({ staff: s, schedule: day, branchForDay });
+  }
+
+  // Employee codes of everyone in scope today — used below to separate
+  // "visitor" scans (people who scanned but weren't expected) from the
+  // expected/scheduled population.
+  const scheduledEmpNos = new Set(
+    scheduledStaff
+      .map(({ staff }) => staff.employeeId)
+      .filter((id): id is string => !!id),
   );
 
-  // Scan stats: scoped to this branch's devices when one is selected; global
-  // (all devices) in all-branches mode. Visitor detection is branch-only.
-  const deviceIds = devices.map((d) => d.device_id);
-  const scanScopeFilter = selectedBranch
-    ? deviceIds.length
-      ? { device_id: { in: deviceIds } }
-      : { device_id: { in: [-1] } } // selected branch has no devices → match nothing
-    : {}; // all branches → no device filter
+  // ── HRFS: aggregate today's Hikvision events ─────────────────────────────
+  // - LEFT JOIN hikvision_id_map to translate "wrong" person_ids to true ids.
+  // - Group by translated empNo so the same person across both scanners
+  //   (HQ + ST) appears once with min/max times.
+  const aggResult = await queryEbrightHrfs<{
+    emp_no: string;
+    first_event: Date;
+    last_event: Date;
+    scan_count: string;
+    sample_device_name: string | null;
+  }>(
+    `WITH events AS (
+       SELECT
+         COALESCE(m.true_id, h.person_id) AS emp_no,
+         h.event_time,
+         h.device_name
+       FROM public.hikvision_attendance_all h
+       LEFT JOIN public.hikvision_id_map m ON m.wrong_id = h.person_id
+       WHERE h.event_time >= $1 AND h.event_time < $2
+     )
+     SELECT
+       emp_no,
+       MIN(event_time) AS first_event,
+       MAX(event_time) AS last_event,
+       COUNT(*)::text AS scan_count,
+       (array_agg(device_name ORDER BY event_time))[1] AS sample_device_name
+     FROM events
+     WHERE emp_no IS NOT NULL
+     GROUP BY emp_no`,
+    [dayStart.toISOString(), dayEnd.toISOString()],
+  );
+  const aggregated: AggregatedScan[] = aggResult.rows.map((r) => ({
+    emp_no: r.emp_no,
+    first_event: r.first_event instanceof Date ? r.first_event : new Date(r.first_event),
+    last_event: r.last_event instanceof Date ? r.last_event : new Date(r.last_event),
+    scan_count: Number(r.scan_count) || 0,
+    sample_device_name: r.sample_device_name,
+  }));
+  const scanByEmpNo = new Map<string, AggregatedScan>();
+  for (const s of aggregated) scanByEmpNo.set(s.emp_no, s);
 
-  const [branchLogAgg, lastBranchScan, branchLogsToday] = await Promise.all([
-    prisma.attendance_log.aggregate({
-      where: {
-        ...scanScopeFilter,
-        scan_time: { gte: dayStart, lt: dayEnd },
-      },
-      _count: { _all: true },
-    }),
-    prisma.attendance_log.findFirst({
-      where: scanScopeFilter,
-      orderBy: { scan_time: "desc" },
-      select: { scan_time: true },
-    }),
-    selectedBranch && deviceIds.length
-      ? prisma.attendance_log.findMany({
-          where: {
-            device_id: { in: deviceIds },
-            scan_time: { gte: dayStart, lt: dayEnd },
-          },
-          select: { user_id: true, scan_time: true },
-        })
-      : Promise.resolve([] as Array<{ user_id: number; scan_time: Date }>),
-  ]);
-
-  const recordsToday = branchLogAgg._count._all ?? 0;
-  const lastSyncedIso = lastBranchScan?.scan_time?.toISOString() ?? null;
-  const scannerOnline = lastBranchScan?.scan_time
-    ? Date.now() - lastBranchScan.scan_time.getTime() <
-      SCANNER_ONLINE_WINDOW_MIN * 60_000
+  // Most-recent scan timestamp + total event count today — for "scanner online"
+  // and "Records today" indicators on the summary view.
+  const liveResult = await queryEbrightHrfs<{
+    last_event: Date | null;
+    total: string;
+  }>(
+    `SELECT MAX(event_time) AS last_event, COUNT(*)::text AS total
+       FROM public.hikvision_attendance_all
+      WHERE event_time >= $1 AND event_time < $2`,
+    [dayStart.toISOString(), dayEnd.toISOString()],
+  );
+  const lastEventRaw = liveResult.rows[0]?.last_event ?? null;
+  const lastScanTs = lastEventRaw
+    ? lastEventRaw instanceof Date ? lastEventRaw : new Date(lastEventRaw)
+    : null;
+  const recordsToday = Number(liveResult.rows[0]?.total ?? 0);
+  const scannerOnline = lastScanTs
+    ? Date.now() - lastScanTs.getTime() < SCANNER_ONLINE_WINDOW_MIN * 60_000
     : false;
 
-  // Aggregate today's scans at this branch by user_id (first/last/count)
-  type BranchScanInfo = { min: Date; max: Date; count: number };
-  const branchScansByUser = new Map<number, BranchScanInfo>();
-  for (const log of branchLogsToday) {
-    const existing = branchScansByUser.get(log.user_id);
-    if (!existing) {
-      branchScansByUser.set(log.user_id, {
-        min: log.scan_time,
-        max: log.scan_time,
-        count: 1,
-      });
-    } else {
-      if (log.scan_time < existing.min) existing.min = log.scan_time;
-      if (log.scan_time > existing.max) existing.max = log.scan_time;
-      existing.count++;
+  // ── HRFS: leave records covering selectedDate ────────────────────────────
+  // Match by EmployeeCode (= BranchStaff.employeeId), with a name fallback for
+  // legacy rows that have NULL EmployeeCode. LeaveTransaction has no
+  // LeaveTypeName column on HRFS — we just surface the code (e.g. "SL", "AL",
+  // "UL") and let the UI render it.
+  const leaveResult = await queryEbrightHrfs<{
+    employee_code: string | null;
+    employee_name: string | null;
+    leave_type_code: string | null;
+  }>(
+    `SELECT "EmployeeCode" AS employee_code,
+            "EmployeeName" AS employee_name,
+            "LeaveTypeCode" AS leave_type_code
+       FROM public."LeaveTransaction"
+      WHERE "LeaveDate" = $1::date`,
+    [selectedDate],
+  );
+  const leaveByEmpCode = new Map<string, { code: string | null; name: string | null }>();
+  const leaveByName = new Map<string, { code: string | null; name: string | null }>();
+  for (const r of leaveResult.rows) {
+    const entry = { code: r.leave_type_code, name: null };
+    if (r.employee_code) leaveByEmpCode.set(r.employee_code, entry);
+    if (r.employee_name) leaveByName.set(r.employee_name.trim().toLowerCase(), entry);
+  }
+  function leaveFor(staff: LocalStaffRow) {
+    if (staff.employeeId) {
+      const byCode = leaveByEmpCode.get(staff.employeeId);
+      if (byCode) return byCode;
+    }
+    if (staff.name) {
+      const byName = leaveByName.get(staff.name.trim().toLowerCase());
+      if (byName) return byName;
+    }
+    return null;
+  }
+
+  // ── HRFS: HR-entered justifications for selectedDate ─────────────────────
+  // Reads HRFS public.attendance_justification (the spec's schema —
+  // emp_no/reason/evidence_url/...). Keyed by emp_no since that's how it
+  // joins to BranchStaff.employeeId. Same row drops the person from Missing
+  // and surfaces them in the Justify side box.
+  const justificationsRes = await queryEbrightHrfs<{
+    id: string;
+    emp_no: string | null;
+    reason: string | null;
+    evidence_url: string | null;
+  }>(
+    `SELECT id::text, emp_no, reason, evidence_url
+       FROM public.attendance_justification
+      WHERE just_date = $1::date`,
+    [selectedDate],
+  );
+  const justificationByEmpNo = new Map<string, { id: string; reason: string | null; evidence_url: string | null }>();
+  for (const j of justificationsRes.rows) {
+    if (j.emp_no) {
+      justificationByEmpNo.set(j.emp_no, { id: j.id, reason: j.reason, evidence_url: j.evidence_url });
     }
   }
 
-  // Visitors: scanned at this branch today but NOT assigned to it
-  const visitorIds = [...branchScansByUser.keys()].filter(
-    (id) => !expectedSet.has(id),
-  );
+  // ── Expected rows ──────────────────────────────────────────────────────
+  // One row per staff member who is scheduled to work today (scheduledStaff,
+  // built above from BranchStaff + BranchStaffSchedule + rotation).
+  const expectedRows: AttendanceRow[] = scheduledStaff.map(({ staff: s, schedule: sched, branchForDay }) => {
+    const scan = s.employeeId ? scanByEmpNo.get(s.employeeId) ?? null : null;
+    const checkInDate = scan?.first_event ?? null;
+    const checkOutDate =
+      scan
+      && scan.last_event.getTime() > scan.first_event.getTime()
+      && utcToMytHm(scan.last_event) >= CHECKOUT_EARLIEST_MYT
+        ? scan.last_event
+        : null;
 
-  const visitors = visitorIds.length
-    ? await prisma.users.findMany({
-        where: {
-          user_id: { in: visitorIds },
-          status: "active",
-          role_id: STAFF_ROLE_ID,
-        },
-        select: {
-          user_id: true,
-          user_profile: { select: { full_name: true } },
-          employment: {
-            take: 1,
-            orderBy: { employment_id: "desc" },
-            select: {
-              employee_id: true,
-              position: true,
-              department: { select: { department_name: true } },
-              branch: { select: { branch_name: true, branch_code: true } },
-            },
-          },
-        },
-      })
-    : [];
-
-  // Build rows: expected first, then visitors.
-  // Trust the attendance row directly — if the table has check_in/check_out
-  // for the day, show them. The scans count is still surfaced separately so
-  // log/attendance drift is visible in the UI.
-  const expectedRows: AttendanceRow[] = employees.map((e) => {
-    const scansForToday = logCountMap.get(e.user_id) ?? 0;
-    const att = attMap.get(e.user_id);
-    const checkIn = att?.check_in ?? null;
-    const checkOut = att?.check_out ?? null;
-
-    const inStatus: AttendanceRow["in_status"] = checkIn
-      ? mytHour(checkIn) >= LATE_HOUR_MYT
-        ? "late"
-        : "on_time"
+    const inStatus: AttendanceRow["in_status"] = checkInDate
+      ? classifyLate(utcToMytHm(checkInDate), sched.start, LATE_GRACE_MINUTES)
       : null;
-    const outStatus: AttendanceRow["out_status"] = checkOut
-      ? mytHour(checkOut) < EARLY_OUT_HOUR_MYT
-        ? "early"
-        : "normal"
+    const outStatus: AttendanceRow["out_status"] = checkOutDate
+      ? classifyEarly(utcToMytHm(checkOutDate), sched.end)
       : null;
 
-    const employment = e.employment[0];
-    const homeBranchCode = employment?.branch?.branch_code ?? null;
+    // Absence classification — only for staff who didn't scan.
+    //   priority: HR justification → leave record → plain missing
+    let absenceKind: AbsenceKind = null;
+    let leaveCode: string | null = null;
+    let leaveName: string | null = null;
+    const just = s.employeeId ? justificationByEmpNo.get(s.employeeId) ?? null : null;
+    if (!checkInDate && !checkOutDate) {
+      if (just) {
+        absenceKind = "justified";
+        leaveCode = just.reason;
+        leaveName = just.evidence_url; // surfaces as the leave_type_name field
+      } else {
+        const lv = leaveFor(s);
+        if (lv) {
+          leaveCode = lv.code;
+          leaveName = lv.name;
+          // Per spec: UL leaves are excluded from On Leave on the Summary
+          // (they appear in HR Dashboard's MIA card instead). For now we
+          // still tag them as on_leave so they're visible somewhere — switch
+          // to hiding entirely when MIA panel is removed.
+          absenceKind = lv.code === MIA_LEAVE_CODE ? "mia" : "on_leave";
+        } else {
+          absenceKind = "missing";
+        }
+      }
+    }
+
+    // Rotation: if today's assigned branch differs from the staff's home
+    // branch, that's a visiting situation (they're "based" elsewhere but
+    // expected here). We surface it as a chip so HQ-viewing staff understand
+    // the row's context.
+    const rotation = rotationFor(s.employeeId);
+    const visitingFrom =
+      rotation && branchForDay && rotation.homeBranchCode !== branchForDay
+        ? rotation.homeBranchCode
+        : null;
 
     return {
-      user_id: e.user_id,
-      name: e.user_profile?.full_name ?? `User #${e.user_id}`,
-      employee_code: employment?.employee_id ?? null,
-      department: employment?.department?.department_name ?? null,
-      position: employment?.position ?? null,
-      check_in: checkIn?.toISOString() ?? null,
-      check_out: checkOut?.toISOString() ?? null,
+      // user_id slot now holds BranchStaff.id since staff list comes from HRFS.
+      // (No local user_id available without a separate lookup; not currently
+      // needed for display since the Justify modal is disabled in read-only.)
+      user_id: s.id,
+      name: s.name ?? s.employeeId ?? `Staff #${s.id}`,
+      employee_code: s.employeeId ?? null,
+      department: s.department ?? s.location ?? null,
+      position: s.position ?? s.role ?? null,
+      check_in: checkInDate?.toISOString() ?? null,
+      check_out: checkOutDate?.toISOString() ?? null,
       in_status: inStatus,
       out_status: outStatus,
-      scans: scansForToday,
-      home_branch_code: homeBranchCode,
-      visiting_from: null,
+      scans: scan?.scan_count ?? 0,
+      home_branch_code: s.branch ?? null,
+      visiting_from: visitingFrom,
+      absence_kind: absenceKind,
+      leave_type_code: leaveCode,
+      leave_type_name: leaveName,
+      // Justify modal is disabled for now (read-only HRFS). Pre-fill data
+      // converted into the view's existing shape for display purposes only.
+      justification: just
+        ? { id: Number(just.id), reason: just.reason ?? "", note: just.evidence_url }
+        : null,
     };
   });
 
-  const visitorRows: AttendanceRow[] = visitors.map((v) => {
-    const scans = branchScansByUser.get(v.user_id)!;
-    const checkIn = scans.min;
-    const checkOut = scans.count > 1 && scans.max > scans.min ? scans.max : null;
+  // ── Visitor rows ─────────────────────────────────────────────────────────
+  // A scan whose empNo isn't in the scheduled-scope set, and which happened
+  // at a scanner mapped to the selected branch (HQ or ST today). Only
+  // meaningful when a branch is selected.
+  const visitorRows: AttendanceRow[] = [];
+  if (selectedBranch) {
+    for (const scan of aggregated) {
+      if (scheduledEmpNos.has(scan.emp_no)) continue;
+      const staff = staffByEmpNo.get(scan.emp_no) ?? null;
+      if (!staff) continue; // unknown empNo — skip rather than show noise
 
-    const inStatus: AttendanceRow["in_status"] =
-      mytHour(checkIn) >= LATE_HOUR_MYT ? "late" : "on_time";
-    const outStatus: AttendanceRow["out_status"] = checkOut
-      ? mytHour(checkOut) < EARLY_OUT_HOUR_MYT
-        ? "early"
-        : "normal"
-      : null;
+      // Where did they actually scan? Use the first scan's device.
+      const scannedAtBranch = deviceBranchCode(scan.sample_device_name);
+      if (!scannedAtBranch || scannedAtBranch !== branchCode) continue;
 
-    const employment = v.employment[0];
-    const homeBranchCode = employment?.branch?.branch_code ?? null;
-    const homeBranchName = employment?.branch?.branch_name ?? "another branch";
+      // If they scanned at their own home branch, they're not a visitor —
+      // they're just not scheduled today.
+      if (staff.branch === branchCode) continue;
 
-    return {
-      user_id: v.user_id,
-      name: v.user_profile?.full_name ?? `User #${v.user_id}`,
-      employee_code: employment?.employee_id ?? null,
-      department: employment?.department?.department_name ?? null,
-      position: employment?.position ?? null,
-      check_in: checkIn.toISOString(),
-      check_out: checkOut?.toISOString() ?? null,
-      in_status: inStatus,
-      out_status: outStatus,
-      scans: scans.count,
-      home_branch_code: homeBranchCode,
-      visiting_from: homeBranchName,
-    };
-  });
+      const checkInDate = scan.first_event;
+      const checkOutDate =
+        scan.last_event.getTime() > scan.first_event.getTime()
+        && utcToMytHm(scan.last_event) >= CHECKOUT_EARLIEST_MYT
+          ? scan.last_event
+          : null;
+
+      visitorRows.push({
+        user_id: staff.user_id,
+        name: staff.name ?? `Emp ${scan.emp_no}`,
+        employee_code: scan.emp_no,
+        department: staff.department ?? staff.location ?? null,
+        position: staff.position ?? staff.role ?? null,
+        check_in: checkInDate.toISOString(),
+        check_out: checkOutDate?.toISOString() ?? null,
+        // No schedule context for visitors (they're working outside their
+        // home branch today) — surface times without late/early judgment.
+        in_status: "on_time",
+        out_status: checkOutDate ? "normal" : null,
+        scans: scan.scan_count,
+        home_branch_code: staff.branch ?? null,
+        visiting_from: staff.branch ?? "another branch",
+        absence_kind: null,
+        leave_type_code: null,
+        leave_type_name: null,
+        justification: null,
+      });
+    }
+  }
 
   const rows: AttendanceRow[] = [...expectedRows, ...visitorRows];
 
-  // Counts only describe the assigned workforce — visitors don't change the
-  // "missing" math, but they're counted separately in `scanned`.
+  // Sort by check-in time DESCENDING (latest scanners at the top — matches
+  // the reference portal's layout). People who didn't scan today sort to the
+  // bottom, secondary-sorted by name so the absent block has a stable order.
+  rows.sort((a, b) => {
+    if (a.check_in && b.check_in) return b.check_in.localeCompare(a.check_in);
+    if (a.check_in) return -1;
+    if (b.check_in) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  // ── Counters (assigned-only for absence math; visitors counted separately) ─
   const expectedScanned = expectedRows.filter(
     (r) => r.check_in || r.check_out,
   ).length;
   const currentlyIn = rows.filter((r) => r.check_in && !r.check_out).length;
   const checkedOut = rows.filter((r) => r.check_in && r.check_out).length;
   const totalEmployees = expectedRows.length;
-  const missing = totalEmployees - expectedScanned;
+  const missing   = expectedRows.filter((r) => r.absence_kind === "missing").length;
+  const onLeave   = expectedRows.filter((r) => r.absence_kind === "on_leave").length;
+  const mia       = expectedRows.filter((r) => r.absence_kind === "mia").length;
+  const justified = expectedRows.filter((r) => r.absence_kind === "justified").length;
   const scanned = expectedScanned + visitorRows.length;
 
   const data: SummaryData = {
@@ -389,12 +588,16 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
       currentlyIn,
       checkedOut,
       missing,
+      onLeave,
+      mia,
+      justified,
       totalEmployees,
     },
     scannerOnline,
-    lastSyncedIso,
+    lastSyncedIso: lastScanTs?.toISOString() ?? null,
     recordsToday,
     rows,
+    canJustify: ALLOWED_ROLE_TYPES.has(roleType),
   };
 
   return (

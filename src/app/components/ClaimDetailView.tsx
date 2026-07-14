@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Home,
@@ -9,6 +9,19 @@ import {
   TrendingUp,
   HeartPulse,
   Car,
+  UserPlus,
+  RefreshCw,
+  Timer,
+  Trophy,
+  Sparkles,
+  GraduationCap,
+  Megaphone,
+  Store,
+  Backpack,
+  Hourglass,
+  Crown,
+  Presentation,
+  Share2,
   User,
   Mail,
   Phone,
@@ -28,7 +41,7 @@ import {
   FileType2,
   type LucideIcon,
 } from "lucide-react";
-import { reviewClaim } from "@/app/claim/actions";
+import { reviewClaim, advanceClaim } from "@/app/claim/actions";
 
 interface ClaimInfo {
   claimId: number;
@@ -39,9 +52,7 @@ interface ClaimInfo {
   approvedAmount: number | null;
   claimDate: string;
   status: string;
-  attachment: string | null;
-  attachmentExists: boolean;
-  attachmentName: string | null;
+  attachments: { url: string | null; exists: boolean; name: string }[];
   remarks: string | null;
   submittedOn: string;
   updatedAt: string;
@@ -86,6 +97,110 @@ const TYPE_META: Record<
     accentBorder: "#FED7AA",
     accentText: "#C2410C",
   },
+  sales_incentive: {
+    label: "Salesperson Incentive",
+    Icon: UserPlus,
+    accent: "#4F46E5",
+    accentSoft: "#EEF2FF",
+    accentBorder: "#C7D2FE",
+    accentText: "#4338CA",
+  },
+  renewal_incentive: {
+    label: "Renewal Incentive",
+    Icon: RefreshCw,
+    accent: "#0891B2",
+    accentSoft: "#ECFEFF",
+    accentBorder: "#A5F3FC",
+    accentText: "#0E7490",
+  },
+  ot: {
+    label: "Overtime (OT)",
+    Icon: Timer,
+    accent: "#7C3AED",
+    accentSoft: "#F5F3FF",
+    accentBorder: "#DDD6FE",
+    accentText: "#6D28D9",
+  },
+  branch_rank_reward: {
+    label: "Branch Ranking Reward",
+    Icon: Trophy,
+    accent: "#E11D48",
+    accentSoft: "#FFF1F2",
+    accentBorder: "#FECDD3",
+    accentText: "#BE123C",
+  },
+  jackpot: {
+    label: "Jackpot",
+    Icon: Sparkles,
+    accent: "#D97706",
+    accentSoft: "#FFFBEB",
+    accentBorder: "#FDE68A",
+    accentText: "#B45309",
+  },
+  class: {
+    label: "Class Claim",
+    Icon: GraduationCap,
+    accent: "#6366F1",
+    accentSoft: "#EEF2FF",
+    accentBorder: "#C7D2FE",
+    accentText: "#4338CA",
+  },
+  roadshow: {
+    label: "Roadshow Claim",
+    Icon: Megaphone,
+    accent: "#D946EF",
+    accentSoft: "#FDF4FF",
+    accentBorder: "#F5D0FE",
+    accentText: "#A21CAF",
+  },
+  showcase: {
+    label: "Showcase Claim",
+    Icon: Store,
+    accent: "#0EA5E9",
+    accentSoft: "#F0F9FF",
+    accentBorder: "#BAE6FD",
+    accentText: "#0369A1",
+  },
+  internship: {
+    label: "Internship Claim",
+    Icon: Backpack,
+    accent: "#84CC16",
+    accentSoft: "#F7FEE7",
+    accentBorder: "#D9F99D",
+    accentText: "#4D7C0F",
+  },
+  part_time: {
+    label: "Part Time Claim",
+    Icon: Hourglass,
+    accent: "#06B6D4",
+    accentSoft: "#ECFEFF",
+    accentBorder: "#A5F3FC",
+    accentText: "#0E7490",
+  },
+  rm_incentive: {
+    label: "Regional Manager Incentive",
+    Icon: Crown,
+    accent: "#7C3AED",
+    accentSoft: "#F5F3FF",
+    accentBorder: "#DDD6FE",
+    accentText: "#6D28D9",
+  },
+  trainer: {
+    label: "Trainer Claim",
+    Icon: Presentation,
+    accent: "#F43F5E",
+    accentSoft: "#FFF1F2",
+    accentBorder: "#FECDD3",
+    accentText: "#BE123C",
+  },
+  referral: {
+    label: "Referral Claim",
+    Icon: Share2,
+    accent: "#16A34A",
+    accentSoft: "#F0FDF4",
+    accentBorder: "#BBF7D0",
+    accentText: "#15803D",
+  },
 };
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
@@ -95,6 +210,95 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; labe
   disbursed: { bg: "#FAF5FF", text: "#6B21A8", dot: "#A855F7", label: "Disbursed" },
   received: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Received" },
 };
+
+// Monthly claim cycle stages, mirrored from the Claims list page but coloured
+// per-claim by status: red = submitted/rejected (needs attention), green =
+// approved/disbursed (passed), grey = not reached yet.
+const CYCLE_STAGES = [
+  { key: "submission", date: "2nd", label: "Submission" },
+  { key: "approval", date: "12th", label: "Approval" },
+  { key: "resubmission", date: "14th", label: "Resubmission" },
+  { key: "finalReview", date: "17th", label: "Final Review" },
+  { key: "disbursement", date: "22nd", label: "Disbursement" },
+] as const;
+
+type StageColor = "green" | "red" | "grey";
+
+function claimCycleColors(status: string): StageColor[] {
+  switch (status) {
+    case "pending":
+      // Submitted, awaiting review — submission marked red, the rest upcoming.
+      return ["red", "grey", "grey", "grey", "grey"];
+    case "approved":
+      return ["green", "green", "green", "green", "grey"];
+    case "rejected":
+      return ["green", "red", "red", "red", "grey"];
+    case "disbursed":
+    case "received":
+      return ["green", "green", "green", "green", "green"];
+    default:
+      return ["grey", "grey", "grey", "grey", "grey"];
+  }
+}
+
+const STAGE_PALETTE: Record<
+  StageColor,
+  { dot: string; bg: string; border: string; text: string; line: string }
+> = {
+  green: { dot: "#10B981", bg: "#ECFDF5", border: "#A7F3D0", text: "#047857", line: "#34D399" },
+  red: { dot: "#EF4444", bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", line: "#F87171" },
+  grey: { dot: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0", text: "#64748B", line: "#E2E8F0" },
+};
+
+function ClaimCycleTimeline({ status }: { status: string }) {
+  const colors = claimCycleColors(status);
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-4">
+        Claim Progress
+      </h2>
+      <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+        {CYCLE_STAGES.map((stage, i) => {
+          const c = STAGE_PALETTE[colors[i]];
+          const lineColor =
+            colors[i + 1] === "grey"
+              ? STAGE_PALETTE.grey.line
+              : STAGE_PALETTE[colors[i]].line;
+          return (
+            <Fragment key={stage.key}>
+              <div
+                style={{ flexShrink: 0, backgroundColor: c.bg, borderColor: c.border }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full border whitespace-nowrap"
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: c.dot }}
+                  aria-hidden="true"
+                />
+                <span className="text-xs" style={{ color: c.text }}>
+                  <span className="font-semibold">{stage.date}</span>
+                  <span className="mx-1 opacity-50">·</span>
+                  {stage.label}
+                </span>
+              </div>
+              {i < CYCLE_STAGES.length - 1 && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    flex: "1 1 0%",
+                    height: "2px",
+                    margin: "0 8px",
+                    backgroundColor: lineColor,
+                  }}
+                />
+              )}
+            </Fragment>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB");
@@ -111,10 +315,12 @@ export default function ClaimDetailView({
   claim,
   employee,
   isFinance = false,
+  isOwner = false,
 }: {
   claim: ClaimInfo;
   employee: EmployeeInfo;
   isFinance?: boolean;
+  isOwner?: boolean;
 }) {
   const meta = TYPE_META[claim.claimType] ?? TYPE_META.sales;
   const badge = STATUS_BADGE[claim.status] ?? {
@@ -123,10 +329,6 @@ export default function ClaimDetailView({
     dot: "#64748B",
     label: claim.status,
   };
-
-  const attachmentName =
-    claim.attachmentName ??
-    (claim.attachment ? claim.attachment.split("/").pop() ?? "attachment" : null);
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "#FAFAFA" }}>
@@ -229,6 +431,9 @@ export default function ClaimDetailView({
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "24px", padding: "28px 32px" }}>
+            {/* Claim progress — cycle stages coloured by this claim's status */}
+            <ClaimCycleTimeline status={claim.status} />
+
             {/* Amount summary */}
             <div
               style={{
@@ -307,18 +512,23 @@ export default function ClaimDetailView({
                 </div>
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                    Attachment
+                    {claim.attachments.length > 1 ? "Attachments" : "Attachment"}
                   </p>
-                  {claim.attachment ? (
-                    <AttachmentCard
-                      url={claim.attachment}
-                      filename={attachmentName ?? "attachment"}
-                      exists={claim.attachmentExists}
-                      accent={meta.accent}
-                      accentSoft={meta.accentSoft}
-                      accentBorder={meta.accentBorder}
-                      accentText={meta.accentText}
-                    />
+                  {claim.attachments.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {claim.attachments.map((att, i) => (
+                        <AttachmentCard
+                          key={i}
+                          url={att.url ?? ""}
+                          filename={att.name.split("/").pop() || "attachment"}
+                          exists={att.exists}
+                          accent={meta.accent}
+                          accentSoft={meta.accentSoft}
+                          accentBorder={meta.accentBorder}
+                          accentText={meta.accentText}
+                        />
+                      ))}
+                    </div>
                   ) : (
                     <p className="text-sm text-slate-400 italic">No attachment.</p>
                   )}
@@ -363,6 +573,22 @@ export default function ClaimDetailView({
                   defaultAmount={claim.amount}
                   meta={meta}
                 />
+              </>
+            )}
+
+            {/* Finance disburses an approved claim. */}
+            {isFinance && claim.status === "approved" && (
+              <>
+                <Divider />
+                <ClaimAdvancePanel claimId={claim.claimId} mode="disburse" meta={meta} />
+              </>
+            )}
+
+            {/* The employee who requested the claim confirms receipt once disbursed. */}
+            {isOwner && claim.status === "disbursed" && (
+              <>
+                <Divider />
+                <ClaimAdvancePanel claimId={claim.claimId} mode="receive" meta={meta} />
               </>
             )}
           </div>
@@ -1080,6 +1306,156 @@ function FinanceReviewPanel({
         >
           <CheckCircle2 size={15} aria-hidden="true" />
           {isPending ? "Saving…" : "Approve Claim"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ClaimAdvancePanel({
+  claimId,
+  mode,
+  meta,
+}: {
+  claimId: number;
+  mode: "disburse" | "receive";
+  meta: ReviewMeta;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const isDisburse = mode === "disburse";
+  const action = mode;
+  const cta = isDisburse ? "Mark as Disbursed" : "Mark as Received";
+  const title = isDisburse ? "Disbursement" : "Confirm Receipt";
+  const desc = isDisburse
+    ? "Mark this approved claim as disbursed once payment has been made."
+    : "Confirm you have received this claim's payment.";
+  const Icon = isDisburse ? Receipt : CheckCircle2;
+
+  const doAdvance = () => {
+    setError(null);
+    const fd = new FormData();
+    fd.append("claim_id", String(claimId));
+    fd.append("action", action);
+    startTransition(async () => {
+      const result = await advanceClaim(null, fd);
+      if (!result.ok) setError(result.error ?? "Failed to update claim.");
+    });
+  };
+
+  return (
+    <section
+      style={{
+        borderRadius: "16px",
+        border: `1px solid ${meta.accentBorder}`,
+        backgroundColor: meta.accentSoft,
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          marginBottom: "18px",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            display: "grid",
+            placeItems: "center",
+            backgroundColor: "#fff",
+            border: `1px solid ${meta.accentBorder}`,
+          }}
+        >
+          <Icon size={16} style={{ color: meta.accent }} aria-hidden="true" />
+        </div>
+        <div>
+          <h2
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: meta.accentText,
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {title}
+          </h2>
+          <p style={{ fontSize: "12px", color: meta.accentText, opacity: 0.75 }}>{desc}</p>
+        </div>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "flex-start",
+            borderRadius: "10px",
+            backgroundColor: "#FEF2F2",
+            border: "1px solid #FECACA",
+            padding: "12px 14px",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              width: "18px",
+              height: "18px",
+              borderRadius: "9999px",
+              backgroundColor: "#DC2626",
+              color: "#fff",
+              display: "grid",
+              placeItems: "center",
+              fontSize: "11px",
+              fontWeight: 700,
+              marginTop: "1px",
+              flexShrink: 0,
+            }}
+          >
+            !
+          </div>
+          <p style={{ fontSize: "12.5px", color: "#991B1B", lineHeight: 1.55 }}>{error}</p>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          paddingTop: "16px",
+          borderTop: `1px dashed ${meta.accentBorder}`,
+        }}
+      >
+        <button
+          type="button"
+          onClick={doAdvance}
+          disabled={isPending}
+          style={{
+            height: "44px",
+            padding: "0 22px",
+            borderRadius: "10px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            backgroundColor: isPending ? "#D4D4D4" : meta.accent,
+            color: "#fff",
+            fontSize: "13.5px",
+            fontWeight: 600,
+            cursor: isPending ? "not-allowed" : "pointer",
+            boxShadow: isPending ? "none" : `0 4px 12px ${meta.accentSoft}`,
+            transition: "background-color 0.15s, box-shadow 0.15s",
+            border: "none",
+          }}
+        >
+          <Icon size={15} aria-hidden="true" />
+          {isPending ? "Saving…" : cta}
         </button>
       </div>
     </section>

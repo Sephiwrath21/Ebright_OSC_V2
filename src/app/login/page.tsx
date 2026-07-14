@@ -46,22 +46,24 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-red-950 via-red-800 to-red-950">
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-rose-600 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-red-700 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
         </div>
       </div>
 
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl mb-4 shadow-lg">
-              <Lock className="w-8 h-8 text-white" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Ebright"
+              className="h-16 w-auto mx-auto mb-6"
+            />
             <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-blue-200 text-sm">Sign in to your account</p>
+            <p className="text-red-100 text-sm">Sign in to your account</p>
           </div>
 
           {justRegistered && (
@@ -77,12 +79,12 @@ function LoginForm() {
               and signs in via NextAuth when JS is loaded. */}
           <form onSubmit={handleSubmit} method="post" className="space-y-6" autoComplete="off">
             <div className="space-y-2">
-              <label htmlFor="login-email" className="block text-sm font-medium text-blue-100 ml-1">
+              <label htmlFor="login-email" className="block text-sm font-medium text-red-100 ml-1">
                 Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="w-5 h-5 text-blue-300" />
+                  <Mail className="w-5 h-5 text-red-200" />
                 </div>
                 <input
                   id="login-email"
@@ -91,19 +93,23 @@ function LoginForm() {
                   required
                   autoComplete="email"
                   placeholder="name@ebright.my"
-                  className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-200/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-red-200/50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
                   autoFocus
+                  // Password managers / autofill extensions inject attributes
+                  // (e.g. fdprocessedid, data-lastpass-*) onto form controls after
+                  // SSR, which trips a recoverable hydration warning. Suppress it.
+                  suppressHydrationWarning
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-blue-100 ml-1">
+              <label className="block text-sm font-medium text-red-100 ml-1">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="w-5 h-5 text-blue-300" />
+                  <Lock className="w-5 h-5 text-red-200" />
                 </div>
                 <input
                   name="password"
@@ -111,12 +117,14 @@ function LoginForm() {
                   required
                   autoComplete="new-password"
                   placeholder="Enter your password"
-                  className="w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-200/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-red-200/50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-white transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-red-200 hover:text-white transition-colors"
+                  suppressHydrationWarning
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -127,11 +135,11 @@ function LoginForm() {
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                  className="w-4 h-4 rounded border-white/30 bg-white/10 text-red-500 focus:ring-red-400 focus:ring-offset-0"
                 />
-                <span className="text-blue-200">Remember me</span>
+                <span className="text-red-100">Remember me</span>
               </label>
-              <Link href="/forgot-password" className="text-blue-300 hover:text-white transition-colors">
+              <Link href="/forgot-password" className="text-red-200 hover:text-white transition-colors">
                 Forgot password?
               </Link>
             </div>
@@ -145,7 +153,8 @@ function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-cyan-400 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-rose-500 text-white font-semibold rounded-xl hover:from-red-700 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-red-950 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              suppressHydrationWarning
             >
               {isLoading ? (
                 <span className="flex items-center justify-center space-x-2">
@@ -161,7 +170,7 @@ function LoginForm() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-blue-200">
+          <p className="mt-6 text-center text-sm text-red-100">
             Don&apos;t have an account?{" "}
             <Link href="/register" className="text-white font-semibold hover:underline">
               Sign up
@@ -169,7 +178,7 @@ function LoginForm() {
           </p>
 
           <div className="mt-6 text-center">
-            <p className="text-blue-200 text-xs">
+            <p className="text-red-100 text-xs">
               © 2026 HR System. All rights reserved.
             </p>
           </div>

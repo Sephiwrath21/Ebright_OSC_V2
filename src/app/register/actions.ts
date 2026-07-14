@@ -17,6 +17,7 @@ export interface EmailCheckResult {
   error?: string;
   status?: "claim" | "new";
   email?: string;
+  name?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,14 +35,21 @@ export async function checkEmail(_: EmailCheckResult | null, formData: FormData)
 
   const existing = await prisma.users.findUnique({
     where: { email },
-    select: { user_id: true, password: true },
+    select: { user_id: true, password: true, user_profile: { select: { full_name: true } } },
   });
 
   if (existing) {
     if (existing.password !== null) {
       return { ok: false, error: "An account with this email already exists. Please sign in." };
     }
-    return { ok: true, status: "claim", email };
+    return { ok: true, status: "claim", email, name: existing.user_profile?.full_name ?? undefined };
+  }
+
+  if (email.endsWith("@ebright.my")) {
+    return {
+      ok: false,
+      error: "This email is not registered in our staff records. Please contact HR at 01169491088 to update your email",
+    };
   }
 
   return { ok: true, status: "new", email };
@@ -78,6 +86,13 @@ export async function registerUser(_: RegisterResult | null, formData: FormData)
       return { ok: false, error: `Could not set password: ${msg}` };
     }
     return { ok: true, success: true, claimed: true };
+  }
+
+  if (email.endsWith("@ebright.my")) {
+    return {
+      ok: false,
+      error: "This email is not registered in our staff records. Please contact HR at 01169491088 to update your email",
+    };
   }
 
   const fullName = s(formData, "fullName");

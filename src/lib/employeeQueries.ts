@@ -27,6 +27,7 @@ export interface EmployeeRow {
   departmentName: string | null;
   status: string | null;
   startDate: string | null;
+  endDate: string | null;
   pendingOnboarding: boolean;
 }
 
@@ -90,7 +91,6 @@ export async function listEmployees(filters: ListFilters = {}): Promise<Employee
   // Staff only (role_id 6) — the workforce, excluding admin/management
   // accounts (superadmin, ceo, department, branch, regional manager).
   const whereUser: Record<string, unknown> = {
-    status: "active",
     role_id: STAFF_ROLE_ID,
   };
 
@@ -139,6 +139,7 @@ export async function listEmployees(filters: ListFilters = {}): Promise<Employee
       departmentName: emp?.department?.department_name ?? null,
       status: emp?.status ?? u.status ?? null,
       startDate: emp?.start_date ? emp.start_date.toISOString().slice(0, 10) : null,
+      endDate: emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null,
       pendingOnboarding: !u.user_profile,
     };
   });

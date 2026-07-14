@@ -4,9 +4,16 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
-import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
+import FinanceDashboard from "@/app/components/FinanceDashboard";
+import ODDashboard from "@/app/components/ODDashboard";
+import OperationsDashboard from "@/app/components/OperationsDashboard";
+import MarketingDashboard from "@/app/components/MarketingDashboard";
+import AcademyDashboard from "@/app/components/AcademyDashboard";
 import BranchDashboard from "@/app/components/BranchDashboard";
 import AppShell from "@/app/components/AppShell";
+import HodPendingAlert from "@/app/components/HodPendingAlert";
+
+const FINANCE_EMAIL = "finance@ebright.my";
 
 export default function HomePage() {
   const { data: session, status } = useSession({
@@ -26,25 +33,35 @@ export default function HomePage() {
 
   const userEmail = session?.user?.email || "";
   const userRole = (session?.user as { role?: string } | undefined)?.role || "USER";
+  const userPosition = (session?.user as { position?: string } | undefined)?.position ?? "";
   const userName = session?.user?.name ?? null;
   const branchName =
     (session?.user as { branchName?: string | null } | undefined)?.branchName ?? null;
 
-  const role = userRole.toLowerCase();
-  const isStaff = role === "staff"; // role_id = 6
-  const isBranch = role === "branch"; // role_id = 4
-  const isHr = userEmail.toLowerCase() === "hr@ebright.my";
+  // role_type "staff" corresponds to role_id = 4 in the DB.
+  const isStaff = userRole.toLowerCase() === "staff";
+  const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
+  const isOD = userEmail.toLowerCase() === "od@ebright.my";
+  const isOperations = userEmail.toLowerCase() === "operations@ebright.my";
+  const isMarketing = userEmail.toLowerCase() === "marketing@ebright.my";
+  const isAcademy = userEmail.toLowerCase() === "academy@ebright.my";
+  const isBranch = userRole.toLowerCase() === "branch";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      {isHr ? (
-        <HrPersonalizedDashboard userName={userName} userEmail={userEmail} />
+      <HodPendingAlert position={userPosition} />
+      {isOD ? (
+        <ODDashboard userName={userName} userEmail={userEmail} />
+      ) : isOperations ? (
+        <OperationsDashboard userName={userName} userEmail={userEmail} />
+      ) : isMarketing ? (
+        <MarketingDashboard userName={userName} userEmail={userEmail} />
+      ) : isAcademy ? (
+        <AcademyDashboard userName={userName} userEmail={userEmail} />
       ) : isBranch ? (
-        <BranchDashboard
-          userName={userName}
-          userEmail={userEmail}
-          branchName={branchName}
-        />
+        <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
+      ) : isFinance ? (
+        <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
       ) : (

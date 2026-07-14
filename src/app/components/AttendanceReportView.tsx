@@ -4,30 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
+  ArrowLeft,
+  CheckCircle2,
+  CalendarX,
+  Plane,
+  Timer,
+  Hash,
+  Building2,
+  Briefcase,
+  MapPin,
+  CalendarClock,
+  RefreshCw,
   Home,
   ChevronRight,
-  ChevronDown,
-  ChevronLeft,
-  Calendar as CalendarIcon,
-  X,
 } from "lucide-react";
 
 export interface BranchOption {
   code: string;
   name: string;
 }
-
 export interface DepartmentOption {
   code: string;
   name: string;
 }
-
 export interface EmployeeOption {
   userId: number;
   name: string;
   branchCode: string | null;
 }
-
 export interface MonthOption {
   value: string;
   label: string;
@@ -42,6 +46,9 @@ export interface DayRow {
   checkOut: string | null;
   duration: string | null;
   status: "present" | "no_record" | "weekend" | "leave";
+  late?: boolean;
+  leftEarly?: boolean;
+  leaveCode?: string | null;
 }
 
 export interface EmployeeContext {
@@ -52,12 +59,22 @@ export interface EmployeeContext {
   role: string | null;
   location: string | null;
   branchCode: string | null;
+  /** HRFS BranchStaff.id — when present, the Schedule link opens the editor. */
+  branchStaffId: number | null;
+  employeeCode: string | null;
 }
 
 interface Summary {
   present: number;
   noRecord: number;
+  onLeave: number;
+  /** Count of days with a late clock-in (in the active window). */
+  late: number;
+  /** Count of days with a left-early clock-out. */
+  leftEarly: number;
   totalHours: string | null;
+  /** Raw seconds for the % bar / sub-caption. */
+  totalSeconds?: number;
 }
 
 interface Props {
@@ -72,7 +89,7 @@ interface Props {
   selectedEmployeeId: number | null;
   selectedMonth: string;
   monthLabel: string;
-  selectedDate: string;        // "" = no day filter; otherwise YYYY-MM-DD
+  selectedDate: string;
   dateLabel: string | null;
   restrictToSelf?: boolean;
   summary: Summary;
@@ -80,42 +97,13 @@ interface Props {
 
 const STATUS_BADGE: Record<
   DayRow["status"],
-  { bg: string; text: string; dot: string; label: string; rowTint: string }
+  { bg: string; text: string; dot: string; label: string }
 > = {
-  present:   { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Present",    rowTint: "" },
-  no_record: { bg: "bg-rose-50",    text: "text-rose-600",    dot: "bg-rose-500",    label: "No Record",  rowTint: "" },
-  weekend:   { bg: "bg-stone-200/70", text: "text-stone-500",  dot: "bg-stone-400",  label: "Weekend",    rowTint: "bg-stone-100/70" },
-  leave:     { bg: "bg-violet-50",  text: "text-violet-700",  dot: "bg-violet-500",  label: "On Leave",   rowTint: "" },
+  present:   { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Present"   },
+  no_record: { bg: "bg-rose-50",    text: "text-rose-600",    dot: "bg-rose-500",    label: "No Record" },
+  weekend:   { bg: "bg-stone-100",  text: "text-stone-500",   dot: "bg-stone-400",   label: "Weekend"   },
+  leave:     { bg: "bg-violet-50",  text: "text-violet-700",  dot: "bg-violet-500",  label: "On Leave"  },
 };
-
-// Hex values used directly via inline `style` so Tailwind JIT can't strip them.
-const AVATAR_COLORS = [
-  "#059669", // emerald-600
-  "#2563eb", // blue-600
-  "#7c3aed", // violet-600
-  "#d97706", // amber-600
-  "#e11d48", // rose-600
-  "#0d9488", // teal-600
-  "#4f46e5", // indigo-600
-  "#ea580c", // orange-600
-];
-const AVATAR_FALLBACK = "#64748b"; // slate-500
-
-function getInitials(name: string | null): string {
-  if (!name) return "?";
-  const cleaned = name.replace(/[^a-zA-Z0-9\s]/g, "");
-  const parts = cleaned.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function colorForName(name: string | null): string {
-  if (!name) return AVATAR_FALLBACK;
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[hash];
-}
 
 export default function AttendanceReportView({
   branches,
@@ -153,48 +141,21 @@ export default function AttendanceReportView({
     });
   };
 
-  // Picking a date aligns the month to it and supersedes any month filter.
-  // Clearing the date keeps the same month visible.
-  const onDateChange = (iso: string) => {
-    if (!iso) {
-      updateParams({ date: null });
-      return;
-    }
-    updateParams({ date: iso, month: iso.slice(0, 7) });
-  };
+  const onRefresh = () => startTransition(() => router.refresh());
 
-  // Picking a different month should clear any single-day filter so the user
-  // sees the whole month again.
   const onMonthChange = (m: string | null) => {
     updateParams({ month: m, date: null });
   };
 
-  const branchLabel =
-    branches.find((b) => b.code === selectedBranch)?.name ?? "All branches";
-  const deptLabel =
-    departments.find((d) => d.code === selectedDept)?.name ?? "All departments";
-  const employeeLabel =
-    employees.find((e) => e.userId === selectedEmployeeId)?.name ??
-    (employee ? employee.name ?? `User #${employee.userId}` : "—");
-  const displayName = employee
-    ? employee.name ?? `User #${employee.userId}`
-    : "—";
-  // Subtitle prefers position (e.g. "FT COACH"); falls back to department name.
-  const subtitle = employee?.position ?? employee?.department ?? null;
-
-  // months are sorted newest-first; previous = next index, next = prev index
-  const monthIdx = months.findIndex((m) => m.value === selectedMonth);
-  const prevMonth = monthIdx >= 0 ? months[monthIdx + 1]?.value : undefined;
-  const nextMonth = monthIdx > 0 ? months[monthIdx - 1]?.value : undefined;
-
-  const workingDays = summary.present + summary.noRecord;
-  const attendanceRate = workingDays > 0 ? Math.round((summary.present / workingDays) * 100) : 0;
-
   return (
-    <div className="min-h-full bg-stone-100/60">
-      <div className="max-w-6xl mx-auto px-6 pt-4 pb-16">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+    <div className="min-h-full bg-slate-50">
+      <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 space-y-5">
+        {/* Breadcrumb — same pattern as /attendance landing page. */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
+          <Link
+            href="/home"
+            className="flex items-center gap-1 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
+          >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
@@ -206,61 +167,91 @@ export default function AttendanceReportView({
           <span className="text-slate-900 font-medium">Report</span>
         </nav>
 
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
-            Attendance Report
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Daily clock-in breakdown from the thumbprint scanner.
-          </p>
+        {/* Header */}
+        <header className="flex items-start gap-4">
+          <Link
+            href="/attendance"
+            className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            Back
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Attendance Report</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Monthly attendance breakdown · Pulled live from scanner logs
+            </p>
+          </div>
         </header>
 
-        {/* Filter pills */}
-        <div
-          className={`flex flex-wrap items-stretch gap-3 mb-5 transition-opacity ${isPending ? "opacity-60" : ""}`}
-          aria-label="Filters"
-        >
-          {!restrictToSelf && (
-            <>
-              <FilterPill label="Branch" value={branchLabel}>
-                <select
-                  value={selectedBranch}
-                  onChange={(e) =>
-                    updateParams({ branch: e.target.value || null, dept: null, employeeId: null })
-                  }
-                >
-                  <option value="">All branches</option>
-                  {branches.map((b) => (
-                    <option key={b.code} value={b.code}>
-                      {b.name} ({b.code})
-                    </option>
-                  ))}
-                </select>
-              </FilterPill>
+        {/* Stat cards (top-border accent) */}
+        <section className="grid gap-4" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          <StatCard label="Days Present" value={summary.present} Icon={CheckCircle2} accent="emerald" />
+          <StatCard label="No Record"    value={summary.noRecord} Icon={CalendarX}   accent="rose" />
+          <StatCard label="On Leave"     value={summary.onLeave}  Icon={Plane}       accent="blue" />
+          <StatCard
+            label="Total Hours"
+            value={summary.totalHours ?? "—"}
+            mono={!!summary.totalHours}
+            Icon={Timer}
+            accent="amber"
+            caption={summary.totalHours ?? undefined}
+          />
+        </section>
 
-              {selectedBranch === "HQ" && departments.length > 0 && (
-                <FilterPill label="Department" value={deptLabel}>
+        {/* Main grid: sidebar + table */}
+        <div className="grid gap-5" style={{ gridTemplateColumns: "320px minmax(0, 1fr)" }}>
+          {/* Sidebar */}
+          <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="flex items-center gap-3 px-5 py-5 border-b-2 border-blue-500/80">
+              <span className="w-1 h-6 rounded-full bg-blue-500" aria-hidden="true" />
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Employee</h2>
+                <p className="text-xs font-medium text-slate-500 mt-0.5">Pick the staff member and period</p>
+              </div>
+            </div>
+
+            <div className={`p-5 space-y-4 ${isPending ? "opacity-60" : ""}`}>
+              {!restrictToSelf && (
+                <Field icon={<MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Branch">
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => updateParams({ branch: e.target.value || null, dept: null, employeeId: null })}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">All branches</option>
+                    {branches.map((b) => (
+                      <option key={b.code} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
+              {!restrictToSelf && selectedBranch === "HQ" && departments.length > 0 && (
+                <Field icon={<Building2 className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Department">
                   <select
                     value={selectedDept}
-                    onChange={(e) =>
-                      updateParams({ dept: e.target.value || null, employeeId: null })
-                    }
+                    onChange={(e) => updateParams({ dept: e.target.value || null, employeeId: null })}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">All departments</option>
                     {departments.map((d) => (
                       <option key={d.code} value={d.code}>
-                        {d.name} ({d.code})
+                        {d.name}
                       </option>
                     ))}
                   </select>
-                </FilterPill>
+                </Field>
               )}
 
-              <FilterPill label="Employee" value={employeeLabel}>
+              <Field icon={<Briefcase className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Name">
                 <select
                   value={selectedEmployeeId ?? ""}
                   onChange={(e) => updateParams({ employeeId: e.target.value || null })}
-                  disabled={employees.length === 0}
+                  disabled={restrictToSelf || employees.length === 0}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {employees.length === 0 && <option value="">No employees</option>}
                   {employees.map((e) => (
@@ -269,313 +260,260 @@ export default function AttendanceReportView({
                     </option>
                   ))}
                 </select>
-              </FilterPill>
-            </>
-          )}
+              </Field>
 
-          <MonthPill
-            label="Month"
-            value={monthLabel}
-            onPrev={prevMonth ? () => onMonthChange(prevMonth) : null}
-            onNext={nextMonth ? () => onMonthChange(nextMonth) : null}
-          >
-            <select
-              value={selectedMonth}
-              onChange={(e) => onMonthChange(e.target.value || null)}
-            >
-              {months.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </MonthPill>
-
-          <DatePill
-            label="Date"
-            value={selectedDate}
-            displayLabel={dateLabel ?? "All days"}
-            onChange={onDateChange}
-          />
-        </div>
-
-        {/* Hero card */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-5">
-            <div className="flex items-center gap-4 min-w-0">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0"
-                style={{ backgroundColor: colorForName(displayName) }}
-              >
-                {getInitials(displayName)}
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold text-slate-900 truncate">{displayName}</h2>
-                {subtitle && (
-                  <p className="text-sm text-slate-500 truncate">{subtitle}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-stretch gap-2.5">
-              <StatTile bg="bg-emerald-50" labelColor="text-emerald-700" value={summary.present} label="Present" />
-              <StatTile bg="bg-rose-50"    labelColor="text-rose-600"    value={summary.noRecord} label="No Record" />
-              <StatTile bg="bg-stone-200/60" labelColor="text-slate-600" value={summary.totalHours ?? "—"} label="Total Hours" mono={!!summary.totalHours} />
-            </div>
-          </div>
-
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                style={{ width: `${attendanceRate}%` }}
-              />
-            </div>
-            <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
-              <span>
-                {attendanceRate}% attendance rate {selectedDate ? "for selected day" : "this month"}
-              </span>
-              <span>
-                {summary.present} / {workingDays} {selectedDate ? "day" : "working days"}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Daily table */}
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed">
-              <thead>
-                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-200">
-                  <th className="py-3 px-4 w-[6%]">#</th>
-                  <th className="py-3 px-3 w-[10%]">Day</th>
-                  <th className="py-3 px-3 w-[14%]">Date</th>
-                  <th className="py-3 px-3 w-[15%]">Clock In</th>
-                  <th className="py-3 px-3 w-[15%]">Clock Out</th>
-                  <th className="py-3 px-3 w-[15%]">Duration</th>
-                  <th className="py-3 px-4 text-right w-[25%]">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-16 text-center text-sm text-slate-400">
-                      No data for this selection.
-                    </td>
-                  </tr>
-                )}
-                {rows.map((r) => {
-                  const badge = STATUS_BADGE[r.status];
-                  const dim = r.status === "weekend" || r.status === "no_record";
-                  return (
-                    <tr
-                      key={r.isoDate}
-                      className={`border-b border-slate-100 last:border-b-0 transition-colors hover:bg-slate-50/60 ${badge.rowTint}`}
-                    >
-                      <td className={`py-3 px-4 tabular-nums ${dim ? "text-slate-400" : "text-slate-500"}`}>
-                        {r.day}
-                      </td>
-                      <td className={`py-3 px-3 ${dim ? "text-slate-500" : "text-slate-900 font-semibold"}`}>
-                        {r.dayName}
-                      </td>
-                      <td className={`py-3 px-3 font-mono tabular-nums ${dim ? "text-slate-400" : "text-slate-500"}`}>
-                        {r.date}
-                      </td>
-                      <td className="py-3 px-3 font-mono tabular-nums">
-                        {r.checkIn ? (
-                          <span className="text-slate-900">{r.checkIn}</span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 font-mono tabular-nums">
-                        {r.checkOut ? (
-                          <span className="text-slate-900">{r.checkOut}</span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 font-mono tabular-nums">
-                        {r.duration ? (
-                          <span className="text-slate-700">{r.duration}</span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}
+              {/* Employee detail card */}
+              {employee && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+                  <dl className="text-sm divide-y divide-slate-200">
+                    <DetailRow icon={<Hash className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Employee ID">
+                      <span className="font-mono text-xs text-slate-900">{employee.employeeCode ?? "—"}</span>
+                    </DetailRow>
+                    <DetailRow icon={<Building2 className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Department">
+                      <span className="font-semibold text-slate-900">{employee.department ?? "—"}</span>
+                    </DetailRow>
+                    <DetailRow icon={<Briefcase className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Role">
+                      <span className="font-semibold text-slate-900">{employee.position ?? employee.role ?? "—"}</span>
+                    </DetailRow>
+                    <DetailRow icon={<MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Location">
+                      <span className="text-slate-700">{employee.location ?? "—"}</span>
+                    </DetailRow>
+                    <DetailRow icon={<CalendarClock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />} label="Schedule">
+                      {employee.branchStaffId !== null ? (
+                        <Link
+                          href={`/attendance/working-hours?staffId=${employee.branchStaffId}`}
+                          className="text-emerald-600 font-bold hover:text-emerald-700 hover:underline underline-offset-2"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
-                          {badge.label}
-                        </span>
+                          Set
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </DetailRow>
+                  </dl>
+                  <div className="flex items-center gap-2 px-3 py-3 border-t border-slate-200 bg-white">
+                    <CountChip count={summary.late} label="late" tone="rose" />
+                    <CountChip count={summary.leftEarly} label="left early" tone="amber" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* Main table */}
+          <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b-2 border-blue-500/80">
+              <div className="flex items-center gap-3">
+                <span className="w-1 h-6 rounded-full bg-blue-500" aria-hidden="true" />
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    {dateLabel ?? monthLabel}
+                  </h2>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5 uppercase tracking-wider">
+                    {employee?.name ?? "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Month nav */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => onMonthChange(e.target.value || null)}
+                  className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-400"
+                >
+                  {months.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`} aria-hidden="true" />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="text-left px-6 py-3 w-[8%]">No.</th>
+                    <th className="text-left px-3 py-3 w-[10%]">Day</th>
+                    <th className="text-left px-3 py-3 w-[14%]">Date</th>
+                    <th className="text-left px-3 py-3 w-[17%]">Clock In</th>
+                    <th className="text-left px-3 py-3 w-[17%]">Clock Out</th>
+                    <th className="text-left px-3 py-3 w-[14%]">Duration</th>
+                    <th className="text-right px-6 py-3 w-[20%]">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-16 text-center text-sm font-medium text-slate-400">
+                        No data for this selection.
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                  ) : (
+                    rows.map((r, i) => {
+                      const badge = STATUS_BADGE[r.status];
+                      const dim = r.status === "weekend" || r.status === "no_record";
+                      return (
+                        <tr key={r.isoDate} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70 transition-colors">
+                          <td className={`px-6 py-4 tabular-nums text-sm ${dim ? "text-slate-400" : "text-slate-500"}`}>
+                            {i + 1}
+                          </td>
+                          <td className={`px-3 py-4 text-sm ${dim ? "text-slate-500" : "text-blue-600 font-bold"}`}>
+                            {r.dayName}
+                          </td>
+                          <td className={`px-3 py-4 font-mono tabular-nums text-sm ${dim ? "text-slate-400" : "text-slate-700"}`}>
+                            {r.date}
+                          </td>
+                          <td className="px-3 py-4 font-mono tabular-nums text-sm">
+                            {r.checkIn ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className={r.late ? "text-rose-700 font-bold" : "text-slate-900"}>{r.checkIn}</span>
+                                {r.late && <ChipBadge tone="rose">Late</ChipBadge>}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-4 font-mono tabular-nums text-sm">
+                            {r.checkOut ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className={r.leftEarly ? "text-amber-700 font-bold" : "text-slate-900"}>{r.checkOut}</span>
+                                {r.leftEarly && <ChipBadge tone="amber">Left Early</ChipBadge>}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-4 font-mono tabular-nums text-sm">
+                            {r.duration ? (
+                              <span className="text-slate-700">{r.duration}</span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${badge.bg} ${badge.text}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} aria-hidden="true" />
+                              {r.status === "leave" && r.leaveCode ? r.leaveCode : badge.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        <p className="mt-5 text-xs text-slate-500 leading-relaxed">
-          Sun &amp; Mon are off days · Hours calculated from clock-in to clock-out
-          <br />
-          Data pulled live from the thumbprint scanner
-        </p>
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/60 text-xs text-slate-500">
+              Hours = clock-out − clock-in · Late / Left Early are judged against the working-hours schedule active that day.
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
 }
 
-function FilterPill({
+// ──────────────────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────────────────
+
+const STAT_ACCENT = {
+  blue: { bar: "bg-blue-500", tile: "bg-blue-50", icon: "text-blue-600", text: "text-blue-600" },
+  emerald: { bar: "bg-emerald-500", tile: "bg-emerald-50", icon: "text-emerald-600", text: "text-emerald-600" },
+  amber: { bar: "bg-amber-500", tile: "bg-amber-50", icon: "text-amber-600", text: "text-amber-600" },
+  rose: { bar: "bg-rose-500", tile: "bg-rose-50", icon: "text-rose-600", text: "text-rose-600" },
+} as const;
+
+function StatCard({
   label,
   value,
-  children,
+  Icon,
+  accent,
+  caption,
+  mono,
 }: {
   label: string;
-  value: string;
-  children: React.ReactElement<React.SelectHTMLAttributes<HTMLSelectElement>>;
-}) {
-  return (
-    <label className="group relative inline-flex items-stretch rounded-lg border border-slate-200 bg-white overflow-hidden hover:border-slate-300 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 transition cursor-pointer">
-      <span className="px-3 self-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/80 border-r border-slate-200 py-2.5">
-        {label}
-      </span>
-      <span className="px-3 py-2 inline-flex items-center gap-2">
-        <span className="text-sm font-medium text-slate-900 max-w-[200px] truncate">{value}</span>
-        <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-      </span>
-      <SelectOverlay>{children}</SelectOverlay>
-    </label>
-  );
-}
-
-function MonthPill({
-  label,
-  value,
-  onPrev,
-  onNext,
-  children,
-}: {
-  label: string;
-  value: string;
-  onPrev: (() => void) | null;
-  onNext: (() => void) | null;
-  children: React.ReactElement<React.SelectHTMLAttributes<HTMLSelectElement>>;
-}) {
-  return (
-    <div className="inline-flex items-stretch rounded-lg border border-slate-200 bg-white overflow-hidden">
-      <button
-        type="button"
-        onClick={onPrev ?? undefined}
-        disabled={!onPrev}
-        className="px-2 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
-        aria-label="Previous month"
-      >
-        <ChevronLeft className="w-4 h-4 text-slate-500" aria-hidden="true" />
-      </button>
-      <label className="group relative inline-flex items-stretch hover:bg-slate-50/60 focus-within:bg-slate-50/60 transition cursor-pointer">
-        <span className="px-3 self-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/80 border-r border-slate-200 py-2.5">
-          {label}
-        </span>
-        <span className="px-3 py-2 inline-flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-900">{value}</span>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-        </span>
-        <SelectOverlay>{children}</SelectOverlay>
-      </label>
-      <button
-        type="button"
-        onClick={onNext ?? undefined}
-        disabled={!onNext}
-        className="px-2 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed border-l border-slate-200 transition-colors"
-        aria-label="Next month"
-      >
-        <ChevronRight className="w-4 h-4 text-slate-500" aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-function DatePill({
-  label,
-  value,
-  displayLabel,
-  onChange,
-}: {
-  label: string;
-  value: string;          // "" or "YYYY-MM-DD"
-  displayLabel: string;   // e.g. "All days" or "Sat, 2 May 2026"
-  onChange: (iso: string) => void;
-}) {
-  const isSet = !!value;
-  return (
-    <div className="inline-flex items-stretch rounded-lg border border-slate-200 bg-white overflow-hidden hover:border-slate-300 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 transition">
-      <label className="group relative inline-flex items-stretch cursor-pointer">
-        <span className="px-3 self-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/80 border-r border-slate-200 py-2.5">
-          {label}
-        </span>
-        <span className="px-3 py-2 inline-flex items-center gap-2">
-          <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-          <span className={`text-sm font-medium max-w-[200px] truncate ${isSet ? "text-slate-900" : "text-slate-500"}`}>
-            {displayLabel}
-          </span>
-          {!isSet && <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />}
-        </span>
-        <input
-          type="date"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label="Pick a date"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-      </label>
-      {isSet && (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          className="px-2 hover:bg-slate-50 border-l border-slate-200 transition-colors"
-          aria-label="Clear date filter"
-          title="Clear date filter"
-        >
-          <X className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function SelectOverlay({
-  children,
-}: {
-  children: React.ReactElement<React.SelectHTMLAttributes<HTMLSelectElement>>;
-}) {
-  const select = children;
-  const merged = `${select.props.className ?? ""} absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed`;
-  return <select {...select.props} className={merged} />;
-}
-
-function StatTile({
-  bg,
-  labelColor,
-  value,
-  label,
-  mono = false,
-}: {
-  bg: string;
-  labelColor: string;
-  value: string | number;
-  label: string;
+  value: number | string;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  accent: keyof typeof STAT_ACCENT;
+  caption?: string;
   mono?: boolean;
 }) {
+  const a = STAT_ACCENT[accent];
   return (
-    <div className={`${bg} rounded-xl px-4 py-2.5 min-w-[88px] text-center`}>
-      <p className={`text-xl font-bold text-slate-900 leading-tight ${mono ? "font-mono tabular-nums" : ""}`}>
-        {value}
-      </p>
-      <p className={`text-[11px] font-medium mt-0.5 ${labelColor}`}>{label}</p>
+    <div className="relative bg-white border border-slate-200 rounded-2xl shadow-sm p-5 pt-6 overflow-hidden">
+      <span className={`absolute top-0 left-0 right-0 h-1 ${a.bar}`} aria-hidden="true" />
+      <span className={`absolute top-1 left-1/4 right-1/4 h-2 ${a.bar} opacity-30 blur-md rounded-full`} aria-hidden="true" />
+      <div className="flex items-start gap-4">
+        <div className={`${a.tile} w-10 h-10 rounded-xl flex items-center justify-center shrink-0`}>
+          <Icon className={`w-5 h-5 ${a.icon}`} aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <p className={`text-4xl font-bold tracking-tight ${mono ? "font-mono" : "tabular-nums"} ${a.text}`}>
+            {value}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-700">{label}</p>
+          {caption && <p className="mt-0.5 text-xs text-slate-400 font-mono">{caption}</p>}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function Field({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        {icon}
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+        {icon}
+        {label}
+      </dt>
+      <dd className="text-right truncate">{children}</dd>
+    </div>
+  );
+}
+
+function CountChip({ count, label, tone }: { count: number; label: string; tone: "rose" | "amber" }) {
+  const styles = tone === "rose" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-amber-50 text-amber-700 border-amber-200";
+  const dot = tone === "rose" ? "bg-rose-500" : "bg-amber-500";
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${styles}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} aria-hidden="true" />
+      <span className="tabular-nums">{count}</span> {label}
+    </span>
+  );
+}
+
+function ChipBadge({ tone, children }: { tone: "rose" | "amber"; children: React.ReactNode }) {
+  const styles = tone === "rose" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${styles}`}>
+      {children}
+    </span>
   );
 }

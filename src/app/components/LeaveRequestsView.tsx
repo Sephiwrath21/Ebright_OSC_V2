@@ -9,13 +9,12 @@ import {
   Plus,
   Umbrella,
   Inbox,
-  Eye,
+  Hourglass,
   User,
   Users,
-  Clock3,
 } from "lucide-react";
-import ManagerApprovalDashboard from "@/app/attendance/leave/approvals/ManagerApprovalDashboard";
-import type { ApprovalRow } from "@/app/attendance/leave/approvals/queries";
+import HodApprovalTable, { type HodApprovalItem } from "@/app/components/HodApprovalTable";
+import LeaveDetailButton from "@/app/components/LeaveDetailButton";
 
 export interface LeaveRow {
   leaveId: number;
@@ -26,6 +25,7 @@ export interface LeaveRow {
   endDate: string;
   totalDays: number;
   reason: string | null;
+  rejectionReason: string | null;
   status: string;
   appliedAt: string;
   employeeName?: string;
@@ -34,6 +34,7 @@ export interface LeaveRow {
 export interface LeaveStatusCounts {
   total: number;
   pending: number;
+  hod_approved: number;
   approved: number;
   rejected: number;
   cancelled: number;
@@ -48,6 +49,7 @@ const STATUS_OPTIONS = [
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
+  hod_approved: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", label: "HOD Approved" },
   approved: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Approved" },
   rejected: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Rejected" },
   cancelled: { bg: "#F1F5F9", text: "#475569", dot: "#94A3B8", label: "Cancelled" },
@@ -56,33 +58,91 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; labe
 const statCards = [
   { key: "total", label: "TOTAL", dot: "bg-blue-500", text: "text-blue-600", ring: "ring-blue-200 bg-blue-50/40" },
   { key: "pending", label: "PENDING", dot: "bg-amber-500", text: "text-amber-600", ring: "" },
+  { key: "hod_approved", label: "HOD APPROVED", dot: "bg-blue-500", text: "text-blue-600", ring: "" },
   { key: "approved", label: "APPROVED", dot: "bg-emerald-500", text: "text-emerald-600", ring: "" },
   { key: "rejected", label: "REJECTED", dot: "bg-red-500", text: "text-red-600", ring: "" },
   { key: "cancelled", label: "CANCELLED", dot: "bg-slate-400", text: "text-slate-600", ring: "" },
 ] as const;
 
-type LeaveTab = "mine" | "team";
+// Segments shown in the donut (total is rendered in the center, not as a slice).
+const DONUT_SEGMENTS = [
+  { key: "pending", label: "Pending", color: STATUS_BADGE.pending.dot },
+  { key: "hod_approved", label: "HOD Approved", color: STATUS_BADGE.hod_approved.dot },
+  { key: "approved", label: "Approved", color: STATUS_BADGE.approved.dot },
+  { key: "rejected", label: "Rejected", color: STATUS_BADGE.rejected.dot },
+  { key: "cancelled", label: "Cancelled", color: STATUS_BADGE.cancelled.dot },
+] as const;
+
+function StatusDonut({ counts }: { counts: Record<string, number> }) {
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius;
+  const sum = DONUT_SEGMENTS.reduce((acc, s) => acc + (counts[s.key] ?? 0), 0);
+
+  let offset = 0;
+
+  return (
+    <div className="relative w-40 h-40 shrink-0">
+      <svg viewBox="0 0 160 160" className="w-40 h-40 -rotate-90">
+        {/* Track */}
+        <circle cx="80" cy="80" r={radius} fill="none" stroke="#F1F5F9" strokeWidth="20" />
+        {sum > 0 &&
+          DONUT_SEGMENTS.map((s) => {
+            const value = counts[s.key] ?? 0;
+            if (value === 0) return null;
+            const length = (value / sum) * circumference;
+            const circle = (
+              <circle
+                key={s.key}
+                cx="80"
+                cy="80"
+                r={radius}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="20"
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={-offset}
+              />
+            );
+            offset += length;
+            return circle;
+          })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold text-slate-900">{counts.total ?? 0}</span>
+        <span className="text-[11px] font-semibold tracking-widest text-slate-400">TOTAL</span>
+      </div>
+    </div>
+  );
+}
 
 export default function LeaveRequestsView({
   rows = [],
   counts,
   canApprove = false,
-  initialTab = "mine",
-  approvalRows = [],
-  viewOnly = false,
+  viewerIsHod = false,
+  approvalItems = [],
 }: {
   rows?: LeaveRow[];
   counts?: LeaveStatusCounts;
   canApprove?: boolean;
-  initialTab?: LeaveTab;
-  approvalRows?: ApprovalRow[];
-  viewOnly?: boolean;
+  viewerIsHod?: boolean;
+  approvalItems?: HodApprovalItem[];
 }) {
-  const [tab, setTab] = useState<LeaveTab>(canApprove ? initialTab : "mine");
+  // True when the row set spans multiple employees (e.g. HR/superadmin
+  // "view all" mode) rather than just the current user's own requests.
+  // ASSUMPTION: derived from row shape since no explicit prop is passed in —
+  // confirm this matches intent, or wire an explicit `viewOnly` prop instead.
+  const viewOnly = rows.some((r) => r.employeeName != null);
+
+  // A HOD's own request skips the HOD stage and goes straight to HR, so the
+  // "HOD Approved" state never reflects a real HOD approval for them — show it
+  // as awaiting HR instead.
+  const hodApprovedLabel = viewerIsHod ? "Awaiting HR" : "HOD Approved";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
+  const [tab, setTab] = useState<"mine" | "approve">("mine");
 
   const typeOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -116,6 +176,7 @@ export default function LeaveRequestsView({
   const displayCounts: Record<string, number> = {
     total: counts?.total ?? 0,
     pending: counts?.pending ?? 0,
+    hod_approved: counts?.hod_approved ?? 0,
     approved: counts?.approved ?? 0,
     rejected: counts?.rejected ?? 0,
     cancelled: counts?.cancelled ?? 0,
@@ -138,16 +199,16 @@ export default function LeaveRequestsView({
           <span className="text-slate-900 font-medium">Leave</span>
         </nav>
 
-        {/* Unified header: title + tabs/CTA in one row */}
+        {/* Unified header: title + CTA in one row */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              {tab === "team" && canApprove
+              {tab === "approve" && canApprove
                 ? "Leave Approvals"
                 : viewOnly ? "All Leave Requests" : "Leave Requests"}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              {tab === "team" && canApprove
+              {tab === "approve" && canApprove
                 ? "Review and respond to leave requests from your team."
                 : viewOnly
                   ? "Read-only view of every employee's leave requests."
@@ -155,48 +216,6 @@ export default function LeaveRequestsView({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {canApprove && (
-              <div
-                role="tablist"
-                aria-label="Leave view"
-                className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1"
-              >
-                <button
-                  role="tab"
-                  aria-selected={tab === "mine"}
-                  onClick={() => setTab("mine")}
-                  className={[
-                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer",
-                    tab === "mine"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <User className="w-4 h-4" aria-hidden="true" />
-                  {viewOnly ? "All Requests" : "My Requests"}
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={tab === "team"}
-                  onClick={() => setTab("team")}
-                  className={[
-                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer",
-                    tab === "team"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <Users className="w-4 h-4" aria-hidden="true" />
-                  Team Approvals
-                </button>
-              </div>
-            )}
-            {tab === "team" && canApprove && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
-                <Clock3 className="w-3.5 h-3.5" aria-hidden="true" />
-                {approvalRows.filter(r => r.status === "pending").length} pending
-              </span>
-            )}
             {tab === "mine" && !viewOnly && (
               <Link
                 href="/attendance/leave/new"
@@ -209,36 +228,113 @@ export default function LeaveRequestsView({
           </div>
         </header>
 
-        {tab === "team" && canApprove ? (
-          <ManagerApprovalDashboard initialRows={approvalRows} hideHeader />
-        ) : (
-        <>
+        {canApprove && (
+          <div className="flex justify-end">
+            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-sm font-medium">
+            <button
+              type="button"
+              onClick={() => setTab("mine")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
+                tab === "mine" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <User className="w-4 h-4" aria-hidden="true" />
+              {viewOnly ? "All Requests" : "My Requests"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("approve")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
+                tab === "approve" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Users className="w-4 h-4" aria-hidden="true" />
+              To Approve{approvalItems.length > 0 ? ` (${approvalItems.length})` : ""}
+            </button>
+            </div>
+          </div>
+        )}
 
-        {/* Stat cards */}
+        {canApprove && approvalItems.length > 0 && tab !== "approve" && (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <Hourglass className="w-4 h-4 shrink-0 text-amber-600" aria-hidden="true" />
+            <span className="flex-1">
+              {approvalItems.length === 1
+                ? "There is 1 pending leave request awaiting your approval."
+                : `There are ${approvalItems.length} pending leave requests awaiting your approval.`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setTab("approve")}
+              className="shrink-0 inline-flex items-center justify-center rounded-lg bg-amber-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-amber-700 transition-colors"
+            >
+              Review
+            </button>
+          </div>
+        )}
+
+        {tab === "mine" && (
+          <>
+        {/* Status overview */}
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gridTemplateColumns: "minmax(300px, 360px) 1fr",
             gap: "1rem",
           }}
         >
-          {statCards.map((card) => {
-            const value = displayCounts[card.key];
-            return (
-              <div
-                key={card.key}
-                className={`bg-white border border-slate-200 rounded-2xl px-5 py-4 ${card.ring}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${card.dot}`} aria-hidden="true" />
-                  <p className="text-[11px] font-semibold tracking-widest text-slate-500">
-                    {card.label}
-                  </p>
-                </div>
-                <p className={`mt-2 text-3xl font-bold ${card.text}`}>{value}</p>
-              </div>
-            );
-          })}
+          {/* Donut chart */}
+          <div className="bg-white border border-slate-200 rounded-2xl px-6 py-5 flex items-center gap-6">
+            <StatusDonut counts={displayCounts} />
+            <ul className="space-y-2 min-w-0">
+              {DONUT_SEGMENTS.map((s) => (
+                <li key={s.key} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-slate-600">
+                    {s.key === "hod_approved" ? hodApprovedLabel : s.label}
+                  </span>
+                  <span className="ml-auto font-semibold text-slate-900 tabular-nums">
+                    {displayCounts[s.key]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Status cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            {statCards
+              .filter((card) => card.key !== "total")
+              .map((card) => {
+                const value = displayCounts[card.key];
+                return (
+                  <div
+                    key={card.key}
+                    className={`bg-white border border-slate-200 rounded-2xl px-5 py-4 ${card.ring}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${card.dot}`} aria-hidden="true" />
+                      <p className="text-[11px] font-semibold tracking-widest text-slate-500">
+                        {card.key === "hod_approved"
+                          ? hodApprovedLabel.toUpperCase()
+                          : card.label}
+                      </p>
+                    </div>
+                    <p className={`mt-2 text-3xl font-bold ${card.text}`}>{value}</p>
+                  </div>
+                );
+              })}
+          </div>
         </section>
 
         {/* Filters */}
@@ -371,12 +467,16 @@ export default function LeaveRequestsView({
                   </tr>
                 ) : (
                   filtered.map((r) => {
-                    const badge = STATUS_BADGE[r.status] ?? {
+                    const baseBadge = STATUS_BADGE[r.status] ?? {
                       bg: "#F1F5F9",
                       text: "#334155",
                       dot: "#64748B",
                       label: r.status,
                     };
+                    const badge =
+                      r.status === "hod_approved"
+                        ? { ...baseBadge, label: hodApprovedLabel }
+                        : baseBadge;
                     return (
                       <tr
                         key={r.leaveId}
@@ -422,13 +522,19 @@ export default function LeaveRequestsView({
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Link
-                            href={`/attendance/leave/${r.leaveId}`}
-                            aria-label={`View ${r.displayId}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" aria-hidden="true" />
-                          </Link>
+                          <LeaveDetailButton
+                            detail={{
+                              displayId: r.displayId,
+                              leaveTypeName: r.leaveTypeName,
+                              startDate: r.startDate,
+                              endDate: r.endDate,
+                              totalDays: r.totalDays,
+                              status: r.status,
+                              appliedAt: r.appliedAt,
+                              reason: r.reason,
+                              rejectionReason: r.rejectionReason,
+                            }}
+                          />
                         </td>
                       </tr>
                     );
@@ -438,8 +544,10 @@ export default function LeaveRequestsView({
             </table>
           </div>
         </section>
-        </>
+          </>
         )}
+
+        {tab === "approve" && canApprove && <HodApprovalTable items={approvalItems} />}
       </div>
     </div>
   );

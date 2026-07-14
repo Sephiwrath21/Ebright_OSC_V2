@@ -25,7 +25,12 @@ function createClient() {
   //                               is replaced rather than reused.
   //   keepAlive                 — keep TCP alive against idle middleboxes.
   const adapter = new PrismaPg({
-    connectionString: process.env.HRFS_DATABASE_URL ?? process.env.DATABASE_URL,
+    // Prisma reads DATABASE_URL first — that's where the lowercase Prisma
+    // tables (users, employment, user_profile, ...) live. HRFS_DATABASE_URL
+    // is for raw pg queries via @/lib/ebright-hrfs (hikvision_attendance_all,
+    // LeaveTransaction, BranchStaff). Inverting the priority on Jun 23 to
+    // unbreak staging login — see /attendance/summary investigation.
+    connectionString: process.env.DATABASE_URL ?? process.env.HRFS_DATABASE_URL,
     options:
       "-c TimeZone=UTC " +
       "-c statement_timeout=60000 " +

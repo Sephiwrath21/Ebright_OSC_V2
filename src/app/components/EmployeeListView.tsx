@@ -16,6 +16,8 @@ import {
   ChevronRight as ChevronRightLg,
   UserPlus,
   CircleAlert,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -62,6 +64,7 @@ export interface EmployeeRow {
   departmentName: string | null;
   status: string | null;
   startDate: string | null;
+  endDate: string | null;
   pendingOnboarding: boolean;
 }
 
@@ -129,6 +132,12 @@ export default function EmployeeListView({
   const [status, setStatus] = useState("");
   const [activeBox, setActiveBox] = useState<EmployeeBoxKey | null>(null);
   const [page, setPage] = useState(1);
+  const [advOpen, setAdvOpen] = useState(false);
+  const [startFrom, setStartFrom] = useState("");
+  const [startTo, setStartTo] = useState("");
+  const [endFrom, setEndFrom] = useState("");
+  const [endTo, setEndTo] = useState("");
+  const [nullFields, setNullFields] = useState<string[]>([]);
 
   // Clicking an overview card drives the list on its own, so we clear the
   // manual dropdown/search filters and let the box be the sole active filter
@@ -139,6 +148,11 @@ export default function EmployeeListView({
     setOrgUnit("");
     setRole("");
     setStatus("");
+    setStartFrom("");
+    setStartTo("");
+    setEndFrom("");
+    setEndTo("");
+    setNullFields([]);
     setPage(1);
   };
   const [deleteTarget, setDeleteTarget] = useState<EmployeeRow | null>(null);
@@ -206,6 +220,16 @@ export default function EmployeeListView({
         // the -1 week .. +6 months window (set computed server-side).
         if (!onboardingIdSet.has(e.id)) return false;
       }
+      if (startFrom && (!e.startDate || e.startDate < startFrom)) return false;
+      if (startTo && (!e.startDate || e.startDate > startTo)) return false;
+      if (endFrom && (!e.endDate || e.endDate < endFrom)) return false;
+      if (endTo && (!e.endDate || e.endDate > endTo)) return false;
+      if (nullFields.length > 0) {
+        const allMissing = nullFields.every((key) =>
+          key === "pendingOnboarding" ? e.pendingOnboarding : !e[key as keyof EmployeeRow],
+        );
+        if (!allMissing) return false;
+      }
       if (!q) return true;
       return (
         e.fullName.toLowerCase().includes(q) ||
@@ -214,7 +238,7 @@ export default function EmployeeListView({
         e.email.toLowerCase().includes(q)
       );
     });
-  }, [employees, search, orgUnit, role, status, activeBox, onboardingIdSet]);
+  }, [employees, search, orgUnit, role, status, activeBox, onboardingIdSet, startFrom, startTo, endFrom, endTo, nullFields]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -223,13 +247,22 @@ export default function EmployeeListView({
 
   // "total" means "show all", so it doesn't count as an active filter.
   const boxFiltering = activeBox !== null && activeBox !== "total";
-  const hasActiveFilters = Boolean(search || orgUnit || role || status || boxFiltering);
+  const hasAdvFilters = Boolean(startFrom || startTo || endFrom || endTo || nullFields.length > 0);
+  const hasActiveFilters = Boolean(search || orgUnit || role || status || boxFiltering || hasAdvFilters);
+  const clearAdvFilters = () => {
+    setStartFrom("");
+    setStartTo("");
+    setEndFrom("");
+    setEndTo("");
+    setNullFields([]);
+  };
   const clearFilters = () => {
     setSearch("");
     setOrgUnit("");
     setRole("");
     setStatus("");
     setActiveBox(null);
+    clearAdvFilters();
     setPage(1);
   };
 
@@ -445,6 +478,20 @@ export default function EmployeeListView({
               onChange={(v) => { setStatus(v); setActiveBox(null); setPage(1); }}
               options={STATUS_OPTIONS}
             />
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAdvOpen(true)}
+                aria-label="Advanced filters"
+                className={`h-10 w-10 rounded-lg border flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${hasAdvFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              >
+                <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+              </button>
+              {hasAdvFilters && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white" />
+              )}
+            </div>
           </div>
 
           {pageRows.length === 0 ? (
@@ -582,6 +629,137 @@ export default function EmployeeListView({
           onConfirm={confirmDelete}
         />
       )}
+
+      {advOpen && (
+        <AdvancedFiltersModal
+          startFrom={startFrom} startTo={startTo}
+          endFrom={endFrom} endTo={endTo}
+          nullFields={nullFields}
+          onStartFrom={setStartFrom} onStartTo={setStartTo}
+          onEndFrom={setEndFrom} onEndTo={setEndTo}
+          onNullFields={setNullFields}
+          onClear={clearAdvFilters}
+          onClose={() => setAdvOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+const NULL_FIELD_OPTIONS: { key: string; label: string }[] = [
+  { key: "employeeId",      label: "Employee ID" },
+  { key: "nickName",        label: "Nickname" },
+  { key: "phone",           label: "Phone" },
+  { key: "dob",             label: "Date of Birth" },
+  { key: "role",            label: "Role / Position" },
+  { key: "branchCode",      label: "Branch" },
+  { key: "departmentCode",  label: "Department" },
+  { key: "startDate",       label: "Start Date" },
+  { key: "endDate",         label: "End Date" },
+  { key: "pendingOnboarding", label: "No profile set up" },
+];
+
+function AdvancedFiltersModal({
+  startFrom, startTo, endFrom, endTo, nullFields,
+  onStartFrom, onStartTo, onEndFrom, onEndTo, onNullFields,
+  onClear, onClose,
+}: {
+  startFrom: string; startTo: string; endFrom: string; endTo: string;
+  nullFields: string[];
+  onStartFrom: (v: string) => void; onStartTo: (v: string) => void;
+  onEndFrom: (v: string) => void; onEndTo: (v: string) => void;
+  onNullFields: (v: string[]) => void;
+  onClear: () => void; onClose: () => void;
+}) {
+  const fieldSet = new Set(nullFields);
+  const toggleField = (key: string) => {
+    const next = new Set(fieldSet);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    onNullFields(Array.from(next));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <button type="button" aria-label="Close" onClick={onClose}
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm focus:outline-none" />
+      <div role="dialog" aria-modal="true" aria-labelledby="adv-filter-title"
+        className="relative w-full max-w-md bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h2 id="adv-filter-title" className="text-base font-semibold text-slate-900">Advanced Filters</h2>
+          <button type="button" onClick={onClose} aria-label="Close"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div>
+            <p className="text-sm font-medium text-slate-700 mb-2">Start Date</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">From</label>
+                <input type="date" value={startFrom} onChange={(e) => onStartFrom(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">To</label>
+                <input type="date" value={startTo} onChange={(e) => onStartTo(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-slate-700 mb-2">End Date</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">From</label>
+                <input type="date" value={endFrom} onChange={(e) => onEndFrom(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">To</label>
+                <input type="date" value={endTo} onChange={(e) => onEndTo(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-slate-700 mb-1">Show employees missing field</p>
+            <p className="text-xs text-slate-500 mb-3">Tick fields — only employees missing all ticked fields will appear.</p>
+            <div className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+              {NULL_FIELD_OPTIONS.map(({ key, label }) => {
+                const checked = fieldSet.has(key);
+                return (
+                  <label key={key}
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${checked ? "bg-blue-50" : "hover:bg-slate-50"}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleField(key)}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0" />
+                    <span className={`text-sm ${checked ? "text-blue-700 font-medium" : "text-slate-700"}`}>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {fieldSet.size > 0 && (
+              <p className="mt-2 text-xs text-blue-600 font-medium">
+                {fieldSet.size} field{fieldSet.size > 1 ? "s" : ""} selected
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          <button type="button" onClick={onClear}
+            className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+            Clear all
+          </button>
+          <button type="button" onClick={onClose}
+            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 shadow-sm">
+            Apply Filters
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

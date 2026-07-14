@@ -1,16 +1,22 @@
-import ComingSoonPage from "@/app/components/ComingSoonPage";
-import { Boxes } from "lucide-react";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import AppShell from "@/app/components/AppShell";
+import FAInventoryClient from "./FAInventoryClient";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Inventory — FA System" };
+export const metadata = { title: "Event Inventory — FA System" };
 
-export default function Page() {
+export default async function Page() {
+  const session = await auth();
+  if (!session?.user?.email) redirect("/login");
+
   return (
-    <ComingSoonPage
-      title="Inventory"
-      Icon={Boxes}
-      accent="bg-teal-600"
-      trail={[{ label: "FA System", href: "/dashboards/fa" }, { label: "Inventory" }]}
-    />
+    <AppShell
+      email={session.user.email}
+      role={(session.user as { role?: string }).role ?? ""}
+      name={session.user.name ?? null}
+    >
+      <FAInventoryClient />
+    </AppShell>
   );
 }

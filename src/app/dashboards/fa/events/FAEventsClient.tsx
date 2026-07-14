@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, ReactNode, CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Search,
   MapPin,
   CalendarDays,
   Plus,
   Key,
+  ChevronRight,
+  Home,
 } from "lucide-react";
-import { useBreadcrumb } from "@/app/components/BreadcrumbContext";
 
 type EventStatus = "draft" | "open" | "ongoing" | "closed" | "completed";
 
@@ -29,6 +33,8 @@ interface FAEvent {
   year: number;
   archiveDate?: string;
   multiGrade?: boolean;
+  invitationOpen?: string;
+  invitationClose?: string;
 }
 
 const mockActiveEvents: FAEvent[] = [
@@ -47,6 +53,8 @@ const mockActiveEvents: FAEvent[] = [
     day: 20,
     year: 2026,
     multiGrade: true,
+    invitationOpen: "Jun 1, 2026",
+    invitationClose: "Jun 14, 2026",
   },
   {
     id: "2",
@@ -63,6 +71,8 @@ const mockActiveEvents: FAEvent[] = [
     day: 18,
     year: 2026,
     multiGrade: true,
+    invitationOpen: "Jun 15, 2026",
+    invitationClose: "Jul 4, 2026",
   },
   {
     id: "3",
@@ -196,9 +206,216 @@ function StatusBadge({ status }: { status: EventStatus }) {
   );
 }
 
+type HoverPlacement = "right" | "left" | "above" | "below";
+
+function HoverPreview({ children, preview, width = 320 }: {
+  children: ReactNode;
+  preview: ReactNode;
+  width?: number;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; placement: HoverPlacement } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function open() {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia?.("(hover: none)").matches) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const gap = 16;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let placement: HoverPlacement;
+    if (vw < 768) {
+      placement = vh - rect.bottom >= 260 ? "below" : "above";
+    } else if (vw - rect.right >= width + gap) {
+      placement = "right";
+    } else if (rect.left >= width + gap) {
+      placement = "left";
+    } else if (vh - rect.bottom >= 260) {
+      placement = "below";
+    } else {
+      placement = "above";
+    }
+
+    let top: number, left: number;
+    if (placement === "right")       { top = rect.top + rect.height / 2; left = rect.right + gap; }
+    else if (placement === "left")   { top = rect.top + rect.height / 2; left = rect.left - gap; }
+    else if (placement === "below")  { top = rect.bottom + gap; left = rect.left + rect.width / 2; }
+    else                             { top = rect.top - gap;    left = rect.left + rect.width / 2; }
+
+    if (placement === "above" || placement === "below") {
+      left = Math.min(Math.max(left, width / 2 + 16), vw - width / 2 - 16);
+    }
+
+    setCoords({ top, left, placement });
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setMounted(true);
+    requestAnimationFrame(() => setVisible(true));
+  }
+
+  function close() {
+    setVisible(false);
+    closeTimer.current = setTimeout(() => setMounted(false), 160);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mounted) return;
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [mounted]);
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
+  const baseTranslate = !coords ? "" :
+    coords.placement === "right" ? "translateY(-50%)" :
+    coords.placement === "left"  ? "translate(-100%, -50%)" :
+    coords.placement === "above" ? "translate(-50%, -100%)" :
+                                   "translate(-50%, 0)";
+
+  const transformOrigin = !coords ? "center" :
+    coords.placement === "right" ? "left center" :
+    coords.placement === "left"  ? "right center" :
+    coords.placement === "above" ? "center bottom" :
+                                   "center top";
+
+  const arrowStyle: CSSProperties | null = !coords ? null :
+    coords.placement === "right" ? { left: 0, top: "50%", transform: "translate(-50%,-50%) rotate(45deg)", borderLeft: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" } :
+    coords.placement === "left"  ? { right: 0, top: "50%", transform: "translate(50%,-50%) rotate(45deg)", borderTop: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0" } :
+    coords.placement === "above" ? { left: "50%", bottom: 0, transform: "translate(-50%,50%) rotate(45deg)", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" } :
+                                   { left: "50%", top: 0, transform: "translate(-50%,-50%) rotate(45deg)", borderTop: "1px solid #e2e8f0", borderLeft: "1px solid #e2e8f0" };
+
+  return (
+    <>
+      <div ref={wrapRef} onMouseEnter={open} onMouseLeave={close}>
+        {children}
+      </div>
+      {mounted && coords && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed pointer-events-none"
+          style={{
+            zIndex: 9999,
+            top: coords.top,
+            left: coords.left,
+            width,
+            transform: `${baseTranslate} scale(${visible ? 1 : 0.96})`,
+            transformOrigin,
+            opacity: visible ? 1 : 0,
+            transition: visible
+              ? "opacity 160ms ease-out, transform 160ms cubic-bezier(0.2,0.8,0.2,1)"
+              : "opacity 130ms ease-in, transform 130ms ease-in",
+          }}
+          role="tooltip"
+        >
+          {arrowStyle && (
+            <div className="absolute bg-white" style={{ width: 10, height: 10, ...arrowStyle }} />
+          )}
+          {preview}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function daysUntil(startDate: string): number {
+  const months: Record<string, number> = {
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  };
+  const [d, m, y] = startDate.split(" ");
+  const target = new Date(Number(y), months[m], Number(d));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+function EventPopover({ event }: { event: FAEvent }) {
+  const days = daysUntil(event.startDate);
+  const countdown =
+    days === 0  ? "Today" :
+    days === 1  ? "1 day left" :
+    days > 1    ? `${days} days left` :
+    days === -1 ? "Yesterday" :
+                  `${Math.abs(days)} days ago`;
+
+  return (
+    <div
+      className="bg-white border border-slate-200 rounded-2xl p-5"
+      style={{ boxShadow: "0 20px 40px -12px rgba(15,23,42,0.18), 0 4px 12px -4px rgba(15,23,42,0.08)" }}
+    >
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <StatusBadge status={event.status} />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+          {countdown}
+        </span>
+      </div>
+
+      <h3 className="text-base font-semibold text-slate-900 mb-3 leading-snug">{event.name}</h3>
+
+      <div className="border-t border-slate-100 mb-3" />
+
+      <div className="space-y-2.5 mb-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">When</p>
+          <p className="text-sm text-slate-700">
+            {event.startDate === event.endDate
+              ? event.startDate
+              : `${event.startDate} – ${event.endDate}`} · {event.days} {event.days === 1 ? "day" : "days"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Venue</p>
+          <p className="text-sm text-slate-700">{event.venue}</p>
+        </div>
+        {event.invitationOpen && event.invitationClose && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
+              Invitation Window
+            </p>
+            <p className="text-sm text-slate-700 font-mono">
+              {event.invitationOpen} → {event.invitationClose}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-slate-100 pt-3 grid grid-cols-3 divide-x divide-slate-100">
+        <div className="text-center pr-3">
+          <div className="text-xl font-bold text-slate-800 leading-none">{event.sessions}</div>
+          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Sessions</div>
+        </div>
+        <div className="text-center px-3">
+          <div className="text-xl font-bold text-slate-800 leading-none">{event.invited}</div>
+          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Invited</div>
+        </div>
+        <div className="text-center pl-3">
+          <div className={`text-xl font-bold leading-none ${event.confirmed > 0 ? "text-green-600" : "text-slate-800"}`}>
+            {event.confirmed}
+          </div>
+          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Confirmed</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EventCard({ event, featured = false }: { event: FAEvent; featured?: boolean }) {
   return (
-    <div className={`bg-white border border-slate-200 rounded-2xl p-5 flex gap-5 items-center hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer ${featured ? "shadow-sm" : ""}`}>
+    <HoverPreview preview={<EventPopover event={event} />}>
+    <Link
+      href={`/dashboards/fa/events/${event.id}`}
+      className={`flex gap-5 items-center bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all ${featured ? "shadow-sm" : ""}`}
+    >
       <div className="flex flex-col items-center justify-center min-w-[56px] text-center">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider leading-none">
           {event.month}
@@ -247,7 +464,8 @@ function EventCard({ event, featured = false }: { event: FAEvent; featured?: boo
         <div className="w-px h-8 bg-slate-200" />
         <Stat label="Confirmed" value={event.confirmed} highlight={event.confirmed > 0} />
       </div>
-    </div>
+    </Link>
+    </HoverPreview>
   );
 }
 
@@ -264,7 +482,11 @@ function Stat({ label, value, highlight }: { label: string; value: number; highl
 
 function ArchiveRow({ event }: { event: FAEvent }) {
   return (
-    <div className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer group rounded-xl">
+    <HoverPreview preview={<EventPopover event={event} />}>
+    <Link
+      href={`/dashboards/fa/events/${event.id}`}
+      className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors group rounded-xl"
+    >
       <span className="text-sm text-slate-400 w-28 shrink-0">{event.archiveDate}</span>
 
       <span className="flex-1 text-sm font-medium text-slate-700 group-hover:text-slate-900 truncate">
@@ -282,17 +504,13 @@ function ArchiveRow({ event }: { event: FAEvent }) {
           {event.attended ?? 0} attended
         </span>
       </div>
-    </div>
+    </Link>
+    </HoverPreview>
   );
 }
 
 export default function FAEventsClient() {
-  useBreadcrumb([
-    { label: "Home", href: "/home" },
-    { label: "FA System", href: "/dashboards/fa" },
-    { label: "Events" },
-  ]);
-
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatus | "all">("all");
 
@@ -321,11 +539,24 @@ export default function FAEventsClient() {
     <div className="min-h-full bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 pt-4 pb-0">
 
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+            <Home className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Home</span>
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
+          <span className="text-slate-800 font-medium">Events</span>
+        </nav>
+
         {/* Page header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">FA Events</h1>
           <button
             type="button"
+            onClick={() => router.push("/dashboards/fa/events/new")}
             className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />

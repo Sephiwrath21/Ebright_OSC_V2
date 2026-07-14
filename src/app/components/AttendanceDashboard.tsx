@@ -9,6 +9,7 @@ import {
   FileBarChart,
   Scale,
   Umbrella,
+  Clock,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -78,6 +79,22 @@ const groups: ModuleGroup[] = [
         Icon: Umbrella,
         accent: "bg-emerald-600",
         accentHover: "group-hover:bg-emerald-700",
+      },
+    ],
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    caption: "HR-only tools for shaping the workforce schedule",
+    items: [
+      {
+        id: "working-hours",
+        title: "Working Hours",
+        description: "Edit weekly schedules with effective-from dates; past weeks stay frozen",
+        href: "/attendance/working-hours",
+        Icon: Clock,
+        accent: "bg-indigo-600",
+        accentHover: "group-hover:bg-indigo-700",
       },
     ],
   },

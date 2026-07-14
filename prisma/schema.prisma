@@ -91,26 +91,69 @@ model emergency_contact {
 }
 
 model employment {
-  employment_id   Int         @id @default(autoincrement())
-  user_id         Int
-  employee_id     String?     @unique @db.VarChar(50)
-  branch_id       Int?
-  department_id   Int?
-  position        String?     @db.VarChar(100)
-  start_date      DateTime?   @db.Date
-  end_date        DateTime?   @db.Date
-  employment_type String?     @db.VarChar(50)
-  status          String?     @default("active") @db.VarChar(50)
-  probation       Boolean     @default(false)
-  rate            String?     @db.VarChar(100)
+  employment_id      Int                           @id @default(autoincrement())
+  user_id            Int
+  employee_id        String?                       @unique @db.VarChar(50)
+  branch_id          Int?
+  department_id      Int?
+  position           String?                       @db.VarChar(100)
+  start_date         DateTime?                     @db.Date
+  end_date           DateTime?                     @db.Date
+  employment_type    String?                       @db.VarChar(50)
+  status             String?                       @default("active") @db.VarChar(50)
+  probation          Boolean                       @default(false)
+  rate               String?                       @db.VarChar(100)
   // Re-added 2026-05-07 after a prior schema-vs-DB drift caused `prisma db push`
   // to drop this column with 9 rows of data. Type set to VarChar(50) to match
   // the surrounding `rate` convention; if old values were stored differently,
   // change the type here and re-push.
-  working_hours   String?     @db.VarChar(50)
-  branch          branch?     @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
-  department      department? @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
-  users           users       @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employment_user")
+  working_hours      String?                       @db.VarChar(50)
+  // Weekly schedule { Sun..Sat: { start: "HH:MM", end: "HH:MM" } | null }.
+  // Synced from HRFS BranchStaff.workingHours via /api/admin/sync-from-branchstaff;
+  // edited via /attendance/working-hours which also writes a dated version row
+  // into employment_schedule_version so past weeks aren't re-judged.
+  working_hours_json Json?
+  branch             branch?                       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
+  department         department?                   @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
+  users              users                         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employment_user")
+  schedule_versions  employment_schedule_version[]
+}
+
+// Versioned working-hours snapshots — every "Save" on the editor inserts a row.
+// Resolver picks the row with the GREATEST effective_from <= the date being judged.
+model employment_schedule_version {
+  id             Int        @id @default(autoincrement())
+  employment_id  Int
+  effective_from DateTime   @db.Date
+  schedule       Json
+  created_at     DateTime   @default(now()) @db.Timestamptz(6)
+  employment     employment @relation(fields: [employment_id], references: [employment_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_emp_sched_emp")
+
+  @@unique([employment_id, effective_from], map: "uq_emp_sched_eff")
+  @@index([employment_id, effective_from], map: "idx_emp_sched_lookup")
+  @@map("employment_schedule_version")
+}
+
+// Justification entered by HR for a No-Record day. Unique per (user, date) so
+// at most one justification can exist for a given day. When a row exists, the
+// Summary excludes the staff from "Missing" and the Report shows the reason
+// chip instead of the red No-Record badge.
+model attendance_justification {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  date            DateTime @db.Date
+  reason_category String   @db.VarChar(50)
+  note            String?
+  justified_by    Int
+  justified_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  user      users @relation("justification_for_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_just_user")
+  justifier users @relation("justification_by", fields: [justified_by], references: [user_id], onUpdate: NoAction, map: "fk_just_by")
+
+  @@unique([user_id, date], map: "uq_attendance_justification_user_date")
+  @@index([date], map: "idx_just_date")
+  @@map("attendance_justification")
 }
 
 model leave_request {
@@ -200,6 +243,8 @@ model users {
   workflow_assignments_user                      workflow_assignment[]        @relation("WorkflowAssignmentUser")
   workflow_assignments_by                        workflow_assignment[]        @relation("WorkflowAssignmentAssignedBy")
   workflow_assignment_steps_completed            workflow_assignment_step[]
+  attendance_justifications_for_user             attendance_justification[]   @relation("justification_for_user")
+  attendance_justifications_authored             attendance_justification[]   @relation("justification_by")
   role                                           role                         @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_role")
 }
 
@@ -540,13 +585,13 @@ model offboarding_case {
   finance_processed_at    DateTime? @db.Timestamptz(6)
   finance_processed_by_id Int?
 
-  created_by_id Int
+  created_by_id  Int
   // Assignment (amendment): the HR officer handling this case. The supervisor
   // assignment reuses the existing supervisor_user_id column above.
   assigned_hr_id Int?
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime  @updatedAt @db.Timestamptz(6)
-  completed_at  DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @updatedAt @db.Timestamptz(6)
+  completed_at   DateTime? @db.Timestamptz(6)
 
   user                 users                        @relation("OffboardingCaseUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offboarding_case_user")
   supervisor           users?                       @relation("OffboardingCaseSupervisor", fields: [supervisor_user_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offboarding_case_supervisor")

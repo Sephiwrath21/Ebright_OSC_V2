@@ -13,7 +13,7 @@ interface Props {
   items: HoverPreviewItem[];
   emptyText: string;
   totalLabel?: string;
-  accent: "emerald" | "rose" | "yellow" | "indigo";
+  accent: "emerald" | "rose" | "yellow" | "indigo" | "amber" | "sky";
   footer?: ReactNode;
   /** Where the popover appears relative to the card. Defaults to "right". */
   side?: "right" | "left" | "below";
@@ -24,6 +24,8 @@ const ACCENT_BORDER: Record<Props["accent"], string> = {
   rose: "border-rose-200",
   yellow: "border-yellow-200",
   indigo: "border-indigo-200",
+  amber: "border-amber-200",
+  sky: "border-sky-200",
 };
 
 const ACCENT_HEADER: Record<Props["accent"], string> = {
@@ -31,6 +33,8 @@ const ACCENT_HEADER: Record<Props["accent"], string> = {
   rose: "text-rose-900",
   yellow: "text-yellow-900",
   indigo: "text-indigo-900",
+  amber: "text-amber-900",
+  sky: "text-sky-900",
 };
 
 const ACCENT_HIGHLIGHT: Record<Props["accent"], string> = {
@@ -38,6 +42,8 @@ const ACCENT_HIGHLIGHT: Record<Props["accent"], string> = {
   rose: "bg-rose-50",
   yellow: "bg-yellow-50",
   indigo: "bg-indigo-50",
+  amber: "bg-amber-50",
+  sky: "bg-sky-50",
 };
 
 const POSITION_CLASSES: Record<NonNullable<Props["side"]>, string> = {

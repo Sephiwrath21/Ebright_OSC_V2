@@ -5,9 +5,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { canReviewClaims } from "@/app/claim/roles";
 import { uploadToDrive } from "@/lib/drive";
+import {
+  type ClaimType,
+  isClaimType,
+  canAccessClaimType,
+  MAX_CLAIM_DOCS,
+  requiresAttachment,
+} from "@/app/claim/claim-types";
 import path from "node:path";
-
-type ClaimType = "sales" | "health" | "transport";
 
 const TRANSPORT_RATE = 0.7;
 const TRANSPORT_ROUND_TRIP = 2;
@@ -70,13 +75,40 @@ export async function submitClaim(
 
   const user = await prisma.users.findUnique({
     where: { email: session.user.email },
-    select: { user_id: true },
+    select: {
+      user_id: true,
+      employment: {
+        take: 1,
+        orderBy: { employment_id: "desc" },
+        select: { department: { select: { department_name: true } } },
+      },
+    },
   });
   if (!user) return { ok: false, error: "User record not found." };
 
-  const claimType = s(formData, "claim_type") as ClaimType;
-  if (!["sales", "health", "transport"].includes(claimType)) {
+  const claimTypeRaw = s(formData, "claim_type");
+  if (!isClaimType(claimTypeRaw)) {
     return { ok: false, error: "Invalid claim type." };
+  }
+  const claimType: ClaimType = claimTypeRaw;
+
+  const position =
+    (session.user as { position?: string | null } | undefined)?.position ?? null;
+  const roleType = (session.user as { role?: string } | undefined)?.role ?? null;
+  const department = user.employment?.[0]?.department?.department_name ?? null;
+  if (
+    !canAccessClaimType(claimType, {
+      position,
+      roleType,
+      email: session.user.email,
+      department,
+    })
+  ) {
+    return {
+      ok: false,
+      error:
+        "Only marketing@ebright.my or employees in the Marketing department may submit roadshow or showcase claims.",
+    };
   }
 
   const dateStr = s(formData, "claim_date");
@@ -86,11 +118,19 @@ export async function submitClaim(
     return { ok: false, error: "Claim date is invalid." };
   }
 
+  // Allowed window: today through the end of the current month. No backdating.
+  // Compare as YYYY-MM-DD strings to avoid timezone off-by-one issues.
   const now = new Date();
-  const earliestAllowed = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const latestAllowed = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  if (claimDate < earliestAllowed || claimDate > latestAllowed) {
-    return { ok: false, error: "Claim date must be within the current or previous month." };
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const fmtDate = (d: Date) =>
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const todayStr = fmtDate(now);
+  const monthEndStr = fmtDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  if (dateStr < todayStr) {
+    return { ok: false, error: "Claim date cannot be in the past." };
+  }
+  if (dateStr > monthEndStr) {
+    return { ok: false, error: "Claim date must be within the current month." };
   }
 
   let amount: number;
@@ -133,11 +173,25 @@ export async function submitClaim(
 
   const description = s(formData, "description") || null;
 
+  // One claim may carry several supporting documents (multi-doc claim types).
+  // Each is uploaded to Drive and the resulting IDs are stored comma-separated.
+  const incomingFiles = formData
+    .getAll("attachment_file")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  if (incomingFiles.length > MAX_CLAIM_DOCS) {
+    return { ok: false, error: `You can attach at most ${MAX_CLAIM_DOCS} documents.` };
+  }
+  if (requiresAttachment(claimType) && incomingFiles.length === 0) {
+    return { ok: false, error: "This claim requires at least one supporting document." };
+  }
+
   let attachmentId: string | null = null;
-  const fileField = formData.get("attachment_file");
-  if (fileField instanceof File && fileField.size > 0) {
+  if (incomingFiles.length > 0) {
     try {
-      attachmentId = await saveAttachment(fileField, claimType, claimDate);
+      const ids = await Promise.all(
+        incomingFiles.map((file) => saveAttachment(file, claimType, claimDate)),
+      );
+      attachmentId = ids.join(",");
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Attachment upload failed." };
     }
@@ -228,6 +282,84 @@ export async function reviewClaim(
       remarks,
       updated_at: new Date(),
     },
+  });
+
+  revalidatePath("/claim");
+  revalidatePath(`/claim/${claimId}`);
+
+  return { ok: true };
+}
+
+/**
+ * Advances an already-approved claim along the disbursement flow:
+ * approved → disbursed → received. Finance/superadmin only.
+ */
+export async function advanceClaim(
+  _prev: ReviewClaimResult | null,
+  formData: FormData,
+): Promise<ReviewClaimResult> {
+  const session = await auth();
+  if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
+
+  const me = await prisma.users.findUnique({
+    where: { email: session.user.email },
+    select: {
+      user_id: true,
+      role_id: true,
+      email: true,
+      role: { select: { role_type: true } },
+    },
+  });
+  if (!me) return { ok: false, error: "User record not found." };
+
+  const claimId = parseInt(s(formData, "claim_id"), 10);
+  if (Number.isNaN(claimId)) return { ok: false, error: "Invalid claim id." };
+
+  const action = s(formData, "action"); // "disburse" | "receive"
+  if (!["disburse", "receive"].includes(action)) {
+    return { ok: false, error: "Invalid action." };
+  }
+
+  const existing = await prisma.claim.findUnique({
+    where: { claim_id: claimId },
+    select: { status: true, user_id: true },
+  });
+  if (!existing) return { ok: false, error: "Claim not found." };
+
+  // Disbursement is a finance action; confirming receipt belongs to the
+  // employee who requested the claim.
+  if (action === "disburse") {
+    if (
+      !canReviewClaims({
+        role_id: me.role_id,
+        email: me.email,
+        role_type: me.role?.role_type ?? null,
+      })
+    ) {
+      return { ok: false, error: "Only finance or superadmin can disburse claims." };
+    }
+  } else {
+    if (existing.user_id !== me.user_id) {
+      return { ok: false, error: "Only the claim requester can confirm receipt." };
+    }
+  }
+
+  // Allowed transitions: approved → disbursed → received.
+  const requiredStatus = action === "disburse" ? "approved" : "disbursed";
+  const nextStatus = action === "disburse" ? "disbursed" : "received";
+  if (existing.status !== requiredStatus) {
+    return {
+      ok: false,
+      error:
+        action === "disburse"
+          ? "Only approved claims can be marked as disbursed."
+          : "Only disbursed claims can be marked as received.",
+    };
+  }
+
+  await prisma.claim.update({
+    where: { claim_id: claimId },
+    data: { status: nextStatus, updated_at: new Date() },
   });
 
   revalidatePath("/claim");

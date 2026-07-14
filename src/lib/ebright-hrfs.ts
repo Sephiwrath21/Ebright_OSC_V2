@@ -19,9 +19,15 @@ function makePool(): Pool {
   }
   return new Pool({
     connectionString,
-    max: 5,
+    // HR Dashboard fires ~12 parallel queries (6 cards × 1-3 queries each),
+    // and the Summary/Report make 3-5 more — bumped from 5 to 20 so they
+    // don't queue past the connect timeout.
+    max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    // Bumped from 5s — the MedicalLeave LEFT JOIN subquery is heavier than
+    // a plain leave fetch and was hitting the 5s pool-wait window on the
+    // 5th+ concurrent query.
+    connectionTimeoutMillis: 15000,
   });
 }
 

@@ -1,16 +1,22 @@
-import ComingSoonPage from "@/app/components/ComingSoonPage";
-import { ClipboardCheck } from "lucide-react";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import AppShell from "@/app/components/AppShell";
+import PCMAttendanceClient from "./PCMAttendanceClient";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Attendance — PCM System" };
 
-export default function Page() {
+export default async function Page() {
+  const session = await auth();
+  if (!session?.user?.email) redirect("/login");
+
   return (
-    <ComingSoonPage
-      title="Attendance"
-      Icon={ClipboardCheck}
-      accent="bg-rose-600"
-      trail={[{ label: "PCM System", href: "/dashboards/pcm" }, { label: "Attendance" }]}
-    />
+    <AppShell
+      email={session.user.email}
+      role={(session.user as { role?: string }).role ?? ""}
+      name={session.user.name ?? null}
+    >
+      <PCMAttendanceClient />
+    </AppShell>
   );
 }

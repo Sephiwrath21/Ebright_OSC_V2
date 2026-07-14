@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UserPlus, UserMinus } from "lucide-react";
+import { UserPlus, UserMinus, Flag, AlertOctagon } from "lucide-react";
 import { CardHoverPreview, type HoverPreviewItem } from "./CardHoverPreview";
 
 // Merged from the former OnboardingCard + OffboardingCard, which were
@@ -7,7 +7,7 @@ import { CardHoverPreview, type HoverPreviewItem } from "./CardHoverPreview";
 // the hover-preview copy. Full class strings live in THEMES so Tailwind's
 // JIT still detects every utility (no constructed class names).
 
-export type LifecycleVariant = "onboarding" | "offboarding";
+export type LifecycleVariant = "onboarding" | "offboarding" | "flagged" | "mia";
 
 interface VariantTheme {
   href: string;
@@ -24,7 +24,7 @@ interface VariantTheme {
   labelText: string;
   totalText: string;
   pillClass: string;
-  previewAccent: "emerald" | "rose";
+  previewAccent: "emerald" | "rose" | "amber" | "sky";
   previewTitle: string;
   previewEmpty: string;
   previewFooter: string;
@@ -68,6 +68,44 @@ const THEMES: Record<LifecycleVariant, VariantTheme> = {
     previewTitle: "Offboarding Pipeline",
     previewEmpty: "No upcoming exits.",
     previewFooter: "Highlighted rows leave within 7 days.",
+  },
+  flagged: {
+    href: "/induction/hr-dashboard#flagged",
+    title: "Flagged",
+    Icon: Flag,
+    previewSide: "right",
+    cardClass:
+      "border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 focus-visible:ring-amber-500",
+    blurTop: "bg-amber-300/30",
+    blurBottom: "bg-orange-300/20",
+    iconBg: "bg-amber-600",
+    titleText: "text-amber-900",
+    labelText: "text-amber-700",
+    totalText: "text-amber-900",
+    pillClass: "bg-amber-600/10 text-amber-800",
+    previewAccent: "amber",
+    previewTitle: "Flagged staff (≥ 3 SL this month)",
+    previewEmpty: "No-one flagged this month.",
+    previewFooter: "Counts approved SL leaves in the selected month.",
+  },
+  mia: {
+    href: "/induction/hr-dashboard#mia",
+    title: "MIA",
+    Icon: AlertOctagon,
+    previewSide: "left",
+    cardClass:
+      "border border-sky-200 bg-gradient-to-br from-sky-50 via-sky-100 to-cyan-100 focus-visible:ring-sky-500",
+    blurTop: "bg-sky-300/30",
+    blurBottom: "bg-cyan-300/20",
+    iconBg: "bg-sky-600",
+    titleText: "text-sky-900",
+    labelText: "text-sky-700",
+    totalText: "text-sky-900",
+    pillClass: "bg-sky-600/10 text-sky-800",
+    previewAccent: "sky",
+    previewTitle: "MIA — UL leaves + missing today",
+    previewEmpty: "No-one missing.",
+    previewFooter: "UL leaves last 2 weeks + scheduled today but not scanned.",
   },
 };
 
