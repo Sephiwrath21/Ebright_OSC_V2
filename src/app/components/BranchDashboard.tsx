@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import GreetingHeader from "./GreetingHeader";
-
-/**
- * Home view for the `branch` role (role_id = 4).
- *
- * Bento layout tuned to fit roughly one viewport (minimal scroll). Section
- * priority follows the brief — the top band holds the three most important
- * (1) CRM & SMS metrics, (2) branch revenue ranking, (3) attendance — and the
- * remaining sections (ClickUp pie, events/announcements, brain dump, pending
- * tasks) fill the band below.
- *
- * All figures are MOCK placeholders shaped for a later API swap; they mirror
- * the static approach already used by HrPersonalizedDashboard.
- */
+import { Compass, UserCheck, UserX, Activity, Calendar, Megaphone, Bell, Trash2, Plus } from "lucide-react";
 
 interface BranchDashboardProps {
   userName?: string | null;
   userEmail?: string | null;
   branchName?: string | null;
+}
+
+interface EventItem {
+  id: string;
+  name: string;
+  status: "upcoming" | "ongoing" | "completed";
 }
 
 const fontStack =
@@ -29,59 +23,25 @@ const card: React.CSSProperties = {
   background: "#FFFFFF",
   border: "0.5px solid #E5E7EB",
   borderRadius: 12,
+  boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
 };
-
-// ── Mock data — TODO: replace with real branch API ──────────────────────────
-const CRM_METRICS = [
-  { key: "NL", value: 5 },
-  { key: "CT", value: 3 },
-  { key: "SU", value: 2 },
-  { key: "ENR", value: 1 },
-];
-const SMS_METRICS = [
-  { key: "AS", value: 150 },
-  { key: "FS", value: 3 },
-  { key: "RS", value: 5 },
-  { key: "EXP", value: 2 },
-];
-
-const REVENUE_RANKING = [
-  { rank: 1, name: "Kuala Lumpur", revenue: 2_450_000 },
-  { rank: 2, name: "Putrajaya", revenue: 1_960_000 },
-  { rank: 3, name: "Shah Alam", revenue: 1_720_000 },
-  { rank: 4, name: "Penang", revenue: 1_180_000 },
-  { rank: 5, name: "Johor Bahru", revenue: 980_000 },
-];
-
-const ATTENDANCE = [
-  { label: "Present", value: 18, color: "#0F6E56", bg: "#E1F5EE" },
-  { label: "Absent", value: 2, color: "#A32D2D", bg: "#FCEBEB" },
-  { label: "MC", value: 1, color: "#854F0B", bg: "#FAEEDA" },
-  { label: "Annual Leave", value: 1, color: "#185FA5", bg: "#E6F1FB" },
-];
-
-const CLICKUP = [
-  { label: "Complete", value: 24, color: "#0F6E56" },
-  { label: "In Progress", value: 11, color: "#185FA5" },
-  { label: "To Do", value: 8, color: "#854F0B" },
-  { label: "Overdue", value: 3, color: "#A32D2D" },
-];
-
-const EVENTS = [
-  { date: "06 Jun", title: "Townhall session", tone: "#185FA5" },
-  { date: "10 Jun", title: "BPR meeting", tone: "#3C3489" },
-  { date: "13 Jun", title: "Scrum", tone: "#0F6E56" },
-];
-const ANNOUNCEMENTS = [
-  "Q2 enrolment push — target review on Friday.",
-  "New onboarding SOP published in ClickUp.",
-];
 
 const DEFAULT_TASKS = [
   { id: "t1", title: "Submit weekly enrolment report", done: false },
   { id: "t2", title: "Follow up 3 CNS opportunities", done: false },
   { id: "t3", title: "Approve staff MC application", done: true },
   { id: "t4", title: "Confirm townhall headcount", done: false },
+];
+
+const DEFAULT_EVENTS = [
+  { date: "16 Jul", title: "Townhall session", tone: "#185FA5" },
+  { date: "20 Jul", title: "BPR meeting", tone: "#3C3489" },
+  { date: "24 Jul", title: "Scrum Review", tone: "#0F6E56" },
+];
+
+const DEFAULT_ANNOUNCEMENTS = [
+  "Q3 enrolment push — target review on Friday.",
+  "New onboarding SOP published in ClickUp.",
 ];
 
 function formatRM(n: number): string {
@@ -257,14 +217,70 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
 export default function BranchDashboard({
   userName,
   userEmail,
-  branchName,
+  branchName: sessionBranchName,
 }: BranchDashboardProps) {
-  const greetName = branchName || userName?.split(" ")[0] || userEmail?.split("@")[0] || "";
+  const [loading, setLoading] = useState(true);
+  const [currentBranchName, setCurrentBranchName] = useState(sessionBranchName || "Klang");
+  const [currentBranchCode, setCurrentBranchCode] = useState("KLG");
+  const [crmMetrics, setCrmMetrics] = useState([
+    { key: "NL", value: 0 },
+    { key: "CT", value: 0 },
+    { key: "SU", value: 0 },
+    { key: "ENR", value: 0 },
+  ]);
+  const [smsMetrics, setSmsMetrics] = useState([
+    { key: "AS", value: 0 },
+    { key: "FS", value: 0 },
+    { key: "RS", value: 0 },
+    { key: "EXP", value: 0 },
+  ]);
+  const [attendance, setAttendance] = useState([
+    { label: "Present", value: 0, color: "#0F6E56", bg: "#E1F5EE" },
+    { label: "Absent", value: 0, color: "#A32D2D", bg: "#FCEBEB" },
+    { label: "MC", value: 0, color: "#854F0B", bg: "#FAEEDA" },
+    { label: "Annual Leave", value: 0, color: "#185FA5", bg: "#E6F1FB" },
+  ]);
+  const [revenueRanking, setRevenueRanking] = useState<{ rank: number; name: string; code: string; revenue: number }[]>([]);
+
+  // Clickup status distribution
+  const clickupData = [
+    { label: "Complete", value: 24, color: "#0F6E56" },
+    { label: "In Progress", value: 11, color: "#185FA5" },
+    { label: "To Do", value: 8, color: "#854F0B" },
+    { label: "Overdue", value: 3, color: "#A32D2D" },
+  ];
+
+  // Load live data from branch dashboard API
+  const loadDashboardData = useCallback(() => {
+    setLoading(true);
+    fetch("/api/branch/dashboard")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          if (data.branchName) setCurrentBranchName(data.branchName);
+          if (data.branchCode) setCurrentBranchCode(data.branchCode);
+          if (data.crmMetrics) setCrmMetrics(data.crmMetrics);
+          if (data.smsMetrics) setSmsMetrics(data.smsMetrics);
+          if (data.attendanceToday) setAttendance(data.attendanceToday);
+          if (data.revenueRankings) setRevenueRanking(data.revenueRankings);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load branch metrics:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   // Brain dump — persisted per user in localStorage.
   const noteKey = `branch-braindump:${userEmail ?? "anon"}`;
   const [note, setNote] = useState("");
   const [noteLoaded, setNoteLoaded] = useState(false);
+
   useEffect(() => {
     try {
       setNote(localStorage.getItem(noteKey) ?? "");
@@ -273,6 +289,7 @@ export default function BranchDashboard({
     }
     setNoteLoaded(true);
   }, [noteKey]);
+
   useEffect(() => {
     if (!noteLoaded) return;
     try {
@@ -282,14 +299,109 @@ export default function BranchDashboard({
     }
   }, [note, noteKey, noteLoaded]);
 
-  const [tasks, setTasks] = useState(DEFAULT_TASKS);
+  // Pending tasks list — persisted per user in localStorage
+  const tasksKey = `branch-tasks:${userEmail ?? "anon"}`;
+  const [tasks, setTasks] = useState<{ id: string; title: string; done: boolean }[]>([]);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(tasksKey);
+      if (saved) {
+        setTasks(JSON.parse(saved));
+      } else {
+        setTasks(DEFAULT_TASKS);
+      }
+    } catch {
+      setTasks(DEFAULT_TASKS);
+    }
+    setTasksLoaded(true);
+  }, [tasksKey]);
+
+  useEffect(() => {
+    if (!tasksLoaded) return;
+    try {
+      localStorage.setItem(tasksKey, JSON.stringify(tasks));
+    } catch {
+      /* ignore */
+    }
+  }, [tasks, tasksKey, tasksLoaded]);
+
   const toggleTask = (id: string) =>
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    const t = { id: Date.now().toString(), title: newTaskTitle.trim(), done: false };
+    setTasks((prev) => [...prev, t]);
+    setNewTaskTitle("");
+  };
+
+  // Events list — persisted per user in localStorage
+  const eventsKey = `branch-events:${userEmail ?? "anon"}`;
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventStatus, setNewEventStatus] = useState<"upcoming" | "ongoing" | "completed">("upcoming");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(eventsKey);
+      if (saved) {
+        setEvents(JSON.parse(saved));
+      } else {
+        setEvents([
+          { id: "e1", name: "Q3 Campaign Plan", status: "upcoming" },
+          { id: "e2", name: "TikTok Content Shoots", status: "ongoing" },
+          { id: "e3", name: "Newsletter Send-Out", status: "completed" },
+        ]);
+      }
+    } catch {
+      setEvents([]);
+    }
+    setEventsLoaded(true);
+  }, [eventsKey]);
+
+  useEffect(() => {
+    if (!eventsLoaded) return;
+    try {
+      localStorage.setItem(eventsKey, JSON.stringify(events));
+    } catch {
+      /* ignore */
+    }
+  }, [events, eventsKey, eventsLoaded]);
+
+  const addEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEventName.trim()) return;
+    const item: EventItem = {
+      id: Date.now().toString(),
+      name: newEventName.trim(),
+      status: newEventStatus,
+    };
+    setEvents((prev) => [...prev, item]);
+    setNewEventName("");
+  };
+
+  const moveEvent = (id: string, nextStatus: "upcoming" | "ongoing" | "completed") => {
+    setEvents((prev) =>
+      prev.map((ev) => (ev.id === id ? { ...ev, status: nextStatus } : ev))
+    );
+  };
+
+  const deleteEvent = (id: string) => {
+    setEvents((prev) => prev.filter((ev) => ev.id !== id));
+  };
+
   const pendingCount = tasks.filter((t) => !t.done).length;
 
-  const myRank = REVENUE_RANKING.find(
-    (b) => branchName && b.name.toLowerCase() === branchName.toLowerCase(),
+  const myRank = revenueRanking.find(
+    (b) => b.code.toUpperCase() === currentBranchCode.toUpperCase()
   );
+
+  const greetName = `${currentBranchName} Branch`;
 
   return (
     <div
@@ -310,13 +422,23 @@ export default function BranchDashboard({
           gap: 12,
         }}
       >
-        <GreetingHeader name={greetName} style={{ padding: "4px 0 0" }} />
+        {/* Header */}
+        <div style={{ display: "flex", flexDirection: "column", width: "100%", gap: 4 }}>
+          <GreetingHeader name={greetName} style={{ padding: "4px 0 0" }} />
+          {loading && (
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", background: "#E2E8F0", padding: "3px 6px", borderRadius: 4, letterSpacing: "0.05em" }}>
+                SYNCING BRANCH DATABASE...
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* ── Priority band: 1) metrics, 2) ranking, 3) attendance ─────────── */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.15fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1.15fr 1fr",
             gap: 12,
             alignItems: "stretch",
           }}
@@ -332,95 +454,171 @@ export default function BranchDashboard({
             <MetricRow rowLabel="SMS" metrics={SMS_METRICS} />
           </Panel>
 
-          {/* 2) Branch revenue ranking */}
-          <Panel title="Revenue Ranking" icon={<i className="ti ti-trophy" />}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {REVENUE_RANKING.map((b) => {
-                const mine =
-                  branchName && b.name.toLowerCase() === branchName.toLowerCase();
                 return (
                   <div
-                    key={b.rank}
+                    key={a.label}
                     style={{
+                      background: bg,
+                      border: border,
+                      borderRadius: 12,
+                      padding: 12,
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      padding: "5px 8px",
-                      borderRadius: 7,
-                      background: mine ? "#E6F1FB" : "transparent",
-                      border: mine ? "0.5px solid #BBD7F2" : "0.5px solid transparent",
+                      gap: 12,
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        width: 18,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: b.rank <= 3 ? "#185FA5" : "#94A3B8",
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        background: iconBg,
+                        color: iconColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      {b.rank}
-                    </span>
-                    <span
-                      style={{
-                        flex: 1,
-                        fontSize: 13,
-                        fontWeight: mine ? 700 : 500,
-                        color: "#1F2937",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {b.name}
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
-                      {formatRM(b.revenue)}
-                    </span>
+                      <IconComponent style={{ width: 18, height: 18 }} />
+                    </div>
+                    <div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: labelColor,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {a.label}
+                      </p>
+                      <p
+                        style={{
+                          margin: "2px 0 0",
+                          fontSize: 20,
+                          fontWeight: 700,
+                          color: "#1E293B",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {a.value}
+                      </p>
+                    </div>
                   </div>
                 );
               })}
             </div>
-            {myRank && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
-                Your branch is ranked{" "}
-                <strong style={{ color: "#185FA5" }}>#{myRank.rank}</strong> of{" "}
-                {REVENUE_RANKING.length}.
-              </div>
-            )}
           </Panel>
 
-          {/* 3) Attendance */}
-          <Panel title="Attendance Today" icon={<i className="ti ti-users" />}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-                height: "100%",
-              }}
-            >
-              {ATTENDANCE.map((a) => (
-                <div
-                  key={a.label}
-                  style={{
-                    background: a.bg,
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 700, color: a.color, lineHeight: 1 }}>
-                    {a.value}
+          {/* 2) CRM & SMS Metrics (Middle) */}
+          <Panel
+            title="CRM & SMS Metrics"
+            bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
+          >
+            <MetricRow rowLabel="CRM" metrics={crmMetrics} />
+            <div style={{ height: 0.5, background: "#EEF1F4" }} />
+            <MetricRow rowLabel="SMS" metrics={smsMetrics} />
+          </Panel>
+
+          {/* 3) Branch revenue & rank (Right) */}
+          <Panel title="Revenue & Rank">
+            {myRank ? (() => {
+              const revVal = myRank.revenue;
+              const rankVal = myRank.rank;
+              const isTop10 = rankVal <= 10;
+              
+              // Calculate values beneath the medal
+              const expenseVal = Math.round(revVal * 0.65);
+              const profitVal = revVal - expenseVal;
+
+              return (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "4px 0" }}>
+                  {/* Above the medal: Revenue label */}
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#185FA5", textAlign: "center" }}>
+                    Rev. {formatRM(revVal)}
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: a.color, marginTop: 4 }}>
-                    {a.label}
+
+                  {/* Medal Area (No Box) */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#475569", letterSpacing: "0.05em" }}>
+                      {currentBranchCode.toUpperCase()}
+                    </span>
+
+                    {/* Medal Graphic for Top 10, otherwise Rank Text */}
+                    {isTop10 ? (
+                      <div style={{ position: "relative", width: 50, height: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+                          {/* Ribbon */}
+                          <polygon points="35,50 15,95 38,95 50,75" fill="#EF4444" />
+                          <polygon points="65,50 85,95 62,95 50,75" fill="#DC2626" />
+                          {/* Medal body */}
+                          <circle cx="50" cy="50" r="34" fill="#FBBF24" stroke="#D97706" strokeWidth="4" />
+                          <circle cx="50" cy="50" r="28" fill="#FCD34D" />
+                        </svg>
+                        <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 16, fontWeight: 800, color: "#92400E" }}>
+                          {rankVal}
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 800,
+                          color: "#64748B",
+                          background: "#E2E8F0",
+                          borderRadius: 8,
+                          padding: "4px 10px",
+                          letterSpacing: "-0.02em",
+                        }}
+                      >
+                        #{rankVal}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Beneath the medal: Detailed metrics */}
+                  <div
+                    style={{
+                      width: "100%",
+                      borderTop: "0.5px solid #EEF1F4",
+                      paddingTop: 10,
+                      marginTop: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#64748B", fontWeight: 500 }}>Revenue:</span>
+                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(revVal)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#64748B", fontWeight: 500 }}>Expense:</span>
+                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(expenseVal)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#64748B", fontWeight: 500 }}>Profit:</span>
+                      <span style={{ color: "#0F6E56", fontWeight: 700 }}>{formatRM(profitVal)}</span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })() : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "#94A3B8", fontSize: 13 }}>
+                No ranking data available
+              </div>
+            )}
           </Panel>
         </div>
 
@@ -434,16 +632,46 @@ export default function BranchDashboard({
           }}
         >
           {/* 4) Monthly ClickUp pie */}
-          <Panel title="Monthly ClickUp" icon={<i className="ti ti-chart-pie" />}>
-            <Donut data={CLICKUP} />
+          <Panel title="Monthly ClickUp">
+            <Donut data={clickupData} />
           </Panel>
 
           {/* 7) Pending tasks */}
           <Panel
             title={`Pending Tasks · ${pendingCount}`}
-            icon={<i className="ti ti-checklist" />}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <form onSubmit={handleAddTask} style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <input
+                type="text"
+                placeholder="New task..."
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                style={{
+                  flex: 1,
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 6,
+                  padding: "4px 8px",
+                  fontSize: 12,
+                  outline: "none",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  background: "#185FA5",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "4px 8px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Add
+              </button>
+            </form>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 110, overflowY: "auto" }}>
               {tasks.map((t) => (
                 <label
                   key={t.id}
@@ -451,7 +679,7 @@ export default function BranchDashboard({
                     display: "flex",
                     alignItems: "center",
                     gap: 9,
-                    padding: "5px 4px",
+                    padding: "3px 4px",
                     cursor: "pointer",
                   }}
                 >
@@ -459,13 +687,16 @@ export default function BranchDashboard({
                     type="checkbox"
                     checked={t.done}
                     onChange={() => toggleTask(t.id)}
-                    style={{ width: 15, height: 15, accentColor: "#185FA5", flexShrink: 0 }}
+                    style={{ width: 14, height: 14, accentColor: "#185FA5", flexShrink: 0 }}
                   />
                   <span
                     style={{
-                      fontSize: 13,
+                      fontSize: 12,
                       color: t.done ? "#9CA3AF" : "#1F2937",
                       textDecoration: t.done ? "line-through" : "none",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                     }}
                   >
                     {t.title}
@@ -478,7 +709,6 @@ export default function BranchDashboard({
           {/* 6) Brain dump */}
           <Panel
             title="Brain Dump"
-            icon={<i className="ti ti-notes" />}
             bodyStyle={{ display: "flex" }}
           >
             <textarea
@@ -487,8 +717,8 @@ export default function BranchDashboard({
               placeholder="Jot anything down — saved automatically on this device."
               style={{
                 width: "100%",
-                minHeight: 130,
-                resize: "vertical",
+                minHeight: 120,
+                resize: "none",
                 border: "none",
                 outline: "none",
                 background: "transparent",
@@ -502,8 +732,8 @@ export default function BranchDashboard({
         </div>
 
         {/* 5) Events & announcements — full width footer band */}
-        <Panel title="Events & Announcements" icon={<i className="ti ti-calendar-event" />}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+        <Panel title="Events & Announcements" icon={<Bell style={{ width: 14, height: 14 }} />}>
+          <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr", gap: 18 }}>
             <div>
               <div
                 style={{
@@ -514,27 +744,103 @@ export default function BranchDashboard({
                   marginBottom: 8,
                 }}
               >
-                UPCOMING EVENTS
+                EVENT TRACKER
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {EVENTS.map((e) => (
-                  <div key={e.title} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: e.tone,
-                        borderRadius: 6,
-                        padding: "3px 8px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {e.date}
-                    </span>
-                    <span style={{ fontSize: 13, color: "#1F2937" }}>{e.title}</span>
-                  </div>
-                ))}
+              
+              {/* Event Add Form */}
+              <form onSubmit={addEvent} style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="New event name..."
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  style={{
+                    flex: 1,
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 8,
+                    padding: "5px 10px",
+                    fontSize: 12,
+                    outline: "none",
+                  }}
+                />
+                <select
+                  value={newEventStatus}
+                  onChange={(e) => setNewEventStatus(e.target.value as "upcoming" | "ongoing" | "completed")}
+                  style={{
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 8,
+                    padding: "5px 6px",
+                    fontSize: 11,
+                    outline: "none",
+                    background: "#FFFFFF",
+                  }}
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <button
+                  type="submit"
+                  style={{
+                    background: "#185FA5",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Plus style={{ width: 14, height: 14 }} />
+                </button>
+              </form>
+
+              {/* columns */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                {(["upcoming", "ongoing", "completed"] as const).map((col) => {
+                  const filtered = events.filter((ev) => ev.status === col);
+                  const title = col === "upcoming" ? "Upcoming" : col === "ongoing" ? "Ongoing" : "Completed";
+                  const borderCol = col === "upcoming" ? "0.5px solid #E2E8F0" : col === "ongoing" ? "0.5px solid #FDE68A" : "0.5px solid #A7F3D0";
+                  const bgCol = col === "upcoming" ? "#F8FAFC" : col === "ongoing" ? "#FFFBEB" : "#ECFDF5";
+                  const textCol = col === "upcoming" ? "#475569" : col === "ongoing" ? "#B45309" : "#047857";
+
+                  return (
+                    <div key={col} style={{ border: borderCol, background: bgCol, borderRadius: 10, padding: 8 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", borderBottom: "0.5px solid rgba(0,0,0,0.05)", paddingBottom: 4, color: textCol }}>
+                        {title}
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", paddingRight: 2 }}>
+                        {filtered.map((ev) => (
+                          <div key={ev.id} style={{ padding: 8, background: "#FFFFFF", border: "0.5px solid #E2E8F0", borderRadius: 8, fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: "#334155", wordBreak: "break-all", lineHeight: 1.25 }}>{ev.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #F1F5F9", paddingTop: 6, marginTop: 2 }}>
+                              {col !== "completed" ? (
+                                <button
+                                  onClick={() => moveEvent(ev.id, col === "upcoming" ? "ongoing" : "completed")}
+                                  style={{ background: "none", border: "none", color: "#2563EB", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                                >
+                                  Move ➔
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700 }}>Done</span>
+                              )}
+                              <button
+                                onClick={() => deleteEvent(ev.id)}
+                                style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                              >
+                                <Trash2 style={{ width: 13, height: 13 }} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <div>
@@ -549,13 +855,27 @@ export default function BranchDashboard({
               >
                 ANNOUNCEMENTS
               </div>
-              <ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                {ANNOUNCEMENTS.map((a) => (
-                  <li key={a} style={{ fontSize: 13, color: "#475569", lineHeight: 1.45 }}>
-                    {a}
-                  </li>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto", paddingRight: 2 }}>
+                {DEFAULT_ANNOUNCEMENTS.map((a) => (
+                  <div
+                    key={a}
+                    style={{
+                      display: "flex",
+                      alignItems: "start",
+                      gap: 8,
+                      padding: "8px 10px",
+                      background: "#EFF6FF",
+                      border: "0.5px solid #BFDBFE",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Megaphone style={{ width: 13, height: 13, color: "#1D4ED8", marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.4 }}>
+                      {a}
+                    </span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </Panel>

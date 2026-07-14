@@ -16,7 +16,10 @@ export default async function Page() {
       role={(session.user as { role?: string }).role ?? ""}
       name={session.user.name ?? null}
     >
-      <FADashboardClient />
+      <FADashboardClient
+        userName={session.user.name ?? null}
+        userEmail={session.user.email}
+      />
     </AppShell>
   );
 }
