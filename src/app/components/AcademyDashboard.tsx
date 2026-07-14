@@ -13,12 +13,11 @@ import {
   Sparkles,
   ListTodo,
   ArrowLeft,
-  Phone,
-  Mail,
   User,
   MapPin,
   Clock,
-  Globe,
+  BookOpen,
+  GraduationCap,
 } from "lucide-react";
 
 interface AttendanceData {
@@ -28,22 +27,32 @@ interface AttendanceData {
   al: number;
 }
 
-interface CRMLead {
-  id: number;
-  full_name: string;
-  phone_number: string;
-  email: string;
+interface SMSStudent {
+  id: string;
+  name: string;
   branch: string | null;
-  submitted_at_my: string;
+  grade: number;
+  active: boolean;
+  created_at: string;
 }
 
-function formatBranch(branch: string | null | undefined): string {
-  if (!branch) return "General / Unassigned";
-  return branch
-    .replace(/_/g, " ")
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+const BRANCH_MAP: Record<string, string> = {
+  SA: "Shah Alam",
+  SP: "Sri Petaling",
+  KD: "Kota Damansara",
+  AMP: "Ampang",
+  AM: "Ampang",
+  PU: "Puchong",
+  PC: "Puchong",
+  KA: "Kajang",
+  SB: "Sungai Buloh",
+  PJ: "Petaling Jaya",
+};
+
+function formatSmsBranch(code: string | null | undefined): string {
+  if (!code) return "General / Unassigned";
+  const upper = code.trim().toUpperCase();
+  return BRANCH_MAP[upper] || upper;
 }
 
 function formatTime(isoString: string): string {
@@ -62,7 +71,7 @@ function formatTime(isoString: string): string {
   }
 }
 
-export default function OperationsDashboard({
+export default function AcademyDashboard({
   userName,
   userEmail,
 }: {
@@ -77,17 +86,17 @@ export default function OperationsDashboard({
   };
 
   const dummyDailyTasks = [
-    { id: "86d3g0op1", name: "Daily Operations Sync with Leads", status: "PENDING", listName: "Ops Core", url: "#" },
-    { id: "86d3g0op2", name: "Audit scanner sync errors", status: "PENDING", listName: "Scanners", url: "#" },
-    { id: "86d3g0op3", name: "Review CRM Leads funnel performance", status: "PENDING", listName: "CRM", url: "#" },
-    { id: "86d3g0op4", name: "Verify class scheduling status", status: "COMPLETE", listName: "Schedules", url: "#" },
-    { id: "86d3g0op5", name: "Prepare operations weekly check-in report", status: "COMPLETE", listName: "Ops Core", url: "#" },
+    { id: "86d3g0op1", name: "Review academy tutorial syllabus updates", status: "PENDING", listName: "Academy Core", url: "#" },
+    { id: "86d3g0op2", name: "Audit SMS student registrations list", status: "PENDING", listName: "SMS Sync", url: "#" },
+    { id: "86d3g0op3", name: "Prepare syllabus outline for Q3 intakes", status: "PENDING", listName: "Syllabus", url: "#" },
+    { id: "86d3g0op4", name: "Verify class scheduling allocations", status: "COMPLETE", listName: "Schedules", url: "#" },
+    { id: "86d3g0op5", name: "Prepare academy weekly coordinators sync", status: "COMPLETE", listName: "Academy Core", url: "#" },
   ];
 
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
-    "operations";
+    "academy";
 
   const [loading, setLoading] = useState(true);
   const [attendance, setAttendance] = useState<AttendanceData>({
@@ -96,24 +105,24 @@ export default function OperationsDashboard({
     mc: 0,
     al: 0,
   });
-  const [leads, setLeads] = useState<CRMLead[]>([]);
+  const [students, setStudents] = useState<SMSStudent[]>([]);
   const [braindump, setBraindump] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
-  // Load backend stats & CRM leads
+  // Load backend stats & SMS students
   const loadBackend = useCallback(() => {
     setLoading(true);
-    fetch("/api/operations/dashboard")
+    fetch("/api/academy/dashboard")
       .then((r) => r.json())
       .then((d) => {
         if (d.success) {
           if (d.attendance) setAttendance(d.attendance);
-          if (d.leads) setLeads(d.leads);
+          if (d.students) setStudents(d.students);
         }
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Error loading Operations dashboard data:", err);
+        console.error("Error loading Academy dashboard data:", err);
         setLoading(false);
       });
   }, []);
@@ -124,7 +133,7 @@ export default function OperationsDashboard({
 
   // Load braindump from localStorage
   useEffect(() => {
-    const savedBraindump = localStorage.getItem("operations_braindump");
+    const savedBraindump = localStorage.getItem("academy_braindump");
     if (savedBraindump) setBraindump(savedBraindump);
   }, []);
 
@@ -137,7 +146,7 @@ export default function OperationsDashboard({
           <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
           <div className="flex justify-between items-center flex-wrap gap-2">
             <p className="text-sm text-slate-500">
-              Hi, Operations Department! Here is your custom executive workspace.
+              Hi, Academy Department! Here is your custom executive workspace.
             </p>
             {loading && (
               <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
@@ -206,53 +215,56 @@ export default function OperationsDashboard({
               </div>
             </div>
 
-            {/* 2. CRM Leads Feed */}
+            {/* 2. SMS Student Registrations Feed */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-indigo-500" />
-                  Latest CRM Leads ({leads.length})
+                  <GraduationCap className="w-5 h-5 text-indigo-500" />
+                  Latest Student Registrations (SMS) ({students.length})
                 </h2>
-                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide font-mono">
                   Database Active
                 </span>
               </div>
 
               <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                {leads.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-12">No CRM leads synced recently.</p>
+                {students.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-12">No student registrations synced recently.</p>
                 ) : (
-                  leads.map((lead, idx) => (
+                  students.map((student, idx) => (
                     <div
-                      key={lead.id}
+                      key={student.id}
                       className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
                     >
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-slate-400" />
                           <span className="font-bold text-slate-800 text-sm">
-                            {idx + 1}. {lead.full_name}
+                            {idx + 1}. {student.name}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase tracking-wider ${
+                            student.active 
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                              : "bg-slate-100 text-slate-500 border-slate-200"
+                          }`}>
+                            {student.active ? "Active" : "Inactive"}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-4 text-slate-500">
                           <span className="flex items-center gap-1">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            {lead.phone_number}
+                            <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                            Grade {student.grade}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
-                            {lead.email}
+                          <span className="flex items-center gap-1 text-slate-600 font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                            {formatSmsBranch(student.branch)}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-slate-600 font-medium">
-                          <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                          {formatBranch(lead.branch)}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold self-end sm:self-center font-mono">
                         <Clock className="w-3.5 h-3.5 text-slate-300" />
-                        {formatTime(lead.submitted_at_my)}
+                        {formatTime(student.created_at)}
                       </div>
                     </div>
                   ))
@@ -349,9 +361,9 @@ export default function OperationsDashboard({
                   value={braindump}
                   onChange={(e) => {
                     setBraindump(e.target.value);
-                    localStorage.setItem("operations_braindump", e.target.value);
+                    localStorage.setItem("academy_braindump", e.target.value);
                   }}
-                  placeholder="Write down any notes, thoughts, tasks, ideas or processes to improve here..."
+                  placeholder="Write down any curriculum notes, student issues, class schedules or tutor plans here..."
                   className="w-full flex-1 min-h-[160px] border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono leading-relaxed"
                 />
               </div>

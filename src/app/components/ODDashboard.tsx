@@ -21,6 +21,21 @@ import {
 import GreetingHeader from "./GreetingHeader";
 import ClickUpPieChart from "./ClickUpPieChart";
 
+const TICKET_COLORS: Record<string, string> = {
+  LEAD: "#ed1c24",
+  LEADS: "#ed1c24",
+  AONE: "#4a8fd9",
+  CLICKUP: "#79f471",
+  PS: "#023497",
+  "PROCESS STREET": "#023497",
+  OTHERS: "#6b7280",
+};
+
+function getTicketColor(name: string): string {
+  const upper = name.trim().toUpperCase();
+  return TICKET_COLORS[upper] || "#6366f1";
+}
+
 interface AttendanceData {
   onboarding: number;
   offboarding: number;
@@ -488,8 +503,8 @@ export default function ODDashboard({
                         {/* Progress Bar */}
                         <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
-                            style={{ width: `${percent}%` }}
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}
                           />
                         </div>
                       </div>
