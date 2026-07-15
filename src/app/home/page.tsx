@@ -61,7 +61,7 @@ export default function HomePage() {
       ) : isBranch ? (
         <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
       ) : isFinance ? (
-        <FinanceDashboard userName={userName} />
+        <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
       ) : (
