@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
+import ODDashboard from "@/app/components/ODDashboard";
+import OperationsDashboard from "@/app/components/OperationsDashboard";
+import MarketingDashboard from "@/app/components/MarketingDashboard";
+import AcademyDashboard from "@/app/components/AcademyDashboard";
+import BranchDashboard from "@/app/components/BranchDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 
@@ -36,11 +41,26 @@ export default function HomePage() {
   // role_type "staff" corresponds to role_id = 4 in the DB.
   const isStaff = userRole.toLowerCase() === "staff";
   const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
+  const isOD = userEmail.toLowerCase() === "od@ebright.my";
+  const isOperations = userEmail.toLowerCase() === "operations@ebright.my";
+  const isMarketing = userEmail.toLowerCase() === "marketing@ebright.my";
+  const isAcademy = userEmail.toLowerCase() === "academy@ebright.my";
+  const isBranch = userRole.toLowerCase() === "branch";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <HodPendingAlert position={userPosition} />
-      {isFinance ? (
+      {isOD ? (
+        <ODDashboard userName={userName} userEmail={userEmail} />
+      ) : isOperations ? (
+        <OperationsDashboard userName={userName} userEmail={userEmail} />
+      ) : isMarketing ? (
+        <MarketingDashboard userName={userName} userEmail={userEmail} />
+      ) : isAcademy ? (
+        <AcademyDashboard userName={userName} userEmail={userEmail} />
+      ) : isBranch ? (
+        <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
+      ) : isFinance ? (
         <FinanceDashboard userName={userName} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
