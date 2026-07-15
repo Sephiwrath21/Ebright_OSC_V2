@@ -59,6 +59,12 @@ jobs:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # The Docker build on the small deploy host takes ~11 min, which
+          # exceeds appleboy/ssh-action's 10-minute default command_timeout —
+          # causing the SSH session to be killed and the job to report a FALSE
+          # failure even though the build finished and the container came up.
+          # Give it generous headroom so a slow-but-successful deploy is green.
+          command_timeout: 20m
           script_stop: true
           script: |
             set -euo pipefail
