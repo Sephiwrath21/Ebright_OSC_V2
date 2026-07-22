@@ -102,7 +102,7 @@ export default function BranchDashboardPage() {
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <div className="min-h-full bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <Link href="/clickup-dashboard" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 mb-4 cursor-pointer transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clipRule="evenodd" />

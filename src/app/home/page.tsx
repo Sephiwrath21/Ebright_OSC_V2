@@ -10,6 +10,7 @@ import OperationsDashboard from "@/app/components/OperationsDashboard";
 import MarketingDashboard from "@/app/components/MarketingDashboard";
 import AcademyDashboard from "@/app/components/AcademyDashboard";
 import BranchDashboard from "@/app/components/BranchDashboard";
+import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 
@@ -32,6 +33,7 @@ export default function HomePage() {
   }
 
   const userEmail = session?.user?.email || "";
+  const userId = (session?.user as { id?: string } | undefined)?.id ?? "";
   const userRole = (session?.user as { role?: string } | undefined)?.role || "USER";
   const userPosition = (session?.user as { position?: string } | undefined)?.position ?? "";
   const userName = session?.user?.name ?? null;
@@ -46,6 +48,7 @@ export default function HomePage() {
   const isMarketing = userEmail.toLowerCase() === "marketing@ebright.my";
   const isAcademy = userEmail.toLowerCase() === "academy@ebright.my";
   const isBranch = userRole.toLowerCase() === "branch";
+  const isHr = userRole.toLowerCase() === "hr" || userId === "175";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -64,6 +67,8 @@ export default function HomePage() {
         <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
+      ) : isHr ? (
+        <HrPersonalizedDashboard userName={userName} userEmail={userEmail} />
       ) : (
         <DashboardHome userRole={userRole} userEmail={userEmail} />
       )}

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, Home } from "lucide-react";
+import TrialSchedule from "@/app/components/TrialSchedule";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,50 +47,18 @@ const PRESETS: Array<{ key: Preset; label: string }> = [
   { key: "custom",    label: "Custom" },
 ];
 
-const REGION_BRANCHES: Record<Region, string[]> = {
-  A: ["17 Bandar Rimbayu", "09 Klang", "13 Shah Alam", "03 Setia Alam", "10 Denai Alam", "15 Eco Grandeur", "02 Subang Taipan", "21 Tropicana Sungai Buloh"],
-  B: ["12 Danau Kota", "05 Kota Damansara", "07 Ampang", "04 Sri Petaling", "14 Bandar Tun Hussein Onn", "20 Kajang TTDI Grove", "18 Taman Sri Gombak", "23 Dataran Puchong Utama"],
-  C: ["06 Putrajaya", "19 Kota Warisan", "11 Bandar Baru Bangi", "08 Cyberjaya", "16 Bandar Seri Putra", "01 Online", "22 Puncak Jalil"],
-};
+// Live API payload shape — mirrors src/lib/crm-leads-metrics.ts (read-only,
+// sourced from ebright_crm so the numbers tally with the v1 CNS dashboard).
+interface MetricsResponse {
+  range: { from: string; to: string };
+  main: MainTotals;
+  regions: Record<Region, RegionTotals>;
+  branches: BranchRow[];
+}
 
-const MOCK_BRANCHES: BranchRow[] = [
-  { code: "01", name: "Online",                region: "C", NL: 12, CT: 3,  SU: 0, ENR: 0 },
-  { code: "02", name: "Subang Taipan",         region: "A", NL: 24, CT: 6,  SU: 0, ENR: 0 },
-  { code: "03", name: "Setia Alam",            region: "A", NL: 32, CT: 8,  SU: 1, ENR: 1 },
-  { code: "04", name: "Sri Petaling",          region: "B", NL: 20, CT: 5,  SU: 0, ENR: 0 },
-  { code: "05", name: "Kota Damansara",        region: "B", NL: 28, CT: 7,  SU: 0, ENR: 0 },
-  { code: "06", name: "Putrajaya",             region: "C", NL: 18, CT: 5,  SU: 0, ENR: 0 },
-  { code: "07", name: "Ampang",                region: "B", NL: 24, CT: 6,  SU: 1, ENR: 1 },
-  { code: "08", name: "Cyberjaya",             region: "C", NL: 20, CT: 5,  SU: 0, ENR: 0 },
-  { code: "09", name: "Klang",                 region: "A", NL: 30, CT: 8,  SU: 0, ENR: 0 },
-  { code: "10", name: "Denai Alam",            region: "A", NL: 22, CT: 6,  SU: 0, ENR: 0 },
-  { code: "11", name: "Bandar Baru Bangi",     region: "C", NL: 20, CT: 5,  SU: 0, ENR: 0 },
-  { code: "12", name: "Danau Kota",            region: "B", NL: 26, CT: 7,  SU: 0, ENR: 0 },
-  { code: "13", name: "Shah Alam",             region: "A", NL: 38, CT: 10, SU: 1, ENR: 1 },
-  { code: "14", name: "Bandar Tun Hussein Onn",region: "B", NL: 22, CT: 6,  SU: 0, ENR: 0 },
-  { code: "15", name: "Eco Grandeur",          region: "A", NL: 18, CT: 5,  SU: 0, ENR: 0 },
-  { code: "16", name: "Bandar Seri Putra",     region: "C", NL: 14, CT: 4,  SU: 0, ENR: 0 },
-  { code: "17", name: "Bandar Rimbayu",        region: "A", NL: 28, CT: 7,  SU: 0, ENR: 0 },
-  { code: "18", name: "Taman Sri Gombak",      region: "B", NL: 20, CT: 5,  SU: 1, ENR: 1 },
-  { code: "19", name: "Kota Warisan",          region: "C", NL: 16, CT: 4,  SU: 0, ENR: 0 },
-  { code: "20", name: "Kajang TTDI Grove",     region: "B", NL: 22, CT: 6,  SU: 0, ENR: 0 },
-  { code: "21", name: "Tropicana Sungai Buloh",region: "A", NL: 18, CT: 5,  SU: 0, ENR: 0 },
-  { code: "22", name: "Puncak Jalil",          region: "C", NL: 16, CT: 4,  SU: 0, ENR: 0 },
-  { code: "23", name: "Dataran Puchong Utama", region: "B", NL: 26, CT: 8,  SU: 0, ENR: 0 },
-];
-
-const MOCK_MAIN: MainTotals = {
-  NL: 538, CT: 138, SU: 6, ENR: 6, BUF: 0,
-  convRate:    6 / 538,
-  confRate:  138 / 538,
-  showUpRate:  6 / 138,
-  enrolRate:   6 / 6,
-};
-
-const MOCK_REGIONS: Record<Region, RegionTotals> = {
-  A: { NL: 210, CT: 55, SU: 3, ENR: 3 },
-  B: { NL: 188, CT: 50, SU: 2, ENR: 2 },
-  C: { NL: 140, CT: 33, SU: 1, ENR: 1 },
+const EMPTY_REGION: RegionTotals = { NL: 0, CT: 0, SU: 0, ENR: 0 };
+const EMPTY_MAIN: MainTotals = {
+  ...EMPTY_REGION, BUF: 0, convRate: 0, confRate: 0, showUpRate: 0, enrolRate: 0,
 };
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -101,18 +70,78 @@ function pct(v: number): string {
 
 // ─── Root component ───────────────────────────────────────────────────────────
 
+function formatRange(fromISO: string, toISO: string): string {
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return `${fmt(new Date(fromISO))} – ${fmt(new Date(toISO))}`;
+}
+
 export default function LeadsDashboard() {
   const [preset, setPreset] = useState<Preset>("this_week");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo,   setCustomTo]   = useState("");
-  const [branchId,   setBranchId]   = useState("");
+  const [branchCode, setBranchCode] = useState("");
+
+  const [data,    setData]    = useState<MetricsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
   const customReady = preset === "custom" && !!customFrom && !!customTo;
-  const rangeLabel  = "22 Jun 2026 – 28 Jun 2026"; // replaced by API later
+
+  const load = useCallback(async () => {
+    // Custom range only fires once both ends are picked.
+    if (preset === "custom" && !customReady) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ preset });
+      if (preset === "custom") {
+        params.set("from", new Date(customFrom).toISOString());
+        // Include the whole `to` day (end of day) so it isn't truncated.
+        params.set("to", new Date(new Date(customTo).getTime() + 86_400_000 - 1).toISOString());
+      }
+      const res = await fetch(`/api/crm/leads-metrics?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? `Request failed (${res.status})`);
+      }
+      setData((await res.json()) as MetricsResponse);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load metrics");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [preset, customReady, customFrom, customTo]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const main    = data?.main ?? EMPTY_MAIN;
+  const regions = data?.regions ?? { A: EMPTY_REGION, B: EMPTY_REGION, C: EMPTY_REGION };
+  const allBranches = useMemo(() => data?.branches ?? [], [data]);
+  // Branch picker narrows the per-branch chart + table client-side; the Main
+  // and Region blocks always show the full all-branches picture.
+  const shownBranches = useMemo(
+    () => (branchCode ? allBranches.filter((b) => b.code === branchCode) : allBranches),
+    [allBranches, branchCode],
+  );
+
+  // Region-card subtitle: "NN Name · NN Name …" derived from live branches.
+  const regionBranchLabels = useMemo(() => {
+    const by: Record<Region, string[]> = { A: [], B: [], C: [] };
+    for (const b of allBranches) {
+      if (b.region) by[b.region].push(`${b.code} ${b.name}`);
+    }
+    return by;
+  }, [allBranches]);
+
+  const rangeLabel = data ? formatRange(data.range.from, data.range.to) : "—";
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto max-w-screen-xl px-6 py-6 space-y-6">
+      <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
@@ -137,19 +166,19 @@ export default function LeadsDashboard() {
               Leads Dashboard
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              {rangeLabel} · NL by created · CT by trial date · SU / ENR by stage entry
+              {loading ? "Loading…" : rangeLabel} · NL by created · CT by trial date · SU / ENR by stage entry
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Branch picker */}
             <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
+              value={branchCode}
+              onChange={(e) => setBranchCode(e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All branches</option>
-              {MOCK_BRANCHES.map((b) => (
+              {allBranches.map((b) => (
                 <option key={b.code} value={b.code}>
                   {b.code} {b.name}
                 </option>
@@ -204,36 +233,53 @@ export default function LeadsDashboard() {
           </div>
         )}
 
+        {/* ── Error banner ────────────────────────────────────────────────── */}
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Couldn&apos;t load metrics: {error}
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* ── Main pipeline block ─────────────────────────────────────────── */}
-        <MainBlock data={MOCK_MAIN} />
+        <MainBlock data={main} />
 
         {/* ── Regional cards ──────────────────────────────────────────────── */}
         <div className="grid gap-5 sm:grid-cols-3">
           <RegionCard
             title="Region A"
             accent="sky"
-            branches={REGION_BRANCHES.A}
-            data={MOCK_REGIONS.A}
+            branches={regionBranchLabels.A}
+            data={regions.A}
           />
           <RegionCard
             title="Region B"
             accent="amber"
-            branches={REGION_BRANCHES.B}
-            data={MOCK_REGIONS.B}
+            branches={regionBranchLabels.B}
+            data={regions.B}
           />
           <RegionCard
             title="Region C"
             accent="emerald"
-            branches={REGION_BRANCHES.C}
-            data={MOCK_REGIONS.C}
+            branches={regionBranchLabels.C}
+            data={regions.C}
           />
         </div>
 
+        {/* ── Trial Class Schedule ────────────────────────────────────────── */}
+        <TrialSchedule />
+
         {/* ── New Leads by Branch ─────────────────────────────────────────── */}
-        <BranchBarChart branches={MOCK_BRANCHES} />
+        <BranchBarChart branches={shownBranches} />
 
         {/* ── Per-branch table ─────────────────────────────────────────────── */}
-        <BranchTable branches={MOCK_BRANCHES} />
+        <BranchTable branches={shownBranches} />
 
       </div>
     </div>

@@ -112,7 +112,7 @@ export default function TasksPage() {
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <h1 className="text-2xl font-semibold text-slate-900 mb-8">Ongoing Tasks</h1>
 
         {state.kind === "loading" && (

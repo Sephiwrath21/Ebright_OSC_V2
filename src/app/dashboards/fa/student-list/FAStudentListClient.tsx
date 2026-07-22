@@ -228,7 +228,7 @@ export default function FAStudentListClient() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
 
         {/* Masthead */}
         <div className="mb-6">

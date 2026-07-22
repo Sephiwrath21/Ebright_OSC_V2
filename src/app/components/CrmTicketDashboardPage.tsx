@@ -1,35 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Home, ChevronRight, Ticket, CheckCircle2, Clock,
-  AlertCircle, BarChart2, MessageSquare, Phone, Mail,
-  Camera, RefreshCw, Eye, TrendingDown,
+  AlertCircle, BarChart2, RefreshCw, Eye, TrendingDown,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Priority = "Urgent" | "High" | "Medium" | "Low";
 type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const STATS = [
-  { label: "Total Tickets", value: "47",  icon: Ticket,        bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700" },
-  { label: "Open",          value: "12",  icon: AlertCircle,   bg: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-700" },
-  { label: "In Progress",   value: "8",   icon: Clock,         bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
-  { label: "Resolved",      value: "21",  icon: CheckCircle2,  bg: "bg-emerald-50",border: "border-emerald-200",text: "text-emerald-700" },
-  { label: "Closed",        value: "6",   icon: TrendingDown,  bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-600" },
-  { label: "Avg Response",  value: "2.4h",icon: BarChart2,     bg: "bg-sky-50",    border: "border-sky-200",    text: "text-sky-700" },
-];
-
-const PRIORITY_BADGE: Record<Priority, string> = {
-  Urgent: "bg-red-100 text-red-700",
-  High:   "bg-orange-100 text-orange-700",
-  Medium: "bg-amber-100 text-amber-700",
-  Low:    "bg-slate-100 text-slate-600",
-};
+interface RecentTicket {
+  id: string;
+  ticketNumber: string;
+  subject: string;
+  studentName: string | null;
+  submitterName: string | null;
+  platform: string;
+  accentColor: string | null;
+  branchCode: string | null;
+  branchName: string | null;
+  status: TicketStatus;
+  createdAt: string;
+}
+interface DashboardResponse {
+  totals: { all: number; open: number; inProgress: number; resolved: number; closed: number };
+  avgResolutionHours: number;
+  categories: Array<{ label: string; subType: string; count: number; pct: number }>;
+  byPlatform: Array<{ id: string; name: string; slug: string | null; accent: string | null; count: number }>;
+  recent: RecentTicket[];
+}
 
 const STATUS_BADGE: Record<TicketStatus, string> = {
   "Open":        "bg-amber-100 text-amber-700",
@@ -38,49 +39,57 @@ const STATUS_BADGE: Record<TicketStatus, string> = {
   "Closed":      "bg-slate-100 text-slate-500",
 };
 
-const PLATFORM_ICON: Record<string, React.ReactNode> = {
-  Email:     <Mail className="w-3.5 h-3.5" />,
-  WhatsApp:  <MessageSquare className="w-3.5 h-3.5" />,
-  Phone:     <Phone className="w-3.5 h-3.5" />,
-  Instagram: <Camera className="w-3.5 h-3.5" />,
-};
+const CAT_COLORS = ["bg-blue-500", "bg-amber-500", "bg-emerald-500", "bg-red-400", "bg-violet-500", "bg-slate-400"];
 
-const RECENT_TICKETS: {
-  id: string; subject: string; requester: string;
-  platform: string; priority: Priority; status: TicketStatus; age: string;
-}[] = [
-  { id: "TK-0047", subject: "Trial class booking — Desa Aman Puri",       requester: "Nur Aisyah bt Razak",     platform: "WhatsApp",  priority: "High",   status: "Open",       age: "2h ago" },
-  { id: "TK-0046", subject: "Fee structure query for Term 3",               requester: "Ahmad Firdaus Zainudin",  platform: "Email",     priority: "Medium", status: "In Progress",age: "4h ago" },
-  { id: "TK-0045", subject: "Request to reschedule trial — Shah Alam",      requester: "Priya Nair",              platform: "WhatsApp",  priority: "Medium", status: "Open",       age: "6h ago" },
-  { id: "TK-0044", subject: "Complaint: classroom noise level",             requester: "Tan Wei Liang",           platform: "Email",     priority: "Urgent", status: "In Progress",age: "1d ago" },
-  { id: "TK-0043", subject: "Inquiry about Year 2 syllabus",                requester: "Fatimah Zahra bt Ismail", platform: "Instagram", priority: "Low",    status: "Resolved",   age: "1d ago" },
-  { id: "TK-0042", subject: "Missing trial booking confirmation",           requester: "Kelvin Lim Boon Keat",    platform: "Phone",     priority: "High",   status: "Resolved",   age: "2d ago" },
-  { id: "TK-0041", subject: "PTPTN / financing options question",           requester: "Siti Nabilah bt Hassan",  platform: "Email",     priority: "Low",    status: "Closed",     age: "3d ago" },
-  { id: "TK-0040", subject: "Trial follow-up — Subang Jaya branch",        requester: "Mohamad Izzat Ghani",     platform: "WhatsApp",  priority: "Medium", status: "Closed",     age: "3d ago" },
-];
-
-const CATEGORIES = [
-  { label: "Trial Booking",  count: 14, pct: 30, color: "bg-blue-500" },
-  { label: "Fee Inquiry",    count: 10, pct: 21, color: "bg-amber-500" },
-  { label: "Enrollment",     count: 9,  pct: 19, color: "bg-emerald-500" },
-  { label: "Complaint",      count: 6,  pct: 13, color: "bg-red-400" },
-  { label: "Schedule Change",count: 5,  pct: 11, color: "bg-violet-500" },
-  { label: "General",        count: 3,  pct: 6,  color: "bg-slate-400" },
-];
+function ageOf(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return "<1h ago";
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function CrmTicketDashboardPage() {
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
   const [spinning, setSpinning] = useState(false);
 
-  function refresh() {
-    setSpinning(true);
-    setTimeout(() => setSpinning(false), 700);
-  }
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    fetch("/api/crm/tickets/dashboard", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Request failed (${r.status})`);
+        }
+        return r.json() as Promise<DashboardResponse>;
+      })
+      .then((d) => { if (!ignore) { setData(d); setError(null); } })
+      .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : "Failed to load"); })
+      .finally(() => { if (!ignore) { setLoading(false); setSpinning(false); } });
+    return () => { ignore = true; };
+  }, [nonce]);
+
+  function refresh() { setSpinning(true); setNonce(n => n + 1); }
+
+  const t = data?.totals;
+  const STATS = [
+    { label: "Total Tickets", value: t?.all ?? 0,        icon: Ticket,       bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700" },
+    { label: "Open",          value: t?.open ?? 0,       icon: AlertCircle,  bg: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-700" },
+    { label: "In Progress",   value: t?.inProgress ?? 0, icon: Clock,        bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
+    { label: "Resolved",      value: t?.resolved ?? 0,   icon: CheckCircle2, bg: "bg-emerald-50",border: "border-emerald-200",text: "text-emerald-700" },
+    { label: "Closed",        value: t?.closed ?? 0,     icon: TrendingDown, bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-600" },
+    { label: "Avg Response",  value: data ? `${data.avgResolutionHours.toFixed(1)}h` : "—", icon: BarChart2, bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700" },
+  ];
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -110,6 +119,12 @@ export default function CrmTicketDashboardPage() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            Couldn&apos;t load ticket dashboard: {error}
+          </div>
+        )}
+
         {/* Stat cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {STATS.map(({ label, value, icon: Icon, bg, border, text }) => (
@@ -118,7 +133,7 @@ export default function CrmTicketDashboardPage() {
                 <span className={`text-[11px] font-semibold uppercase tracking-wider ${text}`}>{label}</span>
                 <Icon className={`w-4 h-4 ${text}`} />
               </div>
-              <span className={`text-2xl font-bold ${text}`}>{value}</span>
+              <span className={`text-2xl font-bold ${text}`}>{loading ? "…" : value}</span>
             </div>
           ))}
         </div>
@@ -138,38 +153,44 @@ export default function CrmTicketDashboardPage() {
                 <thead>
                   <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                     <th className="px-5 py-2.5 text-left font-semibold">ID</th>
-                    <th className="px-5 py-2.5 text-left font-semibold">Subject</th>
+                    <th className="px-5 py-2.5 text-left font-semibold">Request</th>
                     <th className="px-5 py-2.5 text-left font-semibold">Platform</th>
-                    <th className="px-5 py-2.5 text-left font-semibold">Priority</th>
+                    <th className="px-5 py-2.5 text-left font-semibold">Branch</th>
                     <th className="px-5 py-2.5 text-left font-semibold">Status</th>
                     <th className="px-5 py-2.5 text-left font-semibold">Age</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {RECENT_TICKETS.map(t => (
+                  {loading ? (
+                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">Loading…</td></tr>
+                  ) : (data?.recent.length ?? 0) === 0 ? (
+                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No tickets.</td></tr>
+                  ) : data!.recent.map(t => (
                     <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3 font-mono text-[11px] text-slate-500">{t.id}</td>
+                      <td className="px-5 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">{t.ticketNumber}</td>
                       <td className="px-5 py-3 max-w-[240px]">
                         <p className="font-medium text-slate-800 text-xs truncate">{t.subject}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{t.requester}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{t.studentName ?? t.submitterName ?? "—"}</p>
                       </td>
                       <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 text-slate-600 text-[11px]">
-                          {PLATFORM_ICON[t.platform] ?? null}
+                        <span className="inline-flex items-center gap-1.5 text-slate-600 text-[11px]">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.accentColor ?? "#94a3b8" }} />
                           {t.platform}
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${PRIORITY_BADGE[t.priority]}`}>
-                          {t.priority}
-                        </span>
+                        {t.branchCode || t.branchName ? (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                            {t.branchCode ?? t.branchName}
+                          </span>
+                        ) : <span className="text-[11px] text-slate-300">—</span>}
                       </td>
                       <td className="px-5 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[t.status]}`}>
                           {t.status}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-[11px] text-slate-400 whitespace-nowrap">{t.age}</td>
+                      <td className="px-5 py-3 text-[11px] text-slate-400 whitespace-nowrap">{ageOf(t.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -179,16 +200,18 @@ export default function CrmTicketDashboardPage() {
 
           {/* Category breakdown */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-4">Tickets by Category</h2>
+            <h2 className="text-sm font-semibold text-slate-900 mb-4">Tickets by Request Type</h2>
             <div className="space-y-3">
-              {CATEGORIES.map(cat => (
-                <div key={cat.label}>
+              {loading ? (
+                <p className="text-xs text-slate-400">Loading…</p>
+              ) : (data?.categories ?? []).map((cat, i) => (
+                <div key={cat.subType || cat.label}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-700">{cat.label}</span>
                     <span className="text-xs font-semibold text-slate-600">{cat.count}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div className={`h-full rounded-full ${cat.color} transition-all`} style={{ width: `${cat.pct}%` }} />
+                    <div className={`h-full rounded-full ${CAT_COLORS[i % CAT_COLORS.length]} transition-all`} style={{ width: `${cat.pct}%` }} />
                   </div>
                 </div>
               ))}
@@ -198,14 +221,9 @@ export default function CrmTicketDashboardPage() {
             <div className="mt-6 pt-4 border-t border-slate-100">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">By Platform</h3>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { name: "WhatsApp",  count: 19, icon: <MessageSquare className="w-4 h-4" />, color: "text-emerald-600" },
-                  { name: "Email",     count: 14, icon: <Mail className="w-4 h-4" />,          color: "text-blue-600" },
-                  { name: "Phone",     count: 8,  icon: <Phone className="w-4 h-4" />,         color: "text-violet-600" },
-                  { name: "Instagram", count: 6,  icon: <Camera className="w-4 h-4" />,        color: "text-pink-500" },
-                ].map(p => (
-                  <div key={p.name} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                    <span className={p.color}>{p.icon}</span>
+                {(data?.byPlatform ?? []).map(p => (
+                  <div key={p.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: p.accent ?? "#94a3b8" }} />
                     <div>
                       <p className="text-[10px] text-slate-500">{p.name}</p>
                       <p className="text-sm font-bold text-slate-800">{p.count}</p>

@@ -49,8 +49,8 @@ export default async function OnboardingDetailPage() {
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <div className="min-h-full bg-slate-50">
-          <header className="bg-emerald-600 text-white px-6 py-5">
-            <div className="max-w-6xl mx-auto">
+          <header className="bg-emerald-600 text-white px-4 sm:px-6 lg:px-8 py-5">
+            <div className="w-full mx-auto">
               <Link
                 href="/induction/hr-dashboard"
                 className="inline-flex items-center gap-1 text-emerald-100 text-sm hover:text-white"
@@ -65,7 +65,7 @@ export default async function OnboardingDetailPage() {
             </div>
           </header>
 
-          <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto shadow-sm">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">

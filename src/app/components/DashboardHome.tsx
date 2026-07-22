@@ -115,7 +115,7 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <header className="mb-10">
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">Welcome</h1>
           <p className="mt-1 text-sm text-slate-500">

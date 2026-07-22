@@ -82,7 +82,7 @@ function getDurationLabel(slotLabel: string): string {
     if (diff <= 0) return "";
     const hours = Math.floor(diff / 60);
     const mins = diff % 60;
-    
+
     if (hours > 0 && mins > 0) {
       return `${hours}h ${mins}m`;
     } else if (hours > 0) {
@@ -196,6 +196,406 @@ function SummaryTable({
   );
 }
 
+// ─── Day Schedule Table ───────────────────────────────────────────────────────
+
+interface SlotObj {
+  label: string;
+  type: "opening" | "coach" | "closing";
+  sequence_no: number;
+}
+
+interface ColDef {
+  id: string;
+  label: string;
+  type: "coach" | "exec" | "training" | "star";
+}
+
+interface DayScheduleTableProps {
+  day: string;
+  daySlots: SlotObj[];
+  COLUMNS: ColDef[];
+  branch: string;
+  tableSelections: Record<string, string>;
+  tableNotes: Record<string, string>;
+  editable: boolean;
+  /** Show branch-replacement dropdowns and CLEAR column buttons in the header */
+  showColumnControls: boolean;
+  managerReplacementBranch: Record<string, string>;
+  columnReplacementBranch: Record<string, string>;
+  setManagerReplacementBranch?: (fn: (prev: Record<string, string>) => Record<string, string>) => void;
+  setColumnReplacementBranch?: (fn: (prev: Record<string, string>) => Record<string, string>) => void;
+  staffByBranch: Record<string, StaffPayload[]>;
+  managersByBranch: Record<string, StaffPayload[]>;
+  checkIfLeavingSoon: (name: string) => boolean;
+  onCellSet?: (day: string, slot: string, colId: string, value: string) => void;
+  onNoteChange?: (key: string, value: string) => void;
+  onClearColumn?: (colId: string) => void;
+  coachCount: number;
+  execCount: number;
+}
+
+function DayScheduleTable({
+  day,
+  daySlots,
+  COLUMNS,
+  branch,
+  tableSelections,
+  tableNotes,
+  editable,
+  showColumnControls,
+  managerReplacementBranch,
+  columnReplacementBranch,
+  setManagerReplacementBranch,
+  setColumnReplacementBranch,
+  staffByBranch,
+  managersByBranch,
+  checkIfLeavingSoon,
+  onCellSet,
+  onNoteChange,
+  onClearColumn,
+  coachCount,
+  execCount,
+}: DayScheduleTableProps) {
+  return (
+    <div className="overflow-x-auto relative">
+      <table className="w-full border-collapse" style={{ minWidth: `${470 + (coachCount + execCount) * 115}px` }}>
+        <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-700 font-bold">
+          <tr>
+            <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 border-r border-slate-200 text-slate-600 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
+              Time Slot
+            </th>
+            {/* Manager column header */}
+            <th className="p-3 text-center border-l border-slate-200 w-[130px] bg-emerald-50/40 border-b-4 border-b-emerald-400">
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-[10px] font-extrabold text-slate-800">MANAGER</span>
+                {showColumnControls && editable ? (
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={managerReplacementBranch[day] ?? ""}
+                      onChange={e =>
+                        setManagerReplacementBranch?.(p => ({ ...p, [day]: e.target.value }))
+                      }
+                      className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 transition-colors outline-none"
+                    >
+                      <option value="">Own Branch</option>
+                      {ALL_BRANCHES.filter(b => b !== branch).map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                    {managerReplacementBranch[day] && (
+                      <button
+                        onClick={() => setManagerReplacementBranch?.(p => ({ ...p, [day]: "" }))}
+                        className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
+                        title="Clear replacement branch"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                {showColumnControls && editable && (
+                  <button
+                    onClick={() => onClearColumn?.("MANAGER")}
+                    className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                    title="Clear this column for the whole day"
+                  >
+                    Clear
+                  </button>
+                )}
+                {(!editable || !showColumnControls) && (
+                  <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2 py-0.5 font-bold">
+                    {managerReplacementBranch[day] || "Own Branch"}
+                  </span>
+                )}
+              </div>
+            </th>
+            {/* Coach / Exec / Training / Star column headers */}
+            {COLUMNS.map(col => {
+              const isExec = col.type === "exec";
+              const isTraining = col.type === "training";
+              const isStar = col.type === "star";
+
+              let colBg = "bg-blue-50/40 border-b-blue-400";
+              let labelColor = "text-blue-800";
+              let badgeClass = "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100";
+              let textBadge = "text-blue-600 bg-blue-50 border-blue-100";
+
+              if (isExec) {
+                colBg = "bg-purple-50/40 border-b-purple-400";
+                labelColor = "text-purple-800";
+                badgeClass = "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100";
+                textBadge = "text-purple-600 bg-purple-50 border-purple-100";
+              } else if (isTraining) {
+                colBg = "bg-amber-50/40 border-b-amber-400";
+                labelColor = "text-amber-800";
+                badgeClass = "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100";
+                textBadge = "text-amber-600 bg-amber-50 border-amber-100";
+              } else if (isStar) {
+                colBg = "bg-rose-50/40 border-b-rose-400";
+                labelColor = "text-rose-800";
+                badgeClass = "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100";
+                textBadge = "text-rose-600 bg-rose-50 border-rose-100";
+              }
+
+              return (
+                <th
+                  key={col.id}
+                  className={`p-3 text-center border-l border-slate-200 w-[115px] border-b-4 ${colBg}`}
+                >
+                  <div className="flex flex-col items-center gap-1.5">
+                    <span className={`text-[10px] font-extrabold ${labelColor}`}>{col.label}</span>
+                    {showColumnControls && editable ? (
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={columnReplacementBranch[`${day}-${col.id}`] ?? ""}
+                          onChange={e =>
+                            setColumnReplacementBranch?.(p => ({
+                              ...p,
+                              [`${day}-${col.id}`]: e.target.value,
+                            }))
+                          }
+                          className={`text-[9px] border rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer transition-colors outline-none ${badgeClass}`}
+                        >
+                          <option value="">Own Branch</option>
+                          {ALL_BRANCHES.filter(b => b !== branch).map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                        {columnReplacementBranch[`${day}-${col.id}`] && (
+                          <button
+                            onClick={() =>
+                              setColumnReplacementBranch?.(p => {
+                                const next = { ...p };
+                                delete next[`${day}-${col.id}`];
+                                return next;
+                              })
+                            }
+                            className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
+                            title="Clear replacement branch"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={`text-[9px] border rounded-full px-2 py-0.5 font-bold ${textBadge}`}>
+                        {columnReplacementBranch[`${day}-${col.id}`] || "Own Branch"}
+                      </span>
+                    )}
+                    {showColumnControls && editable && (
+                      <button
+                        onClick={() => onClearColumn?.(col.id)}
+                        className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                        title="Clear this column for the whole day"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </th>
+              );
+            })}
+            <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold">
+              Notes/Remarks
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {daySlots.map((slotObj: SlotObj) => {
+            const slotLabel = slotObj.label;
+            const isOpenClose = slotObj.type === "opening" || slotObj.type === "closing";
+            const showManager = slotObj.type === "coach";
+            const managerKey = `${day}-${slotLabel}-MANAGER`;
+            const managerVal = tableSelections[managerKey] ?? "";
+
+            return (
+              <tr
+                key={slotLabel}
+                className={`border-b transition-colors group ${
+                  isOpenClose ? "bg-indigo-50/30" : "hover:bg-slate-50/50"
+                }`}
+              >
+                <td
+                  className={`p-3 font-bold border-r border-slate-200 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors text-slate-900 w-[160px] min-w-[160px] whitespace-nowrap ${
+                    isOpenClose
+                      ? "bg-indigo-100/50 group-hover:bg-indigo-100/50"
+                      : "bg-slate-50 group-hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-[11px] text-slate-800 whitespace-nowrap">{slotLabel}</span>
+                    {!isOpenClose && (
+                      <span className="text-[9px] font-medium text-slate-400 mt-0.5 whitespace-nowrap">{getDurationLabel(slotLabel)}</span>
+                    )}
+                  </div>
+                </td>
+
+                {!isOpenClose && (
+                  <td className="p-1.5 border-l border-slate-200 align-middle bg-emerald-50/10 w-[130px]">
+                    {showManager ? (() => {
+                      // Manager cell uses BMs from the replacement branch
+                      // when one is set on this day, otherwise own branch.
+                      const mgrReplBranch = managerReplacementBranch[day] ?? "";
+                      const mgrSourceBranch = mgrReplBranch || branch;
+                      const mgrList = managersByBranch[mgrSourceBranch] ?? [];
+                      return (
+                        <select
+                          disabled={!editable}
+                          value={managerVal}
+                          onChange={e => onCellSet?.(day, slotLabel, "MANAGER", e.target.value)}
+                          className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${
+                            managerVal
+                              ? checkIfLeavingSoon(managerVal)
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : getSoftStaffColor(managerVal)
+                              : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80"
+                          }`}
+                          style={{
+                            backgroundImage: `url("${SELECT_ARROW_DARK}")`,
+                            backgroundPosition: "right 0.35rem center",
+                            backgroundSize: "6px",
+                            backgroundRepeat: "no-repeat",
+                          }}
+                        >
+                          <option value="" style={{ color: "black" }}>Select staff</option>
+                          {mgrList.map(staffObj => {
+                            const name = staffObj.name;
+                            const usedAsStaff = COLUMNS.some(
+                              c => tableSelections[`${day}-${slotLabel}-${c.id}`] === name,
+                            );
+                            const isLeavingSoon = checkIfLeavingSoon(name);
+                            return (
+                              <option
+                                key={staffObj.id}
+                                value={name}
+                                disabled={usedAsStaff && managerVal !== name}
+                                style={{ color: isLeavingSoon ? "red" : "black" }}
+                              >
+                                {name}
+                                {isLeavingSoon ? " (Leaving soon)" : ""}
+                                {usedAsStaff && managerVal !== name
+                                  ? " (assigned as staff)"
+                                  : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      );
+                    })() : (
+                      <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 border border-dashed border-emerald-100 flex items-center justify-center">
+                        <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider">—</span>
+                      </div>
+                    )}
+                  </td>
+                )}
+
+                {isOpenClose ? (
+                  <td colSpan={COLUMNS.length + 2} className="p-3 border-l border-slate-200 text-center">
+                    <span className="inline-flex items-center gap-2 bg-indigo-600 text-white text-[10px] uppercase tracking-wider font-extrabold px-4 py-1.5 rounded-xl shadow-xs">
+                      All Staff — Executive ({slotObj.type === "opening" ? "Opening" : "Closing"})
+                    </span>
+                  </td>
+                ) : (
+                  <>
+                    {COLUMNS.map(col => {
+                      const val = tableSelections[`${day}-${slotLabel}-${col.id}`] ?? "";
+                      const isExec = col.type === "exec";
+                      const isTraining = col.type === "training";
+                      const isStar = col.type === "star";
+
+                      let colBg = "bg-blue-50/10";
+                      if (isExec) colBg = "bg-purple-50/10";
+                      else if (isTraining) colBg = "bg-amber-50/10";
+                      else if (isStar) colBg = "bg-rose-50/10";
+
+                      const selectTheme = val
+                        ? checkIfLeavingSoon(val)
+                          ? "bg-red-50 text-red-700 border border-red-200"
+                          : getSoftStaffColor(val)
+                        : isExec
+                          ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80"
+                          : isTraining
+                            ? "bg-amber-50/40 text-amber-600 border border-amber-200/60 hover:bg-amber-50/80"
+                            : isStar
+                              ? "bg-rose-50/40 text-rose-600 border border-rose-200/60 hover:bg-rose-50/80"
+                              : "bg-blue-50/40 text-blue-600 border border-blue-200/60 hover:bg-blue-50/80";
+
+                      // Coach/Exec cell uses PT/FT coaches from the
+                      // replacement branch when one is set for this
+                      // day+column, otherwise own branch.
+                      const colReplBranch =
+                        columnReplacementBranch[`${day}-${col.id}`] ?? "";
+                      const sourceBranch = colReplBranch || branch;
+                      const colStaff = staffByBranch[sourceBranch] ?? [];
+                      // Names already taken in this slot by Manager or
+                      // any other coach/exec column. Used to disable
+                      // duplicate picks within the slot.
+                      const namesUsedInSlot = new Set<string>([
+                        ...COLUMNS.filter(c => c.id !== col.id)
+                          .map(c => tableSelections[`${day}-${slotLabel}-${c.id}`])
+                          .filter((n): n is string => !!n),
+                        ...(managerVal ? [managerVal] : []),
+                      ]);
+                      return (
+                        <td
+                          key={col.id}
+                          className={`p-1.5 border-l border-slate-200 align-middle ${colBg}`}
+                        >
+                          <select
+                            disabled={!editable}
+                            value={val}
+                            onChange={e => onCellSet?.(day, slotLabel, col.id, e.target.value)}
+                            className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${selectTheme}`}
+                            style={{
+                              backgroundImage: `url("${SELECT_ARROW_DARK}")`,
+                              backgroundPosition: "right 0.35rem center",
+                              backgroundSize: "6px",
+                              backgroundRepeat: "no-repeat",
+                            }}
+                          >
+                            <option value="" style={{ color: "black" }}>None</option>
+                            {colStaff.map(staffObj => {
+                              const name = staffObj.name;
+                              const isLeavingSoon = checkIfLeavingSoon(name);
+                              return (
+                                <option
+                                  key={staffObj.id}
+                                  value={name}
+                                  disabled={namesUsedInSlot.has(name) && val !== name}
+                                  style={{ color: isLeavingSoon ? "red" : "black" }}
+                                >
+                                  {name}
+                                  {isLeavingSoon ? " (Leaving soon)" : ""}
+                                  {namesUsedInSlot.has(name) && val !== name ? " (assigned)" : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </td>
+                      );
+                    })}
+                    <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white">
+                      <textarea
+                        disabled={!editable}
+                        value={tableNotes[`${day}-${slotLabel}-notes`] ?? ""}
+                        onChange={e =>
+                          onNoteChange?.(`${day}-${slotLabel}-notes`, e.target.value)
+                        }
+                        placeholder="Add remarks..."
+                        className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block"
+                      />
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Page Content ─────────────────────────────────────────────────────────────
 
 function PlanNewWeekGridContent() {
@@ -210,8 +610,15 @@ function PlanNewWeekGridContent() {
 
   const [selectedDay, setSelectedDay] = useState<string>("");
   const [editingDays, setEditingDays] = useState<Record<string, boolean>>({});
+
+  // Actual schedule data (editable in update mode, main data in create mode)
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+
+  // Planning schedule data (read-only top table, only populated in update mode)
+  const [planningSelections, setPlanningSelections] = useState<Record<string, string>>({});
+  const [planningNotes, setPlanningNotes] = useState<Record<string, string>>({});
+
   const [columnReplacementBranch, setColumnReplacementBranch] = useState<Record<string, string>>({});
   const [managerReplacementBranch, setManagerReplacementBranch] = useState<Record<string, string>>({});
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -222,10 +629,24 @@ function PlanNewWeekGridContent() {
   const [execCount, setExecCount] = useState<number>(3);
   const [trainingCount, setTrainingCount] = useState<number>(0);
   const [starCount, setStarCount] = useState<number>(0);
-  const [scheduleType, setScheduleType] = useState<"planning" | "actual">(mode === "update" ? "actual" : "planning");
+
+  // Frozen column counts for the Planning (read-only) table.
+  // Derived from the planning data itself so it never changes when the user
+  // adjusts the Actual column selectors.
+  const [planningCoachCount, setPlanningCoachCount] = useState<number>(3);
+  const [planningExecCount, setPlanningExecCount] = useState<number>(3);
+  const [planningTrainingCount, setPlanningTrainingCount] = useState<number>(0);
+  const [planningStarCount, setPlanningStarCount] = useState<number>(0);
+
+  // scheduleType is now derived — no longer a toggle.
+  // In update mode the editable table is always "actual".
+  // In create/view mode it is always "planning".
+  const scheduleType: "planning" | "actual" = mode === "update" ? "actual" : "planning";
+
   const [periodStatus, setPeriodStatus] = useState<"draft" | "archived">("draft");
   const [changedSinceArchive, setChangedSinceArchive] = useState<boolean>(false);
 
+  // Column list for the Actual (editable) table — reacts to user-adjustable counts.
   const COLUMNS = useMemo(() => {
     const list = [];
     for (let i = 1; i <= coachCount; i++) {
@@ -242,6 +663,24 @@ function PlanNewWeekGridContent() {
     }
     return list;
   }, [coachCount, execCount, trainingCount, starCount]);
+
+  // Column list for the Planning (read-only) table — frozen from loaded data.
+  const PLANNING_COLUMNS = useMemo(() => {
+    const list = [];
+    for (let i = 1; i <= planningCoachCount; i++) {
+      list.push({ id: `coach${i}`, label: `Coach ${i}`, type: "coach" as const });
+    }
+    for (let i = 1; i <= planningExecCount; i++) {
+      list.push({ id: `exec${i}`, label: `Exec ${i}`, type: "exec" as const });
+    }
+    for (let i = 1; i <= planningTrainingCount; i++) {
+      list.push({ id: `training${i}`, label: `Training ${i}`, type: "training" as const });
+    }
+    for (let i = 1; i <= planningStarCount; i++) {
+      list.push({ id: `star${i}`, label: `Star Coach ${i}`, type: "star" as const });
+    }
+    return list;
+  }, [planningCoachCount, planningExecCount, planningTrainingCount, planningStarCount]);
 
   // Live data
   const [staffByBranch, setStaffByBranch] = useState<Record<string, StaffPayload[]>>({});
@@ -275,19 +714,35 @@ function PlanNewWeekGridContent() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Fetch staff (for dropdowns) + existing schedule (if mode=update/view)
+  // Fetch staff (for dropdowns) + existing schedule(s)
+  // In update mode: fetch both planning (top, read-only) and actual (bottom, editable)
+  // In view mode: fetch only planning (single read-only table)
+  // In create mode: no existing schedule fetch
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [staffRes, schedRes, settingsRes, positionsRes] = await Promise.all([
-          fetch(`/api/branch-staff`),
-          mode !== "create"
-            ? fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=${scheduleType}`)
-            : Promise.resolve(null),
-          fetch(`/api/schedules/settings?branchName=${encodeURIComponent(branch)}`),
-          fetch(`/api/schedules/positions?branch=${encodeURIComponent(branch)}&weekStartDate=${startStr}`),
+        const staffResPromise = fetch(`/api/branch-staff`);
+        const settingsResPromise = fetch(`/api/schedules/settings?branchName=${encodeURIComponent(branch)}`);
+        const positionsResPromise = fetch(`/api/schedules/positions?branch=${encodeURIComponent(branch)}&weekStartDate=${startStr}`);
+
+        // Planning schedule: needed in update mode (top table) and view mode (only table)
+        const planningSchedPromise = (mode === "update" || mode === "view")
+          ? fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=planning`)
+          : Promise.resolve(null);
+
+        // Actual schedule: only needed in update mode (bottom editable table)
+        const actualSchedPromise = mode === "update"
+          ? fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=actual`)
+          : Promise.resolve(null);
+
+        const [staffRes, settingsRes, positionsRes, planningSchedRes, actualSchedRes] = await Promise.all([
+          staffResPromise,
+          settingsResPromise,
+          positionsResPromise,
+          planningSchedPromise,
+          actualSchedPromise,
         ]);
 
         // Staff
@@ -330,9 +785,54 @@ function PlanNewWeekGridContent() {
           }
         }
 
-        // Existing schedule
-        if (schedRes && schedRes.ok) {
-          const data = await schedRes.json();
+        // Planning schedule data
+        if (planningSchedRes && planningSchedRes.ok) {
+          const data = await planningSchedRes.json();
+          if (cancelled) return;
+          if (data.success && data.schedule) {
+            const match = data.schedule;
+            const sels = (match.selections ?? {}) as Record<string, string>;
+            if (mode === "update") {
+              // In update mode: planning goes into the read-only top table.
+              // Derive column counts by scanning the selection keys for the
+              // highest coach/exec/training/star index present.
+              setPlanningSelections(sels);
+              setPlanningNotes((match.notes ?? {}) as Record<string, string>);
+
+              let maxCoach = 1, maxExec = 1, maxTraining = 0, maxStar = 0;
+              Object.keys(sels).forEach(key => {
+                const coachMatch = key.match(/-(coach)(\d+)$/);
+                if (coachMatch) maxCoach = Math.max(maxCoach, parseInt(coachMatch[2], 10));
+                const execMatch = key.match(/-(exec)(\d+)$/);
+                if (execMatch) maxExec = Math.max(maxExec, parseInt(execMatch[2], 10));
+                const trainMatch = key.match(/-(training)(\d+)$/);
+                if (trainMatch) maxTraining = Math.max(maxTraining, parseInt(trainMatch[2], 10));
+                const starMatch = key.match(/-(star)(\d+)$/);
+                if (starMatch) maxStar = Math.max(maxStar, parseInt(starMatch[2], 10));
+              });
+              setPlanningCoachCount(maxCoach);
+              setPlanningExecCount(maxExec);
+              setPlanningTrainingCount(maxTraining);
+              setPlanningStarCount(maxStar);
+            } else {
+              // In view mode: planning is the single read-only table
+              setSelections(sels);
+              setNotes((match.notes ?? {}) as Record<string, string>);
+            }
+          } else {
+            if (mode === "update") {
+              setPlanningSelections({});
+              setPlanningNotes({});
+            } else {
+              setSelections({});
+              setNotes({});
+            }
+          }
+        }
+
+        // Actual schedule data (update mode bottom table)
+        if (actualSchedRes && actualSchedRes.ok) {
+          const data = await actualSchedRes.json();
           if (cancelled) return;
           if (data.success && data.schedule) {
             const match = data.schedule;
@@ -342,7 +842,6 @@ function PlanNewWeekGridContent() {
             setPeriodStatus(match.periodStatus ?? "draft");
             setChangedSinceArchive(!!match.changedSinceArchive);
           } else {
-            // Clear selections if no schedule exists for this type
             setSelections({});
             setNotes({});
             setPeriodStatus("draft");
@@ -358,7 +857,7 @@ function PlanNewWeekGridContent() {
     return () => {
       cancelled = true;
     };
-  }, [branch, startStr, endStr, mode, scheduleType]);
+  }, [branch, startStr, endStr, mode]);
 
   const ownStaffNames = useMemo(() => {
     return (staffByBranch[branch] ?? []).map(s => s.name);
@@ -413,7 +912,7 @@ function PlanNewWeekGridContent() {
     [dbOperatingDays, selectedDay, dayMapShort],
   );
 
-  // Compute weekly hours summary from current selections
+  // Compute weekly hours summary from current actual selections
   const summaryData = useMemo(() => {
     const stats: Record<string, { coachHrs: number; execHrs: number; total: number }> = {};
     const allNames = Array.from(
@@ -429,7 +928,6 @@ function PlanNewWeekGridContent() {
       const isWeekend = dayName === "Saturday" || dayName === "Sunday";
       const dailyTarget = isWeekend ? 10.5 : 5.0;
 
-      // Find slots for this dayName from dbOperatingDays
       const daySlotsList = formatDbSlotsForDay(dbOperatingDays, dayName, dayMapShort);
 
       allNames.forEach(emp => {
@@ -499,7 +997,7 @@ function PlanNewWeekGridContent() {
     const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const dayIdx = dayOrder.indexOf(dayName);
     if (dayIdx === -1) return;
-    
+
     const assignmentDate = new Date(`${startStr}T00:00:00Z`);
     assignmentDate.setUTCDate(assignmentDate.getUTCDate() + dayIdx);
     const dateStr = assignmentDate.toISOString().slice(0, 10);
@@ -523,7 +1021,7 @@ function PlanNewWeekGridContent() {
       }
       setSaveState("idle");
       setEditingDays(p => ({ ...p, [dayName]: false }));
-      
+
       // Refresh status and warnings
       const schedRes = await fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=${scheduleType}`);
       if (schedRes.ok) {
@@ -600,35 +1098,35 @@ function PlanNewWeekGridContent() {
   // slot of the day, but skips slots where the name is already used elsewhere
   // (manager vs staff, other coach/exec column). Clearing only clears the one
   // cell. Mirrors the old project's handleNameSelect behavior.
-  function setCell(day: string, slot: string, colId: string, value: string) {
+  function setCell(dayArg: string, slot: string, colId: string, value: string) {
     setSelections(prev => {
       const next = { ...prev };
       if (!value) {
-        delete next[`${day}-${slot}-${colId}`];
+        delete next[`${dayArg}-${slot}-${colId}`];
         return next;
       }
 
-      const slotsForDay = formatDbSlotsForDay(dbOperatingDays, day, dayMapShort);
+      const slotsForDay = formatDbSlotsForDay(dbOperatingDays, dayArg, dayMapShort);
       slotsForDay.forEach(({ label: s, type }) => {
         if (type === "opening" || type === "closing") return;
 
         if (colId === "MANAGER") {
           // Don't put someone in Manager if they're already a coach/exec for this slot
           const usedAsStaff = COLUMNS.some(
-            c => next[`${day}-${s}-${c.id}`] === value,
+            c => next[`${dayArg}-${s}-${c.id}`] === value,
           );
           if (usedAsStaff) return;
         } else {
           // Don't put someone in this column if they're already the manager for this slot
-          if (next[`${day}-${s}-MANAGER`] === value) return;
+          if (next[`${dayArg}-${s}-MANAGER`] === value) return;
           // Or already in another coach/exec column for this slot
           const usedInOtherColumn = COLUMNS.filter(c => c.id !== colId).some(
-            c => next[`${day}-${s}-${c.id}`] === value,
+            c => next[`${dayArg}-${s}-${c.id}`] === value,
           );
           if (usedInOtherColumn) return;
         }
 
-        next[`${day}-${s}-${colId}`] = value;
+        next[`${dayArg}-${s}-${colId}`] = value;
       });
 
       return next;
@@ -705,9 +1203,41 @@ function PlanNewWeekGridContent() {
       ? `${format(parseISO(startStr), "dd MMM yyyy")} – ${format(parseISO(endStr), "dd MMM yyyy")}`
       : "";
 
+  // ─── Shared table props helpers ─────────────────────────────────────────────
+
+  // Props for the Actual (editable) table — uses user-adjustable COLUMNS.
+  const sharedTableProps = {
+    day,
+    daySlots,
+    COLUMNS,
+    branch,
+    managerReplacementBranch,
+    columnReplacementBranch,
+    staffByBranch,
+    managersByBranch,
+    checkIfLeavingSoon,
+    coachCount,
+    execCount,
+  };
+
+  // Props for the Planning (read-only) table — uses frozen PLANNING_COLUMNS.
+  const planningTableProps = {
+    day,
+    daySlots,
+    COLUMNS: PLANNING_COLUMNS,
+    branch,
+    managerReplacementBranch,
+    columnReplacementBranch,
+    staffByBranch,
+    managersByBranch,
+    checkIfLeavingSoon,
+    coachCount: planningCoachCount,
+    execCount: planningExecCount,
+  };
+
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-20">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-20">
         {/* Breadcrumb */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           {/* Breadcrumb */}
@@ -762,33 +1292,10 @@ function PlanNewWeekGridContent() {
             </span>
           </nav>
 
-          {!loading && (
+          {/* Column count controls: shown inline here only for create/view mode.
+               In update mode they live inside the Actual section header. */}
+          {!loading && mode !== "update" && (
             <div className="flex items-center gap-3 select-none shrink-0 whitespace-nowrap">
-              {mode === "update" && (
-                <div className="flex items-center gap-1 bg-slate-200/60 p-0.5 rounded-xl text-[11px] font-bold">
-                  <button
-                    onClick={() => setScheduleType("planning")}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      scheduleType === "planning"
-                        ? "bg-white text-slate-800 shadow-xs"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Planning
-                  </button>
-                  <button
-                    onClick={() => setScheduleType("actual")}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      scheduleType === "actual"
-                        ? "bg-white text-slate-800 shadow-xs"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Actual
-                  </button>
-                </div>
-              )}
-
               <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl px-3 py-1.5 shadow-xs text-[11px]">
                 <div className="flex items-center gap-1">
                   <span className="font-semibold text-slate-500">Coach:</span>
@@ -847,13 +1354,14 @@ function PlanNewWeekGridContent() {
           )}
         </div>
 
-        {mode === "update" && scheduleType === "actual" && (
+        {/* Archived / changed-since-archive banners (update mode only) */}
+        {mode === "update" && (
           <div className="mb-4 flex flex-col gap-2">
             {periodStatus === "archived" && (
               <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-emerald-800 shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>This week's schedule has been Finalized & Archived. Manpower cost reports have been generated.</span>
+                  <span>This week's schedule has been Finalized &amp; Archived. Manpower cost reports have been generated.</span>
                 </div>
                 <span className="bg-emerald-100/80 text-emerald-800 text-[10px] uppercase px-2.5 py-1 rounded-lg">Archived</span>
               </div>
@@ -861,442 +1369,325 @@ function PlanNewWeekGridContent() {
             {changedSinceArchive && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 shadow-xs">
                 <span className="bg-amber-100 text-amber-800 text-[10px] uppercase px-2.5 py-1 rounded-lg shrink-0">Warning</span>
-                <span>Schedule modified since last archive. Click "Final Submit & Archive" at the bottom to update cost reports.</span>
+                <span>Schedule modified since last archive. Click "Final Submit &amp; Archive" at the bottom to update cost reports.</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Day table */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Loading schedule…
-              </span>
-            </div>
-          ) : (
-          <>
-          <header className="bg-white p-4 border-b flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
-            {/* Day tabs control on the left */}
-            <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
-              {workingDays.map(d => {
-                const active = selectedDay === d;
-                return (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedDay(d)}
-                    className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                      active
-                        ? "bg-white text-indigo-600 shadow-xs"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    {d.slice(0, 3).toUpperCase()}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Day Title and Date centered */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
-              <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight">
-                {day}
-              </h2>
-              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
-                {dateForDay(startStr, day)}
-              </span>
-            </div>
-
-            {/* Editing actions on the right */}
-            <div className="flex items-center gap-3 relative z-10 ml-auto">
-              {isEditing && (
-                <button
-                  onClick={() => clearAllForDay(day)}
-                  className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1"
-                >
-                  Clear All
-                </button>
-              )}
-              {isEditing ? (
-                <button
-                  onClick={() => handleSaveDay(day)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs transition-colors shadow-xs"
-                >
-                  Save Day
-                </button>
-              ) : (
-                <button
-                  onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
-                  className="text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-5 py-2 rounded-xl font-bold text-xs transition-colors"
-                >
-                  Edit Day
-                </button>
-              )}
-            </div>
-          </header>
-
-          {!loading && daySlots.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
-              <span className="text-sm font-bold text-slate-700">
-                {workingDays.length === 0
-                  ? `No operating days set up for ${branch} yet`
-                  : `No schedule set up for ${branch} on ${day}`}
-              </span>
-              <span className="text-xs text-slate-500 max-w-md">
-                This branch has no operating hours or time slots configured{workingDays.length === 0 ? "" : " for this day"} yet.
-                An Admin needs to set them up in Manpower Schedule Settings before staff can be assigned.
-              </span>
-              <Link
-                href="/manpower-schedule/settings"
-                className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
-              >
-                Go to Settings
-              </Link>
-            </div>
-          ) : (
-          <div className="overflow-x-auto relative">
-            <table className="w-full border-collapse" style={{ minWidth: `${470 + (coachCount + execCount) * 115}px` }}>
-              <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-700 font-bold">
-                <tr>
-                  <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 border-r border-slate-200 text-slate-600 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
-                    Time Slot
-                  </th>
-                  <th className="p-3 text-center border-l border-slate-200 w-[130px] bg-emerald-50/40 border-b-4 border-b-emerald-400">
-                    <div className="flex flex-col items-center gap-1.5">
-                      <span className="text-[10px] font-extrabold text-slate-800">MANAGER</span>
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <select
-                            value={managerReplacementBranch[day] ?? ""}
-                            onChange={e =>
-                              setManagerReplacementBranch(p => ({ ...p, [day]: e.target.value }))
-                            }
-                            className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 transition-colors outline-none"
-                          >
-                            <option value="">Own Branch</option>
-                            {ALL_BRANCHES.filter(b => b !== branch).map(b => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
-                          {managerReplacementBranch[day] && (
-                            <button
-                              onClick={() => setManagerReplacementBranch(p => ({ ...p, [day]: "" }))}
-                              className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
-                              title="Clear replacement branch"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-                      {isEditing && (
-                        <button
-                          onClick={() => clearColumnForDay("MANAGER")}
-                          className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
-                          title="Clear this column for the whole day"
-                        >
-                          Clear
-                        </button>
-                      )}
-                      {!isEditing && (
-                        <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2 py-0.5 font-bold">
-                          {managerReplacementBranch[day] || "Own Branch"}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  {COLUMNS.map(col => {
-                    const isExec = col.type === "exec";
-                    const isTraining = col.type === "training";
-                    const isStar = col.type === "star";
-
-                    let colBg = "bg-blue-50/40 border-b-blue-400";
-                    let labelColor = "text-blue-800";
-                    let badgeClass = "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100";
-                    let textBadge = "text-blue-600 bg-blue-50 border-blue-100";
-
-                    if (isExec) {
-                      colBg = "bg-purple-50/40 border-b-purple-400";
-                      labelColor = "text-purple-800";
-                      badgeClass = "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100";
-                      textBadge = "text-purple-600 bg-purple-50 border-purple-100";
-                    } else if (isTraining) {
-                      colBg = "bg-amber-50/40 border-b-amber-400";
-                      labelColor = "text-amber-800";
-                      badgeClass = "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100";
-                      textBadge = "text-amber-600 bg-amber-50 border-amber-100";
-                    } else if (isStar) {
-                      colBg = "bg-rose-50/40 border-b-rose-400";
-                      labelColor = "text-rose-800";
-                      badgeClass = "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100";
-                      textBadge = "text-rose-600 bg-rose-50 border-rose-100";
-                    }
-
+        {/* ─── Main content area ──────────────────────────────────────────────── */}
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Loading schedule…
+            </span>
+          </div>
+        ) : mode === "update" ? (
+          /* ── UPDATE MODE: Planning (top, read-only) + Actual (bottom, editable) ── */
+          <div className="flex flex-col">
+            {/* Shared day-tab bar — sticky flush strip, no card rounding so it sits tight to the TopBar */}
+            <div className="sticky top-0 z-20 -mx-6 bg-white border-b-2 border-slate-200 shadow-sm">
+              <div className="px-6 py-3 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
+                {/* Day tabs */}
+                <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
+                  {workingDays.map(d => {
+                    const active = selectedDay === d;
                     return (
-                      <th
-                        key={col.id}
-                        className={`p-3 text-center border-l border-slate-200 w-[115px] border-b-4 ${colBg}`}
-                      >
-                        <div className="flex flex-col items-center gap-1.5">
-                          <span className={`text-[10px] font-extrabold ${labelColor}`}>{col.label}</span>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <select
-                                value={columnReplacementBranch[`${day}-${col.id}`] ?? ""}
-                                onChange={e =>
-                                  setColumnReplacementBranch(p => ({
-                                    ...p,
-                                    [`${day}-${col.id}`]: e.target.value,
-                                  }))
-                                }
-                                className={`text-[9px] border rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer transition-colors outline-none ${badgeClass}`}
-                              >
-                                <option value="">Own Branch</option>
-                                {ALL_BRANCHES.filter(b => b !== branch).map(b => (
-                                  <option key={b} value={b}>{b}</option>
-                                ))}
-                              </select>
-                              {columnReplacementBranch[`${day}-${col.id}`] && (
-                                <button
-                                  onClick={() =>
-                                    setColumnReplacementBranch(p => {
-                                      const next = { ...p };
-                                      delete next[`${day}-${col.id}`];
-                                      return next;
-                                    })
-                                  }
-                                  className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
-                                  title="Clear replacement branch"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className={`text-[9px] border rounded-full px-2 py-0.5 font-bold ${textBadge}`}>
-                              {columnReplacementBranch[`${day}-${col.id}`] || "Own Branch"}
-                            </span>
-                          )}
-                          {isEditing && (
-                            <button
-                              onClick={() => clearColumnForDay(col.id)}
-                              className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
-                              title="Clear this column for the whole day"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </th>
-                    );
-                  })}
-                  <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold">
-                    Notes/Remarks
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {daySlots.map((slotObj: { label: string; type: "opening" | "coach" | "closing"; sequence_no: number }, slotIdx: number) => {
-                  const slotLabel = slotObj.label;
-                  const isOpenClose = slotObj.type === "opening" || slotObj.type === "closing";
-                  const showManager = slotObj.type === "coach";
-                  const managerKey = `${day}-${slotLabel}-MANAGER`;
-                  const managerVal = selections[managerKey] ?? "";
-
-                  return (
-                    <tr
-                      key={slotLabel}
-                      className={`border-b transition-colors group ${
-                        isOpenClose ? "bg-indigo-50/30" : "hover:bg-slate-50/50"
-                      }`}
-                    >
-                      <td
-                        className={`p-3 font-bold border-r border-slate-200 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors text-slate-900 w-[160px] min-w-[160px] whitespace-nowrap ${
-                          isOpenClose
-                            ? "bg-indigo-100/50 group-hover:bg-indigo-100/50"
-                            : "bg-slate-50 group-hover:bg-slate-100"
+                      <button
+                        key={d}
+                        onClick={() => setSelectedDay(d)}
+                        className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                          active
+                            ? "bg-white text-indigo-600 shadow-xs"
+                            : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        <div className="flex flex-col">
-                          <span className="font-bold text-[11px] text-slate-800 whitespace-nowrap">{slotLabel}</span>
-                          {!isOpenClose && (
-                            <span className="text-[9px] font-medium text-slate-400 mt-0.5 whitespace-nowrap">{getDurationLabel(slotLabel)}</span>
-                          )}
-                        </div>
-                      </td>
+                        {d.slice(0, 3).toUpperCase()}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      {!isOpenClose && (
-                        <td className="p-1.5 border-l border-slate-200 align-middle bg-emerald-50/10 w-[130px]">
-                          {showManager ? (() => {
-                            // Manager cell uses BMs from the replacement branch
-                            // when one is set on this day, otherwise own branch.
-                            const mgrReplBranch = managerReplacementBranch[day] ?? "";
-                            const mgrSourceBranch = mgrReplBranch || branch;
-                            const mgrList = managersByBranch[mgrSourceBranch] ?? [];
-                            return (
-                              <select
-                                disabled={!isEditing}
-                                value={managerVal}
-                                onChange={e => setCell(day, slotLabel, "MANAGER", e.target.value)}
-                                className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${
-                                  managerVal
-                                    ? checkIfLeavingSoon(managerVal)
-                                      ? "bg-red-50 text-red-700 border border-red-200"
-                                      : getSoftStaffColor(managerVal)
-                                    : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80"
-                                }`}
-                                style={{
-                                  backgroundImage: `url("${SELECT_ARROW_DARK}")`,
-                                  backgroundPosition: "right 0.35rem center",
-                                  backgroundSize: "6px",
-                                  backgroundRepeat: "no-repeat",
-                                }}
-                              >
-                                <option value="" style={{ color: "black" }}>Select staff</option>
-                                {mgrList.map(staffObj => {
-                                  const name = staffObj.name;
-                                  const usedAsStaff = COLUMNS.some(
-                                    c =>
-                                      selections[`${day}-${slotLabel}-${c.id}`] === name,
-                                  );
-                                  const isLeavingSoon = checkIfLeavingSoon(name);
-                                  return (
-                                    <option
-                                      key={staffObj.id}
-                                      value={name}
-                                      disabled={usedAsStaff && managerVal !== name}
-                                      style={{ color: isLeavingSoon ? "red" : "black" }}
-                                    >
-                                      {name}
-                                      {isLeavingSoon ? " (Leaving soon)" : ""}
-                                      {usedAsStaff && managerVal !== name
-                                        ? " (assigned as staff)"
-                                        : ""}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            );
-                          })() : (
-                            <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 border border-dashed border-emerald-100 flex items-center justify-center">
-                              <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider">—</span>
-                            </div>
-                          )}
-                        </td>
-                      )}
+                {/* Day title centered */}
+                <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
+                  <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight">
+                    {day}
+                  </h2>
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
+                    {dateForDay(startStr, day)}
+                  </span>
+                </div>
 
-                      {isOpenClose ? (
-                        <td colSpan={COLUMNS.length + 2} className="p-3 border-l border-slate-200 text-center">
-                          <span className="inline-flex items-center gap-2 bg-indigo-600 text-white text-[10px] uppercase tracking-wider font-extrabold px-4 py-1.5 rounded-xl shadow-xs">
-                            All Staff — Executive ({slotObj.type === "opening" ? "Opening" : "Closing"})
-                          </span>
-                        </td>
-                      ) : (
-                        <>
-                          {COLUMNS.map(col => {
-                            const val = selections[`${day}-${slotLabel}-${col.id}`] ?? "";
-                            const isExec = col.type === "exec";
-                            const isTraining = col.type === "training";
-                            const isStar = col.type === "star";
+                {/* Right spacer */}
+                <div className="ml-auto" />
+              </div>
+            </div>
 
-                            let colBg = "bg-blue-50/10";
-                            if (isExec) colBg = "bg-purple-50/10";
-                            else if (isTraining) colBg = "bg-amber-50/10";
-                            else if (isStar) colBg = "bg-rose-50/10";
+            {/* ── Planning Table (read-only top) — greyed out to signal non-editable ── */}
+            <div className="mt-5 rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+              {/* Planning section header */}
+              <div className="bg-slate-600 px-5 py-3 flex items-center gap-3">
+                <span className="text-slate-300 font-black uppercase tracking-widest text-xs">Planning</span>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-700 border border-slate-500 px-2.5 py-0.5 rounded-full">
+                  Read-only
+                </span>
+              </div>
 
-                            const selectTheme = val
-                              ? checkIfLeavingSoon(val)
-                                ? "bg-red-50 text-red-700 border border-red-200"
-                                : getSoftStaffColor(val)
-                              : isExec
-                                ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80"
-                                : isTraining
-                                  ? "bg-amber-50/40 text-amber-600 border border-amber-200/60 hover:bg-amber-50/80"
-                                  : isStar
-                                    ? "bg-rose-50/40 text-rose-600 border border-rose-200/60 hover:bg-rose-50/80"
-                                    : "bg-blue-50/40 text-blue-600 border border-blue-200/60 hover:bg-blue-50/80";
+              {/* Grey wash over the table body to reinforce read-only state */}
+              <div
+                className="bg-slate-100 select-none pointer-events-none"
+                style={{ filter: "grayscale(0.55) opacity(0.72)" }}
+              >
+                {daySlots.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-12 px-6 text-center">
+                    <span className="text-sm font-bold text-slate-500">
+                      {workingDays.length === 0
+                        ? `No operating days set up for ${branch} yet`
+                        : `No schedule set up for ${branch} on ${day}`}
+                    </span>
+                  </div>
+                ) : (
+                  <DayScheduleTable
+                    {...planningTableProps}
+                    tableSelections={planningSelections}
+                    tableNotes={planningNotes}
+                    editable={false}
+                    showColumnControls={false}
+                  />
+                )}
+              </div>
+            </div>
 
-                            // Coach/Exec cell uses PT/FT coaches from the
-                            // replacement branch when one is set for this
-                            // day+column, otherwise own branch.
-                            const colReplBranch =
-                              columnReplacementBranch[`${day}-${col.id}`] ?? "";
-                            const sourceBranch = colReplBranch || branch;
-                            const colStaff = staffByBranch[sourceBranch] ?? [];
-                            // Names already taken in this slot by Manager or
-                            // any other coach/exec column. Used to disable
-                            // duplicate picks within the slot.
-                            const namesUsedInSlot = new Set<string>([
-                              ...COLUMNS.filter(c => c.id !== col.id)
-                                .map(c => selections[`${day}-${slotLabel}-${c.id}`])
-                                .filter((n): n is string => !!n),
-                              ...(managerVal ? [managerVal] : []),
-                            ]);
-                            return (
-                              <td
-                                key={col.id}
-                                className={`p-1.5 border-l border-slate-200 align-middle ${colBg}`}
-                              >
-                                <select
-                                  disabled={!isEditing}
-                                  value={val}
-                                  onChange={e => setCell(day, slotLabel, col.id, e.target.value)}
-                                  className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${selectTheme}`}
-                                  style={{
-                                    backgroundImage: `url("${SELECT_ARROW_DARK}")`,
-                                    backgroundPosition: "right 0.35rem center",
-                                    backgroundSize: "6px",
-                                    backgroundRepeat: "no-repeat",
-                                  }}
-                                >
-                                  <option value="" style={{ color: "black" }}>None</option>
-                                  {colStaff.map(staffObj => {
-                                    const name = staffObj.name;
-                                    const isLeavingSoon = checkIfLeavingSoon(name);
-                                    return (
-                                      <option
-                                        key={staffObj.id}
-                                        value={name}
-                                        disabled={namesUsedInSlot.has(name) && val !== name}
-                                        style={{ color: isLeavingSoon ? "red" : "black" }}
-                                      >
-                                        {name}
-                                        {isLeavingSoon ? " (Leaving soon)" : ""}
-                                        {namesUsedInSlot.has(name) && val !== name ? " (assigned)" : ""}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                              </td>
-                            );
-                          })}
-                          <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white">
-                            <textarea
-                              disabled={!isEditing}
-                              value={notes[`${day}-${slotLabel}-notes`] ?? ""}
-                              onChange={e =>
-                                setNotes(p => ({
-                                  ...p,
-                                  [`${day}-${slotLabel}-notes`]: e.target.value,
-                                }))
-                              }
-                              placeholder="Add remarks..."
-                              className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block"
-                            />
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {/* ── Actual Table (editable bottom) ── */}
+            <div className="mt-5 bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+              {/* Actual section header — contains column-count controls + action buttons */}
+              <div className="bg-[#2D3F50] px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-white font-black uppercase tracking-widest text-xs shrink-0">Actual</span>
+
+                {/* Right side: column filters + action buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Column count selectors */}
+                  <div className="flex items-center gap-2 bg-[#1e2e3d] rounded-xl px-3 py-1.5 text-[11px] select-none">
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-400">Coach:</span>
+                      <select
+                        value={coachCount}
+                        onChange={(e) => handleCountChange("coach", Number(e.target.value))}
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-400">Exec:</span>
+                      <select
+                        value={execCount}
+                        onChange={(e) => handleCountChange("exec", Number(e.target.value))}
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-400">Train:</span>
+                      <select
+                        value={trainingCount}
+                        onChange={(e) => handleCountChange("training", Number(e.target.value))}
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                      >
+                        {[0, 1].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-400">Star:</span>
+                      <select
+                        value={starCount}
+                        onChange={(e) => handleCountChange("star", Number(e.target.value))}
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="w-px h-5 bg-slate-600 mx-1 shrink-0" />
+
+                  {/* Clear All + Save Day / Edit Day */}
+                  {isEditing && (
+                    <button
+                      onClick={() => clearAllForDay(day)}
+                      className="text-red-300 font-extrabold uppercase text-[10px] hover:text-red-200 transition-colors px-2 py-1"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                  {isEditing ? (
+                    <button
+                      onClick={() => handleSaveDay(day)}
+                      className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-1.5 rounded-xl font-bold text-xs transition-colors shadow-xs"
+                    >
+                      Save Day
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
+                      className="text-slate-200 border border-slate-500 bg-slate-600/50 hover:bg-slate-500/60 px-5 py-1.5 rounded-xl font-bold text-xs transition-colors"
+                    >
+                      Edit Day
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {daySlots.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-12 px-6 text-center">
+                  <span className="text-sm font-bold text-slate-700">
+                    {workingDays.length === 0
+                      ? `No operating days set up for ${branch} yet`
+                      : `No schedule set up for ${branch} on ${day}`}
+                  </span>
+                  <Link
+                    href="/manpower-schedule/settings"
+                    className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                  >
+                    Go to Settings
+                  </Link>
+                </div>
+              ) : (
+                <DayScheduleTable
+                  {...sharedTableProps}
+                  tableSelections={selections}
+                  tableNotes={notes}
+                  editable={isEditing}
+                  showColumnControls={true}
+                  setManagerReplacementBranch={setManagerReplacementBranch}
+                  setColumnReplacementBranch={setColumnReplacementBranch}
+                  onCellSet={setCell}
+                  onNoteChange={(key, value) =>
+                    setNotes(p => ({ ...p, [key]: value }))
+                  }
+                  onClearColumn={clearColumnForDay}
+                />
+              )}
+            </div>
           </div>
-          )}
-          </>
-          )}
-        </div>
+        ) : (
+          /* ── CREATE / VIEW MODE: Single table ── */
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Loading schedule…
+                </span>
+              </div>
+            ) : (
+              <>
+                <header className="bg-white p-4 border-b flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
+                  {/* Day tabs */}
+                  <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
+                    {workingDays.map(d => {
+                      const active = selectedDay === d;
+                      return (
+                        <button
+                          key={d}
+                          onClick={() => setSelectedDay(d)}
+                          className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                            active
+                              ? "bg-white text-indigo-600 shadow-xs"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          {d.slice(0, 3).toUpperCase()}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Day title centered */}
+                  <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
+                    <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight">
+                      {day}
+                    </h2>
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
+                      {dateForDay(startStr, day)}
+                    </span>
+                  </div>
+
+                  {/* Editing actions on the right */}
+                  <div className="flex items-center gap-3 relative z-10 ml-auto">
+                    {isEditing && (
+                      <button
+                        onClick={() => clearAllForDay(day)}
+                        className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                    {isEditing ? (
+                      <button
+                        onClick={() => handleSaveDay(day)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs transition-colors shadow-xs"
+                      >
+                        Save Day
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
+                        className="text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-5 py-2 rounded-xl font-bold text-xs transition-colors"
+                      >
+                        Edit Day
+                      </button>
+                    )}
+                  </div>
+                </header>
+
+                {daySlots.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
+                    <span className="text-sm font-bold text-slate-700">
+                      {workingDays.length === 0
+                        ? `No operating days set up for ${branch} yet`
+                        : `No schedule set up for ${branch} on ${day}`}
+                    </span>
+                    <span className="text-xs text-slate-500 max-w-md">
+                      This branch has no operating hours or time slots configured{workingDays.length === 0 ? "" : " for this day"} yet.
+                      An Admin needs to set them up in Manpower Schedule Settings before staff can be assigned.
+                    </span>
+                    <Link
+                      href="/manpower-schedule/settings"
+                      className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                    >
+                      Go to Settings
+                    </Link>
+                  </div>
+                ) : (
+                  <DayScheduleTable
+                    {...sharedTableProps}
+                    tableSelections={selections}
+                    tableNotes={notes}
+                    editable={isEditing}
+                    showColumnControls={isEditing}
+                    setManagerReplacementBranch={setManagerReplacementBranch}
+                    setColumnReplacementBranch={setColumnReplacementBranch}
+                    onCellSet={setCell}
+                    onNoteChange={(key, value) =>
+                      setNotes(p => ({ ...p, [key]: value }))
+                    }
+                    onClearColumn={clearColumnForDay}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <SummaryTable title="Weekly Hours Summary" data={summaryData} />
 

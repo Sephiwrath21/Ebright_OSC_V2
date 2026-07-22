@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Search, Plus, Download, Columns, Trash2, UserPlus,
@@ -8,14 +8,28 @@ import {
   Users, Phone, Mail, X, Check,
 } from "lucide-react";
 
-// ─── Reference data ───────────────────────────────────────────────────────────
+// ─── Server data shapes (from /api/crm/contacts, read-only ebright_crm) ────────
 
-const STAGES = [
-  { id: "nl",  name: "New Lead",         shortCode: "NL",  color: "blue"   },
-  { id: "ct",  name: "Confirmed Trial",  shortCode: "CT",  color: "purple" },
-  { id: "su",  name: "Show Up",          shortCode: "SU",  color: "amber"  },
-  { id: "enr", name: "Enrolled",         shortCode: "ENR", color: "green"  },
-] as const;
+interface ContactRow {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  createdAt: string;
+  stage: { name: string; shortCode: string | null; color: string } | null;
+  leadSource: { id: string; name: string } | null;
+  assignedUser: { id: string; name: string | null } | null;
+  tags: Array<{ id: string; name: string; color: string }>;
+}
+interface ContactsResponse { data: ContactRow[]; total: number; page: number; pageSize: number }
+interface ContactsMeta {
+  stages: Array<{ name: string; shortCode: string | null }>;
+  leadSources: Array<{ id: string; name: string }>;
+  assignedUsers: Array<{ id: string; name: string | null }>;
+}
+
+// ─── Reference data (used only by the non-persisting New Contact modal) ────────
 
 const LEAD_SOURCES = [
   { id: "fb",     name: "Facebook"        },
@@ -44,54 +58,6 @@ const TAGS = [
   { id: "t6", name: "Interested", color: "#10B981" },
 ];
 
-// ─── Mock contacts ────────────────────────────────────────────────────────────
-
-interface MockContact {
-  id: string;
-  firstName: string;
-  lastName: string | null;
-  email: string | null;
-  phone: string | null;
-  stageId: string;
-  leadSourceId: string | null;
-  bmId: string | null;
-  tagIds: string[];
-  createdAt: string;
-}
-
-const RAW: MockContact[] = [
-  { id: "c01",  firstName: "Nur Aisyah",    lastName: "binti Ahmad",    email: "nuraisyah@gmail.com",     phone: "60112345678",  stageId: "ct",  leadSourceId: "fb",     bmId: "bm1", tagIds: ["t1", "t6"], createdAt: "2026-06-20T08:30:00Z" },
-  { id: "c02",  firstName: "Mohd Fadli",     lastName: "bin Hassan",     email: "fadli.hassan@gmail.com",  phone: "60198765432",  stageId: "nl",  leadSourceId: "ig",     bmId: "bm2", tagIds: ["t2"],       createdAt: "2026-06-19T10:15:00Z" },
-  { id: "c03",  firstName: "Siti Nurhaliza", lastName: "binti Ismail",   email: null,                      phone: "60176543210",  stageId: "ct",  leadSourceId: "wi",     bmId: "bm3", tagIds: ["t1", "t6"], createdAt: "2026-06-19T09:00:00Z" },
-  { id: "c04",  firstName: "Ahmad Zulkifli", lastName: "bin Zakaria",    email: "azulkifli@yahoo.com",     phone: "60189012345",  stageId: "nl",  leadSourceId: "tt",     bmId: "bm4", tagIds: [],           createdAt: "2026-06-18T14:00:00Z" },
-  { id: "c05",  firstName: "Rohana",         lastName: "binti Mahmud",   email: "rohana.m@gmail.com",      phone: "60123456789",  stageId: "su",  leadSourceId: "ref",    bmId: "bm5", tagIds: ["t4"],       createdAt: "2026-06-18T11:30:00Z" },
-  { id: "c06",  firstName: "Mohd Hazwan",    lastName: "bin Ibrahim",    email: null,                      phone: "60134567890",  stageId: "nl",  leadSourceId: "fb",     bmId: "bm1", tagIds: ["t2"],       createdAt: "2026-06-17T16:45:00Z" },
-  { id: "c07",  firstName: "Nurul Ain",      lastName: "binti Yusof",    email: "nurulain@hotmail.com",    phone: "60145678901",  stageId: "ct",  leadSourceId: "wa",     bmId: "bm2", tagIds: ["t1"],       createdAt: "2026-06-17T13:20:00Z" },
-  { id: "c08",  firstName: "Khairul Anuar",  lastName: "bin Ramli",      email: "khanuar@gmail.com",       phone: "60156789012",  stageId: "nl",  leadSourceId: "online", bmId: "bm3", tagIds: [],           createdAt: "2026-06-16T09:10:00Z" },
-  { id: "c09",  firstName: "Fauziah",        lastName: "binti Othman",   email: "fauziah.o@gmail.com",     phone: "60167890123",  stageId: "enr", leadSourceId: "wi",     bmId: "bm4", tagIds: ["t6"],       createdAt: "2026-06-16T08:00:00Z" },
-  { id: "c10",  firstName: "Mohamad Azri",   lastName: "bin Aziz",       email: null,                      phone: "60178901234",  stageId: "nl",  leadSourceId: "fb",     bmId: "bm5", tagIds: ["t2", "t3"], createdAt: "2026-06-15T15:30:00Z" },
-  { id: "c11",  firstName: "Halimah",        lastName: "binti Daud",     email: "halimah.d@yahoo.com",     phone: "60189012345",  stageId: "ct",  leadSourceId: "ig",     bmId: "bm1", tagIds: ["t1"],       createdAt: "2026-06-15T11:00:00Z" },
-  { id: "c12",  firstName: "Rizal Afiq",     lastName: "bin Noor",       email: "rizalafiq@gmail.com",     phone: "60190123456",  stageId: "nl",  leadSourceId: "ref",    bmId: "bm2", tagIds: ["t5"],       createdAt: "2026-06-14T14:20:00Z" },
-  { id: "c13",  firstName: "Sharifah Nabila",lastName: "binti Syed",     email: "snabila@gmail.com",       phone: "60111234567",  stageId: "su",  leadSourceId: "fb",     bmId: "bm3", tagIds: ["t1", "t4"], createdAt: "2026-06-14T10:15:00Z" },
-  { id: "c14",  firstName: "Mohd Izzat",     lastName: "bin Kamal",      email: null,                      phone: "60122345678",  stageId: "nl",  leadSourceId: "tt",     bmId: "bm4", tagIds: ["t2"],       createdAt: "2026-06-13T16:00:00Z" },
-  { id: "c15",  firstName: "Azlina",         lastName: "binti Razak",    email: "azlina.r@hotmail.com",    phone: "60133456789",  stageId: "ct",  leadSourceId: "wa",     bmId: "bm5", tagIds: [],           createdAt: "2026-06-13T09:30:00Z" },
-  { id: "c16",  firstName: "Hafizuddin",     lastName: "bin Sarip",      email: "hafizuddin@gmail.com",    phone: "60144567890",  stageId: "nl",  leadSourceId: "fb",     bmId: "bm1", tagIds: ["t3"],       createdAt: "2026-06-12T13:45:00Z" },
-  { id: "c17",  firstName: "Norzaimah",      lastName: "binti Husin",    email: "norzaimah@gmail.com",     phone: "60155678901",  stageId: "enr", leadSourceId: "ref",    bmId: "bm2", tagIds: ["t6"],       createdAt: "2026-06-12T11:00:00Z" },
-  { id: "c18",  firstName: "Mohd Hafeez",    lastName: "bin Mustafa",    email: null,                      phone: "60166789012",  stageId: "nl",  leadSourceId: "ig",     bmId: "bm3", tagIds: ["t2"],       createdAt: "2026-06-11T15:00:00Z" },
-  { id: "c19",  firstName: "Roslinda",       lastName: "binti Kassim",   email: "roslinda.k@yahoo.com",    phone: "60177890123",  stageId: "ct",  leadSourceId: "online", bmId: "bm4", tagIds: ["t1"],       createdAt: "2026-06-11T09:00:00Z" },
-  { id: "c20",  firstName: "Shahrul Nizam",  lastName: "bin Nasir",      email: "shahrulnizam@gmail.com",  phone: "60188901234",  stageId: "nl",  leadSourceId: "fb",     bmId: "bm5", tagIds: [],           createdAt: "2026-06-10T14:30:00Z" },
-  { id: "c21",  firstName: "Zulaikha",       lastName: "binti Musa",     email: "zulaikha@gmail.com",      phone: "60199012345",  stageId: "nl",  leadSourceId: "wa",     bmId: "bm1", tagIds: ["t2", "t6"], createdAt: "2026-06-10T10:00:00Z" },
-  { id: "c22",  firstName: "Fathiah",        lastName: "binti Zainal",   email: null,                      phone: "60110123456",  stageId: "su",  leadSourceId: "ref",    bmId: "bm2", tagIds: ["t4"],       createdAt: "2026-06-09T13:15:00Z" },
-  { id: "c23",  firstName: "Mohd Hadi",      lastName: "bin Baharum",    email: "mohdhadibaharum@gmail.com",phone: "60121234567", stageId: "ct",  leadSourceId: "ig",     bmId: "bm3", tagIds: ["t1"],       createdAt: "2026-06-09T08:30:00Z" },
-  { id: "c24",  firstName: "Napisah",        lastName: "binti Johari",   email: "napisah.j@hotmail.com",   phone: "60132345678",  stageId: "nl",  leadSourceId: "tt",     bmId: "bm4", tagIds: ["t5"],       createdAt: "2026-06-08T16:45:00Z" },
-  { id: "c25",  firstName: "Khairuddin",     lastName: "bin Sulaiman",   email: "khairuddin.s@gmail.com",  phone: "60143456789",  stageId: "enr", leadSourceId: "fb",     bmId: "bm5", tagIds: ["t6"],       createdAt: "2026-06-08T11:30:00Z" },
-  { id: "c26",  firstName: "Norashikin",     lastName: "binti Zainudin", email: null,                      phone: "60154567890",  stageId: "nl",  leadSourceId: "wi",     bmId: "bm1", tagIds: ["t2"],       createdAt: "2026-06-07T14:00:00Z" },
-  { id: "c27",  firstName: "Azizul Hakim",   lastName: "bin Tajuddin",   email: "azizul@gmail.com",        phone: "60165678901",  stageId: "ct",  leadSourceId: "fb",     bmId: "bm2", tagIds: ["t1", "t3"], createdAt: "2026-06-07T09:45:00Z" },
-  { id: "c28",  firstName: "Haslinda",       lastName: "binti Yaacob",   email: "haslinda.y@yahoo.com",    phone: "60176789012",  stageId: "nl",  leadSourceId: "ref",    bmId: "bm3", tagIds: [],           createdAt: "2026-06-06T15:30:00Z" },
-  { id: "c29",  firstName: "Mohd Faizal",    lastName: "bin Mansor",     email: "mfaizalmansor@gmail.com", phone: "60187890123",  stageId: "nl",  leadSourceId: "ig",     bmId: "bm4", tagIds: ["t2"],       createdAt: "2026-06-06T10:15:00Z" },
-  { id: "c30",  firstName: "Ramlah",         lastName: "binti Samah",    email: "ramlah.s@gmail.com",      phone: "60198901234",  stageId: "ct",  leadSourceId: "wa",     bmId: "bm5", tagIds: ["t6"],       createdAt: "2026-06-05T13:00:00Z" },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const AVATAR_PALETTE = [
@@ -118,12 +84,40 @@ function initials(firstName: string, lastName: string | null): string {
   return (parts[0] ?? "?").slice(0, 2).toUpperCase();
 }
 
-const STAGE_BADGE: Record<string, string> = {
-  blue:   "bg-blue-100 text-blue-700",
-  purple: "bg-purple-100 text-purple-700",
-  amber:  "bg-amber-100 text-amber-700",
-  green:  "bg-green-100 text-green-700",
+// Soft gradient pill styles per canonical colour (full literal strings so
+// Tailwind keeps them — no dynamic interpolation).
+const BADGE_STYLE: Record<string, string> = {
+  blue:    "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 ring-1 ring-inset ring-blue-200/70",
+  violet:  "bg-gradient-to-br from-violet-50 to-violet-100 text-violet-700 ring-1 ring-inset ring-violet-200/70",
+  purple:  "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 ring-1 ring-inset ring-purple-200/70",
+  amber:   "bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200/70",
+  yellow:  "bg-gradient-to-br from-yellow-50 to-yellow-100 text-yellow-700 ring-1 ring-inset ring-yellow-200/70",
+  orange:  "bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 ring-1 ring-inset ring-orange-200/70",
+  emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
+  green:   "bg-gradient-to-br from-green-50 to-green-100 text-green-700 ring-1 ring-inset ring-green-200/70",
+  cyan:    "bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 ring-1 ring-inset ring-cyan-200/70",
+  sky:     "bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70",
+  indigo:  "bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200/70",
+  rose:    "bg-gradient-to-br from-rose-50 to-rose-100 text-rose-700 ring-1 ring-inset ring-rose-200/70",
+  red:     "bg-gradient-to-br from-red-50 to-red-100 text-red-700 ring-1 ring-inset ring-red-200/70",
+  slate:   "bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/70",
 };
+
+// Stage → colour keyed by shortCode (branch-independent) so every "New Lead" is
+// blue, "Confirmed for Trial" purple, etc., regardless of the per-branch DB colour.
+const STAGE_COLOR_BY_CODE: Record<string, string> = {
+  NL: "blue", CT: "violet", SU: "amber", ENR: "emerald",
+  SNE: "yellow", CNS: "orange", CL: "slate", DND: "red", RSD: "cyan",
+  FU1: "sky", FU2: "sky", FU3: "sky", FU3M: "sky",
+  URW1: "rose", URW2: "rose", URW3: "rose",
+  SG: "indigo", BOD: "indigo", ENRB: "cyan", CTB: "cyan",
+};
+
+function stageBadgeClass(shortCode: string | null, dbColor?: string): string {
+  const code = (shortCode ?? "").toUpperCase().replace(/[-_]/g, "");
+  const canonical = STAGE_COLOR_BY_CODE[code] ?? dbColor ?? "slate";
+  return BADGE_STYLE[canonical] ?? BADGE_STYLE.slate;
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -482,6 +476,15 @@ export default function ContactsPage() {
   const [showAssign, setShowAssign]       = useState(false);
   const [showDelete, setShowDelete]       = useState(false);
 
+  // Server data (read-only, from ebright_crm via /api/crm/contacts).
+  const [paginated, setPaginated] = useState<ContactRow[]>([]);
+  const [total, setTotal]         = useState(0);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+
+  // Filter reference data for the dropdowns.
+  const [meta, setMeta] = useState<ContactsMeta>({ stages: [], leadSources: [], assignedUsers: [] });
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -489,44 +492,61 @@ export default function ContactsPage() {
     setSearch(val);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
-      setDebouncedSearch(val.toLowerCase().trim());
+      setDebouncedSearch(val.trim());
       setPage(1);
     }, 300);
   };
 
-  // Client-side filter + sort
-  const filtered = useMemo(() => {
-    let rows = RAW.filter((c) => {
-      if (stageFilter && c.stageId !== stageFilter) return false;
-      if (sourceFilter && c.leadSourceId !== sourceFilter) return false;
-      if (bmFilter && c.bmId !== bmFilter) return false;
-      if (debouncedSearch) {
-        const full = `${c.firstName} ${c.lastName ?? ""} ${c.email ?? ""} ${c.phone ?? ""}`.toLowerCase();
-        if (!full.includes(debouncedSearch)) return false;
+  // Load filter reference data once.
+  useEffect(() => {
+    let ignore = false;
+    fetch("/api/crm/contacts/meta", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m: ContactsMeta | null) => { if (!ignore && m) setMeta(m); })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
+
+  // Fetch the current page whenever a query input changes (server-side filter,
+  // sort and pagination — matches v1's getContactsByTenant).
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        sortBy: sortKey,
+        sortDir: sortDesc ? "desc" : "asc",
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (stageFilter) params.set("stageName", stageFilter);
+      if (sourceFilter) params.set("leadSourceId", sourceFilter);
+      if (bmFilter) params.set("assignedUserId", bmFilter);
+      const res = await fetch(`/api/crm/contacts?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? `Request failed (${res.status})`);
       }
-      return true;
-    });
+      const data = (await res.json()) as ContactsResponse;
+      setPaginated(data.data);
+      setTotal(data.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load contacts");
+      setPaginated([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, sortKey, sortDesc, debouncedSearch, stageFilter, sourceFilter, bmFilter]);
 
-    rows = [...rows].sort((a, b) => {
-      if (sortKey === "name") {
-        const na = `${a.firstName} ${a.lastName ?? ""}`.toLowerCase();
-        const nb = `${b.firstName} ${b.lastName ?? ""}`.toLowerCase();
-        return sortDesc ? nb.localeCompare(na) : na.localeCompare(nb);
-      }
-      // createdAt
-      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      return sortDesc ? diff : -diff;
-    });
+  useEffect(() => { void load(); }, [load]);
 
-    return rows;
-  }, [debouncedSearch, stageFilter, sourceFilter, bmFilter, sortKey, sortDesc]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safeP      = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safeP - 1) * pageSize, safeP * pageSize);
-  const allSelected = paginated.length > 0 && paginated.every((c) => selected.has(c.id));
+  const totalPages   = Math.max(1, Math.ceil(total / pageSize));
+  const safeP        = Math.min(page, totalPages);
+  const allSelected  = paginated.length > 0 && paginated.every((c) => selected.has(c.id));
   const someSelected = paginated.some((c) => selected.has(c.id));
-  const selectedIds = [...selected];
+  const selectedIds  = [...selected];
 
   const toggleAll = () => {
     if (allSelected) {
@@ -549,23 +569,20 @@ export default function ContactsPage() {
     setVisibleCols((v) => { const n = new Set(v); checked ? n.add(id) : n.delete(id); return n; });
   };
 
+  // Export the CURRENT page (server-side pagination — never pulls the full set).
   const exportCsv = () => {
-    const headers = ["Name", "Email", "Phone", "Stage", "Lead Source", "Assigned BM", "Created"];
-    const rows = filtered.map((c) => {
-      const stage  = STAGES.find((s) => s.id === c.stageId);
-      const source = LEAD_SOURCES.find((ls) => ls.id === c.leadSourceId);
-      const bm     = BMS.find((b) => b.id === c.bmId);
-      return [
-        `"${c.firstName} ${c.lastName ?? ""}"`,
-        c.email ?? "",
-        c.phone ?? "",
-        stage?.name ?? "",
-        source?.name ?? "",
-        bm?.name ?? "",
-        formatDate(c.createdAt),
-      ].join(",");
-    });
-    const blob = new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv" });
+    const headers = ["Name", "Email", "Phone", "Stage", "Lead Source", "Assigned BM", "Tags", "Created"];
+    const csvRows = paginated.map((c) => [
+      `"${`${c.firstName} ${c.lastName ?? ""}`.trim()}"`,
+      c.email ?? "",
+      c.phone ?? "",
+      c.stage?.name ?? "",
+      c.leadSource?.name ?? "",
+      c.assignedUser?.name ?? "",
+      `"${c.tags.map((t) => t.name).join("; ")}"`,
+      formatDate(c.createdAt),
+    ].join(","));
+    const blob = new Blob([[headers.join(","), ...csvRows].join("\n")], { type: "text/csv" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href = url;
@@ -586,25 +603,19 @@ export default function ContactsPage() {
       </span>
     );
 
-  // Resolve lookups
-  const stageMap   = Object.fromEntries(STAGES.map((s) => [s.id, s]));
-  const sourceMap  = Object.fromEntries(LEAD_SOURCES.map((ls) => [ls.id, ls]));
-  const bmMap      = Object.fromEntries(BMS.map((b) => [b.id, b]));
-  const tagMap     = Object.fromEntries(TAGS.map((t) => [t.id, t]));
-
   const filterLabel = `${input} h-9`;
 
   return (
     <>
       <div className="min-h-full bg-slate-50">
-        <div className="mx-auto max-w-screen-xl px-6 py-6 space-y-4">
+        <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
 
           {/* ── Page heading ───────────────────────────────────────────────── */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Contacts</h1>
               <p className="mt-0.5 text-sm text-slate-500">
-                {filtered.length.toLocaleString()} contact{filtered.length !== 1 ? "s" : ""}
+                {loading ? "Loading…" : `${total.toLocaleString()} contact${total !== 1 ? "s" : ""}`}
               </p>
             </div>
             <button
@@ -638,8 +649,8 @@ export default function ContactsPage() {
               className={filterLabel}
             >
               <option value="">All stages</option>
-              {STAGES.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {meta.stages.map((s) => (
+                <option key={s.name} value={s.name}>{s.name}</option>
               ))}
             </select>
 
@@ -650,7 +661,7 @@ export default function ContactsPage() {
               className={filterLabel}
             >
               <option value="">All sources</option>
-              {LEAD_SOURCES.map((ls) => (
+              {meta.leadSources.map((ls) => (
                 <option key={ls.id} value={ls.id}>{ls.name}</option>
               ))}
             </select>
@@ -662,8 +673,8 @@ export default function ContactsPage() {
               className={filterLabel}
             >
               <option value="">All users</option>
-              {BMS.map((bm) => (
-                <option key={bm.id} value={bm.id}>{bm.name}</option>
+              {meta.assignedUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.name ?? "—"}</option>
               ))}
             </select>
 
@@ -672,7 +683,7 @@ export default function ContactsPage() {
               <button
                 type="button"
                 onClick={exportCsv}
-                disabled={filtered.length === 0}
+                disabled={paginated.length === 0}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40"
               >
                 <Download className="h-4 w-4" />
@@ -705,6 +716,20 @@ export default function ContactsPage() {
                   Delete
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── Error banner ────────────────────────────────────────────────── */}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Couldn&apos;t load contacts: {error}
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -780,7 +805,16 @@ export default function ContactsPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={20} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                          <p className="text-xs text-slate-500">Loading contacts…</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : paginated.length === 0 ? (
                     <tr>
                       <td colSpan={20} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-3">
@@ -798,10 +832,10 @@ export default function ContactsPage() {
                     </tr>
                   ) : (
                     paginated.map((c) => {
-                      const stage  = stageMap[c.stageId];
-                      const source = c.leadSourceId ? sourceMap[c.leadSourceId] : null;
-                      const bm     = c.bmId ? bmMap[c.bmId] : null;
-                      const tags   = c.tagIds.map((id) => tagMap[id]).filter(Boolean);
+                      const stage  = c.stage;
+                      const source = c.leadSource;
+                      const bm     = c.assignedUser;
+                      const tags   = c.tags;
                       const fullName = `${c.firstName} ${c.lastName ?? ""}`.trim();
                       const isSelected = selected.has(c.id);
 
@@ -873,7 +907,7 @@ export default function ContactsPage() {
                             <td className="px-4 py-3">
                               {stage ? (
                                 <span
-                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_BADGE[stage.color]}`}
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${stageBadgeClass(stage.shortCode, stage.color)}`}
                                 >
                                   {stage.name}
                                 </span>
@@ -893,7 +927,7 @@ export default function ContactsPage() {
                           {/* Assigned BM */}
                           {visibleCols.has("assignedBM") && (
                             <td className="px-4 py-3">
-                              {bm ? (
+                              {bm && bm.name ? (
                                 <div className="flex items-center gap-2">
                                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
                                     {bm.name.slice(0, 2).toUpperCase()}
@@ -945,15 +979,15 @@ export default function ContactsPage() {
             </div>
 
             {/* Pagination footer */}
-            {filtered.length > 0 && (
+            {total > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
                 <p className="text-xs text-slate-500">
                   Showing{" "}
                   <span className="font-medium">{(safeP - 1) * pageSize + 1}</span>
                   {" "}to{" "}
-                  <span className="font-medium">{Math.min(safeP * pageSize, filtered.length)}</span>
+                  <span className="font-medium">{Math.min(safeP * pageSize, total)}</span>
                   {" "}of{" "}
-                  <span className="font-medium">{filtered.length}</span>{" "}contacts
+                  <span className="font-medium">{total.toLocaleString()}</span>{" "}contacts
                 </p>
 
                 <div className="flex items-center gap-2">
