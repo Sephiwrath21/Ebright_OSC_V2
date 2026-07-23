@@ -286,17 +286,21 @@ describe("role scoping", () => {
     branch,
   });
 
-  it("canViewOrg: ADMIN/CEO/OPS yes, HOD/MEMBER no", () => {
+  it("canViewOrg: ADMIN/CEO/OPS yes, HOD/MEMBER/BRANCH/DEPT_SITE/BRANCH_SITE no", () => {
     expect(canViewOrg("ADMIN")).toBe(true);
     expect(canViewOrg("CEO")).toBe(true);
     expect(canViewOrg("OPS")).toBe(true);
     expect(canViewOrg("HOD")).toBe(false);
     expect(canViewOrg("MEMBER")).toBe(false);
+    expect(canViewOrg("BRANCH")).toBe(false);
+    expect(canViewOrg("DEPT_SITE")).toBe(false);
+    expect(canViewOrg("BRANCH_SITE")).toBe(false);
   });
 
   it("canViewEntity: org roles see any entity", () => {
     expect(canViewEntity(user("CEO"), "branch", "Setia Alam")).toBe(true);
     expect(canViewEntity(user("OPS"), "department", "People")).toBe(true);
+    expect(canViewEntity(user("ADMIN"), "branch", "Setia Alam")).toBe(true);
   });
 
   it("canViewEntity: HOD sees ONLY their own department — no branches", () => {
@@ -310,14 +314,33 @@ describe("role scoping", () => {
     expect(canViewEntity(user("HOD", null), "department", "Operations")).toBe(false);
   });
 
-  it("canViewEntity: MEMBER sees no entities", () => {
+  it("canViewEntity: DEPT_SITE sees ONLY their own department — no branches (mirrors HOD)", () => {
+    expect(canViewEntity(user("DEPT_SITE"), "department", "Operations")).toBe(true);
+    expect(canViewEntity(user("DEPT_SITE"), "department", "People")).toBe(false);
+    expect(canViewEntity(user("DEPT_SITE"), "branch", "Subang Taipan")).toBe(false);
+  });
+
+  it("canViewEntity: MEMBER sees no entities, of either type", () => {
     expect(canViewEntity(user("MEMBER"), "department", "Operations")).toBe(false);
+    expect(canViewEntity(user("MEMBER"), "branch", "Subang Taipan")).toBe(false);
   });
 
   it("canViewEntity: BRANCH sees ONLY their own branch — no departments", () => {
     expect(canViewEntity(user("BRANCH"), "branch", "Subang Taipan")).toBe(true);
     expect(canViewEntity(user("BRANCH"), "branch", "Setia Alam")).toBe(false);
     expect(canViewEntity(user("BRANCH"), "department", "Operations")).toBe(false);
+  });
+
+  it("canViewEntity: BRANCH with no branch maps to the Unassigned entity", () => {
+    const noBranchUser = user("BRANCH", "Operations", null);
+    expect(canViewEntity(noBranchUser, "branch", UNASSIGNED)).toBe(true);
+    expect(canViewEntity(noBranchUser, "branch", "Subang Taipan")).toBe(false);
+  });
+
+  it("canViewEntity: BRANCH_SITE sees ONLY their own branch — no departments (mirrors BRANCH)", () => {
+    expect(canViewEntity(user("BRANCH_SITE"), "branch", "Subang Taipan")).toBe(true);
+    expect(canViewEntity(user("BRANCH_SITE"), "branch", "Setia Alam")).toBe(false);
+    expect(canViewEntity(user("BRANCH_SITE"), "department", "Operations")).toBe(false);
   });
 
   it("canViewMember: BRANCH sees own-branch members only", () => {
@@ -337,6 +360,16 @@ describe("role scoping", () => {
     ).toBe(false);
   });
 
+  it("canViewMember: BRANCH with no branch maps to the Unassigned entity", () => {
+    const noBranchUser = user("BRANCH", "Operations", null);
+    expect(
+      canViewMember(noBranchUser, { id: "u-other", department: "Sales", branch: null }),
+    ).toBe(true);
+    expect(
+      canViewMember(noBranchUser, { id: "u-other", department: "Sales", branch: "Setia Alam" }),
+    ).toBe(false);
+  });
+
   it("canViewMember: self always, any role", () => {
     expect(canViewMember(user("MEMBER"), { id: "u-me", department: null })).toBe(true);
   });
@@ -347,6 +380,38 @@ describe("role scoping", () => {
     ).toBe(true);
     expect(
       canViewMember(user("HOD"), { id: "u-other", department: "People" }),
+    ).toBe(false);
+  });
+
+  it("canViewMember: HOD with no department maps to the Unassigned entity", () => {
+    const noDeptUser = user("HOD", null);
+    expect(canViewMember(noDeptUser, { id: "u-other", department: null })).toBe(true);
+    expect(canViewMember(noDeptUser, { id: "u-other", department: "Operations" })).toBe(false);
+  });
+
+  it("canViewMember: DEPT_SITE sees own-department members only (mirrors HOD)", () => {
+    expect(
+      canViewMember(user("DEPT_SITE"), { id: "u-other", department: "Operations" }),
+    ).toBe(true);
+    expect(
+      canViewMember(user("DEPT_SITE"), { id: "u-other", department: "People" }),
+    ).toBe(false);
+  });
+
+  it("canViewMember: BRANCH_SITE sees own-branch members only (mirrors BRANCH)", () => {
+    expect(
+      canViewMember(user("BRANCH_SITE"), {
+        id: "u-other",
+        department: "Sales",
+        branch: "Subang Taipan",
+      }),
+    ).toBe(true);
+    expect(
+      canViewMember(user("BRANCH_SITE"), {
+        id: "u-other",
+        department: "Operations",
+        branch: "Setia Alam",
+      }),
     ).toBe(false);
   });
 
@@ -446,6 +511,7 @@ describe("groupByAssignerRole", () => {
     ["u-ceo", "CEO"],
     ["u-hod", "HOD"],
     ["u-me", "MEMBER"],
+    ["u-deptsite", "DEPT_SITE"], // Operation dept-site's unrestricted-assign account
   ]);
   const roleOf = (id: string) => roles.get(id);
 
@@ -476,6 +542,16 @@ describe("groupByAssignerRole", () => {
   it("unknown starters fall back to MEMBER (peer-started)", () => {
     const streams = groupByAssignerRole([block("b1", "u-ghost")], "u-me", roleOf);
     expect(streams).toEqual([{ key: "MEMBER", blocks: [block("b1", "u-ghost")] }]);
+  });
+
+  it("gives DEPT_SITE-started blocks their own stream, ordered after ADMIN — not dropped", () => {
+    const streams = groupByAssignerRole(
+      [block("b1", "u-ceo"), block("b2", "u-deptsite"), block("b3", "u-hod")],
+      "u-me",
+      roleOf,
+    );
+    expect(streams.map((s) => s.key)).toEqual(["CEO", "DEPT_SITE", "HOD"]);
+    expect(streams[1].blocks.map((b) => b.id)).toEqual(["b2"]);
   });
 
   it("returns no streams for no blocks", () => {

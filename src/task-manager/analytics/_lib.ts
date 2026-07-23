@@ -187,8 +187,13 @@ export function canViewOrg(role: Role): boolean {
 }
 
 /**
- * Entity detail: org roles see any; HOD only their own department; BRANCH
- * only their own branch; MEMBER none.
+ * Entity detail: org roles see any; HOD/DEPT_SITE only their own department;
+ * BRANCH/BRANCH_SITE only their own branch; MEMBER none. DEPT_SITE and
+ * BRANCH_SITE are the view-only department/branch logins (see Role enum
+ * comment in schema.prisma) — this is the ONLY authorization boundary for
+ * them (unlike the donor, which additionally gated everything behind a
+ * shared internal secret), so they must resolve their own entity here
+ * exactly like HOD/BRANCH rather than falling through to deny.
  */
 export function canViewEntity(
   user: ScopeUser,
@@ -199,15 +204,23 @@ export function canViewEntity(
   if (user.role === "HOD") {
     return type === "department" && name === (user.department ?? UNASSIGNED);
   }
+  if (user.role === "DEPT_SITE") {
+    return type === "department" && name === (user.department ?? UNASSIGNED);
+  }
   if (user.role === "BRANCH") {
+    return type === "branch" && name === (user.branch ?? UNASSIGNED);
+  }
+  if (user.role === "BRANCH_SITE") {
     return type === "branch" && name === (user.branch ?? UNASSIGNED);
   }
   return false;
 }
 
 /**
- * Member detail: self always; HOD their own department's members; BRANCH
- * their own branch's members; org roles any.
+ * Member detail: self always; HOD/DEPT_SITE their own department's members;
+ * BRANCH/BRANCH_SITE their own branch's members; org roles any. See
+ * canViewEntity's comment — DEPT_SITE/BRANCH_SITE must resolve here exactly
+ * like HOD/BRANCH; this helper is the actual authorization boundary now.
  */
 export function canViewMember(
   user: ScopeUser,
@@ -218,7 +231,13 @@ export function canViewMember(
   if (user.role === "HOD") {
     return (member.department ?? UNASSIGNED) === (user.department ?? UNASSIGNED);
   }
+  if (user.role === "DEPT_SITE") {
+    return (member.department ?? UNASSIGNED) === (user.department ?? UNASSIGNED);
+  }
   if (user.role === "BRANCH") {
+    return (member.branch ?? UNASSIGNED) === (user.branch ?? UNASSIGNED);
+  }
+  if (user.role === "BRANCH_SITE") {
     return (member.branch ?? UNASSIGNED) === (user.branch ?? UNASSIGNED);
   }
   return false;
@@ -235,16 +254,31 @@ export interface AssignerStream<B> {
 /**
  * Split MY blocks by who assigned them: the role of each block's run starter.
  * Self-started runs group under "self"; unknown starters fall back to MEMBER.
- * Order: CEO, OPS, ADMIN, BRANCH, HOD, MEMBER, self — mirrors the org
- * hierarchy so "CEO Assigned" renders first for an HOD, "HOD Assigned" first
- * for staff.
+ * Order: CEO, OPS, ADMIN, DEPT_SITE, BRANCH, HOD, MEMBER, self — mirrors the
+ * org hierarchy so "CEO Assigned" renders first for an HOD, "HOD Assigned"
+ * first for staff. DEPT_SITE gets its own slot rather than falling through
+ * to MEMBER: the Operation department-site account is the one DEPT_SITE
+ * login with unrestricted assign, same as Superadmin (donor
+ * assign/route.ts's isOperationDeptSite) — donor osc/types.ts's
+ * flowStreamLabel already has a display case for a "DEPT_SITE" stream key,
+ * so surfacing it here (instead of silently dropping it, as the un-listed
+ * key previously did) is the shape the wire contract already expects.
  */
 export function groupByAssignerRole<B extends { run: { startedById: string } }>(
   blocks: B[],
   selfId: string,
   roleOf: (userId: string) => Role | undefined,
 ): AssignerStream<B>[] {
-  const order: AssignerStream<B>["key"][] = ["CEO", "OPS", "ADMIN", "BRANCH", "HOD", "MEMBER", "self"];
+  const order: AssignerStream<B>["key"][] = [
+    "CEO",
+    "OPS",
+    "ADMIN",
+    "DEPT_SITE",
+    "BRANCH",
+    "HOD",
+    "MEMBER",
+    "self",
+  ];
   const groups = new Map<AssignerStream<B>["key"], B[]>();
   for (const b of blocks) {
     const key: AssignerStream<B>["key"] =
