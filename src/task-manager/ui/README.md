@@ -1,7 +1,7 @@
 # OSC integration package — Ebright Flow task progress
 
 Drop-in for the OSC website (Next.js App Router + Tailwind): a **Task Progress
-card** for the dashboard home (next to the To-Do List) and the **ClickUp Tasks
+card** for the dashboard home (next to the To-Do List) and the **Task Manager
 detail page**. Data comes from Ebright Flow's internal bridge
 (`/api/internal/*`) — server-to-server with a shared secret, matched by the
 logged-in user's **email**. No iframe, no client-side secrets, no new npm
@@ -11,7 +11,7 @@ Live demo of both surfaces (inside this repo): `/osc-demo`.
 
 ## What each role sees (from the mockup sites)
 
-| Role | Card | ClickUp Tasks page — overview donuts |
+| Role | Card | Task Manager page — overview donuts |
 |---|---|---|
 | Staff (MEMBER) | Own daily/monthly donut + "HOD assigned tasks" meter | My Status Daily · My Status Monthly · HOD Assigned Tasks, + My Tasks list |
 | HOD | + "CEO assigned tasks" | HOD Daily · HOD Monthly · CEO Assigned · Department Daily · Department Monthly, + department roster (expandable per-member task lists) |
@@ -25,7 +25,7 @@ The page needs BOTH periods: call `getFlowDetail(email, "daily")` and
 
 ## Install into OSC
 
-1. **Copy this folder** into the OSC repo (e.g. `src/lib/flow/` or keep `src/osc/`).
+1. **Location** — this package lives at `src/task-manager/ui/` in this repo (already copied in; no action needed).
 2. **Env** (OSC `.env`):
    ```
    FLOW_INTERNAL_URL="https://flow.ebright.my"      # or http://localhost:3000 locally
@@ -36,8 +36,8 @@ The page needs BOTH periods: call `getFlowDetail(email, "daily")` and
 3. **Dashboard card** — in the OSC home page (server component), alongside the
    To-Do List card:
    ```tsx
-   import { getFlowOverview } from "@/osc/flow-client";
-   import { TaskProgressCard } from "@/osc/task-progress-card";
+   import { getFlowOverview } from "@/task-manager/data"; // in-process data layer, lands in a later task
+   import { TaskProgressCard } from "@/task-manager/ui/task-progress-card";
 
    const email = session.user.email; // OSC's own auth
    const [daily, monthly] = await Promise.all([
@@ -45,22 +45,22 @@ The page needs BOTH periods: call `getFlowDetail(email, "daily")` and
      getFlowOverview(email, "monthly"),
    ]);
    // in the grid next to <TodoListCard />:
-   <TaskProgressCard daily={daily} monthly={monthly} detailHref="/clickup-tasks" />
+   <TaskProgressCard daily={daily} monthly={monthly} detailHref="/task-manager" />
    ```
-4. **ClickUp Tasks page** — `app/clickup-tasks/page.tsx` (the existing sidebar
+4. **Task Manager page** — `app/task-manager/page.tsx` (the existing sidebar
    item's route):
    ```tsx
-   import { getFlowDetail } from "@/osc/flow-client";
-   import { ClickUpTasksView } from "@/osc/clickup-tasks-view";
+   import { getFlowDetail } from "@/task-manager/data"; // in-process data layer, lands in a later task
+   import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 
    export default async function Page({ searchParams }) {
      const { period = "daily" } = await searchParams;
      const detail = await getFlowDetail(session.user.email, period);
      return (
-       <ClickUpTasksView
+       <TaskManagerView
          detail={detail}
-         dailyHref="/clickup-tasks?period=daily"
-         monthlyHref="/clickup-tasks?period=monthly"
+         dailyHref="/task-manager?period=daily"
+         monthlyHref="/task-manager?period=monthly"
        />
      );
    }

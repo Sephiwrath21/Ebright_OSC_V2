@@ -4,7 +4,7 @@
 // the calendar-day arithmetic isn't flaky around local midnight.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatDueDate } from "./types";
+import { formatDueDate, visibleAssignerStreams, type FlowRole } from "./types";
 
 // A fixed Monday, well clear of month/year boundaries.
 const TODAY = new Date(2024, 0, 15, 12, 0, 0);
@@ -69,5 +69,30 @@ describe("formatDueDate", () => {
     expect(result?.className).toBe("text-gray-400");
     // e.g. "Jan 22" — not a bare weekday abbreviation.
     expect(result?.text).toMatch(/^[A-Za-z]+\s+\d{1,2}$/);
+  });
+});
+
+// Regression net for the DEPT_SITE fix (b639da4): Admin/Ops/dept-site
+// assigned tasks share no separate recipient card — every other role's
+// stream stays visible, in the order it was given.
+describe("visibleAssignerStreams", () => {
+  it("drops self/ADMIN/OPS/DEPT_SITE and keeps the rest, in order", () => {
+    const streams: { key: FlowRole | "self" }[] = [
+      { key: "self" },
+      { key: "ADMIN" },
+      { key: "OPS" },
+      { key: "DEPT_SITE" },
+      { key: "CEO" },
+      { key: "HOD" },
+      { key: "BRANCH_SITE" },
+      { key: "MEMBER" },
+    ];
+
+    expect(visibleAssignerStreams(streams).map((s) => s.key)).toEqual([
+      "CEO",
+      "HOD",
+      "BRANCH_SITE",
+      "MEMBER",
+    ]);
   });
 });
