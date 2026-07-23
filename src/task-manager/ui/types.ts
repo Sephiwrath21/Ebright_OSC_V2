@@ -481,12 +481,14 @@ export function flowStreamLabel(key: FlowRole | "self"): string {
  *  "no special Admin Assigned Task category" spec — those tasks still land
  *  in the normal Daily/Monthly/Ad hoc lists via their Cadence tag, they just
  *  don't ALSO get a separate "Admin assigned tasks"/"Ops assigned tasks"
- *  card. Operation dept-site shares the literal ADMIN flow/stream key with
- *  Superadmin (assign/route.ts), so this covers both with one check. "self"
+ *  card. Operation dept-site assignments follow the same rule — their
+ *  stream key is the literal "DEPT_SITE" (startedById stores the site
+ *  account's own id; the shared ADMIN utility flow does not change the
+ *  stream key), so it's excluded here explicitly. "self"
  *  (tasks I started myself) was never meant to show here either — every
  *  caller already excluded it before this helper existed. */
 export function visibleAssignerStreams<T extends { key: FlowRole | "self" }>(streams: T[]): T[] {
-  return streams.filter((s) => s.key !== "self" && s.key !== "ADMIN" && s.key !== "OPS");
+  return streams.filter((s) => s.key !== "self" && s.key !== "ADMIN" && s.key !== "OPS" && s.key !== "DEPT_SITE");
 }
 
 export function flowBucketTotal(t: FlowBucketTotals): number {
