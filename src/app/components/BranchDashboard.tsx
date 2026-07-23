@@ -434,7 +434,7 @@ export default function BranchDashboard({
           }}
         >
           {/* 4) Monthly ClickUp pie */}
-          <Panel title="Monthly ClickUp" icon={<i className="ti ti-chart-pie" />}>
+          <Panel title="Monthly Tasks" icon={<i className="ti ti-chart-pie" />}>
             <Donut data={CLICKUP} />
           </Panel>
 
