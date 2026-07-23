@@ -3,6 +3,10 @@
 // x-internal-secret and no FLOW_INTERNAL_URL. The acting user is always
 // identified by email (the OSC session's email), resolved against the
 // task-manager database's own User table.
+// Unlike the donor's handleApi, native() does NOT JSON-serialize return
+// values: Date fields stay real Dates, so builders must convert explicitly
+// wherever a Flow* type promises an ISO string (as analytics/_lib.ts now
+// does for dueAt).
 import { ZodError, z } from "zod";
 import type { User } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
@@ -13,8 +17,9 @@ export class FlowBridgeError extends Error {
   constructor(
     public status: number,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "FlowBridgeError";
   }
 }
@@ -50,23 +55,28 @@ export async function requireUserByEmail(email: string): Promise<User> {
 /**
  * Wraps every data-layer function: mirrors the old handleApi error mapping
  * (ApiHttpError → its status, ZodError → 400, unknown → logged 500) but throws
- * FlowBridgeError instead of returning an HTTP response.
+ * FlowBridgeError instead of returning an HTTP response. `label` tags the
+ * unknown-error log line (e.g. the calling function's name); every mapped
+ * error preserves the original as `cause` for debugging.
  */
-export async function native<T>(fn: () => Promise<T>): Promise<T> {
+export async function native<T>(fn: () => Promise<T>, label?: string): Promise<T> {
   if (!process.env.TASK_MANAGER_DATABASE_URL) throw new SetupPendingError();
   try {
     return await fn();
   } catch (err) {
     if (err instanceof FlowBridgeError) throw err;
-    if (err instanceof ApiHttpError) throw new FlowBridgeError(err.status, err.message);
+    if (err instanceof ApiHttpError) {
+      throw new FlowBridgeError(err.status, err.message, { cause: err });
+    }
     if (err instanceof ZodError) {
       const first = err.issues[0];
       throw new FlowBridgeError(
         400,
         `${first?.path?.join(".") || "input"}: ${first?.message || "invalid"}`,
+        { cause: err },
       );
     }
-    console.error("[task-manager]", err);
-    throw new FlowBridgeError(500, "Internal error");
+    console.error(label ? `[task-manager] ${label}` : "[task-manager]", err);
+    throw new FlowBridgeError(500, "Internal error", { cause: err });
   }
 }

@@ -415,7 +415,10 @@ export interface TaskRow {
   runName: string;
   flowName: string;
   assigneeId: string;
-  dueAt: Date | null; // NextResponse.json serializes to ISO string
+  dueAt: string | null; // ISO — converted from the RunBlock's Date in toTaskRow.
+  // (The donor's NextResponse.json did this conversion implicitly at the HTTP
+  // boundary; native()'s in-process data layer has no such boundary, so it
+  // happens explicitly here instead — see data/core.ts's file-header comment.)
   status: BlockStatus;
   fromSchedule: boolean;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
@@ -443,20 +446,23 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     runName: b.run.name,
     flowName: b.run.flow.name,
     assigneeId: b.assigneeId,
-    dueAt: b.dueAt,
+    dueAt: b.dueAt ? b.dueAt.toISOString() : null,
     status: b.status,
     fromSchedule: b.scheduleSlotId !== null,
     quickCompletable: isQuickCompletable(b),
   };
 }
 
-/** dueAt asc, nulls last (sort is stable — equal keys keep incoming order). */
+/** dueAt asc, nulls last (sort is stable — equal keys keep incoming order).
+ *  dueAt is an ISO string (toTaskRow's conversion) — fixed-width ISO 8601
+ *  with a "Z" suffix sorts lexicographically in the same order as the
+ *  underlying instant, so a plain string comparison is correct here. */
 export function sortTaskRows<T extends TaskRow>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     if (a.dueAt === null && b.dueAt === null) return 0;
     if (a.dueAt === null) return 1;
     if (b.dueAt === null) return -1;
-    return a.dueAt.getTime() - b.dueAt.getTime();
+    return a.dueAt < b.dueAt ? -1 : a.dueAt > b.dueAt ? 1 : 0;
   });
 }
 

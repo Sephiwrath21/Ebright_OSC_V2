@@ -242,6 +242,8 @@ describe("groupByDimension", () => {
 // ---------- TaskRow ordering ----------
 
 describe("sortTaskRows", () => {
+  // TaskRow.dueAt is an ISO string (toTaskRow's conversion) — this helper still
+  // takes a Date for readability and converts, same as toTaskRow itself does.
   const row = (runBlockId: string, dueAt: Date | null): TaskRow => ({
     runBlockId,
     runId: "run-1",
@@ -249,7 +251,7 @@ describe("sortTaskRows", () => {
     runName: "r",
     flowName: "f",
     assigneeId: "u",
-    dueAt,
+    dueAt: dueAt ? dueAt.toISOString() : null,
     status: "ACTIVE",
     fromSchedule: false,
     quickCompletable: false,
