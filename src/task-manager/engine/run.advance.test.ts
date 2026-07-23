@@ -299,11 +299,15 @@ describe("completeBlock — fan-in P2002 backstop", () => {
 describe("completeBlock — reminder queue unavailable (REDIS_URL unset by design)", () => {
   it("still completes and marks the block DONE when getReminderQueue throws", async () => {
     const snap = snapshot([snapBlock("blk-a", "node-a", ["node-b"]), snapBlock("blk-b", "node-b")]);
-    mocks.runBlockFindUnique.mockResolvedValue(runBlockRow(snap));
+    // reminderJobId: null so removeReminderJob no-ops via its `if (!jobId) return`
+    // guard instead of consuming the single mocked throw itself — the throw must
+    // land on scheduleReminder's call for the newly created block.
+    mocks.runBlockFindUnique.mockResolvedValue({ ...runBlockRow(snap), reminderJobId: null });
     mocks.txRunBlockCount.mockResolvedValue(1);
     mocks.getReminderQueue.mockImplementationOnce(() => {
       throw new Error("REDIS_URL is not set — reminder scheduling disabled");
     });
+    const warnSpy = vi.spyOn(console, "warn"); // call-through: still prints, also assertable
 
     const result = await completeBlock(input);
 
@@ -314,5 +318,12 @@ describe("completeBlock — reminder queue unavailable (REDIS_URL unset by desig
         data: expect.objectContaining({ status: "DONE", reminderJobId: null }),
       }),
     );
+    // the single throw landed on scheduleReminder, not on removeReminderJob
+    expect(mocks.getReminderQueue).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[engine] reminders disabled (REDIS_URL unset) — skipping schedule for runBlock rb-node-b",
+    );
+
+    warnSpy.mockRestore();
   });
 });
