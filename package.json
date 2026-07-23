@@ -10,8 +10,8 @@
     "test": "vitest run",
     "tm:generate": "prisma generate --config prisma.task-manager.config.ts",
     "tm:migrate": "prisma migrate deploy --config prisma.task-manager.config.ts",
-    "tm:seed": "tsx --env-file=.env prisma/task-manager/seed.ts",
-    "tm:bootstrap": "tsx --env-file=.env prisma/task-manager/bootstrap.ts"
+    "tm:seed": "tsx --env-file-if-exists=.env prisma/task-manager/seed.ts",
+    "tm:bootstrap": "tsx --env-file-if-exists=.env prisma/task-manager/bootstrap.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
