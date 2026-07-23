@@ -7,9 +7,21 @@
 // + count everywhere).
 
 import * as React from "react";
-import type { FlowBucketTotals, FlowDrillTask, FlowTaskRow } from "./types";
+import type { ActionResult, FlowBucketTotals, FlowDrillTask, FlowTaskRow } from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
 import { personSolidColor } from "./palette";
+
+/** Small overlay used for a control's transient failure message — same
+ *  chrome as the hand-rolled dropdown popovers in this file (bordered white
+ *  card, shadow), but red text instead of menu items. Absolutely positioned
+ *  by the caller so it never disturbs row/flex layout. */
+function InlineActionError({ text }: { text: string }) {
+  return (
+    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md">
+      {text}
+    </p>
+  );
+}
 
 export const BUCKET_META = [
   { key: "completed", label: "Completed", dot: "bg-emerald-500", stroke: "stroke-emerald-500" },
@@ -211,12 +223,13 @@ function StatusDropdown({
 }: {
   task: FlowTaskRow;
   myUserId?: string;
-  onComplete?: (runBlockId: string) => Promise<void>;
-  onSkip?: (runBlockId: string) => Promise<void>;
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
 }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const isOwner = task.assigneeId === myUserId;
 
@@ -240,12 +253,14 @@ function StatusDropdown({
 
   if (!isOwner) return circle;
 
-  const run = async (action?: (id: string) => Promise<void>) => {
+  const run = async (action?: (id: string) => Promise<ActionResult>) => {
     setOpen(false);
     if (!action) return;
     setBusy(true);
+    setErrorText(null);
     try {
-      await action(task.runBlockId);
+      const result = await action(task.runBlockId);
+      if (!result.ok) setErrorText(result.message);
     } finally {
       setBusy(false);
     }
@@ -265,11 +280,15 @@ function StatusDropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setErrorText(null);
+          setOpen((o) => !o);
+        }}
         className="flex size-3 shrink-0 items-center justify-center disabled:opacity-50"
       >
         {circle}
       </button>
+      {errorText && <InlineActionError text={errorText} />}
       {open && (
         <div
           role="menu"
@@ -355,28 +374,34 @@ function CompleteButton({
   onComplete,
 }: {
   task: FlowTaskRow;
-  onComplete: (runBlockId: string) => Promise<void>;
+  onComplete: (runBlockId: string) => Promise<ActionResult>;
 }) {
   const [completing, setCompleting] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
   const complete = async () => {
     setCompleting(true);
+    setErrorText(null);
     try {
-      await onComplete(task.runBlockId);
+      const result = await onComplete(task.runBlockId);
+      if (!result.ok) setErrorText(result.message);
     } finally {
       setCompleting(false);
     }
   };
   return (
-    <button
-      type="button"
-      title="Mark complete"
-      aria-label="Mark complete"
-      disabled={completing}
-      onClick={complete}
-      className={`flex size-3 shrink-0 items-center justify-center rounded-full border-2 border-emerald-500 transition-colors hover:bg-emerald-500 disabled:opacity-50 ${
-        completing ? "bg-emerald-500" : "bg-white"
-      }`}
-    />
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        title="Mark complete"
+        aria-label="Mark complete"
+        disabled={completing}
+        onClick={complete}
+        className={`flex size-3 items-center justify-center rounded-full border-2 border-emerald-500 transition-colors hover:bg-emerald-500 disabled:opacity-50 ${
+          completing ? "bg-emerald-500" : "bg-white"
+        }`}
+      />
+      {errorText && <InlineActionError text={errorText} />}
+    </span>
   );
 }
 export function TaskRowLine({
@@ -394,14 +419,14 @@ export function TaskRowLine({
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
   myUserId?: string;
-  onComplete?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
   /** "N/A" in the status dropdown — unlike onComplete, not gated on
    *  quickCompletable (marking N/A never captures field values, so it
    *  applies to any non-terminal task of the viewer's own). */
-  onSkip?: (runBlockId: string) => Promise<void>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Pending" in the status dropdown, on an already-Completed/N-A task
    *  (reopen). Omit to disable reopening (option stays but is disabled). */
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
   nameWidth?: number;
   onResizeStart?: (e: React.PointerEvent) => void;
   /** "My Tasks" personal-list mode — see doc comment above. */
@@ -552,10 +577,11 @@ function BulkActionsButton({
   actions,
 }: {
   count: number;
-  actions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<void> }[];
+  actions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[];
 }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -574,11 +600,13 @@ function BulkActionsButton({
     };
   }, [open]);
 
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<ActionResult>) => {
     setOpen(false);
     setBusy(true);
+    setErrorText(null);
     try {
-      await action();
+      const result = await action();
+      if (!result.ok) setErrorText(result.message);
     } finally {
       setBusy(false);
     }
@@ -587,14 +615,17 @@ function BulkActionsButton({
   if (actions.length <= 1) {
     const only = actions[0];
     return (
-      <button
-        type="button"
-        disabled={busy || !only}
-        onClick={() => only && run(only.onRun)}
-        className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {busy ? "Updating…" : only ? `${only.label} (${count})` : `Bulk actions (${count})`}
-      </button>
+      <div className="relative inline-block">
+        <button
+          type="button"
+          disabled={busy || !only}
+          onClick={() => only && run(only.onRun)}
+          className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy ? "Updating…" : only ? `${only.label} (${count})` : `Bulk actions (${count})`}
+        </button>
+        {errorText && <InlineActionError text={errorText} />}
+      </div>
     );
   }
 
@@ -604,11 +635,15 @@ function BulkActionsButton({
         type="button"
         aria-label="Bulk actions"
         disabled={busy}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setErrorText(null);
+          setOpen((o) => !o);
+        }}
         className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
         {busy ? "Updating…" : `(${count}) ▾`}
       </button>
+      {errorText && <InlineActionError text={errorText} />}
       {open && (
         <div
           role="menu"
@@ -643,11 +678,11 @@ export function ResizableTaskList({
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
-  onComplete?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
   /** "N/A" in the status dropdown — see TaskRowLine. */
-  onSkip?: (runBlockId: string) => Promise<void>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Pending" in the status dropdown (reopen) — see TaskRowLine. */
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
   emptyLabel: string;
   hideCompleted?: boolean;
 }) {
@@ -714,22 +749,39 @@ export function ResizableTaskList({
   // full round trip at a time; any that reject stay selected afterward
   // (instead of the whole batch aborting) so a retry only touches what
   // actually failed.
+  // Targets run concurrently (independent rows, no shared transaction); a
+  // target now "fails" when its action RESOLVES with { ok: false } (actions
+  // no longer throw for expected errors — see ActionResult) rather than by
+  // rejecting, though an actual rejection is still treated as a failure too,
+  // defensively. Any that failed stay selected afterward so a retry only
+  // touches what actually failed; the summary result drives the visible
+  // error via BulkActionsButton.
   const runBulk = async (
-    action: ((id: string) => Promise<void>) | undefined,
+    action: ((id: string) => Promise<ActionResult>) | undefined,
     eligible: (t: FlowTaskRow) => boolean,
-  ) => {
-    if (!action) return;
+  ): Promise<ActionResult> => {
+    if (!action) return { ok: true };
     const targets = visibleTasks.filter((t) => selectedIds.has(t.runBlockId) && eligible(t));
     const results = await Promise.allSettled(targets.map((t) => action(t.runBlockId)));
-    const failedIds = targets.filter((_, i) => results[i].status === "rejected").map((t) => t.runBlockId);
+    const failedIds = targets
+      .filter((_, i) => {
+        const r = results[i];
+        return r.status === "rejected" || !r.value.ok;
+      })
+      .map((t) => t.runBlockId);
     setSelectedIds(new Set(failedIds));
+    if (failedIds.length === 0) return { ok: true };
+    return {
+      ok: false,
+      message: `${failedIds.length} of ${targets.length} task${targets.length === 1 ? "" : "s"} failed to update.`,
+    };
   };
 
   // Deliberately just these two — no bulk reopen here, matching the per-row
   // dropdown's own scope for a flat mixed-status list (unlike
   // EntityDrillModal, which is bucket-scoped and offers reopen when the
   // whole bucket being viewed is Completed/N-A).
-  const bulkActions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<void> }[] = [];
+  const bulkActions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[] = [];
   if (onComplete) {
     bulkActions.push({
       key: "complete",
@@ -841,13 +893,13 @@ export function StatusOverviewCard({
    *  every dot read-only regardless of task eligibility. */
   myUserId?: string;
   /** "Click the dot to complete" handler, passed straight to EntityDrillModal. */
-  onComplete?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark N/A" handler, passed straight to EntityDrillModal — see
    *  TaskRowLine's onSkip. */
-  onSkip?: (runBlockId: string) => Promise<void>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Pending" (reopen) handler, passed straight to EntityDrillModal — see
    *  TaskRowLine's onReopen. */
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
 }) {
   const [selected, setSelected] = React.useState<BucketKey | null>(null);
   const drill = tasks ? setSelected : undefined;
@@ -914,12 +966,12 @@ export function EntityDrillModal({
   /** The VIEWER's own user id — see StatusOverviewCard. */
   myUserId?: string;
   /** "Click the dot to complete" handler — omit to keep every dot read-only. */
-  onComplete?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark N/A" handler — see TaskRowLine's onSkip. Unlike onComplete, not
    *  gated on quickCompletable. */
-  onSkip?: (runBlockId: string) => Promise<void>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark Pending" (reopen) handler — see TaskRowLine's onReopen. */
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
 }) {
   const meta = BUCKET_META.find((b) => b.key === bucketKey)!;
   const rows = tasks[bucketKey];
@@ -945,15 +997,27 @@ export function EntityDrillModal({
   // match the per-row dropdown's own eligibility rules. Targets run
   // concurrently (independent rows, no shared transaction); any that reject
   // stay selected afterward so a retry only touches what actually failed.
+  // See ResizableTaskList's runBulk for why "failed" is now { ok: false },
+  // not a rejection — actions return errors instead of throwing them.
   const runBulk = async (
-    action: ((id: string) => Promise<void>) | undefined,
+    action: ((id: string) => Promise<ActionResult>) | undefined,
     eligible: (t: FlowDrillTask) => boolean,
-  ) => {
-    if (!action) return;
+  ): Promise<ActionResult> => {
+    if (!action) return { ok: true };
     const targets = rows.filter((t) => selectedIds.has(t.runBlockId) && eligible(t));
     const results = await Promise.allSettled(targets.map((t) => action(t.runBlockId)));
-    const failedIds = targets.filter((_, i) => results[i].status === "rejected").map((t) => t.runBlockId);
+    const failedIds = targets
+      .filter((_, i) => {
+        const r = results[i];
+        return r.status === "rejected" || !r.value.ok;
+      })
+      .map((t) => t.runBlockId);
     setSelectedIds(new Set(failedIds));
+    if (failedIds.length === 0) return { ok: true };
+    return {
+      ok: false,
+      message: `${failedIds.length} of ${targets.length} task${targets.length === 1 ? "" : "s"} failed to update.`,
+    };
   };
 
   // Every row in this modal already shares ONE status (that's what a bucket
@@ -962,7 +1026,7 @@ export function EntityDrillModal({
   // offers Completed/N-A, mirroring the per-row dropdown's own disabled
   // rules (StatusDropdown's canReopen/canMarkDone/canMarkNA) one bucket at a
   // time instead of per-row.
-  const bulkActions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<void> }[] = [];
+  const bulkActions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[] = [];
   if (bucketKey === "pending") {
     if (onComplete) {
       bulkActions.push({

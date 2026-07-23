@@ -32,7 +32,13 @@ import {
   SetupPendingError,
 } from "@/task-manager/data";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
-import { FLOW_DEPARTMENTS, type FlowAssignInput, type FlowKanbanColumnColor } from "@/task-manager/ui/types";
+import {
+  FLOW_DEPARTMENTS,
+  type ActionResult,
+  type AssignActionResult,
+  type FlowAssignInput,
+  type FlowKanbanColumnColor,
+} from "@/task-manager/ui/types";
 import {
   NoAccountCard,
   SetupPendingCard,
@@ -55,52 +61,92 @@ export default async function TaskManagerPage({
   const period = sp.period === "monthly" ? "monthly" : "daily";
   const href = (p: string) => `/task-manager?period=${p}`;
 
-  async function assign(input: FlowAssignInput) {
+  // Expected errors are RETURNED, never thrown: Next.js masks thrown
+  // server-action error messages in production, so every action here catches
+  // and maps to { ok:false, message } instead of letting the framework
+  // swallow it. revalidatePath only runs on the success path.
+  const FALLBACK_MESSAGE = "Something went wrong — please try again";
+
+  async function assign(input: FlowAssignInput): Promise<AssignActionResult> {
     "use server";
-    const result = await assignFlowTask(email, input);
-    revalidatePath("/task-manager");
-    return result;
+    try {
+      const result = await assignFlowTask(email, input);
+      revalidatePath("/task-manager");
+      return { ok: true, created: result.created };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
   }
 
-  async function completeTask(runBlockId: string) {
+  async function completeTask(runBlockId: string): Promise<ActionResult> {
     "use server";
-    await completeFlowTask(email, runBlockId);
-    revalidatePath("/task-manager");
+    try {
+      await completeFlowTask(email, runBlockId);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
   }
 
-  async function skipTask(runBlockId: string) {
+  async function skipTask(runBlockId: string): Promise<ActionResult> {
     "use server";
-    await skipFlowTask(email, runBlockId);
-    revalidatePath("/task-manager");
+    try {
+      await skipFlowTask(email, runBlockId);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
   }
 
-  async function reopenTask(runBlockId: string) {
+  async function reopenTask(runBlockId: string): Promise<ActionResult> {
     "use server";
-    await reopenFlowTask(email, runBlockId);
-    revalidatePath("/task-manager");
+    try {
+      await reopenFlowTask(email, runBlockId);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
   }
 
   // CEO pinned-department boards: Daily and Monthly are fully independent —
   // each cadence gets its own actions, closed over a fixed cadence.
   function makeCeoActions(cadence: "daily" | "monthly") {
-    async function add(department: string) {
+    async function add(department: string): Promise<ActionResult> {
       "use server";
-      const { departments } = await getCeoDashboardConfig(email, cadence);
-      if (!departments.includes(department)) {
-        await saveCeoDashboardConfig(email, cadence, [...departments, department]);
+      try {
+        const { departments } = await getCeoDashboardConfig(email, cadence);
+        if (!departments.includes(department)) {
+          await saveCeoDashboardConfig(email, cadence, [...departments, department]);
+        }
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
       }
-      revalidatePath("/task-manager");
     }
-    async function remove(department: string) {
+    async function remove(department: string): Promise<ActionResult> {
       "use server";
-      const { departments } = await getCeoDashboardConfig(email, cadence);
-      await saveCeoDashboardConfig(email, cadence, departments.filter((d) => d !== department));
-      revalidatePath("/task-manager");
+      try {
+        const { departments } = await getCeoDashboardConfig(email, cadence);
+        await saveCeoDashboardConfig(email, cadence, departments.filter((d) => d !== department));
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     }
-    async function reorder(orderedNames: string[]) {
+    async function reorder(orderedNames: string[]): Promise<ActionResult> {
       "use server";
-      await saveCeoDashboardConfig(email, cadence, orderedNames);
-      revalidatePath("/task-manager");
+      try {
+        await saveCeoDashboardConfig(email, cadence, orderedNames);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     }
     return { add, remove, reorder };
   }
@@ -108,45 +154,85 @@ export default async function TaskManagerPage({
   const ceoMonthlyActions = makeCeoActions("monthly");
 
   const hodKanbanActions = {
-    async create(column: string, title: string) {
+    async create(column: string, title: string): Promise<ActionResult> {
       "use server";
-      await createKanbanCard(email, column, title);
-      revalidatePath("/task-manager");
+      try {
+        await createKanbanCard(email, column, title);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async move(cardId: string, column: string, order: number) {
+    async move(cardId: string, column: string, order: number): Promise<ActionResult> {
       "use server";
-      await moveKanbanCard(email, cardId, column, order);
-      revalidatePath("/task-manager");
+      try {
+        await moveKanbanCard(email, cardId, column, order);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async remove(cardId: string) {
+    async remove(cardId: string): Promise<ActionResult> {
       "use server";
-      await deleteKanbanCard(email, cardId);
-      revalidatePath("/task-manager");
+      try {
+        await deleteKanbanCard(email, cardId);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async createColumn(label: string) {
+    async createColumn(label: string): Promise<ActionResult> {
       "use server";
-      await createKanbanColumn(email, label);
-      revalidatePath("/task-manager");
+      try {
+        await createKanbanColumn(email, label);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async renameColumn(columnId: string, label: string) {
+    async renameColumn(columnId: string, label: string): Promise<ActionResult> {
       "use server";
-      await renameKanbanColumn(email, columnId, label);
-      revalidatePath("/task-manager");
+      try {
+        await renameKanbanColumn(email, columnId, label);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async moveColumn(columnId: string, order: number) {
+    async moveColumn(columnId: string, order: number): Promise<ActionResult> {
       "use server";
-      await moveKanbanColumn(email, columnId, order);
-      revalidatePath("/task-manager");
+      try {
+        await moveKanbanColumn(email, columnId, order);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async recolorColumn(columnId: string, color: FlowKanbanColumnColor | null) {
+    async recolorColumn(columnId: string, color: FlowKanbanColumnColor | null): Promise<ActionResult> {
       "use server";
-      await recolorKanbanColumn(email, columnId, color);
-      revalidatePath("/task-manager");
+      try {
+        await recolorKanbanColumn(email, columnId, color);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
-    async deleteColumn(columnId: string) {
+    async deleteColumn(columnId: string): Promise<ActionResult> {
       "use server";
-      await deleteKanbanColumn(email, columnId);
-      revalidatePath("/task-manager");
+      try {
+        await deleteKanbanColumn(email, columnId);
+        revalidatePath("/task-manager");
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+      }
     },
   };
 

@@ -34,14 +34,14 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { FlowEntityDetail } from "./types";
+import type { ActionResult, FlowEntityDetail } from "./types";
 import { StatusOverviewCard } from "./bits";
 
 export interface CeoDashboardActions {
-  add: (department: string) => Promise<void>;
-  remove: (department: string) => Promise<void>;
+  add: (department: string) => Promise<ActionResult>;
+  remove: (department: string) => Promise<ActionResult>;
   /** Full new order, sent as one write — computed client-side on drag end. */
-  reorder: (orderedNames: string[]) => Promise<void>;
+  reorder: (orderedNames: string[]) => Promise<ActionResult>;
 }
 
 function CardControls({
@@ -157,7 +157,10 @@ export function CeoDashboardSection({
     if (from < 0 || to < 0) return;
     const next = arrayMove(ids, from, to);
     setOrder(next);
-    void actions.reorder(next);
+    setError(null);
+    void actions.reorder(next).then((result) => {
+      if (!result.ok) setError(result.message);
+    });
   };
 
   return (
@@ -180,11 +183,11 @@ export function CeoDashboardSection({
             const department = selected;
             setError(null);
             startAddTransition(async () => {
-              try {
-                await actions.add(department);
+              const result = await actions.add(department);
+              if (result.ok) {
                 setSelected("");
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not add the department.");
+              } else {
+                setError(result.message);
               }
             });
           }}
@@ -208,7 +211,12 @@ export function CeoDashboardSection({
                   key={dept.name}
                   dept={dept}
                   periodLabel={periodLabel}
-                  onRemove={() => actions.remove(dept.name)}
+                  onRemove={() => {
+                    setError(null);
+                    void actions.remove(dept.name).then((result) => {
+                      if (!result.ok) setError(result.message);
+                    });
+                  }}
                 />
               ))}
             </div>

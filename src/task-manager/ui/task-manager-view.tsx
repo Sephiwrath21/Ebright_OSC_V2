@@ -20,6 +20,8 @@
 
 import * as React from "react";
 import type {
+  ActionResult,
+  AssignActionResult,
   FlowAssignInput,
   FlowDetailResponse,
   FlowEntityRollup,
@@ -239,9 +241,9 @@ function DailyTasksByDay({
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
-  onComplete?: (runBlockId: string) => Promise<void>;
-  onSkip?: (runBlockId: string) => Promise<void>;
-  onReopen?: (runBlockId: string) => Promise<void>;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
   emptyLabel: string;
 }) {
   const groups = React.useMemo(() => groupTasksByWeekday(tasks), [tasks]);
@@ -526,19 +528,21 @@ export function TaskManagerView({
   period: FlowPeriod;
   dailyHref: string;
   monthlyHref: string;
-  /** Server action for the "+ Assigned task" forms (superadmin/OPS only). */
-  assignAction?: (input: FlowAssignInput) => Promise<{ created: number }>;
+  /** Server action for the "+ Assigned task" forms (superadmin/OPS only).
+   *  Returns a typed result rather than throwing — Next.js masks thrown
+   *  server-action error messages in production. */
+  assignAction?: (input: FlowAssignInput) => Promise<AssignActionResult>;
   /** "Click the status dot to complete" — a task row only ever renders a
    *  clickable dot when it's quick-completable AND assigned to the current
    *  viewer; omit to keep every dot on the page read-only. */
-  completeTaskAction?: (runBlockId: string) => Promise<void>;
+  completeTaskAction?: (runBlockId: string) => Promise<ActionResult>;
   /** Status dropdown's "N/A" option — unlike completeTaskAction, offered on
    *  ANY of the viewer's own non-terminal tasks (not gated on
    *  quickCompletable); omit to hide the option everywhere. */
-  skipTaskAction?: (runBlockId: string) => Promise<void>;
+  skipTaskAction?: (runBlockId: string) => Promise<ActionResult>;
   /** Status dropdown's "Pending" option — only actionable on an already-
    *  Completed/N-A task (reopen); omit to disable reopening everywhere. */
-  reopenTaskAction?: (runBlockId: string) => Promise<void>;
+  reopenTaskAction?: (runBlockId: string) => Promise<ActionResult>;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app

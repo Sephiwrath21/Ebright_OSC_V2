@@ -4,6 +4,11 @@
 
 export type FlowPeriod = "daily" | "monthly";
 
+/** Server-action result — expected errors are returned, never thrown, because
+ *  Next.js masks thrown action error messages in production. */
+export type ActionResult = { ok: true } | { ok: false; message: string };
+export type AssignActionResult = { ok: true; created: number } | { ok: false; message: string };
+
 export type FlowRole =
   | "ADMIN"
   | "CEO"

@@ -34,20 +34,27 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { HOD_KANBAN_COLORS, type FlowKanbanCard, type FlowKanbanColumnColor, type FlowKanbanColumnDef } from "./types";
+import {
+  HOD_KANBAN_COLORS,
+  type ActionResult,
+  type FlowKanbanCard,
+  type FlowKanbanColumnColor,
+  type FlowKanbanColumnDef,
+} from "./types";
 
 export interface HodKanbanActions {
-  create: (column: string, title: string) => Promise<void>;
-  move: (cardId: string, column: string, order: number) => Promise<void>;
-  remove: (cardId: string) => Promise<void>;
-  createColumn: (label: string) => Promise<void>;
-  renameColumn: (columnId: string, label: string) => Promise<void>;
-  moveColumn: (columnId: string, order: number) => Promise<void>;
-  /** Throws (e.g. "column isn't empty") if the delete is rejected — the
-   *  column view shows that message inline rather than silently no-op'ing. */
-  deleteColumn: (columnId: string) => Promise<void>;
+  create: (column: string, title: string) => Promise<ActionResult>;
+  move: (cardId: string, column: string, order: number) => Promise<ActionResult>;
+  remove: (cardId: string) => Promise<ActionResult>;
+  createColumn: (label: string) => Promise<ActionResult>;
+  renameColumn: (columnId: string, label: string) => Promise<ActionResult>;
+  moveColumn: (columnId: string, order: number) => Promise<ActionResult>;
+  /** Resolves { ok: false } (e.g. "column isn't empty") if the delete is
+   *  rejected — the column view shows that message inline rather than
+   *  silently no-op'ing. */
+  deleteColumn: (columnId: string) => Promise<ActionResult>;
   /** null resets the column title back to its default neutral color. */
-  recolorColumn: (columnId: string, color: FlowKanbanColumnColor | null) => Promise<void>;
+  recolorColumn: (columnId: string, color: FlowKanbanColumnColor | null) => Promise<ActionResult>;
 }
 
 /** Column title color treatment — text-only per the design (the column
@@ -230,8 +237,8 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
   onRemoveCard: (cardId: string) => void;
   onRename: (columnId: string, label: string) => void;
   onRecolor: (columnId: string, color: FlowKanbanColumnColor | null) => void;
-  /** May reject (non-empty column); shown inline. */
-  onDeleteColumn: (columnId: string) => Promise<void>;
+  /** May resolve { ok: false } (non-empty column); shown inline. */
+  onDeleteColumn: (columnId: string) => Promise<ActionResult>;
 }) {
   const {
     attributes,
@@ -268,11 +275,8 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
 
   const handleDelete = async () => {
     setDeleteError(null);
-    try {
-      await onDeleteColumn(columnId);
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Could not delete column.");
-    }
+    const result = await onDeleteColumn(columnId);
+    if (!result.ok) setDeleteError(result.message);
   };
 
   return (
@@ -446,6 +450,13 @@ export function HodKanban({
   React.useEffect(() => setLocalCards(cards), [cards]);
   const [localColumns, setLocalColumns] = React.useState(columns);
   React.useEffect(() => setLocalColumns(columns), [columns]);
+  // Board-level failure surface for every mutation EXCEPT delete-column,
+  // which already has its own per-column inline error (deleteError, above) —
+  // reused as-is rather than routed through this. Every one of these is an
+  // optimistic update (local state already changed before the action
+  // settles); on failure this only surfaces the message, it does not roll
+  // the optimistic change back.
+  const [boardError, setBoardError] = React.useState<string | null>(null);
 
   const orderedColumns = React.useMemo(
     () => [...localColumns].sort((a, b) => a.order - b.order),
@@ -476,7 +487,10 @@ export function HodKanban({
 
   const handleAdd = React.useCallback(
     (columnId: string, title: string) => {
-      void actions.create(columnId, title);
+      setBoardError(null);
+      void actions.create(columnId, title).then((result) => {
+        if (!result.ok) setBoardError(result.message);
+      });
     },
     [actions],
   );
@@ -484,7 +498,10 @@ export function HodKanban({
   const handleRemove = React.useCallback(
     (cardId: string) => {
       setLocalCards((prev) => prev.filter((c) => c.id !== cardId));
-      void actions.remove(cardId);
+      setBoardError(null);
+      void actions.remove(cardId).then((result) => {
+        if (!result.ok) setBoardError(result.message);
+      });
     },
     [actions],
   );
@@ -522,7 +539,10 @@ export function HodKanban({
     setLocalCards((prev) =>
       prev.map((c) => (c.id === activeCard.id ? { ...c, column: targetColumn, order: newOrder } : c)),
     );
-    void actions.move(activeCard.id, targetColumn, newOrder);
+    setBoardError(null);
+    void actions.move(activeCard.id, targetColumn, newOrder).then((result) => {
+      if (!result.ok) setBoardError(result.message);
+    });
   };
 
   const handleColumnDragEnd = (activeColumnId: string, overId: string) => {
@@ -547,7 +567,10 @@ export function HodKanban({
     setLocalColumns((prev) =>
       prev.map((c) => (c.id === activeColumnId ? { ...c, order: newOrder } : c)),
     );
-    void actions.moveColumn(activeColumnId, newOrder);
+    setBoardError(null);
+    void actions.moveColumn(activeColumnId, newOrder).then((result) => {
+      if (!result.ok) setBoardError(result.message);
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -562,21 +585,34 @@ export function HodKanban({
   };
 
   const handleAddColumn = (label: string) => {
-    void actions.createColumn(label);
+    setBoardError(null);
+    void actions.createColumn(label).then((result) => {
+      if (!result.ok) setBoardError(result.message);
+    });
   };
 
   const handleRenameColumn = React.useCallback(
     (columnId: string, label: string) => {
       setLocalColumns((prev) => prev.map((c) => (c.id === columnId ? { ...c, label } : c)));
-      void actions.renameColumn(columnId, label);
+      setBoardError(null);
+      void actions.renameColumn(columnId, label).then((result) => {
+        if (!result.ok) setBoardError(result.message);
+      });
     },
     [actions],
   );
 
+  // Unlike the other handlers here, this one's result is returned (not just
+  // surfaced to boardError) — KanbanColumnView's own handleDelete shows it
+  // inline next to that one column, the existing pattern this whole file's
+  // error handling was modeled on.
   const handleDeleteColumn = React.useCallback(
-    async (columnId: string) => {
-      await actions.deleteColumn(columnId);
-      setLocalColumns((prev) => prev.filter((c) => c.id !== columnId));
+    async (columnId: string): Promise<ActionResult> => {
+      const result = await actions.deleteColumn(columnId);
+      if (result.ok) {
+        setLocalColumns((prev) => prev.filter((c) => c.id !== columnId));
+      }
+      return result;
     },
     [actions],
   );
@@ -584,16 +620,34 @@ export function HodKanban({
   const handleRecolorColumn = React.useCallback(
     (columnId: string, color: FlowKanbanColumnColor | null) => {
       setLocalColumns((prev) => prev.map((c) => (c.id === columnId ? { ...c, color } : c)));
-      void actions.recolorColumn(columnId, color);
+      setBoardError(null);
+      void actions.recolorColumn(columnId, color).then((result) => {
+        if (!result.ok) setBoardError(result.message);
+      });
     },
     [actions],
   );
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
-        My Board
-      </h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+          My Board
+        </h3>
+        {boardError && (
+          <p className="flex items-center gap-1.5 text-xs text-red-600">
+            {boardError}
+            <button
+              type="button"
+              onClick={() => setBoardError(null)}
+              aria-label="Dismiss"
+              className="text-red-400 hover:text-red-600"
+            >
+              ×
+            </button>
+          </p>
+        )}
+      </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
           <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>

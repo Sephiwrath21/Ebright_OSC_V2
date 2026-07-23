@@ -10,6 +10,7 @@ import * as React from "react";
 import {
   flowFormatTime12h,
   flowRoleForColumn,
+  type ActionResult,
   type FlowManpowerSchedule,
   type FlowScheduleCell,
   type FlowStaffMember,
@@ -20,20 +21,24 @@ function rowKey(cell: { startTime: string; endTime: string }): string {
   return `${cell.startTime}-${cell.endTime}`;
 }
 
+// This grid gets wired to a server page in a later task; its actions are
+// typed now so that page writes matching { ok } | { ok:false, message }
+// server actions from the start, per the framework's expected-errors
+// guidance (Next.js masks thrown server-action error messages in production).
 export interface ManpowerScheduleActions {
-  createSchedule: () => Promise<void>;
-  addRow: (startTime: string, endTime: string) => Promise<void>;
+  createSchedule: () => Promise<ActionResult>;
+  addRow: (startTime: string, endTime: string) => Promise<ActionResult>;
   renameRow: (
     oldStartTime: string,
     oldEndTime: string,
     newStartTime: string,
     newEndTime: string,
-  ) => Promise<void>;
-  deleteRow: (startTime: string, endTime: string) => Promise<void>;
-  addColumn: (kind: "Coach" | "Exec") => Promise<void>;
-  deleteColumn: (roleColumn: string) => Promise<void>;
-  assignCell: (slotId: string, assignedStaffId: string | null) => Promise<void>;
-  publish: () => Promise<void>;
+  ) => Promise<ActionResult>;
+  deleteRow: (startTime: string, endTime: string) => Promise<ActionResult>;
+  addColumn: (kind: "Coach" | "Exec") => Promise<ActionResult>;
+  deleteColumn: (roleColumn: string) => Promise<ActionResult>;
+  assignCell: (slotId: string, assignedStaffId: string | null) => Promise<ActionResult>;
+  publish: () => Promise<ActionResult>;
 }
 
 function ErrorLine({ error }: { error: string | null }) {
@@ -48,7 +53,7 @@ function EditableCell({
 }: {
   cell: FlowScheduleCell;
   staff: FlowStaffMember[];
-  onAssign: (slotId: string, assignedStaffId: string | null) => Promise<void>;
+  onAssign: (slotId: string, assignedStaffId: string | null) => Promise<ActionResult>;
 }) {
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
@@ -63,11 +68,8 @@ function EditableCell({
         onChange={(e) => {
           setError(null);
           startTransition(async () => {
-            try {
-              await onAssign(cell.slotId, e.target.value || null);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not update the cell.");
-            }
+            const result = await onAssign(cell.slotId, e.target.value || null);
+            if (!result.ok) setError(result.message);
           });
         }}
         className={`w-full rounded-md border-0 px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -101,7 +103,7 @@ function StaticCell({ cell }: { cell: FlowScheduleCell }) {
   );
 }
 
-function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => Promise<void> }) {
+function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => Promise<ActionResult> }) {
   const [open, setOpen] = React.useState(false);
   const [start, setStart] = React.useState("");
   const [end, setEnd] = React.useState("");
@@ -144,13 +146,13 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
               setError("Pick a valid start/end time.");
               return;
             }
-            try {
-              await onAdd(start, end);
+            const result = await onAdd(start, end);
+            if (result.ok) {
               setOpen(false);
               setStart("");
               setEnd("");
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not add the row.");
+            } else {
+              setError(result.message);
             }
           })
         }
@@ -176,8 +178,8 @@ function RowTimeLabel({
   onDelete,
 }: {
   row: { startTime: string; endTime: string };
-  onRename: (newStart: string, newEnd: string) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onRename: (newStart: string, newEnd: string) => Promise<ActionResult>;
+  onDelete: () => Promise<ActionResult>;
 }) {
   const [editing, setEditing] = React.useState(false);
   const [start, setStart] = React.useState(row.startTime);
@@ -185,27 +187,38 @@ function RowTimeLabel({
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
+  const handleDelete = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await onDelete();
+      if (!result.ok) setError(result.message);
+    });
+  };
+
   if (!editing) {
     return (
-      <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-700">
-        {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-xs text-gray-400 hover:text-blue-600"
-          title="Edit time"
-        >
-          ✎
-        </button>
-        <button
-          type="button"
-          onClick={() => startTransition(() => onDelete())}
-          disabled={pending}
-          className="text-xs text-gray-400 hover:text-red-600"
-          title="Remove row"
-        >
-          ×
-        </button>
+      <div>
+        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-700">
+          {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-xs text-gray-400 hover:text-blue-600"
+            title="Edit time"
+          >
+            ✎
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={pending}
+            className="text-xs text-gray-400 hover:text-red-600"
+            title="Remove row"
+          >
+            ×
+          </button>
+        </div>
+        <ErrorLine error={error} />
       </div>
     );
   }
@@ -236,11 +249,11 @@ function RowTimeLabel({
                 setError("Invalid time range.");
                 return;
               }
-              try {
-                await onRename(start, end);
+              const result = await onRename(start, end);
+              if (result.ok) {
                 setEditing(false);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not update the row.");
+              } else {
+                setError(result.message);
               }
             })
           }
@@ -289,11 +302,8 @@ export function ManpowerScheduleGrid({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                try {
-                  await actions.createSchedule();
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Could not create the schedule.");
-                }
+                const result = await actions.createSchedule();
+                if (!result.ok) setError(result.message);
               })
             }
             className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
@@ -348,11 +358,8 @@ export function ManpowerScheduleGrid({
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
-                  try {
-                    await actions.publish();
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : "Could not publish the schedule.");
-                  }
+                  const result = await actions.publish();
+                  if (!result.ok) setError(result.message);
                 })
               }
               className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
@@ -375,7 +382,12 @@ export function ManpowerScheduleGrid({
                     {canEdit && col !== "Manager" && (
                       <button
                         type="button"
-                        onClick={() => startTransition(() => actions.deleteColumn(col))}
+                        onClick={() =>
+                          startTransition(async () => {
+                            const result = await actions.deleteColumn(col);
+                            if (!result.ok) setError(result.message);
+                          })
+                        }
                         className="text-gray-300 hover:text-red-600"
                         title="Remove seat"
                       >
@@ -428,14 +440,24 @@ export function ManpowerScheduleGrid({
           <AddRowForm onAdd={actions.addRow} />
           <button
             type="button"
-            onClick={() => startTransition(() => actions.addColumn("Coach"))}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await actions.addColumn("Coach");
+                if (!result.ok) setError(result.message);
+              })
+            }
             className="text-xs font-medium text-blue-600 hover:text-blue-700"
           >
             + Add Coach seat
           </button>
           <button
             type="button"
-            onClick={() => startTransition(() => actions.addColumn("Exec"))}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await actions.addColumn("Exec");
+                if (!result.ok) setError(result.message);
+              })
+            }
             className="text-xs font-medium text-blue-600 hover:text-blue-700"
           >
             + Add Exec seat

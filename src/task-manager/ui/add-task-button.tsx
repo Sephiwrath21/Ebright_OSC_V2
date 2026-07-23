@@ -11,7 +11,7 @@
 // Submits through the same POST /api/internal/assign route.
 
 import * as React from "react";
-import type { FlowAssignInput, FlowStaffMember } from "./types";
+import type { AssignActionResult, FlowAssignInput, FlowStaffMember } from "./types";
 import { AssignTaskForm } from "./assign-task-form";
 
 export function AddTaskButton({
@@ -19,7 +19,7 @@ export function AddTaskButton({
   action,
 }: {
   staff: FlowStaffMember[];
-  action: (input: FlowAssignInput) => Promise<{ created: number }>;
+  action: (input: FlowAssignInput) => Promise<AssignActionResult>;
 }) {
   const [open, setOpen] = React.useState(false);
 

@@ -15,6 +15,7 @@ import * as React from "react";
 import {
   FLOW_DAYS,
   visibleCadenceOptions,
+  type AssignActionResult,
   type CadenceOption,
   type FlowAssignInput,
   type FlowGroup,
@@ -44,8 +45,10 @@ export function AssignTaskForm({
   bare = false,
 }: {
   staff: FlowStaffMember[];
-  /** Server action wrapping assignFlowTask(actorEmail, input). */
-  action: (input: FlowAssignInput) => Promise<{ created: number }>;
+  /** Server action wrapping assignFlowTask(actorEmail, input). Returns a
+   *  typed result rather than throwing — Next.js masks thrown server-action
+   *  error messages in production. */
+  action: (input: FlowAssignInput) => Promise<AssignActionResult>;
   /** Hard-restricts the recipient picker to one group (e.g. "HOD" for the
    *  CEO's "+ Add Task" form) — passed straight through to RecipientPicker.
    *  Omit for the normal, fully flexible Person + any-Group picker. */
@@ -105,25 +108,22 @@ export function AssignTaskForm({
       return;
     }
     startTransition(async () => {
-      try {
-        await action({
-          title: title.trim(),
-          userIds,
-          cadence,
-          days,
-          dueDate: dueDate || undefined,
-        });
+      const result = await action({
+        title: title.trim(),
+        userIds,
+        cadence,
+        days,
+        dueDate: dueDate || undefined,
+      });
+      if (result.ok) {
         setMessage({ ok: true, text: "Task Assigned" });
         setTitle("");
         setUserIds([]);
         setCadence(null);
         setDays([]);
         setDueDate("");
-      } catch (err) {
-        setMessage({
-          ok: false,
-          text: err instanceof Error ? err.message : "Could not assign the task.",
-        });
+      } else {
+        setMessage({ ok: false, text: result.message });
       }
     });
   };
