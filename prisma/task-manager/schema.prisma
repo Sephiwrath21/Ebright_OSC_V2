@@ -1,0 +1,434 @@
+// Ebright Flow — Prisma schema
+// Implements the build spec §4 + §4a, with the following deliberate additions
+// (each one flagged in PROJECT_GUIDE.md §"Spec deviations"):
+//   - Workspace model: spec §2 requires a Workspace → Flow → Run sidebar hierarchy,
+//     but §4 had no Workspace table. Added, with department scoping for §6 multi-tenancy.
+//   - FlowRun.templateSnapshot: spec snapshots only Flow.version (an Int). That does NOT
+//     preserve template *content* — editing Block rows in place would still mutate in-flight
+//     runs. The engine therefore snapshots the full executable template (nodes, edges,
+//     blocks+items, decisions) at run start and reads ONLY from the snapshot.
+//   - RunItem denormalizes type/label/required/config from the template item at run start,
+//     for the same reason.
+//   - Block.dueInHours: spec §5 schedules reminders relative to dueAt but nothing ever set
+//     dueAt. dueAt = activatedAt + dueInHours (falls back to reminder cadence from activation).
+//   - RunBlock.reminderJobId: lets completion cancel the pending BullMQ job by id (§5 requires
+//     real job removal, not ignoring).
+//   - AuditLog: §6 audit-trail requirement.
+//   - Block.escalateToUserId is nullable in the DB but REQUIRED to publish a flow —
+//     enforced by the publish validation, so half-built drafts can be saved.
+//   - User ids on non-identity tables are plain strings (no FK relation): the User table
+//     will eventually mirror OSC identities (§5a); loose coupling keeps that swap cheap.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../src/generated/task-manager-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Identity ----------
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String
+  role           Role           @default(MEMBER)
+  department     String?
+  branch         String? // org location dimension (e.g. "Subang Taipan") — analytics
+  employmentType String? // HOD | Full Time | Part Time | Intern — display label, analytics
+  coachSchedule  String? // Full Time | Part Time — sub-split of employmentType "Coach" only;
+  // used by the assign-task recipient picker's "By Group" filter, NOT by the
+  // Branch Status by Region analytics (which still matches employmentType "Coach").
+  createdAt        DateTime         @default(now())
+  hodKanbanCards   HodKanbanCard[]
+  hodKanbanColumns HodKanbanColumn[] // DEPT_SITE/BRANCH_SITE view-only site logins for
+  // "Department accounts"/"Branch site accounts" (one department/branch's Status
+  // view, no personal tasks) — see role usage below.
+}
+
+enum Role {
+  ADMIN
+  CEO
+  OPS
+  BRANCH
+  HOD
+  MEMBER
+  DEPT_SITE // Department-level view-only login (e.g. "Finance Department") —
+  // sees only that department's own Department Status Daily/Monthly + member
+  // roster, no personal tasks, no assign form — EXCEPT the Operation
+  // department's account, which additionally gets unrestricted Assign Task
+  // (see /api/internal/assign's isOperationDeptSite check).
+  BRANCH_SITE // Branch-level view-only login (e.g. "Subang Taipan") — sees only
+  // that branch's own Branch Status Daily/Monthly + member roster, no
+  // personal tasks, no assign form, no Manpower Schedule.
+}
+
+// One HOD's own freeform personal board — NOT the task engine (no
+// RunBlock/FlowRun involved). 3 fixed columns (Pending/In Progress/
+// Completed, hardcoded client-side, no DB row) plus any custom columns the
+// HOD adds (HodKanbanColumn below); the HOD manually creates and drags cards
+// for their own notes/reminders. `order` is a float (fractional-indexing
+// style) so a drag to a specific position only ever needs to update the ONE
+// moved card. `column` is either one of the 3 fixed strings ("PENDING" |
+// "IN_PROGRESS" | "COMPLETED") or a HodKanbanColumn's own id.
+model HodKanbanCard {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  column    String
+  title     String
+  order     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, column])
+}
+
+// A custom column an HOD added to their own board, beyond the 3 fixed
+// defaults (which stay hardcoded, never stored here, never renamable or
+// deletable). Rename/delete only ever apply to rows in THIS table.
+model HodKanbanColumn {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  label     String
+  order     Float
+  /** Preset key from HOD_KANBAN_COLORS (src/osc/types.ts), or null for the
+   *  default neutral title — never a raw hex/CSS value. */
+  color     String?
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+// ---------- Template layer (design-time) ----------
+
+model Workspace {
+  id         String   @id @default(cuid())
+  name       String
+  icon       String? // emoji shown in the sidebar
+  ownerId    String
+  department String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  flows      Flow[]
+}
+
+model Flow {
+  id            String         @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id])
+  name          String
+  icon          String? // emoji, for quick visual scanning in the sidebar
+  description   String?
+  ownerId       String
+  department    String?
+  order         Int            @default(0)
+  nodes         Json           @default("[]") // React Flow nodes (block + decision), positions
+  edges         Json           @default("[]") // React Flow edges; edge.data.condition per lib/types
+  version       Int            @default(1)
+  isPublished   Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  triggers      FlowTrigger[]
+  blocks        Block[]
+  decisionNodes DecisionNode[]
+  runs          FlowRun[]
+  doc           FlowDoc?
+
+  @@index([workspaceId])
+}
+
+model FlowTrigger {
+  id     String      @id @default(cuid())
+  flowId String
+  flow   Flow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  type   TriggerType
+  config Json // FORM_SUBMIT: form field schema; WORKFLOW_CHAIN: { sourceFlowId }
+
+  @@index([flowId])
+}
+
+enum TriggerType {
+  MANUAL
+  FORM_SUBMIT
+  WORKFLOW_CHAIN
+}
+
+// A Block = one node on canvas = a mini checklist for ONE PIC
+model Block {
+  id               String      @id @default(cuid())
+  flowId           String
+  flow             Flow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  nodeId           String // matches the React Flow node id in Flow.nodes
+  title            String
+  assigneeRole     String? // role/department placeholder, resolved at run time if not fixed
+  fixedAssigneeId  String? // optional: always assign to this specific user
+  dueInHours       Int? // dueAt = activation + dueInHours (see header note)
+  reminderInterval Int         @default(24) // hours between reminders
+  strikeLimit      Int         @default(3)
+  escalateToUserId String? // supervisor; REQUIRED at publish time (validated, not by the DB)
+  outgoingEdges    Json        @default("[]") // ConditionalEdge[] (lib/types) — first match wins
+  items            BlockItem[]
+
+  @@unique([flowId, nodeId])
+}
+
+model BlockItem {
+  id       String   @id @default(cuid())
+  blockId  String
+  block    Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  order    Int
+  type     ItemType
+  label    String
+  required Boolean  @default(true)
+  config   Json     @default("{}") // per-type config, zod-validated (lib/item-schemas)
+
+  @@index([blockId, order])
+}
+
+enum ItemType {
+  CHECKBOX
+  TEXT
+  YES_NO
+  NUMBER
+  DROPDOWN
+  DUE_DATE
+  FILE_UPLOAD
+  APPROVAL
+  SUB_ASSIGNEE_TASK
+  IMAGE_EMBED
+}
+
+// Decision node = flowchart diamond for multi-way branches
+model DecisionNode {
+  id         String @id @default(cuid())
+  flowId     String
+  flow       Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  nodeId     String
+  conditions Json   @default("[]") // ConditionalEdge[] — ordered, first match wins, 'else' last
+
+  @@unique([flowId, nodeId])
+}
+
+// ---------- Execution layer (run-time) ----------
+
+model FlowRun {
+  id               String      @id @default(cuid())
+  flowId           String
+  flow             Flow        @relation(fields: [flowId], references: [id])
+  flowVersion      Int // Flow.version at start
+  templateSnapshot Json // full executable template at start — engine reads ONLY this
+  name             String // display name, e.g. "Client Onboarding — 16 Jul"
+  startedById      String
+  triggerType      TriggerType
+  status           RunStatus   @default(ACTIVE)
+  startedAt        DateTime    @default(now())
+  completedAt      DateTime?
+  runBlocks        RunBlock[]
+
+  @@index([flowId, status])
+  @@index([status, startedAt])
+}
+
+enum RunStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model RunBlock {
+  id            String      @id @default(cuid())
+  runId         String
+  run           FlowRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  blockId       String // template Block id (as captured in the snapshot)
+  nodeId        String // canvas node id — used for edge navigation within the snapshot
+  title         String // denormalized for dashboard queries
+  assigneeId    String
+  status        BlockStatus @default(PENDING)
+  dueAt         DateTime?
+  strikeCount   Int         @default(0)
+  reminderJobId String? // current pending BullMQ job id, cancelled on completion
+  startedAt     DateTime?
+  completedAt   DateTime?
+  scheduleSlotId String? // set when this task was created by a Manpower Schedule slot sync
+  runItems      RunItem[]
+  // Explicit Daily/Monthly/Ad hoc tag, set ONLY by the "+ Add Task" quick-
+  // assign form (assign/route.ts) for its 5 permitted actor roles. A task
+  // gets EXACTLY ONE of these, never more — the form is single-select.
+  // null (the default, and every pre-existing row from before this field
+  // existed) means "untagged" — the OLD dueAt/startedAt date-window rule
+  // (resolveWindow/fetchPeriodBlocks) still decides Daily/Monthly membership
+  // for those, and the OLD starter-role check still decides Ad hoc
+  // membership (getAdhocPayload/getAdhocRegionsPayload). A non-null value
+  // means the tag ALONE decides Daily/Monthly membership — dueAt becomes
+  // purely a deadline/overdue marker for these tasks — and ADHOC (settable
+  // only when the assignee is a Branch Manager) ORs into the existing
+  // starter-role Ad hoc check. Every other creation path (Manpower Schedule
+  // slot sync, engine flow runs) leaves this at its default (null) and is
+  // completely unaffected.
+  cadence       Cadence?
+
+  @@unique([runId, nodeId])
+  @@index([assigneeId, status])
+  @@index([status, dueAt])
+  @@index([runId])
+}
+
+enum BlockStatus {
+  PENDING
+  ACTIVE
+  OVERDUE
+  ESCALATED
+  DONE
+  SKIPPED
+}
+
+enum Cadence {
+  DAILY
+  MONTHLY
+  // Set ONLY on tasks assigned (via /api/internal/assign) to a Branch
+  // Manager assignee — the one branch-side role that keeps all 3 cadence
+  // options. Coach/Branch Exec assignees never get this value (their
+  // Cadence field only ever offers Daily). getAdhocPayload/
+  // getAdhocRegionsPayload OR this tag in alongside the pre-existing
+  // starter-role === BRANCH check.
+  ADHOC
+}
+
+model RunItem {
+  id          String    @id @default(cuid())
+  runBlockId  String
+  runBlock    RunBlock  @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
+  itemId      String // template BlockItem id (as captured in the snapshot)
+  order       Int
+  type        ItemType // denormalized from the snapshot — immune to template edits
+  label       String
+  required    Boolean
+  config      Json      @default("{}")
+  value       Json? // typed answer, shape per lib/item-schemas value schema
+  completedAt DateTime?
+  completedBy String?
+
+  @@index([runBlockId, order])
+}
+
+model NotificationLog {
+  id         String   @id @default(cuid())
+  runBlockId String
+  type       String // REMINDER | ESCALATION
+  sentTo     String
+  sentAt     DateTime @default(now())
+  jobId      String // BullMQ job id, for tracing/debugging
+
+  @@index([runBlockId])
+}
+
+// §6 audit trail: who did what, when — answerable without digging through email
+model AuditLog {
+  id         String   @id @default(cuid())
+  runId      String?
+  runBlockId String?
+  actorId    String // user id, or "system" for engine/worker actions
+  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | REMINDER_SENT
+  detail     Json?
+  createdAt  DateTime @default(now())
+
+  @@index([runId, createdAt])
+  @@index([runBlockId])
+}
+
+// ---------- §4a Wiki page + saved dashboard views ----------
+
+// One attached doc per Flow — SOP notes/context; deliberately NOT versioned with Flow.version
+model FlowDoc {
+  id        String   @id @default(cuid())
+  flowId    String   @unique
+  flow      Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  content   Json // BlockNote document JSON
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
+
+model SavedView {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  viewType  ViewType
+  filters   Json     @default("{}") // status, assignee, flow, overdue-only, etc.
+  sortBy    String?
+  isDefault Boolean  @default(false)
+
+  @@index([userId])
+}
+
+enum ViewType {
+  TABLE
+  BOARD
+  CALENDAR
+}
+
+// ---------- Manpower schedule (OSC bridge) ----------
+
+// A branch manager's weekly/daily staffing grid: rows are time slots,
+// columns are role seats (Manager / Coach N / Exec N, configurable per
+// branch). One row per (branch, date). Assignments only sync to the task
+// engine once PUBLISHED — PLANNING is a draft the branch manager can edit
+// freely without notifying anyone.
+model ManpowerSchedule {
+  id          String         @id @default(cuid())
+  branch      String
+  date        String // YYYY-MM-DD
+  status      ScheduleStatus @default(PLANNING)
+  createdById String
+  publishedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  slots       ScheduleSlot[]
+
+  @@unique([branch, date])
+}
+
+enum ScheduleStatus {
+  PLANNING
+  PUBLISHED
+}
+
+// One grid cell: a (time row × role column) pair. assignedStaffId is who's
+// on that seat for that slot; runBlockId is the linked ad hoc task once the
+// schedule is published and the cell is assigned — kept in sync on every
+// reassignment/unassignment/time edit (see src/app/api/internal/_manpower.ts).
+model ScheduleSlot {
+  id              String           @id @default(cuid())
+  scheduleId      String
+  schedule        ManpowerSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  startTime       String // HH:mm
+  endTime         String // HH:mm
+  roleColumn      String // "Manager" | "Coach 1" | "Exec 1" | ...
+  assignedStaffId String?
+  runBlockId      String?
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([scheduleId, startTime, endTime, roleColumn])
+  @@index([scheduleId])
+}
+
+// ---------- CEO dashboard customization (OSC bridge) ----------
+
+// One row per CEO user PER CADENCE ("daily" | "monthly"): which departments
+// they've pinned to that Kanban board, and in what order. The Daily and
+// Monthly boards are fully independent — adding/removing/reordering on one
+// never touches the other. Personal to that CEO — doesn't affect
+// Superadmin's or anyone else's view. `departments` is an ordered JSON
+// string array of official department names.
+model CeoDashboardConfig {
+  id          String   @id @default(cuid())
+  userId      String
+  cadence     String
+  departments Json     @default("[]")
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, cadence])
+}
