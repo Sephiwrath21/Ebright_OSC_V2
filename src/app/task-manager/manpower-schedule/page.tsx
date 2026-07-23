@@ -79,101 +79,6 @@ export default async function ManpowerSchedulePage({
     }
   }
 
-  async function addRow(startTime: string, endTime: string): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await addScheduleRow(email, schedule.id, startTime, endTime);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
-  async function renameRow(
-    oldStartTime: string,
-    oldEndTime: string,
-    newStartTime: string,
-    newEndTime: string,
-  ): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await renameScheduleRow(email, schedule.id, oldStartTime, oldEndTime, newStartTime, newEndTime);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
-  async function deleteRow(startTime: string, endTime: string): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await deleteScheduleRow(email, schedule.id, startTime, endTime);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
-  async function addColumn(kind: "Coach" | "Exec"): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await addScheduleColumn(email, schedule.id, kind);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
-  async function deleteColumn(roleColumn: string): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await deleteScheduleColumn(email, schedule.id, roleColumn);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
   async function assignCell(
     slotId: string,
     assignedStaffId: string | null,
@@ -191,24 +96,6 @@ export default async function ManpowerSchedulePage({
     }
   }
 
-  async function publish(): Promise<ActionResult> {
-    "use server";
-    try {
-      const { schedule } = await getManpowerSchedule(email, date);
-      if (!schedule) {
-        return { ok: false, message: "No schedule exists for this date yet — create it first" };
-      }
-      await publishSchedule(email, schedule.id);
-      revalidatePath("/task-manager/manpower-schedule");
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
-      };
-    }
-  }
-
   let body: ReactNode;
   try {
     const [{ schedule, canEdit }, { staff }] = await Promise.all([
@@ -216,6 +103,126 @@ export default async function ManpowerSchedulePage({
       getFlowStaff(),
     ]);
     const branchStaff = schedule ? staff.filter((s) => s.branch === schedule.branch) : staff;
+
+    // The six actions below close over this request's already-fetched
+    // schedule id instead of re-fetching the whole grid on every mutation;
+    // the null-guard is pure defense-in-depth since the grid only renders
+    // these controls once a schedule exists.
+    const scheduleId = schedule?.id;
+
+    async function addRow(startTime: string, endTime: string): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await addScheduleRow(email, scheduleId, startTime, endTime);
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
+
+    async function renameRow(
+      oldStartTime: string,
+      oldEndTime: string,
+      newStartTime: string,
+      newEndTime: string,
+    ): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await renameScheduleRow(
+          email,
+          scheduleId,
+          oldStartTime,
+          oldEndTime,
+          newStartTime,
+          newEndTime,
+        );
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
+
+    async function deleteRow(startTime: string, endTime: string): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await deleteScheduleRow(email, scheduleId, startTime, endTime);
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
+
+    async function addColumn(kind: "Coach" | "Exec"): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await addScheduleColumn(email, scheduleId, kind);
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
+
+    async function deleteColumn(roleColumn: string): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await deleteScheduleColumn(email, scheduleId, roleColumn);
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
+
+    async function publish(): Promise<ActionResult> {
+      "use server";
+      try {
+        if (!scheduleId) {
+          return { ok: false, message: "No schedule exists for this date yet — create it first" };
+        }
+        await publishSchedule(email, scheduleId);
+        revalidatePath("/task-manager/manpower-schedule");
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE,
+        };
+      }
+    }
 
     body = (
       <ManpowerScheduleGrid

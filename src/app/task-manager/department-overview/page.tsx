@@ -8,7 +8,7 @@ import { auth } from "@/auth";
 import AppShell from "@/app/components/AppShell";
 import {
   getDepartmentDetail,
-  getFlowDetail,
+  getFlowOverview,
   FlowBridgeError,
   NoAccountError,
   SetupPendingError,
@@ -67,12 +67,14 @@ export default async function DepartmentOverviewPage({
   let isOrgRole = false;
   let department = "";
   try {
-    // Fetched first just to learn the viewer's role/own-department.
-    const identity = await getFlowDetail(email, "daily");
+    // Fetched first just to learn the viewer's role/own-department — the
+    // personal overview payload carries the same me.role/me.department as
+    // the full role-scoped detail, without its org-wide fan-out.
+    const identity = await getFlowOverview(email, "daily");
     isOrgRole =
-      identity.me.me.role === "ADMIN" ||
-      identity.me.me.role === "CEO" ||
-      identity.me.me.role === "OPS";
+      identity.me.role === "ADMIN" ||
+      identity.me.role === "CEO" ||
+      identity.me.role === "OPS";
 
     const requested =
       sp.department && (FLOW_DEPARTMENTS as readonly string[]).includes(sp.department)
@@ -80,7 +82,7 @@ export default async function DepartmentOverviewPage({
         : null;
     department =
       requested ??
-      (isOrgRole ? FLOW_DEPARTMENTS[0] : (identity.me.me.department ?? FLOW_DEPARTMENTS[0]));
+      (isOrgRole ? FLOW_DEPARTMENTS[0] : (identity.me.department ?? FLOW_DEPARTMENTS[0]));
 
     const [daily, monthly] = await Promise.all([
       getDepartmentDetail(email, department, "daily"),
