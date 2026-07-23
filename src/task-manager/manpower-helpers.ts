@@ -93,7 +93,7 @@ export async function loadAdhocFlow() {
   });
   const block = flow?.blocks[0];
   if (!flow || !block) {
-    throw new ApiHttpError(500, "Ad hoc utility flow missing — reseed the database");
+    throw new ApiHttpError(500, "Ad hoc utility flow missing — run the seed/bootstrap");
   }
   const snapshot = (await buildTemplateSnapshot(flow.id)) as unknown as Prisma.InputJsonValue;
   return { flow, block, snapshot };
