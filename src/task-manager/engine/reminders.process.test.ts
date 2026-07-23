@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   notificationCreate: vi.fn(),
   auditCreate: vi.fn(),
   transaction: vi.fn(),
+  getReminderQueue: vi.fn(),
   queueAdd: vi.fn(),
   queueRemove: vi.fn(),
   sendEmail: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("../prisma", () => ({
   },
 }));
 vi.mock("../lib/queues", () => ({
-  getReminderQueue: () => ({ add: mocks.queueAdd, remove: mocks.queueRemove }),
+  getReminderQueue: mocks.getReminderQueue,
   // Mirrors src/lib/queues.ts — deterministic id per (runBlock, strike#).
   reminderJobId: (runBlockId: string, strike: number) => `reminder:${runBlockId}:${strike}`,
 }));
@@ -118,6 +119,7 @@ beforeEach(() => {
         auditLog: { create: mocks.auditCreate },
       }),
   );
+  mocks.getReminderQueue.mockReturnValue({ add: mocks.queueAdd, remove: mocks.queueRemove });
   mocks.queueAdd.mockResolvedValue({});
   mocks.queueRemove.mockResolvedValue({});
   mocks.sendEmail.mockResolvedValue({ id: "mail-1" });
@@ -355,5 +357,28 @@ describe("processReminder — skip paths (no writes, no emails, no jobs)", () =>
     expect(mocks.runBlockUpdateMany).not.toHaveBeenCalled();
     expect(mocks.queueAdd).not.toHaveBeenCalled();
     expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("processReminder — reminder queue unavailable (REDIS_URL unset by design)", () => {
+  it("still applies the strike/status transaction and sends the reminder when getReminderQueue throws", async () => {
+    mocks.runBlockFindUnique.mockResolvedValue(runBlock({ strikeCount: 0 }));
+    mocks.getReminderQueue.mockImplementationOnce(() => {
+      throw new Error("REDIS_URL is not set — reminder scheduling disabled");
+    });
+
+    await expect(processReminder("rb1")).resolves.toBeUndefined();
+
+    expect(mocks.queueAdd).not.toHaveBeenCalled();
+    expect(mocks.runBlockUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: "rb1",
+        status: { in: ["ACTIVE", "OVERDUE"] },
+        strikeCount: 0,
+        run: { status: "ACTIVE" },
+      },
+      data: { strikeCount: 1, reminderJobId: "reminder:rb1:2" },
+    });
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
   });
 });

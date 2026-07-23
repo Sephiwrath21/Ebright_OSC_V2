@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   txRunBlockCreate: vi.fn(),
   txRunBlockCount: vi.fn(),
   txFlowRunUpdateMany: vi.fn(),
+  getReminderQueue: vi.fn(),
   queueAdd: vi.fn(),
   queueRemove: vi.fn(),
   getUsersByIds: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock("../prisma", () => ({
   },
 }));
 vi.mock("../lib/queues", () => ({
-  getReminderQueue: () => ({ add: mocks.queueAdd, remove: mocks.queueRemove }),
+  getReminderQueue: mocks.getReminderQueue,
   reminderJobId: (runBlockId: string, strike: number) => `reminder:${runBlockId}:${strike}`,
 }));
 vi.mock("../lib/users", () => ({ getUsersByIds: mocks.getUsersByIds }));
@@ -149,6 +150,7 @@ beforeEach(() => {
   );
   mocks.txRunBlockCount.mockResolvedValue(0);
   mocks.txFlowRunUpdateMany.mockResolvedValue({ count: 1 });
+  mocks.getReminderQueue.mockReturnValue({ add: mocks.queueAdd, remove: mocks.queueRemove });
   mocks.queueAdd.mockResolvedValue({});
   mocks.queueRemove.mockResolvedValue({});
   mocks.getUsersByIds.mockResolvedValue(new Map([[ASSIGNEE.id, ASSIGNEE]]));
@@ -291,5 +293,26 @@ describe("completeBlock — fan-in P2002 backstop", () => {
 
     await expect(completeBlock(input)).rejects.toThrow("connection lost");
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("completeBlock — reminder queue unavailable (REDIS_URL unset by design)", () => {
+  it("still completes and marks the block DONE when getReminderQueue throws", async () => {
+    const snap = snapshot([snapBlock("blk-a", "node-a", ["node-b"]), snapBlock("blk-b", "node-b")]);
+    mocks.runBlockFindUnique.mockResolvedValue(runBlockRow(snap));
+    mocks.txRunBlockCount.mockResolvedValue(1);
+    mocks.getReminderQueue.mockImplementationOnce(() => {
+      throw new Error("REDIS_URL is not set — reminder scheduling disabled");
+    });
+
+    const result = await completeBlock(input);
+
+    expect(result.activatedNodeIds).toEqual(["node-b"]);
+    expect(mocks.txRunBlockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "rb-a", status: { notIn: ["DONE", "SKIPPED"] } },
+        data: expect.objectContaining({ status: "DONE", reminderJobId: null }),
+      }),
+    );
   });
 });

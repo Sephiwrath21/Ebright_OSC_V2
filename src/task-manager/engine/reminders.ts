@@ -191,7 +191,18 @@ export async function processReminder(runBlockId: string): Promise<void> {
     try {
       return getReminderQueue();
     } catch (err) {
-      console.error(`[reminders] reminder queue unavailable for ${runBlockId}`, err);
+      // REDIS_URL is permanently unset in this deployment, so that specific
+      // failure is a known, by-design state — warn calmly instead of an
+      // error-with-stack per reminder firing; genuine mid-operation queue
+      // failures stay loud.
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("REDIS_URL is not set")) {
+        console.warn(
+          `[reminders] reminders disabled (REDIS_URL unset) — skipping re-queue for ${runBlockId}`,
+        );
+      } else {
+        console.error(`[reminders] reminder queue unavailable for ${runBlockId}`, err);
+      }
       return null;
     }
   })();

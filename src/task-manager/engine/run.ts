@@ -107,8 +107,18 @@ async function scheduleReminder(
       data: { reminderJobId: jobId },
     });
   } catch (err) {
-    // A broken queue must not corrupt the run itself — log and continue.
-    console.error(`[engine] failed to schedule reminder for runBlock ${runBlock.id}`, err);
+    // A broken queue must not corrupt the run itself — log and continue. REDIS_URL
+    // is permanently unset in this deployment, so that specific failure is a known,
+    // by-design state — warn calmly instead of an error-with-stack per block
+    // activation; genuine mid-operation queue failures stay loud.
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("REDIS_URL is not set")) {
+      console.warn(
+        `[engine] reminders disabled (REDIS_URL unset) — skipping schedule for runBlock ${runBlock.id}`,
+      );
+    } else {
+      console.error(`[engine] failed to schedule reminder for runBlock ${runBlock.id}`, err);
+    }
   }
 }
 
