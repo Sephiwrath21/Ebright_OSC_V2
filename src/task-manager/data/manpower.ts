@@ -42,7 +42,7 @@ async function loadGrid(branch: string, date: string) {
     ),
   ];
   const staff = staffIds.length
-    ? await prisma.user.findMany({ where: { id: { in: staffIds } } })
+    ? await prisma.user.findMany({ where: { id: { in: staffIds } }, select: { id: true, name: true } })
     : [];
   const nameById = new Map(staff.map((u) => [u.id, u.name]));
 
@@ -173,7 +173,7 @@ export function renameScheduleRow(
       .parse({ scheduleId, oldStartTime, oldEndTime, newStartTime, newEndTime });
     assertOrder(body.newStartTime, body.newEndTime);
     const actor = await requireUserByEmail(email);
-    await requireEditableSchedule(actor, body.scheduleId);
+    const schedule = await requireEditableSchedule(actor, body.scheduleId);
 
     const slots = await prisma.scheduleSlot.findMany({
       where: { scheduleId: body.scheduleId, startTime: body.oldStartTime, endTime: body.oldEndTime },
@@ -188,9 +188,7 @@ export function renameScheduleRow(
       // Update the linked task in place — same slot, same assignee, new time.
       if (slot.runBlockId) {
         const blockTitle = `${slot.roleColumn} shift (${body.newStartTime}–${body.newEndTime})`;
-        const d = parseLocalDate(
-          (await prisma.manpowerSchedule.findUniqueOrThrow({ where: { id: body.scheduleId } })).date,
-        );
+        const d = parseLocalDate(schedule.date);
         const [endHour, endMinute] = body.newEndTime.split(":").map(Number);
         const dueAt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), endHour, endMinute);
         const runBlock = await prisma.runBlock.update({
@@ -409,6 +407,9 @@ export function publishSchedule(
       });
       const nameById = new Map(assignees.map((u) => [u.id, u.name]));
       const adhoc = await loadAdhocFlow();
+      // Known window (donor parity): a crash between createSlotRun and the
+      // link-back update can orphan a run; re-publish would then duplicate
+      // that slot's task. Hardening ticket: wrap per-slot sync in a transaction.
       for (const slot of toSync) {
         const assigneeId = slot.assignedStaffId as string;
         const runBlockId = await createSlotRun(adhoc, {

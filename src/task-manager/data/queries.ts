@@ -116,6 +116,8 @@ export function getFlowDetail(
   }, "getFlowDetail");
 }
 
+// Deliberately no per-user auth (donor parity): call sites must sit behind
+// session auth. Returns the PII-free staff subset only.
 /** Assignable staff directory (recipient picker options). */
 export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
   return native(async () => {

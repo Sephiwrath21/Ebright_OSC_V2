@@ -62,6 +62,8 @@ export function saveCeoDashboardConfig(
     const user = await requireCeo(email);
     // De-dupe while preserving order.
     const deduped = [...new Set(body.departments)];
+    // Known, accepted last-write-wins: single-owner preference data; overlapping
+    // actions self-heal via revalidatePath on next render.
     await prisma.ceoDashboardConfig.upsert({
       where: { userId_cadence: { userId: user.id, cadence: body.cadence } },
       create: { userId: user.id, cadence: body.cadence, departments: deduped },

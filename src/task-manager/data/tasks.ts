@@ -144,6 +144,10 @@ export function assignFlowTask(
     }
     const cadence: Cadence = CADENCE_ENUM[body.cadence];
 
+    // Pairs touch disjoint rows — no shared transaction ties them together
+    // (each create was already its own implicit transaction in the donor's
+    // loop form), so they run concurrently on purpose. Do not "fix" into a
+    // sequential loop.
     const pairs = targets.flatMap((target) => occurrences.map((occ) => ({ target, occ })));
     const runIds = await Promise.all(
       pairs.map(async ({ target, occ }) => {
