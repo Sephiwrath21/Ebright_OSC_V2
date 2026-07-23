@@ -578,9 +578,11 @@ export function TaskManagerView({
 }) {
   const current = period === "daily" ? daily : monthly;
   const me = current.me;
+  // Donor passed hrefs already carrying `?email=`; this repo passes bare paths.
+  const deptHrefSep = departmentOverviewHref?.includes("?") ? "&" : "?";
   const deptHref = departmentOverviewHref
     ? (department: string) =>
-        `${departmentOverviewHref}&department=${encodeURIComponent(department)}`
+        `${departmentOverviewHref}${deptHrefSep}department=${encodeURIComponent(department)}`
     : undefined;
   // Branch-side MEMBER (Branch Exec/Coach — Manager is role BRANCH, handled
   // separately) sees Daily only, never Monthly: no Monthly "My Status" donut,
