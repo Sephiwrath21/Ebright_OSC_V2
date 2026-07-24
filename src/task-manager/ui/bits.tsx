@@ -42,6 +42,39 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
   );
 }
 
+/** Page-level divider between major page areas (e.g. the read-only Overview
+ *  grids vs. the action-oriented Details/assign area). */
+export function PageSectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+      {children}
+    </h2>
+  );
+}
+
+/** White card with an uppercase title row and optional right-aligned action. */
+export function SectionCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+          {title}
+        </h3>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** 3-segment status donut (SVG stroke arcs), center = children (count or %). */
 export function StatusDonut({
   totals,

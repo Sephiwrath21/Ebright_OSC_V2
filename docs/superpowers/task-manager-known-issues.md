@@ -117,6 +117,32 @@
   neither can be silently renamed. Disambiguation candidate (e.g.
   distinguishing subtext or grouping) for a future UX pass.
 
+## Login-source discovery (2026-07-24, staging cutover)
+
+- **OSC logins are real staff, not demo.** The app's `users` table lives in
+  the `hrfs` database on the shared Postgres server (staging and production
+  share it; dev connects to the same server): 223 active accounts — ~210
+  real staff with personal emails, plus role accounts `od@ebright.my`
+  (superadmin), `kevinkhoo@ebright.my` (ceo), 5 `department` accounts
+  (`academy/finance/hr/marketing/operations@ebright.my`), 4 `branch`
+  accounts. The earlier working assumption that OSC held demo users is
+  wrong.
+- **The TM demo seed (89 donor accounts) overlaps ZERO of those login
+  emails**, so after the staging DB cutover every real login hits the
+  NoAccountCard until a TM account exists for its email. Interim: insert
+  rows for the accounts testers actually use (e.g. `od@ebright.my` as
+  ADMIN). Real fix: `tm:bootstrap` once mapping decisions land.
+- **Unverified: does `ebright_hrfs."User"` (bootstrap's import source, 183
+  rows) cover the emails in `hrfs.users` (the login source, 223 active)?**
+  They are different databases. An overlap check was attempted 2026-07-24
+  but blocked by tool permissions. Must be verified before treating
+  bootstrap as sufficient for cutover — any active login email missing from
+  `ebright_hrfs` will still see NoAccountCard after bootstrap. Known
+  present in both: `kevinkhoo@ebright.my`, `iqbalhakim216@gmail.com`.
+- **`diag-emp-id.ts` is committed at the repo root** — leftover HRFS
+  diagnostic script from the migration work; harmless (reads env vars only)
+  but should be deleted in a future cleanup commit.
+
 ## HRFS mapping — decisions pending (user)
 
 All decisions land in `prisma/task-manager/hrfs-map.ts`'s `OVERRIDES`/

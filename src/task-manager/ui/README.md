@@ -17,8 +17,8 @@ Live demo of both surfaces (inside this repo): `/osc-demo`.
 | HOD | + "CEO assigned tasks" | HOD Daily · HOD Monthly · CEO Assigned · Department Daily · Department Monthly, + department roster (expandable per-member task lists) |
 | BRANCH (branch manager) | own branch meters | Branch Status Daily · Monthly · Ad hoc Tasks (OPS/Admin-started runs), + branch roster |
 | CEO | + "Assigned by me" meter | CEO Tasks (assigned by them) · all-departments Daily + Monthly donut grids |
-| OPS (Operation site) | same as CEO | Operation Department Status Daily + Monthly · all-branches Daily + Monthly grids · Ad hoc (NOT all departments) |
-| Superadmin (ADMIN) | same as CEO | all-departments Daily + Monthly grids · Branch Status by Region A/B/C Daily + Monthly · Ad hoc |
+| OPS (Operation site) | same as CEO | own Daily + Monthly + assigner streams · assign form (no org grids) |
+| Superadmin (ADMIN) | same as CEO | assign form + Department Overview link only — the org grids (all-departments Daily + Monthly · Branch Status by Region A/B/C Daily + Monthly · Ad hoc by Region) render on the OSC **Home page** instead (`home-overview.tsx` via `overview-grids.tsx`, wired in `src/app/home/overview-section.tsx`) |
 
 The page needs BOTH periods: call `getFlowDetail(email, "daily")` and
 `getFlowDetail(email, "monthly")` and pass them as `daily`/`monthly` props.

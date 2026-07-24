@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   UserPlus,
   UserMinus,
@@ -14,12 +14,8 @@ import {
   ClipboardList,
   Compass,
   FileText,
-  ListTodo,
-  TrendingUp,
-  ArrowLeft,
 } from "lucide-react";
 import GreetingHeader from "./GreetingHeader";
-import ClickUpPieChart from "./ClickUpPieChart";
 
 const TICKET_COLORS: Record<string, string> = {
   LEAD: "#ed1c24",
@@ -56,29 +52,22 @@ interface TicketCategory {
   total: number;
 }
 
-interface ClickUpTask {
-  id: string;
-  name: string;
-  status: string;
-  listName: string;
-  url: string;
-  completed: boolean;
-}
-
 interface EventItem {
   id: string;
   name: string;
   status: "upcoming" | "ongoing" | "completed";
 }
 
-// ClickUpPieChart is imported from a shared file
-
 export default function ODDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered Task Manager overview section (superadmin org grids) —
+   *  rendered full-width below the main dashboard grid. */
+  taskOverview?: ReactNode;
 }) {
   const dummyTickets = [
     { name: "Aone", count: 3, total: 5 },
@@ -86,21 +75,6 @@ export default function ODDashboard({
     { name: "Leads", count: 2, total: 6 },
     { name: "Clickup", count: 5, total: 10 },
     { name: "Others", count: 1, total: 4 },
-  ];
-
-  const dummyDistribution = {
-    PENDING: 343,
-    COMPLETE: 651,
-    "NOT APPLICABLE": 3,
-    "N/A": 9,
-  };
-
-  const dummyDailyTasks = [
-    { id: "86d3g0gcw", name: "1800: Update Daily Intern Logsheet", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcy", name: "1730: Meet Iqbal to show the progress", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcz", name: "AOne Task verify", status: "PENDING", listName: "AOne (SMS)", url: "#" },
-    { id: "86d3g0gd0", name: "Process Street SOP update", status: "COMPLETE", listName: "PS", url: "#" },
-    { id: "86d3g0gd1", name: "Daily check of CRM Leads", status: "COMPLETE", listName: "CNS (CRM)", url: "#" },
   ];
 
   const greetName =
@@ -121,18 +95,6 @@ export default function ODDashboard({
   // --- Tickets State (DB-backed) ---
   const [tickets, setTickets] = useState<TicketCategory[]>([]);
 
-  // --- ClickUp Tasks State (ClickUp API-backed) ---
-  const [clickupTasks, setClickupTasks] = useState<ClickUpTask[]>([]);
-  const [clickupConfigured, setClickupConfigured] = useState(false);
-  const [dailyDistribution, setDailyDistribution] = useState({
-    PENDING: 0,
-    COMPLETE: 0,
-    "NOT APPLICABLE": 0,
-    "N/A": 0,
-  });
-  const [dailyTasks, setDailyTasks] = useState<any[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-
   // --- Project Rollout State (localStorage) ---
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
@@ -151,16 +113,6 @@ export default function ODDashboard({
         if (d.success) {
           if (d.attendance) setAttendance(d.attendance);
           if (d.tickets) setTickets(d.tickets);
-          if (d.clickup) {
-            setClickupConfigured(d.clickup.configured);
-            setClickupTasks(d.clickup.tasks);
-            if (d.clickup.dailyDistribution) {
-              setDailyDistribution(d.clickup.dailyDistribution);
-            }
-            if (d.clickup.dailyTasks) {
-              setDailyTasks(d.clickup.dailyTasks);
-            }
-          }
         }
         setLoading(false);
       })
@@ -254,41 +206,6 @@ export default function ODDashboard({
       loadBackend();
     }
   };
-
-  // --- ClickUp Actions (Post to ClickUp API) ---
-  const toggleClickupTask = async (taskId: string, currentCompleted: boolean) => {
-    const nextCompleted = !currentCompleted;
-
-    // Optimistic update
-    setClickupTasks(
-      clickupTasks.map((t) => (t.id === taskId ? { ...t, completed: nextCompleted } : t))
-    );
-
-    try {
-      const res = await fetch("/api/od/dashboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "update_clickup_task",
-          taskId,
-          completed: nextCompleted,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to update task in ClickUp");
-    } catch (error) {
-      console.error(error);
-      // Reload on failure
-      loadBackend();
-    }
-  };
-
-  const completedClickupTasksCount = clickupTasks.filter((t) => t.completed).length;
-  const clickupPercentage = clickupTasks.length > 0 ? Math.round((completedClickupTasksCount / clickupTasks.length) * 100) : 0;
-
-  // Circular progress properties
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (clickupPercentage / 100) * circumference;
 
 
 
@@ -514,76 +431,13 @@ export default function ODDashboard({
               </div>
             </div>
 
-            {/* 5. ClickUp Optimization Progress - CLICKUP API BACKED */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-slate-800">
-              <div>
-                {selectedStatus === null ? (
-                  <>
-                    <h2 className="text-base font-semibold text-slate-900 mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <ListTodo className="w-5 h-5 text-teal-500" />
-                        Daily | Tue - Sat
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                        {clickupConfigured ? "API Connected" : "Demo Mode"}
-                      </span>
-                    </h2>
-
-                    <div className="flex justify-center items-center py-1">
-                      <ClickUpPieChart
-                        distribution={clickupConfigured ? dailyDistribution : dummyDistribution}
-                        onSliceClick={setSelectedStatus}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                      <button
-                        onClick={() => setSelectedStatus(null)}
-                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors flex items-center gap-1 text-xs font-bold"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Chart
-                      </button>
-                      <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                        {selectedStatus} ({(clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length})
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                      {((clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length === 0) ? (
-                        <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
-                      ) : (
-                        (clickupConfigured ? dailyTasks : dummyDailyTasks)
-                          .filter((t) => t.status === selectedStatus)
-                          .map((t) => (
-                            <a
-                              key={t.id}
-                              href={t.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-start gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs transition-all duration-200"
-                            >
-                              <span className="font-mono text-[10px] text-slate-400 font-bold">#{t.id}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-slate-700 leading-tight hover:underline">{t.name}</p>
-                                <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-                                  List: {t.listName}
-                                </p>
-                              </div>
-                            </a>
-                          ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
           </div>
 
         </div>
+
+        {/* Task Manager org overview (superadmin) — server-rendered slot,
+            full-width below the main dashboard grid. */}
+        {taskOverview}
 
       </div>
     </div>
