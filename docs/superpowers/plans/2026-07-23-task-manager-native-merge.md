@@ -2873,6 +2873,8 @@ RUN npx prisma generate --config prisma.task-manager.config.ts
 
 (The `COPY prisma ./prisma/` line already brings `prisma/task-manager/**` along — only the root-level config file needs its own COPY.)
 
+> **Note (added after this plan was written, per review):** the container also needs `TZ=Asia/Kuala_Lumpur` plus `apk add tzdata`, because the task engine's day-boundary/dueAt math runs on process-local time and the business is MYT — and `node:20-alpine` ships no zoneinfo database, so a bare `TZ` env silently no-ops without `tzdata`. `src/lib/myt.ts` was verified fixed-offset/UTC (TZ-independent) first, so this can't regress the existing OSC attendance/scanner features built on it.
+
 - [ ] **Step 2: CI validate job — generate the second client**
 
 In `.github/workflows/deploy.yml`, after the existing "Generate Prisma client" step (lines 28–29), add:
