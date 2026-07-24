@@ -5,8 +5,11 @@
 //   Staff (MEMBER):  My Status Daily · My Status Monthly · {HOD/CEO/…} Assigned
 //   HOD:             My Daily · My Monthly · CEO Assigned · Department D + M
 //   BRANCH:          Branch Status Daily · Monthly · Ad hoc tasks
-//   CEO:             CEO Tasks (assigned by me) · all-departments D + M grids
-//   OPS/ADMIN:       as CEO + all-branches grids
+//   CEO:             CEO Tasks (assigned by me) · pinned-department boards
+//   OPS:             own Daily/Monthly + assign form (no org grids)
+//   ADMIN:           assign form only — the org-wide overview grids
+//                    (all-departments + branch-by-region, overview-grids.tsx)
+//                    render on the OSC Home page instead (home-overview.tsx)
 // No role has a Daily/Monthly toggle anywhere on this page — every donut,
 // list, and roster shows BOTH periods simultaneously, side by side (or
 // stacked, for the longer list-style sections). Every drillable donut opens
@@ -24,7 +27,6 @@ import type {
   AssignActionResult,
   FlowAssignInput,
   FlowDetailResponse,
-  FlowEntityRollup,
   FlowMemberRollup,
   FlowPeriod,
   FlowTaskRow,
@@ -32,7 +34,6 @@ import type {
 import {
   flowBucketize,
   flowBucketTotal,
-  flowCompletionPct,
   flowDedupeTasks,
   flowStreamLabel,
   visibleAssignerStreams,
@@ -42,46 +43,13 @@ import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
-  BUCKET_META,
   CompletionMeter,
-  EntityDrillModal,
   InitialAvatar,
+  PageSectionHeading,
   ResizableTaskList,
-  StatusDonut,
+  SectionCard,
   StatusOverviewCard,
 } from "./bits";
-
-/** Page-level divider between the read-only Overview and the action-oriented
- *  Details area (superadmin/OPS: department+branch grids vs. the assign form). */
-function PageSectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
-      {children}
-    </h2>
-  );
-}
-
-function SectionCard({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-          {title}
-        </h3>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 const WEEKDAY_NAMES = [
   "Sunday",
@@ -334,175 +302,6 @@ function MemberRow({
         </div>
       )}
     </div>
-  );
-}
-
-/** Fallback for entities with no `tasks` data (undrillable — see `drillable`
- *  below), so EntityDrillModal always gets a valid (empty) shape. */
-const EMPTY_DRILL_TASKS: Record<import("./bits").BucketKey, import("./types").FlowDrillTask[]> = {
-  completed: [],
-  pending: [],
-  na: [],
-};
-
-/** Mini donut block for the all-departments / all-branches overview grids.
- *  Clicking a segment (or a legend count) pops out that bucket's tasks. */
-function MiniDonutBlock({
-  entity,
-  nameHref,
-}: {
-  entity: FlowEntityRollup;
-  /** When given, the entity's name links out (e.g. to its full Department
-   *  Overview page) instead of being plain text. */
-  nameHref?: string;
-}) {
-  const [drill, setDrill] = React.useState<"completed" | "pending" | "na" | null>(null);
-  const drillable = Boolean(entity.tasks);
-
-  return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm">
-      {nameHref ? (
-        <a
-          href={nameHref}
-          className="w-full truncate text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
-        >
-          {entity.name}
-        </a>
-      ) : (
-        <p className="w-full truncate text-center text-sm font-semibold text-gray-900">
-          {entity.name}
-        </p>
-      )}
-      <StatusDonut
-        totals={entity}
-        size={88}
-        strokeWidth={12}
-        onSegmentClick={drillable ? setDrill : undefined}
-      >
-        <span className="text-sm font-bold text-gray-900">
-          {flowCompletionPct(entity)}%
-        </span>
-      </StatusDonut>
-      <div className="flex gap-3 text-xs text-gray-500">
-        {BUCKET_META.map((b) =>
-          drillable ? (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setDrill(b.key)}
-              className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100"
-            >
-              <span className={`size-2 rounded-full ${b.dot}`} />
-              {entity[b.key]}
-            </button>
-          ) : (
-            <span key={b.key} className="flex items-center gap-1">
-              <span className={`size-2 rounded-full ${b.dot}`} />
-              {entity[b.key]}
-            </span>
-          ),
-        )}
-      </div>
-      {drill && (
-        <EntityDrillModal
-          name={entity.name}
-          tasks={entity.tasks ?? EMPTY_DRILL_TASKS}
-          bucketKey={drill}
-          onClose={() => setDrill(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function EntityDonutGrid({
-  title,
-  entities,
-  nameHref,
-}: {
-  title: string;
-  entities: FlowEntityRollup[];
-  /** Builds each entity's link-out URL (e.g. Department Overview), by name. */
-  nameHref?: (name: string) => string;
-}) {
-  return (
-    <SectionCard title={title}>
-      {entities.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">No activity.</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {entities.map((e) => (
-            <MiniDonutBlock key={e.name} entity={e} nameHref={nameHref?.(e.name)} />
-          ))}
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-/**
- * Superadmin's branch view: donut grids grouped under Region A / B / C. When
- * `roleVariants` is given, pills (All / Manager / Branch Exec / Coach) filter
- * the grids to that staff role's tasks — "daily separate to manager,
- * exec, coach".
- */
-function RegionDonutGrids({
-  title,
-  regions,
-  roleVariants,
-}: {
-  title: string;
-  regions: { name: string; branches: FlowEntityRollup[] }[];
-  roleVariants?: {
-    role: string;
-    regions: { name: string; branches: FlowEntityRollup[] }[];
-  }[];
-}) {
-  const [selectedRole, setSelectedRole] = React.useState("All");
-  const shown =
-    selectedRole === "All"
-      ? regions
-      : (roleVariants?.find((v) => v.role === selectedRole)?.regions ?? []);
-
-  return (
-    <SectionCard
-      title={title}
-      action={
-        roleVariants && (
-          <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
-            {["All", ...roleVariants.map((v) => v.role)].map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setSelectedRole(r)}
-                className={`rounded-md px-2.5 py-1 ${
-                  selectedRole === r ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        )
-      }
-    >
-      {shown.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">
-          No {selectedRole === "All" ? "" : `${selectedRole.toLowerCase()} `}activity.
-        </p>
-      ) : (
-        shown.map((region) => (
-          <div key={region.name} className="mb-5 last:mb-0">
-            <p className="mb-2 text-sm font-semibold text-gray-700">{region.name}</p>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {region.branches.map((b) => (
-                <MiniDonutBlock key={b.name} entity={b} />
-              ))}
-            </div>
-          </div>
-        ))
-      )}
-    </SectionCard>
   );
 }
 
@@ -884,14 +683,15 @@ export function TaskManagerView({
 
       {current.kind === "org" && me.me.role !== "CEO" && (
         <>
-          {/* Superadmin (ADMIN) gets NO personal cards — just the
-              department + branch status grids and the assign form below. OPS
+          {/* Superadmin (ADMIN) gets NO personal cards — just the assign
+              form below (its org-wide status grids render on the OSC Home
+              page now — ui/home-overview.tsx). OPS
               is a regular individual staff member for THIS section — her own
               Daily/Monthly status + assigner streams (incl. "HOD assigned
               tasks"), same pattern as any other staff member's personal
               overview, and NOTHING else on this page: no Ad hoc card (Branch/
               Manager context), no Department/Branch status grids (Superadmin-
-              only, see below) — her org page is deliberately scoped down to
+              only, on Home) — her org page is deliberately scoped down to
               just her own tasks + the assign form. Daily/Monthly always
               render as a pair (matching Member/HOD's own status, which is
               never data-gated either) — an empty one just shows a 0/0/0 ring
@@ -915,54 +715,9 @@ export function TaskManagerView({
             </div>
           )}
 
-          {/* ---- Overview: read-only department/branch status grids ---- */}
-          <PageSectionHeading>Overview</PageSectionHeading>
-
-          {/* All-departments grid: Superadmin ONLY. OPS's org page is scoped
-              down to just her own Daily/Monthly + assigner streams (above)
-              and the assign form (below) — no org-wide oversight grids. */}
-          {me.me.role === "ADMIN" && daily.org && (
-            <EntityDonutGrid
-              title="All Departments — Daily"
-              entities={daily.org.departments}
-              nameHref={deptHref}
-            />
-          )}
-          {me.me.role === "ADMIN" && monthly.org && (
-            <EntityDonutGrid
-              title="All Departments — Monthly"
-              entities={monthly.org.departments}
-              nameHref={deptHref}
-            />
-          )}
-          {/* Superadmin only: branch status grouped by region — Daily
-              combines all three staff roles (Manager/Branch Exec/Coach);
-              Monthly is Manager only. No role-filter buttons — each grid is
-              fixed to its rule. */}
-          {me.me.role === "ADMIN" && daily.org && (
-            <RegionDonutGrids
-              title="Branch Status by Region — Daily"
-              regions={daily.org.regions}
-            />
-          )}
-          {me.me.role === "ADMIN" && monthly.org && (
-            <RegionDonutGrids
-              title="Branch Status by Region — Monthly (Manager)"
-              regions={
-                monthly.org.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []
-              }
-            />
-          )}
-          {/* Ad hoc tasks: a branch-level concept (the "+ Assigned task —
-              Branch" form's output) — grouped right after branch status, same
-              by-region layout, Manager-level staff only. All-time. Superadmin
-              only, same as the two grids above. */}
-          {me.me.role === "ADMIN" && daily.adhocByRegion && (
-            <RegionDonutGrids
-              title="Ad hoc Tasks by Region (Manager)"
-              regions={daily.adhocByRegion.regions}
-            />
-          )}
+          {/* The org-wide overview grids (all-departments + branch-by-region
+              + ad hoc by region, Superadmin only) moved to the OSC Home page
+              — see ui/home-overview.tsx. This page keeps the assign form. */}
 
           {/* ---- Details: administrative actions (assign tasks) ---- */}
           {(me.me.role === "ADMIN" || me.me.role === "OPS") && assignAction && staff && (
