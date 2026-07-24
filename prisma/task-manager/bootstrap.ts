@@ -18,7 +18,7 @@
 import { Pool } from "pg";
 import { Prisma } from "../../src/generated/task-manager-client";
 import { prisma } from "../../src/task-manager/prisma";
-import { EXTRA_USERS, mapHrfsUser, type HrfsUserRow, type MappedUser } from "./hrfs-map";
+import { diffUserFields, EXTRA_USERS, mapHrfsUser, type HrfsUserRow, type MappedUser } from "./hrfs-map";
 
 const UTILITY_FLOWS = [
   { flowId: "flow-adhoc",        name: "Ad hoc Tasks",        icon: "⚡",  description: "One-off tasks assigned from the '+ Assigned task' quick form.", order: 2, blockId: "block-adhoc",        nodeId: "node-adhoc",        blockTitle: "Ad hoc task",        itemId: "item-adhoc-done" },
@@ -73,27 +73,46 @@ async function fetchHrfsRows(): Promise<HrfsUserRow[]> {
   }
 }
 
+/** One skipped row, kept structured (not just its printable reason string)
+ *  so callers can act on `email` directly — e.g. the real-run STALE check,
+ *  which needs to look each skipped email up in the Task Manager db. */
+interface SkippedRow {
+  email: string;
+  reason: string; // already "<email>: <message>" — see mapHrfsUser/below.
+}
+
 interface MapAllResult {
   hrfsRowCount: number;
   toImport: MappedUser[];
-  skipped: string[]; // one entry per skipped row, "<email>: <reason>"
+  skipped: SkippedRow[];
   warnings: string[]; // one entry per warning, "<email>: <warning>"
 }
 
 /** Maps every HRFS row through mapHrfsUser, appends EXTRA_USERS verbatim,
- *  and buckets the results — pure aggregation, no I/O. */
+ *  and buckets the results — pure aggregation, no I/O. Guards against HRFS
+ *  returning the same (lowercased) email twice: the FIRST occurrence is
+ *  mapped normally; every later one is skipped outright as a duplicate,
+ *  regardless of what its own row would otherwise have mapped to. */
 function mapAll(rows: HrfsUserRow[]): MapAllResult {
   const toImport: MappedUser[] = [];
-  const skipped: string[] = [];
+  const skipped: SkippedRow[] = [];
   const warnings: string[] = [];
+  const seenEmails = new Set<string>();
 
   for (const row of rows) {
+    const email = (row.email ?? "").trim().toLowerCase();
+    if (seenEmails.has(email)) {
+      skipped.push({ email, reason: `${email}: duplicate HRFS email` });
+      continue;
+    }
+    seenEmails.add(email);
+
     const result = mapHrfsUser(row);
     if (result.ok) {
       toImport.push(result.user);
       warnings.push(...result.warnings);
     } else {
-      skipped.push(result.reason);
+      skipped.push({ email, reason: result.reason });
     }
   }
   for (const extra of EXTRA_USERS) toImport.push(extra);
@@ -118,22 +137,30 @@ function extractUnresolvedBranchCodes(messages: string[]): string[] {
 function printSummary(result: MapAllResult, opts: { dryRun: boolean }): void {
   const deptWarnings = result.warnings.filter((w) => w.includes("no department override"));
   const branchWarnings = result.warnings.filter((w) => w.includes("unresolved branch code"));
-  const unresolvedCodes = extractUnresolvedBranchCodes([...result.skipped, ...branchWarnings]);
+  const duplicateSkips = result.skipped.filter((s) => s.reason.includes("duplicate HRFS email"));
+  const unresolvedCodes = extractUnresolvedBranchCodes([...result.skipped.map((s) => s.reason), ...branchWarnings]);
 
   console.log(`\n[bootstrap] ${opts.dryRun ? "DRY RUN — " : ""}mapping summary`);
   console.log(`[bootstrap]   HRFS ACTIVE rows fetched:   ${result.hrfsRowCount}`);
   console.log(`[bootstrap]   EXTRA_USERS appended:       ${EXTRA_USERS.length}`);
   console.log(`[bootstrap]   mapped for import:          ${result.toImport.length}`);
-  console.log(`[bootstrap]   skipped:                    ${result.skipped.length}`);
+  console.log(
+    `[bootstrap]   skipped:                    ${result.skipped.length} (of which ${duplicateSkips.length} duplicate HRFS emails)`,
+  );
   console.log(`[bootstrap]   "no department" warnings:   ${deptWarnings.length}`);
   console.log(`[bootstrap]   unresolved-branch warnings: ${branchWarnings.length}`);
   console.log(
     `[bootstrap]   unresolved branch codes actually encountered: ${unresolvedCodes.length ? unresolvedCodes.join(", ") : "(none)"}`,
   );
+  if (opts.dryRun && result.skipped.length > 0) {
+    console.log(
+      "[bootstrap]   note: STALE checks (does a skipped email still hold a Task Manager account?) only run on a real run, not --dry-run.",
+    );
+  }
 
   if (result.skipped.length > 0) {
     console.log("\n[bootstrap] SKIPPED (every one, with reason):");
-    for (const reason of result.skipped) console.log(`  - ${reason}`);
+    for (const s of result.skipped) console.log(`  - ${s.reason}`);
   }
   if (deptWarnings.length > 0) {
     console.log("\n[bootstrap] \"NO DEPARTMENT\" WARNINGS (imported anyway, department = null):");
@@ -166,6 +193,13 @@ async function upsertUsers(users: MappedUser[]): Promise<{ created: number; upda
     };
     const existing = await prisma.user.findUnique({ where: { email: user.email } });
     if (existing) {
+      // Loud, not silent: an OVERRIDES promotion removed (or any other
+      // mapping change) between runs would otherwise demote/rewrite an
+      // existing account with nobody noticing.
+      const changes = diffUserFields(existing, user);
+      if (changes.length > 0) {
+        console.log(`[bootstrap] CHANGED ${user.email}: ${changes.join(", ")}`);
+      }
       await prisma.user.update({ where: { email: user.email }, data });
       updated++;
     } else {
@@ -174,6 +208,23 @@ async function upsertUsers(users: MappedUser[]): Promise<{ created: number; upda
     }
   }
   return { created, updated };
+}
+
+/** Real-run only (dry-run never connects to the Task Manager database at
+ *  all — see the note printSummary prints instead). For each SKIPPED HRFS
+ *  row, checks whether that email already has a Task Manager account; if
+ *  so, prints a loud STALE line. "Skipped" only ever means "this run didn't
+ *  touch them" — it does NOT mean their existing account was deactivated or
+ *  removed; this makes that explicit instead of leaving it implicit. */
+async function printStaleSkipWarnings(skipped: SkippedRow[]): Promise<void> {
+  for (const s of skipped) {
+    const existing = await prisma.user.findUnique({ where: { email: s.email }, select: { role: true } });
+    if (existing) {
+      console.log(
+        `[bootstrap] STALE ${s.email}: skipped this run but still has a Task Manager account (role ${existing.role}) — row left untouched`,
+      );
+    }
+  }
 }
 
 /** WORKSPACE + 5 UTILITY FLOWS — reused as designed in the original
@@ -256,6 +307,8 @@ async function main() {
   if (dryRun) {
     return;
   }
+
+  await printStaleSkipWarnings(result.skipped);
 
   const { created, updated } = await upsertUsers(result.toImport);
   await provisionUtilityFlows();

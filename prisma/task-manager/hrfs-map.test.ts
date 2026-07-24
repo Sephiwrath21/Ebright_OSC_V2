@@ -5,14 +5,30 @@
 // overrides, it reads the module-level export, so that's the only way to
 // test that path. Each override test uses its own unique *.invalid email so
 // tests never collide with one another regardless of execution order.
-import { describe, expect, it } from "vitest";
-import { FLOW_BRANCH_REGIONS } from "../../src/task-manager/ui/types";
+//
+// hrfs-map.ts imports BRANCH_STAFF_ROLES from analytics/_lib.ts (for its
+// FLOW_STAFF_ROLES equivalence assertion — see hrfs-map.ts's file header),
+// which transitively imports the real src/task-manager/prisma singleton.
+// Mock it (and _lib.ts's other impure import) before anything else, same
+// pattern analytics/_lib.test.ts already uses — this keeps the whole suite
+// DB-free.
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/task-manager/prisma", () => ({ prisma: {} }));
+vi.mock("@/task-manager/lib/users", () => ({ getUsersByIds: vi.fn() }));
+
+import { BRANCH_STAFF_ROLES } from "../../src/task-manager/analytics/_lib";
+import { FLOW_BRANCH_REGIONS, FLOW_STAFF_ROLES } from "../../src/task-manager/ui/types";
 import {
   BRANCH_MAP,
+  diffUserFields,
+  EXTRA_USERS,
   mapHrfsUser,
   OVERRIDES,
   ROLE_MAP,
   UNRESOLVED_BRANCH_CODES,
+  validateHandEditedConfig,
+  type DiffableUserFields,
   type HrfsUserRow,
 } from "./hrfs-map";
 
@@ -286,9 +302,12 @@ describe("override precedence", () => {
   });
 
   it("can promote a role entirely (e.g. dept staff -> CEO), and the override's fields win", () => {
+    // department stays null here (not "CEO") — see validateHandEditedConfig:
+    // department must be a real FLOW_DEPARTMENTS value or null, matching the
+    // corrected OVERRIDES doc-comment example.
     OVERRIDES["promote-to-ceo@example.invalid"] = {
       role: "CEO",
-      department: "CEO",
+      department: null,
       employmentType: "CEO",
       branch: null,
       coachSchedule: null,
@@ -297,7 +316,7 @@ describe("override precedence", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.user.role).toBe("CEO");
-      expect(result.user.department).toBe("CEO");
+      expect(result.user.department).toBeNull();
       expect(result.user.employmentType).toBe("CEO");
     }
   });
@@ -361,5 +380,134 @@ describe("ROLE_MAP completeness", () => {
     for (const role of observed) {
       expect(ROLE_MAP[role], `ROLE_MAP is missing an entry for "${role}"`).toBeDefined();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// load-time validation of the hand-edited config (review follow-up)
+// ---------------------------------------------------------------------------
+
+describe("validateHandEditedConfig", () => {
+  it("does not throw for the actual shipped OVERRIDES/EXTRA_USERS (this module already called it once at load time)", () => {
+    expect(() => validateHandEditedConfig(OVERRIDES, EXTRA_USERS)).not.toThrow();
+  });
+
+  it("throws naming the email, field, and value for a bad OVERRIDES department", () => {
+    const run = () =>
+      validateHandEditedConfig({ "bad-dept@example.invalid": { department: "Not A Real Department" } }, []);
+    expect(run).toThrow("bad-dept@example.invalid");
+    expect(run).toThrow("department");
+    expect(run).toThrow("Not A Real Department");
+  });
+
+  it("throws naming the email, field, and value for a bad OVERRIDES branch", () => {
+    const run = () => validateHandEditedConfig({ "bad-branch@example.invalid": { branch: "Atlantis" } }, []);
+    expect(run).toThrow("bad-branch@example.invalid");
+    expect(run).toThrow("branch");
+    expect(run).toThrow("Atlantis");
+  });
+
+  it("throws naming the email, field, and value for a bad EXTRA_USERS department", () => {
+    const run = () =>
+      validateHandEditedConfig({}, [
+        {
+          email: "extra-bad-dept@example.invalid",
+          name: "X",
+          role: "DEPT_SITE",
+          department: "Not A Real Department",
+          branch: null,
+          employmentType: null,
+          coachSchedule: null,
+        },
+      ]);
+    expect(run).toThrow("extra-bad-dept@example.invalid");
+    expect(run).toThrow("department");
+    expect(run).toThrow("Not A Real Department");
+  });
+
+  it("throws naming the email, field, and value for a bad EXTRA_USERS branch", () => {
+    const run = () =>
+      validateHandEditedConfig({}, [
+        {
+          email: "extra-bad-branch@example.invalid",
+          name: "X",
+          role: "BRANCH_SITE",
+          department: null,
+          branch: "Atlantis",
+          employmentType: null,
+          coachSchedule: null,
+        },
+      ]);
+    expect(run).toThrow("extra-bad-branch@example.invalid");
+    expect(run).toThrow("branch");
+    expect(run).toThrow("Atlantis");
+  });
+
+  it("does not throw when department/branch are null or absent (both are normal, valid states)", () => {
+    expect(() => validateHandEditedConfig({ "no-dept-no-branch@example.invalid": { role: "CEO" } }, [])).not.toThrow();
+  });
+
+  it("does not throw for a valid department and a valid branch", () => {
+    expect(() =>
+      validateHandEditedConfig({ "valid-override@example.invalid": { department: "Finance", branch: "Klang" } }, []),
+    ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FLOW_STAFF_ROLES / BRANCH_STAFF_ROLES equivalence (review follow-up —
+// branchPolicy() depends on this; hrfs-map.ts throws at load time on drift)
+// ---------------------------------------------------------------------------
+
+describe("FLOW_STAFF_ROLES / BRANCH_STAFF_ROLES equivalence", () => {
+  it("hrfs-map.ts loaded without throwing, which already proves its load-time assertion passed (ROLE_MAP is only reachable after it)", () => {
+    expect(ROLE_MAP.SUPER_ADMIN).toBeDefined();
+  });
+
+  it("are set-equal right now, independent of the load-time throw mechanism", () => {
+    expect(new Set(FLOW_STAFF_ROLES)).toEqual(new Set(BRANCH_STAFF_ROLES));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diffUserFields (review follow-up — the pure half of bootstrap.ts's new
+// CHANGED-line feature; lives here alongside MappedUser itself, bootstrap.ts
+// just imports it)
+// ---------------------------------------------------------------------------
+
+describe("diffUserFields", () => {
+  const base: DiffableUserFields = {
+    role: "MEMBER",
+    department: "Operation",
+    branch: null,
+    employmentType: "Full Time",
+    coachSchedule: null,
+  };
+
+  it("returns [] when nothing changed", () => {
+    expect(diffUserFields(base, { ...base })).toEqual([]);
+  });
+
+  it('reports a single changed field as "<field> <old>→<new>"', () => {
+    expect(diffUserFields(base, { ...base, role: "HOD" })).toEqual(["role MEMBER→HOD"]);
+  });
+
+  it("reports multiple changed fields, one per entry, in a fixed field order", () => {
+    const existing: DiffableUserFields = { ...base, role: "HOD" };
+    const next: DiffableUserFields = { ...base, department: null, branch: "Klang" };
+    expect(diffUserFields(existing, next)).toEqual([
+      "role HOD→MEMBER",
+      "department Operation→(none)",
+      "branch (none)→Klang",
+    ]);
+  });
+
+  it('formats null as "(none)" on either side', () => {
+    expect(diffUserFields({ ...base, coachSchedule: null }, { ...base, coachSchedule: "Full Time" })).toEqual([
+      "coachSchedule (none)→Full Time",
+    ]);
+    expect(diffUserFields({ ...base, coachSchedule: "Full Time" }, { ...base, coachSchedule: null })).toEqual([
+      "coachSchedule Full Time→(none)",
+    ]);
   });
 });

@@ -1,7 +1,7 @@
 // Pure mapping config + mapper for the HRFS-driven bootstrap (bootstrap.ts).
-// NO db access, NO side effects — safe to import from a unit test. Everything
-// here only ever touches its own module-level config objects and the
-// argument passed to mapHrfsUser().
+// mapHrfsUser() and every exported map/helper are pure functions/data — no
+// I/O, no side effects, safe to call from a unit test with plain object
+// literals.
 //
 // ---------------------------------------------------------------------------
 // WHY THIS EXISTS (see docs/superpowers/plans/2026-07-23-task-manager-native-
@@ -33,6 +33,17 @@
 // missing-department check, by contrast, runs AFTER OVERRIDES are applied,
 // because department assignment is inherently a per-person concern HRFS
 // cannot supply at all (there's no department column to normalize from).
+//
+// ONE IMPORT-GRAPH EXCEPTION: this file imports BRANCH_STAFF_ROLES from
+// analytics/_lib.ts, purely to load-assert it stays equal to FLOW_STAFF_
+// ROLES (ui/types.ts), which branchPolicy() below actually relies on — see
+// that assertion. _lib.ts transitively imports the real
+// src/task-manager/prisma singleton (constructs a PrismaClient at import
+// time, never queried by anything in THIS file) and src/task-manager/lib/
+// users.ts (same). hrfs-map.test.ts mocks both before importing anything,
+// same pattern analytics/_lib.test.ts already uses — no real DB connection
+// is ever opened by importing or testing this file.
+import { BRANCH_STAFF_ROLES } from "../../src/task-manager/analytics/_lib";
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
@@ -157,10 +168,29 @@ function departmentPolicy(user: Pick<MappedUser, "role" | "employmentType" | "de
   return "none";
 }
 
+// branchPolicy() below treats FLOW_STAFF_ROLES (ui/types.ts) as equivalent
+// to BRANCH_STAFF_ROLES (analytics/_lib.ts) — same values, kept in two
+// files with no shared source-of-truth (see the file header for why this
+// file imports the latter at all). Assert that's still true at load time,
+// so a future edit to either array can't silently desync branchPolicy()
+// from the "Manager"/"Coach"/"Branch Exec" set the rest of the app actually
+// enforces (seed.ts's self-check, DEPARTMENT_EMPLOYMENT_TYPES pairing, etc).
+{
+  const a = new Set<string>(FLOW_STAFF_ROLES as readonly string[]);
+  const b = new Set<string>(BRANCH_STAFF_ROLES as readonly string[]);
+  const drift = [...a].filter((x) => !b.has(x)).concat([...b].filter((x) => !a.has(x)));
+  if (drift.length > 0) {
+    throw new Error(
+      `hrfs-map.ts: FLOW_STAFF_ROLES (ui/types.ts) and BRANCH_STAFF_ROLES (_lib.ts) have drifted — ` +
+        `branchPolicy() below assumes they're the same set. Symmetric difference: ${drift.join(", ")}`,
+    );
+  }
+}
+
 /** Branch-pool employment types (FLOW_STAFF_ROLES === BRANCH_STAFF_ROLES's
- *  values — see _lib.ts) always REQUIRE a resolvable branch; "Regional
- *  Manager" resolves one OPTIONALLY (never blocks import); everything else
- *  never even looks at branchName. */
+ *  values — asserted equal just above) always REQUIRE a resolvable branch;
+ *  "Regional Manager" resolves one OPTIONALLY (never blocks import);
+ *  everything else never even looks at branchName. */
 type BranchPolicy = "required" | "optional" | "none";
 
 function branchPolicy(entry: RoleMapEntry): BranchPolicy {
@@ -304,10 +334,11 @@ export interface MappedUser {
  *   // this is the #1 override every deployment will need at least once:
  *   "daniel@ebright.my": { department: "Operation" },
  *
- *   // Promote an existing HRFS user to CEO (HRFS has no CEO role value) —
- *   // mirrors the demo seed's CEO shape (role/department/employmentType all
- *   // set to "CEO", a real branch kept for personal-context display):
- *   "elaine@ebright.my": { role: "CEO", department: "CEO", employmentType: "CEO", branch: "Subang Taipan" },
+ *   // Promote an existing HRFS user to CEO (HRFS has no CEO role value).
+ *   // department stays null, unlike the demo seed's convention of stashing
+ *   // "CEO" there — the load-time validation below rejects any OVERRIDES/
+ *   // EXTRA_USERS department that isn't a real FLOW_DEPARTMENTS value:
+ *   "elaine@ebright.my": { role: "CEO", employmentType: "CEO", branch: "Subang Taipan" },
  *
  *   // Promote an existing HRFS user to OPS (HRFS has no OPS role value):
  *   "nurul@ebright.my": { role: "OPS", employmentType: "Manager", branch: "Subang Taipan" },
@@ -346,6 +377,56 @@ export const OVERRIDES: Record<string, Partial<MappedUser>> = {};
  * ];
  */
 export const EXTRA_USERS: MappedUser[] = [];
+
+// ---------------------------------------------------------------------------
+// Load-time validation of the hand-edited config. OVERRIDES/EXTRA_USERS are
+// the one part of this file a human types by hand, unlike ROLE_MAP/
+// BRANCH_MAP — which are checked against live data and covered by the
+// ROLE_MAP-completeness test — so they carry none of the auto-derived
+// path's self-checks otherwise, and are the likeliest place to carry a
+// typo. Every department must be a real FLOW_DEPARTMENTS value; every
+// branch must be a canonical FLOW_BRANCH_REGIONS name; null/undefined
+// always pass (no department / no branch is a normal, valid state).
+// ---------------------------------------------------------------------------
+
+/** Exported (rather than inlined below) so hrfs-map.test.ts can call it
+ *  directly with synthetic bad input — by the time any test imports this
+ *  module, the SHIPPED OVERRIDES/EXTRA_USERS have already passed this exact
+ *  check once (see the call immediately below this definition), so there's
+ *  nothing left to fail against without going through this function
+ *  directly. Throws naming the offending email, field, and value. */
+export function validateHandEditedConfig(
+  overrides: Record<string, Partial<MappedUser>>,
+  extraUsers: MappedUser[],
+): void {
+  const checkDepartment = (source: string, email: string, department: string | null | undefined) => {
+    if (!department) return;
+    if (!(FLOW_DEPARTMENTS as readonly string[]).includes(department)) {
+      throw new Error(
+        `hrfs-map.ts: ${source}["${email}"].department = ${JSON.stringify(department)} is not one of FLOW_DEPARTMENTS`,
+      );
+    }
+  };
+  const checkBranch = (source: string, email: string, branch: string | null | undefined) => {
+    if (!branch) return;
+    if (!ALL_BRANCH_NAMES.includes(branch)) {
+      throw new Error(
+        `hrfs-map.ts: ${source}["${email}"].branch = ${JSON.stringify(branch)} is not a canonical FLOW_BRANCH_REGIONS branch`,
+      );
+    }
+  };
+
+  for (const [email, override] of Object.entries(overrides)) {
+    checkDepartment("OVERRIDES", email, override.department);
+    checkBranch("OVERRIDES", email, override.branch);
+  }
+  for (const user of extraUsers) {
+    checkDepartment("EXTRA_USERS", user.email, user.department);
+    checkBranch("EXTRA_USERS", user.email, user.branch);
+  }
+}
+
+validateHandEditedConfig(OVERRIDES, EXTRA_USERS);
 
 // ---------------------------------------------------------------------------
 // mapHrfsUser
@@ -432,4 +513,41 @@ export function mapHrfsUser(row: HrfsUserRow): MapResult {
   }
 
   return { ok: true, user, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// diffUserFields — used by bootstrap.ts to print a loud CHANGED line instead
+// of silently overwriting an existing Task Manager account on re-run.
+// ---------------------------------------------------------------------------
+
+/** Minimal shape diffUserFields needs — the 5 fields bootstrap.ts's
+ *  upsertUsers actually writes on update (a subset of the full Prisma User
+ *  row; deliberately not importing the generated User type here to keep
+ *  this file's import surface small beyond the one exception noted in the
+ *  file header). */
+export interface DiffableUserFields {
+  role: string;
+  department: string | null;
+  branch: string | null;
+  employmentType: string | null;
+  coachSchedule: string | null;
+}
+
+/** Pure: which of the 5 upsert-relevant fields differ between `existing`
+ *  (the current Task Manager row) and `next` (this run's mapped result)?
+ *  Returns one "<field> <old>→<new>" string per changed field (null shown
+ *  as "(none)"), in a fixed field order; [] means no change. Catches the
+ *  silent-revert case — an OVERRIDES promotion later removed demotes
+ *  someone on the next run; the operator should see that happen, not have
+ *  it happen quietly. */
+export function diffUserFields(existing: DiffableUserFields, next: DiffableUserFields): string[] {
+  const fields: (keyof DiffableUserFields)[] = ["role", "department", "branch", "employmentType", "coachSchedule"];
+  const fmt = (v: string | null) => (v === null ? "(none)" : v);
+  const changes: string[] = [];
+  for (const field of fields) {
+    if (existing[field] !== next[field]) {
+      changes.push(`${field} ${fmt(existing[field])}→${fmt(next[field])}`);
+    }
+  }
+  return changes;
 }
