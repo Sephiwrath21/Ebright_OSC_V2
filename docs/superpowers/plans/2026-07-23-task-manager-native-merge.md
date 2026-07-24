@@ -3014,6 +3014,15 @@ git commit -m "feat(task-manager): dev seed wired to the task-manager client"
 
 ### Task 19: Roster parser (TDD) + bootstrap script + roster template
 
+> **REDESIGNED (2026-07-24):** the hand-maintained `roster.csv` design below
+> was replaced at the user's direction — real staff already live in the
+> `ebright_hrfs` database's `User` table, on the same Postgres server as
+> `TASK_MANAGER_DATABASE_URL`. The bootstrap now imports ACTIVE HRFS users
+> through a checked-in mapping config instead: see `prisma/task-manager/
+> hrfs-map.ts` (+ `hrfs-map.test.ts`) and the rewritten `bootstrap.ts`. No
+> `roster.csv`/`roster-parse.ts` exist; Step 6's utility-flow provisioning is
+> unchanged. Text below is kept as historical record, not a to-do list.
+
 **Files:**
 - Create: `prisma/task-manager/roster-parse.test.ts` (FIRST — TDD)
 - Create: `prisma/task-manager/roster-parse.ts`
