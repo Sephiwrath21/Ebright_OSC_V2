@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Home, ChevronRight, Search, Plus, Pencil, X, Building2,
 } from "lucide-react";
@@ -9,41 +9,14 @@ import {
 type Region = "A" | "B" | "C";
 
 interface BranchRow {
-  id: number;
+  id: string;          // crm_branch.id (uuid); "" for the local "add" draft
   name: string;
   code: string;
   region: Region | "";
   address: string;
   phone: string;
-  email: string;
+  email: string;       // branch email or the branch manager's email
 }
-
-const INITIAL_BRANCHES: BranchRow[] = [
-  { id: 1,  name: "00 Ebright (OD)",             code: "OD",  region: "A", address: "OD HQ, Kuala Lumpur",             phone: "0123456789", email: "od@ebright.my" },
-  { id: 2,  name: "01 Online",                    code: "ONL", region: "",  address: "",                                phone: "",           email: "" },
-  { id: 3,  name: "02 Subang Taipan",             code: "ST",  region: "A", address: "USJ 10, Subang Jaya, Selangor",   phone: "0112345001", email: "taipan@ebright.my" },
-  { id: 4,  name: "03 Setia Alam",                code: "SA",  region: "B", address: "Setia Alam, Shah Alam, Selangor", phone: "0112345002", email: "setiaalam@ebright.my" },
-  { id: 5,  name: "04 Sri Petaling",              code: "SRP", region: "A", address: "Sri Petaling, Kuala Lumpur",      phone: "0112345003", email: "sripetaling@ebright.my" },
-  { id: 6,  name: "05 Kota Damansara",            code: "KD",  region: "B", address: "Kota Damansara, Petaling Jaya",  phone: "0112345004", email: "kotadamansara@ebright.my" },
-  { id: 7,  name: "06 Putrajaya",                 code: "PTJ", region: "C", address: "Presint 8, Putrajaya",            phone: "0112345005", email: "putrajaya@ebright.my" },
-  { id: 8,  name: "07 Ampang",                    code: "AMP", region: "A", address: "Ampang, Selangor",                phone: "0112345006", email: "ampang@ebright.my" },
-  { id: 9,  name: "08 Cyberjaya",                 code: "CYB", region: "C", address: "Cyberjaya, Selangor",             phone: "0112345007", email: "cyberjaya@ebright.my" },
-  { id: 10, name: "09 Klang",                     code: "KLG", region: "B", address: "Klang, Selangor",                 phone: "0112345008", email: "klang@ebright.my" },
-  { id: 11, name: "10 Denai Alam",                code: "DA",  region: "B", address: "Denai Alam, Shah Alam",           phone: "0112345009", email: "denaialam@ebright.my" },
-  { id: 12, name: "11 Bandar Baru Bangi",         code: "BBB", region: "C", address: "Bandar Baru Bangi, Kajang",       phone: "0112345010", email: "bangi@ebright.my" },
-  { id: 13, name: "12 Danau Kota",                code: "DK",  region: "A", address: "Danau Kota, Setapak, KL",         phone: "0112345011", email: "danaukota@ebright.my" },
-  { id: 14, name: "13 Shah Alam",                 code: "SLA", region: "B", address: "Shah Alam, Selangor",             phone: "0112345012", email: "shahalam@ebright.my" },
-  { id: 15, name: "14 Bandar Tun Hussein Onn",    code: "BTH", region: "A", address: "Cheras, Kuala Lumpur",            phone: "0112345013", email: "btho@ebright.my" },
-  { id: 16, name: "15 Eco Grandeur",              code: "ECO", region: "B", address: "Eco Grandeur, Puncak Alam",       phone: "0112345014", email: "ecograndeur@ebright.my" },
-  { id: 17, name: "16 Bandar Seri Putra",         code: "BSP", region: "C", address: "Bandar Seri Putra, Bangi",        phone: "0112345015", email: "bsp@ebright.my" },
-  { id: 18, name: "17 Bandar Rimbayu",            code: "BRM", region: "A", address: "Bandar Rimbayu, Shah Alam",       phone: "0112345016", email: "rimbayu@ebright.my" },
-  { id: 19, name: "18 Taman Sri Gombak",          code: "TSG", region: "B", address: "Sri Gombak, Selangor",            phone: "0112345017", email: "srigombak@ebright.my" },
-  { id: 20, name: "19 Kota Warisan",              code: "KW",  region: "C", address: "Kota Warisan, Sepang",            phone: "0112345018", email: "kotawarisan@ebright.my" },
-  { id: 21, name: "20 Kajang TTDI Grove",         code: "KJG", region: "A", address: "TTDI Grove, Kajang, Selangor",    phone: "0112345019", email: "kajang@ebright.my" },
-  { id: 22, name: "21 Tropicana Sungai Buloh",    code: "TSB", region: "B", address: "Tropicana Sungai Buloh",          phone: "0112345020", email: "sungaibuloh@ebright.my" },
-  { id: 23, name: "22 Puncak Jalil",              code: "PJL", region: "A", address: "Puncak Jalil, Kuala Lumpur",      phone: "0112345021", email: "puncakjalil@ebright.my" },
-  { id: 24, name: "23 Dataran Puchong Utama",     code: "DPU", region: "B", address: "Puchong Utama, Selangor",         phone: "0112345022", email: "puchong@ebright.my" },
-];
 
 const REGION_BADGE: Record<string, string> = {
   A: "bg-rose-100 text-rose-700",
@@ -53,12 +26,45 @@ const REGION_BADGE: Record<string, string> = {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
+interface ApiBranch { id: string; name: string; code: string | null; region: string | null; address: string | null; phone: string | null; email: string | null }
+
 export default function CrmBranchesPage() {
-  const [rows, setRows]               = useState<BranchRow[]>(INITIAL_BRANCHES);
+  const [rows, setRows]               = useState<BranchRow[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
   const [search, setSearch]           = useState("");
   const [regionFilter, setRegionFilter] = useState<"" | Region>("");
   const [editTarget, setEditTarget]   = useState<BranchRow | null>(null);
   const [showAdd, setShowAdd]         = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    fetch("/api/crm/branches", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Request failed (${r.status})`);
+        }
+        return r.json() as Promise<{ branches: ApiBranch[] }>;
+      })
+      .then((d) => {
+        if (ignore) return;
+        setRows(d.branches.map((b) => ({
+          id: b.id,
+          name: b.name,
+          code: b.code ?? "",
+          region: b.region === "A" || b.region === "B" || b.region === "C" ? b.region : "",
+          address: b.address ?? "",
+          phone: b.phone ?? "",
+          email: b.email ?? "",
+        })));
+        setError(null);
+      })
+      .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : "Failed to load branches"); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
+  }, []);
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase();
@@ -67,10 +73,10 @@ export default function CrmBranchesPage() {
     return matchSearch && matchRegion;
   });
 
+  // Read-only view: Add/Edit stay in local state only (never written back to the CRM).
   function handleSave(b: BranchRow) {
-    if (b.id === 0) {
-      const newId = Math.max(...rows.map(r => r.id)) + 1;
-      setRows(prev => [...prev, { ...b, id: newId }].sort((a, c) => a.name.localeCompare(c.name)));
+    if (b.id === "") {
+      setRows(prev => [...prev, { ...b, id: `local-${prev.length + 1}` }].sort((a, c) => a.name.localeCompare(c.name)));
     } else {
       setRows(prev => prev.map(r => r.id === b.id ? b : r));
     }
@@ -80,7 +86,7 @@ export default function CrmBranchesPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -100,7 +106,7 @@ export default function CrmBranchesPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Branches</h1>
-            <p className="text-sm text-slate-500 mt-0.5">{rows.length} branches total</p>
+            <p className="text-sm text-slate-500 mt-0.5">{loading ? "Loading…" : `${rows.length} branches total`}</p>
           </div>
           <button
             onClick={() => setShowAdd(true)}
@@ -171,7 +177,20 @@ export default function CrmBranchesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-14 text-center">
+                    <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                    <p className="text-sm text-slate-400">Loading branches…</p>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-14 text-center">
+                    <p className="text-sm text-red-500">Couldn&apos;t load branches: {error}</p>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-14 text-center">
                     <Building2 className="mx-auto mb-2 w-8 h-8 text-slate-300" />
@@ -222,7 +241,7 @@ export default function CrmBranchesPage() {
       {/* Add / Edit modal */}
       {(showAdd || editTarget !== null) && (
         <BranchModal
-          branch={editTarget ?? { id: 0, name: "", code: "", region: "", address: "", phone: "", email: "" }}
+          branch={editTarget ?? { id: "", name: "", code: "", region: "", address: "", phone: "", email: "" }}
           onClose={() => { setShowAdd(false); setEditTarget(null); }}
           onSave={handleSave}
         />
@@ -242,7 +261,7 @@ function BranchModal({
   onClose: () => void;
   onSave: (b: BranchRow) => void;
 }) {
-  const isCreate = branch.id === 0;
+  const isCreate = branch.id === "";
   const [name,    setName]    = useState(branch.name);
   const [code,    setCode]    = useState(branch.code);
   const [region,  setRegion]  = useState<Region | "">(branch.region);
@@ -348,9 +367,21 @@ function BranchModal({
             </label>
             <label className="block">
               <span className={LBL}>Email</span>
-              <input value={email} onChange={e => setEmail(e.target.value)} type="email" className={FLD} />
+              <input
+                value={email}
+                readOnly
+                disabled
+                type="email"
+                placeholder="—"
+                className={FLD + " cursor-not-allowed bg-slate-50 text-slate-500"}
+              />
             </label>
           </div>
+          <p className="text-[10px] italic text-slate-400 leading-relaxed">
+            Branch email is derived from the branch&apos;s account (role_id = 4), linked via that
+            account&apos;s <span className="font-medium">Assigned Branch</span> in its profile. It isn&apos;t
+            stored on the branch and can&apos;t be edited here.
+          </p>
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">

@@ -36,6 +36,11 @@ jobs:
 
   deploy:
     needs: validate
+    # Never let a fork's copy of this workflow SSH into our servers.
+    # A fork can delete this line, so it is a safety net, NOT the real
+    # lock — rotating SSH_DEPLOY_KEY (so forks lack the key) is what
+    # actually prevents fork deploys.
+    if: github.repository == 'EbrightOD/Ebright_OSC_V2'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve deploy target
@@ -57,6 +62,12 @@ jobs:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # The Docker build on the small deploy host takes ~11 min, which
+          # exceeds appleboy/ssh-action's 10-minute default command_timeout —
+          # causing the SSH session to be killed and the job to report a FALSE
+          # failure even though the build finished and the container came up.
+          # Give it generous headroom so a slow-but-successful deploy is green.
+          command_timeout: 20m
           script_stop: true
           script: |
             set -euo pipefail

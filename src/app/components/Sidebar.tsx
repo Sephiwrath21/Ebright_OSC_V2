@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ComponentType, SVGProps } from "react";
 import {
   Home,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   ListChecks,
   ChevronDown,
+  ChevronRight,
   Award,
   ClipboardList,
 } from "lucide-react";
@@ -171,6 +173,13 @@ function containsActive(items: NavItem[], pathname: string | null): boolean {
   );
 }
 
+/** True if `target` sits inside any open flyout popover (they're portaled to
+ * document.body as siblings, so containment can't be checked via ancestry). */
+function isInsideAnyFlyout(target: Node): boolean {
+  const el = target instanceof Element ? target : target.parentElement;
+  return !!el?.closest("[data-nav-flyout]");
+}
+
 /** First navigable href in the subtree — used as the link target in collapsed (icon-only) mode. */
 function firstHref(item: NavItem): string {
   if (item.href) return item.href;
@@ -253,11 +262,23 @@ function NavNode({
   depth,
   pathname,
   collapsed,
+  flyoutMode,
+  onNavigate,
+  isFlyoutOpen,
+  onToggleFlyout,
 }: {
   item: NavItem;
   depth: number;
   pathname: string | null;
   collapsed: boolean;
+  /** True when rendered inside a flyout popover — nested groups cascade into
+   * another side flyout instead of expanding inline underneath. */
+  flyoutMode?: boolean;
+  /** Called when a leaf link navigates — used to close the flyout(s) it was opened from. */
+  onNavigate?: () => void;
+  /** Controlled state for mutually exclusive sibling flyouts. */
+  isFlyoutOpen?: boolean;
+  onToggleFlyout?: (open: boolean) => void;
 }) {
   const { name, href, Icon, iconSrc, external, children } = item;
   const hasChildren = !!children?.length;
@@ -270,6 +291,66 @@ function NavNode({
   useEffect(() => {
     if (hasActiveDescendant) setOpen(true);
   }, [hasActiveDescendant]);
+
+  // Collapsed rail: clicking a parent icon opens a flyout with its children
+  // instead of expanding inline (there's no room to nest in a 64px rail).
+  // Rendered via a portal (positioned with getBoundingClientRect) since the
+  // sidebar's nav wrapper has overflow-x-hidden/overflow-y-auto and would
+  // otherwise clip an absolutely-positioned popover.
+  // scroll/resize, or picking a leaf link inside it.
+  const [localFlyoutOpen, setLocalFlyoutOpen] = useState(false);
+  const flyoutOpen = isFlyoutOpen !== undefined ? isFlyoutOpen : localFlyoutOpen;
+  const setFlyoutOpen = onToggleFlyout || setLocalFlyoutOpen;
+  
+  // Track which child has its flyout open to ensure mutual exclusivity
+  const [activeChildFlyout, setActiveChildFlyout] = useState<string | null>(null);
+
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Measure the button and set the popover position *before* opening, so the
+  // portal paints in the right spot on its first frame instead of flashing at
+  // the top-left corner (0,0) until the positioning effect catches up.
+  function toggleFlyout() {
+    if (!flyoutOpen) {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (rect) setFlyoutPos({ top: rect.top, left: rect.right + 8 });
+    }
+    setFlyoutOpen(!flyoutOpen);
+  }
+
+  useEffect(() => {
+    if (!flyoutOpen) return;
+    // Re-measure in case layout shifted between click and open.
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) setFlyoutPos({ top: rect.top, left: rect.right + 8 });
+
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      // A click inside a cascaded (deeper) flyout shouldn't close this one.
+      if (isInsideAnyFlyout(target)) return;
+      setFlyoutOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFlyoutOpen(false);
+    }
+    function handleClose() {
+      setFlyoutOpen(false);
+      setActiveChildFlyout(null);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    window.addEventListener("resize", handleClose);
+    window.addEventListener("scroll", handleClose, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+      window.removeEventListener("resize", handleClose);
+      window.removeEventListener("scroll", handleClose, true);
+    };
+  }, [flyoutOpen]);
 
   // Indent nested rows so their text lines up after the top-level icon,
   // stepping in a bit further per level.
@@ -291,24 +372,78 @@ function NavNode({
     />
   ) : null;
 
-  // Collapsed (icon-only) rail: no room for nesting — every item is a plain
-  // icon link; parents link to their first child page.
+  // Collapsed (icon-only) rail: no room for nesting.
   if (collapsed) {
     if (depth > 0) return null;
-    const target = href ?? firstHref(item);
-    const className = `relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-      isActive || hasActiveDescendant
+
+    const iconButtonClass = `relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+      isActive || hasActiveDescendant || flyoutOpen
         ? "bg-blue-50 text-blue-700"
         : "text-slate-700 hover:bg-slate-100"
     }`;
+
+    // Parents with children: clicking the icon opens a flyout listing them.
+    if (hasChildren) {
+      return (
+        <li>
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={toggleFlyout}
+            title={name}
+            aria-expanded={flyoutOpen}
+            aria-haspopup="true"
+            className={iconButtonClass}
+          >
+            {icon}
+          </button>
+          {flyoutOpen &&
+            typeof document !== "undefined" &&
+            createPortal(
+              <div
+                ref={popoverRef}
+                data-nav-flyout
+                style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
+                className="z-50 min-w-56 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
+              >
+                <p className="px-3 pb-2 mb-1 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  {name}
+                </p>
+                <ul className="px-1 space-y-0.5">
+                  {children.map((child) => (
+                    <NavNode
+                      key={child.name}
+                      item={child}
+                      depth={0}
+                      pathname={pathname}
+                      collapsed={false}
+                      flyoutMode
+                      onNavigate={() => {
+                        setFlyoutOpen(false);
+                        setActiveChildFlyout(null);
+                      }}
+                      isFlyoutOpen={activeChildFlyout === child.name}
+                      onToggleFlyout={(o) => setActiveChildFlyout(o ? child.name : null)}
+                    />
+                  ))}
+                </ul>
+              </div>,
+              document.body,
+            )}
+        </li>
+      );
+    }
+
+    // Leaf items: plain icon link.
+    const target = href ?? firstHref(item);
     return (
       <li>
         {external ? (
-          <a href={target} target="_blank" rel="noopener noreferrer" title={name} className={className}>
+          <a href={target} target="_blank" rel="noopener noreferrer" title={name} className={iconButtonClass}>
             {icon}
           </a>
         ) : (
-          <Link href={target} title={name} aria-current={isActive ? "page" : undefined} className={className}>
+          <Link href={target} title={name} aria-current={isActive ? "page" : undefined} className={iconButtonClass}>
             {icon}
           </Link>
         )}
@@ -325,6 +460,59 @@ function NavNode({
         ? "text-blue-700 hover:bg-slate-100"
         : `${depth === 0 ? "text-slate-700" : "text-slate-600"} hover:bg-slate-100`
   }`;
+
+  // Inside a flyout popover: a nested group cascades into its own side
+  // flyout (positioned off this row) instead of expanding inline downward.
+  if (flyoutMode && hasChildren) {
+    return (
+      <li>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={toggleFlyout}
+          aria-expanded={flyoutOpen}
+          aria-haspopup="true"
+          className={rowClass}
+          style={indent}
+        >
+          {icon}
+          <span className="flex-1 text-left whitespace-nowrap">{name}</span>
+          <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
+        </button>
+        {flyoutOpen &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              ref={popoverRef}
+              data-nav-flyout
+              style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
+              className="z-50 min-w-56 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
+            >
+              <ul className="px-1 space-y-0.5">
+                {children.map((child) => (
+                  <NavNode
+                    key={child.name}
+                    item={child}
+                    depth={0}
+                    pathname={pathname}
+                    collapsed={false}
+                    flyoutMode
+                    onNavigate={() => {
+                      setFlyoutOpen(false);
+                      setActiveChildFlyout(null);
+                      onNavigate?.();
+                    }}
+                    isFlyoutOpen={activeChildFlyout === child.name}
+                    onToggleFlyout={(o) => setActiveChildFlyout(o ? child.name : null)}
+                  />
+                ))}
+              </ul>
+            </div>,
+            document.body,
+          )}
+      </li>
+    );
+  }
 
   if (hasChildren) {
     return (
@@ -358,6 +546,7 @@ function NavNode({
                 depth={depth + 1}
                 pathname={pathname}
                 collapsed={collapsed}
+                onNavigate={onNavigate}
               />
             ))}
           </ul>
@@ -388,6 +577,7 @@ function NavNode({
           rel="noopener noreferrer"
           className={rowClass}
           style={indent}
+          onClick={onNavigate}
         >
           {inner}
         </a>
@@ -397,6 +587,7 @@ function NavNode({
           aria-current={isActive ? "page" : undefined}
           className={rowClass}
           style={indent}
+          onClick={onNavigate}
         >
           {inner}
         </Link>

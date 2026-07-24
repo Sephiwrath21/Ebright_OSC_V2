@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import UserHeader from "./UserHeader";
 import NotificationBell from "./NotificationBell";
 
@@ -18,14 +18,16 @@ export default function TopBar({ onToggleSidebar, sidebarCollapsed, email, role,
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur border-b border-slate-200">
       <div className="h-full flex items-center gap-3 px-4 md:px-6">
-        {/* Left: sidebar toggle */}
+        {/* Left: sidebar toggle — hamburger opens the drawer on mobile, panel
+            icon collapses the rail on desktop. */}
         <button
           onClick={onToggleSidebar}
           aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!sidebarCollapsed}
           className="shrink-0 p-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
-          <ToggleIcon className="w-5 h-5" aria-hidden="true" />
+          <Menu className="w-5 h-5 lg:hidden" aria-hidden="true" />
+          <ToggleIcon className="w-5 h-5 hidden lg:block" aria-hidden="true" />
         </button>
 
         {/* Spacer */}

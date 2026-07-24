@@ -180,7 +180,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 space-y-6">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-6">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"

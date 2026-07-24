@@ -1,37 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Home, ChevronRight, CheckCircle2 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const BRANCHES = [
-  "00 Ebright (OD)",
-  "01 Online",
-  "02 Subang Taipan",
-  "03 Setia Alam",
-  "04 Sri Petaling",
-  "05 Kota Damansara",
-  "06 Putrajaya",
-  "07 Ampang",
-  "08 Cyberjaya",
-  "09 Klang",
-  "10 Denai Alam",
-  "11 Bandar Baru Bangi",
-  "12 Danau Kota",
-  "13 Shah Alam",
-  "14 Bandar Tun Hussein Onn",
-  "15 Eco Grandeur",
-  "16 Bandar Seri Putra",
-  "17 Bandar Rimbayu",
-  "18 Taman Sri Gombak",
-  "19 Kota Warisan",
-  "20 Kajang TTDI Grove",
-  "21 Tropicana Sungai Buloh",
-  "22 Puncak Jalil",
-  "23 Dataran Puchong Utama",
-];
 
 interface Child {
   name: string;
@@ -55,8 +28,21 @@ export default function CrmFormsPage() {
   const [parentEmail, setParentEmail] = useState("");
   const [numChildren, setNumChildren] = useState(0);
   const [children,    setChildren]    = useState<Child[]>([]);
-  const [branch,      setBranch]      = useState("");
+  const [branch,      setBranch]      = useState("");   // selected branch_id
   const [remarks,     setRemarks]     = useState("");
+  const [branches,    setBranches]    = useState<Array<{ id: string; name: string }>>([]);
+
+  // Load real branches for the dropdown (branch_id → name). Read-only.
+  useEffect(() => {
+    let ignore = false;
+    fetch("/api/crm/branches", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { branches: Array<{ id: string; name: string }> } | null) => {
+        if (!ignore && d?.branches) setBranches(d.branches.map((b) => ({ id: b.id, name: b.name })));
+      })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
 
   const progress = step >= 5 ? 100 : ((step - 1) / 4) * 100;
 
@@ -85,7 +71,7 @@ export default function CrmFormsPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -234,7 +220,7 @@ export default function CrmFormsPage() {
                     className={INPUT + " cursor-pointer appearance-none"}
                   >
                     <option value="">Please select</option>
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
                 <div>

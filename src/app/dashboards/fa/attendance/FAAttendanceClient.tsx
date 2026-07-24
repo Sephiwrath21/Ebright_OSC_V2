@@ -162,7 +162,7 @@ export default function FAAttendanceClient() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-0">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -202,7 +202,7 @@ export default function FAAttendanceClient() {
 
       {/* Sticky filter bar */}
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3 flex-wrap">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
 
           {/* Event select */}
@@ -284,7 +284,7 @@ export default function FAAttendanceClient() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
 
         {/* Mobile summary bar */}
         <div className="sm:hidden bg-white border border-slate-200 rounded-2xl p-4 mb-5 flex items-center justify-around">

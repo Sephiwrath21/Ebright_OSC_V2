@@ -275,7 +275,7 @@ export default function PCMAttendanceClient() {
   }
 
   return (
-    <div className="px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-6">
+    <div className="px-4 py-6 md:px-8 w-full mx-auto space-y-6">
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-slate-400">
