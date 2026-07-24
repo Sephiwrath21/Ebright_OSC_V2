@@ -1,9 +1,19 @@
 import "server-only";
-// queryEbrightHrfs  → portal `hrfs` DB (leave_request + users/employment/…).
-// queryEbrightHrfsSource → `ebright_hrfs` DB (BranchStaff, hikvision scans, …).
-import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
+import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
 import { remapStScan } from "@/lib/scan-identity";
+
+// Portal (`hrfs`) tables — leave_request, users, employment, branch — are read
+// through Prisma (DATABASE_URL), which points at the portal DB on EVERY env.
+// Do NOT use queryEbrightHrfs here: it reads HRFS_DATABASE_URL, which on staging
+// points at `ebright_hrfs` (the SOURCE DB, no leave_request). Source tables
+// (BranchStaff, hikvision, attendance_justification) use queryEbrightHrfsSource.
+// $queryRawUnsafe keeps our $1/$2 positional SQL. Wrapped to return `{ rows }`
+// so it's a drop-in for the old queryEbrightHrfs<T>() call sites.
+async function portalQuery<T>(sql: string, params: unknown[]): Promise<{ rows: T[] }> {
+  const rows = await prisma.$queryRawUnsafe<T[]>(sql, ...params);
+  return { rows };
+}
 
 // Stats used on both the HR Dashboard page (/induction/hr-dashboard) and the
 // /api/hr-dashboard endpoint. Kept in one place so they can't drift.
@@ -69,7 +79,7 @@ export async function getFlaggedThisMonth(
   const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
   const lastDay = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<LeaveDayRow>(
+  const rows = await portalQuery<LeaveDayRow>(
     expandedLeaveSql(
       `AND lt.leave_type_code = 'SL'
         AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
@@ -119,7 +129,7 @@ export async function getMia(
   const [y, m, d] = todayMyt.split("-").map(Number);
   const start = new Date(Date.UTC(y, m - 1, d - 14)).toISOString().slice(0, 10);
 
-  const ulRes = await queryEbrightHrfs<LeaveDayRow>(
+  const ulRes = await portalQuery<LeaveDayRow>(
     expandedLeaveSql(
       `AND lt.leave_type_code = 'UL'
         AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
@@ -189,7 +199,7 @@ export async function getMia(
     ),
     // On approved leave today → resolve to employee_id (scans/BranchStaff key
     // by employee_id, but leave_request keys by portal user_id).
-    queryEbrightHrfs<{ emp_code: string | null }>(
+    portalQuery<{ emp_code: string | null }>(
       `SELECT DISTINCT e.employee_id AS emp_code
          FROM public.leave_request r
          JOIN public.employment e ON e.user_id = r.user_id AND e.status = 'active'
@@ -448,7 +458,7 @@ export async function getMcLastMonth(todayIso: string): Promise<LeaveItem[]> {
   const [y, m, d] = todayIso.split("-").map(Number);
   const monthAgo = new Date(Date.UTC(y, m - 2, d)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<LeaveDayRow>(
+  const rows = await portalQuery<LeaveDayRow>(
     expandedLeaveSql(
       `AND lt.leave_type_code <> 'AL'
         AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
@@ -474,7 +484,7 @@ export async function getAnnualLeaveNext2Weeks(todayIso: string): Promise<LeaveI
   const [y, m, d] = todayIso.split("-").map(Number);
   const twoWeeksAhead = new Date(Date.UTC(y, m - 1, d + 14)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<LeaveDayRow>(
+  const rows = await portalQuery<LeaveDayRow>(
     expandedLeaveSql(
       `AND lt.leave_type_code = 'AL'
         AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
