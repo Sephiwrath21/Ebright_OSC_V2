@@ -66,13 +66,16 @@ enum Role {
 }
 
 // One HOD's own freeform personal board — NOT the task engine (no
-// RunBlock/FlowRun involved). 3 fixed columns (Pending/In Progress/
-// Completed, hardcoded client-side, no DB row) plus any custom columns the
-// HOD adds (HodKanbanColumn below); the HOD manually creates and drags cards
-// for their own notes/reminders. `order` is a float (fractional-indexing
-// style) so a drag to a specific position only ever needs to update the ONE
-// moved card. `column` is either one of the 3 fixed strings ("PENDING" |
-// "IN_PROGRESS" | "COMPLETED") or a HodKanbanColumn's own id.
+// RunBlock/FlowRun involved). 3 default columns (Pending/In Progress/
+// Completed) get lazily persisted here as real HodKanbanColumn rows
+// (owner-scoped ids) the first time that HOD's board is loaded (GET);
+// after that they're ordinary rows — renamable and deletable the same as
+// any custom column the HOD adds (HodKanbanColumn below). The HOD manually
+// creates and drags cards for their own notes/reminders. `order` is a
+// float (fractional-indexing style) so a drag to a specific position only
+// ever needs to update the ONE moved card. `column` is either one of the 3
+// fixed strings ("PENDING" | "IN_PROGRESS" | "COMPLETED") or a
+// HodKanbanColumn's own id.
 model HodKanbanCard {
   id        String   @id @default(cuid())
   ownerId   String
@@ -86,9 +89,12 @@ model HodKanbanCard {
   @@index([ownerId, column])
 }
 
-// A custom column an HOD added to their own board, beyond the 3 fixed
-// defaults (which stay hardcoded, never stored here, never renamable or
-// deletable). Rename/delete only ever apply to rows in THIS table.
+// A column on an HOD's board: either one of the 3 defaults (Pending/In
+// Progress/Completed), lazily created as a row here the first time that
+// HOD's board is loaded (see HodKanbanCard above), or a custom column the
+// HOD added afterward. Once created, default and custom columns are
+// indistinguishable — every row here is equally renamable, reorderable,
+// and deletable.
 model HodKanbanColumn {
   id        String   @id @default(cuid())
   ownerId   String
