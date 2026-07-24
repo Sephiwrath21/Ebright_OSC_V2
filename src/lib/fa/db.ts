@@ -37,5 +37,26 @@ function makePool(): Pool {
   });
 }
 
-export const pool: Pool = globalThis.__faPgPool ?? makePool();
-if (process.env.NODE_ENV !== "production") globalThis.__faPgPool = pool;
+// Construct the pool LAZILY, not at import time. `next build` collects page
+// data by importing every route module, and `.env` is dockerignored so the
+// build stage has no connection string — an eager makePool() here threw
+// "FA database connection string is not set" and failed the Docker build.
+// The Proxy defers makePool() to the first real property access (pool.query at
+// request time), where the running container's env_file provides the URL.
+// `cached` (module-scoped, not the dev-only global) guarantees a single pool in
+// production; the global is only reused across HMR reloads in dev.
+let cached: Pool | undefined;
+function getPool(): Pool {
+  if (cached) return cached;
+  cached = globalThis.__faPgPool ?? makePool();
+  if (process.env.NODE_ENV !== "production") globalThis.__faPgPool = cached;
+  return cached;
+}
+
+export const pool: Pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const real = getPool();
+    const value = Reflect.get(real, prop, real);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
+});

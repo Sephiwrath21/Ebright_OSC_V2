@@ -33,5 +33,24 @@ function makePool(): Pool {
   });
 }
 
-export const pool: Pool = globalThis.__pcmPgPool ?? makePool();
-if (process.env.NODE_ENV !== "production") globalThis.__pcmPgPool = pool;
+// Construct the pool LAZILY, not at import time — see the FA db.ts note. `.env`
+// is dockerignored, so eager construction during `next build` page-data
+// collection threw "PCM database connection string is not set" and failed the
+// build. The Proxy defers makePool() to the first pool.query at request time.
+// `cached` (module-scoped) guarantees a single pool in production; the global is
+// only reused across HMR reloads in dev.
+let cached: Pool | undefined;
+function getPool(): Pool {
+  if (cached) return cached;
+  cached = globalThis.__pcmPgPool ?? makePool();
+  if (process.env.NODE_ENV !== "production") globalThis.__pcmPgPool = cached;
+  return cached;
+}
+
+export const pool: Pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const real = getPool();
+    const value = Reflect.get(real, prop, real);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
+});
