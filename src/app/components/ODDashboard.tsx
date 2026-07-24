@@ -1,11 +1,7 @@
 "use client";
 
-<<<<<<< Updated upstream
-import { useEffect, useState, useCallback, type ReactNode } from "react";
-=======
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
->>>>>>> Stashed changes
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   UserPlus,
   UserMinus,
@@ -19,13 +15,7 @@ import {
   ClipboardList,
   Compass,
   FileText,
-<<<<<<< Updated upstream
-=======
-  ListTodo,
-  TrendingUp,
-  ArrowLeft,
   ChevronRight,
->>>>>>> Stashed changes
 } from "lucide-react";
 import GreetingHeader from "./GreetingHeader";
 
@@ -81,30 +71,6 @@ export default function ODDashboard({
    *  rendered full-width below the main dashboard grid. */
   taskOverview?: ReactNode;
 }) {
-<<<<<<< Updated upstream
-  const dummyTickets = [
-    { name: "Aone", count: 3, total: 5 },
-    { name: "PS", count: 4, total: 8 },
-    { name: "Leads", count: 2, total: 6 },
-    { name: "Clickup", count: 5, total: 10 },
-    { name: "Others", count: 1, total: 4 },
-=======
-  const dummyDistribution = {
-    PENDING: 343,
-    COMPLETE: 651,
-    "NOT APPLICABLE": 3,
-    "N/A": 9,
-  };
-
-  const dummyDailyTasks = [
-    { id: "86d3g0gcw", name: "1800: Update Daily Intern Logsheet", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcy", name: "1730: Meet Iqbal to show the progress", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcz", name: "AOne Task verify", status: "PENDING", listName: "AOne (SMS)", url: "#" },
-    { id: "86d3g0gd0", name: "Process Street SOP update", status: "COMPLETE", listName: "PS", url: "#" },
-    { id: "86d3g0gd1", name: "Daily check of CRM Leads", status: "COMPLETE", listName: "CNS (CRM)", url: "#" },
->>>>>>> Stashed changes
-  ];
-
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
