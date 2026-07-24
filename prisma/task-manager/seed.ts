@@ -3,7 +3,7 @@
 // demos meaningfully on first run. Runs are seeded directly through Prisma — NO
 // BullMQ/Redis/S3/email — so seeding works without any infra beyond Postgres.
 //
-// Run with: npm run db:seed  (tsx prisma/seed.ts)
+// Run with: npm run tm:seed  (dev-only — wipes the TASK_MANAGER_DATABASE_URL database)
 
 import {
   Prisma,
@@ -128,6 +128,13 @@ async function createRunBlock(opts: {
 // ---------- main ----------
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.TM_SEED_FORCE !== "1") {
+    console.error(
+      "[tm:seed] REFUSING to run: NODE_ENV=production and this seed WIPES the target database. Set TM_SEED_FORCE=1 only if you truly mean it.",
+    );
+    process.exit(1);
+  }
+
   // ----- wipe (FK-safe order: leaves first) -----
   await prisma.auditLog.deleteMany();
   await prisma.notificationLog.deleteMany();

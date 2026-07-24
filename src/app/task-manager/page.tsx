@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
 import {
   assignFlowTask,
@@ -69,6 +70,8 @@ export default async function TaskManagerPage({
 
   async function assign(input: FlowAssignInput): Promise<AssignActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       const result = await assignFlowTask(email, input);
       revalidatePath("/task-manager");
@@ -80,6 +83,8 @@ export default async function TaskManagerPage({
 
   async function completeTask(runBlockId: string): Promise<ActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       await completeFlowTask(email, runBlockId);
       revalidatePath("/task-manager");
@@ -91,6 +96,8 @@ export default async function TaskManagerPage({
 
   async function skipTask(runBlockId: string): Promise<ActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       await skipFlowTask(email, runBlockId);
       revalidatePath("/task-manager");
@@ -102,6 +109,8 @@ export default async function TaskManagerPage({
 
   async function reopenTask(runBlockId: string): Promise<ActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       await reopenFlowTask(email, runBlockId);
       revalidatePath("/task-manager");
@@ -116,6 +125,8 @@ export default async function TaskManagerPage({
   function makeCeoActions(cadence: "daily" | "monthly") {
     async function add(department: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         const { departments } = await getCeoDashboardConfig(email, cadence);
         if (!departments.includes(department)) {
@@ -129,6 +140,8 @@ export default async function TaskManagerPage({
     }
     async function remove(department: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         const { departments } = await getCeoDashboardConfig(email, cadence);
         await saveCeoDashboardConfig(email, cadence, departments.filter((d) => d !== department));
@@ -140,6 +153,8 @@ export default async function TaskManagerPage({
     }
     async function reorder(orderedNames: string[]): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await saveCeoDashboardConfig(email, cadence, orderedNames);
         revalidatePath("/task-manager");
@@ -156,6 +171,8 @@ export default async function TaskManagerPage({
   const hodKanbanActions = {
     async create(column: string, title: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await createKanbanCard(email, column, title);
         revalidatePath("/task-manager");
@@ -166,6 +183,8 @@ export default async function TaskManagerPage({
     },
     async move(cardId: string, column: string, order: number): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await moveKanbanCard(email, cardId, column, order);
         revalidatePath("/task-manager");
@@ -176,6 +195,8 @@ export default async function TaskManagerPage({
     },
     async remove(cardId: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await deleteKanbanCard(email, cardId);
         revalidatePath("/task-manager");
@@ -186,6 +207,8 @@ export default async function TaskManagerPage({
     },
     async createColumn(label: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await createKanbanColumn(email, label);
         revalidatePath("/task-manager");
@@ -196,6 +219,8 @@ export default async function TaskManagerPage({
     },
     async renameColumn(columnId: string, label: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await renameKanbanColumn(email, columnId, label);
         revalidatePath("/task-manager");
@@ -206,6 +231,8 @@ export default async function TaskManagerPage({
     },
     async moveColumn(columnId: string, order: number): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await moveKanbanColumn(email, columnId, order);
         revalidatePath("/task-manager");
@@ -216,6 +243,8 @@ export default async function TaskManagerPage({
     },
     async recolorColumn(columnId: string, color: FlowKanbanColumnColor | null): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await recolorKanbanColumn(email, columnId, color);
         revalidatePath("/task-manager");
@@ -226,6 +255,8 @@ export default async function TaskManagerPage({
     },
     async deleteColumn(columnId: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         await deleteKanbanColumn(email, columnId);
         revalidatePath("/task-manager");

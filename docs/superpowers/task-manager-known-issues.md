@@ -54,6 +54,15 @@
   in-file comment: "Known, accepted last-write-wins: single-owner preference
   data; overlapping actions self-heal via revalidatePath on next render."
   Accepted as-is.
+- **`getFlowStaff()` fetched for every role on `/task-manager`**
+  (`src/task-manager/data/queries.ts:122-140`, pulled into
+  `src/app/task-manager/page.tsx`'s `Promise.all` alongside both cadences'
+  `getFlowDetail`) — runs unconditionally regardless of whether the viewing
+  role can actually assign tasks. Donor parity; the function's own comment
+  notes it's deliberately unauthenticated and returns "the PII-free staff
+  subset only," so this is acceptable as-is. Tightening the fetch to
+  assign-capable roles only is a candidate optimization, not a correctness
+  issue.
 
 ## UI polish candidates
 
@@ -75,6 +84,16 @@
   here), `react-hooks/immutability` ×1, `@typescript-eslint/no-unused-vars`
   ×2, `react/no-unescaped-entities` ×2 — 16 total (14 errors, 2 warnings).
   Lint-only; `tsc --noEmit` and `next build` are both clean.
+- **Home tile label collision: "Manpower Planning" vs "Manpower Schedule."**
+  `src/app/components/DashboardHome.tsx` surfaces both on the same home
+  dashboard — the HRMS tile's `{ name: "Manpower Planning", href:
+  "/manpower-schedule" }` (:45, the pre-existing legacy feature) and the
+  Task Manager tile's `{ name: "Manpower Schedule", href:
+  "/task-manager/manpower-schedule" }` (:98, this migration). Both labels
+  are spec-mandated (`docs/superpowers/plans/2026-07-23-task-manager-native-merge.md:2992`
+  requires the Task Manager tile show "My Tasks + Manpower Schedule"), so
+  neither can be silently renamed. Disambiguation candidate (e.g.
+  distinguishing subtext or grouping) for a future UX pass.
 
 ## HRFS mapping — decisions pending (user)
 

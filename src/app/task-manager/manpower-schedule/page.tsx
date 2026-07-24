@@ -6,6 +6,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
 import {
   addScheduleColumn,
@@ -67,6 +68,8 @@ export default async function ManpowerSchedulePage({
 
   async function createSchedule(): Promise<ActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       await createManpowerSchedule(email, date);
       revalidatePath("/task-manager/manpower-schedule");
@@ -84,6 +87,8 @@ export default async function ManpowerSchedulePage({
     assignedStaffId: string | null,
   ): Promise<ActionResult> {
     "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
     try {
       await assignScheduleCell(email, slotId, assignedStaffId);
       revalidatePath("/task-manager/manpower-schedule");
@@ -112,6 +117,8 @@ export default async function ManpowerSchedulePage({
 
     async function addRow(startTime: string, endTime: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
@@ -134,6 +141,8 @@ export default async function ManpowerSchedulePage({
       newEndTime: string,
     ): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
@@ -158,6 +167,8 @@ export default async function ManpowerSchedulePage({
 
     async function deleteRow(startTime: string, endTime: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
@@ -175,6 +186,8 @@ export default async function ManpowerSchedulePage({
 
     async function addColumn(kind: "Coach" | "Exec"): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
@@ -192,6 +205,8 @@ export default async function ManpowerSchedulePage({
 
     async function deleteColumn(roleColumn: string): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
@@ -209,6 +224,8 @@ export default async function ManpowerSchedulePage({
 
     async function publish(): Promise<ActionResult> {
       "use server";
+      const stale = await requireLiveSession(email);
+      if (stale) return stale;
       try {
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
