@@ -11,9 +11,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Server-only deps of the task-manager engine — never bundle these.
+  serverExternalPackages: ["bullmq", "ioredis"],
   experimental: {
     serverActions: {
       // Multi-document claims allow up to MAX_CLAIM_DOCS (10) files at 5MB each,

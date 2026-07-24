@@ -137,7 +137,7 @@ const primaryNav: NavItem[] = [
       { name: "Dashboard", href: "/dashboards/pcm", exact: true },
     ],
   },
-  { name: "ClickUp Tasks", href: "/clickup-dashboard", Icon: ListChecks },
+  { name: "Task Manager", href: "/task-manager", Icon: ListChecks },
 ];
 
 const secondaryNav: NavItem[] = [

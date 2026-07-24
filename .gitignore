@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# task-manager generated prisma client
+/src/generated/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

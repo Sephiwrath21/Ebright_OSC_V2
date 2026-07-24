@@ -28,6 +28,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Generate Task Manager Prisma client
+        run: npx prisma generate --config prisma.task-manager.config.ts
+
       # - name: TypeScript check
       #   run: npx tsc --noEmit
 
@@ -90,14 +93,8 @@ jobs:
             echo "--- Tip of source (templates.ts first 25 lines): ---" >> ~/deploy.log 2>&1
             head -25 src/app/induction/templates.ts >> ~/deploy.log 2>&1 || true
 
-            # Ensure remote .env has ClickUp configuration
-            touch .env
-            sed -i '/^CLICKUP_API_TOKEN=/d' .env || true
-            sed -i '/^CLICKUP_TEAM_ID=/d' .env || true
-            printf '%s\n' "CLICKUP_API_TOKEN=pk_3667618_5NI4BGVS2CJIWLEZ33AHOL4LBPC417FX" >> .env
-            printf '%s\n' "CLICKUP_TEAM_ID=3631897" >> .env
- 
             # Ensure remote .env has Google Drive configuration
+            touch .env
             sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
