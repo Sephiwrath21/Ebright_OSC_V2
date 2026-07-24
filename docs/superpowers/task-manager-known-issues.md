@@ -7,6 +7,28 @@
   plus Task 20's verification sweep. Every item was re-verified against
   current source on 2026-07-24, not copied from memory.
 
+## Added at the staging merge (2026-07-24)
+
+- **`src/lib/clickup.ts` was restored (not deleted) during the merge with
+  `staging`.** Staging's OD executive dashboard
+  (`src/app/api/od/dashboard/route.ts`) imports `getSpaceTasks` from it and
+  calls the real ClickUp SaaS — a consumer that didn't exist when the
+  removal was planned. It keeps working only because `CLICKUP_API_TOKEN`
+  still sits in the servers' `.env` from pre-migration deploys (the deploy
+  workflow no longer re-injects it). **Rotating or removing that token
+  breaks the OD dashboard's ClickUp section** unless it's first migrated to
+  Task Manager data. `clickup.test.ts` (24 tests) was restored with it.
+- **Five pre-existing staging type errors inherited at the merge** (none in
+  migration code; staging has no tsc gate and `next build` ignores type
+  errors): `src/app/api/branch/dashboard/route.ts:221,235` (unknown `users`
+  relation in a leave_request where-input), `src/app/api/od/dashboard/route.ts:195`
+  (**likely live runtime bug**: object shorthand `dailyTasks` references a
+  variable that doesn't exist in scope — that route's clickup section will
+  ReferenceError → 500 when executed), `src/app/components/ClickUpPieChart.tsx:109`
+  (textAnchor type), `src/app/manpower-cost-report/page.tsx:733`
+  (`executiveRate` missing from a totals type). Owners of those dashboards
+  should fix; `npx tsc --noEmit` is clean apart from these five.
+
 ## Deferred by design (spec §11)
 
 - **Redis + reminder worker.** Reminders/escalations are dormant while
