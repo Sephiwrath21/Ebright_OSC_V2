@@ -1,11 +1,13 @@
 "use client";
 
-// OSC integration package — the Department Overview page: chips + donut +
-// member roster, with a client-side drill into one member's own task list.
+// OSC integration package — the entity (department OR branch) overview
+// section: chips + donut + member roster, with a client-side drill into one
+// member's own task list. Originally the standalone Department Overview
+// page's body; generalized for the 2026-07-24 Task Manager redesign, which
+// renders it inline on /task-manager for both departments and branches.
 // This is a different visual grouping of the SAME task data already shown
-// in ClickUp Tasks / Assigned Tasks — no new task source, just reused
-// FlowEntityDetail (getEntityPayload under the hood, same as the HOD's
-// inline "Department Status" card).
+// elsewhere — no new task source, just reused FlowEntityDetail
+// (getEntityPayload under the hood).
 
 import * as React from "react";
 import type { FlowEntityDetail, FlowMemberRollup, FlowTaskRow } from "./types";
@@ -61,10 +63,15 @@ function memberRowRoleLabel(member: FlowMemberRollup): string {
   return member.employmentType || "—";
 }
 
-/** "{role} - {department}", for the Member Detail header only — every role,
- *  not just HOD (e.g. "Full Time - Finance Department"). */
-function memberDetailRoleLabel(member: FlowMemberRollup): string {
-  return `${member.employmentType || "—"} - ${member.department ?? "—"}`;
+/** "{role} - {scope}", for the Member Detail header only — every role, not
+ *  just HOD (e.g. "Full Time - Finance", or "Coach - Subang Taipan" when the
+ *  section shows a branch). */
+function memberDetailRoleLabel(
+  member: FlowMemberRollup,
+  kind: "department" | "branch",
+): string {
+  const scope = kind === "branch" ? member.branch : member.department;
+  return `${member.employmentType || "—"} - ${scope ?? "—"}`;
 }
 
 function memberSummaryText(member: FlowMemberRollup): string {
@@ -148,11 +155,13 @@ function TaskChecklistRow({ task }: { task: FlowTaskRow }) {
 function MemberDetailView({
   label,
   member,
+  kind,
   tasks,
   onBack,
 }: {
   label: string;
   member: FlowMemberRollup;
+  kind: "department" | "branch";
   tasks: FlowTaskRow[];
   onBack: () => void;
 }) {
@@ -182,7 +191,7 @@ function MemberDetailView({
         <InitialAvatar name={member.name} id={member.userId} />
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-gray-900">{member.name}</p>
-          <p className="truncate text-sm text-gray-500">{memberDetailRoleLabel(member)}</p>
+          <p className="truncate text-sm text-gray-500">{memberDetailRoleLabel(member, kind)}</p>
         </div>
       </div>
 
@@ -221,47 +230,53 @@ function MemberDetailView({
 }
 
 /**
- * One period's (Daily or Monthly) full department view: summary chips,
- * status donut, and a scrollable, click-through member roster. Owns its own
- * drill-into-member state, independent of any sibling period section.
+ * One period's (Daily or Monthly) full entity view — a department's or a
+ * branch's summary chips, status donut, and a scrollable, click-through
+ * member roster. Owns its own drill-into-member state, independent of any
+ * sibling period section.
  */
-export function DepartmentOverviewSection({
+export function EntityOverviewSection({
   label,
-  department,
+  entity,
+  kind = "department",
 }: {
   label: string;
-  department: FlowEntityDetail;
+  entity: FlowEntityDetail;
+  /** Which scope the roster belongs to — drives the member-detail header's
+   *  "{role} - {scope}" line. */
+  kind?: "department" | "branch";
 }) {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const selectedMember = selectedMemberId
-    ? department.members.find((m) => m.userId === selectedMemberId)
+    ? entity.members.find((m) => m.userId === selectedMemberId)
     : undefined;
 
   if (selectedMember) {
     const memberTasks = [
-      ...department.tasks.completed,
-      ...department.tasks.pending,
-      ...department.tasks.na,
+      ...entity.tasks.completed,
+      ...entity.tasks.pending,
+      ...entity.tasks.na,
     ].filter((t) => t.assigneeId === selectedMember.userId);
     return (
       <MemberDetailView
         label={label}
         member={selectedMember}
+        kind={kind}
         tasks={memberTasks}
         onBack={() => setSelectedMemberId(null)}
       />
     );
   }
 
-  const completedCount = department.members.filter((m) => memberStatus(m) === "completed").length;
-  const pendingCount = department.members.filter((m) => memberStatus(m) === "pending").length;
+  const completedCount = entity.members.filter((m) => memberStatus(m) === "completed").length;
+  const pendingCount = entity.members.filter((m) => memberStatus(m) === "pending").length;
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="text-lg font-semibold text-gray-900">{department.name} — {label}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{entity.name} — {label}</h2>
 
       <div className="flex gap-3">
-        <SummaryChip label="Members" count={department.members.length} tone="neutral" />
+        <SummaryChip label="Members" count={entity.members.length} tone="neutral" />
         <SummaryChip label="Completed" count={completedCount} tone="completed" />
         <SummaryChip label="Pending" count={pendingCount} tone="pending" />
       </div>
@@ -269,19 +284,19 @@ export function DepartmentOverviewSection({
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <StatusOverviewCard
           title={label}
-          totals={department.totals}
-          tasks={department.tasks}
+          totals={entity.totals}
+          tasks={entity.tasks}
         />
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-widest text-gray-500">
             Members
           </p>
-          {department.members.length === 0 ? (
+          {entity.members.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No members this period.</p>
           ) : (
             <div className="max-h-[480px] divide-y divide-gray-100 overflow-y-auto px-2">
-              {department.members.map((m) => (
+              {entity.members.map((m) => (
                 <MemberListRow
                   key={m.userId}
                   member={m}

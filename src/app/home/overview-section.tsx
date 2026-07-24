@@ -20,7 +20,7 @@ export async function HomeOverviewSection({ email }: { email: string }) {
         dailyOrg={daily.org}
         monthlyOrg={monthly.org}
         adhocByRegion={daily.adhocByRegion}
-        departmentOverviewHref="/task-manager/department-overview"
+        departmentOverviewHref="/task-manager?view=department"
       />
     );
   } catch {

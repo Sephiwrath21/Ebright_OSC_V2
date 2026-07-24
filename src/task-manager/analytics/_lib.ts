@@ -186,14 +186,34 @@ export function canViewOrg(role: Role): boolean {
   return role === "ADMIN" || role === "CEO" || role === "OPS";
 }
 
+/** Department-site accounts with org-wide DEPARTMENT visibility (still no
+ *  branch data) AND the unrestricted "+ Task" assign form (data/tasks.ts):
+ *  Operation (whose donor-era special case was assign-only) and Optimisation
+ *  — per the 2026-07-24 product decision. Every other DEPT_SITE stays locked
+ *  to its own department. */
+export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operation", "Optimisation"] as const;
+
+export function isElevatedDeptSite(user: {
+  role: string;
+  department: string | null;
+}): boolean {
+  return (
+    user.role === "DEPT_SITE" &&
+    user.department !== null &&
+    (ELEVATED_DEPT_SITE_DEPARTMENTS as readonly string[]).includes(user.department)
+  );
+}
+
 /**
- * Entity detail: org roles see any; HOD/DEPT_SITE only their own department;
- * BRANCH/BRANCH_SITE only their own branch; MEMBER none. DEPT_SITE and
- * BRANCH_SITE are the view-only department/branch logins (see Role enum
- * comment in schema.prisma) — this is the ONLY authorization boundary for
- * them (unlike the donor, which additionally gated everything behind a
- * shared internal secret), so they must resolve their own entity here
- * exactly like HOD/BRANCH rather than falling through to deny.
+ * Entity detail: org roles see any; HOD/DEPT_SITE only their own department
+ * — EXCEPT the elevated department sites (Operation/Optimisation), which see
+ * ANY department (never branches); BRANCH/BRANCH_SITE only their own branch;
+ * MEMBER none. DEPT_SITE and BRANCH_SITE are the view-only department/branch
+ * logins (see Role enum comment in schema.prisma) — this is the ONLY
+ * authorization boundary for them (unlike the donor, which additionally
+ * gated everything behind a shared internal secret), so they must resolve
+ * their own entity here exactly like HOD/BRANCH rather than falling through
+ * to deny.
  */
 export function canViewEntity(
   user: ScopeUser,
@@ -205,7 +225,8 @@ export function canViewEntity(
     return type === "department" && name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "DEPT_SITE") {
-    return type === "department" && name === (user.department ?? UNASSIGNED);
+    if (type !== "department") return false;
+    return isElevatedDeptSite(user) || name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "BRANCH") {
     return type === "branch" && name === (user.branch ?? UNASSIGNED);
@@ -217,7 +238,9 @@ export function canViewEntity(
 }
 
 /**
- * Member detail: self always; HOD/DEPT_SITE their own department's members;
+ * Member detail: self always; HOD/DEPT_SITE their own department's members —
+ * EXCEPT the elevated department sites (Operation/Optimisation), which see
+ * any DEPARTMENT member (never branch-side staff, whose department is null);
  * BRANCH/BRANCH_SITE their own branch's members; org roles any. See
  * canViewEntity's comment — DEPT_SITE/BRANCH_SITE must resolve here exactly
  * like HOD/BRANCH; this helper is the actual authorization boundary now.
@@ -232,6 +255,7 @@ export function canViewMember(
     return (member.department ?? UNASSIGNED) === (user.department ?? UNASSIGNED);
   }
   if (user.role === "DEPT_SITE") {
+    if (isElevatedDeptSite(user)) return member.department !== null;
     return (member.department ?? UNASSIGNED) === (user.department ?? UNASSIGNED);
   }
   if (user.role === "BRANCH") {
