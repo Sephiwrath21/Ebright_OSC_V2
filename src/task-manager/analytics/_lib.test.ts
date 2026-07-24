@@ -23,6 +23,7 @@ import {
   groupByAssignerRole,
   groupByDimension,
   inWindow,
+  isElevatedDeptSite,
   parseLocalDate,
   resolveWindow,
   sortTaskRows,
@@ -424,6 +425,43 @@ describe("role scoping", () => {
     expect(
       canViewMember(user("ADMIN"), { id: "u-other", department: null }),
     ).toBe(true);
+  });
+
+  // ---- elevated department sites (Operation/Optimisation, 2026-07-24) ----
+  // NOTE: the fixtures above use the donor's old "Operations" (with an s)
+  // name, which is deliberately NOT in the elevated list — only the official
+  // FLOW_DEPARTMENTS names "Operation" and "Optimisation" elevate.
+
+  it("isElevatedDeptSite: only DEPT_SITE with Operation or Optimisation", () => {
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Operation"))).toBe(true);
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Optimisation"))).toBe(true);
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Finance"))).toBe(false);
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Operations"))).toBe(false);
+    expect(isElevatedDeptSite(user("DEPT_SITE", null))).toBe(false);
+    expect(isElevatedDeptSite(user("HOD", "Operation"))).toBe(false);
+    expect(isElevatedDeptSite(user("ADMIN", "Optimisation"))).toBe(false);
+  });
+
+  it.each(["Operation", "Optimisation"])(
+    "canViewEntity: elevated %s DEPT_SITE sees every department but never a branch",
+    (dept) => {
+      const site = user("DEPT_SITE", dept);
+      expect(canViewEntity(site, "department", dept)).toBe(true);
+      expect(canViewEntity(site, "department", "Finance")).toBe(true);
+      expect(canViewEntity(site, "department", "Human Resource")).toBe(true);
+      expect(canViewEntity(site, "branch", "Subang Taipan")).toBe(false);
+      expect(canViewEntity(site, "branch", "Klang")).toBe(false);
+    },
+  );
+
+  it("canViewMember: elevated DEPT_SITE sees any department member, never branch staff", () => {
+    const site = user("DEPT_SITE", "Optimisation");
+    expect(canViewMember(site, { id: "u-other", department: "Finance" })).toBe(true);
+    expect(canViewMember(site, { id: "u-other", department: "Operation" })).toBe(true);
+    // Branch-side staff carry department: null — out of the elevated scope.
+    expect(
+      canViewMember(site, { id: "u-other", department: null, branch: "Klang" }),
+    ).toBe(false);
   });
 });
 

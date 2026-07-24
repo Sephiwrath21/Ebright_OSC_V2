@@ -131,6 +131,15 @@ export interface FlowDepartmentDetailResponse {
   department: FlowEntityDetail;
 }
 
+/** Same shape as FlowDepartmentDetailResponse but for ONE branch by name —
+ *  the Task Manager page's Branch mode (org roles any; BRANCH/BRANCH_SITE
+ *  own branch only). */
+export interface FlowBranchDetailResponse {
+  period: FlowPeriod;
+  date: string;
+  branch: FlowEntityDetail;
+}
+
 /** Role-scoped detail payload (the ClickUp Tasks page's data). */
 export interface FlowDetailResponse {
   kind: "org" | "department" | "branch" | "member";

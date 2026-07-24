@@ -11,7 +11,7 @@ import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { buildTemplateSnapshot } from "../engine/snapshot";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
-import { BRANCH_STAFF_ROLES, parseLocalDate } from "../analytics/_lib";
+import { BRANCH_STAFF_ROLES, isElevatedDeptSite, parseLocalDate } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
 
 const CADENCE_OPTIONS = ["daily", "monthly", "adhoc"] as const;
@@ -60,10 +60,10 @@ function nextOccurrence(day: (typeof DAYS)[number], from = new Date()): Date {
   return new Date(from.getFullYear(), from.getMonth(), from.getDate() + diff, DUE_HOUR);
 }
 
-/** The Operation department-site login is the ONE DEPT_SITE with assign rights. */
-function isOperationDeptSite(actor: { role: string; department: string | null }): boolean {
-  return actor.role === "DEPT_SITE" && actor.department === "Operation";
-}
+// Elevated department sites (Operation/Optimisation) are the DEPT_SITE
+// logins with assign rights — isElevatedDeptSite from analytics/_lib is the
+// single source of truth for that list (it also unlocks their all-departments
+// view scope in canViewEntity/canViewMember).
 
 /** The "+ Task" quick form: one RunBlock per (recipient × occurrence). */
 export function assignFlowTask(
@@ -78,11 +78,11 @@ export function assignFlowTask(
       actor.role === "OPS" ||
       actor.role === "CEO" ||
       actor.role === "HOD" ||
-      isOperationDeptSite(actor);
+      isElevatedDeptSite(actor);
     if (!allowed) {
       throw new ApiHttpError(
         403,
-        "Only superadmin, operations, HOD, the CEO, or the Operation department account can assign tasks",
+        "Only superadmin, operations, HOD, the CEO, or the Operation/Optimisation department accounts can assign tasks",
       );
     }
 
@@ -115,7 +115,7 @@ export function assignFlowTask(
           ? HOD_ASSIGN_FLOW_ID
           : actor.role === "OPS"
             ? OPS_ASSIGN_FLOW_ID
-            : actor.role === "ADMIN" || isOperationDeptSite(actor)
+            : actor.role === "ADMIN" || isElevatedDeptSite(actor)
               ? ADMIN_ASSIGN_FLOW_ID
               : ADHOC_FLOW_ID; // unreachable given the allow-list — safe fallback only
     const flow = await prisma.flow.findUnique({

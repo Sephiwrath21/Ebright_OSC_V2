@@ -3,7 +3,9 @@
 // OSC integration package — the "ClickUp Tasks" page body. The top of the page
 // is a row of OVERVIEW DONUTS whose composition follows the mockup sites:
 //   Staff (MEMBER):  My Status Daily · My Status Monthly · {HOD/CEO/…} Assigned
-//   HOD:             My Daily · My Monthly · CEO Assigned · Department D + M
+//   HOD:             My Daily · My Monthly · CEO Assigned · inline full
+//                    department detail (chips/donut/roster — the folded-in
+//                    Department Overview page) · Kanban
 //   BRANCH:          Branch Status Daily · Monthly · Ad hoc tasks
 //   CEO:             CEO Tasks (assigned by me) · pinned-department boards
 //   OPS:             own Daily/Monthly + assign form (no org grids)
@@ -41,6 +43,7 @@ import {
 import { AddTaskButton } from "./add-task-button";
 import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
+import { EntityOverviewSection } from "./department-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
   CompletionMeter,
@@ -316,7 +319,6 @@ export function TaskManagerView({
   skipTaskAction,
   reopenTaskAction,
   manpowerScheduleHref,
-  departmentOverviewHref,
   ceoDashboard,
   staff,
   hodKanban,
@@ -347,12 +349,6 @@ export function TaskManagerView({
   /** Link to the Manpower Schedule page (branch manager only) — the host app
    *  owns routing, so this package just needs a URL to point at. */
   manpowerScheduleHref?: string;
-  /** BASE URL for the Department Overview page (no `&department=` yet) — a
-   *  plain string, not a function: Server Components can't pass functions as
-   *  props to Client Components, so the per-department URL is built here,
-   *  client-side, from this base. Used on the HOD's own "Department Status"
-   *  cards and on every entity in the "All Departments" grid. */
-  departmentOverviewHref?: string;
   /** CEO's customizable pinned-department dashboards (CEO role only) — Daily
    *  and Monthly are FULLY INDEPENDENT (separate saved list/order, separate
    *  actions bound to that cadence). Actions are Server Actions ("use
@@ -381,20 +377,13 @@ export function TaskManagerView({
 }) {
   const current = period === "daily" ? daily : monthly;
   const me = current.me;
-  // Donor passed hrefs already carrying `?email=`; this repo passes bare paths.
-  const deptHrefSep = departmentOverviewHref?.includes("?") ? "&" : "?";
-  const deptHref = departmentOverviewHref
-    ? (department: string) =>
-        `${departmentOverviewHref}${deptHrefSep}department=${encodeURIComponent(department)}`
-    : undefined;
   // Branch-side MEMBER (Branch Exec/Coach — Manager is role BRANCH, handled
   // separately) sees Daily only, never Monthly: no Monthly "My Status" donut,
   // no "My Tasks — Monthly" list. Department-side MEMBER/HOD/OPS keep both.
   const branchSideMember = me.me.role === "MEMBER" && me.me.branch !== null;
-  // The Operation department-site account is the one DEPT_SITE that also
-  // gets the "+ Task" button (same staff pool as ADMIN/OPS) — every other
-  // DEPT_SITE/BRANCH_SITE login has no assign capability at all.
-  const isOperationDeptSite = me.me.role === "DEPT_SITE" && me.me.department === "Operation";
+  // NOTE: elevated department sites (Operation/Optimisation) never reach
+  // this view — the page routes them to the dropdown entity overview, where
+  // their "+ Task" button lives in the page header.
   // Spread ONLY into the viewer's own personal-status cards, incoming
   // assigner streams (e.g. "My Status", "HOD Status", "CEO assigned tasks"),
   // and the flat "My Tasks — Daily/Monthly" row lists — deliberately NOT
@@ -454,10 +443,10 @@ export function TaskManagerView({
     />
   );
 
-  const dailyRoster =
-    current.kind === "department" ? daily.department : current.kind === "branch" ? daily.branch : undefined;
-  const monthlyRoster =
-    current.kind === "department" ? monthly.department : current.kind === "branch" ? monthly.branch : undefined;
+  // Branch scope only since the 2026-07-24 redesign — department rosters now
+  // render inside the inline EntityOverviewSection (Details area) instead.
+  const dailyRoster = current.kind === "branch" ? daily.branch : undefined;
+  const monthlyRoster = current.kind === "branch" ? monthly.branch : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -467,11 +456,11 @@ export function TaskManagerView({
           with them too. */}
 
       {/* ---- Overview donuts (composition per role/site) ---- */}
-      {(current.kind === "member" || current.kind === "department") && (
+      {(current.kind === "member" || (current.kind === "department" && me.me.role === "HOD")) && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {/* Personal cards — MEMBER always, HOD but NOT its view-only
               DEPT_SITE counterpart (a "Department account" has no personal
-              tasks at all, only the Department Status cards below). */}
+              tasks at all — its full department detail renders below). */}
           {(current.kind === "member" || me.me.role === "HOD") && (
             <>
               <StatusOverviewCard
@@ -498,45 +487,21 @@ export function TaskManagerView({
               {me.me.role !== "HOD" && delegatedCard}
             </>
           )}
-          {current.kind === "department" && daily.department && (
-            <StatusOverviewCard
-              title="Daily"
-              totals={daily.department.totals}
-              tasks={daily.department.tasks}
-            />
-          )}
-          {current.kind === "department" && monthly.department && (
-            <StatusOverviewCard
-              title="Monthly"
-              totals={monthly.department.totals}
-              tasks={monthly.department.tasks}
-            />
-          )}
         </div>
       )}
 
-      {/* ---- Details: full Department Overview page (HOD + DEPT_SITE both
-          get this — "same as what HOD sees"), Assign Task form (HOD only,
-          restricted; Operation's DEPT_SITE only, unrestricted — every other
-          DEPT_SITE gets no assign capability), and HOD's own personal
-          Kanban (HOD only). ---- */}
-      {current.kind === "department" && daily.department && deptHref && (
+      {/* ---- Details: the full department view (chips + donut + click-
+          through member roster) rendered INLINE for HOD and DEPT_SITE — the
+          standalone Department Overview page was folded in here by the
+          2026-07-24 redesign (its old route now redirects to /task-manager).
+          Assign Task form + personal Kanban stay HOD-only; elevated
+          department sites (Operation/Optimisation) never reach this view —
+          the page routes them to the dropdown entity overview instead. ---- */}
+      {current.kind === "department" && daily.department && monthly.department && (
         <>
           <PageSectionHeading>Details</PageSectionHeading>
-          <a
-            href={deptHref(daily.department.name)}
-            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:bg-blue-50"
-          >
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-                Department Overview
-              </h3>
-              <p className="mt-1 text-sm text-gray-600">
-                Chips, status donut, and a click-through member roster for {daily.department.name}.
-              </p>
-            </div>
-            <span className="text-sm font-medium text-blue-600">Open →</span>
-          </a>
+          <EntityOverviewSection label="Daily" entity={daily.department} kind="department" />
+          <EntityOverviewSection label="Monthly" entity={monthly.department} kind="department" />
           {assignAction && staff && me.me.role === "HOD" && (
             <div className="flex justify-end">
               <AddTaskButton staff={staff} action={assignAction} />
@@ -548,11 +513,6 @@ export function TaskManagerView({
               columns={hodKanban.columns}
               actions={hodKanban.actions}
             />
-          )}
-          {assignAction && staff && isOperationDeptSite && (
-            <div className="flex justify-end">
-              <AddTaskButton staff={staff} action={assignAction} />
-            </div>
           )}
         </>
       )}
@@ -719,27 +679,13 @@ export function TaskManagerView({
               + ad hoc by region, Superadmin only) moved to the OSC Home page
               — see ui/home-overview.tsx. This page keeps the assign form. */}
 
-          {/* ---- Details: administrative actions (assign tasks) ---- */}
-          {(me.me.role === "ADMIN" || me.me.role === "OPS") && assignAction && staff && (
+          {/* ---- Details: administrative actions (assign tasks) — OPS only
+              now: ADMIN no longer renders this view at all (the page routes
+              superadmin to the dropdown entity overview, with + Task in the
+              page header). ---- */}
+          {me.me.role === "OPS" && assignAction && staff && (
             <>
               <PageSectionHeading>Details</PageSectionHeading>
-              {me.me.role === "ADMIN" && departmentOverviewHref && (
-                <a
-                  href={departmentOverviewHref}
-                  className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:bg-blue-50"
-                >
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-                      Department Overview
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Pick any department — chips, status donut, and a click-through member
-                      roster.
-                    </p>
-                  </div>
-                  <span className="text-sm font-medium text-blue-600">Open →</span>
-                </a>
-              )}
               <div className="flex justify-end">
                 <AddTaskButton staff={staff} action={assignAction} />
               </div>
@@ -796,7 +742,7 @@ export function TaskManagerView({
           </>
         )}
 
-      {/* ---- Member roster (department or branch scope), Daily + Monthly ---- */}
+      {/* ---- Member roster (branch scope), Daily + Monthly ---- */}
       {[
         { period: "Daily", roster: dailyRoster },
         { period: "Monthly", roster: monthlyRoster },

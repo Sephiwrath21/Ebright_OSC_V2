@@ -2,6 +2,7 @@
 // single-department detail. Ports of the corresponding /api/internal routes.
 import { z } from "zod";
 import type {
+  FlowBranchDetailResponse,
   FlowDepartmentDetailResponse,
   FlowDetailResponse,
   FlowOverviewResponse,
@@ -163,4 +164,31 @@ export function getDepartmentDetail(
       department: { name: q.department, ...payload },
     } as FlowDepartmentDetailResponse;
   }, "getDepartmentDetail");
+}
+
+const branchQuerySchema = analyticsQuerySchema.extend({
+  branch: z.string().min(1).max(200),
+});
+
+/** Full detail for ONE branch by name (org roles any; BRANCH/BRANCH_SITE own
+ *  only — elevated department sites deliberately have NO branch access). */
+export function getBranchDetail(
+  email: string,
+  branch: string,
+  period: FlowPeriod,
+  date?: string,
+): Promise<FlowBranchDetailResponse> {
+  return native(async () => {
+    const q = branchQuerySchema.parse({ branch, period, ...(date ? { date } : {}) });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityPayload("branch", q.branch, q.period, q.date);
+    return {
+      period: q.period,
+      date: resolvedDate(q.date),
+      branch: { name: q.branch, ...payload },
+    } as FlowBranchDetailResponse;
+  }, "getBranchDetail");
 }

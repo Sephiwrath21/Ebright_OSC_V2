@@ -3,7 +3,16 @@
 // server component fetches all payloads, defines the server actions (each
 // closing over the session email), and passes both down as props — the
 // client components never fetch and never see an identity primitive.
+//
+// 2026-07-24 redesign: Superadmin gets a Department|Branch toggle + dropdown
+// with the selected entity's full Daily+Monthly detail inline (the folded-in
+// Department Overview page, generalized to branches); the elevated
+// department sites (Operation/Optimisation — isElevatedDeptSite) get the
+// department dropdown only; every other role keeps TaskManagerView, with
+// HOD/DEPT_SITE's detail now inline there too. "+ Task" sits in the page
+// header for superadmin + elevated sites.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
@@ -16,6 +25,7 @@ import {
   createKanbanColumn,
   deleteKanbanCard,
   deleteKanbanColumn,
+  getBranchDetail,
   getCeoDashboardConfig,
   getDepartmentDetail,
   getFlowDetail,
@@ -32,8 +42,13 @@ import {
   NoAccountError,
   SetupPendingError,
 } from "@/task-manager/data";
+import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
+import { AddTaskButton } from "@/task-manager/ui/add-task-button";
+import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
+import { EntityPicker } from "@/task-manager/ui/entity-picker";
 import {
+  FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
   type ActionResult,
   type AssignActionResult,
@@ -48,10 +63,42 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const ALL_BRANCHES: string[] = FLOW_BRANCH_REGIONS.flatMap((r) => [...r.branches]);
+/** Fullest demo roster — the least-empty default for the Branch mode. */
+const DEFAULT_BRANCH = "Subang Taipan";
+
+/** Superadmin's top-level mode switch — Department or Branch, never both. */
+function ModeTabs({ active }: { active: "department" | "branch" }) {
+  const base = "rounded-lg px-4 py-1.5 text-sm font-medium";
+  const on = "bg-white text-gray-900 shadow-sm";
+  const off = "text-gray-500 hover:text-gray-700";
+  return (
+    <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
+      <Link
+        href="/task-manager?view=department"
+        className={`${base} ${active === "department" ? on : off}`}
+      >
+        Department
+      </Link>
+      <Link
+        href="/task-manager?view=branch"
+        className={`${base} ${active === "branch" ? on : off}`}
+      >
+        Branch
+      </Link>
+    </div>
+  );
+}
+
 export default async function TaskManagerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    view?: string;
+    department?: string;
+    branch?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
@@ -268,12 +315,119 @@ export default async function TaskManagerPage({
   };
 
   let body: ReactNode;
+  let headerAction: ReactNode = null;
   try {
     const [daily, monthly, { staff }] = await Promise.all([
       getFlowDetail(email, "daily"),
       getFlowDetail(email, "monthly"),
       getFlowStaff(),
     ]);
+    const role = daily.me.me.role;
+    const elevatedDeptSite = isElevatedDeptSite({
+      role,
+      department: daily.me.me.department ?? null,
+    });
+
+    if (role === "ADMIN" || elevatedDeptSite) {
+      // Superadmin + elevated department sites (Operation/Optimisation):
+      // dropdown-driven entity overview. ADMIN gets the Department|Branch
+      // toggle; elevated sites are department-only (no branch visibility by
+      // design — getBranchDetail would 403 them anyway). "+ Task" renders in
+      // the page header, above whatever mode is active.
+      headerAction = <AddTaskButton staff={staff} action={assign} />;
+
+      const view: "department" | "branch" =
+        role === "ADMIN" && sp.view === "branch" ? "branch" : "department";
+
+      let overview: ReactNode;
+      if (view === "department") {
+        const fallback = elevatedDeptSite
+          ? (daily.me.me.department ?? FLOW_DEPARTMENTS[0])
+          : FLOW_DEPARTMENTS[0];
+        const department =
+          sp.department && (FLOW_DEPARTMENTS as readonly string[]).includes(sp.department)
+            ? sp.department
+            : fallback;
+        const [dailyDetail, monthlyDetail] = await Promise.all([
+          getDepartmentDetail(email, department, "daily"),
+          getDepartmentDetail(email, department, "monthly"),
+        ]);
+        overview = (
+          <>
+            <EntityPicker
+              label="Department"
+              value={department}
+              groups={[{ options: FLOW_DEPARTMENTS }]}
+              param="department"
+              basePath="/task-manager"
+              extraParams={{ view: "department" }}
+            />
+            <EntityOverviewSection
+              label="Daily"
+              entity={dailyDetail.department}
+              kind="department"
+            />
+            <EntityOverviewSection
+              label="Monthly"
+              entity={monthlyDetail.department}
+              kind="department"
+            />
+          </>
+        );
+      } else {
+        const branch =
+          sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
+        const [dailyDetail, monthlyDetail] = await Promise.all([
+          getBranchDetail(email, branch, "daily"),
+          getBranchDetail(email, branch, "monthly"),
+        ]);
+        overview = (
+          <>
+            <EntityPicker
+              label="Branch"
+              value={branch}
+              groups={FLOW_BRANCH_REGIONS.map((r) => ({
+                label: r.name,
+                options: r.branches,
+              }))}
+              param="branch"
+              basePath="/task-manager"
+              extraParams={{ view: "branch" }}
+            />
+            <EntityOverviewSection label="Daily" entity={dailyDetail.branch} kind="branch" />
+            <EntityOverviewSection
+              label="Monthly"
+              entity={monthlyDetail.branch}
+              kind="branch"
+            />
+          </>
+        );
+      }
+
+      body = (
+        <div className="flex flex-col gap-6">
+          {role === "ADMIN" && <ModeTabs active={view} />}
+          {overview}
+        </div>
+      );
+
+      return (
+        <AppShell email={email} role={su.role} name={su.name}>
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold">Task Manager</h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Your tasks, team status, and assignments — daily and monthly.
+                </p>
+              </div>
+              {headerAction}
+            </div>
+            {body}
+          </div>
+        </AppShell>
+      );
+    }
 
     // CEO only: each cadence's own pinned list + donut data, independently.
     let ceoDashboard: Parameters<typeof TaskManagerView>[0]["ceoDashboard"];
@@ -319,7 +473,6 @@ export default async function TaskManagerPage({
         skipTaskAction={skipTask}
         reopenTaskAction={reopenTask}
         manpowerScheduleHref="/task-manager/manpower-schedule"
-        departmentOverviewHref="/task-manager/department-overview"
         ceoDashboard={ceoDashboard}
         staff={staff}
         hodKanban={hodKanban}
