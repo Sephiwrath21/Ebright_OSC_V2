@@ -1,15 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search, Home, ChevronRight, Filter,
-  ClipboardCheck, Users,
+  ClipboardCheck, Users, Loader2,
 } from "lucide-react";
 import {
-  BRANCHES, MOCK_ATT_EVENTS, MOCK_ATT_STUDENTS,
-  AttendanceStatus, BranchCode,
-} from "./_mock";
+  BRANCHES, gradeLabel, countsAsAttended,
+  type FAEvent, type Session, type Invitation,
+} from "@/lib/fa/types";
+
+// The v2 attendance UI uses a present/late/absent marker. FA's underlying model
+// is the invitation status (attended/walk_in/no_show/…); we map attended|walk_in
+// → present, no_show → absent, everything else → unrecorded. "late" has no FA
+// equivalent, so it only ever appears from an in-page (unsaved) mark.
+type AttendanceStatus = "present" | "absent" | "late";
+
+interface AttRow {
+  id: string;          // invitation id
+  studentId: string;
+  name: string;
+  branch: string;
+  grade: number;
+  session: string;     // session label
+  status: AttendanceStatus | null;
+}
+
+function invStatusToAttendance(status: Invitation["status"]): AttendanceStatus | null {
+  if (countsAsAttended(status)) return "present";
+  if (status === "no_show") return "absent";
+  return null;
+}
+
+function sessionLabel(s: Session | undefined): string {
+  if (!s) return "—";
+  const time = s.startTime ? ` · ${s.startTime}${s.endTime ? `–${s.endTime}` : ""}` : "";
+  return `D${s.dayNumber} S${s.sessionNumber}${time}`;
+}
 
 type StatusFilter = "all" | "present" | "absent" | "late" | "unrecorded";
 
@@ -95,11 +123,41 @@ function StatPill({
 }
 
 export default function FAAttendanceClient() {
-  const [eventId,      setEventId]      = useState(MOCK_ATT_EVENTS[0].id);
-  const [branch,       setBranch]       = useState<BranchCode | "all">("all");
+  const [eventId,      setEventId]      = useState<string>("");
+  const [branch,       setBranch]       = useState<string>("all");
   const [session,      setSession]      = useState("all");
   const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const [events, setEvents]           = useState<FAEvent[]>([]);
+  const [sessionsData, setSessionsData] = useState<Session[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/fa/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load attendance (${res.status})`);
+        const data = (await res.json()) as { events: FAEvent[]; sessions: Session[]; invitations: Invitation[] };
+        if (!alive) return;
+        const sorted = [...(data.events ?? [])].sort((a, b) => b.startDate.localeCompare(a.startDate));
+        setEvents(sorted);
+        setSessionsData(data.sessions ?? []);
+        setInvitations(data.invitations ?? []);
+        // Default to the most recent event that actually has invitations.
+        const withInvites = sorted.find(e => (data.invitations ?? []).some(i => i.eventId === e.id));
+        setEventId(withInvites?.id ?? sorted[0]?.id ?? "");
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load attendance");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const [overrides, setOverrides] = useState<Map<string, AttendanceStatus | null>>(new Map());
 
@@ -110,11 +168,27 @@ export default function FAAttendanceClient() {
     setOverrides(prev => new Map(prev).set(studentId, status));
   }
 
-  const selectedEvent = MOCK_ATT_EVENTS.find(e => e.id === eventId)!;
+  const selectedEvent = events.find(e => e.id === eventId) ?? null;
 
-  const eventStudents = useMemo(
-    () => MOCK_ATT_STUDENTS.filter(s => s.eventId === eventId),
-    [eventId],
+  const sessionById = useMemo(() => {
+    const m = new Map<string, Session>();
+    for (const s of sessionsData) m.set(s.id, s);
+    return m;
+  }, [sessionsData]);
+
+  const eventStudents = useMemo<AttRow[]>(
+    () => invitations
+      .filter(i => i.eventId === eventId)
+      .map(i => ({
+        id: i.id,
+        studentId: i.studentId,
+        name: i.studentNameSnapshot || `#${i.studentId}`,
+        branch: i.branch,
+        grade: i.targetGrade,
+        session: sessionLabel(sessionById.get(i.sessionId)),
+        status: invStatusToAttendance(i.status),
+      })),
+    [invitations, eventId, sessionById],
   );
 
   const sessions = useMemo(() => {
@@ -181,9 +255,13 @@ export default function FAAttendanceClient() {
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">FA Attendance</h1>
             <p className="text-sm text-slate-500 mt-1">
-              {selectedEvent.name} · {fmtDate(selectedEvent.startDate)}
-              {selectedEvent.startDate !== selectedEvent.endDate && ` – ${fmtDate(selectedEvent.endDate)}`}
-              {" · "}{selectedEvent.venue}
+              {selectedEvent ? (
+                <>
+                  {selectedEvent.name} · {fmtDate(selectedEvent.startDate)}
+                  {selectedEvent.startDate !== selectedEvent.endDate && ` – ${fmtDate(selectedEvent.endDate)}`}
+                  {" · "}{selectedEvent.venue}
+                </>
+              ) : loading ? "Loading…" : "Select an event"}
             </p>
           </div>
 
@@ -212,7 +290,7 @@ export default function FAAttendanceClient() {
             className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ minWidth: 240 }}
           >
-            {MOCK_ATT_EVENTS.map(ev => (
+            {events.map(ev => (
               <option key={ev.id} value={ev.id}>
                 {ev.name} ({fmtDate(ev.startDate)})
               </option>
@@ -237,7 +315,7 @@ export default function FAAttendanceClient() {
           {/* Branch select */}
           <select
             value={branch}
-            onChange={e => setBranch(e.target.value as BranchCode | "all")}
+            onChange={e => setBranch(e.target.value)}
             className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ minWidth: 160 }}
           >
@@ -325,7 +403,16 @@ export default function FAAttendanceClient() {
           </div>
         )}
 
-        {rows.length === 0 ? (
+        {loading ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+            <p className="text-sm text-slate-500">Loading attendance…</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
+            <p className="text-sm font-medium text-red-600">{error}</p>
+          </div>
+        ) : rows.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
             <Users className="w-10 h-10 text-slate-300 mb-3" />
             <p className="text-sm font-medium text-slate-500">No students match your filters.</p>
@@ -360,7 +447,7 @@ export default function FAAttendanceClient() {
                           </span>
                         </td>
                         <td className="px-4 py-3 font-mono text-sm text-slate-700">
-                          G{row.grade}
+                          {gradeLabel(row.grade)}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                           {row.session}
@@ -399,7 +486,7 @@ export default function FAAttendanceClient() {
         {/* Save notice */}
         <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
           <ClipboardCheck className="w-3.5 h-3.5 shrink-0" />
-          Changes are saved locally (mock only — backend not connected yet).
+          Attendance is loaded live from the FA database. Marking changes here are not yet persisted (write-back is the next phase).
         </div>
       </div>
     </div>

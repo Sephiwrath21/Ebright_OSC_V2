@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search, Home, ChevronRight, Filter,
-  Pencil, Printer, Camera, Users,
+  Pencil, Printer, Camera, Users, Loader2,
 } from "lucide-react";
 import {
-  BRANCHES, FA_REPORT_MAX_PER_CRITERION, faReportTotal,
-  MOCK_EVENTS, MOCK_INVITATIONS, MOCK_REPORTS, BranchCode,
-} from "./_mock";
+  BRANCHES, FA_REPORT_MAX_PER_CRITERION, faReportTotal, gradeLabel, countsAsAttended,
+  type FAEvent, type Invitation, type FAReport,
+} from "@/lib/fa/types";
 
 type FilledFilter = "all" | "filled" | "pending";
 
@@ -40,38 +40,74 @@ function FilledBadge({ filled }: { filled: boolean }) {
 }
 
 export default function FAReportsClient() {
-  const [branch,  setBranch]  = useState<BranchCode | "all">("all");
+  const [branch,  setBranch]  = useState<string>("all");
   const [eventId, setEventId] = useState("all");
   const [search,  setSearch]  = useState("");
   const [filled,  setFilled]  = useState<FilledFilter>("all");
 
+  const [events, setEvents]           = useState<FAEvent[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [reports, setReports]         = useState<FAReport[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [dataRes, reportsRes] = await Promise.all([
+          fetch("/api/fa/data", { cache: "no-store" }),
+          fetch("/api/fa/reports", { cache: "no-store" }),
+        ]);
+        if (!dataRes.ok || !reportsRes.ok) throw new Error("Failed to load reports");
+        const data = (await dataRes.json()) as { events: FAEvent[]; invitations: Invitation[] };
+        const rep  = (await reportsRes.json()) as { reports: FAReport[] };
+        if (!alive) return;
+        setEvents(data.events ?? []);
+        setInvitations(data.invitations ?? []);
+        setReports(rep.reports ?? []);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load reports");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Only students who actually attended (attended / walk_in) can carry a report.
+  const attendees = useMemo(
+    () => invitations.filter(i => countsAsAttended(i.status)),
+    [invitations],
+  );
+
   const sortedEvents = useMemo(
-    () => [...MOCK_EVENTS].sort((a, b) => b.startDate.localeCompare(a.startDate)),
-    [],
+    () => [...events].sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [events],
   );
 
   const reportByInvId = useMemo(() => {
-    const m = new Map<string, typeof MOCK_REPORTS[number]>();
-    for (const r of MOCK_REPORTS) m.set(r.invitationId, r);
+    const m = new Map<string, FAReport>();
+    for (const r of reports) m.set(r.invitationId, r);
     return m;
-  }, []);
+  }, [reports]);
 
   const eventNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const e of MOCK_EVENTS) m.set(e.id, e.name);
+    for (const e of events) m.set(e.id, e.name);
     return m;
-  }, []);
+  }, [events]);
 
   const rows = useMemo(() => {
-    const list = MOCK_INVITATIONS.map(inv => ({
+    const list = attendees.map(inv => ({
       invitationId: inv.id,
       studentId:    inv.studentId,
-      name:         inv.studentName,
+      name:         inv.studentNameSnapshot || reportByInvId.get(inv.id)?.studentName || `#${inv.studentId}`,
       branch:       inv.branch,
-      grade:        inv.grade,
+      grade:        inv.targetGrade,
       eventId:      inv.eventId,
       eventName:    eventNameById.get(inv.eventId) ?? "—",
-      attendedAt:   inv.attendedAt,
+      attendedAt:   inv.attendanceMarkedAt ?? inv.invitedAt,
       report:       reportByInvId.get(inv.id),
     }));
 
@@ -97,15 +133,15 @@ export default function FAReportsClient() {
         if (b.report) return 1;
         return b.attendedAt.localeCompare(a.attendedAt);
       });
-  }, [branch, eventId, filled, search, reportByInvId, eventNameById]);
+  }, [attendees, branch, eventId, filled, search, reportByInvId, eventNameById]);
 
   const totalFilled = useMemo(() => rows.filter(r => r.report).length, [rows]);
   const coverage    = rows.length === 0 ? 0 : Math.round((totalFilled / rows.length) * 100);
   const totalMax    = FA_REPORT_MAX_PER_CRITERION * 4;
 
-  const globalFilled   = MOCK_REPORTS.length;
-  const globalTotal    = MOCK_INVITATIONS.length;
-  const globalCoverage = Math.round((globalFilled / globalTotal) * 100);
+  const globalFilled   = reports.length;
+  const globalTotal    = attendees.length;
+  const globalCoverage = globalTotal === 0 ? 0 : Math.round((globalFilled / globalTotal) * 100);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -135,7 +171,7 @@ export default function FAReportsClient() {
             <button
               type="button"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors mb-0.5"
-              title="Bulk export — backend not connected yet"
+              title="Bulk export — not connected yet"
             >
               <Printer className="w-3.5 h-3.5" />
               Export {totalFilled} as PDF
@@ -178,7 +214,7 @@ export default function FAReportsClient() {
             className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ minWidth: 160 }}
             value={branch}
-            onChange={e => setBranch(e.target.value as BranchCode | "all")}
+            onChange={e => setBranch(e.target.value)}
           >
             <option value="all">All branches</option>
             {BRANCHES.map(b => (
@@ -211,7 +247,16 @@ export default function FAReportsClient() {
       </div>
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
-        {rows.length === 0 ? (
+        {loading ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+            <p className="text-sm text-slate-500">Loading reports…</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
+            <p className="text-sm font-medium text-red-600">{error}</p>
+          </div>
+        ) : rows.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
             <Users className="w-10 h-10 text-slate-300 mb-3" />
             <p className="text-sm font-medium text-slate-500">No attendees match your filters.</p>
@@ -251,7 +296,7 @@ export default function FAReportsClient() {
                           </span>
                         </td>
                         <td className="px-4 py-3 font-mono text-sm text-slate-700 whitespace-nowrap">
-                          G{row.grade}
+                          {gradeLabel(row.grade)}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap max-w-[180px] truncate">
                           {row.eventName}
@@ -316,7 +361,7 @@ export default function FAReportsClient() {
                               <button
                                 type="button"
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 whitespace-nowrap transition-colors"
-                                title="Certificate print — backend not connected yet"
+                                title="Certificate print — not connected yet"
                               >
                                 <Printer className="w-3 h-3" /> Print
                               </button>

@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Home, ChevronRight, ListOrdered, Search,
-  Download, Copy, Check, Users,
+  Download, Copy, Check, Users, Loader2,
 } from "lucide-react";
+import {
+  BRANCHES as PCM_BRANCHES, gradeLabel,
+  type FAEvent as RawEvent, type Session as RawSession, type Invitation as RawInvitation,
+} from "@/lib/pcm/types";
 
-type BranchCode = "PJ" | "SA" | "SP" | "KD" | "SE" | "JB";
+type BranchCode = string;
 type InvitationStatus = "invited" | "confirmed" | "attended" | "rescheduled" | "declined" | "no_show";
 type InviteType = "progress" | "renewal";
 
@@ -42,97 +46,49 @@ interface PCMInvitation {
   coachName: string | null;
 }
 
-// ─── Mock events ──────────────────────────────────────────────────────────────
-
-const MOCK_EVENTS: PCMMockEvent[] = [
-  { id: "pcm-001", name: "PCM Jul 2026 Weekly Showcase", startLabel: "14 Jul",  endLabel: "20 Jul 2026" },
-  { id: "pcm-a1",  name: "PCM Jan 2025 Weekly Showcase", startLabel: "6 Jan",   endLabel: "12 Jan 2025" },
-  { id: "pcm-a2",  name: "PCM Mar 2026 Weekly Showcase", startLabel: "9 Mar",   endLabel: "15 Mar 2026" },
-  { id: "pcm-a3",  name: "PCM May 2026 Weekly Showcase", startLabel: "11 May",  endLabel: "17 May 2026" },
-];
-
-// ─── Mock sessions ────────────────────────────────────────────────────────────
-
-const SESSION_TIMES = [
-  { n: 1, start: "09:00", end: "10:00" },
-  { n: 2, start: "10:00", end: "11:00" },
-  { n: 3, start: "11:00", end: "12:00" },
-  { n: 4, start: "14:00", end: "15:00" },
-  { n: 5, start: "15:00", end: "16:00" },
-  { n: 6, start: "16:00", end: "17:00" },
-];
-
-const EVENT_DAY_LABELS: Record<string, Record<number, string>> = {
-  "pcm-001": { 1: "Mon 14 Jul", 2: "Tue 15 Jul", 3: "Wed 16 Jul", 4: "Thu 17 Jul", 5: "Fri 18 Jul", 6: "Sat 19 Jul", 7: "Sun 20 Jul" },
-  "pcm-a1":  { 1: "Mon 6 Jan",  2: "Tue 7 Jan",  3: "Wed 8 Jan",  4: "Thu 9 Jan",  5: "Fri 10 Jan", 6: "Sat 11 Jan", 7: "Sun 12 Jan" },
-  "pcm-a2":  { 1: "Mon 9 Mar",  2: "Tue 10 Mar", 3: "Wed 11 Mar", 4: "Thu 12 Mar", 5: "Fri 13 Mar", 6: "Sat 14 Mar", 7: "Sun 15 Mar" },
-  "pcm-a3":  { 1: "Mon 11 May", 2: "Tue 12 May", 3: "Wed 13 May", 4: "Thu 14 May", 5: "Fri 15 May", 6: "Sat 16 May", 7: "Sun 17 May" },
-};
-
-const MOCK_SESSIONS: PCMMockSession[] = [];
-for (const ev of MOCK_EVENTS) {
-  const dayLabels = EVENT_DAY_LABELS[ev.id] ?? {};
-  for (let d = 1; d <= 7; d++) {
-    for (const t of SESSION_TIMES) {
-      MOCK_SESSIONS.push({
-        id: `${ev.id}-d${d}-s${t.n}`,
-        eventId: ev.id,
-        dayNumber: d,
-        dayLabel: dayLabels[d] ?? `Day ${d}`,
-        sessionNumber: t.n,
-        startTime: t.start,
-        endTime: t.end,
-      });
-    }
-  }
+interface PCMDataBundle {
+  events: RawEvent[];
+  sessions: RawSession[];
+  invitations: RawInvitation[];
 }
 
-// ─── Mock invitations ─────────────────────────────────────────────────────────
+const BRANCH_NAMES: Record<string, string> = Object.fromEntries(PCM_BRANCHES.map(b => [b.code, b.name]));
+const BRANCHES: string[] = PCM_BRANCHES.map(b => b.code);
 
-const MOCK_INVITATIONS: PCMInvitation[] = [
-  // pcm-001 (Jul 2026, upcoming) — invited / confirmed / rescheduled / declined
-  { id: "inv-001", eventId: "pcm-001", sessionId: "pcm-001-d1-s1", studentId: "S0001", studentName: "Ahmad Fariz",    branch: "PJ", grade: 5,  targetGrade: 5,  inviteType: "progress", status: "confirmed",   coachName: "Coach Azri" },
-  { id: "inv-002", eventId: "pcm-001", sessionId: "pcm-001-d1-s1", studentId: "S0002", studentName: "Nurul Ain",      branch: "PJ", grade: 7,  targetGrade: 7,  inviteType: "progress", status: "invited",     coachName: "Coach Azri" },
-  { id: "inv-003", eventId: "pcm-001", sessionId: "pcm-001-d1-s2", studentId: "S0004", studentName: "Hafiz Zain",     branch: "PJ", grade: 3,  targetGrade: 3,  inviteType: "renewal",  status: "confirmed",   coachName: null },
-  { id: "inv-004", eventId: "pcm-001", sessionId: "pcm-001-d2-s1", studentId: "S0005", studentName: "Siti Maisarah",  branch: "SA", grade: 8,  targetGrade: 8,  inviteType: "progress", status: "confirmed",   coachName: "Coach Lina" },
-  { id: "inv-005", eventId: "pcm-001", sessionId: "pcm-001-d2-s1", studentId: "S0007", studentName: "Alif Rahim",     branch: "SA", grade: 4,  targetGrade: 4,  inviteType: "progress", status: "invited",     coachName: "Coach Lina" },
-  { id: "inv-006", eventId: "pcm-001", sessionId: "pcm-001-d2-s2", studentId: "S0010", studentName: "Rina Yusof",     branch: "SA", grade: 6,  targetGrade: 6,  inviteType: "renewal",  status: "rescheduled", coachName: null },
-  { id: "inv-007", eventId: "pcm-001", sessionId: "pcm-001-d3-s1", studentId: "S0011", studentName: "Danial Haris",   branch: "SP", grade: 2,  targetGrade: 2,  inviteType: "progress", status: "confirmed",   coachName: "Coach Faiz" },
-  { id: "inv-008", eventId: "pcm-001", sessionId: "pcm-001-d3-s2", studentId: "S0012", studentName: "Nadia Karim",    branch: "SP", grade: 9,  targetGrade: 9,  inviteType: "progress", status: "invited",     coachName: "Coach Faiz" },
-  { id: "inv-009", eventId: "pcm-001", sessionId: "pcm-001-d4-s1", studentId: "S0013", studentName: "Zafran Idris",   branch: "KD", grade: 5,  targetGrade: 5,  inviteType: "renewal",  status: "declined",    coachName: null },
-  { id: "inv-010", eventId: "pcm-001", sessionId: "pcm-001-d4-s2", studentId: "S0014", studentName: "Aisyah Noor",    branch: "KD", grade: 11, targetGrade: 11, inviteType: "progress", status: "confirmed",   coachName: "Coach Razi" },
-  { id: "inv-011", eventId: "pcm-001", sessionId: "pcm-001-d4-s3", studentId: "S0015", studentName: "Yasmin Osman",   branch: "PJ", grade: 12, targetGrade: 12, inviteType: "progress", status: "confirmed",   coachName: "Coach Azri" },
-  { id: "inv-012", eventId: "pcm-001", sessionId: "pcm-001-d5-s1", studentId: "S0016", studentName: "Rayyan Malik",   branch: "SE", grade: 6,  targetGrade: 6,  inviteType: "renewal",  status: "invited",     coachName: null },
-  { id: "inv-013", eventId: "pcm-001", sessionId: "pcm-001-d5-s2", studentId: "S0017", studentName: "Amira Saad",     branch: "SA", grade: 13, targetGrade: 13, inviteType: "progress", status: "confirmed",   coachName: "Coach Lina" },
-  { id: "inv-014", eventId: "pcm-001", sessionId: "pcm-001-d6-s1", studentId: "S0018", studentName: "Farah Idris",    branch: "JB", grade: 4,  targetGrade: 4,  inviteType: "progress", status: "invited",     coachName: "Coach Nizam" },
-  { id: "inv-015", eventId: "pcm-001", sessionId: "pcm-001-d6-s2", studentId: "S0019", studentName: "Hazwan Faris",   branch: "JB", grade: 7,  targetGrade: 7,  inviteType: "renewal",  status: "confirmed",   coachName: null },
-  { id: "inv-016", eventId: "pcm-001", sessionId: "pcm-001-d7-s1", studentId: "S0020", studentName: "Khairul Amin",   branch: "KD", grade: 8,  targetGrade: 8,  inviteType: "progress", status: "invited",     coachName: "Coach Razi" },
-  { id: "inv-017", eventId: "pcm-001", sessionId: "pcm-001-d7-s2", studentId: "S0021", studentName: "Liyana Hussin",  branch: "SE", grade: 3,  targetGrade: 3,  inviteType: "renewal",  status: "confirmed",   coachName: null },
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function dayMon(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return y && m && d ? `${d} ${MONTHS_SHORT[m - 1]}` : iso;
+}
+function dayMonYear(iso: string): string {
+  const [y] = iso.split("-").map(Number);
+  return `${dayMon(iso)} ${y}`;
+}
 
-  // pcm-a1 (Jan 2025, completed) — mix of attended / no_show
-  { id: "inv-a01", eventId: "pcm-a1", sessionId: "pcm-a1-d1-s1", studentId: "S0001", studentName: "Ahmad Fariz",    branch: "PJ", grade: 4,  targetGrade: 4,  inviteType: "progress", status: "attended",  coachName: "Coach Azri" },
-  { id: "inv-a02", eventId: "pcm-a1", sessionId: "pcm-a1-d1-s2", studentId: "S0002", studentName: "Nurul Ain",      branch: "PJ", grade: 6,  targetGrade: 6,  inviteType: "progress", status: "attended",  coachName: "Coach Azri" },
-  { id: "inv-a03", eventId: "pcm-a1", sessionId: "pcm-a1-d2-s1", studentId: "S0004", studentName: "Hafiz Zain",     branch: "PJ", grade: 2,  targetGrade: 2,  inviteType: "renewal",  status: "no_show",   coachName: null },
-  { id: "inv-a04", eventId: "pcm-a1", sessionId: "pcm-a1-d2-s2", studentId: "S0005", studentName: "Siti Maisarah",  branch: "SA", grade: 7,  targetGrade: 7,  inviteType: "progress", status: "attended",  coachName: "Coach Lina" },
-  { id: "inv-a05", eventId: "pcm-a1", sessionId: "pcm-a1-d3-s1", studentId: "S0010", studentName: "Rina Yusof",     branch: "SA", grade: 5,  targetGrade: 5,  inviteType: "renewal",  status: "attended",  coachName: null },
-  { id: "inv-a06", eventId: "pcm-a1", sessionId: "pcm-a1-d3-s2", studentId: "S0011", studentName: "Danial Haris",   branch: "SP", grade: 1,  targetGrade: 1,  inviteType: "progress", status: "attended",  coachName: "Coach Faiz" },
-  { id: "inv-a07", eventId: "pcm-a1", sessionId: "pcm-a1-d4-s1", studentId: "S0013", studentName: "Zafran Idris",   branch: "KD", grade: 4,  targetGrade: 4,  inviteType: "renewal",  status: "no_show",   coachName: null },
-  { id: "inv-a08", eventId: "pcm-a1", sessionId: "pcm-a1-d5-s2", studentId: "S0016", studentName: "Rayyan Malik",   branch: "SE", grade: 5,  targetGrade: 5,  inviteType: "renewal",  status: "attended",  coachName: null },
-];
-
-// ─── Lookup maps ──────────────────────────────────────────────────────────────
-
-const SESSIONS_BY_ID = new Map<string, PCMMockSession>(MOCK_SESSIONS.map(s => [s.id, s]));
-
-const BRANCH_NAMES: Record<BranchCode, string> = {
-  PJ: "Petaling Jaya", SA: "Shah Alam", SP: "Seri Petaling",
-  KD: "Kepong Damansara", SE: "Selayang", JB: "Johor Bahru",
-};
-
-const BRANCHES: BranchCode[] = ["PJ", "SA", "SP", "KD", "SE", "JB"];
-
-function gradeLabel(g: number): string {
-  return g <= 12 ? `G${g}` : `GB${g - 12}`;
+function toEvents(data: PCMDataBundle): PCMMockEvent[] {
+  return data.events.map(e => ({
+    id: e.id, name: e.name,
+    startLabel: dayMon(e.startDate), endLabel: dayMonYear(e.endDate),
+  }));
+}
+function toSessions(data: PCMDataBundle): PCMMockSession[] {
+  return data.sessions.map(s => ({
+    id: s.id, eventId: s.eventId, dayNumber: s.dayNumber,
+    dayLabel: s.label || `Day ${s.dayNumber}`,
+    sessionNumber: s.sessionNumber, startTime: s.startTime, endTime: s.endTime,
+  }));
+}
+function toInvitations(data: PCMDataBundle): PCMInvitation[] {
+  return data.invitations.map(i => ({
+    id: i.id, eventId: i.eventId, sessionId: i.sessionId,
+    studentId: i.studentId,
+    studentName: i.studentName || `#${i.studentId}`,
+    branch: i.branch,
+    grade: i.targetGrade, targetGrade: i.targetGrade,
+    inviteType: (i.inviteType === "renewal" ? "renewal" : "progress"),
+    status: i.status,
+    coachName: i.coachName ?? null,
+  }));
 }
 
 const STATUS_BADGE: Record<InvitationStatus, string> = {
@@ -152,7 +108,7 @@ const STATUS_LABELS: Record<InvitationStatus, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PCMInvitationsClient() {
-  const [eventId, setEventId] = useState<string>(MOCK_EVENTS[0].id);
+  const [eventId, setEventId] = useState<string>("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<number | "all">("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
@@ -161,12 +117,52 @@ export default function PCMInvitationsClient() {
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const currentEvent = MOCK_EVENTS.find(e => e.id === eventId);
+  const [events, setEvents]           = useState<PCMMockEvent[]>([]);
+  const [sessions, setSessions]       = useState<PCMMockSession[]>([]);
+  const [invitations, setInvitations] = useState<PCMInvitation[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/pcm/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load invitations (${res.status})`);
+        const data = (await res.json()) as PCMDataBundle;
+        if (!alive) return;
+        // Events sorted soonest-first, matching the events page ordering.
+        const evs = toEvents(data).sort((a, b) => {
+          const ea = data.events.find(e => e.id === a.id)?.startDate ?? "";
+          const eb = data.events.find(e => e.id === b.id)?.startDate ?? "";
+          return ea.localeCompare(eb);
+        });
+        setEvents(evs);
+        setSessions(toSessions(data));
+        setInvitations(toInvitations(data));
+        // Default to the most recent event that has invitations.
+        const withInv = [...evs].reverse().find(e => data.invitations.some(i => i.eventId === e.id));
+        setEventId(withInv?.id ?? evs[0]?.id ?? "");
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load invitations");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const SESSIONS_BY_ID = useMemo(
+    () => new Map<string, PCMMockSession>(sessions.map(s => [s.id, s])),
+    [sessions],
+  );
+
+  const currentEvent = events.find(e => e.id === eventId);
 
   const eventSessions = useMemo(
-    () => MOCK_SESSIONS.filter(s => s.eventId === eventId)
+    () => sessions.filter(s => s.eventId === eventId)
           .sort((a, b) => a.dayNumber - b.dayNumber || a.sessionNumber - b.sessionNumber),
-    [eventId],
+    [sessions, eventId],
   );
 
   const dayNumbers = useMemo(() => {
@@ -183,7 +179,7 @@ export default function PCMInvitationsClient() {
   );
 
   const rows = useMemo(() => {
-    let list = MOCK_INVITATIONS.filter(i => i.eventId === eventId);
+    let list = invitations.filter(i => i.eventId === eventId);
     if (branchFilter !== "all") list = list.filter(i => i.branch === branchFilter);
     if (statusFilter !== "all") list = list.filter(i => i.status === statusFilter);
     if (typeFilter !== "all")   list = list.filter(i => i.inviteType === typeFilter);
@@ -209,7 +205,7 @@ export default function PCMInvitationsClient() {
       }
       return a.studentName.localeCompare(b.studentName);
     });
-  }, [eventId, branchFilter, statusFilter, typeFilter, dayFilter, sessionFilter, search]);
+  }, [invitations, SESSIONS_BY_ID, eventId, branchFilter, statusFilter, typeFilter, dayFilter, sessionFilter, search]);
 
   const counts = useMemo(() => {
     let invited = 0, confirmed = 0, attended = 0, absent = 0, rescheduled = 0, progress = 0, renewal = 0;
@@ -337,7 +333,7 @@ export default function PCMInvitationsClient() {
                 value={eventId}
                 onChange={e => { setEventId(e.target.value); setDayFilter("all"); setSessionFilter("all"); }}
               >
-                {MOCK_EVENTS.map(ev => (
+                {events.map(ev => (
                   <option key={ev.id} value={ev.id}>{ev.name} ({ev.startLabel})</option>
                 ))}
               </select>
@@ -481,7 +477,14 @@ export default function PCMInvitationsClient() {
             <span className="text-xs text-slate-400">{rows.length} rows</span>
           </div>
 
-          {rows.length === 0 ? (
+          {loading ? (
+            <div className="p-12 flex flex-col items-center text-center">
+              <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+              <p className="text-sm text-slate-500">Loading invitations…</p>
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center"><p className="text-sm font-medium text-red-600">{error}</p></div>
+          ) : rows.length === 0 ? (
             <div className="p-12 text-center">
               <div className="w-12 h-12 rounded-full bg-slate-100 mx-auto mb-3 flex items-center justify-center">
                 <Users className="w-5 h-5 text-slate-400" />

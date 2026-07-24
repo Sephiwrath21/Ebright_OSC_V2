@@ -288,6 +288,29 @@ export async function getPlatforms(): Promise<PlatformRow[] | null> {
   }));
 }
 
+/** Per-platform ticket tally for the OD homepage "Tickets Counter" card:
+ *  total tickets and how many are solved (status = 'complete') per platform.
+ *  `count` is the solved subset; the card bar renders count/total. */
+export async function getTicketCounterByPlatform(): Promise<
+  { name: string; count: number; total: number }[] | null
+> {
+  const tenantId = await resolveTenantId();
+  if (!tenantId) return null;
+  const res = await queryCrmDb<{ name: string; total: number; solved: number }>(
+    `SELECT p.name,
+            COUNT(t.id)::int AS total,
+            COUNT(t.id) FILTER (WHERE t.status = 'complete')::int AS solved
+       FROM crm.tkt_platform p
+       LEFT JOIN crm.tkt_ticket t ON t.platform_id = p.id AND t.tenant_id = $1
+      WHERE p.tenant_id = $1
+      GROUP BY p.name
+      ORDER BY total DESC, p.name ASC`,
+    [tenantId],
+  );
+  if (!res) return null;
+  return res.rows.map((r) => ({ name: r.name, count: Number(r.solved), total: Number(r.total) }));
+}
+
 // ─── Reference data (New Ticket dropdowns) ───────────────────────────────────
 
 export interface TicketRefData {
@@ -334,30 +357,70 @@ export const TICKET_KANBAN_STATUSES: Array<{ key: string; label: string }> = [
 ];
 const KANBAN_CARDS_PER_COL = 40;
 
-export async function getTicketKanban(): Promise<{ columns: TicketKanbanColumn[]; total: number } | null> {
+/** Time-window presets for the kanban board. Ranges are evaluated against the
+ *  DB's own `now()` so the boundary and the (naive) created_at timestamps share
+ *  one timezone frame — no client/server tz guessing. */
+export type TicketKanbanRange = "today" | "yesterday" | "last7" | "month" | "custom" | "all";
+
+/** Build the `AND created_at …` SQL fragment for a range, plus any params.
+ *  `col` is the timestamp column reference; `startIdx` is the first free $-param. */
+function ticketRangeClause(
+  range: TicketKanbanRange,
+  from: string | null,
+  to: string | null,
+  startIdx: number,
+  col: string,
+): { sql: string; params: string[] } {
+  switch (range) {
+    case "today":     return { sql: ` AND ${col}::date = now()::date`, params: [] };
+    case "yesterday": return { sql: ` AND ${col}::date = now()::date - 1`, params: [] };
+    case "last7":     return { sql: ` AND ${col} >= now() - interval '7 days'`, params: [] };
+    case "month":     return { sql: ` AND date_trunc('month', ${col}) = date_trunc('month', now())`, params: [] };
+    case "custom":
+      if (from && to) return { sql: ` AND ${col}::date >= $${startIdx}::date AND ${col}::date <= $${startIdx + 1}::date`, params: [from, to] };
+      if (from)       return { sql: ` AND ${col}::date >= $${startIdx}::date`, params: [from] };
+      if (to)         return { sql: ` AND ${col}::date <= $${startIdx}::date`, params: [to] };
+      return { sql: "", params: [] };
+    default:          return { sql: "", params: [] };
+  }
+}
+
+export async function getTicketKanban(
+  opts: { range?: TicketKanbanRange; from?: string | null; to?: string | null } = {},
+): Promise<{ columns: TicketKanbanColumn[]; total: number } | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
 
+  const range = opts.range ?? "all";
+  const from = opts.from ?? null;
+  const to = opts.to ?? null;
+
+  // Count query: tenant is $1, so custom date params start at $2.
+  const countRange = ticketRangeClause(range, from, to, 2, "created_at");
   const countRes = await queryCrmDb<{ status: string; n: string }>(
-    `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1 GROUP BY status`,
-    [tenantId],
+    `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1${countRange.sql} GROUP BY status`,
+    [tenantId, ...countRange.params],
   );
   const countByStatus = new Map((countRes?.rows ?? []).map((r) => [r.status, Number(r.n)]));
 
-  // Capped cards per status via ROW_NUMBER window.
+  // Cards query: the date filter lives INSIDE the ranked CTE so ROW_NUMBER only
+  // ranks rows within the window. tenant is $1, custom date params $2…, then the
+  // per-column cap comes last.
+  const cardsRange = ticketRangeClause(range, from, to, 2, "tk.created_at");
+  const capIdx = 2 + cardsRange.params.length;
   const cardsRes = await queryCrmDb<RawTicket & { rn: number }>(
     `WITH ranked AS (
        SELECT tk.*, ROW_NUMBER() OVER (PARTITION BY tk.status ORDER BY tk.created_at DESC) AS rn
-         FROM crm.tkt_ticket tk WHERE tk.tenant_id = $1
+         FROM crm.tkt_ticket tk WHERE tk.tenant_id = $1${cardsRange.sql}
      )
      SELECT ${SELECT_COLS}, tk.rn AS rn
        FROM ranked tk
        JOIN crm.tkt_platform p ON p.id = tk.platform_id
        LEFT JOIN crm.tkt_branch b ON b.id = tk.branch_id
        LEFT JOIN crm.crm_auth_user au ON au.id = tk.user_id
-      WHERE tk.rn <= $2
+      WHERE tk.rn <= $${capIdx}
       ORDER BY tk.created_at DESC`,
-    [tenantId, KANBAN_CARDS_PER_COL],
+    [tenantId, ...cardsRange.params, KANBAN_CARDS_PER_COL],
   );
   const cardsByStatus = new Map<string, TicketRow[]>();
   for (const r of cardsRes?.rows ?? []) {

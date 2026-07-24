@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
-  Home, ChevronRight, ClipboardCheck, Search, Printer,
+  Home, ChevronRight, ClipboardCheck, Search, Printer, Loader2,
 } from "lucide-react";
+import {
+  BRANCHES as PCM_BRANCHES, gradeLabel,
+  type FAEvent as RawEvent, type Invitation as RawInvitation, type PcmReport as RawReport,
+} from "@/lib/pcm/types";
 
-type BranchCode = "PJ" | "SA" | "SP" | "KD" | "SE" | "JB";
+type BranchCode = string;
 
 interface PCMReport {
   id: string;
@@ -31,52 +35,18 @@ interface MockEvent {
   shortLabel: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+const BRANCH_NAMES: Record<string, string> = Object.fromEntries(PCM_BRANCHES.map(b => [b.code, b.name]));
+const BRANCHES: string[] = PCM_BRANCHES.map(b => b.code);
 
-const MOCK_EVENTS: MockEvent[] = [
-  { id: "pcm-001", name: "PCM Jul 2026 Weekly Showcase", shortLabel: "14 Jul 2026" },
-  { id: "pcm-a1",  name: "PCM Jan 2025 Weekly Showcase", shortLabel: "6 Jan 2025" },
-  { id: "pcm-a2",  name: "PCM Mar 2026 Weekly Showcase", shortLabel: "9 Mar 2026" },
-  { id: "pcm-a3",  name: "PCM May 2026 Weekly Showcase", shortLabel: "11 May 2026" },
-];
+interface PCMDataBundle {
+  events: RawEvent[];
+  invitations: RawInvitation[];
+}
 
-const MOCK_REPORTS: PCMReport[] = [
-  // pcm-a1 (Jan 2025)
-  { id: "r001", invitationId: "inv-a01", eventId: "pcm-a1", studentId: "S0001", studentName: "Ahmad Fariz",    branch: "PJ", grade: 4,  preparedBy: "Coach Azri",  confidenceScore: 4, voiceClarityScore: 5, eyeContactScore: 4, ideaExpressionScore: 4, createdAt: "2025-01-08", updatedAt: "2025-01-08" },
-  { id: "r002", invitationId: "inv-a02", eventId: "pcm-a1", studentId: "S0002", studentName: "Nurul Ain",      branch: "PJ", grade: 6,  preparedBy: "Coach Azri",  confidenceScore: 3, voiceClarityScore: 4, eyeContactScore: 3, ideaExpressionScore: 4, createdAt: "2025-01-08", updatedAt: "2025-01-08" },
-  { id: "r003", invitationId: "inv-a04", eventId: "pcm-a1", studentId: "S0005", studentName: "Siti Maisarah",  branch: "SA", grade: 7,  preparedBy: "Coach Lina",  confidenceScore: 5, voiceClarityScore: 5, eyeContactScore: 4, ideaExpressionScore: 5, createdAt: "2025-01-09", updatedAt: "2025-01-09" },
-  { id: "r004", invitationId: "inv-a05", eventId: "pcm-a1", studentId: "S0010", studentName: "Rina Yusof",     branch: "SA", grade: 5,  preparedBy: "Coach Lina",  confidenceScore: 4, voiceClarityScore: 3, eyeContactScore: 4, ideaExpressionScore: 3, createdAt: "2025-01-09", updatedAt: "2025-01-09" },
-  { id: "r005", invitationId: "inv-a06", eventId: "pcm-a1", studentId: "S0011", studentName: "Danial Haris",   branch: "SP", grade: 1,  preparedBy: "Coach Faiz",  confidenceScore: 2, voiceClarityScore: 3, eyeContactScore: 2, ideaExpressionScore: 3, createdAt: "2025-01-10", updatedAt: "2025-01-10" },
-  { id: "r006", invitationId: "inv-a08", eventId: "pcm-a1", studentId: "S0016", studentName: "Rayyan Malik",   branch: "SE", grade: 5,  preparedBy: "Coach Zara",  confidenceScore: 4, voiceClarityScore: 4, eyeContactScore: 5, ideaExpressionScore: 4, createdAt: "2025-01-11", updatedAt: "2025-01-11" },
-
-  // pcm-a2 (Mar 2026)
-  { id: "r007", invitationId: "inv-b01", eventId: "pcm-a2", studentId: "S0001", studentName: "Ahmad Fariz",    branch: "PJ", grade: 5,  preparedBy: "Coach Azri",  confidenceScore: 4, voiceClarityScore: 5, eyeContactScore: 5, ideaExpressionScore: 4, createdAt: "2026-03-11", updatedAt: "2026-03-11" },
-  { id: "r008", invitationId: "inv-b02", eventId: "pcm-a2", studentId: "S0004", studentName: "Hafiz Zain",     branch: "PJ", grade: 3,  preparedBy: "Coach Azri",  confidenceScore: 3, voiceClarityScore: 3, eyeContactScore: 4, ideaExpressionScore: 3, createdAt: "2026-03-11", updatedAt: "2026-03-11" },
-  { id: "r009", invitationId: "inv-b03", eventId: "pcm-a2", studentId: "S0005", studentName: "Siti Maisarah",  branch: "SA", grade: 8,  preparedBy: "Coach Lina",  confidenceScore: 5, voiceClarityScore: 5, eyeContactScore: 5, ideaExpressionScore: 5, createdAt: "2026-03-12", updatedAt: "2026-03-12" },
-  { id: "r010", invitationId: "inv-b04", eventId: "pcm-a2", studentId: "S0013", studentName: "Zafran Idris",   branch: "KD", grade: 5,  preparedBy: "Coach Razi",  confidenceScore: 4, voiceClarityScore: 4, eyeContactScore: 3, ideaExpressionScore: 4, createdAt: "2026-03-13", updatedAt: "2026-03-13" },
-  { id: "r011", invitationId: "inv-b05", eventId: "pcm-a2", studentId: "S0014", studentName: "Aisyah Noor",    branch: "KD", grade: 10, preparedBy: "Coach Razi",  confidenceScore: 4, voiceClarityScore: 5, eyeContactScore: 4, ideaExpressionScore: 4, createdAt: "2026-03-13", updatedAt: "2026-03-13" },
-  { id: "r012", invitationId: "inv-b06", eventId: "pcm-a2", studentId: "S0016", studentName: "Rayyan Malik",   branch: "SE", grade: 6,  preparedBy: "Coach Zara",  confidenceScore: 5, voiceClarityScore: 4, eyeContactScore: 5, ideaExpressionScore: 4, createdAt: "2026-03-14", updatedAt: "2026-03-14" },
-
-  // pcm-a3 (May 2026)
-  { id: "r013", invitationId: "inv-c01", eventId: "pcm-a3", studentId: "S0001", studentName: "Ahmad Fariz",    branch: "PJ", grade: 5,  preparedBy: "Coach Azri",  confidenceScore: 5, voiceClarityScore: 5, eyeContactScore: 5, ideaExpressionScore: 4, createdAt: "2026-05-13", updatedAt: "2026-05-13" },
-  { id: "r014", invitationId: "inv-c02", eventId: "pcm-a3", studentId: "S0005", studentName: "Siti Maisarah",  branch: "SA", grade: 8,  preparedBy: "Coach Lina",  confidenceScore: 5, voiceClarityScore: 4, eyeContactScore: 5, ideaExpressionScore: 5, createdAt: "2026-05-13", updatedAt: "2026-05-13" },
-  { id: "r015", invitationId: "inv-c03", eventId: "pcm-a3", studentId: "S0015", studentName: "Yasmin Osman",   branch: "PJ", grade: 12, preparedBy: "Coach Azri",  confidenceScore: 5, voiceClarityScore: 5, eyeContactScore: 4, ideaExpressionScore: 5, createdAt: "2026-05-14", updatedAt: "2026-05-14" },
-  { id: "r016", invitationId: "inv-c04", eventId: "pcm-a3", studentId: "S0017", studentName: "Amira Saad",     branch: "SA", grade: 13, preparedBy: "Coach Lina",  confidenceScore: 5, voiceClarityScore: 5, eyeContactScore: 5, ideaExpressionScore: 5, createdAt: "2026-05-15", updatedAt: "2026-05-15" },
-  { id: "r017", invitationId: "inv-c05", eventId: "pcm-a3", studentId: "S0011", studentName: "Danial Haris",   branch: "SP", grade: 2,  preparedBy: "Coach Faiz",  confidenceScore: 3, voiceClarityScore: 4, eyeContactScore: 3, ideaExpressionScore: 3, createdAt: "2026-05-15", updatedAt: "2026-05-15" },
-  { id: "r018", invitationId: "inv-c06", eventId: "pcm-a3", studentId: "S0013", studentName: "Zafran Idris",   branch: "KD", grade: 5,  preparedBy: "Coach Razi",  confidenceScore: 4, voiceClarityScore: 5, eyeContactScore: 4, ideaExpressionScore: 5, createdAt: "2026-05-16", updatedAt: "2026-05-16" },
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const BRANCH_NAMES: Record<BranchCode, string> = {
-  PJ: "Petaling Jaya", SA: "Shah Alam", SP: "Seri Petaling",
-  KD: "Kepong Damansara", SE: "Selayang", JB: "Johor Bahru",
-};
-
-const BRANCHES: BranchCode[] = ["PJ", "SA", "SP", "KD", "SE", "JB"];
-
-function gradeLabel(g: number): string {
-  return g <= 12 ? `G${g}` : `GB${g - 12}`;
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function shortLabelOf(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return y && m && d ? `${d} ${MONTHS_SHORT[m - 1]} ${y}` : iso;
 }
 
 function formatDate(s: string): string {
@@ -91,12 +61,6 @@ const SCORE_STYLE = (sc: number) =>
   sc >= 3 ? "bg-blue-50 text-blue-700" :
             "bg-amber-50 text-amber-700";
 
-// Mock attended counts per event (for coverage %)
-const ATTENDED_PER_EVENT: Record<string, number> = {
-  "pcm-a1": 6,
-  "pcm-a2": 8,
-  "pcm-a3": 10,
-};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -105,8 +69,64 @@ export default function PCMReportsClient() {
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
+  const [reports, setReports]           = useState<PCMReport[]>([]);
+  const [events, setEvents]             = useState<MockEvent[]>([]);
+  const [attendedPerEvent, setAttendedPerEvent] = useState<Record<string, number>>({});
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [reportsRes, dataRes] = await Promise.all([
+          fetch("/api/pcm/reports", { cache: "no-store" }),
+          fetch("/api/pcm/data", { cache: "no-store" }),
+        ]);
+        if (!reportsRes.ok || !dataRes.ok) throw new Error("Failed to load reports");
+        const rep = (await reportsRes.json()) as { reports: RawReport[] };
+        const data = (await dataRes.json()) as PCMDataBundle;
+        if (!alive) return;
+
+        // Reports key on invitationId; resolve each report's event via its
+        // invitation, and tally attended per event (v1 rule: status==="attended").
+        const invById = new Map<string, RawInvitation>();
+        const attended: Record<string, number> = {};
+        for (const i of data.invitations ?? []) {
+          invById.set(i.id, i);
+          if (i.status === "attended") attended[i.eventId] = (attended[i.eventId] ?? 0) + 1;
+        }
+        setEvents((data.events ?? [])
+          .sort((a, b) => b.startDate.localeCompare(a.startDate))
+          .map(e => ({ id: e.id, name: e.name, shortLabel: shortLabelOf(e.startDate) })));
+        setAttendedPerEvent(attended);
+        setReports((rep.reports ?? []).map(r => ({
+          id: r.id,
+          invitationId: r.invitationId,
+          eventId: invById.get(r.invitationId)?.eventId ?? "",
+          studentId: r.studentId,
+          studentName: r.studentName,
+          branch: r.branch,
+          grade: r.grade,
+          preparedBy: r.preparedBy,
+          confidenceScore: r.confidenceScore,
+          voiceClarityScore: r.voiceClarityScore,
+          eyeContactScore: r.eyeContactScore,
+          ideaExpressionScore: r.ideaExpressionScore,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        })));
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load reports");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = [...MOCK_REPORTS];
+    let list = [...reports];
     if (eventId !== "all") list = list.filter(r => r.eventId === eventId);
     if (branchFilter !== "all") list = list.filter(r => r.branch === branchFilter);
     const q = search.trim().toLowerCase();
@@ -116,18 +136,18 @@ export default function PCMReportsClient() {
       r.preparedBy.toLowerCase().includes(q),
     );
     return list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [eventId, branchFilter, search]);
+  }, [reports, eventId, branchFilter, search]);
 
   const coverageInfo = useMemo(() => {
     if (eventId === "all") {
-      const totalAttended = Object.values(ATTENDED_PER_EVENT).reduce((s, n) => s + n, 0);
+      const totalAttended = Object.values(attendedPerEvent).reduce((s, n) => s + n, 0);
       return { attended: totalAttended, coverage: totalAttended === 0 ? 0 : Math.round((filtered.length / totalAttended) * 100) };
     }
-    const attended = ATTENDED_PER_EVENT[eventId] ?? 0;
+    const attended = attendedPerEvent[eventId] ?? 0;
     return { attended, coverage: attended === 0 ? 0 : Math.round((filtered.length / attended) * 100) };
-  }, [eventId, filtered.length]);
+  }, [eventId, filtered.length, attendedPerEvent]);
 
-  const EVENT_BY_ID = useMemo(() => new Map(MOCK_EVENTS.map(e => [e.id, e])), []);
+  const EVENT_BY_ID = useMemo(() => new Map(events.map(e => [e.id, e])), [events]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -168,7 +188,7 @@ export default function PCMReportsClient() {
               onChange={e => setEventId(e.target.value)}
             >
               <option value="all">All events</option>
-              {MOCK_EVENTS.map(ev => (
+              {events.map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.name} ({ev.shortLabel})</option>
               ))}
             </select>
@@ -199,7 +219,7 @@ export default function PCMReportsClient() {
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-slate-800">Reports</h2>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">{filtered.length} of {MOCK_REPORTS.length} total</span>
+              <span className="text-xs text-slate-400">{filtered.length} of {reports.length} total</span>
               {filtered.length > 0 && (
                 <button
                   type="button"
@@ -213,7 +233,14 @@ export default function PCMReportsClient() {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-12 flex flex-col items-center text-center">
+              <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+              <p className="text-sm text-slate-500">Loading reports…</p>
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center"><p className="text-sm font-medium text-red-600">{error}</p></div>
+          ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <div className="w-12 h-12 rounded-full bg-slate-100 mx-auto mb-3 flex items-center justify-center">
                 <ClipboardCheck className="w-5 h-5 text-slate-400" />

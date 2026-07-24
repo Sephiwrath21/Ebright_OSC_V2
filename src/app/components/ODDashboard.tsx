@@ -1,6 +1,11 @@
 "use client";
 
+<<<<<<< Updated upstream
 import { useEffect, useState, useCallback, type ReactNode } from "react";
+=======
+import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+>>>>>>> Stashed changes
 import {
   UserPlus,
   UserMinus,
@@ -14,6 +19,13 @@ import {
   ClipboardList,
   Compass,
   FileText,
+<<<<<<< Updated upstream
+=======
+  ListTodo,
+  TrendingUp,
+  ArrowLeft,
+  ChevronRight,
+>>>>>>> Stashed changes
 } from "lucide-react";
 import GreetingHeader from "./GreetingHeader";
 
@@ -69,12 +81,28 @@ export default function ODDashboard({
    *  rendered full-width below the main dashboard grid. */
   taskOverview?: ReactNode;
 }) {
+<<<<<<< Updated upstream
   const dummyTickets = [
     { name: "Aone", count: 3, total: 5 },
     { name: "PS", count: 4, total: 8 },
     { name: "Leads", count: 2, total: 6 },
     { name: "Clickup", count: 5, total: 10 },
     { name: "Others", count: 1, total: 4 },
+=======
+  const dummyDistribution = {
+    PENDING: 343,
+    COMPLETE: 651,
+    "NOT APPLICABLE": 3,
+    "N/A": 9,
+  };
+
+  const dummyDailyTasks = [
+    { id: "86d3g0gcw", name: "1800: Update Daily Intern Logsheet", status: "PENDING", listName: "Management", url: "#" },
+    { id: "86d3g0gcy", name: "1730: Meet Iqbal to show the progress", status: "PENDING", listName: "Management", url: "#" },
+    { id: "86d3g0gcz", name: "AOne Task verify", status: "PENDING", listName: "AOne (SMS)", url: "#" },
+    { id: "86d3g0gd0", name: "Process Street SOP update", status: "COMPLETE", listName: "PS", url: "#" },
+    { id: "86d3g0gd1", name: "Daily check of CRM Leads", status: "COMPLETE", listName: "CNS (CRM)", url: "#" },
+>>>>>>> Stashed changes
   ];
 
   const greetName =
@@ -211,11 +239,11 @@ export default function ODDashboard({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12 space-y-6">
-        
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-12 space-y-6">
+
         {/* Header */}
         <div className="mb-6 w-full space-y-2">
-          <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
+          <GreetingHeader name={greetName} style={{ padding: "0 0 4px" }} />
           <div className="flex justify-between items-center flex-wrap gap-2">
             <p className="text-sm text-slate-500">
               Hi, Optimization Department! Here is your custom executive workspace.
@@ -392,44 +420,85 @@ export default function ODDashboard({
           <div className="lg:col-span-5 space-y-6">
             
             {/* 4. Tickets Counter - DB BACKED */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <Link
+              href="/crm/ticket/opportunities"
+              className="group bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-indigo-200 transition-all"
+            >
               <div>
                 <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-indigo-500" />
                     Tickets Counter
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                    {tickets.length > 0 ? "Database Active" : "Demo Mode"}
-                  </span>
+                  {tickets.length > 0 && (
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                      Live
+                    </span>
+                  )}
                 </h2>
-                
-                <div className="space-y-3">
-                  {(tickets.length > 0 ? tickets : dummyTickets).map((t, idx) => {
-                    const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
-                    return (
-                      <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-500 font-mono">
-                              {t.count}/{t.total} ({percent}%)
-                            </span>
-                          </div>
+
+                {loading ? (
+                  // Skeleton while the real data loads — never flash demo numbers.
+                  <div className="space-y-3">
+                    <div className="h-3 w-40 bg-slate-100 rounded animate-pulse mb-3" />
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-3 w-16 bg-slate-100 rounded animate-pulse" />
                         </div>
-                        {/* Progress Bar */}
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}
-                          />
-                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full animate-pulse" />
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                ) : tickets.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-8 text-center">No ticket data available.</p>
+                ) : (
+                  <>
+                    {(() => {
+                      const grandTotal = tickets.reduce((s, t) => s + t.total, 0);
+                      const grandSolved = tickets.reduce((s, t) => s + t.count, 0);
+                      const pct = grandTotal > 0 ? Math.round((grandSolved / grandTotal) * 100) : 0;
+                      return (
+                        <p className="text-xs text-slate-500 -mt-2 mb-3">
+                          <span className="font-semibold text-slate-700">{grandSolved.toLocaleString()}</span>
+                          {" of "}
+                          <span className="font-semibold text-slate-700">{grandTotal.toLocaleString()}</span>
+                          {" tickets solved "}
+                          <span className="text-slate-400">({pct}%)</span>
+                        </p>
+                      );
+                    })()}
+
+                    <div className="space-y-3">
+                      {tickets.map((t) => {
+                        const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
+                        return (
+                          <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-500 font-mono">
+                                  {t.count}/{t.total} ({percent}%)
+                                </span>
+                              </div>
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-300"
+                                style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
+            </Link>
 
           </div>
 

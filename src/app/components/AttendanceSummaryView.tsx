@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  ArrowLeft,
   MapPin,
   Radio,
   RadioReceiver,
@@ -243,20 +242,10 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <Link
-              href="/attendance"
-              className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-              Back
-            </Link>
             <div>
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                 Attendance Dashboard
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Live scanner sync · Auto-refreshes every 5 seconds
-              </p>
             </div>
           </div>
           {!isAllBranches && <ScannerStatusChip online={data.scannerOnline} />}

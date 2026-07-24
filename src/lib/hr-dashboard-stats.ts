@@ -1,50 +1,9 @@
 import "server-only";
+// queryEbrightHrfs  → portal `hrfs` DB (leave_request + users/employment/…).
+// queryEbrightHrfsSource → `ebright_hrfs` DB (BranchStaff, hikvision scans, …).
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
-import { queryLeadsDb, isLeadsAvailable } from "@/lib/leads-db";
+import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
 import { remapStScan } from "@/lib/scan-identity";
-
-// Cached autocount_employee_map lookup. Loaded lazily on first call so the
-// pages that don't use it pay nothing. Cleared on process restart. When
-// LEADS_DB_URL isn't set, returns an empty map and isLeadsAvailable() → false
-// (graceful no-op).
-let autocountCache: Map<string, { name: string; role: string | null; branch: string | null; isInactive: boolean }> | null = null;
-async function getAutocountMap() {
-  if (autocountCache) return autocountCache;
-  const map = new Map<string, { name: string; role: string | null; branch: string | null; isInactive: boolean }>();
-  if (!isLeadsAvailable()) {
-    autocountCache = map; // cache empty so we don't re-check the env per call
-    return map;
-  }
-  try {
-    const res = await queryLeadsDb<{
-      autocount_code: string;
-      name: string | null;
-      role: string | null;
-      branch: string | null;
-      status: string | null;
-    }>(
-      `SELECT m.autocount_code, bs.name, bs.role, bs.branch, bs.status
-         FROM public.autocount_employee_map m
-         LEFT JOIN hrfs."BranchStaff" bs ON bs.id = m.branchstaff_id`,
-    );
-    if (res) {
-      for (const r of res.rows) {
-        if (r.autocount_code && r.name) {
-          map.set(r.autocount_code, {
-            name: r.name,
-            role: r.role,
-            branch: r.branch,
-            isInactive: (r.status ?? "").toLowerCase() === "inactive",
-          });
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("[hr-dashboard-stats] autocount lookup failed:", (e as Error).message);
-  }
-  autocountCache = map;
-  return map;
-}
 
 // Stats used on both the HR Dashboard page (/induction/hr-dashboard) and the
 // /api/hr-dashboard endpoint. Kept in one place so they can't drift.
@@ -57,24 +16,50 @@ export interface DashStaffPreview {
   detail?: string | null;
 }
 
-// Reusable subquery — most recent MedicalLeave row per employee, used as
-// a name-resolution fallback for PT staff (e.g. EBPT###) that don't have
-// a BranchStaff record.
-const ML_FALLBACK_JOIN = `
-  LEFT JOIN (
-    SELECT DISTINCT ON ("employeeCode")
-           "employeeCode" AS employee_code,
-           name, position, branch
-      FROM public."MedicalLeave"
-     WHERE "employeeCode" IS NOT NULL AND name IS NOT NULL AND name <> ''
-     ORDER BY "employeeCode", "createdAt" DESC
-  ) ml ON ml.employee_code = lt."EmployeeCode"
-`;
-type MedicalLeaveFallback = {
-  ml_name: string | null;
-  ml_branch: string | null;
-  ml_position: string | null;
+// ── Leave source: portal `hrfs.leave_request` ──────────────────────────
+// leave_request stores each leave as a [start_date, end_date] RANGE keyed by
+// portal user_id. The HR-dashboard leave logic (count SL/month, dedup per day,
+// etc.) was written against the old autocount `LeaveTransaction`, which had one
+// row PER DAY. `generate_series` expands each request back into per-day rows so
+// that logic is unchanged. Identity (name/branch/role/employeeId) is resolved
+// from the portal user — same user_id path as the attendance summary/report.
+type LeaveDayRow = {
+  user_id: number;
+  employee_id: string | null;
+  name: string | null;
+  branch_code: string | null;
+  position: string | null;
+  leave_type_code: string | null;
+  leave_date: string; // YYYY-MM-DD (server-formatted, tz-safe)
 };
+
+// Builds the expanded-per-day approved-leave query. `extraWhere` adds the
+// type/date-window filters and MUST reference `gs.d::date` for the day and
+// `lt.leave_type_code` for the type, with bind params starting at $1.
+function expandedLeaveSql(extraWhere: string): string {
+  return `
+    SELECT DISTINCT ON (r.user_id, gs.d::date, lt.leave_type_code)
+           r.user_id,
+           e.employee_id,
+           COALESCE(NULLIF(TRIM(up.full_name), ''), NULLIF(TRIM(up.nick_name), '')) AS name,
+           b.branch_code,
+           e.position,
+           lt.leave_type_code,
+           to_char(gs.d, 'YYYY-MM-DD') AS leave_date
+      FROM public.leave_request r
+      JOIN public.leave_types lt ON lt.leave_type_id = r.leave_type_id
+      JOIN LATERAL generate_series(r.start_date::timestamp, r.end_date::timestamp, interval '1 day') gs(d) ON true
+      LEFT JOIN public.employment e ON e.user_id = r.user_id AND e.status = 'active'
+      LEFT JOIN public.branch b ON b.branch_id = e.branch_id
+      LEFT JOIN public.user_profile up ON up.user_id = r.user_id
+     WHERE r.status = 'approved'
+       ${extraWhere}
+     ORDER BY r.user_id, gs.d::date, lt.leave_type_code`;
+}
+
+function leaveName(r: LeaveDayRow): string {
+  return r.name ?? r.employee_id ?? `User #${r.user_id}`;
+}
 
 // ── Flagged: > 2 approved SL leaves in the selected month ──────────────
 export async function getFlaggedThisMonth(
@@ -84,65 +69,38 @@ export async function getFlaggedThisMonth(
   const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
   const lastDay = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<{
-    employee_code: string | null;
-    employee_name: string | null;
-    bs_name: string | null;
-    bs_branch: string | null;
-    bs_role: string | null;
-    bs_status: string | null;
-  } & MedicalLeaveFallback>(
-    `SELECT lt."EmployeeCode" AS employee_code,
-            lt."EmployeeName" AS employee_name,
-            bs.name AS bs_name,
-            bs.branch AS bs_branch,
-            bs.role AS bs_role,
-            bs.status AS bs_status,
-            ml.name AS ml_name,
-            ml.branch AS ml_branch,
-            ml.position AS ml_position
-       FROM public."LeaveTransaction" lt
-       LEFT JOIN public."BranchStaff" bs ON bs."employeeId" = lt."EmployeeCode"
-       ${ML_FALLBACK_JOIN}
-      WHERE lt."ApplyStatus" = 'A'
-        AND lt."LeaveTypeCode" = 'SL'
-        AND lt."LeaveDate" >= $1::date AND lt."LeaveDate" <= $2::date`,
+  const rows = await queryEbrightHrfs<LeaveDayRow>(
+    expandedLeaveSql(
+      `AND lt.leave_type_code = 'SL'
+        AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
+    ),
     [firstDay, lastDay],
   );
 
-  const autocount = await getAutocountMap();
   const perEmp = new Map<string, {
     count: number;
     name: string;
     empNo: string | null;
     branch: string | null;
     role: string | null;
-    isInactive: boolean;
   }>();
   for (const r of rows.rows) {
-    const key = r.employee_code ?? r.employee_name ?? "";
-    if (!key) continue;
+    const key = String(r.user_id);
     const e = perEmp.get(key);
     if (e) {
       e.count += 1;
     } else {
-      // Name resolution chain: BranchStaff → LeaveTransaction.EmployeeName
-      // → MedicalLeave.name → autocount_employee_map → raw code.
-      const ac = r.employee_code ? autocount.get(r.employee_code) : undefined;
       perEmp.set(key, {
         count: 1,
-        name: r.bs_name ?? r.employee_name ?? r.ml_name ?? ac?.name ?? key,
-        empNo: r.employee_code,
-        branch: r.bs_branch ?? r.ml_branch ?? ac?.branch ?? null,
-        role: r.bs_role ?? r.ml_position ?? ac?.role ?? null,
-        isInactive:
-          (r.bs_status ?? "").toLowerCase() === "inactive" ||
-          (ac?.isInactive ?? false),
+        name: leaveName(r),
+        empNo: r.employee_id,
+        branch: r.branch_code,
+        role: r.position,
       });
     }
   }
   return [...perEmp.values()]
-    .filter((v) => v.count >= 3 && !v.isInactive)
+    .filter((v) => v.count >= 3)
     .sort((a, b) => b.count - a.count)
     .map((v) => ({
       empNo: v.empNo,
@@ -161,63 +119,38 @@ export async function getMia(
   const [y, m, d] = todayMyt.split("-").map(Number);
   const start = new Date(Date.UTC(y, m - 1, d - 14)).toISOString().slice(0, 10);
 
-  const ulRes = await queryEbrightHrfs<{
-    employee_code: string | null;
-    employee_name: string | null;
-    bs_name: string | null;
-    bs_branch: string | null;
-    bs_role: string | null;
-    bs_status: string | null;
-  } & MedicalLeaveFallback>(
-    `SELECT lt."EmployeeCode" AS employee_code,
-            lt."EmployeeName" AS employee_name,
-            bs.name AS bs_name,
-            bs.branch AS bs_branch,
-            bs.role AS bs_role,
-            bs.status AS bs_status,
-            ml.name AS ml_name,
-            ml.branch AS ml_branch,
-            ml.position AS ml_position
-       FROM public."LeaveTransaction" lt
-       LEFT JOIN public."BranchStaff" bs ON bs."employeeId" = lt."EmployeeCode"
-       ${ML_FALLBACK_JOIN}
-      WHERE lt."ApplyStatus" = 'A'
-        AND lt."LeaveTypeCode" = 'UL'
-        AND lt."LeaveDate" >= $1::date AND lt."LeaveDate" <= $2::date`,
+  const ulRes = await queryEbrightHrfs<LeaveDayRow>(
+    expandedLeaveSql(
+      `AND lt.leave_type_code = 'UL'
+        AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
+    ),
     [start, todayMyt],
   );
 
-  const autocount = await getAutocountMap();
   const ulPerEmp = new Map<string, {
     count: number;
     name: string;
     empNo: string | null;
     branch: string | null;
     role: string | null;
-    isInactive: boolean;
   }>();
   for (const r of ulRes.rows) {
-    const key = r.employee_code ?? r.employee_name ?? "";
-    if (!key) continue;
+    const key = String(r.user_id);
     const e = ulPerEmp.get(key);
     if (e) {
       e.count += 1;
     } else {
-      const ac = r.employee_code ? autocount.get(r.employee_code) : undefined;
       ulPerEmp.set(key, {
         count: 1,
-        name: r.bs_name ?? r.employee_name ?? r.ml_name ?? ac?.name ?? key,
-        empNo: r.employee_code,
-        branch: r.bs_branch ?? r.ml_branch ?? ac?.branch ?? null,
-        role: r.bs_role ?? r.ml_position ?? ac?.role ?? null,
-        isInactive:
-          (r.bs_status ?? "").toLowerCase() === "inactive" ||
-          (ac?.isInactive ?? false),
+        name: leaveName(r),
+        empNo: r.employee_id,
+        branch: r.branch_code,
+        role: r.position,
       });
     }
   }
   const ulList: DashStaffPreview[] = [...ulPerEmp.values()]
-    .filter((v) => v.count >= 1 && !v.isInactive)
+    .filter((v) => v.count >= 1)
     .map((v) => ({
       empNo: v.empNo,
       name: v.name,
@@ -235,7 +168,7 @@ export async function getMia(
   ];
 
   const [activeRes, scanRes, leaveRes, justRes] = await Promise.all([
-    queryEbrightHrfs<{
+    queryEbrightHrfsSource<{
       employee_id: string | null;
       name: string | null;
       branch: string | null;
@@ -247,20 +180,26 @@ export async function getMia(
          FROM public."BranchStaff"
         WHERE status = 'Active' AND branch IN ('HQ','ST') AND "employeeId" IS NOT NULL`,
     ),
-    queryEbrightHrfs<{ person_id: string; device_id: string | null }>(
+    queryEbrightHrfsSource<{ person_id: string; device_id: string | null }>(
       `SELECT DISTINCT person_id, device_id
          FROM public.hikvision_attendance_all
         WHERE event_time >= $1 AND event_time < $2
           AND person_id IS NOT NULL AND person_id <> '' AND person_id <> '0'`,
       [dayStart.toISOString(), dayEnd.toISOString()],
     ),
+    // On approved leave today → resolve to employee_id (scans/BranchStaff key
+    // by employee_id, but leave_request keys by portal user_id).
     queryEbrightHrfs<{ emp_code: string | null }>(
-      `SELECT DISTINCT "EmployeeCode" AS emp_code
-         FROM public."LeaveTransaction"
-        WHERE "ApplyStatus" = 'A' AND "LeaveDate" = $1::date`,
+      `SELECT DISTINCT e.employee_id AS emp_code
+         FROM public.leave_request r
+         JOIN public.employment e ON e.user_id = r.user_id AND e.status = 'active'
+         JOIN LATERAL generate_series(r.start_date::timestamp, r.end_date::timestamp, interval '1 day') gs(d) ON true
+        WHERE r.status = 'approved'
+          AND gs.d::date = $1::date
+          AND e.employee_id IS NOT NULL`,
       [todayMyt],
     ),
-    queryEbrightHrfs<{ emp_no: string | null }>(
+    queryEbrightHrfsSource<{ emp_no: string | null }>(
       `SELECT DISTINCT emp_no FROM public.attendance_justification
          WHERE just_date = $1::date`,
       [todayMyt],
@@ -400,7 +339,7 @@ export async function getOnboarding(todayIso: string): Promise<OnboardingResult>
   const monthFirst = `${todayIso.slice(0, 7)}-01`;
   const monthLast = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<{
+  const rows = await queryEbrightHrfsSource<{
     employee_id: string | null;
     name: string | null;
     branch: string | null;
@@ -439,7 +378,7 @@ export async function getOnboarding(todayIso: string): Promise<OnboardingResult>
   // SIGNED IN: count BranchStaff with parsed signed_date falling in current month.
   // Query separately so we count ALL active staff, not just those in the
   // onboarding window.
-  const signedRows = await queryEbrightHrfs<{ signed_date: string | null }>(
+  const signedRows = await queryEbrightHrfsSource<{ signed_date: string | null }>(
     `SELECT signed_date FROM public."BranchStaff"
        WHERE status = 'Active'
          AND signed_date IS NOT NULL AND signed_date <> ''`,
@@ -468,7 +407,7 @@ export async function getOffboarding(todayIso: string): Promise<OffboardingResul
   const endWindow = new Date(Date.UTC(y, m - 1 + 2, d)).toISOString().slice(0, 10);
   const twoWeeksAhead = new Date(Date.UTC(y, m - 1, d + 14)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<{
+  const rows = await queryEbrightHrfsSource<{
     employee_id: string | null;
     name: string | null;
     branch: string | null;
@@ -509,57 +448,24 @@ export async function getMcLastMonth(todayIso: string): Promise<LeaveItem[]> {
   const [y, m, d] = todayIso.split("-").map(Number);
   const monthAgo = new Date(Date.UTC(y, m - 2, d)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<{
-    employee_code: string | null;
-    employee_name: string | null;
-    bs_name: string | null;
-    bs_branch: string | null;
-    bs_role: string | null;
-    bs_status: string | null;
-    leave_type_code: string | null;
-    leave_date: string;
-  } & MedicalLeaveFallback>(
-    `SELECT DISTINCT ON (lt."EmployeeCode", lt."LeaveDate", lt."LeaveTypeCode")
-            lt."EmployeeCode" AS employee_code,
-            lt."EmployeeName" AS employee_name,
-            bs.name AS bs_name,
-            bs.branch AS bs_branch,
-            bs.role AS bs_role,
-            bs.status AS bs_status,
-            ml.name AS ml_name,
-            ml.branch AS ml_branch,
-            ml.position AS ml_position,
-            lt."LeaveTypeCode" AS leave_type_code,
-            to_char(lt."LeaveDate", 'YYYY-MM-DD') AS leave_date
-       FROM public."LeaveTransaction" lt
-       LEFT JOIN public."BranchStaff" bs ON bs."employeeId" = lt."EmployeeCode"
-       ${ML_FALLBACK_JOIN}
-      WHERE lt."ApplyStatus" = 'A'
-        AND lt."LeaveTypeCode" <> 'AL'
-        AND lt."LeaveDate" >= $1::date AND lt."LeaveDate" <= $2::date`,
+  const rows = await queryEbrightHrfs<LeaveDayRow>(
+    expandedLeaveSql(
+      `AND lt.leave_type_code <> 'AL'
+        AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
+    ),
     [monthAgo, todayIso],
   );
 
-  const autocount = await getAutocountMap();
   return rows.rows
-    .map((r) => {
-      const ac = r.employee_code ? autocount.get(r.employee_code) : undefined;
-      const isInactive =
-        (r.bs_status ?? "").toLowerCase() === "inactive" ||
-        (ac?.isInactive ?? false);
-      return {
-        _isInactive: isInactive,
-        empNo: r.employee_code,
-        name: r.bs_name ?? r.employee_name ?? r.ml_name ?? ac?.name ?? r.employee_code ?? "(unknown)",
-        branch: r.bs_branch ?? r.ml_branch ?? ac?.branch ?? null,
-        role: r.bs_role ?? r.ml_position ?? ac?.role ?? null,
-        date: r.leave_date,
-        leaveTypeCode: r.leave_type_code,
-        detail: r.leave_type_code,
-      };
-    })
-    .filter((r) => !r._isInactive)
-    .map(({ _isInactive: _, ...rest }) => rest)
+    .map((r) => ({
+      empNo: r.employee_id,
+      name: leaveName(r),
+      branch: r.branch_code,
+      role: r.position,
+      date: r.leave_date,
+      leaveTypeCode: r.leave_type_code,
+      detail: r.leave_type_code,
+    }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -568,56 +474,23 @@ export async function getAnnualLeaveNext2Weeks(todayIso: string): Promise<LeaveI
   const [y, m, d] = todayIso.split("-").map(Number);
   const twoWeeksAhead = new Date(Date.UTC(y, m - 1, d + 14)).toISOString().slice(0, 10);
 
-  const rows = await queryEbrightHrfs<{
-    employee_code: string | null;
-    employee_name: string | null;
-    bs_name: string | null;
-    bs_branch: string | null;
-    bs_role: string | null;
-    bs_status: string | null;
-    leave_type_code: string | null;
-    leave_date: string;
-  } & MedicalLeaveFallback>(
-    `SELECT DISTINCT ON (lt."EmployeeCode", lt."LeaveDate", lt."LeaveTypeCode")
-            lt."EmployeeCode" AS employee_code,
-            lt."EmployeeName" AS employee_name,
-            bs.name AS bs_name,
-            bs.branch AS bs_branch,
-            bs.role AS bs_role,
-            bs.status AS bs_status,
-            ml.name AS ml_name,
-            ml.branch AS ml_branch,
-            ml.position AS ml_position,
-            lt."LeaveTypeCode" AS leave_type_code,
-            to_char(lt."LeaveDate", 'YYYY-MM-DD') AS leave_date
-       FROM public."LeaveTransaction" lt
-       LEFT JOIN public."BranchStaff" bs ON bs."employeeId" = lt."EmployeeCode"
-       ${ML_FALLBACK_JOIN}
-      WHERE lt."ApplyStatus" = 'A'
-        AND lt."LeaveTypeCode" = 'AL'
-        AND lt."LeaveDate" >= $1::date AND lt."LeaveDate" <= $2::date`,
+  const rows = await queryEbrightHrfs<LeaveDayRow>(
+    expandedLeaveSql(
+      `AND lt.leave_type_code = 'AL'
+        AND gs.d::date >= $1::date AND gs.d::date <= $2::date`,
+    ),
     [todayIso, twoWeeksAhead],
   );
 
-  const autocount = await getAutocountMap();
   return rows.rows
-    .map((r) => {
-      const ac = r.employee_code ? autocount.get(r.employee_code) : undefined;
-      const isInactive =
-        (r.bs_status ?? "").toLowerCase() === "inactive" ||
-        (ac?.isInactive ?? false);
-      return {
-        _isInactive: isInactive,
-        empNo: r.employee_code,
-        name: r.bs_name ?? r.employee_name ?? r.ml_name ?? ac?.name ?? r.employee_code ?? "(unknown)",
-        branch: r.bs_branch ?? r.ml_branch ?? ac?.branch ?? null,
-        role: r.bs_role ?? r.ml_position ?? ac?.role ?? null,
-        date: r.leave_date,
-        leaveTypeCode: r.leave_type_code,
-        detail: "AL",
-      };
-    })
-    .filter((r) => !r._isInactive)
-    .map(({ _isInactive: _, ...rest }) => rest)
+    .map((r) => ({
+      empNo: r.employee_id,
+      name: leaveName(r),
+      branch: r.branch_code,
+      role: r.position,
+      date: r.leave_date,
+      leaveTypeCode: r.leave_type_code,
+      detail: "AL",
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
