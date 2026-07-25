@@ -4,7 +4,15 @@
 // the calendar-day arithmetic isn't flaky around local midnight.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatDueDate, visibleAssignerStreams, type FlowRole } from "./types";
+import {
+  FLOW_GROUP_DEPT_ALL,
+  FLOW_GROUP_DEPT_NONE,
+  flowGroupMembers,
+  formatDueDate,
+  visibleAssignerStreams,
+  type FlowRole,
+  type FlowStaffMember,
+} from "./types";
 
 // A fixed Monday, well clear of month/year boundaries.
 const TODAY = new Date(2024, 0, 15, 12, 0, 0);
@@ -93,6 +101,48 @@ describe("visibleAssignerStreams", () => {
       "HOD",
       "BRANCH_SITE",
       "MEMBER",
+    ]);
+  });
+});
+
+describe("flowGroupMembers — Intern department drill-down (2026-07-25)", () => {
+  const intern = (id: string, department: string | null): FlowStaffMember => ({
+    id,
+    name: id,
+    role: "MEMBER" as FlowRole,
+    department,
+    branch: null,
+    employmentType: "Intern",
+    coachSchedule: null,
+  });
+  const staff: FlowStaffMember[] = [
+    intern("op-intern", "Operation"),
+    intern("mkt-intern", "Marketing"),
+    intern("no-dept-intern", null),
+  ];
+
+  it("no sub-value or 'All departments' -> every intern (the old flat behavior)", () => {
+    expect(flowGroupMembers(staff, "Intern").map((s) => s.id)).toEqual([
+      "op-intern",
+      "mkt-intern",
+      "no-dept-intern",
+    ]);
+    expect(flowGroupMembers(staff, "Intern", FLOW_GROUP_DEPT_ALL).map((s) => s.id)).toEqual([
+      "op-intern",
+      "mkt-intern",
+      "no-dept-intern",
+    ]);
+  });
+
+  it("a department sub-value narrows to that department's interns only", () => {
+    expect(flowGroupMembers(staff, "Intern", "Operation").map((s) => s.id)).toEqual([
+      "op-intern",
+    ]);
+  });
+
+  it("'No department yet' selects department-less interns only", () => {
+    expect(flowGroupMembers(staff, "Intern", FLOW_GROUP_DEPT_NONE).map((s) => s.id)).toEqual([
+      "no-dept-intern",
     ]);
   });
 });

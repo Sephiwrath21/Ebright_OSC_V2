@@ -12,7 +12,13 @@
 import * as React from "react";
 import type { FlowEntityDetail, FlowMemberRollup, FlowTaskRow } from "./types";
 import { flowCompletionPct, formatDueDate } from "./types";
-import { CalendarIcon, InitialAvatar, StatusDonut, StatusOverviewCard } from "./bits";
+import {
+  CalendarIcon,
+  InitialAvatar,
+  StatusDonut,
+  StatusOverviewCard,
+  type ReassignControl,
+} from "./bits";
 
 function CheckIcon() {
   return (
@@ -239,12 +245,15 @@ export function EntityOverviewSection({
   label,
   entity,
   kind = "department",
+  reassign,
 }: {
   label: string;
   entity: FlowEntityDetail;
   /** Which scope the roster belongs to — drives the member-detail header's
    *  "{role} - {scope}" line. */
   kind?: "department" | "branch";
+  /** "Assign to Others" control for the status donut's Pending drill modal. */
+  reassign?: ReassignControl;
 }) {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const selectedMember = selectedMemberId
@@ -286,6 +295,7 @@ export function EntityOverviewSection({
           title={label}
           totals={entity.totals}
           tasks={entity.tasks}
+          reassign={reassign}
         />
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
