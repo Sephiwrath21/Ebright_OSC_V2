@@ -129,14 +129,18 @@ export function AssignTaskForm({
   };
 
   return (
-    <div className={bare ? "" : "rounded-2xl border border-gray-200 bg-white p-5"}>
+    // Bare mode (the + Task modal): a flex column so the fields region can
+    // scroll independently while the submit footer below stays pinned —
+    // the modal card caps the height (max-h), this fills it. Non-bare
+    // (inline card) has no height cap, so the same markup just flows.
+    <div className={bare ? "flex min-h-0 flex-1 flex-col" : "rounded-2xl border border-gray-200 bg-white p-5"}>
       {!bare && (
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-500">
           Assign Task
         </h3>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
         <label className="max-w-xl text-sm text-gray-600">
           Task title
           <input
@@ -227,22 +231,27 @@ export function AssignTaskForm({
             className={`mt-1 ${selectClass}`}
           />
         </label>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={pending}
-            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {pending ? "Assigning…" : "Assign task"}
-          </button>
-          {message && (
-            <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>
-              {message.text}
-            </p>
-          )}
-        </div>
+      {/* Sticky footer: OUTSIDE the scrollable fields region above, so the
+          submit button is ALWAYS reachable no matter how tall the form grows
+          (10 selected people + day chips + due date) or how short the
+          viewport is — the 2026-07-25 mobile/tablet bug was this button
+          rendering off-screen with no scroll path. All screen sizes. */}
+      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={pending}
+          className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {pending ? "Assigning…" : "Assign task"}
+        </button>
+        {message && (
+          <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>
+            {message.text}
+          </p>
+        )}
       </div>
     </div>
   );
