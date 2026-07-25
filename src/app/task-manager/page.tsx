@@ -47,7 +47,7 @@ import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
-import { EntityPicker } from "@/task-manager/ui/entity-picker";
+import { DailyDatePicker, EntityPicker } from "@/task-manager/ui/entity-picker";
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
@@ -68,21 +68,23 @@ const ALL_BRANCHES: string[] = FLOW_BRANCH_REGIONS.flatMap((r) => [...r.branches
 /** Fullest demo roster — the least-empty default for the Branch mode. */
 const DEFAULT_BRANCH = "Subang Taipan";
 
-/** Superadmin's top-level mode switch — Department or Branch, never both. */
-function ModeTabs({ active }: { active: "department" | "branch" }) {
+/** Superadmin's top-level mode switch — Department or Branch, never both.
+ *  Carries the selected Daily date across so switching modes keeps it. */
+function ModeTabs({ active, date }: { active: "department" | "branch"; date?: string }) {
   const base = "rounded-lg px-4 py-1.5 text-sm font-medium";
   const on = "bg-white text-gray-900 shadow-sm";
   const off = "text-gray-500 hover:text-gray-700";
+  const suffix = date ? `&date=${date}` : "";
   return (
     <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
       <Link
-        href="/task-manager?view=department"
+        href={`/task-manager?view=department${suffix}`}
         className={`${base} ${active === "department" ? on : off}`}
       >
         Department
       </Link>
       <Link
-        href="/task-manager?view=branch"
+        href={`/task-manager?view=branch${suffix}`}
         className={`${base} ${active === "branch" ? on : off}`}
       >
         Branch
@@ -90,6 +92,10 @@ function ModeTabs({ active }: { active: "department" | "branch" }) {
     </div>
   );
 }
+
+/** Strict YYYY-MM-DD or nothing — anything else falls back to today (the
+ *  data layer's own default when `date` is omitted). */
+const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default async function TaskManagerPage({
   searchParams,
@@ -99,6 +105,7 @@ export default async function TaskManagerPage({
     view?: string;
     department?: string;
     branch?: string;
+    date?: string;
   }>;
 }) {
   const session = await auth();
@@ -109,6 +116,9 @@ export default async function TaskManagerPage({
   const sp = await searchParams;
   const period = sp.period === "monthly" ? "monthly" : "daily";
   const href = (p: string) => `/task-manager?period=${p}`;
+  // Daily date filter (2026-07-25): drives the DAILY window only — Monthly
+  // sections always stay on the current month. Undefined = today.
+  const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
@@ -368,7 +378,7 @@ export default async function TaskManagerPage({
             ? sp.department
             : fallback;
         const [dailyDetail, monthlyDetail] = await Promise.all([
-          getDepartmentDetail(email, department, "daily"),
+          getDepartmentDetail(email, department, "daily", dailyDate),
           getDepartmentDetail(email, department, "monthly"),
         ]);
         overview = (
@@ -379,13 +389,20 @@ export default async function TaskManagerPage({
               groups={[{ options: FLOW_DEPARTMENTS }]}
               param="department"
               basePath="/task-manager"
-              extraParams={{ view: "department" }}
+              extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
             />
             <EntityOverviewSection
               label="Daily"
               entity={dailyDetail.department}
               kind="department"
               reassign={reassign}
+              headerControl={
+                <DailyDatePicker
+                  value={dailyDetail.date}
+                  basePath="/task-manager"
+                  extraParams={{ view: "department", department }}
+                />
+              }
             />
             <EntityOverviewSection
               label="Monthly"
@@ -399,7 +416,7 @@ export default async function TaskManagerPage({
         const branch =
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
         const [dailyDetail, monthlyDetail] = await Promise.all([
-          getBranchDetail(email, branch, "daily"),
+          getBranchDetail(email, branch, "daily", dailyDate),
           getBranchDetail(email, branch, "monthly"),
         ]);
         overview = (
@@ -413,13 +430,20 @@ export default async function TaskManagerPage({
               }))}
               param="branch"
               basePath="/task-manager"
-              extraParams={{ view: "branch" }}
+              extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
             />
             <EntityOverviewSection
               label="Daily"
               entity={dailyDetail.branch}
               kind="branch"
               reassign={reassign}
+              headerControl={
+                <DailyDatePicker
+                  value={dailyDetail.date}
+                  basePath="/task-manager"
+                  extraParams={{ view: "branch", branch }}
+                />
+              }
             />
             <EntityOverviewSection
               label="Monthly"
@@ -433,7 +457,7 @@ export default async function TaskManagerPage({
 
       body = (
         <div className="flex flex-col gap-6">
-          {role === "ADMIN" && <ModeTabs active={view} />}
+          {role === "ADMIN" && <ModeTabs active={view} date={dailyDate} />}
           {overview}
         </div>
       );
@@ -488,6 +512,20 @@ export default async function TaskManagerPage({
       hodKanban = { cards, columns, actions: hodKanbanActions };
     }
 
+    // HOD/DEPT_SITE inline Details: the same Daily date filter as the
+    // dropdown overviews ("everywhere this layout appears" — 2026-07-25).
+    // Only their own-department Daily section follows the selected date;
+    // personal cards and Monthly stay on today/current month.
+    let departmentDaily: Parameters<typeof TaskManagerView>[0]["departmentDaily"];
+    let departmentDailyControl: ReactNode | undefined;
+    if (daily.kind === "department" && daily.department) {
+      const detail = await getDepartmentDetail(email, daily.department.name, "daily", dailyDate);
+      departmentDaily = detail.department;
+      departmentDailyControl = (
+        <DailyDatePicker value={detail.date} basePath="/task-manager" extraParams={{}} />
+      );
+    }
+
     body = (
       <TaskManagerView
         daily={daily}
@@ -504,6 +542,8 @@ export default async function TaskManagerPage({
         ceoDashboard={ceoDashboard}
         staff={staff}
         hodKanban={hodKanban}
+        departmentDaily={departmentDaily}
+        departmentDailyControl={departmentDailyControl}
       />
     );
   } catch (err) {

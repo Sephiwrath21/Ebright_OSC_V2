@@ -29,6 +29,7 @@ import type {
   AssignActionResult,
   FlowAssignInput,
   FlowDetailResponse,
+  FlowEntityDetail,
   FlowMemberRollup,
   FlowPeriod,
   FlowTaskRow,
@@ -324,6 +325,8 @@ export function TaskManagerView({
   ceoDashboard,
   staff,
   hodKanban,
+  departmentDaily,
+  departmentDailyControl,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -349,6 +352,11 @@ export function TaskManagerView({
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
+  /** HOD/DEPT_SITE only: replaces daily.department in the inline Details
+   *  Daily section — the page re-fetches it for the selected ?date=. */
+  departmentDaily?: FlowEntityDetail;
+  /** The Daily date filter, rendered on that section's heading row. */
+  departmentDailyControl?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -510,9 +518,10 @@ export function TaskManagerView({
           <PageSectionHeading>Details</PageSectionHeading>
           <EntityOverviewSection
             label="Daily"
-            entity={daily.department}
+            entity={departmentDaily ?? daily.department}
             kind="department"
             reassign={reassign}
+            headerControl={departmentDailyControl}
           />
           <EntityOverviewSection
             label="Monthly"
