@@ -250,6 +250,10 @@ export interface FlowAssignInput {
    *  see assign/route.ts. They're independent, separately-completable
    *  instances that happen to share a title, not one recurring task. */
   days?: (typeof FLOW_DAYS)[number][];
+  /** "Repeat weekly" opt-in (Daily cadence only, default off): when the due
+   *  day passes, next week's occurrence is auto-created in the same series
+   *  — see engine/recurrence.ts. Ignored for Monthly/Ad hoc. */
+  repeatWeekly?: boolean;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD

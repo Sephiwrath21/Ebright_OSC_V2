@@ -62,6 +62,7 @@ export function AssignTaskForm({
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [cadence, setCadence] = React.useState<CadenceOption | null>(null);
   const [days, setDays] = React.useState<NonNullable<FlowAssignInput["days"]>>([]);
+  const [repeatWeekly, setRepeatWeekly] = React.useState(false);
   const [dueDate, setDueDate] = React.useState("");
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -87,7 +88,11 @@ export function AssignTaskForm({
   // applies regardless of cadence.
   const showDay = cadence === "daily";
   React.useEffect(() => {
-    if (!showDay) setDays([]);
+    if (!showDay) {
+      setDays([]);
+      // "Repeat weekly" is Daily-only — drop a stale pick on cadence change.
+      setRepeatWeekly(false);
+    }
   }, [showDay]);
 
   const toggleDay = (value: (typeof FLOW_DAYS)[number]) => {
@@ -114,6 +119,7 @@ export function AssignTaskForm({
         cadence,
         days,
         dueDate: dueDate || undefined,
+        repeatWeekly,
       });
       if (result.ok) {
         setMessage({ ok: true, text: "Task Assigned" });
@@ -121,6 +127,7 @@ export function AssignTaskForm({
         setUserIds([]);
         setCadence(null);
         setDays([]);
+        setRepeatWeekly(false);
         setDueDate("");
       } else {
         setMessage({ ok: false, text: result.message });
@@ -182,6 +189,21 @@ export function AssignTaskForm({
             })}
           </div>
         </div>
+
+        {showDay && (
+          <label className="flex w-fit items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={repeatWeekly}
+              onChange={(e) => setRepeatWeekly(e.target.checked)}
+              className="size-4 rounded border-gray-300 accent-blue-600"
+            />
+            Repeat weekly
+            <span className="text-xs text-gray-400">
+              (auto-creates next week&apos;s task once the day passes)
+            </span>
+          </label>
+        )}
 
         {showDay && (
           <div className="max-w-md">
