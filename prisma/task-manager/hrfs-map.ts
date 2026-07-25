@@ -107,19 +107,14 @@ export const ROLE_MAP: Record<string, RoleMapEntry> = {
   "FT Coach": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Full Time" },
   "PT Coach": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Part Time" },
 
-  // NOTE (see the header's data-provenance comment): in the live data, ALL 4
-  // "FT EXEC" rows carry a non-branch branchName (HQ x2, MKT, OD) — none of
-  // them has a resolvable branch. That's suspicious: it suggests "FT EXEC"
-  // might actually mean an HQ/department-level executive (closer to
-  // DEPARTMENT_EMPLOYMENT_TYPES's "HQ Exec") rather than a branch's own
-  // "Branch Exec". The task spec is explicit about this mapping though, and
-  // branch-resolution failures are deliberately NOT overridable (see header)
-  // — so, AS SPECIFIED, these 4 people skip today with "unresolved branch
-  // code" until a human confirms which is right: (a) add the real branch via
-  // a BRANCH_MAP entry if HQ/MKT/OD do turn out to be unlisted branch codes,
-  // or (b) re-map "FT EXEC" here to MEMBER/"HQ Exec" (department-side) if
-  // they're actually HQ staff — see the dry-run summary for exactly who.
-  "FT EXEC": { role: "MEMBER", employmentType: "Branch Exec", coachSchedule: null },
+  // DECIDED 2026-07-25 (user): "FT EXEC" means an HQ/department-level
+  // executive, NOT a branch's own exec — in the live data every FT EXEC row
+  // carries a non-branch marker (HQ/MKT/OD), never a real branch. Mapped to
+  // the department side ("HQ Exec"), so branchName is ignored entirely and
+  // all of them import. Department comes from OVERRIDES where a marker
+  // identified one (MKT -> Marketing, OD -> Optimisation); the HQ-marked
+  // rows import department-less until someone assigns one.
+  "FT EXEC": { role: "MEMBER", employmentType: "HQ Exec", coachSchedule: null },
 
   REGIONAL_MANAGER: { role: "MEMBER", employmentType: "Regional Manager", coachSchedule: null },
 
@@ -344,7 +339,29 @@ export interface MappedUser {
  *   "nurul@ebright.my": { role: "OPS", employmentType: "Manager", branch: "Subang Taipan" },
  * };
  */
-export const OVERRIDES: Record<string, Partial<MappedUser>> = {};
+export const OVERRIDES: Record<string, Partial<MappedUser>> = {
+  // ---- decisions confirmed by the user, 2026-07-25 ----
+
+  // The one HOD: heads Optimisation ("OD" marker read as Optimisation
+  // Department, matching the org's own od@ebright.my naming).
+  "iqbalhakim216@gmail.com": { department: "Optimisation" },
+
+  // FT EXEC department markers (see ROLE_MAP's "FT EXEC" note): MKT and OD
+  // identified a department; the HQ-marked rows stay department-less.
+  "maizatulmaisarahmior@gmail.com": { department: "Marketing" },
+  "ngyingchenn@gmail.com": { department: "Optimisation" },
+
+  // SUPER_ADMIN demotions: HRFS marks 10 rows SUPER_ADMIN; the user kept
+  // ADMIN for the people/system accounts (od@, admin@ x2, Ashwin, Wan
+  // Nuraihan, Khora) and demoted the department logins to site accounts.
+  // operation@ (no s) is HRFS's spelling; the login staff actually use is
+  // operations@ — added in EXTRA_USERS below. sales@ has no matching Task
+  // Manager department (FLOW_DEPARTMENTS has no Sales), so: plain member.
+  "finance@ebright.my": { role: "DEPT_SITE", department: "Finance", employmentType: null },
+  "marketing@ebright.my": { role: "DEPT_SITE", department: "Marketing", employmentType: null },
+  "operation@ebright.my": { role: "DEPT_SITE", department: "Operation", employmentType: null },
+  "sales@ebright.my": { role: "MEMBER", employmentType: null },
+};
 
 // ---------------------------------------------------------------------------
 // EXTRA_USERS — accounts that don't exist in HRFS at all (site logins, etc).
@@ -376,7 +393,84 @@ export const OVERRIDES: Record<string, Partial<MappedUser>> = {};
  *   },
  * ];
  */
-export const EXTRA_USERS: MappedUser[] = [];
+export const EXTRA_USERS: MappedUser[] = [
+  // ---- decisions confirmed by the user, 2026-07-25 ----
+
+  // CEO: Kevin's HRFS row is BRANCH_MANAGER with branchName "CEO" — a
+  // branch-required role with a non-branch marker, which auto-skips, and
+  // branch skips are deliberately not override-rescuable (see the file
+  // header's asymmetry note). Manual entry instead.
+  {
+    email: "kevinkhoo@ebright.my",
+    name: "Kevin Khoo Kuan Xiong",
+    role: "CEO",
+    department: null,
+    branch: null,
+    employmentType: "CEO",
+    coachSchedule: null,
+  },
+
+  // Department site logins that exist in hrfs.users (the login source) but
+  // not in ebright_hrfs. operations@ (with the s) is the real login;
+  // Operation/Optimisation department sites get the elevated experience
+  // (all-departments view + assign — see isElevatedDeptSite).
+  {
+    email: "operations@ebright.my",
+    name: "Operation Department",
+    role: "DEPT_SITE",
+    department: "Operation",
+    branch: null,
+    employmentType: null,
+    coachSchedule: null,
+  },
+  {
+    email: "academy@ebright.my",
+    name: "Academy Department",
+    role: "DEPT_SITE",
+    department: "Academy",
+    branch: null,
+    employmentType: null,
+    coachSchedule: null,
+  },
+  {
+    email: "hr@ebright.my",
+    name: "Human Resource Department",
+    role: "DEPT_SITE",
+    department: "Human Resource",
+    branch: null,
+    employmentType: null,
+    coachSchedule: null,
+  },
+
+  // Branch site logins (view-only branch status accounts).
+  {
+    email: "ebrightbandarbarubangi@gmail.com",
+    name: "Bandar Baru Bangi Site",
+    role: "BRANCH_SITE",
+    department: null,
+    branch: "Bandar Baru Bangi",
+    employmentType: null,
+    coachSchedule: null,
+  },
+  {
+    email: "ebrightbandarrimbayu@gmail.com",
+    name: "Bandar Rimbayu Site",
+    role: "BRANCH_SITE",
+    department: null,
+    branch: "Bandar Rimbayu",
+    employmentType: null,
+    coachSchedule: null,
+  },
+  {
+    email: "ebrightonline@gmail.com",
+    name: "Online Site",
+    role: "BRANCH_SITE",
+    department: null,
+    branch: "Online",
+    employmentType: null,
+    coachSchedule: null,
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Load-time validation of the hand-edited config. OVERRIDES/EXTRA_USERS are

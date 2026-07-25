@@ -138,15 +138,21 @@ describe("mapHrfsUser — ROLE_MAP families", () => {
     expect(result.ok).toBe(false);
   });
 
-  it('FT EXEC -> MEMBER, "Branch Exec", branch required', () => {
+  it('FT EXEC -> MEMBER, "HQ Exec", department-side — branchName ignored (2026-07-25 decision)', () => {
+    // Even with a resolvable branch code, FT EXEC is department-side now:
+    // branch stays null and nothing about branchName can skip the row.
     const result = mapHrfsUser(row({ role: "FT EXEC", branchName: "BBB", email: "ftexec@ebright.my" }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.user.role).toBe("MEMBER");
-      expect(result.user.employmentType).toBe("Branch Exec");
-      expect(result.user.branch).toBe("Bandar Baru Bangi");
+      expect(result.user.employmentType).toBe("HQ Exec");
+      expect(result.user.branch).toBeNull();
       expect(result.user.department).toBeNull();
     }
+    // The live-data shape: a non-branch marker (HQ) — imports fine too.
+    const hq = mapHrfsUser(row({ role: "FT EXEC", branchName: "HQ", email: "ftexec2@ebright.my" }));
+    expect(hq.ok).toBe(true);
+    if (hq.ok) expect(hq.user.branch).toBeNull();
   });
 
   it('REGIONAL_MANAGER -> MEMBER, "Regional Manager", branch OPTIONAL: resolved when possible, warned-not-skipped otherwise', () => {
