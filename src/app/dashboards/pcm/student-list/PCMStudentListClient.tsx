@@ -1,26 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Users, Filter, Download, ChevronRight, Home } from "lucide-react";
+import { Search, Users, Filter, Download, ChevronRight, Home, Loader2 } from "lucide-react";
+import { BRANCHES as PCM_BRANCHES, gradeLabel, type Student as RawStudent } from "@/lib/pcm/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PCM_MIN_CHAPTER = 9;
 
-const BRANCHES = [
-  { code: "PJ", name: "Petaling Jaya" },
-  { code: "SA", name: "Shah Alam" },
-  { code: "SP", name: "Seri Petaling" },
-  { code: "KD", name: "Kepong Damansara" },
-  { code: "SE", name: "Selayang" },
-  { code: "JB", name: "Johor Bahru" },
-];
-
-function gradeLabel(g: number): string {
-  if (g <= 12) return `G${g}`;
-  return `GB${g - 12}`;
-}
+const BRANCHES = PCM_BRANCHES.map(b => ({ code: b.code, name: b.name }));
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,130 +42,6 @@ function hasBacklog(s: StudentRow): boolean {
   return invitableGradesFor(s).some((g) => s.pcmHistory[g] !== true);
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-const MOCK_STUDENTS: StudentRow[] = [
-  {
-    id: "S0001", name: "Ahmad Hafizuddin Bin Rashid", branch: "PJ", grade: 3,
-    credit: 11, active: true, archived: false,
-    parentName: "Rashid Bin Malik", parentPhone: "012-3456789",
-    enrolmentDate: "2024-01-10",
-    pcmHistory: { 1: true, 2: true, 3: false },
-  },
-  {
-    id: "S0002", name: "Nurul Ain Binti Zaki", branch: "SA", grade: 5,
-    credit: 9, active: true, archived: false,
-    parentName: "Zaki Bin Ahmad", parentPhone: "011-9876543",
-    enrolmentDate: "2024-02-15",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "S0003", name: "Lim Wei Jie", branch: "PJ", grade: 2,
-    credit: 6, active: false, archived: false,
-    parentName: "Lim Ah Kow", parentPhone: "016-1112222",
-    enrolmentDate: "2023-09-01",
-    pcmHistory: { 1: true, 2: false },
-  },
-  {
-    id: "S0004", name: "Priya A/P Rajan", branch: "SP", grade: 6,
-    credit: 12, active: true, archived: false,
-    parentName: "Rajan A/L Subramaniam", parentPhone: "017-3334444",
-    enrolmentDate: "2024-03-20",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: false },
-  },
-  {
-    id: "S0005", name: "Muhammad Arif Bin Noor", branch: "SA", grade: 8,
-    credit: 14, active: true, archived: false,
-    parentName: "Noor Bin Hassan", parentPhone: "019-5556666",
-    enrolmentDate: "2022-01-05",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true },
-  },
-  {
-    id: "S0006", name: "Tan Xin Yi", branch: "KD", grade: 1,
-    credit: 4, active: true, archived: false,
-    parentName: "Tan Boon Huat", parentPhone: "013-7778888",
-    enrolmentDate: "2025-01-08",
-    pcmHistory: {},
-  },
-  {
-    id: "S0007", name: "Siti Hajar Binti Mohd Noor", branch: "PJ", grade: 7,
-    credit: 10, active: true, archived: false,
-    parentName: "Mohd Noor Bin Ibrahim", parentPhone: "014-9990000",
-    enrolmentDate: "2023-06-12",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: false },
-  },
-  {
-    id: "S0008", name: "Kevin Chong Zhi Hong", branch: "SP", grade: 2,
-    credit: 2, active: true, archived: false,
-    parentName: "Chong Kok Wai", parentPhone: "012-1234567",
-    enrolmentDate: "2026-01-20",
-    pcmHistory: { 1: false },
-  },
-  {
-    id: "S0009", name: "Aisha Binti Hassan", branch: "SA", grade: 10,
-    credit: 16, active: false, archived: true,
-    parentName: "Hassan Bin Osman", parentPhone: "011-2345678",
-    enrolmentDate: "2020-03-01",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true, 10: true },
-  },
-  {
-    id: "S0010", name: "Darren Loh Zhi Hao", branch: "KD", grade: 5,
-    credit: 9, active: true, archived: false,
-    parentName: "Loh Chin Huat", parentPhone: "016-3456789",
-    enrolmentDate: "2024-08-15",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "S0011", name: "Nabilah Farhana Binti Aziz", branch: "SE", grade: 2,
-    credit: 11, active: true, archived: false,
-    parentName: "Aziz Bin Kamaruddin", parentPhone: "017-4567890",
-    enrolmentDate: "2025-02-01",
-    pcmHistory: { 1: true, 2: true },
-  },
-  {
-    id: "S0012", name: "Raja Izzatul Hafidz", branch: "SE", grade: 6,
-    credit: 7, active: true, archived: false,
-    parentName: "Raja Faizal Bin Raja Ahmad", parentPhone: "019-5678901",
-    enrolmentDate: "2023-11-20",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "S0013", name: "Chai Mei Lin", branch: "JB", grade: 4,
-    credit: 10, active: true, archived: false,
-    parentName: "Chai Boon Teck", parentPhone: "013-6789012",
-    enrolmentDate: "2024-04-10",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: false },
-  },
-  {
-    id: "S0014", name: "Farhan Izzuddin Bin Yusof", branch: "JB", grade: 1,
-    credit: 3, active: true, archived: false,
-    parentName: "Yusof Bin Ramli", parentPhone: "014-7890123",
-    enrolmentDate: "2026-03-05",
-    pcmHistory: {},
-  },
-  {
-    id: "S0015", name: "Yasmin Binti Razali", branch: "PJ", grade: 12,
-    credit: 9, active: true, archived: false,
-    parentName: "Razali Bin Hamid", parentPhone: "012-8901234",
-    enrolmentDate: "2021-08-22",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true, 10: true, 11: true, 12: false },
-  },
-  {
-    id: "S0016", name: "Wong Jing Kai", branch: "KD", grade: 9,
-    credit: 11, active: true, archived: false,
-    parentName: "Wong Kah Sing", parentPhone: "018-2345678",
-    enrolmentDate: "2022-05-15",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: false },
-  },
-  {
-    id: "S0017", name: "Amira Hana Binti Zulkifli", branch: "SA", grade: 13,
-    credit: 12, active: true, archived: false,
-    parentName: "Zulkifli Bin Hamdan", parentPhone: "017-8901234",
-    enrolmentDate: "2019-07-10",
-    pcmHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true, 10: true, 11: true, 12: true },
-  },
-];
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PCMStudentListClient() {
@@ -187,8 +52,37 @@ export default function PCMStudentListClient() {
   const [activeOnly, setActiveOnly]           = useState(false);
   const [scope, setScope]                     = useState<"current" | "archived" | "all">("current");
 
-  const liveStudents  = useMemo(() => MOCK_STUDENTS.filter((s) => !s.archived), []);
-  const archivedCount = useMemo(() => MOCK_STUDENTS.filter((s) => s.archived).length, []);
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/pcm/students", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load students (${res.status})`);
+        const json = (await res.json()) as { students: RawStudent[] };
+        if (!alive) return;
+        // The API returns pcm_progress_json under `faHistory` (v1 field name);
+        // map it onto this page's pcmHistory field.
+        setStudents((json.students ?? []).map(s => ({
+          id: s.id, name: s.name, branch: s.branch, grade: s.grade, credit: s.credit,
+          active: s.active, archived: s.archived,
+          parentName: s.parentName, parentPhone: s.parentPhone, enrolmentDate: s.enrolmentDate,
+          pcmHistory: s.faHistory,
+        })));
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load students");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const liveStudents  = useMemo(() => students.filter((s) => !s.archived), [students]);
+  const archivedCount = useMemo(() => students.filter((s) => s.archived).length, [students]);
 
   const branchNameByCode = useMemo(
     () => Object.fromEntries(BRANCHES.map((b) => [b.code, b.name])),
@@ -196,7 +90,7 @@ export default function PCMStudentListClient() {
   );
 
   const filtered = useMemo(() => {
-    return MOCK_STUDENTS
+    return students
       .filter((s) => scope === "all" ? true : scope === "archived" ? s.archived : !s.archived)
       .filter((s) => !activeOnly || s.active)
       .filter((s) => branchFilter === "all" || s.branch === branchFilter)
@@ -221,7 +115,7 @@ export default function PCMStudentListClient() {
           b.grade - a.grade ||
           a.name.localeCompare(b.name),
       );
-  }, [search, branchFilter, gradeFilter, progressFilter, activeOnly, scope]);
+  }, [students, search, branchFilter, gradeFilter, progressFilter, activeOnly, scope]);
 
   function handleDownload() {
     const header = [
@@ -248,7 +142,7 @@ export default function PCMStudentListClient() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -391,13 +285,22 @@ export default function PCMStudentListClient() {
             <Filter className="w-3 h-3" />
             Showing{" "}
             <span className="font-mono font-semibold text-slate-900">{filtered.length}</span> of{" "}
-            <span className="font-mono">{MOCK_STUDENTS.length}</span>{" "}
+            <span className="font-mono">{students.length}</span>{" "}
             {filtered.length !== 1 ? "students" : "student"}.
           </div>
         </div>
 
         {/* Table */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-2" />
+            <div className="text-sm text-slate-500">Loading students…</div>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-xl border border-red-200 shadow-sm p-8 text-center">
+            <div className="text-sm font-medium text-red-600">{error}</div>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
             <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             <div className="text-sm text-slate-500">No students match the current filters.</div>

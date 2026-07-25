@@ -1,33 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Home, ChevronRight, Check, ChevronLeft, CheckCircle2, X,
+  Home, ChevronRight, Check, ChevronLeft, CheckCircle2,
 } from "lucide-react";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Reference data types (from /api/crm/tickets/ref-data) ────────────────────
 
-const PLATFORMS = [
-  { code: "01", name: "Lead",           accent: "#ed1c24" },
-  { code: "02", name: "Aone",           accent: "#4a8fd9" },
-  { code: "03", name: "ClickUp",        accent: "#79f471" },
-  { code: "04", name: "Process Street", accent: "#023497" },
-  { code: "05", name: "Others",         accent: "#6b7280" },
-];
+interface RefPlatform { id: string; name: string; slug: string | null; code: string | null; accent: string | null }
+interface RefBranch { id: string; name: string; code: string | null; branchNumber: string | null }
+interface RefData { platforms: RefPlatform[]; branches: RefBranch[]; subTypes: string[] }
 
-const TICKET_TYPES = [
-  { code: "01", name: "Trial Booking",   accent: "#3b82f6" },
-  { code: "02", name: "Fee Inquiry",     accent: "#f59e0b" },
-  { code: "03", name: "Enrollment",      accent: "#10b981" },
-  { code: "04", name: "Complaint",       accent: "#ef4444" },
-  { code: "05", name: "Schedule Change", accent: "#8b5cf6" },
-  { code: "06", name: "General",         accent: "#6b7280" },
-];
+interface Option { code: string; name: string; accent: string }
 
-const BRANCHES  = ["Desa Aman Puri", "Shah Alam", "Subang Jaya", "Bukit Jalil", "Cheras", "Setapak", "Klang", "Puchong", "Online"];
+const TYPE_ACCENTS = ["#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#6b7280", "#0ea5e9", "#ec4899"];
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
-const ASSIGNEES  = ["Ahmad Firdaus (CRM Lead)", "Nur Aisyah (Sales)", "Kelvin Lim (Support)", "Priya Nair (Admin)", "Unassigned"];
+
+function humanize(s: string): string {
+  return s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -41,7 +33,6 @@ function StepBar({ current }: { current: number }) {
         const active = i === current;
         return (
           <div key={label} className="flex items-center flex-1 last:flex-none">
-            {/* Circle */}
             <div className="flex items-center gap-2 shrink-0">
               <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                 done   ? "bg-blue-600 text-white" :
@@ -56,7 +47,6 @@ function StepBar({ current }: { current: number }) {
                 {label}
               </span>
             </div>
-            {/* Connector */}
             {i < STEPS.length - 1 && (
               <div className={`flex-1 h-px mx-3 transition-colors ${done ? "bg-blue-400" : "bg-slate-200"}`} />
             )}
@@ -93,20 +83,16 @@ function SelectCard({
 
 // ─── Step 1: Platform ─────────────────────────────────────────────────────────
 
-function StepPlatform({ value, onChange, onNext }: { value: string; onChange: (v: string) => void; onNext: () => void }) {
+function StepPlatform({ platforms, value, onChange, onNext }: {
+  platforms: Option[]; value: string; onChange: (v: string) => void; onNext: () => void;
+}) {
   return (
     <div>
       <h2 className="text-base font-semibold text-slate-800 mb-4">Select Platform</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        {PLATFORMS.map(p => (
-          <SelectCard
-            key={p.code}
-            code={p.code}
-            name={p.name}
-            accent={p.accent}
-            selected={value === p.code}
-            onSelect={() => onChange(p.code)}
-          />
+        {platforms.map(p => (
+          <SelectCard key={p.code} code={p.code} name={p.name} accent={p.accent}
+            selected={value === p.code} onSelect={() => onChange(p.code)} />
         ))}
       </div>
       <div className="flex justify-end">
@@ -124,22 +110,16 @@ function StepPlatform({ value, onChange, onNext }: { value: string; onChange: (v
 
 // ─── Step 2: Type ─────────────────────────────────────────────────────────────
 
-function StepType({ value, onChange, onNext, onBack }: {
-  value: string; onChange: (v: string) => void; onNext: () => void; onBack: () => void;
+function StepType({ types, value, onChange, onNext, onBack }: {
+  types: Option[]; value: string; onChange: (v: string) => void; onNext: () => void; onBack: () => void;
 }) {
   return (
     <div>
       <h2 className="text-base font-semibold text-slate-800 mb-4">Select Ticket Type</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        {TICKET_TYPES.map(t => (
-          <SelectCard
-            key={t.code}
-            code={t.code}
-            name={t.name}
-            accent={t.accent}
-            selected={value === t.code}
-            onSelect={() => onChange(t.code)}
-          />
+        {types.map(t => (
+          <SelectCard key={t.code} code={t.code} name={t.name} accent={t.accent}
+            selected={value === t.code} onSelect={() => onChange(t.code)} />
         ))}
       </div>
       <div className="flex items-center justify-between">
@@ -169,22 +149,22 @@ interface Details {
   requesterContact: string;
   branch: string;
   priority: string;
-  assignTo: string;
   description: string;
 }
 
 const EMPTY_DETAILS: Details = {
   subject: "", requesterName: "", requesterContact: "",
-  branch: "", priority: "Medium", assignTo: "", description: "",
+  branch: "", priority: "Medium", description: "",
 };
 
-function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode }: {
+function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branches }: {
   value: Details;
   onChange: (d: Details) => void;
   onSubmit: () => void;
   onBack: () => void;
-  platformCode: string;
-  typeCode: string;
+  platform: Option | undefined;
+  type: Option | undefined;
+  branches: RefBranch[];
 }) {
   const [errors, setErrors] = useState<Partial<Record<keyof Details, string>>>({});
 
@@ -206,9 +186,6 @@ function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode
     e.preventDefault();
     if (validate()) onSubmit();
   }
-
-  const platform = PLATFORMS.find(p => p.code === platformCode);
-  const type     = TICKET_TYPES.find(t => t.code === typeCode);
 
   const inputCls  = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
   const selectCls = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
@@ -240,7 +217,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode
           <input
             value={value.subject}
             onChange={e => set("subject", e.target.value)}
-            placeholder="Brief description of the issue or inquiry"
+            placeholder="Brief description of the request"
             className={`${inputCls} ${errors.subject ? "border-red-400" : ""}`}
           />
           {errors.subject && <p className="text-[11px] text-red-500">{errors.subject}</p>}
@@ -249,7 +226,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode
         {/* Requester */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700">Requester Name <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-700">Student / Requester <span className="text-red-500">*</span></label>
             <input
               value={value.requesterName}
               onChange={e => set("requesterName", e.target.value)}
@@ -279,7 +256,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode
               className={`${selectCls} ${errors.branch ? "border-red-400" : ""}`}
             >
               <option value="">Select branch…</option>
-              {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+              {branches.map(b => <option key={b.id} value={b.id}>{b.code ? `${b.code} — ${b.name}` : b.name}</option>)}
             </select>
             {errors.branch && <p className="text-[11px] text-red-500">{errors.branch}</p>}
           </div>
@@ -289,15 +266,6 @@ function StepDetails({ value, onChange, onSubmit, onBack, platformCode, typeCode
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-        </div>
-
-        {/* Assign To */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-700">Assign To</label>
-          <select value={value.assignTo} onChange={e => set("assignTo", e.target.value)} className={selectCls}>
-            <option value="">Select assignee…</option>
-            {ASSIGNEES.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
         </div>
 
         {/* Description */}
@@ -340,9 +308,9 @@ function SuccessScreen({ subject, onReset }: { subject: string; onReset: () => v
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 mb-4">
         <CheckCircle2 className="w-7 h-7 text-emerald-600" />
       </div>
-      <h2 className="text-lg font-bold text-slate-900 mb-1">Ticket Created</h2>
+      <h2 className="text-lg font-bold text-slate-900 mb-1">Ticket Ready</h2>
       <p className="text-sm text-slate-500 mb-6 max-w-xs">
-        <span className="font-semibold text-slate-800">&ldquo;{subject}&rdquo;</span> has been submitted and will be assigned shortly.
+        <span className="font-semibold text-slate-800">&ldquo;{subject}&rdquo;</span> is ready to submit. This is a read-only preview — no ticket was written.
       </p>
       <div className="flex gap-3">
         <button
@@ -370,6 +338,41 @@ export default function CrmTicketNewPage() {
   const [ticketType,   setType]     = useState("");
   const [details,      setDetails]  = useState(EMPTY_DETAILS);
   const [submitted,    setSubmitted] = useState(false);
+
+  const [platforms, setPlatforms] = useState<Option[]>([]);
+  const [types,     setTypes]     = useState<Option[]>([]);
+  const [branches,  setBranches]  = useState<RefBranch[]>([]);
+  const [loadErr,   setLoadErr]   = useState<string | null>(null);
+
+  // Read-only: real platforms / request-types / branches for the dropdowns.
+  useEffect(() => {
+    let ignore = false;
+    fetch("/api/crm/tickets/ref-data", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Request failed (${r.status})`);
+        }
+        return r.json() as Promise<RefData>;
+      })
+      .then((d) => {
+        if (ignore) return;
+        setPlatforms(d.platforms.map((p, i) => ({
+          code: p.code ?? String(i + 1).padStart(2, "0"),
+          name: p.name,
+          accent: p.accent ?? "#6b7280",
+        })));
+        setTypes(d.subTypes.map((s, i) => ({
+          code: String(i + 1).padStart(2, "0"),
+          name: humanize(s),
+          accent: TYPE_ACCENTS[i % TYPE_ACCENTS.length],
+        })));
+        setBranches(d.branches);
+        setLoadErr(null);
+      })
+      .catch((e) => { if (!ignore) setLoadErr(e instanceof Error ? e.message : "Failed to load form data"); });
+    return () => { ignore = true; };
+  }, []);
 
   function reset() {
     setStep(0); setPlatform(""); setType(""); setDetails(EMPTY_DETAILS); setSubmitted(false);
@@ -401,18 +404,26 @@ export default function CrmTicketNewPage() {
         {/* Step bar */}
         {!submitted && <StepBar current={step} />}
 
+        {loadErr && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            Couldn&apos;t load form data: {loadErr}
+          </div>
+        )}
+
         {/* Step content card */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-8 py-7">
           {submitted ? (
             <SuccessScreen subject={details.subject} onReset={reset} />
           ) : step === 0 ? (
             <StepPlatform
+              platforms={platforms}
               value={platform}
               onChange={setPlatform}
               onNext={() => setStep(1)}
             />
           ) : step === 1 ? (
             <StepType
+              types={types}
               value={ticketType}
               onChange={setType}
               onNext={() => setStep(2)}
@@ -424,8 +435,9 @@ export default function CrmTicketNewPage() {
               onChange={setDetails}
               onSubmit={() => setSubmitted(true)}
               onBack={() => setStep(1)}
-              platformCode={platform}
-              typeCode={ticketType}
+              platform={platforms.find(p => p.code === platform)}
+              type={types.find(t => t.code === ticketType)}
+              branches={branches}
             />
           )}
         </div>

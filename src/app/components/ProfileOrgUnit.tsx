@@ -10,10 +10,12 @@ export default function ProfileOrgUnit({
   branches,
   departments,
   defaultOrgUnit,
+  onlyBranches = false,
 }: {
   branches: Opt[];
   departments: Opt[];
   defaultOrgUnit: string;
+  onlyBranches?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<UpdateOrgUnitResult | null, FormData>(updateOrgUnit, null);
 
@@ -24,8 +26,12 @@ export default function ProfileOrgUnit({
           <Building2 className="w-5 h-5 text-blue-600" aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Managed Branch / Department</h2>
-          <p className="text-sm text-slate-500">Select the branch or department you oversee. This is stored in your employment record.</p>
+          <h2 className="text-base font-semibold text-slate-900">{onlyBranches ? "Assigned Branch" : "Managed Branch / Department"}</h2>
+          <p className="text-sm text-slate-500">
+            {onlyBranches
+              ? "Select the branch this account manages. This links your account to the branch (stored in your employment record)."
+              : "Select the branch or department you oversee. This is stored in your employment record."}
+          </p>
         </div>
       </header>
 
@@ -45,7 +51,7 @@ export default function ProfileOrgUnit({
 
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1.5">
-            Branch / Department
+            {onlyBranches ? "Branch" : "Branch / Department"}
             <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
           </span>
           <div className="relative">
@@ -55,17 +61,25 @@ export default function ProfileOrgUnit({
               required
               className="block w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
             >
-              <option value="" disabled>Select branch or department</option>
-              <optgroup label="Branches">
-                {branches.map((b) => (
+              <option value="" disabled>{onlyBranches ? "Select branch" : "Select branch or department"}</option>
+              {onlyBranches ? (
+                branches.map((b) => (
                   <option key={`b-${b.id}`} value={`branch:${b.id}`}>{b.code} — {b.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Departments">
-                {departments.map((d) => (
-                  <option key={`d-${d.id}`} value={`dept:${d.id}`}>{d.code} — {d.name}</option>
-                ))}
-              </optgroup>
+                ))
+              ) : (
+                <>
+                  <optgroup label="Branches">
+                    {branches.map((b) => (
+                      <option key={`b-${b.id}`} value={`branch:${b.id}`}>{b.code} — {b.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Departments">
+                    {departments.map((d) => (
+                      <option key={`d-${d.id}`} value={`dept:${d.id}`}>{d.code} — {d.name}</option>
+                    ))}
+                  </optgroup>
+                </>
+              )}
             </select>
             <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
           </div>

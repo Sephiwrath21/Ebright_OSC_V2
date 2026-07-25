@@ -89,13 +89,13 @@ const dashboards: DashboardCard[] = [
     ],
   },
   {
-    id: "clickup",
-    title: "ClickUp Tasks",
+    id: "task-manager",
+    title: "Task Manager",
     icon: "✅",
     color: "bg-teal-500",
     items: [
-      { name: "Branch Dashboards", href: "/clickup-dashboard", icon: "🏢" },
-      { name: "Operations by Day", href: "/clickup-dashboard/operations", icon: "📅" },
+      { name: "My Tasks", href: "/task-manager", icon: "📋" },
+      { name: "Manpower Schedule", href: "/task-manager/manpower-schedule", icon: "📅" },
     ],
   },
 ];
@@ -115,7 +115,7 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <header className="mb-10">
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">Welcome</h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -126,7 +126,7 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {dashboards.map((dashboard) => {
             const isDisabled = isLocked(dashboard.id);
-            const targetHref = dashboard.id === "academy" ? "/academy" : dashboard.id === "sms" ? "/sms" : dashboard.id === "clickup" ? "/clickup-dashboard" : `/dashboards/${dashboard.id}`;
+            const targetHref = dashboard.id === "academy" ? "/academy" : dashboard.id === "sms" ? "/sms" : dashboard.id === "task-manager" ? "/task-manager" : `/dashboards/${dashboard.id}`;
             const href = isDisabled ? "#" : targetHref;
 
             return (

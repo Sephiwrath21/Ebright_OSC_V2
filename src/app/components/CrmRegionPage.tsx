@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Home, ChevronRight, RefreshCw, MapPinned } from "lucide-react";
 
 const BRAND = "#ED1C24";
@@ -15,9 +15,25 @@ interface BranchRow {
   id: string;
   name: string;
   shortName: string;
-  region: Region;
+  region: Region | null;
   totals: DayCounts;
   days: Record<TrialDay, DayCounts>;
+}
+
+// Shape returned by /api/crm/region/day-distribution
+interface ApiBranch {
+  branchId: string;
+  branchName: string;
+  shortName: string;
+  region: Region | null;
+  totals: DayCounts;
+  days: Record<TrialDay, DayCounts>;
+}
+interface RegionResponse {
+  range: { from: string; to: string };
+  availableRegions: Region[];
+  overall: { totals: DayCounts; days: Record<TrialDay, DayCounts> };
+  branches: ApiBranch[];
 }
 
 const PRESETS = [
@@ -29,56 +45,6 @@ const PRESETS = [
   { id: "last_month", label: "Last Month" },
 ] as const;
 type Preset = (typeof PRESETS)[number]["id"];
-
-// ─── Mock data ─────────────────────────────────────────────────────────────────
-
-const ALL_BRANCHES: BranchRow[] = [
-  {
-    id: "1", name: "02 Subang Taipan", shortName: "Subang Taipan", region: "A",
-    totals: { CT: 12, ENR: 7 },
-    days: { WED: { CT: 3, ENR: 2 }, THU: { CT: 2, ENR: 1 }, FRI: { CT: 1, ENR: 1 }, SAT: { CT: 4, ENR: 2 }, SUN: { CT: 2, ENR: 1 } },
-  },
-  {
-    id: "2", name: "04 Sri Petaling", shortName: "Sri Petaling", region: "A",
-    totals: { CT: 9, ENR: 5 },
-    days: { WED: { CT: 2, ENR: 1 }, THU: { CT: 1, ENR: 1 }, FRI: { CT: 2, ENR: 0 }, SAT: { CT: 3, ENR: 2 }, SUN: { CT: 1, ENR: 1 } },
-  },
-  {
-    id: "3", name: "07 Ampang", shortName: "Ampang", region: "A",
-    totals: { CT: 7, ENR: 3 },
-    days: { WED: { CT: 2, ENR: 0 }, THU: { CT: 1, ENR: 1 }, FRI: { CT: 1, ENR: 1 }, SAT: { CT: 2, ENR: 1 }, SUN: { CT: 1, ENR: 0 } },
-  },
-  {
-    id: "4", name: "03 Setia Alam", shortName: "Setia Alam", region: "B",
-    totals: { CT: 15, ENR: 10 },
-    days: { WED: { CT: 3, ENR: 2 }, THU: { CT: 4, ENR: 3 }, FRI: { CT: 2, ENR: 1 }, SAT: { CT: 4, ENR: 3 }, SUN: { CT: 2, ENR: 1 } },
-  },
-  {
-    id: "5", name: "05 Kota Damansara", shortName: "Kota Damansara", region: "B",
-    totals: { CT: 8, ENR: 4 },
-    days: { WED: { CT: 2, ENR: 1 }, THU: { CT: 2, ENR: 1 }, FRI: { CT: 1, ENR: 0 }, SAT: { CT: 2, ENR: 1 }, SUN: { CT: 1, ENR: 1 } },
-  },
-  {
-    id: "6", name: "09 Klang", shortName: "Klang", region: "B",
-    totals: { CT: 6, ENR: 3 },
-    days: { WED: { CT: 1, ENR: 1 }, THU: { CT: 2, ENR: 0 }, FRI: { CT: 1, ENR: 1 }, SAT: { CT: 1, ENR: 1 }, SUN: { CT: 1, ENR: 0 } },
-  },
-  {
-    id: "7", name: "06 Putrajaya", shortName: "Putrajaya", region: "C",
-    totals: { CT: 6, ENR: 3 },
-    days: { WED: { CT: 1, ENR: 0 }, THU: { CT: 1, ENR: 1 }, FRI: { CT: 2, ENR: 1 }, SAT: { CT: 1, ENR: 1 }, SUN: { CT: 1, ENR: 0 } },
-  },
-  {
-    id: "8", name: "08 Cyberjaya", shortName: "Cyberjaya", region: "C",
-    totals: { CT: 5, ENR: 2 },
-    days: { WED: { CT: 1, ENR: 0 }, THU: { CT: 1, ENR: 1 }, FRI: { CT: 1, ENR: 0 }, SAT: { CT: 2, ENR: 1 }, SUN: { CT: 0, ENR: 0 } },
-  },
-  {
-    id: "9", name: "11 Bandar Baru Bangi", shortName: "Bandar Baru Bangi", region: "C",
-    totals: { CT: 4, ENR: 2 },
-    days: { WED: { CT: 1, ENR: 0 }, THU: { CT: 1, ENR: 1 }, FRI: { CT: 0, ENR: 0 }, SAT: { CT: 1, ENR: 1 }, SUN: { CT: 1, ENR: 0 } },
-  },
-];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -204,6 +170,10 @@ export default function CrmRegionPage() {
   const [region,   setRegion]   = useState<"all" | Region>("all");
   const [branchId, setBranchId] = useState<string>("all");
   const [spin,     setSpin]     = useState(false);
+  const [rows,     setRows]     = useState<BranchRow[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
+  const [nonce,    setNonce]    = useState(0); // bumped by Refresh to refetch
 
   function chooseRegion(r: "all" | Region) {
     setRegion(r);
@@ -212,13 +182,42 @@ export default function CrmRegionPage() {
 
   function handleRefresh() {
     setSpin(true);
-    setTimeout(() => setSpin(false), 700);
+    setNonce((n) => n + 1);
   }
 
-  const branchesInRegion = useMemo(
-    () => region === "all" ? ALL_BRANCHES : ALL_BRANCHES.filter(b => b.region === region),
-    [region],
-  );
+  // Fetch real Day Distribution from ebright_crm (read-only). Server does the
+  // region filtering + per-branch CT/ENR tally; branch drill stays client-side.
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    const qs = new URLSearchParams({ preset });
+    if (region !== "all") qs.set("region", region);
+    fetch(`/api/crm/region/day-distribution?${qs.toString()}`, { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Request failed (${r.status})`);
+        }
+        return r.json() as Promise<RegionResponse>;
+      })
+      .then((d) => {
+        if (ignore) return;
+        setRows(d.branches.map((b) => ({
+          id: b.branchId,
+          name: b.branchName,
+          shortName: b.shortName,
+          region: b.region,
+          totals: b.totals,
+          days: b.days,
+        })));
+        setError(null);
+      })
+      .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : "Failed to load"); })
+      .finally(() => { if (!ignore) { setLoading(false); setSpin(false); } });
+    return () => { ignore = true; };
+  }, [preset, region, nonce]);
+
+  const branchesInRegion = rows;
 
   const rowsToRender = useMemo(
     () => branchId === "all" ? branchesInRegion : branchesInRegion.filter(b => b.id === branchId),
@@ -243,7 +242,7 @@ export default function CrmRegionPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -291,26 +290,29 @@ export default function CrmRegionPage() {
 
         {/* Filter card */}
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm mb-6">
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Date range</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {PRESETS.map(p => (
-                <Pill key={p.id} active={preset === p.id} onClick={() => setPreset(p.id)}>
-                  {p.label}
-                </Pill>
-              ))}
+          {/* Date range + Region share one row (Region to the right) */}
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Date range</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {PRESETS.map(p => (
+                  <Pill key={p.id} active={preset === p.id} onClick={() => setPreset(p.id)}>
+                    {p.label}
+                  </Pill>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Region</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill active={region === "all"} onClick={() => chooseRegion("all")}>All Regions</Pill>
-              {(["A", "B", "C"] as const).map(r => (
-                <Pill key={r} active={region === r} onClick={() => chooseRegion(r)}>
-                  Region {r}
-                </Pill>
-              ))}
+            <div className="sm:ml-auto">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Region</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill active={region === "all"} onClick={() => chooseRegion("all")}>All Regions</Pill>
+                {(["A", "B", "C"] as const).map(r => (
+                  <Pill key={r} active={region === r} onClick={() => chooseRegion(r)}>
+                    Region {r}
+                  </Pill>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -347,7 +349,16 @@ export default function CrmRegionPage() {
         </div>
 
         {/* Grid rows */}
-        {rowsToRender.length === 0 ? (
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm">
+            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-[#ED1C24]" />
+            <p className="text-slate-400">Loading day distribution…</p>
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-sm shadow-sm">
+            <p className="text-red-600">Couldn&apos;t load day distribution: {error}</p>
+          </div>
+        ) : rowsToRender.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm">
             <p className="text-slate-500">No branches match the current filters.</p>
             <p className="mt-1 text-xs text-slate-400">

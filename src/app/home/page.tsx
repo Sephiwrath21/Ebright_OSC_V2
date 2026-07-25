@@ -1,49 +1,85 @@
-"use client";
-
-import { useSession } from "next-auth/react";
+// Home — server component (converted from useSession): resolves the session
+// server-side, same pattern as /task-manager, and routes to the right
+// per-account dashboard. Server-side so the superadmin (od@) branch can
+// compose the server-fetched Task Manager overview section into its
+// dashboard (ODDashboard's `taskOverview` slot) — client dashboards still
+// fetch their own widget data exactly as before.
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
+import ODDashboard from "@/app/components/ODDashboard";
+import OperationsDashboard from "@/app/components/OperationsDashboard";
+import MarketingDashboard from "@/app/components/MarketingDashboard";
+import AcademyDashboard from "@/app/components/AcademyDashboard";
+import BranchDashboard from "@/app/components/BranchDashboard";
+import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
+import { HomeOverviewSection } from "./overview-section";
 
 const FINANCE_EMAIL = "finance@ebright.my";
 
-export default function HomePage() {
-  const { data: session, status } = useSession({
-    required: true,
-    onUnauthenticated() {
-      redirect("/login");
-    },
-  });
+export const dynamic = "force-dynamic";
 
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-blue-600 font-semibold text-lg">
-        Loading Dashboard...
-      </div>
-    );
-  }
+export default async function HomePage() {
+  const session = await auth();
+  if (!session?.user?.email) redirect("/login");
+  const su = session.user as {
+    email: string;
+    name?: string | null;
+    id?: string;
+    role?: string;
+    position?: string | null;
+    branchName?: string | null;
+  };
 
-  const userEmail = session?.user?.email || "";
-  const userRole = (session?.user as { role?: string } | undefined)?.role || "USER";
-  const userPosition = (session?.user as { position?: string } | undefined)?.position ?? "";
-  const userName = session?.user?.name ?? null;
-  const branchName =
-    (session?.user as { branchName?: string | null } | undefined)?.branchName ?? null;
+  const userEmail = su.email;
+  const userId = su.id ?? "";
+  const userRole = su.role || "USER";
+  const userPosition = su.position ?? "";
+  const userName = su.name ?? null;
+  const branchName = su.branchName ?? null;
 
   // role_type "staff" corresponds to role_id = 4 in the DB.
   const isStaff = userRole.toLowerCase() === "staff";
   const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
+  const isOD = userEmail.toLowerCase() === "od@ebright.my";
+  const isOperations = userEmail.toLowerCase() === "operations@ebright.my";
+  const isMarketing = userEmail.toLowerCase() === "marketing@ebright.my";
+  const isAcademy = userEmail.toLowerCase() === "academy@ebright.my";
+  const isBranch = userRole.toLowerCase() === "branch";
+  const isHr = userRole.toLowerCase() === "hr" || userId === "175";
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <HodPendingAlert position={userPosition} />
-      {isFinance ? (
-        <FinanceDashboard userName={userName} />
+      {isOD ? (
+        <ODDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={
+            <Suspense fallback={null}>
+              <HomeOverviewSection email={userEmail} />
+            </Suspense>
+          }
+        />
+      ) : isOperations ? (
+        <OperationsDashboard userName={userName} userEmail={userEmail} />
+      ) : isMarketing ? (
+        <MarketingDashboard userName={userName} userEmail={userEmail} />
+      ) : isAcademy ? (
+        <AcademyDashboard userName={userName} userEmail={userEmail} />
+      ) : isBranch ? (
+        <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
+      ) : isFinance ? (
+        <FinanceDashboard userName={userName} userEmail={userEmail} />
       ) : isStaff ? (
         <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
+      ) : isHr ? (
+        <HrPersonalizedDashboard userName={userName} userEmail={userEmail} />
       ) : (
         <DashboardHome userRole={userRole} userEmail={userEmail} />
       )}
