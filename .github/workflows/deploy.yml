@@ -79,10 +79,14 @@ jobs:
             # Stash any local drift so git checkout/pull never blocks
             git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
-            # Refresh refs and hard-sync local branch to remote
-            git remote set-url origin https://github.com/EbrightOD/Ebright_OSC_V2.git || true
+            # Refresh refs and hard-sync local branch to remote, exactly like
+            # v1's prod-/staging-deploy.yml (fetch + reset --hard). Do NOT force
+            # the remote to an HTTPS URL: the deploy boxes authenticate to the
+            # private repo over SSH (git@github.com). Forcing HTTPS overwrote the
+            # working SSH remote and broke the fetch with "could not read
+            # Username for https://github.com" → exit 128.
             git fetch origin >> ~/deploy.log 2>&1
-            git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
+            git reset --hard "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 
             # Diagnostic: confirm we actually have the latest commit on disk
             echo "--- HEAD commit on server: ---" >> ~/deploy.log 2>&1
