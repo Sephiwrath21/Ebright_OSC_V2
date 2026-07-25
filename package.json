@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "postinstall": "prisma generate",
     "tm:generate": "prisma generate --config prisma.task-manager.config.ts",
     "tm:migrate": "prisma migrate deploy --config prisma.task-manager.config.ts",
     "tm:seed": "tsx --env-file-if-exists=.env prisma/task-manager/seed.ts",
