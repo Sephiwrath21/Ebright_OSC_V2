@@ -58,8 +58,7 @@ export default function GreetingHeader({
           lineHeight: 1.15,
         }}
       >
-        Welcome{name ? `, ${name}` : ""}{" "}
-        <span style={{ display: "inline-block" }}>👋</span>
+        Welcome{name ? `, ${name}` : ""}
       </h1>
       <span
         style={{
