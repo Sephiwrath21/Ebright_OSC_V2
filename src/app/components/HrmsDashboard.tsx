@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles,
   Workflow,
+  FolderOpen,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -139,6 +140,15 @@ const modules: HrmsModule[] = [
     Icon: Users,
     accent: "bg-indigo-600",
     accentHover: "group-hover:bg-indigo-700",
+  },
+  {
+    id: "employee-folder",
+    title: "Employee Folder",
+    description: "Access individual employee records and documents",
+    href: "/employee-folder",
+    Icon: FolderOpen,
+    accent: "bg-cyan-600",
+    accentHover: "group-hover:bg-cyan-700",
   },
 ];
 

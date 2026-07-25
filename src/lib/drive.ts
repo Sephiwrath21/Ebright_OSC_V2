@@ -25,9 +25,14 @@ function getDriveClient(): drive_v3.Drive {
   return cachedClient;
 }
 
-function getFolderId(): string {
-  const id = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim().replace(/^"|"$/g, "").trim();
-  if (!id) throw new Error("GOOGLE_DRIVE_FOLDER_ID is not configured.");
+// Root folder resolution — defaults to the shared GOOGLE_DRIVE_FOLDER_ID
+// (Leave/Claim/Induction/Offboarding's attachment fields all still use this
+// one shared root). Resume/CV, Medical Report, and Confirmation/Extension
+// Letter each got their own dedicated Drive folder — pass folderEnvVar to
+// uploadToDrive to route a field's uploads there instead.
+function getFolderId(envVar: string = "GOOGLE_DRIVE_FOLDER_ID"): string {
+  const id = process.env[envVar]?.trim().replace(/^"|"$/g, "").trim();
+  if (!id) throw new Error(`${envVar} is not configured.`);
   return id;
 }
 
@@ -88,10 +93,10 @@ async function ensureFolder(
 
 export async function uploadToDrive(
   file: File,
-  options: { prefix?: string; folderPath?: string[] } = {},
+  options: { prefix?: string; folderPath?: string[]; folderEnvVar?: string } = {},
 ): Promise<{ id: string; name: string }> {
   const drive = getDriveClient();
-  const rootId = getFolderId();
+  const rootId = getFolderId(options.folderEnvVar);
 
   let parentId = rootId;
   if (options.folderPath && options.folderPath.length > 0) {
@@ -163,10 +168,16 @@ export async function streamFromDrive(fileId: string): Promise<{
   return { body: res.data as unknown as Readable, meta };
 }
 
+// Moves the file to Drive trash rather than permanently deleting it — the
+// service account's Shared Drive role grants canEdit/canTrash but NOT
+// canDelete (confirmed via files.get().capabilities), so files.delete()
+// silently 404s on every call while files.update({trashed:true}) succeeds.
+// This was the actual cause of "replaced/removed files never disappear from
+// Drive" — deleteFromDrive's own error swallowing (below) hid the failure.
 export async function deleteFromDrive(fileId: string): Promise<void> {
   try {
     const drive = getDriveClient();
-    await drive.files.delete({ fileId, supportsAllDrives: true });
+    await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true });
   } catch {
     // Swallow — best-effort cleanup.
   }

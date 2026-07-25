@@ -89,7 +89,259 @@ model emergency_contact {
   name        String  @db.VarChar(255)
   phone       String? @db.VarChar(30)
   relation    String? @db.VarChar(50)
+  email       String? @db.VarChar(255)
+  address     String?
   users       users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_contract_user")
+}
+
+model resume {
+  resume_id      Int     @id @default(autoincrement())
+  user_id        Int     @unique
+  resume_file_id String? @db.VarChar(128)
+  cv_file_id     String? @db.VarChar(128)
+  users          users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resume_user")
+}
+
+model interview_assessment {
+  interview_assessment_id Int       @id @default(autoincrement())
+  user_id                 Int       @unique
+  int_date                DateTime? @db.Date
+  overall_rate            Int?
+  recommendation          String?   @db.VarChar(20)
+  strength                String?
+  weakness                String?
+  hiring_note             String?
+  users                   users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_interview_assessment_user")
+}
+
+model reference_check {
+  reference_check_id Int     @id @default(autoincrement())
+  user_id            Int     @unique
+  ref_name           String? @db.VarChar(255)
+  company            String? @db.VarChar(200)
+  relationship       String? @db.VarChar(50)
+  position           String? @db.VarChar(100)
+  contact_number     String? @db.VarChar(30)
+  email              String? @db.VarChar(255)
+  users              users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reference_check_user")
+}
+
+model medical_check {
+  medical_check_id       Int     @id @default(autoincrement())
+  user_id                Int     @unique
+  medical_report_file_id String? @db.VarChar(128)
+  result                 String? @db.VarChar(30)
+  users                  users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_medical_check_user")
+}
+
+model probation {
+  probation_id                Int       @id @default(autoincrement())
+  user_id                     Int       @unique
+  probation_status            String?   @db.VarChar(20)
+  start_date                  DateTime? @db.Date
+  end_date                    DateTime? @db.Date
+  confirm_date                DateTime? @db.Date
+  ext_end_date                DateTime? @db.Date
+  confirmation_letter_file_id String?   @db.VarChar(128)
+  extension_letter_file_id    String?   @db.VarChar(128)
+  users                       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_probation_user")
+}
+
+model documents {
+  documents_id                Int     @id @default(autoincrement())
+  user_id                     Int     @unique
+  employment_contract_file_id String? @db.VarChar(128)
+  employee_handbook_file_id   String? @db.VarChar(128)
+  users                       users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_documents_user")
+}
+
+// pcb_form is constrained to TP1/TP2/TP3 by a DB-level CHECK constraint
+// (chk_payroll_pcb_form, prisma/manual-sql/add_payroll.sql) not modeled
+// here — Prisma has no native CHECK-constraint mapping in this schema's
+// current preview features, so it's enforced purely at the Postgres level.
+model payroll {
+  payroll_id             Int     @id @default(autoincrement())
+  user_id                Int     @unique
+  epf_number             String? @db.VarChar(30)
+  socso_number           String? @db.VarChar(30)
+  eis_number             String? @db.VarChar(30)
+  tax_number             String? @db.VarChar(30)
+  pcb_form               String? @db.VarChar(3)
+  pcb_attachment_file_id String? @db.VarChar(128)
+  users                  users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payroll_user")
+}
+
+// Repeatable — an employee can have many achievements over their tenure —
+// so this follows leave_request/employee_rate_history's convention (own
+// serial PK, user_id NOT unique) rather than resume/medical_check's 1:1
+// pattern.
+model achievement {
+  achievement_id     Int       @id @default(autoincrement())
+  user_id            Int
+  name               String?   @db.VarChar(255)
+  date               DateTime? @db.Date
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_achievement_user")
+
+  @@index([user_id], map: "idx_achievement_user")
+}
+
+// Repeatable, same convention as achievement. Separate table from
+// employee_rate_history per explicit decision — see add_salary_revision.sql.
+model salary_revision {
+  salary_revision_id Int       @id @default(autoincrement())
+  user_id            Int
+  issued_date        DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  current_salary     Decimal?  @db.Decimal(10, 2)
+  new_salary         Decimal?  @db.Decimal(10, 2)
+  reason             String?
+  salary_adjustment  Decimal?  @db.Decimal(6, 2)
+  approved_by        String?   @db.VarChar(100)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_salary_revision_user")
+
+  @@index([user_id], map: "idx_salary_revision_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision.
+model promotion {
+  promotion_id       Int       @id @default(autoincrement())
+  user_id            Int
+  promotion_date     DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  current_position   String?   @db.VarChar(100)
+  new_position       String?   @db.VarChar(100)
+  reason             String?
+  approved_by        String?   @db.VarChar(100)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_promotion_user")
+
+  @@index([user_id], map: "idx_promotion_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision/promotion.
+// from_location/to_location store text (branch/department/role) per
+// explicit decision — see add_transfer.sql.
+model transfer {
+  transfer_id        Int       @id @default(autoincrement())
+  user_id            Int
+  type               String?   @db.VarChar(50)
+  effective_date     DateTime? @db.Date
+  from_location      String?   @db.VarChar(100)
+  to_location        String?   @db.VarChar(100)
+  reason             String?
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_transfer_user")
+
+  @@index([user_id], map: "idx_transfer_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision/promotion/
+// transfer. status is free-text — no canonical option list exists anywhere
+// in the mock for this field.
+model training {
+  training_id Int       @id @default(autoincrement())
+  user_id     Int
+  name        String?   @db.VarChar(255)
+  date        DateTime? @db.Date
+  status      String?   @db.VarChar(30)
+  users       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_training_user")
+
+  @@index([user_id], map: "idx_training_user")
+}
+
+// Singleton — one row per user_id, confirmed via the mock's single-form-only
+// rendering (no history list, unlike the repeatable tables above). status is
+// constrained to Active/Expired/Pending by a DB-level CHECK constraint
+// (chk_nda_status, add_nda.sql) not modeled here — same convention as
+// payroll.pcb_form.
+model nda {
+  nda_id             Int       @id @default(autoincrement())
+  user_id            Int       @unique
+  sign_date          DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  status             String?   @db.VarChar(20)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_nda_user")
+}
+
+// Singleton — one row per user_id, same convention as nda. duration is
+// free-text (e.g. "12 months") — no structured interval type used.
+model non_compete {
+  non_compete_id     Int       @id @default(autoincrement())
+  user_id            Int       @unique
+  sign_date          DateTime? @db.Date
+  expiry_date        DateTime? @db.Date
+  duration           String?   @db.VarChar(50)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_non_compete_user")
+}
+
+// ─── Disciplinary (4 repeatable tables, same convention as
+// achievement/promotion/etc) — field configs match
+// js/disciplinary-record.js's CONFIGS map (domestic-inquiry/suspension-
+// letter/showcause-letter/pip), confirmed via the pre-existing
+// DisciplinarySection placeholder's own "+Add a record" modal pattern for
+// each. Single-line "text" fields (panel/decision/type/issued_by/status/
+// supervisor) map to varchar; "textarea" fields (case_summary/reason/
+// emp_response/improvement_goal/remark/review_result) map to text. PIP has
+// no attachment field — not in the mock's own PIP config. ───
+
+model domestic_inquiry {
+  domestic_inquiry_id Int       @id @default(autoincrement())
+  user_id             Int
+  date                DateTime? @db.Date
+  panel               String?   @db.VarChar(255)
+  case_summary        String?
+  decision            String?
+  attachment_file_id  String?   @db.VarChar(128)
+  users               users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_domestic_inquiry_user")
+
+  @@index([user_id], map: "idx_domestic_inquiry_user")
+}
+
+model suspension_letter {
+  suspension_letter_id Int       @id @default(autoincrement())
+  user_id              Int
+  start_date           DateTime? @db.Date
+  end_date             DateTime? @db.Date
+  type                 String?   @db.VarChar(100)
+  reason               String?
+  issued_by            String?   @db.VarChar(100)
+  attachment_file_id   String?   @db.VarChar(128)
+  users                users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_suspension_letter_user")
+
+  @@index([user_id], map: "idx_suspension_letter_user")
+}
+
+model showcause_warning_letter {
+  showcause_warning_letter_id Int       @id @default(autoincrement())
+  user_id                     Int
+  type                        String?   @db.VarChar(100)
+  date                        DateTime? @db.Date
+  issued_by                   String?   @db.VarChar(100)
+  status                      String?   @db.VarChar(50)
+  reason                      String?
+  emp_response                String?
+  attachment_file_id          String?   @db.VarChar(128)
+  users                       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_showcause_warning_letter_user")
+
+  @@index([user_id], map: "idx_showcause_warning_letter_user")
+}
+
+model pip {
+  pip_id           Int       @id @default(autoincrement())
+  user_id          Int
+  start_date       DateTime? @db.Date
+  end_date         DateTime? @db.Date
+  supervisor       String?   @db.VarChar(100)
+  review_result    String?
+  improvement_goal String?
+  remark           String?
+  users            users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pip_user")
+
+  @@index([user_id], map: "idx_pip_user")
 }
 
 model employment {
@@ -202,12 +454,15 @@ model users {
   created_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
   deleted_at                                     DateTime?                    @db.Timestamptz(6)
+  achievement                                    achievement[]
   attendance                                     attendance[]
   attendance_justifications_authored             attendance_justification[]   @relation("justification_by")
   attendance_justifications_for_user             attendance_justification[]   @relation("justification_for_user")
   attendance_log                                 attendance_log[]
   bank_details                                   bank_details?
   claim                                          claim[]
+  documents                                      documents?
+  domestic_inquiry                               domestic_inquiry[]
   emergency_contact                              emergency_contact[]
   employee_rate_history                          employee_rate_history[]
   employment                                     employment[]
@@ -218,9 +473,13 @@ model users {
   induction_request_user                         induction_request?           @relation("induction_request_user")
   induction_completed                            induction_step[]             @relation("inductionCompletedBy")
   induction_responsible                          induction_step[]             @relation("inductionResponsible")
+  interview_assessment                           interview_assessment?
   leave_request_leave_request_approved_byTousers leave_request[]              @relation("leave_request_approved_byTousers")
   leave_request_leave_request_user_idTousers     leave_request[]              @relation("leave_request_user_idTousers")
   manpower_cost_report                           manpower_cost_report[]
+  medical_check                                  medical_check?
+  nda                                            nda?
+  non_compete                                    non_compete?
   offboarding_audit_actor                        offboarding_audit_log[]
   offboarding_case_assigned_hr                   offboarding_case[]           @relation("OffboardingCaseAssignedHR")
   offboarding_case_created                       offboarding_case[]           @relation("OffboardingCaseCreatedBy")
@@ -228,7 +487,18 @@ model users {
   offboarding_case_supervisor                    offboarding_case[]           @relation("OffboardingCaseSupervisor")
   offboarding_case_user                          offboarding_case[]           @relation("OffboardingCaseUser")
   offboarding_checklist_completed                offboarding_checklist_item[]
+  payroll                                        payroll?
+  pip                                            pip[]
+  probation_record                               probation?
+  promotion                                      promotion[]
   assigned_recommendations                       recommendation[]             @relation("recommendation_assigned_to")
+  reference_check                                reference_check?
+  resume                                         resume?
+  salary_revision                                salary_revision[]
+  showcause_warning_letter                       showcause_warning_letter[]
+  suspension_letter                              suspension_letter[]
+  training                                       training[]
+  transfer                                       transfer[]
   user_profile                                   user_profile?
   role                                           role                         @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_role")
   workflow_assignments_by                        workflow_assignment[]        @relation("WorkflowAssignmentAssignedBy")

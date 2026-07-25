@@ -37,7 +37,7 @@ async function saveAttachment(file: File): Promise<string> {
   if (file.size > MAX_FILE_BYTES) {
     throw new Error("Attachment exceeds 5MB.");
   }
-  const { id } = await uploadToDrive(file, { prefix: "leave" });
+  const { id } = await uploadToDrive(file, { prefix: "leave", folderEnvVar: "GOOGLE_DRIVE_LEAVE_FOLDER_ID" });
   return id;
 }
 

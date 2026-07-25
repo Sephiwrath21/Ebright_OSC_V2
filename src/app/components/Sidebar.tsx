@@ -38,6 +38,7 @@ interface NavItem {
 
 const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
+  { name: "ClickUp Task", href: "/clickup-task", Icon: ClipboardList },
   {
     name: "HRMS",
     href: "/dashboards/hrms",
@@ -59,6 +60,7 @@ const primaryNav: NavItem[] = [
       { name: "HR Dashboard", href: "/induction/hr-dashboard" },
       { name: "Manpower Cost Report", href: "/manpower-cost-report" },
       { name: "Staff Directory", href: "/staff-directory" },
+      { name: "Employee Folder", href: "/employee-folder" },
     ],
   },
   {
