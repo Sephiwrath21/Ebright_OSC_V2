@@ -19,7 +19,15 @@ import { Pool } from "pg";
 import { Prisma } from "../../src/generated/task-manager-client";
 import { prisma } from "../../src/task-manager/prisma";
 import { FLOW_DEPARTMENTS } from "../../src/task-manager/ui/types";
-import { diffUserFields, EXTRA_USERS, mapHrfsUser, type HrfsUserRow, type MappedUser } from "./hrfs-map";
+import {
+  diffUserFields,
+  EXTRA_USERS,
+  mapHrfsUser,
+  mapPortalEmployee,
+  type HrfsUserRow,
+  type MappedUser,
+  type PortalEmployeeRow,
+} from "./hrfs-map";
 
 const UTILITY_FLOWS = [
   { flowId: "flow-adhoc",        name: "Ad hoc Tasks",        icon: "⚡",  description: "One-off tasks assigned from the '+ Assigned task' quick form.", order: 2, blockId: "block-adhoc",        nodeId: "node-adhoc",        blockTitle: "Ad hoc task",        itemId: "item-adhoc-done" },
@@ -141,6 +149,35 @@ function enrichDepartments(toImport: MappedUser[], byEmail: Map<string, string>)
     filled++;
   }
   return filled;
+}
+
+/** Read-only: ACTIVE portal employees (active login + their ACTIVE
+ *  employment's position/department/branch). Employees with NO active
+ *  employment row still return (position null) so they surface as loud
+ *  unknown-position skips instead of silently vanishing. Second bootstrap
+ *  source — see mapPortalEmployee's header in hrfs-map.ts. */
+async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
+  const pool = new Pool({
+    connectionString: resolvePortalUrl(),
+    max: 3,
+    connectionTimeoutMillis: 10_000,
+  });
+  try {
+    const result = await pool.query<PortalEmployeeRow>(
+      `select lower(u.email) as email, up.full_name as name, e.position,
+              d.department_name as department, b.branch_name as branch
+       from users u
+       join user_profile up on up.user_id = u.user_id
+       left join employment e on e.user_id = u.user_id and e.status = 'active'
+       left join department d on d.department_id = e.department_id
+       left join branch b on b.branch_id = e.branch_id
+       where u.deleted_at is null and u.status = 'active'
+       order by u.email`,
+    );
+    return result.rows;
+  } finally {
+    await pool.end();
+  }
 }
 
 /** One skipped row, kept structured (not just its printable reason string)
@@ -372,6 +409,41 @@ async function main() {
 
   const rows = await fetchHrfsRows();
   const result = mapAll(rows);
+
+  // SECOND SOURCE (2026-07-25): active portal employees ebright_hrfs doesn't
+  // cover — 63 of the Employee Management page's active staff had no
+  // ebright_hrfs row at all. Primary-source emails always win; duplicates
+  // within the portal result (multiple active employments) collapse to the
+  // first row.
+  try {
+    const portalEmployees = await fetchPortalEmployees();
+    const covered = new Set(result.toImport.map((u) => u.email.toLowerCase()));
+    let added = 0;
+    const portalSkipped: SkippedRow[] = [];
+    const portalWarnings: string[] = [];
+    for (const row of portalEmployees) {
+      const email = (row.email ?? "").trim().toLowerCase();
+      if (!email || covered.has(email)) continue;
+      covered.add(email);
+      const mapped = mapPortalEmployee(row);
+      if (mapped.ok) {
+        result.toImport.push(mapped.user);
+        added++;
+        portalWarnings.push(...mapped.warnings);
+      } else {
+        portalSkipped.push({ email, reason: mapped.reason });
+      }
+    }
+    console.log(
+      `[bootstrap] portal second source: ${portalEmployees.length} active employees checked, ${added} added from the portal, ${portalSkipped.length} skipped`,
+    );
+    for (const s of portalSkipped) console.log(`  - ${s.reason}`);
+    for (const w of portalWarnings) console.log(`  - WARN ${w}`);
+  } catch (err) {
+    console.warn(
+      `[bootstrap] WARNING: portal database unreachable — portal-only employees NOT imported (${err instanceof Error ? err.message : err})`,
+    );
+  }
 
   // Department enrichment from the portal DB (read-only — runs in dry-run
   // too). Non-fatal: if the portal database is unreachable, the import still
