@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   UserPlus,
   UserMinus,
@@ -14,12 +15,9 @@ import {
   ClipboardList,
   Compass,
   FileText,
-  ListTodo,
-  TrendingUp,
-  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import GreetingHeader from "./GreetingHeader";
-import ClickUpPieChart from "./ClickUpPieChart";
 
 const TICKET_COLORS: Record<string, string> = {
   LEAD: "#ed1c24",
@@ -56,53 +54,23 @@ interface TicketCategory {
   total: number;
 }
 
-interface ClickUpTask {
-  id: string;
-  name: string;
-  status: string;
-  listName: string;
-  url: string;
-  completed: boolean;
-}
-
 interface EventItem {
   id: string;
   name: string;
   status: "upcoming" | "ongoing" | "completed";
 }
 
-// ClickUpPieChart is imported from a shared file
-
 export default function ODDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered Task Manager overview section (superadmin org grids) —
+   *  rendered full-width below the main dashboard grid. */
+  taskOverview?: ReactNode;
 }) {
-  const dummyTickets = [
-    { name: "Aone", count: 3, total: 5 },
-    { name: "PS", count: 4, total: 8 },
-    { name: "Leads", count: 2, total: 6 },
-    { name: "Clickup", count: 5, total: 10 },
-    { name: "Others", count: 1, total: 4 },
-  ];
-
-  const dummyDistribution = {
-    PENDING: 343,
-    COMPLETE: 651,
-    "NOT APPLICABLE": 3,
-    "N/A": 9,
-  };
-
-  const dummyDailyTasks = [
-    { id: "86d3g0gcw", name: "1800: Update Daily Intern Logsheet", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcy", name: "1730: Meet Iqbal to show the progress", status: "PENDING", listName: "Management", url: "#" },
-    { id: "86d3g0gcz", name: "AOne Task verify", status: "PENDING", listName: "AOne (SMS)", url: "#" },
-    { id: "86d3g0gd0", name: "Process Street SOP update", status: "COMPLETE", listName: "PS", url: "#" },
-    { id: "86d3g0gd1", name: "Daily check of CRM Leads", status: "COMPLETE", listName: "CNS (CRM)", url: "#" },
-  ];
-
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
@@ -120,18 +88,6 @@ export default function ODDashboard({
 
   // --- Tickets State (DB-backed) ---
   const [tickets, setTickets] = useState<TicketCategory[]>([]);
-
-  // --- ClickUp Tasks State (ClickUp API-backed) ---
-  const [clickupTasks, setClickupTasks] = useState<ClickUpTask[]>([]);
-  const [clickupConfigured, setClickupConfigured] = useState(false);
-  const [dailyDistribution, setDailyDistribution] = useState({
-    PENDING: 0,
-    COMPLETE: 0,
-    "NOT APPLICABLE": 0,
-    "N/A": 0,
-  });
-  const [dailyTasks, setDailyTasks] = useState<any[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   // --- Project Rollout State (localStorage) ---
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
@@ -151,16 +107,6 @@ export default function ODDashboard({
         if (d.success) {
           if (d.attendance) setAttendance(d.attendance);
           if (d.tickets) setTickets(d.tickets);
-          if (d.clickup) {
-            setClickupConfigured(d.clickup.configured);
-            setClickupTasks(d.clickup.tasks);
-            if (d.clickup.dailyDistribution) {
-              setDailyDistribution(d.clickup.dailyDistribution);
-            }
-            if (d.clickup.dailyTasks) {
-              setDailyTasks(d.clickup.dailyTasks);
-            }
-          }
         }
         setLoading(false);
       })
@@ -255,50 +201,15 @@ export default function ODDashboard({
     }
   };
 
-  // --- ClickUp Actions (Post to ClickUp API) ---
-  const toggleClickupTask = async (taskId: string, currentCompleted: boolean) => {
-    const nextCompleted = !currentCompleted;
-
-    // Optimistic update
-    setClickupTasks(
-      clickupTasks.map((t) => (t.id === taskId ? { ...t, completed: nextCompleted } : t))
-    );
-
-    try {
-      const res = await fetch("/api/od/dashboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "update_clickup_task",
-          taskId,
-          completed: nextCompleted,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to update task in ClickUp");
-    } catch (error) {
-      console.error(error);
-      // Reload on failure
-      loadBackend();
-    }
-  };
-
-  const completedClickupTasksCount = clickupTasks.filter((t) => t.completed).length;
-  const clickupPercentage = clickupTasks.length > 0 ? Math.round((completedClickupTasksCount / clickupTasks.length) * 100) : 0;
-
-  // Circular progress properties
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (clickupPercentage / 100) * circumference;
-
 
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-12 space-y-6">
-        
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-12 space-y-6">
+
         {/* Header */}
         <div className="mb-6 w-full space-y-2">
-          <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
+          <GreetingHeader name={greetName} style={{ padding: "0 0 4px" }} />
           <div className="flex justify-between items-center flex-wrap gap-2">
             <p className="text-sm text-slate-500">
               Hi, Optimization Department! Here is your custom executive workspace.
@@ -475,115 +386,93 @@ export default function ODDashboard({
           <div className="lg:col-span-5 space-y-6">
             
             {/* 4. Tickets Counter - DB BACKED */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <Link
+              href="/crm/ticket/opportunities"
+              className="group bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-indigo-200 transition-all"
+            >
               <div>
                 <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-indigo-500" />
                     Tickets Counter
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                    {tickets.length > 0 ? "Database Active" : "Demo Mode"}
-                  </span>
+                  {tickets.length > 0 && (
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                      Live
+                    </span>
+                  )}
                 </h2>
-                
-                <div className="space-y-3">
-                  {(tickets.length > 0 ? tickets : dummyTickets).map((t, idx) => {
-                    const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
-                    return (
-                      <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-500 font-mono">
-                              {t.count}/{t.total} ({percent}%)
-                            </span>
-                          </div>
+
+                {loading ? (
+                  // Skeleton while the real data loads — never flash demo numbers.
+                  <div className="space-y-3">
+                    <div className="h-3 w-40 bg-slate-100 rounded animate-pulse mb-3" />
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-3 w-16 bg-slate-100 rounded animate-pulse" />
                         </div>
-                        {/* Progress Bar */}
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}
-                          />
-                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full animate-pulse" />
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* 5. ClickUp Optimization Progress - CLICKUP API BACKED */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-slate-800">
-              <div>
-                {selectedStatus === null ? (
-                  <>
-                    <h2 className="text-base font-semibold text-slate-900 mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <ListTodo className="w-5 h-5 text-teal-500" />
-                        Daily | Tue - Sat
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
-                        {clickupConfigured ? "API Connected" : "Demo Mode"}
-                      </span>
-                    </h2>
-
-                    <div className="flex justify-center items-center py-1">
-                      <ClickUpPieChart
-                        distribution={clickupConfigured ? dailyDistribution : dummyDistribution}
-                        onSliceClick={setSelectedStatus}
-                      />
-                    </div>
-                  </>
+                    ))}
+                  </div>
+                ) : tickets.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-8 text-center">No ticket data available.</p>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                      <button
-                        onClick={() => setSelectedStatus(null)}
-                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors flex items-center gap-1 text-xs font-bold"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Chart
-                      </button>
-                      <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                        {selectedStatus} ({(clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length})
-                      </span>
-                    </div>
+                    {(() => {
+                      const grandTotal = tickets.reduce((s, t) => s + t.total, 0);
+                      const grandSolved = tickets.reduce((s, t) => s + t.count, 0);
+                      const pct = grandTotal > 0 ? Math.round((grandSolved / grandTotal) * 100) : 0;
+                      return (
+                        <p className="text-xs text-slate-500 -mt-2 mb-3">
+                          <span className="font-semibold text-slate-700">{grandSolved.toLocaleString()}</span>
+                          {" of "}
+                          <span className="font-semibold text-slate-700">{grandTotal.toLocaleString()}</span>
+                          {" tickets solved "}
+                          <span className="text-slate-400">({pct}%)</span>
+                        </p>
+                      );
+                    })()}
 
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                      {((clickupConfigured ? dailyTasks : dummyDailyTasks).filter((t) => t.status === selectedStatus).length === 0) ? (
-                        <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
-                      ) : (
-                        (clickupConfigured ? dailyTasks : dummyDailyTasks)
-                          .filter((t) => t.status === selectedStatus)
-                          .map((t) => (
-                            <a
-                              key={t.id}
-                              href={t.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-start gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs transition-all duration-200"
-                            >
-                              <span className="font-mono text-[10px] text-slate-400 font-bold">#{t.id}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-slate-700 leading-tight hover:underline">{t.name}</p>
-                                <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-                                  List: {t.listName}
-                                </p>
+                    <div className="space-y-3">
+                      {tickets.map((t) => {
+                        const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
+                        return (
+                          <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-500 font-mono">
+                                  {t.count}/{t.total} ({percent}%)
+                                </span>
                               </div>
-                            </a>
-                          ))
-                      )}
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-300"
+                                style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
               </div>
-            </div>
+            </Link>
 
           </div>
 
         </div>
+
+        {/* Task Manager org overview (superadmin) — server-rendered slot,
+            full-width below the main dashboard grid. */}
+        {taskOverview}
 
       </div>
     </div>

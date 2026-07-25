@@ -9,14 +9,16 @@ export const dynamic = "force-dynamic";
 
 async function getHealthUsedThisYear(userId: number): Promise<number> {
   const now = new Date();
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  const yearEnd = new Date(now.getFullYear(), 11, 31);
+  // claim_date is stored as UTC midnight (date-only form strings parse as
+  // UTC), so the window must be UTC-anchored regardless of process TZ.
+  const yearStart = new Date(Date.UTC(now.getFullYear(), 0, 1));
+  const yearEnd = new Date(Date.UTC(now.getFullYear() + 1, 0, 1));
   const res = await prisma.claim.aggregate({
     where: {
       user_id: userId,
       claim_type: "health",
       status: { in: ["approved", "disbursed", "received"] },
-      claim_date: { gte: yearStart, lte: yearEnd },
+      claim_date: { gte: yearStart, lt: yearEnd },
     },
     _sum: { approved_amount: true },
   });

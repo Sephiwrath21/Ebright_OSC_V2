@@ -28,6 +28,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Generate Task Manager Prisma client
+        run: npx prisma generate --config prisma.task-manager.config.ts
+
       # - name: TypeScript check
       #   run: npx tsc --noEmit
 
@@ -76,10 +79,14 @@ jobs:
             # Stash any local drift so git checkout/pull never blocks
             git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
-            # Refresh refs and hard-sync local branch to remote
-            git remote set-url origin https://github.com/EbrightOD/Ebright_OSC_V2.git || true
+            # Refresh refs and hard-sync local branch to remote, exactly like
+            # v1's prod-/staging-deploy.yml (fetch + reset --hard). Do NOT force
+            # the remote to an HTTPS URL: the deploy boxes authenticate to the
+            # private repo over SSH (git@github.com). Forcing HTTPS overwrote the
+            # working SSH remote and broke the fetch with "could not read
+            # Username for https://github.com" → exit 128.
             git fetch origin >> ~/deploy.log 2>&1
-            git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
+            git reset --hard "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 
             # Diagnostic: confirm we actually have the latest commit on disk
             echo "--- HEAD commit on server: ---" >> ~/deploy.log 2>&1
@@ -90,14 +97,8 @@ jobs:
             echo "--- Tip of source (templates.ts first 25 lines): ---" >> ~/deploy.log 2>&1
             head -25 src/app/induction/templates.ts >> ~/deploy.log 2>&1 || true
 
-            # Ensure remote .env has ClickUp configuration
-            touch .env
-            sed -i '/^CLICKUP_API_TOKEN=/d' .env || true
-            sed -i '/^CLICKUP_TEAM_ID=/d' .env || true
-            printf '%s\n' "CLICKUP_API_TOKEN=pk_3667618_5NI4BGVS2CJIWLEZ33AHOL4LBPC417FX" >> .env
-            printf '%s\n' "CLICKUP_TEAM_ID=3631897" >> .env
- 
             # Ensure remote .env has Google Drive configuration
+            touch .env
             sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true

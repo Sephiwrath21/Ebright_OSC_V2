@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/app/components/AppShell";
+import ContactProfile from "@/app/components/ContactProfile";
 import { ChevronRight, Home } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +11,14 @@ export const metadata = {
   title: "Contact Profile",
 };
 
-export default async function ContactProfilePage() {
+export default async function ContactProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const userEmail = session.user.email;
   const userRole  = (session.user as { role?: string }).role ?? "";
   const userName  = session.user.name ?? null;
+  const { id } = await params;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -35,10 +37,7 @@ export default async function ContactProfilePage() {
             <span className="text-slate-900 font-medium">Profile</span>
           </nav>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-            <p className="text-sm font-medium text-slate-700">Contact Profile</p>
-            <p className="mt-1 text-xs text-slate-500">Coming soon — backend integration in progress.</p>
-          </div>
+          <ContactProfile contactId={id} />
         </div>
       </div>
     </AppShell>

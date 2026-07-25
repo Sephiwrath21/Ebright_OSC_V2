@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import {
   CalendarDays, Users, CheckCircle2, XCircle,
-  MapPin, Home, ChevronRight, BarChart3,
+  MapPin, Home, ChevronRight, BarChart3, Loader2,
 } from "lucide-react";
 import { useBreadcrumb } from "@/app/components/BreadcrumbContext";
 import {
-  BRANCHES, MOCK_DASH_EVENTS, MOCK_DASH_SESSIONS, MOCK_DASH_QUOTAS, MOCK_DASH_INVS,
-  countsAsConfirmed,
-  type BranchCode, type EventStatus,
-} from "./_mock";
+  BRANCHES,
+  countsAsConfirmed, countsAsAttended,
+  type EventStatus, type FAEvent, type Session, type SessionQuota, type Invitation,
+} from "@/lib/fa/types";
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<EventStatus, { label: string; cls: string }> = {
@@ -23,7 +23,7 @@ const STATUS_STYLES: Record<EventStatus, { label: string; cls: string }> = {
 };
 
 function StatusPill({ status }: { status: EventStatus }) {
-  const { label, cls } = STATUS_STYLES[status];
+  const { label, cls } = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       {label}
@@ -88,6 +88,15 @@ function TH({ children, center }: { children: React.ReactNode; center?: boolean 
   );
 }
 
+type BranchFilter = string; // branch code or "all"
+
+interface FAData {
+  events: FAEvent[];
+  sessions: Session[];
+  quotas: SessionQuota[];
+  invitations: Invitation[];
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function FADashboardClient() {
   useBreadcrumb([
@@ -96,21 +105,47 @@ export default function FADashboardClient() {
     { label: "Dashboard" },
   ]);
 
+  const [data, setData]       = useState<FAData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/fa/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+        const json = (await res.json()) as FAData;
+        if (alive) setData(json);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load FA data");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const events       = useMemo(() => data?.events ?? [], [data]);
+  const sessions     = useMemo(() => data?.sessions ?? [], [data]);
+  const quotas       = useMemo(() => data?.quotas ?? [], [data]);
+  const invitations  = useMemo(() => data?.invitations ?? [], [data]);
+
   const years = useMemo(
-    () => Array.from(new Set(MOCK_DASH_EVENTS.map(e => e.year))).sort((a, b) => b - a),
-    []
+    () => Array.from(new Set(events.map(e => e.year))).sort((a, b) => b - a),
+    [events]
   );
 
   const [yearFilter, setYearFilter]     = useState<number | "all">("all");
   const [eventFilter, setEventFilter]   = useState<string>("all");
-  const [branchFilter, setBranchFilter] = useState<BranchCode | "all">("all");
+  const [branchFilter, setBranchFilter] = useState<BranchFilter>("all");
 
   const eventsForFilter = useMemo(
     () =>
-      MOCK_DASH_EVENTS
+      events
         .filter(e => yearFilter === "all" || e.year === yearFilter)
         .sort((a, b) => b.startDate.localeCompare(a.startDate)),
-    [yearFilter]
+    [events, yearFilter]
   );
 
   useEffect(() => {
@@ -121,15 +156,15 @@ export default function FADashboardClient() {
 
   // Per-event stats
   const eventStats = useMemo(() => {
-    return MOCK_DASH_EVENTS
+    return events
       .filter(e => yearFilter === "all" || e.year === yearFilter)
       .filter(e => eventFilter === "all" || e.id === eventFilter)
       .map(event => {
         const sessionIds = new Set(
-          MOCK_DASH_SESSIONS.filter(s => s.eventId === event.id).map(s => s.id)
+          sessions.filter(s => s.eventId === event.id).map(s => s.id)
         );
-        let relevantQuotas = MOCK_DASH_QUOTAS.filter(q => sessionIds.has(q.sessionId));
-        let relevantInvs   = MOCK_DASH_INVS.filter(i => i.eventId === event.id);
+        let relevantQuotas = quotas.filter(q => sessionIds.has(q.sessionId));
+        let relevantInvs   = invitations.filter(i => i.eventId === event.id);
         if (branchFilter !== "all") {
           relevantQuotas = relevantQuotas.filter(q => q.branch === branchFilter);
           relevantInvs   = relevantInvs.filter(i => i.branch === branchFilter);
@@ -137,7 +172,7 @@ export default function FADashboardClient() {
         const totalQuota = relevantQuotas.reduce((sum, q) => sum + q.quota, 0);
         const invited    = relevantInvs.length;
         const confirmed  = relevantInvs.filter(i => countsAsConfirmed(i.status)).length;
-        const attended   = relevantInvs.filter(i => i.status === "attended").length;
+        const attended   = relevantInvs.filter(i => countsAsAttended(i.status)).length;
         const noShow     = relevantInvs.filter(i => i.status === "no_show").length;
         return {
           event,
@@ -151,7 +186,7 @@ export default function FADashboardClient() {
         };
       })
       .sort((a, b) => b.event.startDate.localeCompare(a.event.startDate));
-  }, [yearFilter, eventFilter, branchFilter]);
+  }, [events, sessions, quotas, invitations, yearFilter, eventFilter, branchFilter]);
 
   const totals = useMemo(() =>
     eventStats.reduce(
@@ -174,7 +209,7 @@ export default function FADashboardClient() {
   // Attendance by branch
   const attendanceByBranch = useMemo(() => {
     const eventIds = new Set(
-      MOCK_DASH_EVENTS
+      events
         .filter(e => yearFilter === "all" || e.year === yearFilter)
         .filter(e => eventFilter === "all" || e.id === eventFilter)
         .map(e => e.id)
@@ -182,38 +217,38 @@ export default function FADashboardClient() {
     const branches = branchFilter === "all" ? BRANCHES : BRANCHES.filter(b => b.code === branchFilter);
     return branches
       .map(b => {
-        const bInvs    = MOCK_DASH_INVS.filter(i => eventIds.has(i.eventId) && i.branch === b.code);
+        const bInvs    = invitations.filter(i => eventIds.has(i.eventId) && i.branch === b.code);
         const invited  = bInvs.length;
         const confirmed = bInvs.filter(i => countsAsConfirmed(i.status)).length;
-        const attended  = bInvs.filter(i => i.status === "attended").length;
+        const attended  = bInvs.filter(i => countsAsAttended(i.status)).length;
         const absent    = bInvs.filter(i => i.status === "no_show").length;
         const marked    = attended + absent;
         return { branch: b, invited, confirmed, attended, absent, marked, rate: marked > 0 ? attended / marked : 0 };
       })
-      .filter(row => branchFilter !== "all" || row.marked > 0)
+      .filter(row => branchFilter !== "all" ? true : row.invited > 0)
       .sort((a, b) => a.rate - b.rate || b.invited - a.invited);
-  }, [yearFilter, eventFilter, branchFilter]);
+  }, [events, invitations, yearFilter, eventFilter, branchFilter]);
 
   // Branch breakdown (all-branch view only)
   const branchBreakdown = useMemo(() => {
     if (branchFilter !== "all") return null;
     const eventIds = new Set(
-      MOCK_DASH_EVENTS
+      events
         .filter(e => yearFilter === "all" || e.year === yearFilter)
         .filter(e => eventFilter === "all" || e.id === eventFilter)
         .map(e => e.id)
     );
     const sessionIds = new Set(
-      MOCK_DASH_SESSIONS.filter(s => eventIds.has(s.eventId)).map(s => s.id)
+      sessions.filter(s => eventIds.has(s.eventId)).map(s => s.id)
     );
     return BRANCHES
       .map(b => {
-        const bQuotas   = MOCK_DASH_QUOTAS.filter(q => sessionIds.has(q.sessionId) && q.branch === b.code);
-        const bInvs     = MOCK_DASH_INVS.filter(i => eventIds.has(i.eventId) && i.branch === b.code);
+        const bQuotas   = quotas.filter(q => sessionIds.has(q.sessionId) && q.branch === b.code);
+        const bInvs     = invitations.filter(i => eventIds.has(i.eventId) && i.branch === b.code);
         const totalQuota = bQuotas.reduce((sum, q) => sum + q.quota, 0);
         const invited   = bInvs.length;
         const confirmed = bInvs.filter(i => countsAsConfirmed(i.status)).length;
-        const attended  = bInvs.filter(i => i.status === "attended").length;
+        const attended  = bInvs.filter(i => countsAsAttended(i.status)).length;
         const noShow    = bInvs.filter(i => i.status === "no_show").length;
         const marked    = attended + noShow;
         return {
@@ -222,13 +257,13 @@ export default function FADashboardClient() {
           attRate:  marked > 0 ? attended / marked : 0,
         };
       })
-      .filter(b => b.totalQuota > 0)
+      .filter(b => b.totalQuota > 0 || b.invited > 0)
       .sort((a, b) => b.attended - a.attended);
-  }, [yearFilter, eventFilter, branchFilter]);
+  }, [events, sessions, quotas, invitations, yearFilter, eventFilter, branchFilter]);
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -251,6 +286,18 @@ export default function FADashboardClient() {
           </p>
         </div>
 
+        {loading ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center justify-center text-center">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+            <p className="text-sm text-slate-500">Loading FA data…</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
+            <p className="text-sm font-medium text-red-600">{error}</p>
+            <p className="text-xs text-slate-400 mt-1">Check the FA database connection and try again.</p>
+          </div>
+        ) : (
+        <>
         {/* Filters */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
           <div className="flex flex-wrap items-end gap-3">
@@ -282,7 +329,7 @@ export default function FADashboardClient() {
               <select
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
                 value={branchFilter}
-                onChange={e => setBranchFilter(e.target.value as BranchCode | "all")}
+                onChange={e => setBranchFilter(e.target.value)}
               >
                 <option value="all">All branches</option>
                 {BRANCHES.map(b => (
@@ -511,6 +558,8 @@ export default function FADashboardClient() {
               </table>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

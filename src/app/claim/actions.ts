@@ -151,14 +151,16 @@ export async function submitClaim(
 
   if (claimType === "health") {
     const year = claimDate.getFullYear();
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year, 11, 31);
+    // claim_date is stored as UTC midnight (date-only form strings parse as
+    // UTC), so the window must be UTC-anchored regardless of process TZ.
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
     const used = await prisma.claim.aggregate({
       where: {
         user_id: user.user_id,
         claim_type: "health",
         status: { in: ["approved", "disbursed", "received"] },
-        claim_date: { gte: yearStart, lte: yearEnd },
+        claim_date: { gte: yearStart, lt: yearEnd },
       },
       _sum: { approved_amount: true },
     });

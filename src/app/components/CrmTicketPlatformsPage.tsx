@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Home, ChevronRight, Plus, Pencil, Trash2, X,
 } from "lucide-react";
@@ -9,22 +9,15 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Platform {
-  id: number;
+  id: string;
   name: string;
   slug: string;
+  code: string | null;
   accent: string;
   tickets: number;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const INITIAL: Platform[] = [
-  { id: 1, name: "Lead",           slug: "lead",           accent: "#ed1c24", tickets: 175 },
-  { id: 2, name: "Aone",           slug: "aone",           accent: "#4a8fd9", tickets: 206 },
-  { id: 3, name: "ClickUp",        slug: "clickup",        accent: "#79f471", tickets: 2   },
-  { id: 4, name: "Process Street", slug: "process-street", accent: "#023497", tickets: 6   },
-  { id: 5, name: "Others",         slug: "others",         accent: "#6b7280", tickets: 6   },
-];
+interface ApiPlatform { id: string; name: string; slug: string | null; code: string | null; accent: string | null; tickets: number }
 
 function toSlug(name: string) {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -40,7 +33,7 @@ interface ModalProps {
   platform: Platform | null;
   onClose: () => void;
   onSave: (p: Platform) => void;
-  nextId: number;
+  nextId: string;
 }
 
 function PlatformModal({ platform, onClose, onSave, nextId }: ModalProps) {
@@ -61,6 +54,7 @@ function PlatformModal({ platform, onClose, onSave, nextId }: ModalProps) {
       id:      isEdit ? platform!.id : nextId,
       name:    name.trim(),
       slug:    slug.trim() || toSlug(name),
+      code:    isEdit ? platform!.code : null,
       accent,
       tickets: isEdit ? platform!.tickets : 0,
     });
@@ -136,11 +130,38 @@ function PlatformModal({ platform, onClose, onSave, nextId }: ModalProps) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function CrmTicketPlatformsPage() {
-  const [platforms, setPlatforms] = useState<Platform[]>(INITIAL);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<"add" | Platform | null>(null);
 
+  // Read-only: real platforms + ticket counts from ebright_crm (tkt_platform).
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    fetch("/api/crm/tickets/platforms", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Request failed (${r.status})`);
+        }
+        return r.json() as Promise<{ platforms: ApiPlatform[] }>;
+      })
+      .then((d) => {
+        if (ignore) return;
+        setPlatforms(d.platforms.map((p) => ({
+          id: p.id, name: p.name, slug: p.slug ?? "", code: p.code, accent: p.accent ?? "#6b7280", tickets: p.tickets,
+        })));
+        setError(null);
+      })
+      .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : "Failed to load platforms"); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
+  }, []);
+
+  // Add/Edit/Delete stay local-only (read-only view — never written back).
   function handleSave(p: Platform) {
-    if (p.id === 0 || !platforms.find(x => x.id === p.id)) {
+    if (!platforms.find(x => x.id === p.id)) {
       setPlatforms(prev => [...prev, p]);
     } else {
       setPlatforms(prev => prev.map(x => x.id === p.id ? p : x));
@@ -148,11 +169,11 @@ export default function CrmTicketPlatformsPage() {
     setModal(null);
   }
 
-  function deletePlatform(id: number) {
+  function deletePlatform(id: string) {
     setPlatforms(prev => prev.filter(x => x.id !== id));
   }
 
-  const nextId = platforms.length ? Math.max(...platforms.map(p => p.id)) + 1 : 1;
+  const nextId = `local-${platforms.length + 1}`;
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -165,7 +186,7 @@ export default function CrmTicketPlatformsPage() {
         />
       )}
 
-      <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -210,17 +231,27 @@ export default function CrmTicketPlatformsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {platforms.length === 0 && (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600" />
+                    <p className="text-sm text-slate-400">Loading platforms…</p>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-red-500">Couldn&apos;t load platforms: {error}</td>
+                </tr>
+              ) : platforms.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
                     No platforms yet. Click &ldquo;Add Platform&rdquo; to get started.
                   </td>
                 </tr>
-              )}
-              {platforms.map((p, i) => (
+              ) : platforms.map((p, i) => (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-mono text-sm font-medium text-slate-500">
-                    {pad(i + 1)}
+                    {p.code ?? pad(i + 1)}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">
                     {p.name}
