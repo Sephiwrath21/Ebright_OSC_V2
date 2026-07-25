@@ -167,7 +167,10 @@ export async function getEntityPayload(
   date?: string,
 ): Promise<EntityPayload> {
   const window = resolveWindow(period, date);
-  const all = await fetchPeriodBlocks(window);
+  // strictWindow: this payload feeds the date-filterable entity overviews —
+  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
+  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
+  const all = await fetchPeriodBlocks(window, { strictWindow: true });
   const users = await getAssigneeMap(all);
 
   // Scope to this entity via the assignee's branch/department (null → Unassigned).
