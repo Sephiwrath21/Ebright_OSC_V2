@@ -7,7 +7,13 @@
 // + count everywhere).
 
 import * as React from "react";
-import type { ActionResult, FlowBucketTotals, FlowDrillTask, FlowTaskRow } from "./types";
+import type {
+  ActionResult,
+  FlowBucketTotals,
+  FlowDrillTask,
+  FlowStaffMember,
+  FlowTaskRow,
+} from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
 import { personSolidColor } from "./palette";
 
@@ -913,6 +919,7 @@ export function StatusOverviewCard({
   onComplete,
   onSkip,
   onReopen,
+  reassign,
 }: {
   title: string;
   /** Period line under the title; omit for un-periodized overview cards. */
@@ -933,6 +940,8 @@ export function StatusOverviewCard({
   /** "Pending" (reopen) handler, passed straight to EntityDrillModal — see
    *  TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** "Assign to Others" control, passed straight to EntityDrillModal. */
+  reassign?: ReassignControl;
 }) {
   const [selected, setSelected] = React.useState<BucketKey | null>(null);
   const drill = tasks ? setSelected : undefined;
@@ -960,8 +969,83 @@ export function StatusOverviewCard({
           onComplete={onComplete}
           onSkip={onSkip}
           onReopen={onReopen}
+          reassign={reassign}
         />
       )}
+    </div>
+  );
+}
+
+/** Everything "Assign to Others" needs, bundled so pages thread ONE optional
+ *  prop: the assignable staff directory + the reassignment server action.
+ *  Only provided to viewers with assign rights (page-side gate); the server
+ *  action re-checks authorization regardless. */
+export interface ReassignControl {
+  staff: FlowStaffMember[];
+  action: (runBlockId: string, newAssigneeId: string) => Promise<ActionResult>;
+}
+
+/** Inline person picker for "Assign to Others" — search + click ONE name
+ *  (deliberately single-select, unlike the + Task RecipientPicker: one task,
+ *  one new assignee). Renders under the task row inside EntityDrillModal. */
+function ReassignPicker({
+  staff,
+  currentAssigneeId,
+  onPick,
+}: {
+  staff: FlowStaffMember[];
+  currentAssigneeId: string;
+  onPick: (userId: string) => Promise<ActionResult>;
+}) {
+  const [search, setSearch] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const q = search.trim().toLowerCase();
+  const candidates = staff
+    .filter((s) => s.id !== currentAssigneeId)
+    .filter((s) => s.name.toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, 30);
+
+  return (
+    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+      <input
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setError(null);
+        }}
+        placeholder="Search staff to assign…"
+        className="mb-1.5 w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+      />
+      {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
+      <div className="max-h-36 overflow-y-auto">
+        {candidates.length === 0 ? (
+          <p className="py-2 text-center text-xs text-gray-400">No staff match.</p>
+        ) : (
+          candidates.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                const r = await onPick(s.id);
+                setBusy(false);
+                if (!r.ok) setError(r.message);
+              }}
+              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-gray-700 hover:bg-white disabled:opacity-50"
+            >
+              <span className="truncate">{s.name}</span>
+              {s.employmentType && (
+                <span className="shrink-0 text-[10px] text-gray-400">{s.employmentType}</span>
+              )}
+            </button>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -991,6 +1075,7 @@ export function EntityDrillModal({
   onComplete,
   onSkip,
   onReopen,
+  reassign,
 }: {
   name: string;
   tasks: Record<BucketKey, FlowDrillTask[]>;
@@ -1005,10 +1090,15 @@ export function EntityDrillModal({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark Pending" (reopen) handler — see TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** "Assign to Others" (2026-07-25): when provided, every PENDING row gets
+   *  a reassign control opening an inline person picker. Only passed for
+   *  the 5 assign-capable identities; the server action re-checks. */
+  reassign?: ReassignControl;
 }) {
   const meta = BUCKET_META.find((b) => b.key === bucketKey)!;
   const rows = tasks[bucketKey];
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [reassignRow, setReassignRow] = React.useState<string | null>(null);
 
   const ownedRows = rows.filter((t) => myUserId && t.assigneeId === myUserId);
   const allOwnedSelected = ownedRows.length > 0 && ownedRows.every((t) => selectedIds.has(t.runBlockId));
@@ -1140,35 +1230,64 @@ export function EntityDrillModal({
               const due = t.dueAt ? new Date(t.dueAt) : null;
               const dueDisplay = formatDueDate(due);
               const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
+              const canReassign = bucketKey === "pending" && Boolean(reassign);
               return (
                 <div
                   key={t.runBlockId}
-                  className="flex items-center gap-2.5 py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
+                  className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
                 >
-                  {isOwned && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(t.runBlockId)}
-                      onChange={() => toggleSelect(t.runBlockId)}
-                      aria-label={`Select ${t.blockTitle}`}
-                      className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
-                    />
-                  )}
-                  <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-sm font-semibold ${
-                        t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
-                      }`}
-                    >
-                      {t.blockTitle}
-                    </p>
-                    {!isOwned && (
-                      <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
+                  <div className="flex items-center gap-2.5">
+                    {isOwned && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(t.runBlockId)}
+                        onChange={() => toggleSelect(t.runBlockId)}
+                        aria-label={`Select ${t.blockTitle}`}
+                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+                      />
+                    )}
+                    <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`truncate text-sm font-semibold ${
+                          t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+                        }`}
+                      >
+                        {t.blockTitle}
+                      </p>
+                      {!isOwned && (
+                        <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
+                      )}
+                    </div>
+                    {dueDisplay && (
+                      <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+                    )}
+                    {canReassign && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
+                        }
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          reassignRow === t.runBlockId
+                            ? "border-blue-400 bg-blue-50 text-blue-700"
+                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                        }`}
+                      >
+                        Assign to Others
+                      </button>
                     )}
                   </div>
-                  {dueDisplay && (
-                    <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+                  {canReassign && reassign && reassignRow === t.runBlockId && (
+                    <ReassignPicker
+                      staff={reassign.staff}
+                      currentAssigneeId={t.assigneeId}
+                      onPick={async (userId) => {
+                        const r = await reassign.action(t.runBlockId, userId);
+                        if (r.ok) setReassignRow(null);
+                        return r;
+                      }}
+                    />
                   )}
                 </div>
               );

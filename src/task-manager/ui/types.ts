@@ -415,6 +415,17 @@ export type FlowGroup = (typeof FLOW_GROUPS)[number];
 
 export const FLOW_GROUPS_NEEDING_SUBVALUE: readonly FlowGroup[] = ["Department"];
 
+/** Groups whose member list can OPTIONALLY be narrowed by department —
+ *  unlike FLOW_GROUPS_NEEDING_SUBVALUE no sub-pick is required; the default
+ *  ("All departments") behaves exactly like the flat group did.
+ *  2026-07-25 user decision: Intern only, deliberately not the other
+ *  department-side roles. */
+export const FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT: readonly FlowGroup[] = ["Intern"];
+export const FLOW_GROUP_DEPT_ALL = "All departments";
+/** Real option, not just a label: 65 imported staff currently have no
+ *  department assigned — a plain department filter would never reach them. */
+export const FLOW_GROUP_DEPT_NONE = "No department yet";
+
 /** Resolve a "By Group" selection (+ optional department sub-value) into the
  *  matching staff members. */
 export function flowGroupMembers(
@@ -439,8 +450,13 @@ export function flowGroupMembers(
       return staff.filter((s) => s.employmentType === "Coach" && s.coachSchedule === "Full Time");
     case "Part Time Coach":
       return staff.filter((s) => s.employmentType === "Coach" && s.coachSchedule === "Part Time");
-    case "Intern":
-      return staff.filter((s) => s.employmentType === "Intern");
+    case "Intern": {
+      // Optional department drill-down (see FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT).
+      const interns = staff.filter((s) => s.employmentType === "Intern");
+      if (!subValue || subValue === FLOW_GROUP_DEPT_ALL) return interns;
+      if (subValue === FLOW_GROUP_DEPT_NONE) return interns.filter((s) => !s.department);
+      return interns.filter((s) => s.department === subValue);
+    }
     case "Department":
       return subValue ? staff.filter((s) => s.department === subValue) : [];
   }

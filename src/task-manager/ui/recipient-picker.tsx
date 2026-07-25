@@ -14,8 +14,10 @@
 import * as React from "react";
 import {
   FLOW_DEPARTMENTS,
+  FLOW_GROUP_DEPT_NONE,
   FLOW_GROUPS,
   FLOW_GROUPS_NEEDING_SUBVALUE,
+  FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT,
   flowGroupMembers,
   type FlowGroup,
   type FlowStaffMember,
@@ -237,6 +239,11 @@ export function RecipientPicker({
 
   const groupValue: FlowGroup | null = restrictToGroup ?? (group === "" ? null : group);
   const needsSub = groupValue !== null && FLOW_GROUPS_NEEDING_SUBVALUE.includes(groupValue);
+  // Optional department narrowing (e.g. "Intern → Operation") — renders the
+  // same department dropdown, but an empty pick means "All departments"
+  // rather than blocking the member list.
+  const optionalDeptSub =
+    groupValue !== null && FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT.includes(groupValue);
   const groupResults =
     groupValue !== null && (!needsSub || groupSub)
       ? flowGroupMembers(staff, groupValue, groupSub)
@@ -272,16 +279,19 @@ export function RecipientPicker({
     return (
       <div className="flex flex-col gap-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-3">
-          {needsSub && (
+          {(needsSub || optionalDeptSub) && (
             <select
               value={groupSub}
               onChange={(e) => setGroupSub(e.target.value)}
               className={`mb-2 ${selectClass}`}
             >
-              <option value="">Select a department…</option>
+              <option value="">{needsSub ? "Select a department…" : "All departments"}</option>
               {FLOW_DEPARTMENTS.map((v) => (
                 <option key={v}>{v}</option>
               ))}
+              {optionalDeptSub && (
+                <option value={FLOW_GROUP_DEPT_NONE}>{FLOW_GROUP_DEPT_NONE}</option>
+              )}
             </select>
           )}
           {needsSub && !groupSub ? (
@@ -347,16 +357,19 @@ export function RecipientPicker({
             ))}
           </select>
 
-          {needsSub && groupValue !== null && (
+          {(needsSub || optionalDeptSub) && groupValue !== null && (
             <select
               value={groupSub}
               onChange={(e) => setGroupSub(e.target.value)}
               className={`mb-2 ${selectClass}`}
             >
-              <option value="">Select a department…</option>
+              <option value="">{needsSub ? "Select a department…" : "All departments"}</option>
               {FLOW_DEPARTMENTS.map((v) => (
                 <option key={v}>{v}</option>
               ))}
+              {optionalDeptSub && (
+                <option value={FLOW_GROUP_DEPT_NONE}>{FLOW_GROUP_DEPT_NONE}</option>
+              )}
             </select>
           )}
 

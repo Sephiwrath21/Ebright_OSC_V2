@@ -48,6 +48,69 @@ const assignInputSchema = z.object({
   cadence: z.enum(CADENCE_OPTIONS),
 });
 
+/** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
+ *  Allowed for the same identities as assignFlowTask; HOD additionally
+ *  scoped to their own department on BOTH ends (the task's current assignee
+ *  AND the new one must be in the HOD's department). */
+export function reassignFlowTask(
+  actorEmail: string,
+  runBlockId: string,
+  newAssigneeId: string,
+): Promise<void> {
+  return native(async () => {
+    const actor = await requireUserByEmail(actorEmail);
+    const allowed =
+      actor.role === "ADMIN" ||
+      actor.role === "OPS" ||
+      actor.role === "CEO" ||
+      actor.role === "HOD" ||
+      isElevatedDeptSite(actor);
+    if (!allowed) {
+      throw new ApiHttpError(
+        403,
+        "Only superadmin, operations, HOD, the CEO, or the Operation/Optimisation department accounts can reassign tasks",
+      );
+    }
+
+    const block = await prisma.runBlock.findUnique({ where: { id: runBlockId } });
+    if (!block) throw new ApiHttpError(404, "Task not found");
+    if (block.status === "DONE" || block.status === "SKIPPED") {
+      throw new ApiHttpError(400, "Only pending tasks can be reassigned");
+    }
+
+    const [current, next] = await Promise.all([
+      prisma.user.findUnique({ where: { id: block.assigneeId } }),
+      prisma.user.findUnique({ where: { id: newAssigneeId } }),
+    ]);
+    if (!next) throw new ApiHttpError(404, "New assignee not found");
+    if (actor.role === "HOD") {
+      const dept = actor.department;
+      if (!dept || current?.department !== dept || next.department !== dept) {
+        throw new ApiHttpError(403, "HODs can only reassign tasks within their own department");
+      }
+    }
+    if (next.id === block.assigneeId) return;
+
+    await prisma.runBlock.update({
+      where: { id: block.id },
+      data: { assigneeId: next.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        runId: block.runId,
+        runBlockId: block.id,
+        actorId: actor.id,
+        action: "BLOCK_REASSIGNED",
+        detail: { from: block.assigneeId, to: next.id },
+      },
+    });
+    // TODO(reminders): when the Redis reminder worker goes live (spec §6),
+    // cancel this block's scheduled reminder job and reschedule it for the
+    // new assignee — today reminders are dormant (REDIS_URL unset), so
+    // there's nothing to move yet.
+  }, "reassignFlowTask");
+}
+
 const ADHOC_FLOW_ID = "flow-adhoc";
 const CEO_ASSIGN_FLOW_ID = "flow-ceo-assign";
 const HOD_ASSIGN_FLOW_ID = "flow-hod-assign";
