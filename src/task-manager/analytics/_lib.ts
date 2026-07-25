@@ -522,6 +522,14 @@ export interface PeriodBlockFilter {
   startedById?: string;
   /** Drop blocks assigned to this user (delegated view excludes self-work). */
   excludeAssigneeId?: string;
+  /** Cadence-TAGGED blocks normally belong to their period UNCONDITIONALLY
+   *  (the personal "My Tasks — Daily" weekday tabs need the whole week's
+   *  DAILY tasks at once). Date-filtered surfaces (the entity overviews'
+   *  Daily date picker, 2026-07-25) set this so tagged blocks must ALSO
+   *  fall inside the window, by the same dueAt-else-startedAt rule
+   *  untagged blocks use — otherwise "+ Task"-created (always-tagged)
+   *  tasks appear identically on every selected date. */
+  strictWindow?: boolean;
 }
 
 /**
@@ -548,7 +556,15 @@ export async function fetchPeriodBlocks(
       ...(window
         ? {
             OR: [
-              { cadence: CADENCE_FOR_PERIOD[window.period] },
+              filter.strictWindow
+                ? {
+                    cadence: CADENCE_FOR_PERIOD[window.period],
+                    OR: [
+                      { dueAt: { gte: window.start, lt: window.end } },
+                      { dueAt: null, startedAt: { gte: window.start, lt: window.end } },
+                    ],
+                  }
+                : { cadence: CADENCE_FOR_PERIOD[window.period] },
               { cadence: null, dueAt: { gte: window.start, lt: window.end } },
               { cadence: null, dueAt: null, startedAt: { gte: window.start, lt: window.end } },
             ],
