@@ -276,11 +276,26 @@ model RunBlock {
   // slot sync, engine flow runs) leaves this at its default (null) and is
   // completely unaffected.
   cadence       Cadence?
+  // Weekly auto-recurrence (2026-07-25, opt-in "+ Task" toggle, DAILY only —
+  // "recurring series" model): when this block's due day has passed, the
+  // lazy catch-up (engine/recurrence.ts, called from the data reads) creates
+  // NEXT week's occurrence and links it back via recurrenceOfId. The
+  // finished block is never touched, so per-day history (the Daily date
+  // filter) keeps showing what actually happened. recurrenceOfId is UNIQUE —
+  // a block can have at most ONE successor — which makes concurrent
+  // catch-ups idempotent (the losing racer hits the constraint and stops).
+  // Manpower-Schedule tasks (scheduleSlotId set, cadence ADHOC) never
+  // qualify.
+  repeatWeekly   Boolean   @default(false)
+  recurrenceOfId String?   @unique
+  recurrenceOf   RunBlock? @relation("BlockRecurrence", fields: [recurrenceOfId], references: [id])
+  successor      RunBlock? @relation("BlockRecurrence")
 
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
+  @@index([repeatWeekly, dueAt])
 }
 
 enum BlockStatus {
@@ -338,7 +353,7 @@ model AuditLog {
   runId      String?
   runBlockId String?
   actorId    String // user id, or "system" for engine/worker actions
-  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | REMINDER_SENT
+  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | REMINDER_SENT
   detail     Json?
   createdAt  DateTime @default(now())
 

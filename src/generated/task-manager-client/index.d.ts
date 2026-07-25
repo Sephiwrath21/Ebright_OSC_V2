@@ -14396,6 +14396,8 @@ export namespace Prisma {
     completedAt: Date | null
     scheduleSlotId: string | null
     cadence: $Enums.Cadence | null
+    repeatWeekly: boolean | null
+    recurrenceOfId: string | null
   }
 
   export type RunBlockMaxAggregateOutputType = {
@@ -14413,6 +14415,8 @@ export namespace Prisma {
     completedAt: Date | null
     scheduleSlotId: string | null
     cadence: $Enums.Cadence | null
+    repeatWeekly: boolean | null
+    recurrenceOfId: string | null
   }
 
   export type RunBlockCountAggregateOutputType = {
@@ -14430,6 +14434,8 @@ export namespace Prisma {
     completedAt: number
     scheduleSlotId: number
     cadence: number
+    repeatWeekly: number
+    recurrenceOfId: number
     _all: number
   }
 
@@ -14457,6 +14463,8 @@ export namespace Prisma {
     completedAt?: true
     scheduleSlotId?: true
     cadence?: true
+    repeatWeekly?: true
+    recurrenceOfId?: true
   }
 
   export type RunBlockMaxAggregateInputType = {
@@ -14474,6 +14482,8 @@ export namespace Prisma {
     completedAt?: true
     scheduleSlotId?: true
     cadence?: true
+    repeatWeekly?: true
+    recurrenceOfId?: true
   }
 
   export type RunBlockCountAggregateInputType = {
@@ -14491,6 +14501,8 @@ export namespace Prisma {
     completedAt?: true
     scheduleSlotId?: true
     cadence?: true
+    repeatWeekly?: true
+    recurrenceOfId?: true
     _all?: true
   }
 
@@ -14595,6 +14607,8 @@ export namespace Prisma {
     completedAt: Date | null
     scheduleSlotId: string | null
     cadence: $Enums.Cadence | null
+    repeatWeekly: boolean
+    recurrenceOfId: string | null
     _count: RunBlockCountAggregateOutputType | null
     _avg: RunBlockAvgAggregateOutputType | null
     _sum: RunBlockSumAggregateOutputType | null
@@ -14631,8 +14645,12 @@ export namespace Prisma {
     completedAt?: boolean
     scheduleSlotId?: boolean
     cadence?: boolean
+    repeatWeekly?: boolean
+    recurrenceOfId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    successor?: boolean | RunBlock$successorArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
@@ -14651,7 +14669,10 @@ export namespace Prisma {
     completedAt?: boolean
     scheduleSlotId?: boolean
     cadence?: boolean
+    repeatWeekly?: boolean
+    recurrenceOfId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -14669,7 +14690,10 @@ export namespace Prisma {
     completedAt?: boolean
     scheduleSlotId?: boolean
     cadence?: boolean
+    repeatWeekly?: boolean
+    recurrenceOfId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectScalar = {
@@ -14687,19 +14711,25 @@ export namespace Prisma {
     completedAt?: boolean
     scheduleSlotId?: boolean
     cadence?: boolean
+    repeatWeekly?: boolean
+    recurrenceOfId?: boolean
   }
 
-  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence", ExtArgs["result"]["runBlock"]>
+  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId", ExtArgs["result"]["runBlock"]>
   export type RunBlockInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    successor?: boolean | RunBlock$successorArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type RunBlockIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
   }
   export type RunBlockIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
+    recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
   }
 
   export type $RunBlockPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14707,6 +14737,8 @@ export namespace Prisma {
     objects: {
       run: Prisma.$FlowRunPayload<ExtArgs>
       runItems: Prisma.$RunItemPayload<ExtArgs>[]
+      recurrenceOf: Prisma.$RunBlockPayload<ExtArgs> | null
+      successor: Prisma.$RunBlockPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -14723,6 +14755,8 @@ export namespace Prisma {
       completedAt: Date | null
       scheduleSlotId: string | null
       cadence: $Enums.Cadence | null
+      repeatWeekly: boolean
+      recurrenceOfId: string | null
     }, ExtArgs["result"]["runBlock"]>
     composites: {}
   }
@@ -15119,6 +15153,8 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     run<T extends FlowRunDefaultArgs<ExtArgs> = {}>(args?: Subset<T, FlowRunDefaultArgs<ExtArgs>>): Prisma__FlowRunClient<$Result.GetResult<Prisma.$FlowRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     runItems<T extends RunBlock$runItemsArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$runItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    recurrenceOf<T extends RunBlock$recurrenceOfArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$recurrenceOfArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15162,6 +15198,8 @@ export namespace Prisma {
     readonly completedAt: FieldRef<"RunBlock", 'DateTime'>
     readonly scheduleSlotId: FieldRef<"RunBlock", 'String'>
     readonly cadence: FieldRef<"RunBlock", 'Cadence'>
+    readonly repeatWeekly: FieldRef<"RunBlock", 'Boolean'>
+    readonly recurrenceOfId: FieldRef<"RunBlock", 'String'>
   }
     
 
@@ -15584,6 +15622,44 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: RunItemScalarFieldEnum | RunItemScalarFieldEnum[]
+  }
+
+  /**
+   * RunBlock.recurrenceOf
+   */
+  export type RunBlock$recurrenceOfArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+  }
+
+  /**
+   * RunBlock.successor
+   */
+  export type RunBlock$successorArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
   }
 
   /**
@@ -24267,7 +24343,9 @@ export namespace Prisma {
     startedAt: 'startedAt',
     completedAt: 'completedAt',
     scheduleSlotId: 'scheduleSlotId',
-    cadence: 'cadence'
+    cadence: 'cadence',
+    repeatWeekly: 'repeatWeekly',
+    recurrenceOfId: 'recurrenceOfId'
   };
 
   export type RunBlockScalarFieldEnum = (typeof RunBlockScalarFieldEnum)[keyof typeof RunBlockScalarFieldEnum]
@@ -25376,8 +25454,12 @@ export namespace Prisma {
     completedAt?: DateTimeNullableFilter<"RunBlock"> | Date | string | null
     scheduleSlotId?: StringNullableFilter<"RunBlock"> | string | null
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
+    repeatWeekly?: BoolFilter<"RunBlock"> | boolean
+    recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
+    recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
   }
 
   export type RunBlockOrderByWithRelationInput = {
@@ -25395,12 +25477,17 @@ export namespace Prisma {
     completedAt?: SortOrderInput | SortOrder
     scheduleSlotId?: SortOrderInput | SortOrder
     cadence?: SortOrderInput | SortOrder
+    repeatWeekly?: SortOrder
+    recurrenceOfId?: SortOrderInput | SortOrder
     run?: FlowRunOrderByWithRelationInput
     runItems?: RunItemOrderByRelationAggregateInput
+    recurrenceOf?: RunBlockOrderByWithRelationInput
+    successor?: RunBlockOrderByWithRelationInput
   }
 
   export type RunBlockWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    recurrenceOfId?: string
     runId_nodeId?: RunBlockRunIdNodeIdCompoundUniqueInput
     AND?: RunBlockWhereInput | RunBlockWhereInput[]
     OR?: RunBlockWhereInput[]
@@ -25418,9 +25505,12 @@ export namespace Prisma {
     completedAt?: DateTimeNullableFilter<"RunBlock"> | Date | string | null
     scheduleSlotId?: StringNullableFilter<"RunBlock"> | string | null
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
+    repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
-  }, "id" | "runId_nodeId">
+    recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+  }, "id" | "recurrenceOfId" | "runId_nodeId">
 
   export type RunBlockOrderByWithAggregationInput = {
     id?: SortOrder
@@ -25437,6 +25527,8 @@ export namespace Prisma {
     completedAt?: SortOrderInput | SortOrder
     scheduleSlotId?: SortOrderInput | SortOrder
     cadence?: SortOrderInput | SortOrder
+    repeatWeekly?: SortOrder
+    recurrenceOfId?: SortOrderInput | SortOrder
     _count?: RunBlockCountOrderByAggregateInput
     _avg?: RunBlockAvgOrderByAggregateInput
     _max?: RunBlockMaxOrderByAggregateInput
@@ -25462,6 +25554,8 @@ export namespace Prisma {
     completedAt?: DateTimeNullableWithAggregatesFilter<"RunBlock"> | Date | string | null
     scheduleSlotId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
     cadence?: EnumCadenceNullableWithAggregatesFilter<"RunBlock"> | $Enums.Cadence | null
+    repeatWeekly?: BoolWithAggregatesFilter<"RunBlock"> | boolean
+    recurrenceOfId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
   }
 
   export type RunItemWhereInput = {
@@ -26791,8 +26885,11 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockUncheckedCreateInput = {
@@ -26810,7 +26907,10 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockUpdateInput = {
@@ -26827,8 +26927,11 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type RunBlockUncheckedUpdateInput = {
@@ -26846,7 +26949,10 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type RunBlockCreateManyInput = {
@@ -26864,6 +26970,8 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
   }
 
   export type RunBlockUpdateManyMutationInput = {
@@ -26880,6 +26988,7 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type RunBlockUncheckedUpdateManyInput = {
@@ -26897,6 +27006,8 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RunItemCreateInput = {
@@ -28324,6 +28435,11 @@ export namespace Prisma {
     none?: RunItemWhereInput
   }
 
+  export type RunBlockNullableScalarRelationFilter = {
+    is?: RunBlockWhereInput | null
+    isNot?: RunBlockWhereInput | null
+  }
+
   export type RunItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -28348,6 +28464,8 @@ export namespace Prisma {
     completedAt?: SortOrder
     scheduleSlotId?: SortOrder
     cadence?: SortOrder
+    repeatWeekly?: SortOrder
+    recurrenceOfId?: SortOrder
   }
 
   export type RunBlockAvgOrderByAggregateInput = {
@@ -28369,6 +28487,8 @@ export namespace Prisma {
     completedAt?: SortOrder
     scheduleSlotId?: SortOrder
     cadence?: SortOrder
+    repeatWeekly?: SortOrder
+    recurrenceOfId?: SortOrder
   }
 
   export type RunBlockMinOrderByAggregateInput = {
@@ -28386,6 +28506,8 @@ export namespace Prisma {
     completedAt?: SortOrder
     scheduleSlotId?: SortOrder
     cadence?: SortOrder
+    repeatWeekly?: SortOrder
+    recurrenceOfId?: SortOrder
   }
 
   export type RunBlockSumOrderByAggregateInput = {
@@ -29366,11 +29488,29 @@ export namespace Prisma {
     connect?: RunItemWhereUniqueInput | RunItemWhereUniqueInput[]
   }
 
+  export type RunBlockCreateNestedOneWithoutSuccessorInput = {
+    create?: XOR<RunBlockCreateWithoutSuccessorInput, RunBlockUncheckedCreateWithoutSuccessorInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSuccessorInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
+  export type RunBlockCreateNestedOneWithoutRecurrenceOfInput = {
+    create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
   export type RunItemUncheckedCreateNestedManyWithoutRunBlockInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
     createMany?: RunItemCreateManyRunBlockInputEnvelope
     connect?: RunItemWhereUniqueInput | RunItemWhereUniqueInput[]
+  }
+
+  export type RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput = {
+    create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
+    connect?: RunBlockWhereUniqueInput
   }
 
   export type EnumBlockStatusFieldUpdateOperationsInput = {
@@ -29403,6 +29543,26 @@ export namespace Prisma {
     deleteMany?: RunItemScalarWhereInput | RunItemScalarWhereInput[]
   }
 
+  export type RunBlockUpdateOneWithoutSuccessorNestedInput = {
+    create?: XOR<RunBlockCreateWithoutSuccessorInput, RunBlockUncheckedCreateWithoutSuccessorInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSuccessorInput
+    upsert?: RunBlockUpsertWithoutSuccessorInput
+    disconnect?: RunBlockWhereInput | boolean
+    delete?: RunBlockWhereInput | boolean
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutSuccessorInput, RunBlockUpdateWithoutSuccessorInput>, RunBlockUncheckedUpdateWithoutSuccessorInput>
+  }
+
+  export type RunBlockUpdateOneWithoutRecurrenceOfNestedInput = {
+    create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
+    upsert?: RunBlockUpsertWithoutRecurrenceOfInput
+    disconnect?: RunBlockWhereInput | boolean
+    delete?: RunBlockWhereInput | boolean
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
+  }
+
   export type RunItemUncheckedUpdateManyWithoutRunBlockNestedInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -29415,6 +29575,16 @@ export namespace Prisma {
     update?: RunItemUpdateWithWhereUniqueWithoutRunBlockInput | RunItemUpdateWithWhereUniqueWithoutRunBlockInput[]
     updateMany?: RunItemUpdateManyWithWhereWithoutRunBlockInput | RunItemUpdateManyWithWhereWithoutRunBlockInput[]
     deleteMany?: RunItemScalarWhereInput | RunItemScalarWhereInput[]
+  }
+
+  export type RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput = {
+    create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
+    upsert?: RunBlockUpsertWithoutRecurrenceOfInput
+    disconnect?: RunBlockWhereInput | boolean
+    delete?: RunBlockWhereInput | boolean
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
   }
 
   export type RunBlockCreateNestedOneWithoutRunItemsInput = {
@@ -31068,7 +31238,10 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunInput = {
@@ -31085,7 +31258,10 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunInput = {
@@ -31185,6 +31361,8 @@ export namespace Prisma {
     completedAt?: DateTimeNullableFilter<"RunBlock"> | Date | string | null
     scheduleSlotId?: StringNullableFilter<"RunBlock"> | string | null
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
+    repeatWeekly?: BoolFilter<"RunBlock"> | boolean
+    recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
   }
 
   export type FlowRunCreateWithoutRunBlocksInput = {
@@ -31252,6 +31430,96 @@ export namespace Prisma {
   export type RunItemCreateManyRunBlockInputEnvelope = {
     data: RunItemCreateManyRunBlockInput | RunItemCreateManyRunBlockInput[]
     skipDuplicates?: boolean
+  }
+
+  export type RunBlockCreateWithoutSuccessorInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutSuccessorInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutSuccessorInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutSuccessorInput, RunBlockUncheckedCreateWithoutSuccessorInput>
+  }
+
+  export type RunBlockCreateWithoutRecurrenceOfInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutRecurrenceOfInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutRecurrenceOfInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
   }
 
   export type FlowRunUpsertWithoutRunBlocksInput = {
@@ -31324,6 +31592,108 @@ export namespace Prisma {
     completedBy?: StringNullableFilter<"RunItem"> | string | null
   }
 
+  export type RunBlockUpsertWithoutSuccessorInput = {
+    update: XOR<RunBlockUpdateWithoutSuccessorInput, RunBlockUncheckedUpdateWithoutSuccessorInput>
+    create: XOR<RunBlockCreateWithoutSuccessorInput, RunBlockUncheckedCreateWithoutSuccessorInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutSuccessorInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutSuccessorInput, RunBlockUncheckedUpdateWithoutSuccessorInput>
+  }
+
+  export type RunBlockUpdateWithoutSuccessorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutSuccessorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+  }
+
+  export type RunBlockUpsertWithoutRecurrenceOfInput = {
+    update: XOR<RunBlockUpdateWithoutRecurrenceOfInput, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
+    create: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutRecurrenceOfInput, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
+  }
+
+  export type RunBlockUpdateWithoutRecurrenceOfInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutRecurrenceOfInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+  }
+
   export type RunBlockCreateWithoutRunItemsInput = {
     id?: string
     blockId: string
@@ -31338,7 +31708,10 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunItemsInput = {
@@ -31356,6 +31729,9 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunItemsInput = {
@@ -31388,7 +31764,10 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunItemsInput = {
@@ -31406,6 +31785,9 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type FlowCreateWithoutDocInput = {
@@ -31972,6 +32354,8 @@ export namespace Prisma {
     completedAt?: Date | string | null
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
   }
 
   export type RunBlockUpdateWithoutRunInput = {
@@ -31988,7 +32372,10 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunInput = {
@@ -32005,7 +32392,10 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutRunInput = {
@@ -32022,6 +32412,8 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RunItemCreateManyRunBlockInput = {

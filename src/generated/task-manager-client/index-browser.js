@@ -243,7 +243,9 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   startedAt: 'startedAt',
   completedAt: 'completedAt',
   scheduleSlotId: 'scheduleSlotId',
-  cadence: 'cadence'
+  cadence: 'cadence',
+  repeatWeekly: 'repeatWeekly',
+  recurrenceOfId: 'recurrenceOfId'
 };
 
 exports.Prisma.RunItemScalarFieldEnum = {

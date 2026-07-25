@@ -46,6 +46,7 @@ const assignInputSchema = z.object({
   userIds: z.array(z.string().min(1).max(100)).max(100).default([]),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   cadence: z.enum(CADENCE_OPTIONS),
+  repeatWeekly: z.boolean().optional().default(false),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -206,6 +207,10 @@ export function assignFlowTask(
       occurrences = [{ dueAt: null, runName: body.title }];
     }
     const cadence: Cadence = CADENCE_ENUM[body.cadence];
+    // "Repeat weekly" is DAILY-only (see engine/recurrence.ts) and needs a
+    // real dueAt to anchor the weekly advance — a dateless daily task has no
+    // day to recur on, so the flag is quietly dropped there.
+    const repeatWeekly = body.repeatWeekly && cadence === "DAILY";
 
     // Pairs touch disjoint rows — no shared transaction ties them together
     // (each create was already its own implicit transaction in the donor's
@@ -236,6 +241,7 @@ export function assignFlowTask(
             startedAt: new Date(),
             dueAt: occ.dueAt,
             cadence,
+            repeatWeekly: repeatWeekly && occ.dueAt !== null,
             runItems: {
               create: block.items.map((it) => ({
                 itemId: it.id,
