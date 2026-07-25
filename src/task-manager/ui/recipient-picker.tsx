@@ -26,6 +26,51 @@ import {
 const selectClass =
   "w-full appearance-none rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-blue-500 focus:outline-none";
 
+/** The picker's search-input style — exported so other person pickers (e.g.
+ *  the drill modal's "Assign to Others") reuse the exact same look. */
+export const pickerSearchClass =
+  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none";
+
+/** "Name · Role" in one truncated span — THE person-row text format, shared
+ *  by every list this file renders and by SinglePersonPickList below. */
+export function personRowLabel(m: FlowStaffMember, showRole = true): string {
+  return showRole && m.employmentType ? `${m.name} · ${m.employmentType}` : m.name;
+}
+
+/** Single-select person list for one-shot picks (the drill modal's "Assign
+ *  to Others"): identical row styling to MemberDropdown's rows, but one
+ *  click = the pick — no checkboxes, no chips, no Done row. */
+export function SinglePersonPickList({
+  members,
+  onPick,
+  disabled = false,
+  emptyLabel,
+}: {
+  members: FlowStaffMember[];
+  onPick: (userId: string) => void;
+  disabled?: boolean;
+  emptyLabel: string;
+}) {
+  if (members.length === 0) {
+    return <p className="py-2 text-center text-xs text-gray-400">{emptyLabel}</p>;
+  }
+  return (
+    <div className="max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+      {members.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPick(m.id)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <span className="truncate">{personRowLabel(m)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function chipClass(active: boolean): string {
   return `rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
     active ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -134,10 +179,7 @@ function MemberDropdown({
                 >
                   {isSelected && <CheckIcon />}
                 </span>
-                <span className="truncate">
-                  {m.name}
-                  {showRole && m.employmentType ? ` · ${m.employmentType}` : ""}
-                </span>
+                <span className="truncate">{personRowLabel(m, showRole)}</span>
               </button>
             );
           })}
@@ -327,7 +369,7 @@ export function RecipientPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search staff by name…"
-            className="mb-2 w-full rounded-full border border-gray-300 px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            className={`mb-2 ${pickerSearchClass}`}
           />
           <MemberDropdown
             members={personResults}

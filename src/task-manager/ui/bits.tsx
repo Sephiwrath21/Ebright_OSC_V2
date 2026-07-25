@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
 import { personSolidColor } from "./palette";
+import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
 
 /** Small overlay used for a control's transient failure message — same
  *  chrome as the hand-rolled dropdown popovers in this file (bordered white
@@ -987,7 +988,10 @@ export interface ReassignControl {
 
 /** Inline person picker for "Assign to Others" — search + click ONE name
  *  (deliberately single-select, unlike the + Task RecipientPicker: one task,
- *  one new assignee). Renders under the task row inside EntityDrillModal. */
+ *  one new assignee). Built from the + Task picker's OWN exported pieces
+ *  (pickerSearchClass + SinglePersonPickList — same search input, same
+ *  "Name · Role" rows), so the two pickers share one styling source and
+ *  can't drift apart. Renders under the task row inside EntityDrillModal. */
 function ReassignPicker({
   staff,
   currentAssigneeId,
@@ -1005,8 +1009,7 @@ function ReassignPicker({
   const candidates = staff
     .filter((s) => s.id !== currentAssigneeId)
     .filter((s) => s.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .slice(0, 30);
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
@@ -1016,36 +1019,23 @@ function ReassignPicker({
           setSearch(e.target.value);
           setError(null);
         }}
-        placeholder="Search staff to assign…"
-        className="mb-1.5 w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+        placeholder="Search staff by name…"
+        className={`mb-1.5 ${pickerSearchClass}`}
       />
       {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
-      <div className="max-h-36 overflow-y-auto">
-        {candidates.length === 0 ? (
-          <p className="py-2 text-center text-xs text-gray-400">No staff match.</p>
-        ) : (
-          candidates.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError(null);
-                const r = await onPick(s.id);
-                setBusy(false);
-                if (!r.ok) setError(r.message);
-              }}
-              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-gray-700 hover:bg-white disabled:opacity-50"
-            >
-              <span className="truncate">{s.name}</span>
-              {s.employmentType && (
-                <span className="shrink-0 text-[10px] text-gray-400">{s.employmentType}</span>
-              )}
-            </button>
-          ))
-        )}
-      </div>
+      <SinglePersonPickList
+        members={candidates}
+        disabled={busy}
+        emptyLabel="No staff match that search."
+        onPick={async (userId) => {
+          setBusy(true);
+          setError(null);
+          const r = await onPick(userId);
+          setBusy(false);
+          if (!r.ok) setError(r.message);
+        }}
+      />
+      {busy && <p className="mt-1 text-xs text-gray-400">Assigning…</p>}
     </div>
   );
 }
