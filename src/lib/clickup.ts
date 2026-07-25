@@ -1,5 +1,114 @@
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
 
+// ── Department Dashboard task data shape + mock generator ────────────────────
+// A "member" is a folder/list in the department's space.
+//   member.week    = ALL their tasks (done vs pending) — the "Weekly" view
+//   member.days[i] = tasks DUE on weekday CLICKUP_DAYS[i] (a subset of week)
+//   department.week = Σ members.week
+//
+// Note: week is every task (incl. ones with no due date / due Monday), so it can
+// exceed the sum of days — "Weekly" is the full picture, each day a slice of it.
+
+export const CLICKUP_DAYS = ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+
+// done + pending + notApplicable = total.
+export type Stats = { done: number; pending: number; notApplicable: number; total: number };
+
+// Task titles split by status, so the UI can list the actual tasks.
+export type TaskList = { complete: string[]; pending: string[]; notApplicable: string[] };
+
+export type MemberWeek = {
+  id: string;
+  name: string;
+  role: string;
+  week: Stats; // all of the member's tasks
+  days: Stats[]; // indexed by CLICKUP_DAYS
+  weekTasks: TaskList; // task titles for the whole week
+  dayTasks: TaskList[]; // task titles per CLICKUP_DAYS day
+};
+
+export type DeptDataset = {
+  slug: string;
+  members: MemberWeek[];
+  week: Stats; // department overall totals (Σ members.week)
+};
+
+const ZERO_STATS: Stats = { done: 0, pending: 0, notApplicable: 0, total: 0 };
+
+export function addStats(a: Stats, b: Stats): Stats {
+  return {
+    done: a.done + b.done,
+    pending: a.pending + b.pending,
+    notApplicable: a.notApplicable + b.notApplicable,
+    total: a.total + b.total,
+  };
+}
+
+export function sumStats(list: Stats[]): Stats {
+  return list.reduce(addStats, ZERO_STATS);
+}
+
+/** Stats → donut segments (Complete / Pending / Not Applicable), matching ClickUp. */
+export function toPie(stats: Stats): { label: string; value: number; color: string }[] {
+  return [
+    { label: "Complete", value: stats.done, color: "#0F6E56" },
+    { label: "Pending", value: stats.pending, color: "#DC2626" },
+    { label: "Not Applicable", value: stats.notApplicable, color: "#EAB308" },
+  ];
+}
+
+// ── Mock generator (fallback when ClickUp isn't configured) ──────────────────
+const MOCK_MEMBERS: { id: string; name: string; role: string }[] = [
+  { id: "m1", name: "Aisyah Rahman", role: "Executive" },
+  { id: "m2", name: "Daniel Lim", role: "Senior Executive" },
+  { id: "m3", name: "Priya Nair", role: "Analyst" },
+  { id: "m4", name: "Marcus Tan", role: "Executive" },
+  { id: "m5", name: "Nur Iman", role: "Associate" },
+  { id: "m6", name: "Wei Jian", role: "Executive" },
+  { id: "m7", name: "Sara Devi", role: "Lead" },
+  { id: "m8", name: "Adrian Goh", role: "Associate" },
+];
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mockMemberDay(slug: string, id: string, dayIndex: number): Stats {
+  const base = hashStr(`${slug}:${id}:${dayIndex}`);
+  const total = 1 + (base % 5);
+  const done = (base >>> 3) % (total + 1);
+  const rest = total - done;
+  const notApplicable = rest > 2 ? 1 : 0;
+  return { done, pending: rest - notApplicable, notApplicable, total };
+}
+
+function mockNames(label: string, n: number): string[] {
+  return Array.from({ length: n }, (_, i) => `${label} ${i + 1}`);
+}
+
+export function mockDepartmentDataset(slug: string): DeptDataset {
+  const members: MemberWeek[] = MOCK_MEMBERS.map((m) => {
+    const days = CLICKUP_DAYS.map((_d, i) => mockMemberDay(slug, m.id, i));
+    const dayTasks: TaskList[] = days.map((s) => ({
+      complete: mockNames("Completed task", s.done),
+      pending: mockNames("Pending task", s.pending),
+      notApplicable: mockNames("N/A task", s.notApplicable),
+    }));
+    const weekTasks: TaskList = {
+      complete: dayTasks.flatMap((d) => d.complete),
+      pending: dayTasks.flatMap((d) => d.pending),
+      notApplicable: dayTasks.flatMap((d) => d.notApplicable),
+    };
+    return { ...m, days, week: sumStats(days), dayTasks, weekTasks };
+  });
+  return { slug, members, week: sumStats(members.map((m) => m.week)) };
+}
+
 export interface ClickUpTaskView {
   id: string;
   name: string;
