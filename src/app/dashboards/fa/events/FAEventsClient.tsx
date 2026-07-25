@@ -12,7 +12,21 @@ import {
   Key,
   ChevronRight,
   Home,
+  Loader2,
 } from "lucide-react";
+import {
+  countsAsConfirmed, countsAsAttended,
+  type FAEvent as RawEvent, type Session as RawSession,
+  type Invitation as RawInvitation, type EventBranchOverride as RawOverride,
+} from "@/lib/fa/types";
+
+interface FADataBundle {
+  events: RawEvent[];
+  sessions: RawSession[];
+  quotas: unknown[];
+  invitations: RawInvitation[];
+  overrides: RawOverride[];
+}
 
 type EventStatus = "draft" | "open" | "ongoing" | "closed" | "completed";
 
@@ -35,149 +49,72 @@ interface FAEvent {
   multiGrade?: boolean;
   invitationOpen?: string;
   invitationClose?: string;
+  /** ISO start date (YYYY-MM-DD) kept for chronological sorting — the display
+   *  `startDate` above is a human string that doesn't sort by date. */
+  isoStart: string;
 }
 
-const mockActiveEvents: FAEvent[] = [
-  {
-    id: "1",
-    name: "20-21 June Weekly Showcase",
-    startDate: "20 Jun 2026",
-    endDate: "21 Jun 2026",
-    days: 2,
-    venue: "KL Gateway",
-    status: "closed",
-    sessions: 14,
-    invited: 268,
-    confirmed: 240,
-    month: "JUN",
-    day: 20,
-    year: 2026,
-    multiGrade: true,
-    invitationOpen: "Jun 1, 2026",
-    invitationClose: "Jun 14, 2026",
-  },
-  {
-    id: "2",
-    name: "18-19 July Weekly Showcase",
-    startDate: "18 Jul 2026",
-    endDate: "19 Jul 2026",
-    days: 2,
-    venue: "Pavilion Damansara Heights",
-    status: "ongoing",
-    sessions: 14,
-    invited: 215,
-    confirmed: 180,
-    month: "JUL",
-    day: 18,
-    year: 2026,
-    multiGrade: true,
-    invitationOpen: "Jun 15, 2026",
-    invitationClose: "Jul 4, 2026",
-  },
-  {
-    id: "3",
-    name: "25-26 July Weekly Showcase",
-    startDate: "25 Jul 2026",
-    endDate: "26 Jul 2026",
-    days: 2,
-    venue: "NU Empire",
-    status: "draft",
-    sessions: 14,
-    invited: 0,
-    confirmed: 0,
-    month: "JUL",
-    day: 25,
-    year: 2026,
-  },
-];
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-const mockArchiveEvents: FAEvent[] = [
-  {
-    id: "a1",
-    name: "16-17 May Weekly Showcase",
-    startDate: "16 May 2026",
-    endDate: "17 May 2026",
-    days: 2,
-    venue: "Mid Valley",
-    status: "completed",
-    sessions: 14,
-    invited: 249,
-    confirmed: 191,
-    attended: 190,
-    month: "MAY",
-    day: 16,
-    year: 2026,
-    archiveDate: "Jun 10, 2026",
-  },
-  {
-    id: "a2",
-    name: "30-31 May Weekly Showcase",
-    startDate: "30 May 2026",
-    endDate: "31 May 2026",
-    days: 2,
-    venue: "Sunway Pyramid",
-    status: "completed",
-    sessions: 14,
-    invited: 190,
-    confirmed: 146,
-    attended: 146,
-    month: "MAY",
-    day: 30,
-    year: 2026,
-    archiveDate: "Jun 4, 2026",
-  },
-  {
-    id: "a3",
-    name: "FA MAY",
-    startDate: "16 May 2026",
-    endDate: "16 May 2026",
-    days: 1,
-    venue: "HQ",
-    status: "completed",
-    sessions: 10,
-    invited: 0,
-    confirmed: 0,
-    attended: 0,
-    month: "MAY",
-    day: 16,
-    year: 2026,
-    archiveDate: "May 16, 2026",
-  },
-  {
-    id: "a4",
-    name: "test",
-    startDate: "8 May 2026",
-    endDate: "8 May 2026",
-    days: 1,
-    venue: "HQ",
-    status: "completed",
-    sessions: 10,
-    invited: 2,
-    confirmed: 0,
-    attended: 0,
-    month: "MAY",
-    day: 8,
-    year: 2026,
-    archiveDate: "May 8, 2026",
-  },
-  {
-    id: "a5",
-    name: "Historical FA (pre-portal records)",
-    startDate: "1 Jan 2025",
-    endDate: "1 Jan 2025",
-    days: 1,
-    venue: "—",
-    status: "completed",
-    sessions: 1,
-    invited: 710,
-    confirmed: 710,
-    attended: 710,
-    month: "JAN",
-    day: 1,
-    year: 2025,
-    archiveDate: "Jan 1, 2025",
-  },
-];
+function fmtDayMonYear(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const mon = MONTHS[m - 1] ?? "";
+  return `${d} ${mon.charAt(0) + mon.slice(1).toLowerCase()} ${y}`;
+}
+
+function fmtLongDate(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const mon = MONTHS[m - 1] ?? "";
+  return `${mon.charAt(0) + mon.slice(1).toLowerCase()} ${d}, ${y}`;
+}
+
+/** Fold the raw FA data bundle into the display-oriented FAEvent rows this page
+ *  renders. Counts are derived from invitations; multiGrade from overrides. */
+function toDisplayEvents(data: FADataBundle): FAEvent[] {
+  const sessionCountByEvent = new Map<string, number>();
+  for (const s of data.sessions) {
+    sessionCountByEvent.set(s.eventId, (sessionCountByEvent.get(s.eventId) ?? 0) + 1);
+  }
+  const overrideEventIds = new Set(data.overrides.map((o) => o.eventId));
+  const invByEvent = new Map<string, RawInvitation[]>();
+  for (const inv of data.invitations) {
+    const arr = invByEvent.get(inv.eventId) ?? [];
+    arr.push(inv);
+    invByEvent.set(inv.eventId, arr);
+  }
+
+  return data.events.map((e) => {
+    const invs = invByEvent.get(e.id) ?? [];
+    const invited = invs.length;
+    const confirmed = invs.filter((i) => countsAsConfirmed(i.status)).length;
+    const attended = invs.filter((i) => countsAsAttended(i.status)).length;
+    const [sy, sm, sd] = e.startDate.split("-").map(Number);
+    return {
+      id: e.id,
+      name: e.name,
+      startDate: fmtDayMonYear(e.startDate),
+      endDate: fmtDayMonYear(e.endDate),
+      days: e.numberOfDays,
+      venue: e.venue,
+      status: e.status,
+      sessions: sessionCountByEvent.get(e.id) ?? 0,
+      invited,
+      confirmed,
+      attended,
+      isoStart: e.startDate,
+      month: MONTHS[(sm ?? e.month) - 1] ?? "",
+      day: sd || 1,
+      year: sy || e.year,
+      archiveDate: e.status === "completed" ? fmtLongDate(e.endDate) : undefined,
+      multiGrade: overrideEventIds.has(e.id),
+      invitationOpen: fmtLongDate(e.invitationOpenDate),
+      invitationClose: fmtLongDate(e.invitationCloseDate),
+    };
+  });
+}
 
 const STATUS_FILTERS: { label: string; value: EventStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -514,12 +451,43 @@ export default function FAEventsClient() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatus | "all">("all");
 
+  const [allEvents, setAllEvents] = useState<FAEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/fa/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load events (${res.status})`);
+        const data = (await res.json()) as FADataBundle;
+        if (alive) setAllEvents(toDisplayEvents(data));
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load events");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Match v1 (marketing/page.tsx): upcoming (non-completed) sorted by start
+  // date ASCENDING so the nearest event is the hero; archive (completed)
+  // sorted DESCENDING (most recent first).
+  const activeEvents = allEvents
+    .filter((e) => e.status !== "completed")
+    .sort((a, b) => a.isoStart.localeCompare(b.isoStart));
+  const archiveEvents = allEvents
+    .filter((e) => e.status === "completed")
+    .sort((a, b) => b.isoStart.localeCompare(a.isoStart));
+
   const q = search.toLowerCase();
 
   const matchesSearch = (e: FAEvent) =>
     !search || e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q);
 
-  const filteredActive = mockActiveEvents.filter((e) => {
+  const filteredActive = activeEvents.filter((e) => {
     if (!matchesSearch(e)) return false;
     if (statusFilter === "completed") return false;
     if (statusFilter === "all") return true;
@@ -529,15 +497,15 @@ export default function FAEventsClient() {
   // Archive always shows completed; if filter is set to a non-completed status, hide archive
   const showArchive = statusFilter === "all" || statusFilter === "completed";
   const filteredArchive = showArchive
-    ? mockArchiveEvents.filter(matchesSearch)
+    ? archiveEvents.filter(matchesSearch)
     : [];
 
-  const multiGradeCount = mockActiveEvents.filter((e) => e.multiGrade).length;
+  const multiGradeCount = activeEvents.filter((e) => e.multiGrade).length;
   const [nextEvent, ...upcoming] = filteredActive;
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-0">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -567,7 +535,7 @@ export default function FAEventsClient() {
 
       {/* Sticky search + filters bar */}
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -613,9 +581,20 @@ export default function FAEventsClient() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
+        {loading && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center mb-6">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+            <p className="text-sm text-slate-500">Loading events…</p>
+          </div>
+        )}
+        {error && !loading && (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center mb-6">
+            <p className="text-sm font-medium text-red-600">{error}</p>
+          </div>
+        )}
         {/* Active events list */}
-        {statusFilter !== "completed" && (
+        {!loading && !error && statusFilter !== "completed" && (
           <>
             {filteredActive.length === 0 && statusFilter !== "all" ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
@@ -665,7 +644,7 @@ export default function FAEventsClient() {
         )}
 
         {/* Empty state when completed filter + no archive results */}
-        {statusFilter === "completed" && filteredArchive.length === 0 && (
+        {!loading && !error && statusFilter === "completed" && filteredArchive.length === 0 && (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
             <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />
             <p className="text-sm font-medium text-slate-500">No completed events match your search.</p>

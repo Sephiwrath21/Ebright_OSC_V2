@@ -12,3 +12,4 @@ node_modules
 npm-debug.log
 *.md
 !README.md
+src/generated

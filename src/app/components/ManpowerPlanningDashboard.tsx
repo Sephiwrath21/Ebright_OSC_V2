@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   CalendarCog,
   Archive,
+  Settings,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -60,12 +61,21 @@ const modules: SubModule[] = [
     accent: "bg-sky-600",
     accentHover: "group-hover:bg-sky-700",
   },
+  {
+    id: "settings",
+    title: "Schedule Settings",
+    description: "Manage branch active days, customize time slots, and setup duty seats",
+    href: "/manpower-schedule/settings",
+    Icon: Settings,
+    accent: "bg-slate-700",
+    accentHover: "group-hover:bg-slate-800",
+  },
 ];
 
 export default function ManpowerPlanningDashboard() {
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link
             href="/home"
@@ -85,16 +95,9 @@ export default function ManpowerPlanningDashboard() {
           <span className="text-slate-900 font-medium">Manpower Planning</span>
         </nav>
 
-        <header className="mb-5">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-600 mb-1.5">
-            Manpower
-          </p>
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-            Manpower Planning
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-            Plan upcoming weeks, adjust live schedules, and review past rosters.
-          </p>
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Manpower Planning</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Plan upcoming weeks, adjust live schedules, and review past rosters.</p>
         </header>
 
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

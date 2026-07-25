@@ -51,14 +51,16 @@ model bank_details {
 }
 
 model branch {
-  branch_id          Int                 @id @default(autoincrement())
-  branch_name        String              @db.VarChar(100)
-  location           String?             @db.VarChar(255)
-  branch_code        String?             @unique @db.VarChar(10)
-  region             String?             @db.VarChar(10)
-  devices            devices[]
-  employment         employment[]
-  manpower_schedules manpower_schedule[]
+  branch_id              Int                      @id @default(autoincrement())
+  branch_name            String                   @db.VarChar(100)
+  location               String?                  @db.VarChar(255)
+  branch_code            String?                  @unique @db.VarChar(10)
+  region                 String?                  @db.VarChar(10)
+  branch_duty_position   branch_duty_position[]
+  branch_operating_day   branch_operating_day[]
+  devices                devices[]
+  employment             employment[]
+  schedule_period_status schedule_period_status[]
 }
 
 model department {
@@ -103,15 +105,7 @@ model employment {
   status             String?                       @default("active") @db.VarChar(50)
   probation          Boolean                       @default(false)
   rate               String?                       @db.VarChar(100)
-  // Re-added 2026-05-07 after a prior schema-vs-DB drift caused `prisma db push`
-  // to drop this column with 9 rows of data. Type set to VarChar(50) to match
-  // the surrounding `rate` convention; if old values were stored differently,
-  // change the type here and re-push.
   working_hours      String?                       @db.VarChar(50)
-  // Weekly schedule { Sun..Sat: { start: "HH:MM", end: "HH:MM" } | null }.
-  // Synced from HRFS BranchStaff.workingHours via /api/admin/sync-from-branchstaff;
-  // edited via /attendance/working-hours which also writes a dated version row
-  // into employment_schedule_version so past weeks aren't re-judged.
   working_hours_json Json?
   branch             branch?                       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
   department         department?                   @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
@@ -119,8 +113,6 @@ model employment {
   schedule_versions  employment_schedule_version[]
 }
 
-// Versioned working-hours snapshots — every "Save" on the editor inserts a row.
-// Resolver picks the row with the GREATEST effective_from <= the date being judged.
 model employment_schedule_version {
   id             Int        @id @default(autoincrement())
   employment_id  Int
@@ -134,10 +126,6 @@ model employment_schedule_version {
   @@map("employment_schedule_version")
 }
 
-// Justification entered by HR for a No-Record day. Unique per (user, date) so
-// at most one justification can exist for a given day. When a row exists, the
-// Summary excludes the staff from "Missing" and the Report shows the reason
-// chip instead of the red No-Record badge.
 model attendance_justification {
   id              Int      @id @default(autoincrement())
   user_id         Int
@@ -147,9 +135,8 @@ model attendance_justification {
   justified_by    Int
   justified_at    DateTime @default(now()) @db.Timestamptz(6)
   updated_at      DateTime @default(now()) @db.Timestamptz(6)
-
-  user      users @relation("justification_for_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_just_user")
-  justifier users @relation("justification_by", fields: [justified_by], references: [user_id], onUpdate: NoAction, map: "fk_just_by")
+  justifier       users    @relation("justification_by", fields: [justified_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_just_by")
+  user            users    @relation("justification_for_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_just_user")
 
   @@unique([user_id, date], map: "uq_attendance_justification_user_date")
   @@index([date], map: "idx_just_date")
@@ -191,17 +178,18 @@ model role {
 }
 
 model user_profile {
-  profile_id   Int       @id @default(autoincrement())
-  user_id      Int       @unique
-  full_name    String    @db.VarChar(255)
-  nick_name    String?   @db.VarChar(255)
-  gender       String?   @db.VarChar(20)
-  dob          DateTime? @db.Date
-  phone        String?   @db.VarChar(30)
-  nationality  String?   @db.VarChar(100)
-  nric         String?   @unique @db.VarChar(30)
-  home_address String?
-  users        users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profile_user")
+  profile_id        Int                 @id @default(autoincrement())
+  user_id           Int                 @unique
+  full_name         String              @db.VarChar(255)
+  nick_name         String?             @db.VarChar(255)
+  gender            String?             @db.VarChar(20)
+  dob               DateTime?           @db.Date
+  phone             String?             @db.VarChar(30)
+  nationality       String?             @db.VarChar(100)
+  nric              String?             @unique @db.VarChar(30)
+  home_address      String?
+  manpower_schedule manpower_schedule[]
+  users             users               @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profile_user")
 }
 
 model users {
@@ -215,37 +203,38 @@ model users {
   updated_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
   deleted_at                                     DateTime?                    @db.Timestamptz(6)
   attendance                                     attendance[]
+  attendance_justifications_authored             attendance_justification[]   @relation("justification_by")
+  attendance_justifications_for_user             attendance_justification[]   @relation("justification_for_user")
   attendance_log                                 attendance_log[]
   bank_details                                   bank_details?
   claim                                          claim[]
   emergency_contact                              emergency_contact[]
+  employee_rate_history                          employee_rate_history[]
   employment                                     employment[]
-  leave_request_leave_request_approved_byTousers leave_request[]              @relation("leave_request_approved_byTousers")
-  leave_request_leave_request_user_idTousers     leave_request[]              @relation("leave_request_user_idTousers")
-  user_profile                                   user_profile?
-  induction_profile                              induction_profile?           @relation("inductionProfile")
   induction_buddy_for                            induction_profile[]          @relation("inductionBuddy")
   induction_created                              induction_profile[]          @relation("inductionCreatedBy")
-  induction_responsible                          induction_step[]             @relation("inductionResponsible")
-  induction_completed                            induction_step[]             @relation("inductionCompletedBy")
-  induction_request_user                         induction_request[]          @relation("induction_request_user")
+  induction_profile                              induction_profile?           @relation("inductionProfile")
   induction_request_triggered_by                 induction_request[]          @relation("induction_request_triggered_by")
-  assigned_recommendations                       recommendation[]             @relation("recommendation_assigned_to")
-  manpower_schedules                             manpower_schedule[]
-  offboarding_case_user                          offboarding_case[]           @relation("OffboardingCaseUser")
-  offboarding_case_supervisor                    offboarding_case[]           @relation("OffboardingCaseSupervisor")
+  induction_request_user                         induction_request?           @relation("induction_request_user")
+  induction_completed                            induction_step[]             @relation("inductionCompletedBy")
+  induction_responsible                          induction_step[]             @relation("inductionResponsible")
+  leave_request_leave_request_approved_byTousers leave_request[]              @relation("leave_request_approved_byTousers")
+  leave_request_leave_request_user_idTousers     leave_request[]              @relation("leave_request_user_idTousers")
+  manpower_cost_report                           manpower_cost_report[]
+  offboarding_audit_actor                        offboarding_audit_log[]
+  offboarding_case_assigned_hr                   offboarding_case[]           @relation("OffboardingCaseAssignedHR")
   offboarding_case_created                       offboarding_case[]           @relation("OffboardingCaseCreatedBy")
   offboarding_case_finance_processed             offboarding_case[]           @relation("OffboardingCaseFinanceProcessor")
-  offboarding_case_assigned_hr                   offboarding_case[]           @relation("OffboardingCaseAssignedHR")
+  offboarding_case_supervisor                    offboarding_case[]           @relation("OffboardingCaseSupervisor")
+  offboarding_case_user                          offboarding_case[]           @relation("OffboardingCaseUser")
   offboarding_checklist_completed                offboarding_checklist_item[]
-  offboarding_audit_actor                        offboarding_audit_log[]
-  workflow_templates_created                     workflow_template[]          @relation("WorkflowTemplateCreatedBy")
-  workflow_assignments_user                      workflow_assignment[]        @relation("WorkflowAssignmentUser")
-  workflow_assignments_by                        workflow_assignment[]        @relation("WorkflowAssignmentAssignedBy")
-  workflow_assignment_steps_completed            workflow_assignment_step[]
-  attendance_justifications_for_user             attendance_justification[]   @relation("justification_for_user")
-  attendance_justifications_authored             attendance_justification[]   @relation("justification_by")
+  assigned_recommendations                       recommendation[]             @relation("recommendation_assigned_to")
+  user_profile                                   user_profile?
   role                                           role                         @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_role")
+  workflow_assignments_by                        workflow_assignment[]        @relation("WorkflowAssignmentAssignedBy")
+  workflow_assignments_user                      workflow_assignment[]        @relation("WorkflowAssignmentUser")
+  workflow_assignment_steps_completed            workflow_assignment_step[]
+  workflow_templates_created                     workflow_template[]          @relation("WorkflowTemplateCreatedBy")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -270,46 +259,30 @@ model claim {
 }
 
 model induction_profile {
-  id                     Int       @id @default(autoincrement())
-  user_id                Int       @unique
-  induction_type         String    @default("Onboarding") @db.VarChar(20)
-  workflow_template      String    @default("Standard") @db.VarChar(50)
+  id                     Int                    @id @default(autoincrement())
+  user_id                Int                    @unique
+  induction_type         String                 @default("Onboarding") @db.VarChar(20)
+  workflow_template      String                 @default("Standard") @db.VarChar(50)
   buddy_user_id          Int?
-  link_token             String    @unique @db.VarChar(128)
-  link_expires_at        DateTime  @db.Timestamptz(6)
-  status                 String    @default("Created") @db.VarChar(20)
-  start_date             DateTime  @db.Date
-  exit_date              DateTime? @db.Date
-  // How many days HR assigns this induction to last. Used for the dashboard
-  // "expected end" calculation. NULL = fall back to the template default
-  // (Coach Part-timer ≈ 21, all other paths ≈ 3).
-  target_duration_days   Int?
-  // Date on which the onboarding "welcome + credentials" email should go
-  // out to the candidate. Defaults to start_date in the Add Employee
-  // form but HR can pick an earlier/later date. NULL = no email scheduled
-  // (older rows or HR opted out).
-  send_email_on          DateTime? @db.Date
-  // Stamped by the cron job (/api/jobs/send-onboarding-emails) the first
-  // time it successfully dispatches the email. Used as the idempotency
-  // guard so the cron never sends twice.
-  email_sent_at          DateTime? @db.Timestamptz(6)
-  // Plaintext temp password held only between save-employee time and
-  // when the cron job dispatches the welcome email — the same value
-  // HR sees in the credential overlay. Cleared (set to NULL) by the
-  // cron the moment it sends, so the plaintext lives at most until
-  // send_email_on + a cron tick. NULL once email_sent_at is set.
-  pending_email_password String?   @db.VarChar(255)
+  link_token             String                 @unique @db.VarChar(128)
+  link_expires_at        DateTime               @db.Timestamptz(6)
+  status                 String                 @default("Created") @db.VarChar(20)
+  start_date             DateTime               @db.Date
+  exit_date              DateTime?              @db.Date
   created_by             Int
-  completed_at           DateTime? @db.Timestamptz(6)
-  created_at             DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime  @updatedAt @db.Timestamptz(6)
-
-  user                  users                  @relation("inductionProfile", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_profile_user")
-  buddy                 users?                 @relation("inductionBuddy", fields: [buddy_user_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_induction_profile_buddy")
-  creator               users                  @relation("inductionCreatedBy", fields: [created_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_induction_profile_creator")
-  steps                 induction_step[]
-  onboarding_candidates onboarding_candidate[]
-  survey_responses      survey_response[]      @relation("survey_responses")
+  completed_at           DateTime?              @db.Timestamptz(6)
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @updatedAt @db.Timestamptz(6)
+  target_duration_days   Int?
+  send_email_on          DateTime?              @db.Date
+  email_sent_at          DateTime?              @db.Timestamptz(6)
+  pending_email_password String?                @db.VarChar(255)
+  buddy                  users?                 @relation("inductionBuddy", fields: [buddy_user_id], references: [user_id], onUpdate: NoAction, map: "fk_induction_profile_buddy")
+  creator                users                  @relation("inductionCreatedBy", fields: [created_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_induction_profile_creator")
+  user                   users                  @relation("inductionProfile", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_profile_user")
+  steps                  induction_step[]
+  onboarding_candidates  onboarding_candidate[]
+  survey_responses       survey_response[]      @relation("survey_responses")
 
   @@index([link_token], map: "idx_induction_profile_token")
   @@index([created_by], map: "idx_induction_profile_creator")
@@ -318,25 +291,24 @@ model induction_profile {
 }
 
 model induction_step {
-  id                   Int       @id @default(autoincrement())
+  id                   Int               @id @default(autoincrement())
   induction_profile_id Int
   step_number          Int
-  title                String    @db.VarChar(200)
+  title                String            @db.VarChar(200)
   description          String?
   responsible_user_id  Int?
-  due_date             DateTime  @db.Date
-  status               String    @default("Pending") @db.VarChar(20)
-  completed_at         DateTime? @db.Timestamptz(6)
+  due_date             DateTime          @db.Date
+  status               String            @default("Pending") @db.VarChar(20)
+  completed_at         DateTime?         @db.Timestamptz(6)
   completed_by         Int?
   notes                String?
-  evidence_file_id     String?   @db.VarChar(128)
-  evidence_uploaded_at DateTime? @db.Timestamptz(6)
-  created_at           DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
-
-  induction_profile  induction_profile @relation(fields: [induction_profile_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_step_profile")
-  responsible_person users?            @relation("inductionResponsible", fields: [responsible_user_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_induction_step_responsible")
-  completed_by_user  users?            @relation("inductionCompletedBy", fields: [completed_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_induction_step_completer")
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime          @updatedAt @db.Timestamptz(6)
+  evidence_file_id     String?           @db.VarChar(128)
+  evidence_uploaded_at DateTime?         @db.Timestamptz(6)
+  completed_by_user    users?            @relation("inductionCompletedBy", fields: [completed_by], references: [user_id], onUpdate: NoAction, map: "fk_induction_step_completer")
+  induction_profile    induction_profile @relation(fields: [induction_profile_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_step_profile")
+  responsible_person   users?            @relation("inductionResponsible", fields: [responsible_user_id], references: [user_id], onUpdate: NoAction, map: "fk_induction_step_responsible")
 
   @@unique([induction_profile_id, step_number], map: "uq_induction_step_profile_number")
   @@index([induction_profile_id], map: "idx_induction_step_profile")
@@ -344,27 +316,17 @@ model induction_step {
   @@index([status], map: "idx_induction_step_status")
 }
 
-// Department / branch-level mini-workflow attached to a parent step in a
-// workflow template (e.g. "Department Training" on Standard.15, "3-Week Branch
-// Training" on CoachPartTimer.15). Defined once per template; shared across
-// every inductee on that template.
 model induction_substep_template {
-  id                 Int      @id @default(autoincrement())
-  template_key       String   @db.VarChar(50)
+  id                 Int         @id @default(autoincrement())
+  template_key       String      @db.VarChar(50)
   parent_step_number Int
-  // Department-scoped sub-tasks. NULL = global (legacy / applies to anyone
-  // on this template). When set, only inductees whose employment.department_id
-  // matches will see this sub-task in their auto-generated sub-workflow.
-  department_id      Int?
-  title              String   @db.VarChar(200)
+  title              String      @db.VarChar(200)
   description        String?
-  // What the employee must submit to complete this sub-task.
-  // One of: photo | video | screenshot | document | text | none.
-  evidence_type      String   @default("photo") @db.VarChar(20)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @updatedAt @db.Timestamptz(6)
-
-  department department? @relation(fields: [department_id], references: [department_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_substep_template_department")
+  created_at         DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime    @updatedAt @db.Timestamptz(6)
+  evidence_type      String      @default("photo") @db.VarChar(20)
+  department_id      Int?
+  department         department? @relation(fields: [department_id], references: [department_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_substep_template_department")
 
   @@index([template_key, parent_step_number], map: "idx_induction_substep_template_parent")
   @@index([department_id], map: "idx_induction_substep_template_department")
@@ -372,7 +334,7 @@ model induction_substep_template {
 
 model induction_request {
   id                   Int       @id @default(autoincrement())
-  user_id              Int
+  user_id              Int       @unique(map: "uq_induction_request_user_active", where: raw("((status)::text <> 'completed'::text)"))
   triggered_by_id      Int
   status               String    @default("pending") @db.VarChar(50)
   triggered_at         DateTime  @default(now()) @db.Timestamptz(6)
@@ -380,11 +342,9 @@ model induction_request {
   induction_profile_id Int?
   created_at           DateTime  @default(now()) @db.Timestamptz(6)
   updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  triggered_by         users     @relation("induction_request_triggered_by", fields: [triggered_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_induction_request_triggered_by")
+  user                 users     @relation("induction_request_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_request_user")
 
-  user         users @relation("induction_request_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_induction_request_user")
-  triggered_by users @relation("induction_request_triggered_by", fields: [triggered_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_induction_request_triggered_by")
-
-  @@unique([user_id], map: "uq_induction_request_user_active", where: raw("status <> 'completed'"))
   @@index([status], map: "idx_induction_request_status")
   @@index([triggered_by_id], map: "idx_induction_request_triggered_by")
   @@index([created_at], map: "idx_induction_request_created_at")
@@ -402,7 +362,7 @@ model onboarding_candidate {
   synced_at            DateTime           @default(now()) @db.Timestamptz(6)
   updated_at           DateTime           @updatedAt @db.Timestamptz(6)
   induction_profile_id Int?
-  induction_profile    induction_profile? @relation(fields: [induction_profile_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_onboarding_candidate_profile")
+  induction_profile    induction_profile? @relation(fields: [induction_profile_id], references: [id], onUpdate: NoAction, map: "fk_onboarding_candidate_profile")
 
   @@index([candidate_type], map: "idx_onboarding_candidate_type")
   @@index([synced_at], map: "idx_onboarding_candidate_synced_at")
@@ -457,8 +417,8 @@ model recommendation {
   impact_after     Float?
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
   updated_at       DateTime     @updatedAt @db.Timestamptz(6)
-  assigned_user    users?       @relation("recommendation_assigned_to", fields: [assigned_to], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_recommendation_assigned_to")
   impact_logs      impact_log[]
+  assigned_user    users?       @relation("recommendation_assigned_to", fields: [assigned_to], references: [user_id], onUpdate: NoAction, map: "fk_recommendation_assigned_to")
 
   @@index([status], map: "idx_recommendation_status")
 }
@@ -506,100 +466,72 @@ model annual_leave_record {
 }
 
 model manpower_schedule {
-  manpower_id         Int      @id @default(autoincrement())
-  branch_id           Int
-  user_id             Int
-  start_date          DateTime @db.Date
-  end_date            DateTime @db.Date
-  selections          Json     @default("{}")
-  notes               Json     @default("{}")
-  original_selections Json     @default("{}")
-  original_notes      Json     @default("{}")
-  status              String   @default("Finalized") @db.VarChar(50)
-  submitted_at        DateTime @default(now()) @db.Timestamptz(6)
-  branch              branch   @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_manpower_schedule_branch")
-  users               users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_manpower_schedule_user")
+  mp_schedule_id       Int                  @id @default(autoincrement())
+  date                 DateTime             @db.Date
+  slot_id              Int
+  position_id          Int
+  profile_id           Int
+  schedule_type        String               @default("planning") @db.VarChar(10)
+  updated_at           DateTime             @default(now()) @updatedAt @db.Timestamp(6)
+  branch_duty_position branch_duty_position @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_position")
+  user_profile         user_profile         @relation(fields: [profile_id], references: [profile_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_profile")
+  slot                 slot                 @relation(fields: [slot_id], references: [slot_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_slot")
 
-  @@unique([branch_id, start_date], map: "uq_manpower_schedule_branch_week")
-  @@index([branch_id, start_date(sort: Desc)], map: "idx_manpower_schedule_branch_date")
-  @@index([status], map: "idx_manpower_schedule_status")
+  @@unique([date, slot_id, position_id, schedule_type], map: "uq_mps_date_slot_position_type")
+  @@index([date], map: "idx_mps_date")
+  @@index([profile_id], map: "idx_mps_profile")
+  @@index([schedule_type], map: "idx_mps_schedule_type")
 }
 
-// ============================================================
-// OFFBOARDING — standalone module added 2026-05-27
-//
-// One row per offboarding case. Separate from induction_profile (which
-// piggybacks on the same table for the old offboarding-as-induction flow)
-// so the 5-stage workflow + audit trail + finance fields have a clean
-// home. Old induction_profile-with-type-Offboarding rows remain readable
-// in legacy views but are not used by the new flow.
-//
-// Spec stages:
-//   Trigger → HR Review → Exit Interview → Checklist → Sign-off & Done
-// ============================================================
+model schedule_period_status {
+  schedule_period_status_id Int       @id @default(autoincrement())
+  branch_id                 Int
+  period_start              DateTime  @db.Date
+  period_end                DateTime  @db.Date
+  status                    String    @default("draft") @db.VarChar(20)
+  archived_at               DateTime? @db.Timestamp(6)
+  branch                    branch    @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sps_branch")
+
+  @@unique([branch_id, period_start, period_end], map: "uq_sps_branch_period")
+}
 
 model offboarding_case {
-  id            Int    @id @default(autoincrement())
-  user_id       Int
-  case_type     String @db.VarChar(20)
-  // "Resign" | "ContractEnded"
-  status        String @default("Pending") @db.VarChar(20)
-  // "Pending" | "InProgress" | "Completed"
-  current_stage String @default("Trigger") @db.VarChar(30)
-  // "Trigger" | "HRReview" | "ExitInterview" | "Checklist" | "SignOff" | "Done"
-
-  // Stage 1 — HR Review
-  last_working_day        DateTime? @db.Date
-  exit_interview_date     DateTime? @db.Date
-  exit_interview_time     String?   @db.VarChar(20)
-  exit_interview_location String?   @db.VarChar(200)
-
-  // Stage 2 — Exit Interview
-  exit_interview_completed_at DateTime? @db.Timestamptz(6)
+  id                          Int                          @id @default(autoincrement())
+  user_id                     Int
+  case_type                   String                       @db.VarChar(20)
+  status                      String                       @default("Pending") @db.VarChar(20)
+  current_stage               String                       @default("Trigger") @db.VarChar(30)
+  last_working_day            DateTime?                    @db.Date
+  exit_interview_date         DateTime?                    @db.Date
+  exit_interview_time         String?                      @db.VarChar(20)
+  exit_interview_location     String?                      @db.VarChar(200)
+  exit_interview_completed_at DateTime?                    @db.Timestamptz(6)
   exit_interview_notes        String?
   exit_interview_outcome      String?
-
-  // Trigger — Contract Ended path
-  supervisor_decision    String?   @db.VarChar(20)
-  // null | "Continue" | "End"
-  supervisor_decision_at DateTime? @db.Timestamptz(6)
-
-  // Trigger — Resign path
-  resignation_letter_file_id String?   @db.VarChar(128)
-  resigned_at                DateTime? @db.Timestamptz(6)
-
-  // Stage 4 — Supervisor Sign-off
-  // supervisor_user_id is resolved at case creation:
-  //   HQ staff → their department's HOD
-  //   Branch staff → their branch's BM
-  supervisor_user_id        Int?
-  supervisor_signoff_status String?   @db.VarChar(20)
-  // null | "Pending" | "Approved" | "FlaggedIssue"
-  supervisor_signoff_at     DateTime? @db.Timestamptz(6)
-  supervisor_remarks        String?
-
-  // Stage 5 — Finance
-  finance_remarks         String?
-  final_pay_breakdown     Json?
-  // Structured payload: { proRated, outstandingPettyCash, deductions, total }
-  finance_processed_at    DateTime? @db.Timestamptz(6)
-  finance_processed_by_id Int?
-
-  created_by_id  Int
-  // Assignment (amendment): the HR officer handling this case. The supervisor
-  // assignment reuses the existing supervisor_user_id column above.
-  assigned_hr_id Int?
-  created_at     DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime  @updatedAt @db.Timestamptz(6)
-  completed_at   DateTime? @db.Timestamptz(6)
-
-  user                 users                        @relation("OffboardingCaseUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offboarding_case_user")
-  supervisor           users?                       @relation("OffboardingCaseSupervisor", fields: [supervisor_user_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offboarding_case_supervisor")
-  created_by           users                        @relation("OffboardingCaseCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_offboarding_case_creator")
-  finance_processed_by users?                       @relation("OffboardingCaseFinanceProcessor", fields: [finance_processed_by_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offboarding_case_finance")
-  assigned_hr          users?                       @relation("OffboardingCaseAssignedHR", fields: [assigned_hr_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offboarding_case_assigned_hr")
-  checklist_items      offboarding_checklist_item[]
-  audit_log            offboarding_audit_log[]
+  supervisor_decision         String?                      @db.VarChar(20)
+  supervisor_decision_at      DateTime?                    @db.Timestamptz(6)
+  resignation_letter_file_id  String?                      @db.VarChar(128)
+  resigned_at                 DateTime?                    @db.Timestamptz(6)
+  supervisor_user_id          Int?
+  supervisor_signoff_status   String?                      @db.VarChar(20)
+  supervisor_signoff_at       DateTime?                    @db.Timestamptz(6)
+  supervisor_remarks          String?
+  finance_remarks             String?
+  final_pay_breakdown         Json?
+  finance_processed_at        DateTime?                    @db.Timestamptz(6)
+  finance_processed_by_id     Int?
+  created_by_id               Int
+  created_at                  DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                     @default(now()) @updatedAt @db.Timestamptz(6)
+  completed_at                DateTime?                    @db.Timestamptz(6)
+  assigned_hr_id              Int?
+  audit_log                   offboarding_audit_log[]
+  assigned_hr                 users?                       @relation("OffboardingCaseAssignedHR", fields: [assigned_hr_id], references: [user_id], onUpdate: NoAction, map: "fk_offboarding_case_assigned_hr")
+  created_by                  users                        @relation("OffboardingCaseCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_offboarding_case_creator")
+  finance_processed_by        users?                       @relation("OffboardingCaseFinanceProcessor", fields: [finance_processed_by_id], references: [user_id], onUpdate: NoAction, map: "fk_offboarding_case_finance")
+  supervisor                  users?                       @relation("OffboardingCaseSupervisor", fields: [supervisor_user_id], references: [user_id], onUpdate: NoAction, map: "fk_offboarding_case_supervisor")
+  user                        users                        @relation("OffboardingCaseUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offboarding_case_user")
+  checklist_items             offboarding_checklist_item[]
 
   @@index([user_id], map: "idx_offboarding_case_user")
   @@index([status], map: "idx_offboarding_case_status")
@@ -607,99 +539,56 @@ model offboarding_case {
   @@index([last_working_day], map: "idx_offboarding_case_last_day")
 }
 
-// Five items seeded per case (one row each):
-//   portal_deactivate, whatsapp_remove, browser_clear,
-//   equipment_return, petty_cash
 model offboarding_checklist_item {
-  id              Int       @id @default(autoincrement())
+  id              Int              @id @default(autoincrement())
   case_id         Int
-  item_key        String    @db.VarChar(50)
-  title           String    @db.VarChar(200)
-  actor_role      String    @db.VarChar(50)
-  // "HR" | "IT" | "Supervisor" | "Candidate"
-  status          String    @default("Pending") @db.VarChar(20)
-  // "Pending" | "Done"
-  completed_at    DateTime? @db.Timestamptz(6)
+  item_key        String           @db.VarChar(50)
+  title           String           @db.VarChar(200)
+  actor_role      String           @db.VarChar(50)
+  status          String           @default("Pending") @db.VarChar(20)
+  completed_at    DateTime?        @db.Timestamptz(6)
   completed_by_id Int?
   notes           String?
-  // Only populated for the petty_cash item — links to the candidate's
-  // settlement claim in the Claims module. Read-only display in the
-  // checklist; status mirrors the claim's status.
   linked_claim_id Int?
-
-  case         offboarding_case @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offb_checklist_case")
-  completed_by users?           @relation(fields: [completed_by_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offb_checklist_user")
+  case            offboarding_case @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offb_checklist_case")
+  completed_by    users?           @relation(fields: [completed_by_id], references: [user_id], onUpdate: NoAction, map: "fk_offb_checklist_user")
 
   @@unique([case_id, item_key], map: "uq_offb_checklist_case_item")
   @@index([case_id], map: "idx_offb_checklist_case")
 }
 
-// Full audit trail per case. One row per discrete event. Never updated;
-// only inserted. Sort by created_at to replay the case history.
 model offboarding_audit_log {
-  id         Int      @id @default(autoincrement())
+  id         Int              @id @default(autoincrement())
   case_id    Int
   actor_id   Int?
-  // null = system event (e.g. account deactivation, scheduled email sent)
-  action     String   @db.VarChar(50)
-  // "CaseCreated" | "StageAdvanced" | "ChecklistItemCompleted" |
-  // "EmailSent" | "SupervisorDecision" | "SupervisorSignOff" |
-  // "FinanceProcessed" | "AccountDeactivated"
-  stage      String?  @db.VarChar(30)
+  action     String           @db.VarChar(50)
+  stage      String?          @db.VarChar(30)
   details    Json?
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  case  offboarding_case @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offb_audit_case")
-  actor users?           @relation(fields: [actor_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_offb_audit_actor")
+  created_at DateTime         @default(now()) @db.Timestamptz(6)
+  actor      users?           @relation(fields: [actor_id], references: [user_id], onUpdate: NoAction, map: "fk_offb_audit_actor")
+  case       offboarding_case @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offb_audit_case")
 
   @@index([case_id], map: "idx_offb_audit_case")
   @@index([created_at], map: "idx_offb_audit_at")
 }
 
-// ============================================================
-// WORKFLOW CENTER — DB-backed (replaces lib/workflow-mock-data.ts)
-// Added 2026-05-28 for Workflow Center PR1.
-//
-// Design:
-//   - workflow_template          → the workflow definition
-//   - workflow_step              → steps belonging to a workflow
-//   - workflow_assignment        → assignment of a workflow to a candidate
-//   - workflow_assignment_step   → per-step completion for an assignment
-//
-// HOD scoping: workflow_template.department_id determines who can see
-// and edit it. Superadmin + admin see all; HOD sees only their dept.
-//
-// Category drives auto-assignment (PR2): "Onboarding" workflows are
-// auto-assigned to candidates after Day 3 if their employee type
-// supports it. "Offboarding" workflows attach to offboarding cases.
-// "Other" / custom categories live in the Center but never auto-trigger.
-// ============================================================
-
 model workflow_template {
-  id            Int       @id @default(autoincrement())
-  name          String    @db.VarChar(200)
+  id            Int                   @id @default(autoincrement())
+  name          String                @db.VarChar(200)
   department_id Int
-  // Category drives auto-assignment behavior.
-  //   "Onboarding"  → auto-assigned after Day 3 (PR2)
-  //   "Offboarding" → linked to offboarding cases (PR2)
-  //   "Other" or custom → lives in Center, no auto-trigger
-  category      String    @db.VarChar(50)
-  status        String    @default("draft") @db.VarChar(20)
-  // "draft" | "active" | "archived"
-  trigger       String    @default("after-day-3") @db.VarChar(40)
-  // "after-day-3" | "after-branch" | "manual"
+  category      String                @db.VarChar(50)
+  status        String                @default("draft") @db.VarChar(20)
+  trigger       String                @default("after-day-3") @db.VarChar(40)
   applies_to    Json
-  // Array of employee type labels: ["Regular Intern", "Coach (Part-timer)", ...]
   created_by_id Int
-  published_at  DateTime? @db.Timestamptz(6)
-  archived_at   DateTime? @db.Timestamptz(6)
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime  @updatedAt @db.Timestamptz(6)
-
-  department  department            @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_template_department")
-  created_by  users                 @relation("WorkflowTemplateCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_template_created_by")
-  steps       workflow_step[]
-  assignments workflow_assignment[]
+  published_at  DateTime?             @db.Timestamptz(6)
+  archived_at   DateTime?             @db.Timestamptz(6)
+  created_at    DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  assignments   workflow_assignment[]
+  steps         workflow_step[]
+  created_by    users                 @relation("WorkflowTemplateCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_template_created_by")
+  department    department            @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_template_department")
 
   @@index([department_id], map: "idx_workflow_template_department")
   @@index([category], map: "idx_workflow_template_category")
@@ -707,47 +596,38 @@ model workflow_template {
 }
 
 model workflow_step {
-  id                   Int      @id @default(autoincrement())
+  id                   Int                        @id @default(autoincrement())
   workflow_template_id Int
   step_number          Int
-  title                String   @db.VarChar(200)
+  title                String                     @db.VarChar(200)
   description          String?
-  // Who is responsible:
-  //   "Candidate" | "HOD" | "HR" | "Buddy" | "System"
-  actor_role           String   @db.VarChar(50)
-  // Step type for display:
-  //   "Task" | "Submission" | "Meeting" | "Sign-off" | "Reading"
-  type                 String   @db.VarChar(30)
-  due_days_after_start Int      @default(0)
-  required             Boolean  @default(true)
-  created_at           DateTime @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime @updatedAt @db.Timestamptz(6)
-
-  workflow_template workflow_template          @relation(fields: [workflow_template_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_step_template")
-  assignment_steps  workflow_assignment_step[]
+  actor_role           String                     @db.VarChar(50)
+  type                 String                     @db.VarChar(30)
+  due_days_after_start Int                        @default(0)
+  required             Boolean                    @default(true)
+  created_at           DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime                   @default(now()) @updatedAt @db.Timestamptz(6)
+  assignment_steps     workflow_assignment_step[]
+  workflow_template    workflow_template          @relation(fields: [workflow_template_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_step_template")
 
   @@unique([workflow_template_id, step_number], map: "uq_workflow_step_template_number")
   @@index([workflow_template_id], map: "idx_workflow_step_template")
 }
 
 model workflow_assignment {
-  id                   Int       @id @default(autoincrement())
+  id                   Int                        @id @default(autoincrement())
   workflow_template_id Int
   user_id              Int
   assigned_by_id       Int
-  status               String    @default("InProgress") @db.VarChar(20)
-  // "InProgress" | "Completed" | "Cancelled"
-  assigned_at          DateTime  @default(now()) @db.Timestamptz(6)
-  completed_at         DateTime? @db.Timestamptz(6)
+  status               String                     @default("InProgress") @db.VarChar(20)
+  assigned_at          DateTime                   @default(now()) @db.Timestamptz(6)
+  completed_at         DateTime?                  @db.Timestamptz(6)
   notes                String?
+  assigned_by          users                      @relation("WorkflowAssignmentAssignedBy", fields: [assigned_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_assignment_assigned_by")
+  workflow_template    workflow_template          @relation(fields: [workflow_template_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_template")
+  user                 users                      @relation("WorkflowAssignmentUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_user")
+  assignment_steps     workflow_assignment_step[]
 
-  workflow_template workflow_template          @relation(fields: [workflow_template_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_template")
-  user              users                      @relation("WorkflowAssignmentUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_user")
-  assigned_by       users                      @relation("WorkflowAssignmentAssignedBy", fields: [assigned_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workflow_assignment_assigned_by")
-  assignment_steps  workflow_assignment_step[]
-
-  // One active assignment per (user, workflow) — re-assigning would
-  // require completing or cancelling the existing row first.
   @@unique([user_id, workflow_template_id], map: "uq_workflow_assignment_user_template")
   @@index([user_id], map: "idx_workflow_assignment_user")
   @@index([workflow_template_id], map: "idx_workflow_assignment_template")
@@ -755,20 +635,120 @@ model workflow_assignment {
 }
 
 model workflow_assignment_step {
-  id                     Int       @id @default(autoincrement())
+  id                     Int                 @id @default(autoincrement())
   workflow_assignment_id Int
   workflow_step_id       Int
-  status                 String    @default("Pending") @db.VarChar(20)
-  // "Pending" | "Done"
-  completed_at           DateTime? @db.Timestamptz(6)
+  status                 String              @default("Pending") @db.VarChar(20)
+  completed_at           DateTime?           @db.Timestamptz(6)
   completed_by_id        Int?
   notes                  String?
-
-  workflow_assignment workflow_assignment @relation(fields: [workflow_assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_step_assignment")
-  workflow_step       workflow_step       @relation(fields: [workflow_step_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_step_step")
-  completed_by        users?              @relation(fields: [completed_by_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_workflow_assignment_step_completed_by")
+  workflow_assignment    workflow_assignment @relation(fields: [workflow_assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_step_assignment")
+  completed_by           users?              @relation(fields: [completed_by_id], references: [user_id], onUpdate: NoAction, map: "fk_workflow_assignment_step_completed_by")
+  workflow_step          workflow_step       @relation(fields: [workflow_step_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_workflow_assignment_step_step")
 
   @@unique([workflow_assignment_id, workflow_step_id], map: "uq_workflow_assignment_step_unique")
   @@index([workflow_assignment_id], map: "idx_workflow_assignment_step_assignment")
   @@index([workflow_step_id], map: "idx_workflow_assignment_step_step")
+}
+
+model announcement {
+  id               BigInt   @id @default(autoincrement())
+  title            String
+  body             String
+  image_data       String?
+  created_by_email String?
+  created_by_name  String?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "idx_announcement_created")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model branch_duty_position {
+  position_id       Int                 @id @default(autoincrement())
+  branch_id         Int
+  week_start_date   DateTime            @db.Date
+  position_label    String              @db.VarChar(50)
+  position_type     String              @db.VarChar(20)
+  display_order     Int                 @default(0)
+  is_active         Boolean             @default(true)
+  branch            branch              @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_bdp_branch")
+  manpower_schedule manpower_schedule[]
+
+  @@unique([branch_id, week_start_date, position_label], map: "uq_bdp_label")
+  @@index([branch_id, week_start_date], map: "idx_bdp_branch_week")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model branch_operating_day {
+  branch_operating_day_id Int      @id @default(autoincrement())
+  branch_id               Int
+  day_of_week             String   @db.VarChar(10)
+  open_time               DateTime @db.Time(6)
+  close_time              DateTime @db.Time(6)
+  is_active               Boolean  @default(true)
+  branch                  branch   @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_bod_branch")
+  slot                    slot[]
+
+  @@unique([branch_id, day_of_week], map: "uq_branch_day")
+}
+
+model department_chat_message {
+  id              BigInt    @id @default(autoincrement())
+  dept            String
+  sender_email    String
+  sender_name     String?
+  recipient_email String?
+  body            String
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  edited_at       DateTime? @db.Timestamptz(6)
+
+  @@index([dept, created_at], map: "idx_dcm_dept_created")
+  @@index([recipient_email, created_at], map: "idx_dcm_recipient")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model employee_rate_history {
+  rate_history_id Int       @id @default(autoincrement())
+  user_id         Int
+  rate            Decimal   @db.Decimal(10, 2)
+  effective_from  DateTime  @db.Date
+  effective_to    DateTime? @db.Date
+  users           users     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_erh_user")
+
+  @@index([user_id], map: "idx_erh_user")
+}
+
+model manpower_cost_report {
+  manpower_cost_report_id Int      @id @default(autoincrement())
+  user_id                 Int
+  date                    DateTime @db.Date
+  coach_hrs               Decimal  @default(0) @db.Decimal(6, 2)
+  exec_hrs                Decimal  @default(0) @db.Decimal(6, 2)
+  coach_rate              Decimal  @db.Decimal(10, 2)
+  exec_rate               Decimal  @db.Decimal(10, 2)
+  total_pay               Decimal  @db.Decimal(10, 2)
+  calculated_at           DateTime @default(now()) @db.Timestamp(6)
+  training_hrs            Decimal  @default(0) @db.Decimal(6, 2)
+  training_rate           Decimal  @default(8.00) @db.Decimal(10, 2)
+  star_coach_hrs          Decimal  @default(0) @db.Decimal(6, 2)
+  star_coach_rate         Decimal  @default(50.00) @db.Decimal(10, 2)
+  users                   users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mcr_user")
+
+  @@unique([user_id, date], map: "uq_mcr_user_date")
+  @@index([user_id, date], map: "idx_mcr_user_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slot {
+  slot_id                 Int                  @id @default(autoincrement())
+  branch_operating_day_id Int
+  slot_start              DateTime             @db.Time(6)
+  slot_end                DateTime             @db.Time(6)
+  slot_type               String               @db.VarChar(20)
+  sequence_no             Int
+  manpower_schedule       manpower_schedule[]
+  branch_operating_day    branch_operating_day @relation(fields: [branch_operating_day_id], references: [branch_operating_day_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_slot_bod")
+
+  @@index([branch_operating_day_id], map: "idx_slot_bod")
 }

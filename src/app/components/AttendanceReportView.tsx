@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
-  ArrowLeft,
   CheckCircle2,
   CalendarX,
   Plane,
@@ -149,7 +148,7 @@ export default function AttendanceReportView({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 space-y-5">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-5">
         {/* Breadcrumb — same pattern as /attendance landing page. */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
           <Link
@@ -167,37 +166,28 @@ export default function AttendanceReportView({
           <span className="text-slate-900 font-medium">Report</span>
         </nav>
 
-        {/* Header */}
-        <header className="flex items-start gap-4">
-          <Link
-            href="/attendance"
-            className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Back
-          </Link>
+        {/* Header + compact stat cards on one row */}
+        <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Attendance Report</h1>
             <p className="mt-1 text-sm text-slate-500">
               Monthly attendance breakdown · Pulled live from scanner logs
             </p>
           </div>
+          <section className="flex flex-wrap items-stretch gap-2.5">
+            <StatCard compact label="Days Present" value={summary.present} Icon={CheckCircle2} accent="emerald" />
+            <StatCard compact label="No Record"    value={summary.noRecord} Icon={CalendarX}   accent="rose" />
+            <StatCard compact label="On Leave"     value={summary.onLeave}  Icon={Plane}       accent="blue" />
+            <StatCard
+              compact
+              label="Total Hours"
+              value={summary.totalHours ?? "—"}
+              mono={!!summary.totalHours}
+              Icon={Timer}
+              accent="amber"
+            />
+          </section>
         </header>
-
-        {/* Stat cards (top-border accent) */}
-        <section className="grid gap-4" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-          <StatCard label="Days Present" value={summary.present} Icon={CheckCircle2} accent="emerald" />
-          <StatCard label="No Record"    value={summary.noRecord} Icon={CalendarX}   accent="rose" />
-          <StatCard label="On Leave"     value={summary.onLeave}  Icon={Plane}       accent="blue" />
-          <StatCard
-            label="Total Hours"
-            value={summary.totalHours ?? "—"}
-            mono={!!summary.totalHours}
-            Icon={Timer}
-            accent="amber"
-            caption={summary.totalHours ?? undefined}
-          />
-        </section>
 
         {/* Main grid: sidebar + table */}
         <div className="grid gap-5" style={{ gridTemplateColumns: "320px minmax(0, 1fr)" }}>
@@ -445,6 +435,7 @@ function StatCard({
   accent,
   caption,
   mono,
+  compact,
 }: {
   label: string;
   value: number | string;
@@ -452,8 +443,29 @@ function StatCard({
   accent: keyof typeof STAT_ACCENT;
   caption?: string;
   mono?: boolean;
+  compact?: boolean;
 }) {
   const a = STAT_ACCENT[accent];
+
+  if (compact) {
+    return (
+      <div className="relative bg-white border border-slate-200 rounded-xl shadow-sm pl-3 pr-4 py-2 pt-2.5 overflow-hidden">
+        <span className={`absolute top-0 left-0 right-0 h-0.5 ${a.bar}`} aria-hidden="true" />
+        <div className="flex items-center gap-2.5">
+          <div className={`${a.tile} w-8 h-8 rounded-lg flex items-center justify-center shrink-0`}>
+            <Icon className={`w-4 h-4 ${a.icon}`} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className={`text-xl font-bold tracking-tight leading-none whitespace-nowrap ${mono ? "font-mono" : "tabular-nums"} ${a.text}`}>
+              {value}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-600 whitespace-nowrap">{label}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative bg-white border border-slate-200 rounded-2xl shadow-sm p-5 pt-6 overflow-hidden">
       <span className={`absolute top-0 left-0 right-0 h-1 ${a.bar}`} aria-hidden="true" />

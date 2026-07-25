@@ -409,22 +409,9 @@ export default function AppealForm() {
           {/* LEFT: heading + type cards + history */}
           <div className="lg:col-span-2 space-y-6">
             {/* Page heading */}
-            <header className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0">
-                <Megaphone className="w-6 h-6 text-blue-600" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-blue-600 mb-1">
-                  Disciplinary
-                </p>
-                <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-                  File an Appeal
-                </h1>
-                <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-                  Compose a warning letter, show-cause letter, or PIP, preview the PDF, and submit
-                  the appeal for HR review.
-                </p>
-              </div>
+            <header className="mb-6">
+              <h1 className="text-2xl font-bold text-slate-900">File an Appeal</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Compose a warning letter, show-cause letter, or PIP, preview the PDF, and submit the appeal for HR review.</p>
             </header>
 
             {/* Appeal Categories */}

@@ -549,7 +549,7 @@ export default function StaffDirectory({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
             <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
@@ -625,12 +625,7 @@ export default function StaffDirectory({
           >
             <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                  Meet the team
-                </p>
-                <h1 className="mt-1 text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-                  Staff Directory
-                </h1>
+                <h1 className="text-2xl font-bold text-slate-900">Staff Directory</h1>
               </div>
               <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>

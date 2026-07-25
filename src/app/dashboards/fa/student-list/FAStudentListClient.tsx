@@ -1,42 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, Users, Filter, Download } from "lucide-react";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const FA_CURRENT_GRADE_MIN_CHAPTER = 9;
-
-const BRANCHES = [
-  { code: "FA1", name: "Foundation Academy 1" },
-  { code: "FA2", name: "Foundation Academy 2" },
-  { code: "FA3", name: "Foundation Academy 3" },
-  { code: "FA4", name: "Foundation Academy 4" },
-];
-
-function gradeLabel(g: number): string {
-  return `G${g}`;
-}
+import { useEffect, useMemo, useState } from "react";
+import { Search, Users, Filter, Download, Loader2 } from "lucide-react";
+import {
+  BRANCHES, FA_CURRENT_GRADE_MIN_CHAPTER, gradeLabel,
+  type Student,
+} from "@/lib/fa/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface StudentRow {
-  id: string;
-  name: string;
-  branch: string;
-  grade: number;
-  credit: number;
-  active: boolean;
-  archived: boolean;
-  parentName: string;
-  parentPhone: string;
-  enrolmentDate: string;
-  faHistory: Record<number, boolean>;
-}
+type StudentRow = Student;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function invitableGradesFor(s: StudentRow): number[] {
+// The grades this row DISPLAYS in the "FA Completed" column — every past grade
+// plus the current grade once the student reaches C9. Distinct from the domain
+// `invitableGradesFor` (which drops grades already ticked done); here we want
+// to show the full history incl. completed ticks.
+function displayGradesFor(s: StudentRow): number[] {
   const grades: number[] = [];
   for (let g = 1; g <= s.grade; g++) {
     if (g < s.grade) grades.push(g);
@@ -46,118 +27,8 @@ function invitableGradesFor(s: StudentRow): number[] {
 }
 
 function hasBacklog(s: StudentRow): boolean {
-  return invitableGradesFor(s).some((g) => s.faHistory[g] !== true);
+  return displayGradesFor(s).some((g) => s.faHistory[g] !== true);
 }
-
-// ── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_STUDENTS: StudentRow[] = [
-  {
-    id: "STU0001", name: "Ahmad Hafizuddin Bin Rashid", branch: "FA1", grade: 3,
-    credit: 11, active: true, archived: false,
-    parentName: "Rashid Bin Malik", parentPhone: "012-3456789",
-    enrolmentDate: "2024-01-10",
-    faHistory: { 1: true, 2: true, 3: false },
-  },
-  {
-    id: "STU0002", name: "Nurul Ain Binti Zaki", branch: "FA2", grade: 5,
-    credit: 9, active: true, archived: false,
-    parentName: "Zaki Bin Ahmad", parentPhone: "011-9876543",
-    enrolmentDate: "2024-02-15",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "STU0003", name: "Lim Wei Jie", branch: "FA1", grade: 2,
-    credit: 6, active: false, archived: false,
-    parentName: "Lim Ah Kow", parentPhone: "016-1112222",
-    enrolmentDate: "2023-09-01",
-    faHistory: { 1: true, 2: false },
-  },
-  {
-    id: "STU0004", name: "Priya A/P Rajan", branch: "FA3", grade: 6,
-    credit: 12, active: true, archived: false,
-    parentName: "Rajan A/L Subramaniam", parentPhone: "017-3334444",
-    enrolmentDate: "2024-03-20",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: false },
-  },
-  {
-    id: "STU0005", name: "Muhammad Arif Bin Noor", branch: "FA2", grade: 8,
-    credit: 14, active: true, archived: false,
-    parentName: "Noor Bin Hassan", parentPhone: "019-5556666",
-    enrolmentDate: "2022-01-05",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true },
-  },
-  {
-    id: "STU0006", name: "Tan Xin Yi", branch: "FA4", grade: 1,
-    credit: 4, active: true, archived: false,
-    parentName: "Tan Boon Huat", parentPhone: "013-7778888",
-    enrolmentDate: "2025-01-08",
-    faHistory: {},
-  },
-  {
-    id: "STU0007", name: "Siti Hajar Binti Mohd Noor", branch: "FA1", grade: 7,
-    credit: 10, active: true, archived: false,
-    parentName: "Mohd Noor Bin Ibrahim", parentPhone: "014-9990000",
-    enrolmentDate: "2023-06-12",
-    faHistory: { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: false },
-  },
-  {
-    id: "STU0008", name: "Kevin Chong Zhi Hong", branch: "FA3", grade: 2,
-    credit: 2, active: true, archived: false,
-    parentName: "Chong Kok Wai", parentPhone: "012-1234567",
-    enrolmentDate: "2026-01-20",
-    faHistory: { 1: false },
-  },
-  {
-    id: "STU0009", name: "Aisha Binti Hassan", branch: "FA2", grade: 8,
-    credit: 16, active: false, archived: true,
-    parentName: "Hassan Bin Osman", parentPhone: "011-2345678",
-    enrolmentDate: "2020-03-01",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true },
-  },
-  {
-    id: "STU0010", name: "Darren Loh Zhi Hao", branch: "FA4", grade: 5,
-    credit: 9, active: true, archived: false,
-    parentName: "Loh Chin Huat", parentPhone: "016-3456789",
-    enrolmentDate: "2024-08-15",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "STU0011", name: "Nabilah Farhana Binti Aziz", branch: "FA1", grade: 2,
-    credit: 11, active: true, archived: false,
-    parentName: "Aziz Bin Kamaruddin", parentPhone: "017-4567890",
-    enrolmentDate: "2025-02-01",
-    faHistory: { 1: true, 2: true },
-  },
-  {
-    id: "STU0012", name: "Raja Izzatul Hafidz", branch: "FA3", grade: 6,
-    credit: 7, active: true, archived: false,
-    parentName: "Raja Faizal Bin Raja Ahmad", parentPhone: "019-5678901",
-    enrolmentDate: "2023-11-20",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: false },
-  },
-  {
-    id: "STU0013", name: "Chai Mei Lin", branch: "FA4", grade: 4,
-    credit: 10, active: true, archived: false,
-    parentName: "Chai Boon Teck", parentPhone: "013-6789012",
-    enrolmentDate: "2024-04-10",
-    faHistory: { 1: true, 2: true, 3: true, 4: false },
-  },
-  {
-    id: "STU0014", name: "Farhan Izzuddin Bin Yusof", branch: "FA2", grade: 1,
-    credit: 3, active: true, archived: false,
-    parentName: "Yusof Bin Ramli", parentPhone: "014-7890123",
-    enrolmentDate: "2026-03-05",
-    faHistory: {},
-  },
-  {
-    id: "STU0015", name: "Yasmin Binti Razali", branch: "FA1", grade: 7,
-    credit: 9, active: true, archived: false,
-    parentName: "Razali Bin Hamid", parentPhone: "012-8901234",
-    enrolmentDate: "2023-08-22",
-    faHistory: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: false },
-  },
-];
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -169,8 +40,29 @@ export default function FAStudentListClient() {
   const [activeOnly, setActiveOnly]     = useState(false);
   const [scope, setScope]               = useState<"current" | "archived" | "all">("current");
 
-  const liveStudents   = useMemo(() => MOCK_STUDENTS.filter((s) => !s.archived), []);
-  const archivedCount  = useMemo(() => MOCK_STUDENTS.filter((s) => s.archived).length, []);
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/fa/students", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load students (${res.status})`);
+        const json = (await res.json()) as { students: StudentRow[] };
+        if (alive) setStudents(json.students ?? []);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load students");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const liveStudents   = useMemo(() => students.filter((s) => !s.archived), [students]);
+  const archivedCount  = useMemo(() => students.filter((s) => s.archived).length, [students]);
 
   const branchNameByCode = useMemo(
     () => Object.fromEntries(BRANCHES.map((b) => [b.code, b.name])),
@@ -178,7 +70,7 @@ export default function FAStudentListClient() {
   );
 
   const filtered = useMemo(() => {
-    return MOCK_STUDENTS
+    return students
       .filter((s) => scope === "all" ? true : scope === "archived" ? s.archived : !s.archived)
       .filter((s) => !activeOnly || s.active)
       .filter((s) => branchFilter === "all" || s.branch === branchFilter)
@@ -203,7 +95,7 @@ export default function FAStudentListClient() {
           b.grade - a.grade ||
           a.name.localeCompare(b.name),
       );
-  }, [search, branchFilter, gradeFilter, progressFilter, activeOnly, scope]);
+  }, [students, search, branchFilter, gradeFilter, progressFilter, activeOnly, scope]);
 
   function handleDownload() {
     const header = [
@@ -211,7 +103,7 @@ export default function FAStudentListClient() {
       "Active", "Archived", "FA Done", "FA Expected", "Guardian", "Guardian Phone",
     ];
     const rows = filtered.map((s) => {
-      const grades = invitableGradesFor(s);
+      const grades = displayGradesFor(s);
       const done = grades.filter((g) => s.faHistory[g] === true).length;
       return [
         s.id, s.name, s.branch, gradeLabel(s.grade), `C${s.credit}`,
@@ -228,7 +120,7 @@ export default function FAStudentListClient() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
 
         {/* Masthead */}
         <div className="mb-6">
@@ -363,13 +255,22 @@ export default function FAStudentListClient() {
             <Filter className="w-3 h-3" />
             Showing{" "}
             <span className="font-mono font-semibold text-slate-900">{filtered.length}</span> of{" "}
-            <span className="font-mono">{MOCK_STUDENTS.length}</span>{" "}
+            <span className="font-mono">{students.length}</span>{" "}
             {filtered.length !== 1 ? "students" : "student"}.
           </div>
         </div>
 
         {/* Table */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-2" />
+            <div className="text-sm text-slate-500">Loading students…</div>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-xl border border-red-200 shadow-sm p-8 text-center">
+            <div className="text-sm font-medium text-red-600">{error}</div>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
             <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             <div className="text-sm text-slate-500">No students match the current filters.</div>
@@ -395,7 +296,7 @@ export default function FAStudentListClient() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filtered.map((s) => {
-                    const grades = invitableGradesFor(s);
+                    const grades = displayGradesFor(s);
                     const expected = grades.length;
                     const doneCount = grades.filter((g) => s.faHistory[g] === true).length;
                     const branchName = branchNameByCode[s.branch] ?? "";

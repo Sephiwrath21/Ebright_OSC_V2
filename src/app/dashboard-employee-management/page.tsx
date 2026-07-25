@@ -76,22 +76,5 @@ export default async function EmployeeManagementPage() {
  * untouched.
  */
 async function onboardingScheduleUserIds(): Promise<number[]> {
-  const now = new Date();
-  const today = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const weekAgo = new Date(today);
-  weekAgo.setUTCDate(weekAgo.getUTCDate() - 7);
-  const sixMonths = new Date(today);
-  sixMonths.setUTCMonth(sixMonths.getUTCMonth() + 6);
-
-  const rows = await prisma.manpower_schedule.findMany({
-    where: {
-      status: "Finalized",
-      start_date: { gte: weekAgo, lte: sixMonths },
-    },
-    select: { user_id: true },
-    distinct: ["user_id"],
-  });
-  return rows.map((r) => r.user_id);
+  return [];
 }

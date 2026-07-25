@@ -29,7 +29,7 @@ export default async function TicketPage() {
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
             <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors rounded">
-              CRM
+              CNS
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
             <span className="text-slate-900 font-medium">Ticket</span>

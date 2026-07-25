@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Home, ChevronRight } from "lucide-react";
+import { Home, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
 import { canManageInductions } from "@/app/induction/roles";
@@ -131,7 +131,7 @@ export default async function HrDashboardPage() {
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <div className="min-h-full bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-5">
             <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
@@ -144,20 +144,10 @@ export default async function HrDashboardPage() {
             <span className="text-slate-900 font-medium">HR Dashboard</span>
           </nav>
 
-          <header className="flex flex-wrap items-end justify-between gap-4 mb-5">
-            <div>
-              <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
-                HR Dashboard
-              </h1>
-              <p className="mt-1 text-sm text-slate-600">Employee Lifecycle Data</p>
-            </div>
-            <Link
-              href="/dashboards/hrms"
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-              Back to HRMS
-            </Link>
+          <header className="mb-5">
+            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
+              HR Dashboard
+            </h1>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
+import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
 import AppShell from "@/app/components/AppShell";
 import AttendanceSummaryView, {
   type SummaryData,
@@ -22,6 +22,10 @@ const MIA_LEAVE_CODE = "UL";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_ROLE_TYPES = new Set(["superadmin", "ceo", "hr"]);
+// role_ids that represent real, badge-carrying staff shown in attendance:
+// ceo(2), regional manager(5), staff(6), hod(7). Excludes generic/shared
+// accounts — superadmin(1), department(3), branch(4).
+const ATTENDANCE_ROLE_IDS = [2, 5, 6, 7];
 // Late = first scan > scheduled start + this grace.
 const LATE_GRACE_MINUTES = 1;
 // "Scanner online" if a scan came in within this many minutes.
@@ -193,65 +197,68 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
     : null;
   const branchCode = selectedBranch?.branch_code ?? null;
 
-  // ── HRFS: BranchStaff is the source of truth for "who exists" — same DB
-  //         the Hikvision scans live in. Switching back from local employment
-  //         (which only had 48/165 staff synced) so every active person
-  //         appears here, with no dependency on a local sync running first.
-  const branchStaffRes = await queryEbrightHrfs<{
-    id: number;
-    name: string | null;
-    branch: string | null;
-    role: string | null;
-    position: string | null;
-    department: string | null;
-    location: string | null;
-    employeeId: string | null;
-    workingHours: Record<string, { start: string; end: string } | null> | null;
-  }>(
-    `SELECT id, name, branch, role, position, department, location,
-            "employeeId", "workingHours"
-       FROM public."BranchStaff"
-      WHERE status = 'Active'
-      ORDER BY name ASC`,
-  );
-  const allStaff: LocalStaffRow[] = branchStaffRes.rows.map((s) => ({
-    id: s.id,
-    // user_id no longer applies (no local row guaranteed) — use BranchStaff.id
-    // as a stable numeric identifier for React keys / urls.
-    user_id: s.id,
-    name: s.name,
-    branch: s.branch,
-    role: s.role,
-    position: s.position,
-    department: s.department,
-    location: s.location,
-    employeeId: s.employeeId,
-    workingHours: s.workingHours,
-  }));
+  // ── PORTAL roster (users + employment), keyed by user_id — replaces the
+  //    external HRFS BranchStaff list. Attendance scans link by
+  //    employment.employee_id (= hikvision_attendance_all.person_id). Coverage
+  //    is bounded by how many active employments carry a correct employee_id
+  //    and a synced schedule (accepted tradeoff vs the BranchStaff roster).
+  const employments = await prisma.employment.findMany({
+    // Only real staff roles appear in attendance: staff(6), regional manager(5),
+    // hod(7), ceo(2). Excludes generic/shared logins — superadmin(1),
+    // department(3), branch(4) — which have no badge and aren't people.
+    where: {
+      status: "active",
+      users: { status: "active", role_id: { in: ATTENDANCE_ROLE_IDS } },
+    },
+    select: {
+      employment_id: true,
+      user_id: true,
+      employee_id: true,
+      position: true,
+      working_hours_json: true,
+      branch: { select: { branch_code: true, branch_name: true } },
+      department: { select: { department_name: true } },
+      users: { select: { user_profile: { select: { full_name: true, nick_name: true } } } },
+      schedule_versions: {
+        select: { effective_from: true, schedule: true },
+        orderBy: { effective_from: "asc" },
+      },
+    },
+    orderBy: { employment_id: "asc" },
+  });
+
+  // schedulesByDate: latest version whose effective_from <= selectedDate, keyed
+  // by employment_id — mirrors the old BranchStaffSchedule DISTINCT ON query.
+  const schedulesByDate: Record<number, WeeklySchedule> = {};
+  const seenUsers = new Set<number>();
+  const allStaff: LocalStaffRow[] = [];
+  for (const e of employments) {
+    if (seenUsers.has(e.user_id)) continue; // one active employment per user
+    seenUsers.add(e.user_id);
+    allStaff.push({
+      id: e.employment_id, // schedule-history key (was BranchStaff.id)
+      user_id: e.user_id,
+      name: e.users.user_profile?.full_name ?? e.users.user_profile?.nick_name ?? null,
+      branch: e.branch?.branch_code ?? null,
+      role: null,
+      position: e.position ?? null,
+      department: e.department?.department_name ?? null,
+      location: e.branch?.branch_name ?? null,
+      employeeId: e.employee_id,
+      workingHours: (e.working_hours_json as LocalStaffRow["workingHours"]) ?? null,
+    });
+    let best: { eff: string; schedule: WeeklySchedule } | null = null;
+    for (const v of e.schedule_versions) {
+      const eff = v.effective_from.toISOString().slice(0, 10);
+      if (eff <= selectedDate && (!best || eff > best.eff)) {
+        best = { eff, schedule: v.schedule as WeeklySchedule };
+      }
+    }
+    if (best) schedulesByDate[e.employment_id] = best.schedule;
+  }
   const staffByEmpNo = new Map<string, LocalStaffRow>();
   for (const s of allStaff) {
     if (s.employeeId) staffByEmpNo.set(s.employeeId, s);
-  }
-
-  // ── HRFS BranchStaffSchedule: resolved schedule per BranchStaff.id for
-  //    selectedDate. Picks the row with the greatest effectiveFrom that is
-  //    <= selectedDate. Keyed by BranchStaff.id so it lines up with the
-  //    staff records we just fetched.
-  const scheduleVersionRes = await queryEbrightHrfs<{
-    branch_staff_id: number;
-    schedule: Record<string, { start: string; end: string } | null>;
-  }>(
-    `SELECT DISTINCT ON ("branchStaffId")
-       "branchStaffId" AS branch_staff_id,
-       schedule
-     FROM public."BranchStaffSchedule"
-     WHERE "effectiveFrom" <= $1::date
-     ORDER BY "branchStaffId", "effectiveFrom" DESC`,
-    [selectedDate],
-  );
-  const schedulesByDate: Record<number, WeeklySchedule> = {};
-  for (const v of scheduleVersionRes.rows) {
-    schedulesByDate[v.branch_staff_id] = v.schedule as WeeklySchedule;
   }
 
   // Resolve every staff's effective schedule for selectedDate, then keep only
@@ -305,28 +312,33 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
   // - LEFT JOIN hikvision_id_map to translate "wrong" person_ids to true ids.
   // - Group by translated empNo so the same person across both scanners
   //   (HQ + ST) appears once with min/max times.
-  const aggResult = await queryEbrightHrfs<{
+  const aggResult = await queryEbrightHrfsSource<{
     emp_no: string;
     first_event: Date;
     last_event: Date;
     scan_count: string;
     sample_device_name: string | null;
   }>(
+    // `event_time` is `timestamp WITHOUT time zone` holding the MYT wall clock.
+    // Reinterpret it as Asia/Kuala_Lumpur -> `timestamptz` so node-pg parses the
+    // true instant (not the wall clock read as UTC, which shifts reads +8h).
+    // The $1/$2 bounds are UTC ISO strings, so compare against the converted ts.
     `WITH events AS (
        SELECT
          COALESCE(m.true_id, h.person_id) AS emp_no,
-         h.event_time,
+         (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') AS event_ts,
          h.device_name
        FROM public.hikvision_attendance_all h
        LEFT JOIN public.hikvision_id_map m ON m.wrong_id = h.person_id
-       WHERE h.event_time >= $1 AND h.event_time < $2
+       WHERE (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') >= $1
+         AND (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') < $2
      )
      SELECT
        emp_no,
-       MIN(event_time) AS first_event,
-       MAX(event_time) AS last_event,
+       MIN(event_ts) AS first_event,
+       MAX(event_ts) AS last_event,
        COUNT(*)::text AS scan_count,
-       (array_agg(device_name ORDER BY event_time))[1] AS sample_device_name
+       (array_agg(device_name ORDER BY event_ts))[1] AS sample_device_name
      FROM events
      WHERE emp_no IS NOT NULL
      GROUP BY emp_no`,
@@ -344,13 +356,16 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
 
   // Most-recent scan timestamp + total event count today — for "scanner online"
   // and "Records today" indicators on the summary view.
-  const liveResult = await queryEbrightHrfs<{
+  const liveResult = await queryEbrightHrfsSource<{
     last_event: Date | null;
     total: string;
   }>(
-    `SELECT MAX(event_time) AS last_event, COUNT(*)::text AS total
+    // Same MYT-wall-clock reinterpretation as the aggregate query above.
+    `SELECT MAX(event_time AT TIME ZONE 'Asia/Kuala_Lumpur') AS last_event,
+            COUNT(*)::text AS total
        FROM public.hikvision_attendance_all
-      WHERE event_time >= $1 AND event_time < $2`,
+      WHERE (event_time AT TIME ZONE 'Asia/Kuala_Lumpur') >= $1
+        AND (event_time AT TIME ZONE 'Asia/Kuala_Lumpur') < $2`,
     [dayStart.toISOString(), dayEnd.toISOString()],
   );
   const lastEventRaw = liveResult.rows[0]?.last_event ?? null;
@@ -367,7 +382,7 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
   // legacy rows that have NULL EmployeeCode. LeaveTransaction has no
   // LeaveTypeName column on HRFS — we just surface the code (e.g. "SL", "AL",
   // "UL") and let the UI render it.
-  const leaveResult = await queryEbrightHrfs<{
+  const leaveResult = await queryEbrightHrfsSource<{
     employee_code: string | null;
     employee_name: string | null;
     leave_type_code: string | null;
@@ -403,7 +418,7 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
   // emp_no/reason/evidence_url/...). Keyed by emp_no since that's how it
   // joins to BranchStaff.employeeId. Same row drops the person from Missing
   // and surfaces them in the Justify side box.
-  const justificationsRes = await queryEbrightHrfs<{
+  const justificationsRes = await queryEbrightHrfsSource<{
     id: string;
     emp_no: string | null;
     reason: string | null;

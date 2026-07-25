@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  ArrowLeft,
   MapPin,
   Radio,
   RadioReceiver,
@@ -222,7 +221,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 space-y-5">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-5">
         {/* Breadcrumb — same pattern as /attendance landing page. */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
           <Link
@@ -243,20 +242,10 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <Link
-              href="/attendance"
-              className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-              Back
-            </Link>
             <div>
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                 Attendance Dashboard
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Live scanner sync · Auto-refreshes every 5 seconds
-              </p>
             </div>
           </div>
           {!isAllBranches && <ScannerStatusChip online={data.scannerOnline} />}

@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
+import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
 import AppShell from "@/app/components/AppShell";
 import AttendanceReportView, {
   type EmployeeOption,
@@ -19,8 +19,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const REPORT_ROLE_IDS = [2, 4];
-const STAFF_ROLE_ID = 4;
+// role_ids of real, badge-carrying staff shown in attendance: ceo(2),
+// regional manager(5), staff(6), hod(7). Excludes generic/shared accounts —
+// superadmin(1), department(3), branch(4).
+const ATTENDANCE_ROLE_IDS = [2, 5, 6, 7];
+// A plain staff member can only view their own report.
+const STAFF_ROLE_ID = 6;
 
 
 const WEEKEND_DAY_NUMBERS = new Set([0, 1]);
@@ -101,15 +105,6 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
 
   const restrictToSelf = me.role_id === STAFF_ROLE_ID;
 
-  // Resolve the logged-in user's BranchStaff.employeeId via local employment
-  // (the only link we have between portal users and the HRFS BranchStaff list).
-  const myEmployment = await prisma.employment.findFirst({
-    where: { user_id: me.user_id, status: "active" },
-    orderBy: { employment_id: "desc" },
-    select: { employee_id: true },
-  });
-  const myEmployeeId = myEmployment?.employee_id ?? null;
-
   // Pull local branches (static lookup — used for the Branch dropdown labels).
   const branches = await prisma.branch.findMany({
     where: { branch_code: { not: null } },
@@ -117,70 +112,114 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
     orderBy: { branch_name: "asc" },
   });
 
-  // ── HRFS BranchStaff: source of truth for the staff picker + sidebar
-  //    metadata, matching the reference portal's behavior. Each row carries
-  //    its own name/branch/role/position/department/location so we don't
-  //    cross-reference local Prisma rows for display.
-  type BsRow = {
-    id: number;
-    name: string | null;
-    branch: string | null;
-    role: string | null;
-    position: string | null;
-    department: string | null;
-    location: string | null;
+  // ── PORTAL roster (users + employment), keyed by user_id. This replaces the
+  //    external HRFS BranchStaff list: the staff picker, branch/department
+  //    filters, schedule and sidebar all come from portal records. Attendance
+  //    scans link by employment.employee_id — the same value stored as the
+  //    biometric enrollment number in hikvision_attendance_all.person_id.
+  interface StaffRow {
+    userId: number;
+    employmentId: number;
     employeeId: string | null;
-  };
-  const bsRes = await queryEbrightHrfs<BsRow>(
-    `SELECT id, name, branch, role, position, department, location, "employeeId"
-       FROM public."BranchStaff"
-      WHERE status = 'Active'
-      ORDER BY name ASC`,
-  );
-  const allStaff = bsRes.rows;
+    name: string | null;
+    branchCode: string | null;
+    branchName: string | null;
+    department: string | null;
+    position: string | null;
+    workingHours: WeeklySchedule | null;
+    versions: { effectiveFrom: string; schedule: WeeklySchedule }[];
+  }
 
-  // Departments dropdown: only relevant when Branch=HQ. Derive from the
-  // actual BranchStaff department values on HQ so the dropdown reflects
-  // real data (BranchStaff.department is free text, not FK).
+  const employments = await prisma.employment.findMany({
+    // Only real staff roles appear in attendance: staff(6), regional manager(5),
+    // hod(7), ceo(2). Excludes generic/shared logins — superadmin(1),
+    // department(3), branch(4) — which have no badge and aren't people.
+    where: {
+      status: "active",
+      users: { status: "active", role_id: { in: ATTENDANCE_ROLE_IDS } },
+    },
+    select: {
+      employment_id: true,
+      user_id: true,
+      employee_id: true,
+      position: true,
+      working_hours_json: true,
+      branch: { select: { branch_code: true, branch_name: true } },
+      department: { select: { department_name: true } },
+      users: { select: { user_profile: { select: { full_name: true, nick_name: true } } } },
+      schedule_versions: {
+        select: { effective_from: true, schedule: true },
+        orderBy: { effective_from: "asc" },
+      },
+    },
+    orderBy: { employment_id: "asc" },
+  });
+
+  // One active employment per user (defensive: keep the first seen).
+  const staffByUser = new Map<number, StaffRow>();
+  for (const e of employments) {
+    if (staffByUser.has(e.user_id)) continue;
+    staffByUser.set(e.user_id, {
+      userId: e.user_id,
+      employmentId: e.employment_id,
+      employeeId: e.employee_id,
+      name: e.users.user_profile?.full_name ?? e.users.user_profile?.nick_name ?? null,
+      branchCode: e.branch?.branch_code ?? null,
+      branchName: e.branch?.branch_name ?? null,
+      department: e.department?.department_name ?? null,
+      position: e.position ?? null,
+      workingHours: (e.working_hours_json as WeeklySchedule | null) ?? null,
+      versions: e.schedule_versions.map((v) => ({
+        effectiveFrom: v.effective_from.toISOString().slice(0, 10),
+        schedule: v.schedule as WeeklySchedule,
+      })),
+    });
+  }
+  const allStaff = [...staffByUser.values()].sort((a, b) =>
+    (a.name ?? `#${a.userId}`).localeCompare(b.name ?? `#${b.userId}`),
+  );
+  const myStaff = allStaff.find((s) => s.userId === me.user_id) ?? null;
+
+  // Departments dropdown: only relevant when Branch=HQ. Derive from the actual
+  // department values on HQ staff so the dropdown reflects real data.
   const hqDepts = new Set<string>();
   for (const s of allStaff) {
-    if (s.branch === "HQ" && s.department) hqDepts.add(s.department);
+    if (s.branchCode === "HQ" && s.department) hqDepts.add(s.department);
   }
   const departments = [...hqDepts].sort().map((d) => ({ department_code: d, department_name: d }));
 
- 
   const branchFilter = restrictToSelf ? "" : (sp.branch ?? "");
-  
+
   const deptFilter =
     !restrictToSelf && branchFilter === "HQ" ? (sp.dept ?? "") : "";
   const staffForDropdown = restrictToSelf
-    ? allStaff.filter((s) => s.employeeId && s.employeeId === myEmployeeId)
+    ? allStaff.filter((s) => s.userId === me.user_id)
     : allStaff.filter((s) => {
-        if (branchFilter && s.branch !== branchFilter) return false;
+        if (branchFilter && s.branchCode !== branchFilter) return false;
         if (deptFilter && s.department !== deptFilter) return false;
         return true;
       });
 
   const employeeOptions: EmployeeOption[] = staffForDropdown.map((s) => ({
-    userId: s.id, // BranchStaff.id (used as the picker value)
-    name: s.name ?? `Staff #${s.id}`,
-    branchCode: s.branch,
+    userId: s.userId, // portal user_id (used as the picker value)
+    name: s.name ?? `Staff #${s.userId}`,
+    branchCode: s.branchCode,
   }));
 
-  
-  let selectedId: number;
+  let selectedId: number | null;
   if (restrictToSelf) {
-    selectedId = staffForDropdown[0]?.id ?? null;
+    selectedId = staffForDropdown[0]?.userId ?? null;
   } else {
     const requested = sp.employeeId ? Number(sp.employeeId) : NaN;
-    if (Number.isFinite(requested) && staffForDropdown.some((s) => s.id === requested)) {
+    if (Number.isFinite(requested) && staffForDropdown.some((s) => s.userId === requested)) {
       selectedId = requested;
+    } else if (myStaff && staffForDropdown.some((s) => s.userId === myStaff.userId)) {
+      selectedId = myStaff.userId;
     } else {
-      const myOwn = staffForDropdown.find((s) => s.employeeId === myEmployeeId);
-      selectedId = myOwn?.id ?? staffForDropdown[0]?.id ?? null;
+      selectedId = staffForDropdown[0]?.userId ?? null;
     }
   }
-  const selected = selectedId !== null ? allStaff.find((s) => s.id === selectedId) ?? null : null;
+  const selected = selectedId !== null ? allStaff.find((s) => s.userId === selectedId) ?? null : null;
   const selectedEmployeeCode = selected?.employeeId ?? null;
 
   
@@ -214,32 +253,11 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   const windowStart = new Date(Date.UTC(year, month - 1, startDay, -8, 0, 0));
   const windowEnd   = new Date(Date.UTC(year, month - 1, endDay + 1, -8, 0, 0));
 
-  // ── HRFS BranchStaff + BranchStaffSchedule: schedule history for selected
-  //    staff. Keyed by BranchStaff.id, matches the reference portal.
-  let cachedWorkingHours: WeeklySchedule | null = null;
-  let versions: { effectiveFrom: string; schedule: WeeklySchedule }[] = [];
-
-  if (selected) {
-    // Current cached schedule from BranchStaff.workingHours
-    const whRes = await queryEbrightHrfs<{ working_hours: WeeklySchedule | null }>(
-      `SELECT "workingHours" AS working_hours FROM public."BranchStaff" WHERE id = $1`,
-      [selected.id],
-    );
-    cachedWorkingHours = whRes.rows[0]?.working_hours ?? null;
-
-    // Versioned snapshots from BranchStaffSchedule
-    const verRes = await queryEbrightHrfs<{ effective_from: string; schedule: WeeklySchedule }>(
-      `SELECT to_char("effectiveFrom", 'YYYY-MM-DD') AS effective_from, schedule
-         FROM public."BranchStaffSchedule"
-        WHERE "branchStaffId" = $1
-        ORDER BY "effectiveFrom" ASC`,
-      [selected.id],
-    );
-    versions = verRes.rows.map((r) => ({
-      effectiveFrom: r.effective_from,
-      schedule: r.schedule,
-    }));
-  }
+  // Schedule history for the selected staff — sourced from the PORTAL
+  // (employment.working_hours_json + employment_schedule_version), resolved on
+  // the roster row above. No BranchStaff dependency.
+  const cachedWorkingHours: WeeklySchedule | null = selected?.workingHours ?? null;
+  const versions = selected?.versions ?? [];
 
   // ── HRFS: scans for this employee in the window ──────────────────────────
   // Aggregate per MYT date so a single day shows one row even when scans came
@@ -253,7 +271,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   };
   const scansByDate = new Map<string, { firstEvent: Date; lastEvent: Date }>();
   if (selectedEmployeeCode) {
-    const scanRes = await queryEbrightHrfs<ScanRow>(
+    const scanRes = await queryEbrightHrfsSource<ScanRow>(
       `WITH events AS (
          SELECT
            COALESCE(m.true_id, h.person_id) AS emp_no,
@@ -288,7 +306,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   // we surface just the code (UI renders it as a chip).
   const leaveByDate = new Map<string, { code: string | null; name: string | null }>();
   if (selectedEmployeeCode) {
-    const lvRes = await queryEbrightHrfs<{
+    const lvRes = await queryEbrightHrfsSource<{
       leave_date: string;
       leave_type_code: string | null;
     }>(
@@ -440,19 +458,18 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
       })
     : null;
 
-  // Sidebar metadata now comes directly from BranchStaff — matches the
-  // reference portal exactly.
+  // Sidebar metadata now comes from the portal employment/user record.
   const employeeContext: EmployeeContext | null = selected
     ? {
-        userId: selected.id,
+        userId: selected.userId,
         name: selected.name,
         position: selected.position,
         department: selected.department,
-        role: selected.role,
-        location: selected.location,
-        branchCode: selected.branch,
-        // BranchStaff.id is the canonical schedule-history key on HRFS.
-        branchStaffId: selected.id,
+        role: null,
+        location: selected.branchName,
+        branchCode: selected.branchCode,
+        // No BranchStaff link — schedule editor deep-link is disabled.
+        branchStaffId: null,
         employeeCode: selectedEmployeeCode,
       }
     : null;
@@ -475,7 +492,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
         employee={employeeContext}
         selectedBranch={branchFilter}
         selectedDept={deptFilter}
-        selectedEmployeeId={selected?.id ?? null}
+        selectedEmployeeId={selected?.userId ?? null}
         selectedMonth={monthStr}
         monthLabel={monthLabel}
         selectedDate={dateStr}

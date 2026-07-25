@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { Home as HomeIcon, ChevronRight, Search, Calendar, Download, ChevronDown, Wallet, FileDown } from "lucide-react";
+import { Home as HomeIcon, ChevronRight, Search, Calendar, Download, ChevronDown, Wallet, FileDown, Eye, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import AppShell from "@/app/components/AppShell";
@@ -43,6 +43,7 @@ const AVAILABLE_MONTHS = getAvailableMonths();
 
 interface StaffRow {
   name: string;
+  nickName: string | null;
   employeeId: string | null;
   branch: string;
   position: string | null;
@@ -99,6 +100,7 @@ function fmtHrs(h: number): string {
 function makeEmptyRow(viewer: Viewer | null): StaffRow {
   return {
     name: viewer?.name ?? "",
+    nickName: null,
     employeeId: viewer?.employeeId ?? null,
     branch: viewer?.branch ?? "",
     position: viewer?.position ?? null,
@@ -194,7 +196,12 @@ function ManpowerCostReportContent() {
       })
       .filter(s => {
         if (weekFilter && s.totalHrs === 0) return false;
-        if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matchesName = s.name.toLowerCase().includes(q);
+          const matchesNick = s.nickName?.toLowerCase().includes(q) ?? false;
+          if (!matchesName && !matchesNick) return false;
+        }
         if (viewTab === "pt" && !s.isPT) return false;
         if (viewTab === "ft" && s.isPT) return false;
         if (regionFilter) {
@@ -245,7 +252,7 @@ function ManpowerCostReportContent() {
     // Try to load logo
     let logoImg: string | null = null;
     try {
-      const resp = await fetch("/ebright-logo.png");
+      const resp = await fetch("/ebright-font.png");
       if (resp.ok) {
         const blob = await resp.blob();
         logoImg = await new Promise<string>((resolve) => {
@@ -262,8 +269,11 @@ function ManpowerCostReportContent() {
 
     let headerX = 14;
     if (logoImg) {
-      doc.addImage(logoImg, "PNG", 14, 3, 55, 22);
-      headerX = 74;
+      // ebright-font.png is 2172x724 (~3:1) — width derived from that ratio
+      // so the mark isn't stretched; 3mm top/bottom margin centers it in the
+      // 28mm header bar.
+      doc.addImage(logoImg, "PNG", 14, 3, 66, 22);
+      headerX = 88;
     }
 
     doc.setTextColor(255, 255, 255);
@@ -399,11 +409,12 @@ function ManpowerCostReportContent() {
       y += 4;
 
       const tableHead = viewTab === "ft"
-        ? [["Name", "Branch", "Type", "Coach Hrs", "Exec Hrs", "Total Hrs"]]
-        : [["Name", "Branch", "Type", "Coach Hrs", "Exec Hrs", "Total Hrs", "Rate", "Total Pay"]];
+        ? [["Name", "Branch", "Type", "Coach Hrs", "Class", "Exec Hrs", "Total Hrs"]]
+        : [["Name", "Branch", "Type", "Coach Hrs", "Class", "Exec Hrs", "Total Hrs", "Rate", "Total Pay"]];
 
       const tableBody: string[][] = filteredStaff.map(s => {
-        const row = [s.name, s.branch, s.isPT ? "PT" : "FT", fmtHrs(s.coachHrs), fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
+        const classes = Math.round(s.coachHrs / 1.25);
+        const row = [s.name, s.branch, s.isPT ? "PT" : "FT", fmtHrs(s.coachHrs), classes > 0 ? `${classes} class${classes !== 1 ? "es" : ""}` : "-", fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
         if (viewTab !== "ft") {
           row.push(s.isPT && s.rate ? `RM${s.rate}` : "-");
           row.push(s.isPT ? `RM ${s.totalPay.toFixed(2)}` : "-");
@@ -413,7 +424,7 @@ function ManpowerCostReportContent() {
 
       const footerRow: string[] = [
         `Total (${totals.totalStaff})`, "", "",
-        fmtHrs(totals.totalCoachHrs), fmtHrs(totals.totalExecHrs), fmtHrs(totals.totalHrs),
+        fmtHrs(totals.totalCoachHrs), "", fmtHrs(totals.totalExecHrs), fmtHrs(totals.totalHrs),
       ];
       if (viewTab !== "ft") {
         footerRow.push("");
@@ -454,7 +465,7 @@ function ManpowerCostReportContent() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
@@ -476,29 +487,99 @@ function ManpowerCostReportContent() {
         </nav>
 
         {/* Page heading */}
-        <header className="mb-8 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-teal-100 flex items-center justify-center shrink-0">
-            <Wallet className="w-6 h-6 text-teal-600" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-600 mb-1">
-              Manpower
-            </p>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              {isEmployeeView ? "My Manpower Report" : "Manpower Cost Report"}
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-              {isEmployeeView
-                ? `Your hours and pay for ${monthLabel}.${
-                    viewer?.position ? ` Position: ${viewer.position}.` : ""
-                  }`
-                : "Breakdown of labor costs across branches, with per-staff hours and pay."}
-            </p>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isEmployeeView ? "My Manpower Report" : "Manpower Cost Report"}
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5 max-w-lg">
+            {isEmployeeView
+              ? `Your hours and pay for ${monthLabel}.${viewer?.position ? ` Position: ${viewer.position}.` : ""}`
+              : "Breakdown of labor costs across branches, with per-staff hours and pay."}
+          </p>
         </header>
 
-        {/* Toolbar — admin view only. In employee view the same controls live
-            on the right side of the profile card. */}
+        {isEmployeeView ? (
+          loading ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-500 font-medium">Loading your manpower data...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+              <p className="text-red-600 font-medium">{error}</p>
+            </div>
+          ) : (
+            <EmployeeBreakdown
+              s={filteredStaff[0] ?? makeEmptyRow(viewer)}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              monthLabel={monthLabel}
+              weekFilter={weekFilter}
+              setWeekFilter={setWeekFilter}
+              weekStart={weekStart}
+              weekEnd={weekEnd}
+              execRate={execRate}
+              availableWeeks={availableWeeks}
+              onPdf={generatePDF}
+            />
+          )
+        ) : (
+          <>
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Staff</p>
+            <p className="text-2xl font-black text-slate-700">{totals.totalStaff}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">PT: {totals.ptCount} | FT: {totals.ftCount}</p>
+          </div>
+          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
+            <p className="text-xl font-black text-blue-600">{fmtHrs(totals.totalHrs)}</p>
+          </div>
+          <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200">
+            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1">Coach Hours</p>
+            <p className="text-xl font-black text-orange-600">{fmtHrs(totals.totalCoachHrs)}</p>
+          </div>
+          <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200">
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Exec Hours</p>
+            <p className="text-xl font-black text-indigo-600">{fmtHrs(totals.totalExecHrs)}</p>
+          </div>
+          <div className="rounded-2xl p-4 bg-green-50 border border-green-200">
+            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">PT Cost</p>
+            <p className="text-xl font-black text-green-600">
+              RM {totals.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg / PT</p>
+            <p className="text-xl font-black text-slate-600">
+              RM {totals.ptCount > 0 ? (totals.totalPay / totals.ptCount).toFixed(0) : "0"}
+            </p>
+          </div>
+        </div>
+
+        {/* Rate info bar + PDF */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-slate-500">
+            <span className="font-bold text-slate-700">Exec Rate:</span> RM {execRate}/hr (fixed)
+            <span className="mx-3 text-slate-300">|</span>
+            <span className="font-bold text-slate-700">Coach Rate:</span> per employee profile (PT only)
+            <span className="mx-3 text-slate-300">|</span>
+            <span className="font-bold text-slate-700">Period:</span> {monthLabel}
+            <span className="mx-3 text-slate-300">|</span>
+            <span className="font-bold text-slate-700">FT:</span> hours only (fixed salary)
+          </p>
+          <button
+            type="button"
+            onClick={generatePDF}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            PDF
+          </button>
+        </div>
+
+        {/* Toolbar — admin view only. */}
         {!isEmployeeView && (
           <div className="flex flex-wrap items-center gap-3 mb-6">
             <div className="relative">
@@ -582,87 +663,6 @@ function ManpowerCostReportContent() {
           </div>
         )}
 
-        {isEmployeeView ? (
-          loading ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">Loading your manpower data...</p>
-            </div>
-          ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-              <p className="text-red-600 font-medium">{error}</p>
-            </div>
-          ) : (
-            <EmployeeBreakdown
-              s={filteredStaff[0] ?? makeEmptyRow(viewer)}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              monthLabel={monthLabel}
-              weekFilter={weekFilter}
-              setWeekFilter={setWeekFilter}
-              weekStart={weekStart}
-              weekEnd={weekEnd}
-              execRate={execRate}
-              availableWeeks={availableWeeks}
-              onPdf={generatePDF}
-            />
-          )
-        ) : (
-          <>
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Staff</p>
-            <p className="text-2xl font-black text-slate-700">{totals.totalStaff}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">PT: {totals.ptCount} | FT: {totals.ftCount}</p>
-          </div>
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
-            <p className="text-xl font-black text-blue-600">{fmtHrs(totals.totalHrs)}</p>
-          </div>
-          <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200">
-            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1">Coach Hours</p>
-            <p className="text-xl font-black text-orange-600">{fmtHrs(totals.totalCoachHrs)}</p>
-          </div>
-          <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200">
-            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Exec Hours</p>
-            <p className="text-xl font-black text-indigo-600">{fmtHrs(totals.totalExecHrs)}</p>
-          </div>
-          <div className="rounded-2xl p-4 bg-green-50 border border-green-200">
-            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">PT Cost</p>
-            <p className="text-xl font-black text-green-600">
-              RM {totals.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg / PT</p>
-            <p className="text-xl font-black text-slate-600">
-              RM {totals.ptCount > 0 ? (totals.totalPay / totals.ptCount).toFixed(0) : "0"}
-            </p>
-          </div>
-        </div>
-
-        {/* Rate info bar + PDF */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-slate-500">
-            <span className="font-bold text-slate-700">Exec Rate:</span> RM {execRate}/hr (fixed)
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">Coach Rate:</span> per employee profile (PT only)
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">Period:</span> {monthLabel}
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">FT:</span> hours only (fixed salary)
-          </p>
-          <button
-            type="button"
-            onClick={generatePDF}
-            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-all flex items-center gap-1.5 shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            PDF
-          </button>
-        </div>
-
         {/* Staff table */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -673,6 +673,7 @@ function ManpowerCostReportContent() {
                   <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                   <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Type</th>
                   <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center">Coach Hrs</th>
+                  <th className="px-5 py-4 text-xs font-bold text-pink-500 uppercase tracking-wider text-center">Class</th>
                   <th className="px-5 py-4 text-xs font-bold text-indigo-500 uppercase tracking-wider text-center">Exec Hrs</th>
                   <th className="px-5 py-4 text-xs font-bold text-blue-500 uppercase tracking-wider text-center">Total Hrs</th>
                   {viewTab !== "ft" && (
@@ -713,8 +714,7 @@ function ManpowerCostReportContent() {
                       <Row
                         key={rowKey}
                         s={s}
-                        isExpanded={isExpanded}
-                        onToggle={() => setExpandedRow(isExpanded ? null : rowKey)}
+                        onView={() => setExpandedRow(isExpanded ? null : rowKey)}
                         showPay={viewTab !== "ft"}
                       />
                     );
@@ -724,6 +724,16 @@ function ManpowerCostReportContent() {
             </table>
           </div>
         </div>
+
+        {/* Daily Breakdown Modal */}
+        {expandedRow && (
+          <DailyBreakdownModal
+            s={filteredStaff.find(st => `${st.name}:::${st.branch}` === expandedRow)!}
+            monthLabel={monthLabel}
+            execRate={totals?.executiveRate || 0}
+            onClose={() => setExpandedRow(null)}
+          />
+        )}
           </>
         )}
       </div>
@@ -1045,13 +1055,11 @@ function EmployeeBreakdown({
 
 function Row({
   s,
-  isExpanded,
-  onToggle,
+  onView,
   showPay,
 }: {
   s: StaffRow;
-  isExpanded: boolean;
-  onToggle: () => void;
+  onView: () => void;
   showPay: boolean;
 }) {
   const initials = s.name
@@ -1063,7 +1071,7 @@ function Row({
 
   return (
     <>
-      <tr className={`hover:bg-slate-50/50 transition-colors ${isExpanded ? "bg-blue-50/30" : ""}`}>
+      <tr className="hover:bg-slate-50/50 transition-colors">
         <td className="px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
@@ -1088,6 +1096,15 @@ function Row({
           </span>
         </td>
         <td className="px-5 py-4 text-center text-sm font-bold text-orange-600">{fmtHrs(s.coachHrs)}</td>
+        <td className="px-5 py-4 text-center">
+          {s.coachHrs > 0 ? (
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-50 text-pink-600 border border-pink-200">
+              {Math.round(s.coachHrs / 1.25)}
+            </span>
+          ) : (
+            <span className="text-slate-300">—</span>
+          )}
+        </td>
         <td className="px-5 py-4 text-center text-sm font-bold text-indigo-600">{fmtHrs(s.execHrs)}</td>
         <td className="px-5 py-4 text-center text-sm font-black text-blue-600">{fmtHrs(s.totalHrs)}</td>
         {showPay && (
@@ -1102,65 +1119,14 @@ function Row({
         )}
         <td className="px-5 py-4 text-center">
           <button
-            onClick={onToggle}
+            onClick={onView}
             className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+            title="View Daily Breakdown"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+            <Eye className="w-4 h-4" />
           </button>
         </td>
       </tr>
-
-      {isExpanded && (
-        <tr>
-          <td colSpan={9} className="p-0">
-            <div className="bg-slate-50 border-y border-slate-200 px-5 py-4">
-              <p className="text-sm font-bold text-slate-700 mb-3">
-                Daily Breakdown: <span className="text-blue-600">{s.name}</span>
-                <span className="text-slate-400 font-normal ml-2">({s.days.length} day{s.days.length === 1 ? "" : "s"} worked)</span>
-              </p>
-              {s.days.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No days worked.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse bg-white rounded-lg border border-slate-200">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-bold text-slate-500 uppercase">Date</th>
-                        <th className="px-3 py-2 text-left font-bold text-slate-500 uppercase">Day</th>
-                        <th className="px-3 py-2 text-left font-bold text-slate-500 uppercase">Branch</th>
-                        <th className="px-3 py-2 text-center font-bold text-orange-500 uppercase">Coach</th>
-                        <th className="px-3 py-2 text-center font-bold text-indigo-500 uppercase">Exec</th>
-                        <th className="px-3 py-2 text-center font-bold text-blue-500 uppercase">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {s.days.map(d => (
-                        <tr key={d.date}>
-                          <td className="px-3 py-2 font-medium text-slate-700">{d.date}</td>
-                          <td className="px-3 py-2 text-slate-600">{d.day}</td>
-                          <td className="px-3 py-2 text-slate-600">
-                            {d.scheduleBranch ? (
-                              <span className="text-amber-600 font-medium">
-                                {d.scheduleBranch}{" "}
-                                <span className="text-slate-400 font-normal">(replacement)</span>
-                              </span>
-                            ) : (
-                              s.branch
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold text-orange-600">{fmtHrs(d.coachHrs)}</td>
-                          <td className="px-3 py-2 text-center font-bold text-indigo-600">{fmtHrs(d.execHrs)}</td>
-                          <td className="px-3 py-2 text-center font-black text-blue-600">{fmtHrs(d.totalHrs)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
     </>
   );
 }
@@ -1229,5 +1195,172 @@ export default function ManpowerCostReportPage() {
     <AppShell email={userEmail} role={userRole} name={userName}>
       <ManpowerCostReportContent />
     </AppShell>
+  );
+}
+
+// ─── Daily Breakdown Modal ──────────────────────────────────────────────────
+
+function DailyBreakdownModal({
+  s,
+  monthLabel,
+  execRate,
+  onClose,
+}: {
+  s: StaffRow;
+  monthLabel: string;
+  execRate: number;
+  onClose: () => void;
+}) {
+  const [yr, mn] = monthLabel ? [new Date(monthLabel).getFullYear(), new Date(monthLabel).getMonth() + 1] : [new Date().getFullYear(), new Date().getMonth() + 1];
+  const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const numDays = new Date(yr, mn, 0).getDate();
+  const allDays = Array.from({ length: numDays }, (_, i) => {
+    const d = i + 1;
+    const dateStr = `${yr}-${String(mn).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dayName = daysOfWeek[new Date(yr, mn - 1, d).getDay()];
+    return { dayNum: d, date: dateStr, day: dayName };
+  });
+  
+  const workedMap: Record<string, { coachHrs: number; execHrs: number; totalHrs: number; scheduleBranch?: string }> = {};
+  s.days.forEach(d => { workedMap[d.date] = d; });
+
+  const handlePdf = () => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(`Daily Breakdown: ${s.name}`, 14, 20);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Month: ${monthLabel} | Branch: ${s.branch}`, 14, 27);
+    
+    const tableData = allDays.map(row => {
+      const entry = workedMap[row.date];
+      if (!entry) return [row.dayNum.toString(), row.day.slice(0, 3), row.date, "-", "-", "-", "-", "-"];
+      const classes = Math.round(entry.coachHrs / 1.25);
+      const coachPayDay = entry.coachHrs * (s.rate || 0);
+      const execPayDay = entry.execHrs * execRate;
+      return [
+        row.dayNum.toString(),
+        row.day.slice(0, 3),
+        row.date,
+        fmtHrs(entry.coachHrs),
+        classes > 0 ? classes.toString() : "-",
+        fmtHrs(entry.execHrs),
+        fmtHrs(entry.totalHrs),
+        s.isPT ? `RM ${(coachPayDay + execPayDay).toFixed(2)}` : "-",
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["NO.", "DAY", "DATE", "COACH HR", "CLASS", "EXEC HR", "TOTAL HR", "PAY (RM)"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 3 },
+      columnStyles: {
+        3: { halign: "center", textColor: [234, 88, 12] },
+        4: { halign: "center", textColor: [249, 115, 22] },
+        5: { halign: "center", textColor: [79, 70, 229] },
+        6: { halign: "center", textColor: [37, 99, 235] },
+        7: { halign: "right", fontStyle: "bold" },
+      }
+    });
+
+    doc.save(`daily_breakdown_${s.name.replace(/\s+/g, "_")}_${monthLabel}.pdf`);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-slate-200">
+        <div className="flex items-start justify-between p-5 border-b border-slate-200 gap-4 shrink-0">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">
+              Daily Breakdown: <span className="text-blue-600 uppercase">{s.name}</span>
+              <span className="text-slate-400 font-normal ml-2 text-xs">
+                ({s.branch} | Coach {s.isPT && s.rate ? `RM${s.rate}/hr` : "N/A"}, Exec RM{execRate}/hr)
+              </span>
+            </h2>
+            <p className="text-xs font-medium text-slate-500 mt-1">
+              {s.days.length} day{s.days.length === 1 ? "" : "s"} worked
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={handlePdf}
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+            >
+              <FileDown className="w-4 h-4" /> PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto p-0">
+          <table className="w-full text-xs border-collapse">
+            <thead className="bg-white sticky top-0 shadow-sm z-10 border-b border-slate-100">
+              <tr>
+                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">No.</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Day</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-center font-bold text-orange-500 uppercase tracking-wider">Coach Hr</th>
+                <th className="px-4 py-3 text-center font-bold text-pink-500 uppercase tracking-wider">Class</th>
+                <th className="px-4 py-3 text-center font-bold text-indigo-400 uppercase tracking-wider">Exec Hr</th>
+                <th className="px-4 py-3 text-center font-bold text-blue-500 uppercase tracking-wider">Total Hr</th>
+                <th className="px-4 py-3 text-right font-bold text-green-600 uppercase tracking-wider">Pay (RM)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {allDays.map(row => {
+                const entry = workedMap[row.date];
+                const isWeekend = row.day === "Saturday" || row.day === "Sunday";
+                const worked = !!entry;
+                const coachPayDay = worked ? entry.coachHrs * (s.rate || 0) : 0;
+                const execPayDay = worked ? entry.execHrs * execRate : 0;
+                const dayPay = coachPayDay + execPayDay;
+                const classes = worked ? Math.round(entry.coachHrs / 1.25) : 0;
+                
+                return (
+                  <tr key={row.date} className={`hover:bg-slate-50/50 transition-colors ${!worked ? "text-slate-300" : ""}`}>
+                    <td className="px-4 py-2 font-medium text-slate-400">{row.dayNum}</td>
+                    <td className={`px-4 py-2 font-bold ${!worked ? "text-slate-300" : isWeekend ? "text-blue-500" : "text-slate-500"}`}>
+                      {row.day.slice(0, 3)}
+                    </td>
+                    <td className={`px-4 py-2 ${!worked ? "text-slate-300" : "text-slate-600"}`}>
+                      {row.date}
+                      {worked && entry.scheduleBranch && (
+                        <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider">
+                          Training / Replacement
+                        </span>
+                      )}
+                    </td>
+                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-orange-500" : "text-slate-200"}`}>
+                      {worked ? fmtHrs(entry.coachHrs) : "-"}
+                    </td>
+                    <td className={`px-4 py-2 text-center font-bold ${worked && classes > 0 ? "text-pink-500" : "text-slate-200"}`}>
+                      {worked && classes > 0 ? classes : "-"}
+                    </td>
+                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-indigo-500" : "text-slate-200"}`}>
+                      {worked ? fmtHrs(entry.execHrs) : "-"}
+                    </td>
+                    <td className={`px-4 py-2 text-center font-black ${worked ? "text-blue-600" : "text-slate-200"}`}>
+                      {worked ? fmtHrs(entry.totalHrs) : "-"}
+                    </td>
+                    <td className={`px-4 py-2 text-right font-black ${worked && dayPay > 0 ? "text-green-600" : "text-slate-200"}`}>
+                      {worked && s.isPT ? `RM ${dayPay.toFixed(2)}` : "-"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }

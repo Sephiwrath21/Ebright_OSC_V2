@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSpaceTasks } from "@/lib/clickup";
+import { isCrmAvailable } from "@/lib/crm-db";
+import { getTicketCounterByPlatform } from "@/lib/crm-tickets";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +61,24 @@ export async function GET() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Ensure tickets table exists and get ticket counts from DB
-    await ensureTicketsTable();
-    const tickets = await prisma.$queryRawUnsafe<{ name: string; count: number; total: number }[]>(
-      `SELECT name, count, total FROM public.od_tickets ORDER BY id ASC;`
-    );
+    // 1. Tickets Counter — real per-platform tally from the CRM ticket system:
+    //    total tickets per platform + how many are solved (status = 'complete').
+    let tickets: { name: string; count: number; total: number }[] = [];
+    try {
+      if (isCrmAvailable()) {
+        const real = await getTicketCounterByPlatform();
+        if (real && real.length > 0) tickets = real;
+      }
+    } catch (e) {
+      console.error("[od/dashboard] ticket counter failed:", e instanceof Error ? e.message : e);
+    }
+    // Fall back to the local demo table only when the CRM link is unavailable.
+    if (tickets.length === 0) {
+      await ensureTicketsTable();
+      tickets = await prisma.$queryRawUnsafe<{ name: string; count: number; total: number }[]>(
+        `SELECT name, count, total FROM public.od_tickets ORDER BY id ASC;`
+      );
+    }
 
     // 2. Query attendance metrics from DB
     const [onboarding, offboarding, mcCount, alCount] = await Promise.all([
@@ -104,6 +119,7 @@ export async function GET() {
     // 3. Fetch ClickUp tasks from ClickUp API
     let clickupTasks: any[] = [];
     let clickupConfigured = false;
+    let dailyTasks: { id: string; name: string; status: string; listName: string; url: string }[] = [];
     const dailyDistribution = {
       PENDING: 0,
       COMPLETE: 0,
@@ -144,7 +160,7 @@ export async function GET() {
           "tuesday (x)", "wednesday (x)", "thursday(x)", "friday(x)", "saturday(x)"
         ]);
 
-        const dailyTasks = rawTasks
+        dailyTasks = rawTasks
           .filter((t) => t.folderName && DAILY_FOLDERS.has(t.folderName.trim().toLowerCase()))
           .map((t) => {
             let s = t.status.toUpperCase();
