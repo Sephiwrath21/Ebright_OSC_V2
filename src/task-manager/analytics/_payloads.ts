@@ -336,9 +336,16 @@ export interface AdhocRegionsPayload {
  * mentType "Manager" — allowedCadenceOptions in assign/route.ts), so every
  * tagged block already satisfies it; Coach/Branch Exec assignees never see
  * the Ad hoc Cadence option at all. Grouped by branch then Region A/B/C.
- * All-time, not period-windowed.
+ *
+ * `date` (YYYY-MM-DD, 2026-07-28): window to that single day by the
+ * dueAt-else-startedAt rule — the Home overview's Ad hoc date filter.
+ * Omitted = ALL-TIME (the original semantics; the /task-manager payloads
+ * still use this). The ADHOC cadence tag never binds a block to a period,
+ * so the day window is applied here in JS, not via fetchPeriodBlocks'
+ * tag-aware window query.
  */
-export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
+export async function getAdhocRegionsPayload(date?: string): Promise<AdhocRegionsPayload> {
+  const window = date ? resolveWindow("daily", date) : null;
   const all = await fetchPeriodBlocks(null);
   const [users, starters] = await Promise.all([
     getAssigneeMap(all),
@@ -347,6 +354,10 @@ export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
   const blocks = all.filter((b) => {
     const isAdhoc = starters.get(b.run.startedById)?.role === "BRANCH" || b.cadence === "ADHOC";
     if (!isAdhoc) return false;
+    if (window) {
+      const ts = b.dueAt ?? b.startedAt;
+      if (!ts || ts < window.start || ts >= window.end) return false;
+    }
     return users.get(b.assigneeId)?.employmentType === "Manager";
   });
   const branches = attachEntityTasks(
