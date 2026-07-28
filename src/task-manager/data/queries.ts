@@ -55,7 +55,14 @@ export function getFlowDetail(
     await advanceRecurringBlocks();
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    const me = await getMePayload(user, q.period, q.date);
+    // Personal sets are windowed to the anchor day/month (the personal
+    // view's date filters, 2026-07-28) — EXCEPT the CEO, whose single
+    // combined "My Tasks" list deliberately mixes the whole daily+monthly
+    // sets and has no picker; strict windows would silently drop their
+    // upcoming tasks.
+    const me = await getMePayload(user, q.period, q.date, {
+      strictWindow: user.role !== "CEO",
+    });
 
     if (canViewOrg(user.role)) {
       const [org, adhoc, adhocByRegion] = await Promise.all([
