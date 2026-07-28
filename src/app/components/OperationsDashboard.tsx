@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import GreetingHeader from "@/app/components/GreetingHeader";
-import ClickUpPieChart from "@/app/components/ClickUpPieChart";
 import {
   Compass,
   Calendar,
@@ -11,8 +10,6 @@ import {
   UserMinus,
   FileText,
   Sparkles,
-  ListTodo,
-  ArrowLeft,
   Phone,
   Mail,
   User,
@@ -65,25 +62,13 @@ function formatTime(isoString: string): string {
 export default function OperationsDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered department Task Manager overview (real data slot). */
+  taskOverview?: ReactNode;
 }) {
-  const dummyDistribution = {
-    PENDING: 184,
-    COMPLETE: 492,
-    "NOT APPLICABLE": 1,
-    "N/A": 5,
-  };
-
-  const dummyDailyTasks = [
-    { id: "86d3g0op1", name: "Daily Operations Sync with Leads", status: "PENDING", listName: "Ops Core", url: "#" },
-    { id: "86d3g0op2", name: "Audit scanner sync errors", status: "PENDING", listName: "Scanners", url: "#" },
-    { id: "86d3g0op3", name: "Review CRM Leads funnel performance", status: "PENDING", listName: "CRM", url: "#" },
-    { id: "86d3g0op4", name: "Verify class scheduling status", status: "COMPLETE", listName: "Schedules", url: "#" },
-    { id: "86d3g0op5", name: "Prepare operations weekly check-in report", status: "COMPLETE", listName: "Ops Core", url: "#" },
-  ];
-
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
@@ -98,7 +83,6 @@ export default function OperationsDashboard({
   });
   const [leads, setLeads] = useState<CRMLead[]>([]);
   const [braindump, setBraindump] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   // Load backend stats & CRM leads
   const loadBackend = useCallback(() => {
@@ -265,72 +249,9 @@ export default function OperationsDashboard({
           {/* Right Column (Width 5/12) */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* 3. ClickUp Optimization Progress */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-slate-800">
-              <div>
-                {selectedStatus === null ? (
-                  <>
-                    <h2 className="text-base font-semibold text-slate-900 mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <ListTodo className="w-5 h-5 text-teal-500" />
-                        Daily | Tue - Sat
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide font-mono">
-                        Demo Mode
-                      </span>
-                    </h2>
-
-                    <div className="flex justify-center items-center py-1">
-                      <ClickUpPieChart
-                        distribution={dummyDistribution}
-                        onSliceClick={setSelectedStatus}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                      <button
-                        onClick={() => setSelectedStatus(null)}
-                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors flex items-center gap-1 text-xs font-bold"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Chart
-                      </button>
-                      <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                        {selectedStatus} ({dummyDailyTasks.filter((t) => t.status === selectedStatus).length})
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                      {dummyDailyTasks.filter((t) => t.status === selectedStatus).length === 0 ? (
-                        <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
-                      ) : (
-                        dummyDailyTasks
-                          .filter((t) => t.status === selectedStatus)
-                          .map((t) => (
-                            <a
-                              key={t.id}
-                              href={t.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-start gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs transition-all duration-200"
-                            >
-                              <span className="font-mono text-[10px] text-slate-400 font-bold">#{t.id}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-slate-700 leading-tight hover:underline">{t.name}</p>
-                                <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-                                  List: {t.listName}
-                                </p>
-                              </div>
-                            </a>
-                          ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+            {/* Real department Task Manager status (server-rendered slot) —
+                replaced the legacy DEMO-MODE ClickUp widget (2026-07-28). */}
+            {taskOverview}
 
             {/* 4. Braindump Section */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
