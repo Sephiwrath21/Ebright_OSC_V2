@@ -253,6 +253,8 @@ describe("sortTaskRows", () => {
     runName: "r",
     flowName: "f",
     assigneeId: "u",
+    cadence: null,
+    repeatWeekly: false,
     dueAt: dueAt ? dueAt.toISOString() : null,
     status: "ACTIVE",
     fromSchedule: false,

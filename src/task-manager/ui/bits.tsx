@@ -921,6 +921,7 @@ export function StatusOverviewCard({
   onSkip,
   onReopen,
   reassign,
+  autoRefresh,
 }: {
   title: string;
   /** Period line under the title; omit for un-periodized overview cards. */
@@ -943,6 +944,8 @@ export function StatusOverviewCard({
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
   /** "Assign to Others" control, passed straight to EntityDrillModal. */
   reassign?: ReassignControl;
+  /** "Auto Refresh" control, passed straight to EntityDrillModal. */
+  autoRefresh?: AutoRefreshControl;
 }) {
   const [selected, setSelected] = React.useState<BucketKey | null>(null);
   const drill = tasks ? setSelected : undefined;
@@ -971,6 +974,7 @@ export function StatusOverviewCard({
           onSkip={onSkip}
           onReopen={onReopen}
           reassign={reassign}
+          autoRefresh={autoRefresh}
         />
       )}
     </div>
@@ -984,6 +988,20 @@ export function StatusOverviewCard({
 export interface ReassignControl {
   staff: FlowStaffMember[];
   action: (runBlockId: string, newAssigneeId: string) => Promise<ActionResult>;
+}
+
+/** "Auto Refresh" (2026-07-25): flip weekly auto-recurrence on an existing
+ *  task from the task lists — per-row chip + bulk enable/disable. Only
+ *  provided to the 5 assign-capable identities (page-side gate); the server
+ *  action re-checks. Renders on DAILY rows with a due date only. */
+export interface AutoRefreshControl {
+  action: (runBlockId: string, enabled: boolean) => Promise<ActionResult>;
+}
+
+/** DAILY + has a due day — the only rows Auto Refresh can act on (mirrors
+ *  setTaskAutoRefresh's server-side guards). */
+function autoRefreshEligible(t: FlowDrillTask): boolean {
+  return t.cadence === "DAILY" && t.dueAt !== null && !t.fromSchedule;
 }
 
 /** Inline person picker for "Assign to Others" — search + click ONE name
@@ -1066,6 +1084,7 @@ export function EntityDrillModal({
   onSkip,
   onReopen,
   reassign,
+  autoRefresh,
 }: {
   name: string;
   tasks: Record<BucketKey, FlowDrillTask[]>;
@@ -1084,14 +1103,30 @@ export function EntityDrillModal({
    *  a reassign control opening an inline person picker. Only passed for
    *  the 5 assign-capable identities; the server action re-checks. */
   reassign?: ReassignControl;
+  /** "Auto Refresh": per-row toggle chip + bulk enable/disable on DAILY
+   *  rows. Same 5-identity gate as reassign. */
+  autoRefresh?: AutoRefreshControl;
 }) {
   const meta = BUCKET_META.find((b) => b.key === bucketKey)!;
   const rows = tasks[bucketKey];
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [reassignRow, setReassignRow] = React.useState<string | null>(null);
+  // Optimistic Auto Refresh states (runBlockId -> enabled) so the chip flips
+  // immediately; server revalidation catches the props up afterwards.
+  const [refreshState, setRefreshState] = React.useState<Record<string, boolean>>({});
+  const [refreshError, setRefreshError] = React.useState<string | null>(null);
+  const rowAutoRefresh = (t: FlowDrillTask) => refreshState[t.runBlockId] ?? t.repeatWeekly;
 
   const ownedRows = rows.filter((t) => myUserId && t.assigneeId === myUserId);
-  const allOwnedSelected = ownedRows.length > 0 && ownedRows.every((t) => selectedIds.has(t.runBlockId));
+  // Selection extends beyond the viewer's OWN rows when an Auto Refresh
+  // control is present (its bulk action targets other people's tasks).
+  // Safe for the pre-existing bulk actions: each one still filters its
+  // targets by its own eligibility rules (assignee === viewer etc.).
+  const selectableRows = autoRefresh
+    ? rows.filter((t) => (myUserId && t.assigneeId === myUserId) || autoRefreshEligible(t))
+    : ownedRows;
+  const allSelected =
+    selectableRows.length > 0 && selectableRows.every((t) => selectedIds.has(t.runBlockId));
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1101,7 +1136,7 @@ export function EntityDrillModal({
     });
   };
   const toggleSelectAll = () => {
-    setSelectedIds(allOwnedSelected ? new Set() : new Set(ownedRows.map((t) => t.runBlockId)));
+    setSelectedIds(allSelected ? new Set() : new Set(selectableRows.map((t) => t.runBlockId)));
   };
 
   // Bulk actions only ever touch tasks that are BOTH selected AND still
@@ -1169,6 +1204,37 @@ export function EntityDrillModal({
       onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId),
     });
   }
+  // Auto Refresh bulk actions — any bucket (a DONE task can be enabled so
+  // next week's occurrence still spawns), DAILY rows with a due day only.
+  if (autoRefresh) {
+    const applyBulk = async (enabled: boolean): Promise<ActionResult> => {
+      const ids = rows
+        .filter((t) => selectedIds.has(t.runBlockId) && autoRefreshEligible(t))
+        .map((t) => t.runBlockId);
+      const r = await runBulk((id) => autoRefresh.action(id, enabled), autoRefreshEligible);
+      if (r.ok) {
+        setRefreshState((prev) => ({
+          ...prev,
+          ...Object.fromEntries(ids.map((id) => [id, enabled])),
+        }));
+      }
+      return r;
+    };
+    bulkActions.push(
+      {
+        key: "auto-refresh-on",
+        label: "Enable Auto Refresh",
+        icon: <span className="shrink-0 text-[11px] leading-none text-blue-600">↻</span>,
+        onRun: () => applyBulk(true),
+      },
+      {
+        key: "auto-refresh-off",
+        label: "Disable Auto Refresh",
+        icon: <span className="shrink-0 text-[11px] leading-none text-gray-400">⊘</span>,
+        onRun: () => applyBulk(false),
+      },
+    );
+  }
 
   return (
     <div
@@ -1194,12 +1260,12 @@ export function EntityDrillModal({
             ✕
           </button>
         </div>
-        {ownedRows.length > 0 && (
+        {selectableRows.length > 0 && (
           <div className="mb-2 flex items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
               <input
                 type="checkbox"
-                checked={allOwnedSelected}
+                checked={allSelected}
                 onChange={toggleSelectAll}
                 className="size-4 rounded border-gray-300 accent-blue-600"
               />
@@ -1210,6 +1276,7 @@ export function EntityDrillModal({
             )}
           </div>
         )}
+        {refreshError && <p className="mb-2 text-xs text-red-600">{refreshError}</p>}
         {rows.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">
             No {meta.label.toLowerCase()} tasks this period.
@@ -1221,13 +1288,15 @@ export function EntityDrillModal({
               const dueDisplay = formatDueDate(due);
               const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
               const canReassign = bucketKey === "pending" && Boolean(reassign);
+              const selectable =
+                isOwned || (Boolean(autoRefresh) && autoRefreshEligible(t));
               return (
                 <div
                   key={t.runBlockId}
                   className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
                 >
                   <div className="flex items-center gap-2.5">
-                    {isOwned && (
+                    {selectable && (
                       <input
                         type="checkbox"
                         checked={selectedIds.has(t.runBlockId)}
@@ -1251,6 +1320,29 @@ export function EntityDrillModal({
                     </div>
                     {dueDisplay && (
                       <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+                    )}
+                    {autoRefresh && autoRefreshEligible(t) && (
+                      <button
+                        type="button"
+                        title="Auto Refresh — recreates this task every week when its day passes"
+                        onClick={async () => {
+                          const next = !rowAutoRefresh(t);
+                          setRefreshError(null);
+                          const r = await autoRefresh.action(t.runBlockId, next);
+                          if (r.ok) {
+                            setRefreshState((p) => ({ ...p, [t.runBlockId]: next }));
+                          } else {
+                            setRefreshError(r.message);
+                          }
+                        }}
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          rowAutoRefresh(t)
+                            ? "border-blue-400 bg-blue-50 text-blue-700"
+                            : "border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600"
+                        }`}
+                      >
+                        ↻ {rowAutoRefresh(t) ? "On" : "Off"}
+                      </button>
                     )}
                     {canReassign && (
                       <button
