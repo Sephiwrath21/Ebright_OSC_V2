@@ -49,6 +49,66 @@ const assignInputSchema = z.object({
   repeatWeekly: z.boolean().optional().default(false),
 });
 
+/** "Auto Refresh" (2026-07-25 correction — standalone list-view action, NOT
+ *  a creation-form field): flip weekly auto-recurrence on ONE existing task.
+ *  Allowed for the same identities as assignFlowTask; HOD scoped to their
+ *  own department's tasks. Enabling requires a DAILY-cadence task with a
+ *  due date (the weekly advance anchors on it); disabling is always
+ *  allowed. The recurrence itself is engine/recurrence.ts, unchanged. */
+export function setTaskAutoRefresh(
+  actorEmail: string,
+  runBlockId: string,
+  enabled: boolean,
+): Promise<void> {
+  return native(async () => {
+    const actor = await requireUserByEmail(actorEmail);
+    const allowed =
+      actor.role === "ADMIN" ||
+      actor.role === "OPS" ||
+      actor.role === "CEO" ||
+      actor.role === "HOD" ||
+      isElevatedDeptSite(actor);
+    if (!allowed) {
+      throw new ApiHttpError(
+        403,
+        "Only superadmin, operations, HOD, the CEO, or the Operations/Optimisation department accounts can change Auto Refresh",
+      );
+    }
+
+    const block = await prisma.runBlock.findUnique({ where: { id: runBlockId } });
+    if (!block) throw new ApiHttpError(404, "Task not found");
+    if (enabled) {
+      if (block.cadence !== "DAILY") {
+        throw new ApiHttpError(400, "Auto Refresh is for Daily tasks only");
+      }
+      if (!block.dueAt) {
+        throw new ApiHttpError(400, "Auto Refresh needs a task with a due day to repeat on");
+      }
+      if (block.scheduleSlotId) {
+        throw new ApiHttpError(400, "Manpower Schedule tasks are managed by the schedule, not Auto Refresh");
+      }
+    }
+    if (actor.role === "HOD") {
+      const assignee = await prisma.user.findUnique({ where: { id: block.assigneeId } });
+      if (!actor.department || assignee?.department !== actor.department) {
+        throw new ApiHttpError(403, "HODs can only change Auto Refresh within their own department");
+      }
+    }
+    if (block.repeatWeekly === enabled) return;
+
+    await prisma.runBlock.update({ where: { id: block.id }, data: { repeatWeekly: enabled } });
+    await prisma.auditLog.create({
+      data: {
+        runId: block.runId,
+        runBlockId: block.id,
+        actorId: actor.id,
+        action: "BLOCK_AUTO_REFRESH",
+        detail: { enabled },
+      },
+    });
+  }, "setTaskAutoRefresh");
+}
+
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
  *  Allowed for the same identities as assignFlowTask; HOD additionally
  *  scoped to their own department on BOTH ends (the task's current assignee

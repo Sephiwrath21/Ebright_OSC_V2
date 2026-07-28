@@ -321,6 +321,7 @@ export function TaskManagerView({
   skipTaskAction,
   reopenTaskAction,
   reassign,
+  autoRefresh,
   manpowerScheduleHref,
   ceoDashboard,
   staff,
@@ -352,6 +353,9 @@ export function TaskManagerView({
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
+  /** "Auto Refresh" control (weekly recurrence toggle) for the same drill
+   *  modals — same 5-identity gate. */
+  autoRefresh?: import("./bits").AutoRefreshControl;
   /** HOD/DEPT_SITE only: replaces daily.department in the inline Details
    *  Daily section — the page re-fetches it for the selected ?date=. */
   departmentDaily?: FlowEntityDetail;
@@ -413,6 +417,7 @@ export function TaskManagerView({
     onSkip: skipTaskAction,
     onReopen: reopenTaskAction,
     reassign,
+    autoRefresh,
   };
 
 
@@ -443,7 +448,7 @@ export function TaskManagerView({
       title="Tasks I Assigned"
       totals={me.delegatedAll.totals}
       tasks={flowBucketize(me.delegatedAll.tasks)}
-      reassign={reassign}
+      reassign={reassign} autoRefresh={autoRefresh}
     />
   );
 
@@ -455,7 +460,7 @@ export function TaskManagerView({
       title="Ad hoc Tasks"
       totals={current.adhoc.totals}
       tasks={flowBucketize(current.adhoc.tasks)}
-      reassign={reassign}
+      reassign={reassign} autoRefresh={autoRefresh}
     />
   );
 
@@ -520,14 +525,14 @@ export function TaskManagerView({
             label="Daily"
             entity={departmentDaily ?? daily.department}
             kind="department"
-            reassign={reassign}
+            reassign={reassign} autoRefresh={autoRefresh}
             headerControl={departmentDailyControl}
           />
           <EntityOverviewSection
             label="Monthly"
             entity={monthly.department}
             kind="department"
-            reassign={reassign}
+            reassign={reassign} autoRefresh={autoRefresh}
           />
           {assignAction && staff && me.me.role === "HOD" && (
             <div className="flex justify-end">
@@ -552,7 +557,7 @@ export function TaskManagerView({
                 title="Daily"
                 totals={daily.branch.totals}
                 tasks={daily.branch.tasks}
-                reassign={reassign}
+                reassign={reassign} autoRefresh={autoRefresh}
               />
             )}
             {monthly.branch && (
@@ -560,7 +565,7 @@ export function TaskManagerView({
                 title="Monthly"
                 totals={monthly.branch.totals}
                 tasks={monthly.branch.tasks}
-                reassign={reassign}
+                reassign={reassign} autoRefresh={autoRefresh}
               />
             )}
             {/* Ad hoc oversight — Branch Manager only, not the view-only
