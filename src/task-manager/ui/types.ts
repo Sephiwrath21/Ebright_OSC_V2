@@ -227,7 +227,10 @@ export const FLOW_BRANCH_REGIONS = [
 export const FLOW_STAFF_ROLES = ["Manager", "Branch Exec", "Coach"] as const;
 export const FLOW_DAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 export const FLOW_DEPARTMENTS = [
-  "Operation",
+  // Renamed from "Operation" 2026-07-25 (user spelling correction). The
+  // SOURCE systems (portal hrfs department table, HRFS markers) still say
+  // "Operation" — hrfs-map.ts's normalizeSourceDepartment shims imports.
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",
