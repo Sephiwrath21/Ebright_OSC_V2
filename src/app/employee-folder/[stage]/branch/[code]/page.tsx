@@ -9,6 +9,7 @@ import {
   listEmployeeOverviewRows,
   listExitTypesByUserId,
 } from "@/lib/employeeQueries";
+import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,15 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
 
   const { stage, code } = await params;
   if (!isEmployeeStage(stage)) notFound();
+
+  // Block direct-URL access to another branch's namelist for a scoped
+  // account — this account's own scope key isn't "this branch" (either
+  // they're department-scoped, branch-scoped to a different branch, or
+  // scoped to nothing), so there's nothing here for them to legitimately
+  // browse to, not just an empty list.
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) redirect("/login");
+  if (!scope.fullAccess && scope.branchCode !== code) notFound();
 
   const [rows, branches] = await Promise.all([listEmployeeOverviewRows(), listBranches()]);
   const branch = branches.find((b) => b.code === code);

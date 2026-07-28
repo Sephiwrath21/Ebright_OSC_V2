@@ -10,8 +10,7 @@ import {
   Subsection,
   RecordTable,
   EditableField,
-  PlaceholderField,
-  PlaceholderSelectField,
+  EditableSelectField,
   EmergencyContactPanel,
   PersonalInfoPanel,
   ResumePanel,
@@ -31,8 +30,13 @@ import {
   RealAttachmentLink,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection } from "@/app/components/EditMode";
-import { EMPLOYEE_RECORD_STATIC_PANELS, PayrollPanel } from "@/app/components/EmployeeRecordPanels";
-import { updateBankDetails, updateEmergencyContact } from "@/lib/employeeRecordActions";
+import {
+  EMPLOYEE_RECORD_STATIC_PANELS,
+  PayrollPanel,
+  GuardianInfoPanel,
+  PerformanceReviewPanel,
+} from "@/app/components/EmployeeRecordPanels";
+import { updateBankDetails, updateEmergencyContact, updatePaymentInfo } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
   LeaveHistoryRow,
@@ -52,6 +56,10 @@ import type {
   SuspensionLetterEntry,
   ShowcauseWarningLetterEntry,
   PipEntry,
+  GuardianInfoEntry,
+  PaymentInfoData,
+  PerformanceReviewInfo,
+  PayslipInfo,
 } from "@/lib/employeeQueries";
 
 // Vertical sub-nav rail — green, from category_shared.css (shared by every
@@ -99,6 +107,14 @@ interface Props {
   suspensionLetters?: SuspensionLetterEntry[];
   showcauseWarningLetters?: ShowcauseWarningLetterEntry[];
   pips?: PipEntry[];
+  /** Real guardian_info rows — only fetched for Personal Info > Guardian Info. */
+  guardianInfo?: GuardianInfoEntry[];
+  /** Real payment_info data — only fetched for Personal Info > Payment. */
+  paymentInfo?: PaymentInfoData | null;
+  /** Real performance_review data — only fetched for Active Employment > Performance Review. */
+  performanceReview?: PerformanceReviewInfo | null;
+  /** Real payslip data — only fetched for Finance > Payroll/Payslip. */
+  payslip?: PayslipInfo | null;
 }
 
 export default function EmployeeRecordView({
@@ -124,6 +140,10 @@ export default function EmployeeRecordView({
   suspensionLetters,
   showcauseWarningLetters,
   pips,
+  guardianInfo,
+  paymentInfo,
+  performanceReview,
+  payslip,
 }: Props) {
   const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
 
@@ -181,8 +201,10 @@ export default function EmployeeRecordView({
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
               if (sectionKey === "personal-info" && employeeDetail)
                 return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} />;
-              if (sectionKey === "payment" && employeeDetail)
-                return <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} />;
+              if (sectionKey === "guardian-info" && guardianInfo !== undefined)
+                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} />;
+              if (sectionKey === "payment" && employeeDetail && paymentInfo !== undefined)
+                return <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} />;
               if (sectionKey === "emergency-contact" && employeeDetail)
                 return (
                   <EmergencyContactPanel employee={employeeDetail} onSave={(data) => updateEmergencyContact(employeeId, data)} />
@@ -198,12 +220,14 @@ export default function EmployeeRecordView({
                 return <DocumentsPanel userId={employeeId} data={documentsInfo} showEmploymentContract={false} />;
               if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
                 return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
-              if (category.key === "finance" && sectionKey === "payroll" && salaryRevisions !== undefined)
-                return <PayrollPanel employeeId={employeeId} salaryRevisions={salaryRevisions} />;
+              if (category.key === "finance" && sectionKey === "payroll" && salaryRevisions !== undefined && payslip !== undefined)
+                return <PayrollPanel employeeId={employeeId} salaryRevisions={salaryRevisions} payslip={payslip} />;
               if (category.key === "hr-info" && sectionKey === "nda-nc" && ndaInfo !== undefined && nonCompeteInfo !== undefined)
                 return <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} />;
               if (category.key === "active-employment" && sectionKey === "cert" && achievements !== undefined)
                 return <AchievementPanel userId={employeeId} data={achievements} />;
+              if (category.key === "active-employment" && sectionKey === "performance-review" && performanceReview !== undefined)
+                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} />;
               if (category.key === "active-employment" && sectionKey === "promotion" && promotions !== undefined)
                 return <PromotionPanel userId={employeeId} data={promotions} />;
               if (category.key === "active-employment" && sectionKey === "transfer" && transfers !== undefined)
@@ -259,20 +283,52 @@ export default function EmployeeRecordView({
   );
 }
 
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "Bank Transfer", label: "Bank Transfer" },
+  { value: "Cheque", label: "Cheque" },
+  { value: "Cash", label: "Cash" },
+];
+const PAYMENT_FREQUENCY_OPTIONS = [
+  { value: "Monthly", label: "Monthly" },
+  { value: "Bi-weekly", label: "Bi-weekly" },
+  { value: "Weekly", label: "Weekly" },
+];
+
 // Matches pinfo_payment.html's exact layout: "Bank Details" subsection (Bank
 // Name, Account Holder, Account Number — real bank_details columns) +
 // "Payment" subsection (Payment Method, Payment Frequency, Pay Date,
-// Remarks — no matching column anywhere; would need 4 new columns, most
-// likely on a payroll_settings-style table, to persist for real). Shown as
-// PlaceholderFields so they read "Not provided" like everything else instead
-// of a permanent on-screen caveat.
-function PaymentInfoPanel({ employee, employeeId }: { employee: EmployeeDetailFull; employeeId: number }) {
+// Remarks — real payment_info columns now, deliberately separate from
+// bank_details). One Edit/Save button for the whole tab, same as
+// PayrollPanel — both real tables saved together.
+function PaymentInfoPanel({
+  employee,
+  employeeId,
+  data,
+}: {
+  employee: EmployeeDetailFull;
+  employeeId: number;
+  data: PaymentInfoData | null;
+}) {
   const [bankName, setBankName] = useState(employee.bankName ?? "");
   const [accountName, setAccountName] = useState(employee.accountName ?? "");
   const [bankAccount, setBankAccount] = useState(employee.bankAccount ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(data?.paymentMethod ?? "");
+  const [paymentFrequency, setPaymentFrequency] = useState(data?.paymentFrequency ?? "");
+  const [payDate, setPayDate] = useState(data?.payDate ?? "");
+  const [remark, setRemark] = useState(data?.remark ?? "");
+
+  async function handleSave() {
+    const [bankResult, paymentResult] = await Promise.all([
+      updateBankDetails(employeeId, { bankName, accountName, bankAccount }),
+      updatePaymentInfo(employeeId, { paymentMethod, paymentFrequency, payDate, remark }),
+    ]);
+    if (bankResult && bankResult.ok === false) return bankResult;
+    if (paymentResult && paymentResult.ok === false) return paymentResult;
+    return { ok: true };
+  }
 
   return (
-    <EditableSection onSave={() => updateBankDetails(employeeId, { bankName, accountName, bankAccount })}>
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Payment &amp; Bank Info</PanelHeading>
       <Subsection heading="Bank Details">
         <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
@@ -280,10 +336,15 @@ function PaymentInfoPanel({ employee, employeeId }: { employee: EmployeeDetailFu
         <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
       </Subsection>
       <Subsection heading="Payment">
-        <PlaceholderSelectField label="Payment Method" options={["Bank Transfer", "Cheque", "Cash"]} />
-        <PlaceholderSelectField label="Payment Frequency" options={["Monthly", "Bi-weekly", "Weekly"]} />
-        <PlaceholderField label="Pay Date" type="date" />
-        <PlaceholderField label="Remarks" full />
+        <EditableSelectField label="Payment Method" value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_METHOD_OPTIONS} />
+        <EditableSelectField
+          label="Payment Frequency"
+          value={paymentFrequency}
+          onChange={setPaymentFrequency}
+          options={PAYMENT_FREQUENCY_OPTIONS}
+        />
+        <EditableField label="Pay Date" value={payDate} onChange={setPayDate} type="date" />
+        <EditableField label="Remarks" value={remark} onChange={setRemark} full />
       </Subsection>
     </EditableSection>
   );

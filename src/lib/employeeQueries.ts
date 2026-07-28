@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { titleCaseName } from "@/lib/text";
 import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage } from "@/lib/employeeStages";
+import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
 export type { EmployeeStage };
@@ -174,7 +175,13 @@ function stageFromEmployment(status: string | null, probation: boolean): Employe
   return "active";
 }
 
-export async function listEmployeeOverviewRows(): Promise<EmployeeOverviewRow[]> {
+// `skipScopeFilter` exists only for callers that deliberately need every
+// employee regardless of the current session's own department/branch scope
+// (e.g. a future system/background job) — every existing caller is an
+// Employee Overview/Record page, so the default (scoped) is what every one
+// of them should get; opt OUT explicitly rather than opt in, so a new
+// caller that forgets about scope still fails closed instead of open.
+export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
   const [pending, staff] = await Promise.all([
     prisma.users.findMany({
       where: { status: "pending" },
@@ -228,7 +235,16 @@ export async function listEmployeeOverviewRows(): Promise<EmployeeOverviewRow[]>
     };
   });
 
-  return [...pendingRows, ...staffRows];
+  const rows = [...pendingRows, ...staffRows];
+  if (options.skipScopeFilter) return rows;
+
+  const scope = await getCurrentEmployeeScope();
+  // No session -> the caller's own auth() gate (already required before
+  // reaching any page that calls this) will have redirected; returning
+  // everything unfiltered here would only matter if that gate were ever
+  // missing, so fail closed instead.
+  if (!scope) return [];
+  return filterRowsByScope(scope, rows);
 }
 
 // Real salary_revision table — Active stage's own "Salary Revision" tab.
@@ -552,6 +568,70 @@ export async function listDisciplinarySummary(userId: number): Promise<Disciplin
   ];
   rows.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return rows;
+}
+
+// ─── Exit stage's 3 singleton tables (resignation/reference_letter/
+// exit_interview_note) — same "return null if no row" convention as nda/
+// probation. ───
+
+export interface ResignationInfo {
+  submissionDate: string | null;
+  lastWorkingDate: string | null;
+  reason: string | null;
+  resignLetterFileId: string | null;
+  acceptLetterFileId: string | null;
+}
+
+export async function getResignation(userId: number): Promise<ResignationInfo | null> {
+  const row = await prisma.resignation.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    submissionDate: row.submission_date ? row.submission_date.toISOString().slice(0, 10) : null,
+    lastWorkingDate: row.last_working_date ? row.last_working_date.toISOString().slice(0, 10) : null,
+    reason: row.reason,
+    resignLetterFileId: row.resign_letter_file_id,
+    acceptLetterFileId: row.accept_letter_file_id,
+  };
+}
+
+export interface ReferenceLetterInfo {
+  requestDate: string | null;
+  type: string | null;
+  issuedDate: string | null;
+  issuedBy: string | null;
+  remark: string | null;
+  issuedLetterFileId: string | null;
+}
+
+export async function getReferenceLetter(userId: number): Promise<ReferenceLetterInfo | null> {
+  const row = await prisma.reference_letter.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    requestDate: row.request_date ? row.request_date.toISOString().slice(0, 10) : null,
+    type: row.type,
+    issuedDate: row.issued_date ? row.issued_date.toISOString().slice(0, 10) : null,
+    issuedBy: row.issued_by,
+    remark: row.remark,
+    issuedLetterFileId: row.issued_letter_file_id,
+  };
+}
+
+export interface ExitInterviewNoteInfo {
+  date: string | null;
+  interviewer: string | null;
+  reason: string | null;
+  note: string | null;
+}
+
+export async function getExitInterviewNote(userId: number): Promise<ExitInterviewNoteInfo | null> {
+  const row = await prisma.exit_interview_note.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    date: row.date ? row.date.toISOString().slice(0, 10) : null,
+    interviewer: row.interviewer,
+    reason: row.reason,
+    note: row.note,
+  };
 }
 
 export type RealExitType = "resignation" | "eoc";
@@ -949,5 +1029,96 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     emergencyRelation: em?.relation ?? null,
     emergencyEmail: em?.email ?? null,
     emergencyAddress: em?.address ?? null,
+  };
+}
+
+// ─── Employee Record singleton/repeatable tables added alongside
+// resignation/reference_letter/exit_interview_note above ───
+
+// Repeatable — confirmed via the mock's own real "Add Another" button
+// (pinfo_guardianInfo.html) — same convention as achievement.
+export interface GuardianInfoEntry {
+  id: number;
+  name: string | null;
+  relationship: string | null;
+  gender: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+}
+
+export async function listGuardianInfo(userId: number): Promise<GuardianInfoEntry[]> {
+  const rows = await prisma.guardian_info.findMany({ where: { user_id: userId }, orderBy: { guardian_info_id: "asc" } });
+  return rows.map((r) => ({
+    id: r.guardian_info_id,
+    name: r.name,
+    relationship: r.relationship,
+    gender: r.gender,
+    email: r.email,
+    phone: r.phone,
+    address: r.address,
+  }));
+}
+
+// Singleton — Personal Info > Payment & Bank Info's own "Payment"
+// subsection (separate from bank_details, which backs "Bank Details").
+export interface PaymentInfoData {
+  paymentMethod: string | null;
+  paymentFrequency: string | null;
+  payDate: string | null;
+  remark: string | null;
+}
+
+export async function getPaymentInfo(userId: number): Promise<PaymentInfoData | null> {
+  const row = await prisma.payment_info.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    paymentMethod: row.payment_method,
+    paymentFrequency: row.payment_frequency,
+    payDate: row.pay_date ? row.pay_date.toISOString().slice(0, 10) : null,
+    remark: row.remark,
+  };
+}
+
+// Singleton — confirmed via the mock's own single-form-only rendering
+// (activeEmp_performanceRev.html), no history list/"+Add" button.
+export interface PerformanceReviewInfo {
+  period: string | null;
+  reviewDate: string | null;
+  reviewer: string | null;
+  overallRating: string | null;
+  comment: string | null;
+  attachmentFileId: string | null;
+}
+
+export async function getPerformanceReview(userId: number): Promise<PerformanceReviewInfo | null> {
+  const row = await prisma.performance_review.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    period: row.period,
+    reviewDate: row.review_date ? row.review_date.toISOString().slice(0, 10) : null,
+    reviewer: row.reviewer,
+    overallRating: row.overall_rating,
+    comment: row.comment,
+    attachmentFileId: row.attachment_file_id,
+  };
+}
+
+// Singleton — Finance > Payroll/Payslip's "Basic Pay" + "Payslip"
+// subsections (deliberately separate from the existing payroll table's
+// EPF/SOCSO/EIS/Tax/PCB fields — no overlap).
+export interface PayslipInfo {
+  basicPay: string | null;
+  type: string | null;
+  attachmentFileId: string | null;
+}
+
+export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
+  const row = await prisma.payslip.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    basicPay: row.basic_pay?.toString() ?? null,
+    type: row.type,
+    attachmentFileId: row.attachment_file_id,
   };
 }

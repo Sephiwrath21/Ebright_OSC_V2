@@ -22,6 +22,9 @@ import {
   getNda,
   getNonCompete,
   listDisciplinarySummary,
+  getResignation,
+  getReferenceLetter,
+  getExitInterviewNote,
   resolveLocationName,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
@@ -92,6 +95,13 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   const ndaInfo = activeOrAfter ? await getNda(numId) : undefined;
   const nonCompeteInfo = activeOrAfter ? await getNonCompete(numId) : undefined;
   const disciplinarySummary = activeOrAfter ? await listDisciplinarySummary(numId) : undefined;
+  // Resignation/Reference Letter/Exit Interview Notes are Exit's own tabs
+  // only — Exit is terminal (nothing comes after it), so unlike Active's
+  // tabs above these never need to be fetched for an earlier stage's history.
+  const isExit = stage === "exit";
+  const resignationInfo = isExit ? await getResignation(numId) : undefined;
+  const referenceLetterInfo = isExit ? await getReferenceLetter(numId) : undefined;
+  const exitInterviewNoteInfo = isExit ? await getExitInterviewNote(numId) : undefined;
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -121,6 +131,9 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         ndaInfo={ndaInfo}
         nonCompeteInfo={nonCompeteInfo}
         disciplinarySummary={disciplinarySummary}
+        resignationInfo={resignationInfo}
+        referenceLetterInfo={referenceLetterInfo}
+        exitInterviewNoteInfo={exitInterviewNoteInfo}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

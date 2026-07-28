@@ -31,6 +31,9 @@ import type {
   NdaInfo,
   NonCompeteInfo,
   DisciplinarySummaryRow,
+  ResignationInfo,
+  ReferenceLetterInfo,
+  ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
 import {
   PanelHeading,
@@ -53,6 +56,9 @@ import {
   NonCompetePanel,
   DisciplinarySummaryPanel,
   RealAttachmentLink,
+  ResignationPanel,
+  ReferenceLetterPanel,
+  ExitInterviewNotesPanel,
 } from "@/app/components/ActiveProfilePanels";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
 import { updateEmergencyContact } from "@/lib/employeeRecordActions";
@@ -82,6 +88,9 @@ interface Props {
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  resignationInfo?: ResignationInfo | null;
+  referenceLetterInfo?: ReferenceLetterInfo | null;
+  exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
   /** Which branch/dept-scoped namelist this employee was opened from — null
    *  for Pre/Probation (no location layer) or when opened without that
    *  context. Drives the breadcrumb's dynamic branch/dept segment, mirroring
@@ -122,6 +131,9 @@ export default function StageProfileView({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  resignationInfo,
+  referenceLetterInfo,
+  exitInterviewNoteInfo,
   locationGroup,
   locationCode,
   locationName,
@@ -283,6 +295,9 @@ export default function StageProfileView({
                 ndaInfo,
                 nonCompeteInfo,
                 disciplinarySummary,
+                resignationInfo,
+                referenceLetterInfo,
+                exitInterviewNoteInfo,
                 employeeId,
               })}
             </div>
@@ -405,6 +420,9 @@ function resolvePanel({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  resignationInfo,
+  referenceLetterInfo,
+  exitInterviewNoteInfo,
   employeeId,
 }: {
   originStage: EmployeeStage;
@@ -426,6 +444,9 @@ function resolvePanel({
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  resignationInfo?: ResignationInfo | null;
+  referenceLetterInfo?: ReferenceLetterInfo | null;
+  exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
   employeeId: number;
 }) {
   if (originStage === "active" && section.key === "mc-leave" && leaveHistory) {
@@ -502,6 +523,18 @@ function resolvePanel({
   }
   if (section.key === "disciplinary" && disciplinarySummary !== undefined) {
     return <DisciplinarySummaryPanel data={disciplinarySummary} />;
+  }
+  // Exit stage's 3 real singleton tabs — Resignation/Reference Letter/Exit
+  // Interview Notes. Its 4 Clearance sub-tabs remain placeholders (no
+  // backing tables), still resolved via STAGE_CONTENT_PANELS below.
+  if (section.key === "resignation" && resignationInfo !== undefined) {
+    return <ResignationPanel userId={employeeId} data={resignationInfo} />;
+  }
+  if (section.key === "reference-letter" && referenceLetterInfo !== undefined) {
+    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} />;
+  }
+  if (section.key === "exit-interview-notes" && exitInterviewNoteInfo !== undefined) {
+    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} />;
   }
   if (STAGE_CONTENT_PANELS[section.key]) {
     const ContentPanel = STAGE_CONTENT_PANELS[section.key];
@@ -664,6 +697,20 @@ function ExitHistoryTiles({
 // listLeaveHistory). The mock's own MC/Leave columns are Leave Type/Date/
 // Duration/Attachment; Status and Reason are kept since they're real and
 // useful, beyond what the mock happened to show.
+// Start/end date stacked on their own line within the Date cell (rather than
+// squeezed onto one "start – end" line, which wraps messily) — each line is
+// its own whitespace-nowrap span so a single date never breaks mid-string.
+// Same-day leave shows just the one date, no second line.
+function LeaveDateCell({ startDate, endDate }: { startDate: string; endDate: string }) {
+  if (startDate === endDate) return <span className="whitespace-nowrap">{startDate}</span>;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="whitespace-nowrap">{startDate}</span>
+      <span className="whitespace-nowrap">{endDate}</span>
+    </div>
+  );
+}
+
 function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
   return (
     <div>
@@ -679,9 +726,9 @@ function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
         ]}
         rows={rows.map((r) => ({
           type: r.leaveTypeName,
-          dates: r.startDate === r.endDate ? r.startDate : `${r.startDate} – ${r.endDate}`,
-          days: `${r.totalDays} Day${r.totalDays === "1" ? "" : "s"}`,
-          status: <span className="capitalize">{r.status}</span>,
+          dates: <LeaveDateCell startDate={r.startDate} endDate={r.endDate} />,
+          days: <span className="whitespace-nowrap">{`${r.totalDays} Day${r.totalDays === "1" ? "" : "s"}`}</span>,
+          status: <span className="capitalize whitespace-nowrap">{r.status}</span>,
           reason: r.reason ?? "—",
           attachment: <RealAttachmentLink fileId={r.attachment} />,
         }))}

@@ -9,6 +9,7 @@ import {
   listEmployeeOverviewRows,
   listExitTypesByUserId,
 } from "@/lib/employeeQueries";
+import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,12 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
 
   const { stage, code } = await params;
   if (!isEmployeeStage(stage)) notFound();
+
+  // Block direct-URL access to another department's namelist for a scoped
+  // account — same reasoning as the branch namelist page.
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) redirect("/login");
+  if (!scope.fullAccess && scope.departmentCode !== code) notFound();
 
   const [rows, departments] = await Promise.all([listEmployeeOverviewRows(), listDepartments()]);
   const department = departments.find((d) => d.code === code);

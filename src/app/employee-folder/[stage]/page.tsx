@@ -12,6 +12,7 @@ import {
   summarizeStageByDepartment,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
+import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,19 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
         <StageFlatListView stage={stage} rows={stageRows} />
       </AppShell>
     );
+  }
+
+  // Department/branch-scoped accounts have only one possible location to
+  // drill into (their own) — skip the "By Branch / By Department" selection
+  // screen entirely and land them straight on their own filtered list,
+  // consistent with the breadcrumb pattern (Employee Overview > Active >
+  // Marketing) rather than making them pick their own department from a
+  // list of every department. HR/Superadmin (fullAccess) keep seeing the
+  // selection screen unchanged.
+  const scope = await getCurrentEmployeeScope();
+  if (scope && !scope.fullAccess) {
+    if (scope.departmentCode) redirect(`/employee-folder/${stage}/department/${scope.departmentCode}`);
+    if (scope.branchCode) redirect(`/employee-folder/${stage}/branch/${scope.branchCode}`);
   }
 
   const { by } = await searchParams;

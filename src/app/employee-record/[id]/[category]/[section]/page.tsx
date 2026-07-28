@@ -22,6 +22,10 @@ import {
   listSuspensionLetters,
   listShowcauseWarningLetters,
   listPips,
+  listGuardianInfo,
+  getPaymentInfo,
+  getPerformanceReview,
+  getPayslip,
 } from "@/lib/employeeQueries";
 import { findRecordCategory } from "@/lib/employeeRecordConfig";
 
@@ -80,6 +84,11 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const showcauseWarningLetters =
     category === "disciplinary" && section === "showcause" ? await listShowcauseWarningLetters(numId) : undefined;
   const pips = category === "disciplinary" && section === "pip" ? await listPips(numId) : undefined;
+  const guardianInfo = category === "personal-info" && section === "guardian-info" ? await listGuardianInfo(numId) : undefined;
+  const paymentInfo = category === "personal-info" && section === "payment" ? await getPaymentInfo(numId) : undefined;
+  const performanceReview =
+    category === "active-employment" && section === "performance-review" ? await getPerformanceReview(numId) : undefined;
+  const payslip = category === "finance" && section === "payroll" ? await getPayslip(numId) : undefined;
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -110,6 +119,10 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         suspensionLetters={suspensionLetters}
         showcauseWarningLetters={showcauseWarningLetters}
         pips={pips}
+        guardianInfo={guardianInfo}
+        paymentInfo={paymentInfo}
+        performanceReview={performanceReview}
+        payslip={payslip}
       />
     </AppShell>
   );

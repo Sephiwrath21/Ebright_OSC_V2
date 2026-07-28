@@ -344,6 +344,117 @@ model pip {
   @@index([user_id], map: "idx_pip_user")
 }
 
+// ─── Exit (3 singleton tables, same convention as resume/medical_check/
+// probation) — confirmed via the mock's single-form-only rendering for each
+// (no "+Add"/history list anywhere for Resignation/Reference Letter/Exit
+// Interview Notes). ───
+
+model resignation {
+  resignation_id        Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  submission_date       DateTime? @db.Date
+  last_working_date     DateTime? @db.Date
+  reason                String?
+  resign_letter_file_id String?   @db.VarChar(128)
+  accept_letter_file_id String?   @db.VarChar(128)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resignation_user")
+}
+
+// type is constrained to employment/reference/service by a DB-level CHECK
+// constraint (chk_reference_letter_type, add_reference_letter.sql) not
+// modeled here — same convention as nda.status.
+model reference_letter {
+  reference_letter_id   Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  request_date          DateTime? @db.Date
+  type                  String?   @db.VarChar(20)
+  issued_date           DateTime? @db.Date
+  issued_by             String?   @db.VarChar(100)
+  remark                String?
+  issued_letter_file_id String?   @db.VarChar(128)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reference_letter_user")
+}
+
+// No attachment field — not in the mock's own Exit Interview Notes panel.
+// reason is constrained to career/compensation/relocation/personal/other by
+// a DB-level CHECK constraint (chk_exit_interview_note_reason,
+// add_exit_interview_note.sql) not modeled here — same convention as
+// nda.status.
+model exit_interview_note {
+  exit_interview_note_id Int       @id @default(autoincrement())
+  user_id                Int       @unique
+  date                   DateTime? @db.Date
+  interviewer            String?   @db.VarChar(100)
+  reason                 String?   @db.VarChar(20)
+  note                   String?
+  users                  users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exit_interview_note_user")
+}
+
+// ─── Employee Record singleton tables (same convention as resume/
+// medical_check/probation) ───
+
+// Repeatable — confirmed via the mock's own real "Add Another" button
+// (pinfo_guardianInfo.html, id="add-guardian-btn") — same convention as
+// achievement/salary_revision (own serial PK, user_id NOT unique, indexed).
+model guardian_info {
+  guardian_info_id Int     @id @default(autoincrement())
+  user_id          Int
+  name             String? @db.VarChar(255)
+  relationship     String? @db.VarChar(50)
+  gender           String? @db.VarChar(20)
+  email            String? @db.VarChar(255)
+  phone            String? @db.VarChar(30)
+  address          String?
+  users            users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_guardian_info_user")
+
+  @@index([user_id], map: "idx_guardian_info_user")
+}
+
+// payment_method/payment_frequency are constrained by DB-level CHECK
+// constraints (chk_payment_info_method/chk_payment_info_frequency,
+// add_payment_info.sql) not modeled here — same convention as
+// nda.status/payroll.pcb_form. Deliberately separate from bank_details,
+// which backs the same Payment & Bank Info page's "Bank Details" subsection.
+model payment_info {
+  payment_info_id   Int       @id @default(autoincrement())
+  user_id           Int       @unique
+  payment_method    String?   @db.VarChar(20)
+  payment_frequency String?   @db.VarChar(20)
+  pay_date          DateTime? @db.Date
+  remark            String?
+  users             users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payment_info_user")
+}
+
+// overall_rating is constrained by a DB-level CHECK constraint
+// (chk_performance_review_rating, add_performance_review.sql) not modeled
+// here — same convention as nda.status.
+model performance_review {
+  performance_review_id Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  period                String?   @db.VarChar(50)
+  review_date           DateTime? @db.Date
+  reviewer              String?   @db.VarChar(100)
+  overall_rating        String?   @db.VarChar(30)
+  comment               String?
+  attachment_file_id    String?   @db.VarChar(128)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_performance_review_user")
+}
+
+// Deliberately separate from the existing payroll model (EPF/SOCSO/EIS/Tax/
+// PCB) — backs a different subsection (Basic Pay/Payslip) of a different
+// tab (Finance > Payroll/Payslip vs. Onboarding's own Payroll/Finance > Tax
+// Info). type is constrained by a DB-level CHECK constraint
+// (chk_payslip_type, add_payslip.sql) not modeled here — same convention as
+// nda.status.
+model payslip {
+  payslip_id         Int      @id @default(autoincrement())
+  user_id            Int      @unique
+  basic_pay          Decimal? @db.Decimal(10, 2)
+  type               String?  @db.VarChar(20)
+  attachment_file_id String?  @db.VarChar(128)
+  users              users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payslip_user")
+}
+
 model employment {
   employment_id      Int                           @id @default(autoincrement())
   user_id            Int
@@ -450,6 +561,14 @@ model users {
   password                                       String?                      @db.VarChar(255)
   role_id                                        Int
   status                                         String?                      @default("active") @db.VarChar(50)
+  // Per-account override for the Employee Overview/Record department/branch
+  // scope rule (see add_users_is_full_access.sql) — lets a specific account
+  // (e.g. hr@ebright.my, whose role_type is "department" rather than "hr" for
+  // unrelated historical reasons — ~30 other places already key off that
+  // exact role_type string, so changing it risked side effects elsewhere)
+  // see every employee without altering role_type. role_type "hr"/"superadmin"
+  // already imply full access on their own; this is only for exceptions.
+  is_full_access                                 Boolean                      @default(false)
   last_login                                     DateTime?                    @db.Timestamptz(6)
   created_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
@@ -505,6 +624,13 @@ model users {
   workflow_assignments_user                      workflow_assignment[]        @relation("WorkflowAssignmentUser")
   workflow_assignment_steps_completed            workflow_assignment_step[]
   workflow_templates_created                     workflow_template[]          @relation("WorkflowTemplateCreatedBy")
+  resignation                                    resignation?
+  reference_letter                               reference_letter?
+  exit_interview_note                            exit_interview_note?
+  guardian_info                                  guardian_info[]
+  payment_info                                   payment_info?
+  performance_review                             performance_review?
+  payslip                                        payslip?
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

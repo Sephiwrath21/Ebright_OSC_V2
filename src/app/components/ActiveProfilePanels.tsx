@@ -34,6 +34,9 @@ import {
   deleteShowcauseWarningLetter,
   addPip,
   deletePip,
+  updateResignation,
+  updateReferenceLetter,
+  updateExitInterviewNote,
 } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
@@ -55,6 +58,9 @@ import type {
   ShowcauseWarningLetterEntry,
   PipEntry,
   DisciplinarySummaryRow,
+  ResignationInfo,
+  ReferenceLetterInfo,
+  ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
 
 // Shared "inner white form card" primitives used by every tab across both the
@@ -962,12 +968,12 @@ function RecordTable({
               rows.map((row, i) => (
                 <tr key={rowIds?.[i] ?? i}>
                   {columns.map((c) => (
-                    <td key={c.key} className="px-3.5 py-3 text-sm text-[#4b4949] border-b border-black/5">
+                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5">
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
                   {showDeleteColumn && (
-                    <td className="px-3.5 py-3 text-center border-b border-black/5">
+                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5">
                       {rowIds?.[i] !== undefined && (
                         <button
                           type="button"
@@ -1942,6 +1948,143 @@ export function PipPanel({ userId, data }: { userId: number; data: PipEntry[] })
   );
 }
 
+// ─── Exit's 3 singleton tabs (resignation/reference_letter/
+// exit_interview_note) — Exit stage-flow only, no Employee Record equivalent
+// (mirrors probation's own placement). Resignation Letter/Acceptance Letter/
+// Issued Letter route to GOOGLE_DRIVE_LETTER_FOLDER_ID, same shared "letters"
+// folder as probation's confirmation/extension letters and (per this task)
+// suspension/showcause letters. ───
+
+export function ResignationPanel({ userId, data }: { userId: number; data: ResignationInfo | null }) {
+  const [submissionDate, setSubmissionDate] = useState(data?.submissionDate ?? "");
+  const [lastWorkingDate, setLastWorkingDate] = useState(data?.lastWorkingDate ?? "");
+  const [reason, setReason] = useState(data?.reason ?? "");
+  const [resignLetterFileId, setResignLetterFileId] = useState(data?.resignLetterFileId ?? null);
+  const [pendingResignLetter, setPendingResignLetter] = useState<File | null>(null);
+  const [acceptLetterFileId, setAcceptLetterFileId] = useState(data?.acceptLetterFileId ?? null);
+  const [pendingAcceptLetter, setPendingAcceptLetter] = useState<File | null>(null);
+
+  function clearResignLetter() {
+    if (pendingResignLetter) setPendingResignLetter(null);
+    else setResignLetterFileId(null);
+  }
+  function clearAcceptLetter() {
+    if (pendingAcceptLetter) setPendingAcceptLetter(null);
+    else setAcceptLetterFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateResignation(userId, {
+          submissionDate,
+          lastWorkingDate,
+          reason,
+          resignLetterFileId,
+          resignLetterFile: pendingResignLetter,
+          acceptLetterFileId,
+          acceptLetterFile: pendingAcceptLetter,
+        })
+      }
+    >
+      <PanelHeading>Resignation</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Submission Date" value={submissionDate} onChange={setSubmissionDate} type="date" />
+        <EditableField label="Last Working Date" value={lastWorkingDate} onChange={setLastWorkingDate} type="date" />
+        <EditableTextArea label="Reason" value={reason} onChange={setReason} full />
+        <RealFileField
+          label="Resignation Letter"
+          existingFileId={resignLetterFileId}
+          pendingFile={pendingResignLetter}
+          onPick={setPendingResignLetter}
+          onClear={clearResignLetter}
+        />
+        <RealFileField
+          label="Acceptance Letter"
+          existingFileId={acceptLetterFileId}
+          pendingFile={pendingAcceptLetter}
+          onPick={setPendingAcceptLetter}
+          onClear={clearAcceptLetter}
+        />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+const REFERENCE_LETTER_TYPE_OPTIONS = [
+  { value: "employment", label: "Employment Confirmation" },
+  { value: "reference", label: "Character Reference" },
+  { value: "service", label: "Service / Experience Letter" },
+];
+
+export function ReferenceLetterPanel({ userId, data }: { userId: number; data: ReferenceLetterInfo | null }) {
+  const [requestDate, setRequestDate] = useState(data?.requestDate ?? "");
+  const [type, setType] = useState(data?.type ?? "");
+  const [issuedDate, setIssuedDate] = useState(data?.issuedDate ?? "");
+  const [issuedBy, setIssuedBy] = useState(data?.issuedBy ?? "");
+  const [remark, setRemark] = useState(data?.remark ?? "");
+  const [fileId, setFileId] = useState(data?.issuedLetterFileId ?? null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  function clearFile() {
+    if (pendingFile) setPendingFile(null);
+    else setFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateReferenceLetter(userId, {
+          requestDate,
+          type,
+          issuedDate,
+          issuedBy,
+          remark,
+          issuedLetterFileId: fileId,
+          issuedLetterFile: pendingFile,
+        })
+      }
+    >
+      <PanelHeading>Reference Letter</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Request Date" value={requestDate} onChange={setRequestDate} type="date" />
+        <EditableSelectField label="Letter Type" value={type} onChange={setType} options={REFERENCE_LETTER_TYPE_OPTIONS} />
+        <EditableField label="Issued Date" value={issuedDate} onChange={setIssuedDate} type="date" />
+        <EditableField label="Issued By" value={issuedBy} onChange={setIssuedBy} />
+        <EditableTextArea label="Remarks" value={remark} onChange={setRemark} full />
+        <RealFileField label="Issued Letter" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+const EXIT_REASON_OPTIONS = [
+  { value: "career", label: "Career Advancement" },
+  { value: "compensation", label: "Compensation" },
+  { value: "relocation", label: "Relocation" },
+  { value: "personal", label: "Personal Reasons" },
+  { value: "other", label: "Other" },
+];
+
+export function ExitInterviewNotesPanel({ userId, data }: { userId: number; data: ExitInterviewNoteInfo | null }) {
+  const [date, setDate] = useState(data?.date ?? "");
+  const [interviewer, setInterviewer] = useState(data?.interviewer ?? "");
+  const [reason, setReason] = useState(data?.reason ?? "");
+  const [note, setNote] = useState(data?.note ?? "");
+
+  return (
+    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })}>
+      <PanelHeading>Exit Interview Notes</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Interview Date" value={date} onChange={setDate} type="date" />
+        <EditableField label="Interviewer" value={interviewer} onChange={setInterviewer} />
+        <EditableSelectField label="Primary Reason for Leaving" value={reason} onChange={setReason} options={EXIT_REASON_OPTIONS} full />
+        <EditableTextArea label="Feedback / Notes" value={note} onChange={setNote} full />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
 const GENDER_OPTIONS = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },
@@ -2044,6 +2187,7 @@ export {
   FieldDisplay,
   EditableField,
   EditableSelectField,
+  EditableTextArea,
   PlaceholderField,
   PlaceholderSelectField,
   PlaceholderTextArea,
