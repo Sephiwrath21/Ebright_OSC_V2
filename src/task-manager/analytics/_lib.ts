@@ -188,10 +188,10 @@ export function canViewOrg(role: Role): boolean {
 
 /** Department-site accounts with org-wide DEPARTMENT visibility (still no
  *  branch data) AND the unrestricted "+ Task" assign form (data/tasks.ts):
- *  Operation (whose donor-era special case was assign-only) and Optimisation
+ *  Operations (whose donor-era special case was assign-only) and Optimisation
  *  — per the 2026-07-24 product decision. Every other DEPT_SITE stays locked
- *  to its own department. */
-export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operation", "Optimisation"] as const;
+ *  to its own department. ("Operations" since the 2026-07-25 rename.) */
+export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operations", "Optimisation"] as const;
 
 export function isElevatedDeptSite(user: {
   role: string;
@@ -267,6 +267,44 @@ export function canViewMember(
   return false;
 }
 
+// ---------- member roster ordering (2026-07-25 user decision) ----------
+
+/**
+ * Role-priority rank for member rosters — the primary sort key of every
+ * department/branch Members list (names alphabetical within a group).
+ * Department side: HOD → HQ Exec → Full Time → Part Time → Intern.
+ * Branch side: Manager → Branch Exec → Full Time Coach → Part Time Coach.
+ * One combined ranking serves both (the two pools' types never mix in one
+ * roster); anything unrecognized sorts last.
+ */
+export function memberSortRank(
+  employmentType: string | null | undefined,
+  coachSchedule: string | null | undefined,
+): number {
+  switch (employmentType) {
+    case "HOD":
+      return 0;
+    case "Manager":
+      return 1;
+    case "HQ Exec":
+      return 2;
+    case "Branch Exec":
+      return 3;
+    case "Full Time":
+      return 4;
+    case "Coach":
+      return coachSchedule === "Full Time" ? 5 : 6;
+    case "Part Time":
+      return 7;
+    case "Intern":
+      return 8;
+    case "Regional Manager":
+      return 9;
+    default:
+      return 99;
+  }
+}
+
 // ---------- assigner streams (brief §Task streams) ----------
 
 export interface AssignerStream<B> {
@@ -318,9 +356,11 @@ export function groupByAssignerRole<B extends { run: { startedById: string } }>(
 
 // ---------- org reference data: departments ----------
 
-/** The official department list — org overviews always show all six. */
+/** The official department list — org overviews always show all six.
+ *  ("Operations" since the 2026-07-25 rename; mirrors ui/types.ts's
+ *  FLOW_DEPARTMENTS.) */
 export const DEPARTMENTS = [
-  "Operation",
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",
@@ -522,6 +562,14 @@ export interface PeriodBlockFilter {
   startedById?: string;
   /** Drop blocks assigned to this user (delegated view excludes self-work). */
   excludeAssigneeId?: string;
+  /** Cadence-TAGGED blocks normally belong to their period UNCONDITIONALLY
+   *  (the personal "My Tasks — Daily" weekday tabs need the whole week's
+   *  DAILY tasks at once). Date-filtered surfaces (the entity overviews'
+   *  Daily date picker, 2026-07-25) set this so tagged blocks must ALSO
+   *  fall inside the window, by the same dueAt-else-startedAt rule
+   *  untagged blocks use — otherwise "+ Task"-created (always-tagged)
+   *  tasks appear identically on every selected date. */
+  strictWindow?: boolean;
 }
 
 /**
@@ -548,7 +596,15 @@ export async function fetchPeriodBlocks(
       ...(window
         ? {
             OR: [
-              { cadence: CADENCE_FOR_PERIOD[window.period] },
+              filter.strictWindow
+                ? {
+                    cadence: CADENCE_FOR_PERIOD[window.period],
+                    OR: [
+                      { dueAt: { gte: window.start, lt: window.end } },
+                      { dueAt: null, startedAt: { gte: window.start, lt: window.end } },
+                    ],
+                  }
+                : { cadence: CADENCE_FOR_PERIOD[window.period] },
               { cadence: null, dueAt: { gte: window.start, lt: window.end } },
               { cadence: null, dueAt: null, startedAt: { gte: window.start, lt: window.end } },
             ],

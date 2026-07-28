@@ -62,6 +62,7 @@ async function saveAttachment(
   const { id } = await uploadToDrive(file, {
     prefix: claimType,
     folderPath: driveFolderForClaim(claimDate),
+    folderEnvVar: "GOOGLE_DRIVE_CLAIM_FOLDER_ID",
   });
   return id;
 }

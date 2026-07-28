@@ -20,6 +20,7 @@ import {
   getOrgPayload,
   resolvedDate,
 } from "../analytics/_payloads";
+import { advanceRecurringBlocks } from "../engine/recurrence";
 import { native, requireUserByEmail } from "./core";
 
 /** Personal progress for the dashboard card (daily or monthly). */
@@ -43,6 +44,9 @@ export function getFlowDetail(
   date?: string,
 ): Promise<FlowDetailResponse> {
   return native(async () => {
+    // Lazy weekly-recurrence catch-up (engine/recurrence.ts) — throttled
+    // in-process, idempotent, no-op when nothing recurring is overdue.
+    await advanceRecurringBlocks();
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
     const me = await getMePayload(user, q.period, q.date);
@@ -152,6 +156,7 @@ export function getDepartmentDetail(
   date?: string,
 ): Promise<FlowDepartmentDetailResponse> {
   return native(async () => {
+    await advanceRecurringBlocks();
     const q = departmentQuerySchema.parse({ department, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
     if (!canViewEntity(user, "department", q.department)) {
@@ -179,6 +184,7 @@ export function getBranchDetail(
   date?: string,
 ): Promise<FlowBranchDetailResponse> {
   return native(async () => {
+    await advanceRecurringBlocks();
     const q = branchQuerySchema.parse({ branch, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
     if (!canViewEntity(user, "branch", q.branch)) {

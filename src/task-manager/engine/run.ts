@@ -517,8 +517,12 @@ export async function completeBlock(input: CompleteBlockInput): Promise<Complete
         if (!next) continue;
         created.push(
           await tx.runBlock.create({
+            // `run: { connect }` (not scalar runId): runBlockCreateData returns
+            // the CHECKED create shape, and since the recurrence self-relation
+            // was added (2026-07-25) mixing it with an unchecked scalar FK no
+            // longer satisfies either arm of Prisma's create-input union.
             data: {
-              runId,
+              run: { connect: { id: runId } },
               ...runBlockCreateData(next, nextAssignees.get(nodeId) ?? run.startedById, now),
             },
           }),

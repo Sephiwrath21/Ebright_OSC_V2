@@ -1,13 +1,12 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, CircleCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
   const [showPassword, setShowPassword] = useState(false);
@@ -33,8 +32,11 @@ function LoginForm() {
 
       if (res?.error) {
         setError("Invalid email or password");
-      } else if (res?.ok) {
-        router.push("/home");
+      } else {
+        // Full-page navigation (not router.push) so /home loads with the new
+        // session cookie already set — avoids the SPA race where useSession
+        // still reads "unauthenticated" and bounces back to /login.
+        window.location.href = "/home";
       }
     } catch (err) {
       console.error(err);

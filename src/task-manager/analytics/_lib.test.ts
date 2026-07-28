@@ -24,6 +24,7 @@ import {
   groupByDimension,
   inWindow,
   isElevatedDeptSite,
+  memberSortRank,
   parseLocalDate,
   resolveWindow,
   sortTaskRows,
@@ -317,10 +318,13 @@ describe("role scoping", () => {
     expect(canViewEntity(user("HOD", null), "department", "Operations")).toBe(false);
   });
 
-  it("canViewEntity: DEPT_SITE sees ONLY their own department — no branches (mirrors HOD)", () => {
-    expect(canViewEntity(user("DEPT_SITE"), "department", "Operations")).toBe(true);
-    expect(canViewEntity(user("DEPT_SITE"), "department", "People")).toBe(false);
-    expect(canViewEntity(user("DEPT_SITE"), "branch", "Subang Taipan")).toBe(false);
+  it("canViewEntity: regular DEPT_SITE sees ONLY their own department — no branches (mirrors HOD)", () => {
+    // Uses Finance: since the 2026-07-25 rename, "Operations" is an ELEVATED
+    // department site (see the elevated tests below), so the fixture default
+    // can no longer demonstrate the locked-down case.
+    expect(canViewEntity(user("DEPT_SITE", "Finance"), "department", "Finance")).toBe(true);
+    expect(canViewEntity(user("DEPT_SITE", "Finance"), "department", "People")).toBe(false);
+    expect(canViewEntity(user("DEPT_SITE", "Finance"), "branch", "Subang Taipan")).toBe(false);
   });
 
   it("canViewEntity: MEMBER sees no entities, of either type", () => {
@@ -392,12 +396,13 @@ describe("role scoping", () => {
     expect(canViewMember(noDeptUser, { id: "u-other", department: "Operations" })).toBe(false);
   });
 
-  it("canViewMember: DEPT_SITE sees own-department members only (mirrors HOD)", () => {
+  it("canViewMember: regular DEPT_SITE sees own-department members only (mirrors HOD)", () => {
+    // Finance, not the fixture default — "Operations" is elevated post-rename.
     expect(
-      canViewMember(user("DEPT_SITE"), { id: "u-other", department: "Operations" }),
+      canViewMember(user("DEPT_SITE", "Finance"), { id: "u-other", department: "Finance" }),
     ).toBe(true);
     expect(
-      canViewMember(user("DEPT_SITE"), { id: "u-other", department: "People" }),
+      canViewMember(user("DEPT_SITE", "Finance"), { id: "u-other", department: "People" }),
     ).toBe(false);
   });
 
@@ -427,22 +432,21 @@ describe("role scoping", () => {
     ).toBe(true);
   });
 
-  // ---- elevated department sites (Operation/Optimisation, 2026-07-24) ----
-  // NOTE: the fixtures above use the donor's old "Operations" (with an s)
-  // name, which is deliberately NOT in the elevated list — only the official
-  // FLOW_DEPARTMENTS names "Operation" and "Optimisation" elevate.
+  // ---- elevated department sites (Operations/Optimisation) ----
+  // "Operations" replaced "Operation" in the 2026-07-25 rename; the old
+  // singular spelling must no longer elevate.
 
-  it("isElevatedDeptSite: only DEPT_SITE with Operation or Optimisation", () => {
-    expect(isElevatedDeptSite(user("DEPT_SITE", "Operation"))).toBe(true);
+  it("isElevatedDeptSite: only DEPT_SITE with Operations or Optimisation", () => {
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Operations"))).toBe(true);
     expect(isElevatedDeptSite(user("DEPT_SITE", "Optimisation"))).toBe(true);
     expect(isElevatedDeptSite(user("DEPT_SITE", "Finance"))).toBe(false);
-    expect(isElevatedDeptSite(user("DEPT_SITE", "Operations"))).toBe(false);
+    expect(isElevatedDeptSite(user("DEPT_SITE", "Operation"))).toBe(false);
     expect(isElevatedDeptSite(user("DEPT_SITE", null))).toBe(false);
-    expect(isElevatedDeptSite(user("HOD", "Operation"))).toBe(false);
+    expect(isElevatedDeptSite(user("HOD", "Operations"))).toBe(false);
     expect(isElevatedDeptSite(user("ADMIN", "Optimisation"))).toBe(false);
   });
 
-  it.each(["Operation", "Optimisation"])(
+  it.each(["Operations", "Optimisation"])(
     "canViewEntity: elevated %s DEPT_SITE sees every department but never a branch",
     (dept) => {
       const site = user("DEPT_SITE", dept);
@@ -457,11 +461,41 @@ describe("role scoping", () => {
   it("canViewMember: elevated DEPT_SITE sees any department member, never branch staff", () => {
     const site = user("DEPT_SITE", "Optimisation");
     expect(canViewMember(site, { id: "u-other", department: "Finance" })).toBe(true);
-    expect(canViewMember(site, { id: "u-other", department: "Operation" })).toBe(true);
+    expect(canViewMember(site, { id: "u-other", department: "Operations" })).toBe(true);
     // Branch-side staff carry department: null — out of the elevated scope.
     expect(
       canViewMember(site, { id: "u-other", department: null, branch: "Klang" }),
     ).toBe(false);
+  });
+});
+
+describe("memberSortRank — roster ordering (2026-07-25 decision)", () => {
+  it("department side: HOD → HQ Exec → Full Time → Part Time → Intern", () => {
+    const order = ["HOD", "HQ Exec", "Full Time", "Part Time", "Intern"].map((t) =>
+      memberSortRank(t, null),
+    );
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it("branch side: Manager → Branch Exec → Full Time Coach → Part Time Coach", () => {
+    const order = [
+      memberSortRank("Manager", null),
+      memberSortRank("Branch Exec", null),
+      memberSortRank("Coach", "Full Time"),
+      memberSortRank("Coach", "Part Time"),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it("a Coach with no recorded schedule sorts with the Part Time Coaches", () => {
+    expect(memberSortRank("Coach", null)).toBe(memberSortRank("Coach", "Part Time"));
+  });
+
+  it("unknown or missing employment types sort last", () => {
+    expect(memberSortRank(null, null)).toBeGreaterThan(memberSortRank("Regional Manager", null));
+    expect(memberSortRank("Something Odd", null)).toBeGreaterThan(memberSortRank("Intern", null));
   });
 });
 
@@ -471,9 +505,9 @@ describe("withAllDepartments", () => {
   const rollup = (name: string, completed = 2) => ({ name, completed, pending: 1, na: 0 });
 
   it("zero-fills missing official departments in official order", () => {
-    const out = withAllDepartments([rollup("Marketing"), rollup("operation")]);
+    const out = withAllDepartments([rollup("Marketing"), rollup("operations")]);
     expect(out.map((d) => d.name)).toEqual([
-      "operation", // existing rollup keeps its casing
+      "operations", // existing rollup keeps its casing (case-insensitive match)
       "Academy",
       "Marketing",
       "Optimisation",
