@@ -916,6 +916,7 @@ export function StatusOverviewCard({
   totals,
   tasks,
   action,
+  actionPlacement = "corner",
   myUserId,
   onComplete,
   onSkip,
@@ -929,6 +930,12 @@ export function StatusOverviewCard({
   tasks?: Record<BucketKey, FlowDrillTask[]>;
   /** Rendered top-right (e.g. the Daily/Monthly toggle). */
   action?: React.ReactNode;
+  /** "corner" (default) overlays the action absolutely in the top-right —
+   *  fine for tiny controls (the CEO cards' drag/remove handle). Wide
+   *  controls like the date filter would sit ON TOP of the centered title,
+   *  so they use "row": a right-aligned row in normal flow ABOVE the title
+   *  (2026-07-28 overlap fix) — no overlap at any card width. */
+  actionPlacement?: "corner" | "row";
   /** The VIEWER's own user id — a task's status dot is only ever clickable
    *  when it's both quick-completable AND assigned to this id. Omit to keep
    *  every dot read-only regardless of task eligibility. */
@@ -949,7 +956,12 @@ export function StatusOverviewCard({
 
   return (
     <div className="relative rounded-2xl border border-gray-200 bg-white px-6 py-8 shadow-sm">
-      {action && <div className="absolute right-4 top-4">{action}</div>}
+      {action && actionPlacement === "corner" && (
+        <div className="absolute right-4 top-4">{action}</div>
+      )}
+      {action && actionPlacement === "row" && (
+        <div className="mb-3 flex flex-wrap justify-end">{action}</div>
+      )}
       <p className="text-center text-lg font-semibold text-gray-900">{title}</p>
       {subtitle && <p className="text-center text-sm text-gray-500">{subtitle}</p>}
 
