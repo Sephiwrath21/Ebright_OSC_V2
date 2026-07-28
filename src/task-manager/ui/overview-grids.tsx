@@ -98,14 +98,17 @@ export function EntityDonutGrid({
   title,
   entities,
   nameHref,
+  action,
 }: {
   title: string;
   entities: FlowEntityRollup[];
   /** Builds each entity's link-out URL (e.g. Department Overview), by name. */
   nameHref?: (name: string) => string;
+  /** Right-aligned control in the heading row (e.g. the date filter). */
+  action?: React.ReactNode;
 }) {
   return (
-    <SectionCard title={title}>
+    <SectionCard title={title} action={action}>
       {entities.length === 0 ? (
         <p className="py-6 text-center text-sm text-gray-400">No activity.</p>
       ) : (

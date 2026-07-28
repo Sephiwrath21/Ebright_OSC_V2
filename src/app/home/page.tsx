@@ -25,9 +25,23 @@ import { HomeDeptOverviewSection } from "./dept-overview-section";
 
 const FINANCE_EMAIL = "finance@ebright.my";
 
+/** Strict YYYY-MM-DD or nothing — anything else falls back to today (the
+ *  data layer's own default when the date is omitted). Same rule as
+ *  /task-manager's Daily filter. */
+const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  // Overview date filters (superadmin section): ?date= anchors the Daily
+  // half, ?mdate= the Monthly half — independent of each other.
+  searchParams: Promise<{ date?: string; mdate?: string }>;
+}) {
+  const sp = await searchParams;
+  const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
+  const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -65,7 +79,11 @@ export default async function HomePage() {
           userEmail={userEmail}
           taskOverview={
             <Suspense fallback={null}>
-              <HomeOverviewSection email={userEmail} />
+              <HomeOverviewSection
+                email={userEmail}
+                dailyDate={dailyDate}
+                monthlyDate={monthlyDate}
+              />
             </Suspense>
           }
         />

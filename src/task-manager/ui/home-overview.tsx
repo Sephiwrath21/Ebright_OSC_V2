@@ -8,6 +8,7 @@
 
 import type { FlowDetailResponse } from "./types";
 import { PageSectionHeading } from "./bits";
+import { DailyDatePicker } from "./entity-picker";
 import { EntityDonutGrid, RegionDonutGrids } from "./overview-grids";
 
 export function HomeTaskOverview({
@@ -15,6 +16,9 @@ export function HomeTaskOverview({
   monthlyOrg,
   adhocByRegion,
   departmentOverviewHref,
+  dailyDate,
+  monthlyDate,
+  dateFilterParams,
 }: {
   dailyOrg: NonNullable<FlowDetailResponse["org"]>;
   monthlyOrg?: FlowDetailResponse["org"];
@@ -23,10 +27,21 @@ export function HomeTaskOverview({
    *  out to `?department=<name>` on it (same separator handling as
    *  task-manager-view's deptHref). */
   departmentOverviewHref: string;
+  /** Resolved Daily anchor date (YYYY-MM-DD) — when given, mounts the date
+   *  filter on the Daily grid heading. Both org payloads (departments AND
+   *  branch regions) follow their section's anchor. */
+  dailyDate?: string;
+  /** Resolved Monthly anchor date — filter on the Monthly grid heading;
+   *  any picked date selects that date's whole month. */
+  monthlyDate?: string;
+  /** The raw ?date=/?mdate= values currently in the URL — each picker
+   *  carries the OTHER one along so the two filters stay independent. */
+  dateFilterParams?: { date?: string; mdate?: string };
 }) {
   const sep = departmentOverviewHref.includes("?") ? "&" : "?";
   const deptHref = (department: string) =>
     `${departmentOverviewHref}${sep}department=${encodeURIComponent(department)}`;
+  const raw = dateFilterParams ?? {};
 
   return (
     <div className="flex flex-col gap-5">
@@ -35,12 +50,32 @@ export function HomeTaskOverview({
         title="All Departments — Daily"
         entities={dailyOrg.departments}
         nameHref={deptHref}
+        action={
+          dailyDate && (
+            <DailyDatePicker
+              value={dailyDate}
+              basePath="/home"
+              extraParams={raw.mdate ? { mdate: raw.mdate } : {}}
+            />
+          )
+        }
       />
       {monthlyOrg && (
         <EntityDonutGrid
           title="All Departments — Monthly"
           entities={monthlyOrg.departments}
           nameHref={deptHref}
+          action={
+            monthlyDate && (
+              <DailyDatePicker
+                value={monthlyDate}
+                basePath="/home"
+                param="mdate"
+                step="month"
+                extraParams={raw.date ? { date: raw.date } : {}}
+              />
+            )
+          }
         />
       )}
       {/* Branch status grouped by region — Daily combines all three staff
