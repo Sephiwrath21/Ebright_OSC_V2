@@ -158,19 +158,36 @@ export async function HomeScopedOverviewSection({
       onSkip: actions.skip,
       onReopen: actions.reopen,
     };
-    // Assigner-stream cards ("HOD assigned tasks" / "CEO assigned tasks"):
-    // ALL-TIME, deliberately not date-windowed — same as the Task Manager
-    // page's stream cards. Admin/Ops streams stay hidden per the "no special
-    // Admin Assigned Task category" spec (visibleAssignerStreams).
-    const streamCards = visibleAssignerStreams(daily.me.streamsAll).map((s) => (
+    // Third section — "HOD assigned tasks": ALWAYS present for staff (the
+    // 3-section requirement: Daily · Monthly · HOD Assigned), zero-filled
+    // when this person has no HOD-assigned tasks yet. streamsAll only
+    // carries streams that HAVE tasks, so the card must not depend on the
+    // stream existing. ALL-TIME, deliberately not date-windowed — same as
+    // the Task Manager page's stream cards.
+    const hodStream = daily.me.streamsAll.find((s) => s.key === "HOD");
+    const hodCard = (
       <StatusOverviewCard
-        key={s.key}
-        title={flowStreamLabel(s.key)}
-        totals={s.totals}
-        tasks={flowBucketize(s.tasks)}
+        title={flowStreamLabel("HOD")}
+        subtitle="From HOD"
+        totals={hodStream?.totals ?? { completed: 0, pending: 0, na: 0 }}
+        tasks={flowBucketize(hodStream?.tasks ?? [])}
         {...completeProps}
       />
-    ));
+    );
+    // Any other visible assigner stream (e.g. "CEO assigned tasks") appends
+    // when non-empty; Admin/Ops streams stay hidden per the "no special
+    // Admin Assigned Task category" spec (visibleAssignerStreams).
+    const otherStreamCards = visibleAssignerStreams(daily.me.streamsAll)
+      .filter((s) => s.key !== "HOD")
+      .map((s) => (
+        <StatusOverviewCard
+          key={s.key}
+          title={flowStreamLabel(s.key)}
+          totals={s.totals}
+          tasks={flowBucketize(s.tasks)}
+          {...completeProps}
+        />
+      ));
     return (
       <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <StatusOverviewCard
@@ -191,7 +208,8 @@ export async function HomeScopedOverviewSection({
           actionPlacement="row"
           {...completeProps}
         />
-        {streamCards}
+        {hodCard}
+        {otherStreamCards}
       </div>
     );
   } catch {
