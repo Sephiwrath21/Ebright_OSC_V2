@@ -379,7 +379,10 @@ export interface OrgPayload {
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
 export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
   const window = resolveWindow(period, date);
-  const blocks = await fetchPeriodBlocks(window);
+  // strictWindow: the org grids are date-filterable (Home overview's Daily/
+  // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
+  // cadence-tagged tasks appear identically on every selected date.
+  const blocks = await fetchPeriodBlocks(window, { strictWindow: true });
   const users = await getAssigneeMap(blocks);
   const branches = attachEntityTasks(
     groupByDimension(blocks, (id) => users.get(id)?.branch),
