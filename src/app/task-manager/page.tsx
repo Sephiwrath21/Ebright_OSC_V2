@@ -564,8 +564,11 @@ export default async function TaskManagerPage({
     // Mon–Sun quick-jump pills for "My Tasks — Daily" (2026-07-28): one-click
     // day browsing within the selected week, navigating the same ?date= the
     // picker uses — donut, list, and picker all follow.
+    // key: this element is rendered among the SectionCard's children list
+    // (above the task list), so React wants an explicit key on it.
     const personalDailyWeekPills = (
       <WeekdayJumpPills
+        key="daily-week-pills"
         value={daily.date}
         basePath="/task-manager"
         extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
