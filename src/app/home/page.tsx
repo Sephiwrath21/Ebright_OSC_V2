@@ -36,12 +36,14 @@ export default async function HomePage({
   searchParams,
 }: {
   // Overview date filters (superadmin section): ?date= anchors the Daily
-  // half, ?mdate= the Monthly half — independent of each other.
-  searchParams: Promise<{ date?: string; mdate?: string }>;
+  // half, ?mdate= the Monthly half, ?adate= the Ad hoc regions — all
+  // independent of each other.
+  searchParams: Promise<{ date?: string; mdate?: string; adate?: string }>;
 }) {
   const sp = await searchParams;
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
+  const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -83,6 +85,7 @@ export default async function HomePage({
                 email={userEmail}
                 dailyDate={dailyDate}
                 monthlyDate={monthlyDate}
+                adhocDate={adhocDate}
               />
             </Suspense>
           }

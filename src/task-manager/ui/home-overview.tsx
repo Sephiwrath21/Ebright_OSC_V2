@@ -18,6 +18,7 @@ export function HomeTaskOverview({
   departmentOverviewHref,
   dailyDate,
   monthlyDate,
+  adhocDate,
   dateFilterParams,
 }: {
   dailyOrg: NonNullable<FlowDetailResponse["org"]>;
@@ -34,25 +35,31 @@ export function HomeTaskOverview({
   /** Resolved Monthly anchor date — filter on the Monthly grid heading;
    *  any picked date selects that date's whole month. */
   monthlyDate?: string;
-  /** The raw ?date=/?mdate= values currently in the URL — each picker
-   *  carries the OTHER one along so the two filters stay independent. */
-  dateFilterParams?: { date?: string; mdate?: string };
+  /** Resolved Ad hoc anchor date — filter on the Ad hoc regions heading.
+   *  One picker only (Ad hoc is its own cadence, no Daily/Monthly split);
+   *  the section shows that single day's ad hoc tasks. */
+  adhocDate?: string;
+  /** The raw ?date=/?mdate=/?adate= values currently in the URL — each
+   *  picker carries the OTHERS along so the three filters stay independent. */
+  dateFilterParams?: { date?: string; mdate?: string; adate?: string };
 }) {
   const sep = departmentOverviewHref.includes("?") ? "&" : "?";
   const deptHref = (department: string) =>
     `${departmentOverviewHref}${sep}department=${encodeURIComponent(department)}`;
   const raw = dateFilterParams ?? {};
+  // Every picker carries the OTHER filters' raw params along unchanged, so
+  // changing one date never resets the others.
+  const carry = (except: string) =>
+    Object.fromEntries(
+      Object.entries(raw).filter(([k, v]) => v && k !== except),
+    ) as Record<string, string>;
 
   // One picker per period, mounted on BOTH that period's sections
   // (departments + branch regions). They share a URL param, so the two
   // Daily pickers (and the two Monthly ones) always show the same date and
   // either can drive it.
   const dailyPicker = dailyDate && (
-    <DailyDatePicker
-      value={dailyDate}
-      basePath="/home"
-      extraParams={raw.mdate ? { mdate: raw.mdate } : {}}
-    />
+    <DailyDatePicker value={dailyDate} basePath="/home" extraParams={carry("date")} />
   );
   const monthlyPicker = monthlyDate && (
     <DailyDatePicker
@@ -60,7 +67,15 @@ export function HomeTaskOverview({
       basePath="/home"
       param="mdate"
       step="month"
-      extraParams={raw.date ? { date: raw.date } : {}}
+      extraParams={carry("mdate")}
+    />
+  );
+  const adhocPicker = adhocDate && (
+    <DailyDatePicker
+      value={adhocDate}
+      basePath="/home"
+      param="adate"
+      extraParams={carry("adate")}
     />
   );
 
@@ -102,6 +117,7 @@ export function HomeTaskOverview({
         <RegionDonutGrids
           title="Ad hoc Tasks by Region (Manager)"
           regions={adhocByRegion.regions}
+          action={adhocPicker}
         />
       )}
     </div>

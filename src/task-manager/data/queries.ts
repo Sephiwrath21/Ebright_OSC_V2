@@ -42,6 +42,12 @@ export function getFlowDetail(
   email: string,
   period: FlowPeriod,
   date?: string,
+  opts?: {
+    /** Window `adhocByRegion` to this single day (Home overview's Ad hoc
+     *  date filter, 2026-07-28). Omitted = all-time, the original
+     *  semantics — /task-manager keeps that. */
+    adhocDate?: string;
+  },
 ): Promise<FlowDetailResponse> {
   return native(async () => {
     // Lazy weekly-recurrence catch-up (engine/recurrence.ts) — throttled
@@ -56,7 +62,7 @@ export function getFlowDetail(
         getOrgPayload(q.period, q.date),
         getAdhocPayload(null),
         user.role === "ADMIN" || user.role === "OPS"
-          ? getAdhocRegionsPayload()
+          ? getAdhocRegionsPayload(opts?.adhocDate)
           : Promise.resolve(undefined),
       ]);
       if (user.role === "OPS") {
