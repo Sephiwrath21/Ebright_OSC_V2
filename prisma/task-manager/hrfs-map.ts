@@ -365,8 +365,14 @@ export const OVERRIDES: Record<string, Partial<MappedUser>> = {
   // Manager department (FLOW_DEPARTMENTS has no Sales), so: plain member.
   "finance@ebright.my": { role: "DEPT_SITE", department: "Finance", employmentType: null },
   "marketing@ebright.my": { role: "DEPT_SITE", department: "Marketing", employmentType: null },
-  "operation@ebright.my": { role: "DEPT_SITE", department: "Operation", employmentType: null },
+  "operation@ebright.my": { role: "DEPT_SITE", department: "Operations", employmentType: null },
   "sales@ebright.my": { role: "MEMBER", employmentType: null },
+
+  // od@ebright.my is the Optimisation Department's own superadmin login —
+  // recording its department (no authorization effect for ADMIN) makes the
+  // Task Manager department dropdown default to Optimisation for it
+  // (2026-07-25 user decision).
+  "od@ebright.my": { department: "Optimisation" },
 };
 
 // ---------------------------------------------------------------------------
@@ -422,9 +428,9 @@ export const EXTRA_USERS: MappedUser[] = [
   // (all-departments view + assign — see isElevatedDeptSite).
   {
     email: "operations@ebright.my",
-    name: "Operation Department",
+    name: "Operations Department",
     role: "DEPT_SITE",
-    department: "Operation",
+    department: "Operations",
     branch: null,
     employmentType: null,
     coachSchedule: null,
@@ -628,6 +634,19 @@ export function mapHrfsUser(row: HrfsUserRow): MapResult {
 // primary source didn't already map.
 // ---------------------------------------------------------------------------
 
+/** Task Manager renamed "Operation" -> "Operations" (2026-07-25 user
+ *  spelling fix) but the SOURCE systems (portal hrfs department table, HRFS
+ *  markers) still say "Operation" — normalize on the way in so imports and
+ *  enrichment keep matching. */
+export const SOURCE_DEPARTMENT_RENAMES: Record<string, string> = {
+  Operation: "Operations",
+};
+
+export function normalizeSourceDepartment(name: string | null): string | null {
+  if (!name) return null;
+  return SOURCE_DEPARTMENT_RENAMES[name] ?? name;
+}
+
 export interface PortalEmployeeRow {
   email: string;
   name: string | null;
@@ -693,11 +712,12 @@ export function mapPortalEmployee(row: PortalEmployeeRow): MapResult {
     }
   }
 
+  const sourceDept = normalizeSourceDepartment(row.department);
   const department =
     bPolicy === "none" &&
-    row.department &&
-    (FLOW_DEPARTMENTS as readonly string[]).includes(row.department)
-      ? row.department
+    sourceDept &&
+    (FLOW_DEPARTMENTS as readonly string[]).includes(sourceDept)
+      ? sourceDept
       : null;
 
   const name = row.name && row.name.trim() ? row.name.trim() : emailLocalPart(email);

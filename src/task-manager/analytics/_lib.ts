@@ -188,10 +188,10 @@ export function canViewOrg(role: Role): boolean {
 
 /** Department-site accounts with org-wide DEPARTMENT visibility (still no
  *  branch data) AND the unrestricted "+ Task" assign form (data/tasks.ts):
- *  Operation (whose donor-era special case was assign-only) and Optimisation
+ *  Operations (whose donor-era special case was assign-only) and Optimisation
  *  — per the 2026-07-24 product decision. Every other DEPT_SITE stays locked
- *  to its own department. */
-export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operation", "Optimisation"] as const;
+ *  to its own department. ("Operations" since the 2026-07-25 rename.) */
+export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operations", "Optimisation"] as const;
 
 export function isElevatedDeptSite(user: {
   role: string;
@@ -356,9 +356,11 @@ export function groupByAssignerRole<B extends { run: { startedById: string } }>(
 
 // ---------- org reference data: departments ----------
 
-/** The official department list — org overviews always show all six. */
+/** The official department list — org overviews always show all six.
+ *  ("Operations" since the 2026-07-25 rename; mirrors ui/types.ts's
+ *  FLOW_DEPARTMENTS.) */
 export const DEPARTMENTS = [
-  "Operation",
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",

@@ -370,9 +370,15 @@ export default async function TaskManagerPage({
 
       let overview: ReactNode;
       if (view === "department") {
-        const fallback = elevatedDeptSite
-          ? (daily.me.me.department ?? FLOW_DEPARTMENTS[0])
-          : FLOW_DEPARTMENTS[0];
+        // Default to the ACCOUNT'S OWN department when it has one — the
+        // elevated sites always do, and od@ (Superadmin = the Optimisation
+        // Department's login) carries Optimisation since the 2026-07-25
+        // decision. First list item only as the last resort.
+        const own = daily.me.me.department;
+        const fallback =
+          own && (FLOW_DEPARTMENTS as readonly string[]).includes(own)
+            ? own
+            : FLOW_DEPARTMENTS[0];
         const department =
           sp.department && (FLOW_DEPARTMENTS as readonly string[]).includes(sp.department)
             ? sp.department

@@ -116,7 +116,7 @@ describe("flowGroupMembers — Intern department drill-down (2026-07-25)", () =>
     coachSchedule: null,
   });
   const staff: FlowStaffMember[] = [
-    intern("op-intern", "Operation"),
+    intern("op-intern", "Operations"),
     intern("mkt-intern", "Marketing"),
     intern("no-dept-intern", null),
   ];
@@ -135,7 +135,7 @@ describe("flowGroupMembers — Intern department drill-down (2026-07-25)", () =>
   });
 
   it("a department sub-value narrows to that department's interns only", () => {
-    expect(flowGroupMembers(staff, "Intern", "Operation").map((s) => s.id)).toEqual([
+    expect(flowGroupMembers(staff, "Intern", "Operations").map((s) => s.id)).toEqual([
       "op-intern",
     ]);
   });
