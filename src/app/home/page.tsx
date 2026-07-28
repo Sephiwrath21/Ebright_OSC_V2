@@ -1,11 +1,11 @@
 // Home — server component (converted from useSession): resolves the session
 // server-side, same pattern as /task-manager, and routes to the right
-// per-account dashboard. Server-side so the superadmin (od@) branch can
-// compose the server-fetched Task Manager overview section into its
-// dashboard (ODDashboard's `taskOverview` slot), and the department
-// dashboards (Operations/Marketing/Academy) get their own-department
-// Task Manager section the same way — other client dashboards still
-// fetch their own widget data exactly as before.
+// per-account dashboard. EVERY dashboard receives the same server-fetched
+// Task Manager overview section (`taskOverview` slot) — scoped by the data
+// layer per role (org grids / all departments / own department / own branch
+// / personal) and always carrying the date filters (2026-07-28 "no
+// exceptions" requirement). Client dashboards still fetch their own other
+// widget data exactly as before.
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -20,8 +20,7 @@ import BranchDashboard from "@/app/components/BranchDashboard";
 import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
-import { HomeOverviewSection } from "./overview-section";
-import { HomeDeptOverviewSection } from "./dept-overview-section";
+import { HomeScopedOverviewSection } from "./scoped-overview-section";
 
 const FINANCE_EMAIL = "finance@ebright.my";
 
@@ -35,8 +34,8 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
-  // Overview date filters (superadmin section): ?date= anchors the Daily
-  // half, ?mdate= the Monthly half, ?adate= the Ad hoc regions — all
+  // Overview date filters: ?date= anchors the Daily half, ?mdate= the
+  // Monthly half, ?adate= the Ad hoc regions (org views only) — all
   // independent of each other.
   searchParams: Promise<{ date?: string; mdate?: string; adate?: string }>;
 }) {
@@ -72,64 +71,54 @@ export default async function HomePage({
   const isBranch = userRole.toLowerCase() === "branch";
   const isHr = userRole.toLowerCase() === "hr" || userId === "175";
 
+  // One overview for every account type — the section itself resolves the
+  // Task Manager role and scopes/routes accordingly (and renders nothing on
+  // any Task Manager failure, so no dashboard can break because of it).
+  const taskOverview = (
+    <Suspense fallback={null}>
+      <HomeScopedOverviewSection
+        email={userEmail}
+        dailyDate={dailyDate}
+        monthlyDate={monthlyDate}
+        adhocDate={adhocDate}
+      />
+    </Suspense>
+  );
+
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <HodPendingAlert position={userPosition} />
       {isOD ? (
-        <ODDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeOverviewSection
-                email={userEmail}
-                dailyDate={dailyDate}
-                monthlyDate={monthlyDate}
-                adhocDate={adhocDate}
-              />
-            </Suspense>
-          }
-        />
+        <ODDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isOperations ? (
-        <OperationsDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
-        />
+        <OperationsDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isMarketing ? (
-        <MarketingDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
-        />
+        <MarketingDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isAcademy ? (
-        <AcademyDashboard
+        <AcademyDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
+      ) : isBranch ? (
+        <BranchDashboard
           userName={userName}
           userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
+          branchName={branchName}
+          taskOverview={taskOverview}
         />
-      ) : isBranch ? (
-        <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
       ) : isFinance ? (
-        <FinanceDashboard userName={userName} userEmail={userEmail} />
+        <FinanceDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isStaff ? (
-        <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
+        <EmployeeSelfServiceDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={taskOverview}
+        />
       ) : isHr ? (
-        <HrPersonalizedDashboard userName={userName} userEmail={userEmail} />
+        <HrPersonalizedDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={taskOverview}
+        />
       ) : (
-        <DashboardHome userRole={userRole} userEmail={userEmail} />
+        <DashboardHome userRole={userRole} userEmail={userEmail} taskOverview={taskOverview} />
       )}
     </AppShell>
   );

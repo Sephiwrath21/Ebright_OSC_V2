@@ -11,7 +11,13 @@ import type {
 } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
-import { analyticsQuerySchema, canViewEntity, canViewOrg, UNASSIGNED } from "../analytics/_lib";
+import {
+  analyticsQuerySchema,
+  canViewEntity,
+  canViewOrg,
+  isElevatedDeptSite,
+  UNASSIGNED,
+} from "../analytics/_lib";
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
@@ -115,13 +121,25 @@ export function getFlowDetail(
 
     if (user.role === "HOD" || user.role === "DEPT_SITE") {
       const departmentName = user.department ?? UNASSIGNED;
-      const department = await getEntityPayload("department", departmentName, q.period, q.date);
+      // Elevated department sites (Operations/Optimisation) see EVERY
+      // department (2026-07-28, the Home overview for all roles) — org
+      // payload with the branch halves STRIPPED: elevated visibility is
+      // org-wide DEPARTMENTS only, never branch data (see
+      // ELEVATED_DEPT_SITE_DEPARTMENTS).
+      const elevated = isElevatedDeptSite({ role: user.role, department: user.department });
+      const [department, org] = await Promise.all([
+        getEntityPayload("department", departmentName, q.period, q.date),
+        elevated ? getOrgPayload(q.period, q.date) : Promise.resolve(undefined),
+      ]);
       return {
         kind: "department",
         period: q.period,
         date: resolvedDate(q.date),
         me,
         department: { name: departmentName, ...department },
+        ...(org
+          ? { org: { ...org, branches: [], regions: [], regionsByRole: [] } }
+          : {}),
       } as FlowDetailResponse;
     }
 

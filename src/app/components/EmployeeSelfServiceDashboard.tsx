@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
 import {
   Check,
@@ -80,6 +80,8 @@ interface DashboardData {
 interface Props {
   userName?:  string | null;
   userEmail?: string;
+  /** Server-rendered Task Manager overview (personal, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,7 +125,7 @@ function formatWeekRange(startIso: string, endIso: string): string {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Props) {
+export default function EmployeeSelfServiceDashboard({ userName, userEmail, taskOverview }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -192,6 +194,9 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <GreetingHeader name={greetName} style={{ marginBottom: 32 }} />
+
+        {/* Task Manager — personal status (server-rendered slot). */}
+        {taskOverview && <div className="mb-6">{taskOverview}</div>}
 
         {/* ── Metric cards ───────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

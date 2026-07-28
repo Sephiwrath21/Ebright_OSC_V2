@@ -1,10 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
 
 interface HrPersonalizedDashboardProps {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 type PaletteKey = "blue" | "green" | "amber" | "red" | "purple" | "gray";
@@ -498,6 +501,7 @@ function shadeOfBlue(t: number): string {
 export default function HrPersonalizedDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: HrPersonalizedDashboardProps) {
   const greetName =
     userName?.split(" ")[0] ||
@@ -525,6 +529,9 @@ export default function HrPersonalizedDashboard({
       >
         {/* Greeting header */}
         <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
+
+        {/* Task Manager — own-department status (server-rendered slot). */}
+        {taskOverview}
 
         {/* Section 2: Metric cards */}
         <section
