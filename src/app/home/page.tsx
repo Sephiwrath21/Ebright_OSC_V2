@@ -2,7 +2,9 @@
 // server-side, same pattern as /task-manager, and routes to the right
 // per-account dashboard. Server-side so the superadmin (od@) branch can
 // compose the server-fetched Task Manager overview section into its
-// dashboard (ODDashboard's `taskOverview` slot) — client dashboards still
+// dashboard (ODDashboard's `taskOverview` slot), and the department
+// dashboards (Operations/Marketing/Academy) get their own-department
+// Task Manager section the same way — other client dashboards still
 // fetch their own widget data exactly as before.
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -19,6 +21,7 @@ import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 import { HomeOverviewSection } from "./overview-section";
+import { HomeDeptOverviewSection } from "./dept-overview-section";
 
 const FINANCE_EMAIL = "finance@ebright.my";
 
@@ -67,11 +70,35 @@ export default async function HomePage() {
           }
         />
       ) : isOperations ? (
-        <OperationsDashboard userName={userName} userEmail={userEmail} />
+        <OperationsDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={
+            <Suspense fallback={null}>
+              <HomeDeptOverviewSection email={userEmail} />
+            </Suspense>
+          }
+        />
       ) : isMarketing ? (
-        <MarketingDashboard userName={userName} userEmail={userEmail} />
+        <MarketingDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={
+            <Suspense fallback={null}>
+              <HomeDeptOverviewSection email={userEmail} />
+            </Suspense>
+          }
+        />
       ) : isAcademy ? (
-        <AcademyDashboard userName={userName} userEmail={userEmail} />
+        <AcademyDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={
+            <Suspense fallback={null}>
+              <HomeDeptOverviewSection email={userEmail} />
+            </Suspense>
+          }
+        />
       ) : isBranch ? (
         <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
       ) : isFinance ? (
