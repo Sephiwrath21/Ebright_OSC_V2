@@ -24,6 +24,7 @@ import {
   groupByDimension,
   inWindow,
   isElevatedDeptSite,
+  memberSortRank,
   parseLocalDate,
   resolveWindow,
   sortTaskRows,
@@ -462,6 +463,36 @@ describe("role scoping", () => {
     expect(
       canViewMember(site, { id: "u-other", department: null, branch: "Klang" }),
     ).toBe(false);
+  });
+});
+
+describe("memberSortRank — roster ordering (2026-07-25 decision)", () => {
+  it("department side: HOD → HQ Exec → Full Time → Part Time → Intern", () => {
+    const order = ["HOD", "HQ Exec", "Full Time", "Part Time", "Intern"].map((t) =>
+      memberSortRank(t, null),
+    );
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it("branch side: Manager → Branch Exec → Full Time Coach → Part Time Coach", () => {
+    const order = [
+      memberSortRank("Manager", null),
+      memberSortRank("Branch Exec", null),
+      memberSortRank("Coach", "Full Time"),
+      memberSortRank("Coach", "Part Time"),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it("a Coach with no recorded schedule sorts with the Part Time Coaches", () => {
+    expect(memberSortRank("Coach", null)).toBe(memberSortRank("Coach", "Part Time"));
+  });
+
+  it("unknown or missing employment types sort last", () => {
+    expect(memberSortRank(null, null)).toBeGreaterThan(memberSortRank("Regional Manager", null));
+    expect(memberSortRank("Something Odd", null)).toBeGreaterThan(memberSortRank("Intern", null));
   });
 });
 
