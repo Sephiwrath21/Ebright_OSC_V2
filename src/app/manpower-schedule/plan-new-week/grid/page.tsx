@@ -1,19 +1,19 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import Link from "next/link";
-import { Home as HomeIcon, ChevronRight } from "lucide-react";
+import { Home as HomeIcon, ChevronRight, Undo2, Redo2 } from "lucide-react";
 import AppShell from "@/app/components/AppShell";
 import {
   ALL_BRANCHES,
   isManagerOnDutySlot,
-  isAdminSlot,
   getStaffColorByIndex,
   getSoftStaffColor,
+  SOFT_STAFF_PALETTE,
   SELECT_ARROW_WHITE,
   SELECT_ARROW_DARK,
 } from "@/lib/manpowerUtils";
@@ -23,6 +23,7 @@ import {
 interface StaffPayload {
   id: number;
   name: string;
+  fullName?: string;
   branch: string;
   role: string | null; // 'branch_manager_xxx' or null
   endDate: string | null;
@@ -41,6 +42,8 @@ interface ScheduleWire {
 }
 
 type Mode = "create" | "update" | "view";
+
+type AttnStatus = "Present" | "Absent" | "Late";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,7 +106,7 @@ function formatDbSlotsForDay(
   dbOperatingDays: any[],
   dayName: string,
   dayMapShort: Record<string, string>,
-): { label: string; type: "opening" | "coach" | "closing"; sequence_no: number }[] {
+): { label: string; type: "opening" | "coach" | "closing"; sequence_no: number; startMin: number; endMin: number }[] {
   const shortDay = dayMapShort[dayName] || dayName;
   const opDay = dbOperatingDays.find(od => od.day_of_week === shortDay);
 
@@ -123,10 +126,16 @@ function formatDbSlotsForDay(
     };
     const startFormatted = formatTimeStr(s.slot_start);
     const endFormatted = formatTimeStr(s.slot_end);
+    const toMin = (tStr: string) => {
+      const p = String(tStr).split(":");
+      return parseInt(p[0]) * 60 + parseInt(p[1] ?? "0");
+    };
     return {
       label: `${startFormatted} - ${endFormatted}`,
       type: s.slot_type as "opening" | "coach" | "closing",
       sequence_no: s.sequence_no ?? idx + 1,
+      startMin: toMin(s.slot_start),
+      endMin: toMin(s.slot_end),
     };
   });
 }
@@ -136,42 +145,131 @@ function formatDbSlotsForDay(
 function SummaryTable({
   title,
   data,
+  showAll,
+  onToggleShowAll,
+  dayLabel,
+  colorFor,
+  dateLabel,
+  fullNameFor,
+  collapsed,
+  onToggleCollapsed,
 }: {
   title: string;
-  data: { name: string; coachHrs: number; execHrs: number; total: number }[];
+  data: { name: string; coachHrs: number; execHrs: number; total: number; classes: number }[];
+  showAll: boolean;
+  onToggleShowAll: (all: boolean) => void;
+  dayLabel: string;
+  colorFor: (name: string) => string;
+  dateLabel: string;
+  fullNameFor: (name: string) => string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
   const fmt = (h: number) => {
     const hrs = Math.floor(h);
     const min = Math.round((h - hrs) * 60);
     return { h: hrs.toString(), m: min.toString().padStart(2, "0") };
   };
+  // Scheduled staff first (most hours first); un-scheduled (grey) sink to bottom.
+  const sorted = [...data].sort((a, b) => {
+    const az = a.total === 0 ? 1 : 0;
+    const bz = b.total === 0 ? 1 : 0;
+    if (az !== bz) return az - bz;
+    if (b.total !== a.total) return b.total - a.total;
+    return fullNameFor(a.name).localeCompare(fullNameFor(b.name));
+  });
   return (
-    <div className="mt-12 bg-white p-8 rounded-2xl border border-slate-200 shadow-md overflow-hidden text-slate-800">
-      <header className="border-b border-slate-200 pb-4 mb-4 text-center">
-        <h2 className="m-0 text-lg font-bold text-slate-800">
-          {title}
-        </h2>
+    <div className={`mt-12 bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden text-slate-800 ${collapsed ? "px-8 py-4" : "p-8"}`}>
+      {/* Tabs left · date absolutely centered · title + collapse toggle right */}
+      <header className={`flex items-center justify-between gap-4 relative ${collapsed ? "" : "border-b border-slate-200 pb-4 mb-4"}`}>
+        {!collapsed && (
+          <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
+            <button
+              onClick={() => onToggleShowAll(true)}
+              className={`px-4 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                showAll ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              All week
+            </button>
+            <button
+              onClick={() => onToggleShowAll(false)}
+              className={`px-4 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                !showAll ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {dayLabel}
+            </button>
+          </div>
+        )}
+        {!collapsed && (
+          <div className="absolute left-1/2 -translate-x-1/2 text-sm font-bold text-slate-500 whitespace-nowrap pointer-events-none hidden lg:block">
+            {dateLabel}
+          </div>
+        )}
+        <div className="flex items-center gap-3 z-10 ml-auto">
+          <h2 className="m-0 text-lg font-bold text-slate-800 whitespace-nowrap">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+            title={collapsed ? "Expand" : "Collapse"}
+          >
+            <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? "rotate-90" : "-rotate-90"}`} aria-hidden="true" />
+          </button>
+        </div>
       </header>
+      {!collapsed && (
       <div className="overflow-x-auto">
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
               <th className="w-[60px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">No.</th>
               <th className="w-[250px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-left">Name</th>
+              <th className="w-[110px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Classes</th>
               <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Class (Coach)</th>
               <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Executive</th>
               <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Total (hrs:min)</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => {
+            {data.length === 0 && (
+              <tr>
+                <td colSpan={6} className="border border-slate-300 px-3 py-6 text-center text-sm font-semibold text-slate-400">
+                  No staff scheduled{showAll ? "" : ` for ${dayLabel}`}.
+                </td>
+              </tr>
+            )}
+            {sorted.map((row, i) => {
               const c = fmt(row.coachHrs);
               const e = fmt(row.execHrs);
               const t = fmt(row.total);
+              // No assignments anywhere this week → grey out + flag.
+              const noSchedule = row.total === 0;
               return (
-                <tr key={row.name} className="even:bg-slate-50 hover:bg-slate-100 transition-colors">
+                <tr key={row.name} className={`transition-colors ${noSchedule ? "bg-slate-50/60" : "even:bg-slate-50 hover:bg-slate-100"}`}>
                   <td className="border border-slate-300 px-3 py-3 text-center font-bold text-slate-500">{i + 1}</td>
-                  <td className="border border-slate-300 px-3 py-3 font-black text-slate-800">{row.name}</td>
+                  <td className="border border-slate-300 px-3 py-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-block px-3 py-1 rounded-full border text-sm font-bold ${
+                        noSchedule
+                          ? "bg-slate-100 text-slate-400 border-slate-200"
+                          : (colorFor(row.name) || "bg-slate-100 text-slate-700 border-slate-200")
+                      }`}>
+                        {fullNameFor(row.name)}
+                      </span>
+                      {noSchedule && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 italic">
+                          No schedule this week
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="border border-slate-300 px-3 py-3 text-center">
+                    <span className={`text-base font-black ${noSchedule ? "text-slate-300" : "text-slate-700"}`}>{row.classes}</span>
+                  </td>
                   {[c, e, t].map((time, j) => (
                     <td key={j} className={`border border-slate-300 px-2 py-3 ${j === 2 ? "bg-blue-50/50" : ""}`}>
                       <div className="flex flex-row gap-4 items-center justify-center">
@@ -191,6 +289,185 @@ function SummaryTable({
             })}
           </tbody>
         </table>
+      </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Manual Attendance Table (Update mode) ────────────────────────────────────
+// BM ticks Present / Absent / Late per scheduled staff for the selected day.
+// A row is "unsaved" while its current status differs from the last saved one.
+function AttendanceTable({
+  rows,
+  currentFor,
+  savedFor,
+  onSet,
+  onSaveAll,
+  saving,
+  fullNameFor,
+  editable,
+  dateLabel,
+  dayLocked,
+  dayLockSaving,
+  onToggleDayLock,
+  canManageLock,
+}: {
+  rows: { name: string; isNew: boolean }[];
+  currentFor: (name: string) => AttnStatus | undefined;
+  savedFor: (name: string) => AttnStatus | undefined;
+  onSet: (name: string, status: AttnStatus) => void;
+  onSaveAll: () => void;
+  saving: boolean;
+  fullNameFor: (name: string) => string;
+  editable: boolean;
+  dateLabel: string;
+  dayLocked: boolean;
+  dayLockSaving: boolean;
+  onToggleDayLock: (lock: boolean) => void;
+  canManageLock: boolean;
+}) {
+  const STATUSES: AttnStatus[] = ["Present", "Absent", "Late"];
+  const unsavedCount = rows.filter(r => {
+    const c = currentFor(r.name);
+    return !!c && c !== savedFor(r.name);
+  }).length;
+  const rowEditable = editable && !dayLocked;
+  const toneFor = (status: AttnStatus, active: boolean) => {
+    if (!active) return "bg-white text-slate-400 border-slate-200 hover:bg-slate-50";
+    if (status === "Present") return "bg-emerald-600 text-white border-emerald-600";
+    if (status === "Absent") return "bg-red-600 text-white border-red-600";
+    return "bg-amber-500 text-white border-amber-500";
+  };
+
+  return (
+    <div className="mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="relative flex items-center justify-center gap-2 mb-4">
+        <h2 className="text-sm font-black text-center uppercase tracking-widest text-slate-800">Attendance</h2>
+        {dateLabel && <span className="text-xs font-semibold text-slate-400">· {dateLabel}</span>}
+        {/* Day lock control, top-right — superadmin only */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+          {!canManageLock ? null : dayLocked ? (
+            <button
+              type="button"
+              disabled={dayLockSaving}
+              onClick={() => onToggleDayLock(false)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                !dayLockSaving
+                  ? "bg-slate-700 text-white border-slate-700 hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+              }`}
+              title="Unlock this day to allow attendance edits"
+            >
+              🔒 {dayLockSaving ? "…" : "Locked — Unlock"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={dayLockSaving}
+              onClick={() => onToggleDayLock(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                !dayLockSaving
+                  ? "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  : "bg-white text-slate-300 border-slate-200 cursor-not-allowed"
+              }`}
+              title="Lock this day — prevents any further attendance changes"
+            >
+              {dayLockSaving ? "…" : "Lock Day"}
+            </button>
+          )}
+        </div>
+      </div>
+      {dayLocked && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold uppercase tracking-wide">
+          🔒 This day is locked — attendance is read-only.
+        </div>
+      )}
+      <div className="rounded-xl border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead className="text-slate-600 bg-slate-100 border-b border-slate-200">
+              <tr>
+                <th className="p-2 border-r border-slate-200 text-left w-10">No.</th>
+                <th className="p-2 border-r border-slate-200 text-left">Name</th>
+                <th className="p-2 border-r border-slate-200 text-center">Status</th>
+                <th className="p-2 text-center w-20">Saved</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-4 text-center text-slate-400">
+                    No staff assigned for this day yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, index) => {
+                  const current = currentFor(row.name);
+                  const saved = savedFor(row.name);
+                  const isDirty = !!current && current !== saved;
+                  return (
+                    <tr key={row.name} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-2 border-r border-slate-100 text-center text-slate-400 font-bold">{index + 1}</td>
+                      <td className="p-2 border-r border-slate-100 font-bold text-slate-700">
+                        {fullNameFor(row.name)}
+                        {fullNameFor(row.name) !== row.name && (
+                          <span className="ml-1 text-[10px] font-normal text-slate-400">({row.name})</span>
+                        )}
+                        {row.isNew && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-fuchsia-100 text-fuchsia-700 text-[9px] font-black uppercase tracking-wide align-middle">New</span>
+                        )}
+                      </td>
+                      <td className="p-2 border-r border-slate-100">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {STATUSES.map(status => (
+                            <button
+                              key={status}
+                              type="button"
+                              disabled={!rowEditable}
+                              onClick={() => onSet(row.name, status)}
+                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-colors ${toneFor(status, current === status)} ${!rowEditable ? "opacity-60 cursor-not-allowed" : ""}`}
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-2 text-center">
+                        {!current ? (
+                          <span className="text-slate-300">—</span>
+                        ) : isDirty ? (
+                          <span className="inline-block w-2 h-2 rounded-full bg-amber-500" title="Unsaved" />
+                        ) : (
+                          <span className="text-emerald-600 font-bold" title="Saved">✓</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Single save-all button */}
+      <div className="mt-3 flex items-center justify-end gap-3">
+        {unsavedCount > 0 && (
+          <span className="text-xs font-semibold text-amber-600">{unsavedCount} unsaved</span>
+        )}
+        <button
+          type="button"
+          disabled={!rowEditable || unsavedCount === 0 || saving}
+          onClick={onSaveAll}
+          className={`px-6 py-2 rounded-xl text-sm font-semibold shadow-sm transition-colors ${
+            rowEditable && unsavedCount > 0 && !saving
+              ? "bg-[#2D3F50] text-white hover:bg-[#1f2c38]"
+              : "bg-slate-100 text-slate-400 cursor-not-allowed"
+          }`}
+        >
+          {saving ? "Saving…" : "Save Attendance"}
+        </button>
       </div>
     </div>
   );
@@ -232,6 +509,7 @@ interface DayScheduleTableProps {
   onClearColumn?: (colId: string) => void;
   coachCount: number;
   execCount: number;
+  colorFor: (name: string) => string;
 }
 
 function DayScheduleTable({
@@ -255,7 +533,15 @@ function DayScheduleTable({
   onClearColumn,
   coachCount,
   execCount,
+  colorFor,
 }: DayScheduleTableProps) {
+  // Notes column: always shown when editable (so remarks can be added). In a
+  // read-only view, hide it entirely when this day has no remark at all; keep it
+  // if even one slot has a remark.
+  const hasAnyRemark = daySlots.some(
+    s => (tableNotes[`${day}-${s.label}-notes`] ?? "").trim() !== "",
+  );
+  const showNotesCol = editable || hasAnyRemark;
   return (
     <div className="overflow-x-auto relative">
       <table className="w-full border-collapse" style={{ minWidth: `${470 + (coachCount + execCount) * 115}px` }}>
@@ -395,9 +681,11 @@ function DayScheduleTable({
                 </th>
               );
             })}
-            <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold">
-              Notes/Remarks
-            </th>
+            {showNotesCol && (
+              <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold">
+                Notes/Remarks
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -447,11 +735,11 @@ function DayScheduleTable({
                             managerVal
                               ? checkIfLeavingSoon(managerVal)
                                 ? "bg-red-50 text-red-700 border border-red-200"
-                                : getSoftStaffColor(managerVal)
+                                : colorFor(managerVal)
                               : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80"
                           }`}
                           style={{
-                            backgroundImage: `url("${SELECT_ARROW_DARK}")`,
+                            backgroundImage: editable ? `url("${SELECT_ARROW_DARK}")` : "none",
                             backgroundPosition: "right 0.35rem center",
                             backgroundSize: "6px",
                             backgroundRepeat: "no-repeat",
@@ -490,7 +778,7 @@ function DayScheduleTable({
                 )}
 
                 {isOpenClose ? (
-                  <td colSpan={COLUMNS.length + 2} className="p-3 border-l border-slate-200 text-center">
+                  <td colSpan={COLUMNS.length + (showNotesCol ? 2 : 1)} className="p-3 border-l border-slate-200 text-center">
                     <span className="inline-flex items-center gap-2 bg-indigo-600 text-white text-[10px] uppercase tracking-wider font-extrabold px-4 py-1.5 rounded-xl shadow-xs">
                       All Staff — Executive ({slotObj.type === "opening" ? "Opening" : "Closing"})
                     </span>
@@ -511,7 +799,7 @@ function DayScheduleTable({
                       const selectTheme = val
                         ? checkIfLeavingSoon(val)
                           ? "bg-red-50 text-red-700 border border-red-200"
-                          : getSoftStaffColor(val)
+                          : colorFor(val)
                         : isExec
                           ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80"
                           : isTraining
@@ -547,7 +835,7 @@ function DayScheduleTable({
                             onChange={e => onCellSet?.(day, slotLabel, col.id, e.target.value)}
                             className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${selectTheme}`}
                             style={{
-                              backgroundImage: `url("${SELECT_ARROW_DARK}")`,
+                              backgroundImage: editable ? `url("${SELECT_ARROW_DARK}")` : "none",
                               backgroundPosition: "right 0.35rem center",
                               backgroundSize: "6px",
                               backgroundRepeat: "no-repeat",
@@ -574,17 +862,24 @@ function DayScheduleTable({
                         </td>
                       );
                     })}
-                    <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white">
-                      <textarea
-                        disabled={!editable}
-                        value={tableNotes[`${day}-${slotLabel}-notes`] ?? ""}
-                        onChange={e =>
-                          onNoteChange?.(`${day}-${slotLabel}-notes`, e.target.value)
-                        }
-                        placeholder="Add remarks..."
-                        className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block"
-                      />
-                    </td>
+                    {showNotesCol && (
+                      <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white">
+                        {editable ? (
+                          <textarea
+                            value={tableNotes[`${day}-${slotLabel}-notes`] ?? ""}
+                            onChange={e =>
+                              onNoteChange?.(`${day}-${slotLabel}-notes`, e.target.value)
+                            }
+                            placeholder="Add remarks..."
+                            className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block"
+                          />
+                        ) : (
+                          <span className="block w-full px-1 text-[11px] font-medium italic text-slate-600 whitespace-pre-wrap">
+                            {tableNotes[`${day}-${slotLabel}-notes`] ?? ""}
+                          </span>
+                        )}
+                      </td>
+                    )}
                   </>
                 )}
               </tr>
@@ -598,9 +893,31 @@ function DayScheduleTable({
 
 // ─── Page Content ─────────────────────────────────────────────────────────────
 
-function PlanNewWeekGridContent() {
+type DayCount = { coach: number; exec: number; training: number; star: number };
+const DEFAULT_DAY_COUNT: DayCount = { coach: 3, exec: 3, training: 0, star: 0 };
+const DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+// ISO date (YYYY-MM-DD) for a day name within the week starting at startStr (Mon).
+function isoDateForDay(startStr: string | null, dayName: string): string | null {
+  if (!startStr) return null;
+  const idx = DAY_ORDER.indexOf(dayName);
+  if (idx === -1) return null;
+  const d = new Date(`${startStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + idx);
+  return d.toISOString().slice(0, 10);
+}
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNiceDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Only superadmins may lock / unlock an attendance day.
+  const canManageAttendanceLock = userRole.toLowerCase() === "superadmin";
 
   const branch = searchParams.get("branch") ?? "Bandar Seri Putra";
   const startStr = searchParams.get("start");
@@ -609,7 +926,10 @@ function PlanNewWeekGridContent() {
   const isReadOnly = mode === "view";
 
   const [selectedDay, setSelectedDay] = useState<string>("");
-  const [editingDays, setEditingDays] = useState<Record<string, boolean>>({});
+  // "All" or a day name — filters the hours summary table below.
+  // Weekly Hours Summary: show the whole-week rollup, or just the selected day.
+  const [summaryShowAll, setSummaryShowAll] = useState(true);
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
   // Actual schedule data (editable in update mode, main data in create mode)
   const [selections, setSelections] = useState<Record<string, string>>({});
@@ -625,10 +945,14 @@ function PlanNewWeekGridContent() {
   const [newEmployeeName, setNewEmployeeName] = useState("");
   const [newEmployeePosition, setNewEmployeePosition] = useState("Part Time");
 
-  const [coachCount, setCoachCount] = useState<number>(3);
-  const [execCount, setExecCount] = useState<number>(3);
-  const [trainingCount, setTrainingCount] = useState<number>(0);
-  const [starCount, setStarCount] = useState<number>(0);
+  // Column counts are PER DAY (per calendar date), keyed by day name for the
+  // currently-open week. Changing one day's columns no longer affects others.
+  const [dayCounts, setDayCounts] = useState<Record<string, DayCount>>({});
+  const curCounts = dayCounts[selectedDay] ?? DEFAULT_DAY_COUNT;
+  const coachCount = curCounts.coach;
+  const execCount = curCounts.exec;
+  const trainingCount = curCounts.training;
+  const starCount = curCounts.star;
 
   // Frozen column counts for the Planning (read-only) table.
   // Derived from the planning data itself so it never changes when the user
@@ -639,12 +963,35 @@ function PlanNewWeekGridContent() {
   const [planningStarCount, setPlanningStarCount] = useState<number>(0);
 
   // scheduleType is now derived — no longer a toggle.
-  // In update mode the editable table is always "actual".
-  // In create/view mode it is always "planning".
-  const scheduleType: "planning" | "actual" = mode === "update" ? "actual" : "planning";
+  //   create → "planning" (building the plan)
+  //   update → "actual"   (adjusting what actually happened)
+  //   view   → "actual"   (archive shows the finalized/updated roster)
+  const scheduleType: "planning" | "actual" = mode === "create" ? "planning" : "actual";
 
   const [periodStatus, setPeriodStatus] = useState<"draft" | "archived">("draft");
   const [changedSinceArchive, setChangedSinceArchive] = useState<boolean>(false);
+  // Unsaved-edits flag for the Update-mode Actual grid (drives the status chip
+  // and the leave-page warning). Set on any edit, cleared after a save.
+  const [dirty, setDirty] = useState(false);
+
+  // Undo/redo history of the editable roster (selections + notes). Each discrete
+  // edit snapshots the PRE-edit state onto the undo stack; consecutive edits to
+  // the same note cell are coalesced into one step so typing isn't per-character.
+  type RosterSnap = { selections: Record<string, string>; notes: Record<string, string> };
+  const [undoStack, setUndoStack] = useState<RosterSnap[]>([]);
+  const [redoStack, setRedoStack] = useState<RosterSnap[]>([]);
+  const lastEditSigRef = useRef<string | null>(null);
+
+  // Manual attendance (Update mode). Keyed `${isoDate}::${nickname}`.
+  //   attnStatus = the currently-selected status; attnSaved = last persisted.
+  // A row is "unsaved" when attnStatus differs from attnSaved.
+  const [attnStatus, setAttnStatus] = useState<Record<string, AttnStatus>>({});
+  const [attnSaved, setAttnSaved] = useState<Record<string, AttnStatus>>({});
+  const [attnSaving, setAttnSaving] = useState(false);
+  // Per-day lock overrides keyed by ISO date (true=locked, false=unlocked). No
+  // entry → fall back to the auto rule (date before today ⇒ locked).
+  const [dayLockOverride, setDayLockOverride] = useState<Record<string, boolean>>({});
+  const [dayLockSaving, setDayLockSaving] = useState(false);
 
   // Column list for the Actual (editable) table — reacts to user-adjustable counts.
   const COLUMNS = useMemo(() => {
@@ -727,13 +1074,20 @@ function PlanNewWeekGridContent() {
         const settingsResPromise = fetch(`/api/schedules/settings?branchName=${encodeURIComponent(branch)}`);
         const positionsResPromise = fetch(`/api/schedules/positions?branch=${encodeURIComponent(branch)}&weekStartDate=${startStr}`);
 
-        // Planning schedule: needed in update mode (top table) and view mode (only table)
-        const planningSchedPromise = (mode === "update" || mode === "view")
-          ? fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=planning`)
-          : Promise.resolve(null);
+        // Planning schedule: load in ALL modes now.
+        //   - update mode → read-only top table
+        //   - view mode   → the single read-only table
+        //   - create mode → pre-fill the editable grid so reopening a week you
+        //     already planned shows your saved assignments instead of a blank
+        //     grid. (Create mode used to skip this fetch, which is why a saved
+        //     day "disappeared" on reopen even though it was persisted.)
+        const planningSchedPromise =
+          fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=planning`);
 
-        // Actual schedule: only needed in update mode (bottom editable table)
-        const actualSchedPromise = mode === "update"
+        // Actual schedule: the editable bottom table in update mode, AND the
+        // single read-only table in view/archive mode (archive shows what
+        // actually happened — the finalized/updated roster, not the plan).
+        const actualSchedPromise = (mode === "update" || mode === "view")
           ? fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=actual`)
           : Promise.resolve(null);
 
@@ -773,15 +1127,26 @@ function PlanNewWeekGridContent() {
           }
         }
 
-        // Positions Counts
+        // Positions — per-day counts (data.days is keyed by ISO date)
         if (positionsRes.ok) {
           const data = await positionsRes.json();
           if (cancelled) return;
-          if (data.success && data.counts) {
-            setCoachCount(data.counts.coach);
-            setExecCount(data.counts.exec);
-            setTrainingCount(data.counts.training);
-            setStarCount(data.counts.star);
+          if (data.success && data.days) {
+            const base = new Date(`${startStr}T00:00:00Z`);
+            const next: Record<string, DayCount> = {};
+            DAY_ORDER.forEach((dn, idx) => {
+              const d = new Date(base);
+              d.setUTCDate(d.getUTCDate() + idx);
+              const iso = d.toISOString().slice(0, 10);
+              const c = data.days[iso];
+              if (c) next[dn] = {
+                coach: c.coach ?? 0,
+                exec: c.exec ?? 0,
+                training: c.training ?? 0,
+                star: c.star ?? 0,
+              };
+            });
+            setDayCounts(next);
           }
         }
 
@@ -814,16 +1179,17 @@ function PlanNewWeekGridContent() {
               setPlanningExecCount(maxExec);
               setPlanningTrainingCount(maxTraining);
               setPlanningStarCount(maxStar);
-            } else {
-              // In view mode: planning is the single read-only table
+            } else if (mode === "create") {
+              // Create mode: prefill the editable grid with the saved plan.
               setSelections(sels);
               setNotes((match.notes ?? {}) as Record<string, string>);
             }
+            // view mode: the single table shows the ACTUAL roster, set below.
           } else {
             if (mode === "update") {
               setPlanningSelections({});
               setPlanningNotes({});
-            } else {
+            } else if (mode === "create") {
               setSelections({});
               setNotes({});
             }
@@ -848,6 +1214,26 @@ function PlanNewWeekGridContent() {
             setChangedSinceArchive(false);
           }
         }
+
+        // Manual attendance (update mode only)
+        if (mode === "update") {
+          const attnRes = await fetch(
+            `/api/schedules/attendance?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}`,
+          );
+          if (attnRes.ok) {
+            const data = await attnRes.json();
+            if (cancelled) return;
+            if (data.success && data.attendance) {
+              const st: Record<string, AttnStatus> = {};
+              Object.entries(data.attendance as Record<string, { status: string }>).forEach(
+                ([k, v]) => { st[k] = v.status as AttnStatus; },
+              );
+              setAttnStatus(st);
+              setAttnSaved(st);
+              setDayLockOverride((data.dayLocks as Record<string, boolean>) ?? {});
+            }
+          }
+        }
       } catch (err) {
         console.error("Failed to load grid data", err);
       } finally {
@@ -863,7 +1249,127 @@ function PlanNewWeekGridContent() {
     return (staffByBranch[branch] ?? []).map(s => s.name);
   }, [staffByBranch, branch]);
 
-  const isEditing = !isReadOnly && !!editingDays[selectedDay];
+  // Distinct, stable color per staff member. Colors are assigned by index over
+  // a stable sorted roster (own-branch staff first, then any others assigned),
+  // so two different people never share a color (up to the palette size) and a
+  // given person keeps the same color across days/weeks. Used by BOTH the grid
+  // cells and the summary table so they always match.
+  const colorForName = useMemo(() => {
+    const others = Array.from(
+      new Set(Object.values(selections).filter(v => !!v && v !== "None" && !ownStaffNames.includes(v))),
+    ).sort();
+    const roster = [...[...ownStaffNames].sort(), ...others];
+    const map: Record<string, string> = {};
+    roster.forEach((n, i) => { map[n] = SOFT_STAFF_PALETTE[i % SOFT_STAFF_PALETTE.length]; });
+    return (name: string) => {
+      if (!name || name === "None" || name === "-- Select --" || name === "Select staff") return "";
+      return map[name] ?? getSoftStaffColor(name);
+    };
+  }, [ownStaffNames, selections]);
+
+  // Map a displayed (nick) name → the person's full name for the summary table.
+  const fullNameFor = useMemo(() => {
+    const map: Record<string, string> = {};
+    [...Object.values(staffByBranch), ...Object.values(managersByBranch)].forEach(list => {
+      list.forEach(s => { if (s.name && s.fullName) map[s.name] = s.fullName; });
+    });
+    return (name: string) => map[name] ?? name;
+  }, [staffByBranch, managersByBranch]);
+
+  // ─── Manual attendance (Update mode) ───
+  // Rows = union of Planning ∪ Actual staff for the selected day (managers
+  // included, unlike the hours summary). A name in Actual but not Planning is
+  // flagged "New". Attendance state is keyed `${isoDate}::${nickname}`.
+  const attendanceRows = useMemo(() => {
+    const namesForDay = (sel: Record<string, string>) => {
+      const out = new Set<string>();
+      Object.entries(sel).forEach(([k, v]) => {
+        if (!k.startsWith(`${selectedDay}-`)) return;
+        if (!v || v === "None") return;
+        out.add(v);
+      });
+      return out;
+    };
+    const planning = namesForDay(planningSelections);
+    const actual = namesForDay(selections);
+    const all = new Set<string>([...planning, ...actual]);
+    return Array.from(all)
+      .map(name => ({ name, isNew: actual.has(name) && !planning.has(name) }))
+      .sort((a, b) => fullNameFor(a.name).localeCompare(fullNameFor(b.name)));
+  }, [planningSelections, selections, selectedDay, fullNameFor]);
+
+  const setAttendanceStatus = useCallback((name: string, status: AttnStatus) => {
+    const iso = isoDateForDay(startStr, selectedDay);
+    if (!iso) return;
+    setAttnStatus(prev => ({ ...prev, [`${iso}::${name}`]: status }));
+  }, [startStr, selectedDay]);
+
+  // Save the whole day's attendance in one request — every row whose selected
+  // status differs from what's saved.
+  const saveAllAttendance = useCallback(async () => {
+    const iso = isoDateForDay(startStr, selectedDay);
+    if (!iso) return;
+    const entries = attendanceRows
+      .map(r => ({ name: r.name, status: attnStatus[`${iso}::${r.name}`] }))
+      .filter((e): e is { name: string; status: AttnStatus } =>
+        !!e.status && e.status !== attnSaved[`${iso}::${e.name}`]);
+    if (entries.length === 0) return;
+    setAttnSaving(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/schedules/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branch, date: iso, entries }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Save failed");
+      setAttnSaved(prev => {
+        const next = { ...prev };
+        entries.forEach(e => { next[`${iso}::${e.name}`] = e.status; });
+        return next;
+      });
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save attendance");
+    } finally {
+      setAttnSaving(false);
+    }
+  }, [startStr, selectedDay, attendanceRows, attnStatus, attnSaved, branch]);
+
+  // Day-lock for the selected day — manual only (superadmin). No auto-lock.
+  const selectedIso = isoDateForDay(startStr, selectedDay);
+  const dayLocked = selectedIso ? !!dayLockOverride[selectedIso] : false;
+
+  const toggleDayLock = useCallback(async (lock: boolean) => {
+    const iso = isoDateForDay(startStr, selectedDay);
+    if (!iso) return;
+    setDayLockSaving(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/schedules/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branch, date: iso, locked: lock }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Lock failed");
+      setDayLockOverride(prev => ({ ...prev, [iso]: lock }));
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to update day lock");
+    } finally {
+      setDayLockSaving(false);
+    }
+  }, [startStr, selectedDay, branch]);
+
+  // Create/planning mode is always editable — the whole week is persisted by
+  // the single bottom "Save Plan" button, so there is no per-day edit lock.
+  // Update mode keeps the per-day Edit/Save toggle for recording actual
+  // attendance one day at a time.
+  // Update mode is directly editable (no per-day Edit/Save toggles) until the
+  // week is Finalized & Archived. "Re-open for edits" flips periodStatus back to
+  // draft, which re-enables editing.
+  const isEditing =
+    !isReadOnly && (mode === "create" || (mode === "update" && periodStatus !== "archived"));
   const day = selectedDay;
 
   const dayMapShort = useMemo(() => ({
@@ -893,19 +1399,47 @@ function PlanNewWeekGridContent() {
     [dbOperatingDays, dayOrderFull, dayMapShort],
   );
 
-  // Keep selectedDay/editingDays in sync once the real operating days load
-  // (they start empty since dbOperatingDays is fetched asynchronously).
+  // Keep selectedDay valid once the real operating days load (they start empty
+  // since dbOperatingDays is fetched asynchronously).
   useEffect(() => {
     if (workingDays.length === 0) return;
     setSelectedDay(prev => (workingDays.includes(prev) ? prev : workingDays[0]));
-    setEditingDays(prev => {
-      const next: Record<string, boolean> = {};
-      workingDays.forEach(d => {
-        next[d] = d in prev ? prev[d] : !isReadOnly;
-      });
-      return next;
-    });
-  }, [workingDays, isReadOnly]);
+  }, [workingDays]);
+
+  // Warn before leaving/refreshing with unsaved Update-mode edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // Undo/redo keyboard shortcuts (Update mode only). Ignored while typing in a
+  // form field so the browser's native text undo still works there.
+  useEffect(() => {
+    if (mode !== "update" || !isEditing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoEdit();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        redoEdit();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // Re-bind when the roster changes so undo/redo capture the latest state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, isEditing, selections, notes]);
 
   const daySlots = useMemo(
     () => formatDbSlotsForDay(dbOperatingDays, selectedDay, dayMapShort),
@@ -913,71 +1447,119 @@ function PlanNewWeekGridContent() {
   );
 
   // Compute weekly hours summary from current actual selections
+  // Hours summary, broken down PER working day plus an "All" (week) rollup.
+  // Keyed by filter ("All" or a day name). Day tabs list only staff on duty
+  // that day; "All" also lists own-branch staff with zero hours.
   const summaryData = useMemo(() => {
-    const stats: Record<string, { coachHrs: number; execHrs: number; total: number }> = {};
     const allNames = Array.from(
       new Set([
         ...ownStaffNames,
         ...Object.values(selections).filter(v => !!v && v !== "None"),
       ]),
     );
-    allNames.forEach(n => {
-      stats[n] = { coachHrs: 0, execHrs: 0, total: 0 };
-    });
+    type Acc = { coachHrs: number; execHrs: number; total: number; classes: number };
+    const zero = (): Acc => ({ coachHrs: 0, execHrs: 0, total: 0, classes: 0 });
+    const week: Record<string, Acc> = {};
+    allNames.forEach(n => { week[n] = zero(); });
+    const byDay: Record<string, Record<string, Acc>> = {};
+
     workingDays.forEach(dayName => {
-      const isWeekend = dayName === "Saturday" || dayName === "Sunday";
-      const dailyTarget = isWeekend ? 10.5 : 5.0;
-
       const daySlotsList = formatDbSlotsForDay(dbOperatingDays, dayName, dayMapShort);
+      if (daySlotsList.length === 0) return;
 
-      allNames.forEach(emp => {
-        let coach = 0;
-        let worked = false;
-        daySlotsList.forEach(slotObj => {
-          if (slotObj.type === "opening" || slotObj.type === "closing") return;
-          COLUMNS.forEach(col => {
-            if (selections[`${dayName}-${slotObj.label}-${col.id}`] === emp) {
-              worked = true;
-              if (col.type === "coach") {
-                coach += isAdminSlot(slotObj.label, branch) ? 0.25 : 1.25;
-              }
-            }
-          });
+      // Operating span for the day = earliest slot start → latest slot end
+      // (includes opening/closing + any gaps). Everyone present that day is
+      // "on duty" for this whole span; whatever isn't class time is executive.
+      const dayStart = Math.min(...daySlotsList.map(s => s.startMin));
+      const dayEnd = Math.max(...daySlotsList.map(s => s.endMin));
+      const dailyTarget = (dayEnd - dayStart) / 60;
+      byDay[dayName] = {};
+
+      // Read assignments straight from `selections`, but bound to THIS day's
+      // active column count (dayCounts[dayName]). This handles per-day column
+      // layouts correctly AND ignores stale cells left in state when a column
+      // is hidden by lowering the count (e.g. a filled coach3 after dropping to
+      // 2 coaches) — those must not count. `seatActive` also excludes MANAGER.
+      const dc = dayCounts[dayName] ?? DEFAULT_DAY_COUNT;
+      const seatActive = (colId: string): { type: keyof DayCount } | null => {
+        const m = colId.match(/^(coach|exec|training|star)(\d+)$/);
+        if (!m) return null; // MANAGER or unknown → not a summary column
+        const type = m[1] as keyof DayCount;
+        return parseInt(m[2], 10) <= (dc[type] ?? 0) ? { type } : null;
+      };
+
+      const dayCoach: Record<string, number> = {};
+      const dayClasses: Record<string, number> = {};
+      const worked = new Set<string>();
+
+      daySlotsList.forEach(slotObj => {
+        if (slotObj.type === "opening" || slotObj.type === "closing") return;
+        const durHrs = (slotObj.endMin - slotObj.startMin) / 60;
+        const prefix = `${dayName}-${slotObj.label}-`;
+        Object.entries(selections).forEach(([key, val]) => {
+          if (!val || val === "None") return;
+          if (!key.startsWith(prefix)) return;
+          const parsed = seatActive(key.slice(prefix.length));
+          if (!parsed) return; // hidden/stale column or manager → skip
+          worked.add(val);
+          // Class roles — coach, star coach, training — count as Class (Coach)
+          // hours and as one class each. Exec is Executive (the span remainder).
+          if (parsed.type === "coach" || parsed.type === "star" || parsed.type === "training") {
+            dayCoach[val] = (dayCoach[val] ?? 0) + durHrs;
+            dayClasses[val] = (dayClasses[val] ?? 0) + 1;
+          }
         });
-        if (worked) {
-          stats[emp].coachHrs += coach;
-          stats[emp].execHrs += Math.max(0, dailyTarget - coach);
-          stats[emp].total = stats[emp].coachHrs + stats[emp].execHrs;
-        }
+      });
+
+      worked.forEach(emp => {
+        const coach = dayCoach[emp] ?? 0;
+        const classes = dayClasses[emp] ?? 0;
+        const exec = Math.max(0, dailyTarget - coach);
+        byDay[dayName][emp] = { coachHrs: coach, execHrs: exec, total: coach + exec, classes };
+        if (!week[emp]) week[emp] = zero();
+        week[emp].coachHrs += coach;
+        week[emp].execHrs += exec;
+        week[emp].total += coach + exec;
+        week[emp].classes += classes;
       });
     });
-    return Object.entries(stats)
-      .filter(([name, s]) => s.total > 0 || ownStaffNames.includes(name))
-      .map(([name, s]) => ({ name, ...s }));
-  }, [selections, ownStaffNames, workingDays, branch, dbOperatingDays, dayMapShort]);
+
+    const toRows = (m: Record<string, Acc>) =>
+      Object.entries(m).map(([name, s]) => ({ name, ...s }));
+
+    const result: Record<string, { name: string; coachHrs: number; execHrs: number; total: number; classes: number }[]> = {};
+    result["All"] = toRows(week).filter(r => r.total > 0 || ownStaffNames.includes(r.name));
+    workingDays.forEach(dn => { result[dn] = toRows(byDay[dn] ?? {}); });
+    return result;
+  }, [selections, ownStaffNames, workingDays, dbOperatingDays, dayMapShort, dayCounts]);
+
+  // Date shown in the summary header: the whole-week range for "All", or the
+  // single date for a selected day.
+  const summaryDateLabel = (() => {
+    if (!startStr) return "";
+    if (summaryShowAll) {
+      return endStr ? `${fmtNiceDate(startStr)} – ${fmtNiceDate(endStr)}` : fmtNiceDate(startStr);
+    }
+    const iso = isoDateForDay(startStr, selectedDay);
+    return iso ? fmtNiceDate(iso) : "";
+  })();
 
   async function handleCountChange(type: "coach" | "exec" | "training" | "star", newCount: number) {
     if (isReadOnly) return;
-    if (type === "coach") setCoachCount(newCount);
-    else if (type === "exec") setExecCount(newCount);
-    else if (type === "training") setTrainingCount(newCount);
-    else if (type === "star") setStarCount(newCount);
+    // Update ONLY the selected day's column count.
+    const updated: DayCount = { ...curCounts, [type]: newCount };
+    setDayCounts(prev => ({ ...prev, [selectedDay]: updated }));
 
     try {
-      const counts = {
-        coach: type === "coach" ? newCount : coachCount,
-        exec: type === "exec" ? newCount : execCount,
-        training: type === "training" ? newCount : trainingCount,
-        star: type === "star" ? newCount : starCount,
-      };
-
+      const dateISO = isoDateForDay(startStr, selectedDay);
+      if (!dateISO) return;
       const res = await fetch("/api/schedules/positions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           branch,
-          weekStartDate: startStr,
-          counts,
+          date: dateISO,
+          counts: updated,
         }),
       });
       const data = await res.json();
@@ -989,19 +1571,12 @@ function PlanNewWeekGridContent() {
     }
   }
 
-  async function handleSaveDay(dayName: string) {
-    if (!startStr || !endStr) return;
+  // Save the WHOLE week's Actual roster as a draft (no lock, no cost report).
+  // Returns true on success so callers (Finalize) can chain on it.
+  async function handleSaveWeekActual(): Promise<boolean> {
+    if (!startStr || !endStr) return false;
     setSaveState("saving");
     setErrorMsg(null);
-
-    const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const dayIdx = dayOrder.indexOf(dayName);
-    if (dayIdx === -1) return;
-
-    const assignmentDate = new Date(`${startStr}T00:00:00Z`);
-    assignmentDate.setUTCDate(assignmentDate.getUTCDate() + dayIdx);
-    const dateStr = assignmentDate.toISOString().slice(0, 10);
-
     try {
       const res = await fetch("/api/schedules", {
         method: "POST",
@@ -1010,20 +1585,20 @@ function PlanNewWeekGridContent() {
           branch,
           startDate: startStr,
           endDate: endStr,
-          date: dateStr,
           selections,
-          scheduleType,
+          notes,
+          scheduleType: "actual",
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error ?? "Save failed");
       }
+      setDirty(false);
       setSaveState("idle");
-      setEditingDays(p => ({ ...p, [dayName]: false }));
 
       // Refresh status and warnings
-      const schedRes = await fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=${scheduleType}`);
+      const schedRes = await fetch(`/api/schedules?branch=${encodeURIComponent(branch)}&startDate=${startStr}&endDate=${endStr}&scheduleType=actual`);
       if (schedRes.ok) {
         const schedData = await schedRes.json();
         if (schedData.success && schedData.schedule) {
@@ -1031,15 +1606,28 @@ function PlanNewWeekGridContent() {
           setChangedSinceArchive(!!schedData.schedule.changedSinceArchive);
         }
       }
+      return true;
     } catch (err) {
       setSaveState("error");
       setErrorMsg(err instanceof Error ? err.message : "Save failed");
+      return false;
     }
+  }
+
+  // Re-open a Finalized & Archived week for edits. Flips the local status back
+  // to draft (re-enabling the grid); the DB status returns to draft on next Save.
+  function handleReopen() {
+    setPeriodStatus("draft");
+    setSaveState("idle");
+    setErrorMsg(null);
   }
 
   async function handleArchiveWeek() {
     if (!startStr || !endStr) return;
-    if (!confirm("Finalize and archive this week's Actual schedule? This will lock the schedule and generate the manpower cost report rows.")) return;
+    if (!confirm("Save this week's Actual schedule and update the manpower cost report?")) return;
+    // Persist the latest edits first so we never archive stale data.
+    const saved = await handleSaveWeekActual();
+    if (!saved) return;
     setSaveState("saving");
     setErrorMsg(null);
     try {
@@ -1079,6 +1667,7 @@ function PlanNewWeekGridContent() {
           startDate: startStr,
           endDate: endStr,
           selections,
+          notes,
           scheduleType: "planning",
         }),
       });
@@ -1094,11 +1683,48 @@ function PlanNewWeekGridContent() {
     }
   }
 
+  // Snapshot the current roster onto the undo stack before an edit is applied.
+  // Consecutive edits to the same note cell coalesce into a single step.
+  function pushHistory(sig: string) {
+    if (sig.startsWith("note:") && lastEditSigRef.current === sig) return;
+    lastEditSigRef.current = sig;
+    setUndoStack(prev => [...prev.slice(-49), { selections, notes }]);
+    setRedoStack([]);
+  }
+
+  function undoEdit() {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snap = prev[prev.length - 1];
+      setRedoStack(r => [...r, { selections, notes }]);
+      setSelections(snap.selections);
+      setNotes(snap.notes);
+      setDirty(true);
+      lastEditSigRef.current = null;
+      return prev.slice(0, -1);
+    });
+  }
+
+  function redoEdit() {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snap = prev[prev.length - 1];
+      setUndoStack(u => [...u.slice(-49), { selections, notes }]);
+      setSelections(snap.selections);
+      setNotes(snap.notes);
+      setDirty(true);
+      lastEditSigRef.current = null;
+      return prev.slice(0, -1);
+    });
+  }
+
   // Picking a name auto-fills the same column across every non-opening/closing
   // slot of the day, but skips slots where the name is already used elsewhere
   // (manager vs staff, other coach/exec column). Clearing only clears the one
   // cell. Mirrors the old project's handleNameSelect behavior.
   function setCell(dayArg: string, slot: string, colId: string, value: string) {
+    pushHistory(`cell:${dayArg}-${colId}`);
+    setDirty(true);
     setSelections(prev => {
       const next = { ...prev };
       if (!value) {
@@ -1150,44 +1776,21 @@ function PlanNewWeekGridContent() {
     });
   }
 
-  // For Planning this only clears unsaved local edits (Save Day persists the
-  // removal). For Actual, "Clear Day" deletes the DB rows immediately so the
-  // day resets and re-clones fresh from Planning next time it's opened.
-  async function clearAllForDay(d: string) {
-    if (scheduleType !== "actual") {
-      clearLocalSelectionsForDay(d);
-      return;
-    }
-
-    if (!confirm("Clear all Actual assignments for this day? This deletes them immediately and cannot be undone.")) return;
-
-    const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const dayIdx = dayOrder.indexOf(d);
-    if (dayIdx === -1 || !startStr) return;
-    const assignmentDate = new Date(`${startStr}T00:00:00Z`);
-    assignmentDate.setUTCDate(assignmentDate.getUTCDate() + dayIdx);
-    const dateStr = assignmentDate.toISOString().slice(0, 10);
-
-    try {
-      const res = await fetch("/api/schedules", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branch, date: dateStr, scheduleType }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error ?? "Clear failed");
-      }
-      clearLocalSelectionsForDay(d);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Clear failed");
-    }
+  // "Clear Day" — clears the current day's assignments locally in both Planning
+  // and Actual. The removal is persisted on the next Save (Save Plan / Save
+  // Changes), consistent with the single-save-button model.
+  function clearAllForDay(d: string) {
+    pushHistory(`clearday:${d}`);
+    clearLocalSelectionsForDay(d);
+    setDirty(true);
   }
 
   // Clears one column (e.g. "MANAGER", "coach1") across every slot of the
-  // current day. Local-only, same as picking "None" on each cell — persists
-  // once Save Day / Final Submit is clicked.
+  // current day. Local-only, same as picking "None" on each cell — persists on
+  // the next Save.
   function clearColumnForDay(colId: string) {
+    pushHistory(`clearcol:${day}-${colId}`);
+    setDirty(true);
     setSelections(prev => {
       const next = { ...prev };
       daySlots.forEach(s => {
@@ -1218,6 +1821,7 @@ function PlanNewWeekGridContent() {
     checkIfLeavingSoon,
     coachCount,
     execCount,
+    colorFor: colorForName,
   };
 
   // Props for the Planning (read-only) table — uses frozen PLANNING_COLUMNS.
@@ -1233,13 +1837,14 @@ function PlanNewWeekGridContent() {
     checkIfLeavingSoon,
     coachCount: planningCoachCount,
     execCount: planningExecCount,
+    colorFor: colorForName,
   };
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-20">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-20">
         {/* Breadcrumb */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
           {/* Breadcrumb */}
           <nav
             aria-label="Breadcrumb"
@@ -1291,89 +1896,7 @@ function PlanNewWeekGridContent() {
               )}
             </span>
           </nav>
-
-          {/* Column count controls: shown inline here only for create/view mode.
-               In update mode they live inside the Actual section header. */}
-          {!loading && mode !== "update" && (
-            <div className="flex items-center gap-3 select-none shrink-0 whitespace-nowrap">
-              <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl px-3 py-1.5 shadow-xs text-[11px]">
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Coach:</span>
-                  <select
-                    disabled={isReadOnly}
-                    value={coachCount}
-                    onChange={(e) => handleCountChange("coach", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Exec:</span>
-                  <select
-                    disabled={isReadOnly}
-                    value={execCount}
-                    onChange={(e) => handleCountChange("exec", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Train:</span>
-                  <select
-                    disabled={isReadOnly}
-                    value={trainingCount}
-                    onChange={(e) => handleCountChange("training", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
-                  >
-                    {[0, 1].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Star:</span>
-                  <select
-                    disabled={isReadOnly}
-                    value={starCount}
-                    onChange={(e) => handleCountChange("star", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
-                  >
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-
-        {/* Archived / changed-since-archive banners (update mode only) */}
-        {mode === "update" && (
-          <div className="mb-4 flex flex-col gap-2">
-            {periodStatus === "archived" && (
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-emerald-800 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>This week's schedule has been Finalized &amp; Archived. Manpower cost reports have been generated.</span>
-                </div>
-                <span className="bg-emerald-100/80 text-emerald-800 text-[10px] uppercase px-2.5 py-1 rounded-lg">Archived</span>
-              </div>
-            )}
-            {changedSinceArchive && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 shadow-xs">
-                <span className="bg-amber-100 text-amber-800 text-[10px] uppercase px-2.5 py-1 rounded-lg shrink-0">Warning</span>
-                <span>Schedule modified since last archive. Click "Final Submit &amp; Archive" at the bottom to update cost reports.</span>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ─── Main content area ──────────────────────────────────────────────── */}
         {loading ? (
@@ -1385,9 +1908,11 @@ function PlanNewWeekGridContent() {
         ) : mode === "update" ? (
           /* ── UPDATE MODE: Planning (top, read-only) + Actual (bottom, editable) ── */
           <div className="flex flex-col">
-            {/* Shared day-tab bar — sticky flush strip, no card rounding so it sits tight to the TopBar */}
-            <div className="sticky top-0 z-20 -mx-6 bg-white border-b-2 border-slate-200 shadow-sm">
-              <div className="px-6 py-3 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
+            {/* Shared day-tab bar — sticky flush strip. Negative margins match the
+                page padding (px-4 sm:px-6 lg:px-8) so it bleeds edge-to-edge and
+                doesn't reveal the rounded table card behind it. */}
+            <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 bg-white border-b-2 border-slate-200 shadow-sm">
+              <div className="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
                 {/* Day tabs */}
                 <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
                   {workingDays.map(d => {
@@ -1418,9 +1943,71 @@ function PlanNewWeekGridContent() {
                   </span>
                 </div>
 
-                {/* Right spacer */}
-                <div className="ml-auto" />
+                {/* Status + single action, right-aligned */}
+                <div className="ml-auto flex items-center gap-3 z-10">
+                  {/* Undo / Redo */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={undoEdit}
+                      disabled={!isEditing || undoStack.length === 0}
+                      title="Undo (Ctrl+Z)"
+                      className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Undo2 className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={redoEdit}
+                      disabled={!isEditing || redoStack.length === 0}
+                      title="Redo (Ctrl+Shift+Z)"
+                      className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Redo2 className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <span className="hidden sm:inline text-xs font-semibold">
+                    {periodStatus === "archived" ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Saved &amp; cost report updated
+                      </span>
+                    ) : dirty ? (
+                      <span className="inline-flex items-center gap-1.5 text-amber-600">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        Unsaved changes
+                      </span>
+                    ) : null}
+                  </span>
+
+                  {periodStatus === "archived" && (
+                    <button
+                      onClick={handleReopen}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Edit again
+                    </button>
+                  )}
+                  <button
+                    onClick={handleArchiveWeek}
+                    disabled={saveState === "saving" || saveState === "saved" || periodStatus === "archived"}
+                    className={`px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors ${
+                      saveState === "saved"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                    }`}
+                  >
+                    {saveState === "saving" && "Saving…"}
+                    {saveState === "saved" && "Saved — Redirecting…"}
+                    {saveState !== "saving" && saveState !== "saved" &&
+                      (periodStatus === "archived" ? "Saved" : "Save and Update")}
+                  </button>
+                </div>
               </div>
+              {errorMsg && (
+                <div className="px-6 pb-2 -mt-1 text-right">
+                  <span className="text-xs font-bold text-red-600">{errorMsg}</span>
+                </div>
+              )}
             </div>
 
             {/* ── Planning Table (read-only top) — greyed out to signal non-editable ── */}
@@ -1471,9 +2058,10 @@ function PlanNewWeekGridContent() {
                     <div className="flex items-center gap-1">
                       <span className="font-semibold text-slate-400">Coach:</span>
                       <select
+                        disabled={!isEditing}
                         value={coachCount}
                         onChange={(e) => handleCountChange("coach", Number(e.target.value))}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -1483,9 +2071,10 @@ function PlanNewWeekGridContent() {
                     <div className="flex items-center gap-1">
                       <span className="font-semibold text-slate-400">Exec:</span>
                       <select
+                        disabled={!isEditing}
                         value={execCount}
                         onChange={(e) => handleCountChange("exec", Number(e.target.value))}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -1495,9 +2084,10 @@ function PlanNewWeekGridContent() {
                     <div className="flex items-center gap-1">
                       <span className="font-semibold text-slate-400">Train:</span>
                       <select
+                        disabled={!isEditing}
                         value={trainingCount}
                         onChange={(e) => handleCountChange("training", Number(e.target.value))}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {[0, 1].map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -1507,9 +2097,10 @@ function PlanNewWeekGridContent() {
                     <div className="flex items-center gap-1">
                       <span className="font-semibold text-slate-400">Star:</span>
                       <select
+                        disabled={!isEditing}
                         value={starCount}
                         onChange={(e) => handleCountChange("star", Number(e.target.value))}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer"
+                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-2 py-0.5 font-bold text-slate-200 outline-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -1518,32 +2109,18 @@ function PlanNewWeekGridContent() {
                     </div>
                   </div>
 
-                  {/* Divider */}
-                  <div className="w-px h-5 bg-slate-600 mx-1 shrink-0" />
-
-                  {/* Clear All + Save Day / Edit Day */}
+                  {/* Clear this day (persists on next Save). No per-day save
+                       button — the whole week is saved from the bottom bar. */}
                   {isEditing && (
-                    <button
-                      onClick={() => clearAllForDay(day)}
-                      className="text-red-300 font-extrabold uppercase text-[10px] hover:text-red-200 transition-colors px-2 py-1"
-                    >
-                      Clear All
-                    </button>
-                  )}
-                  {isEditing ? (
-                    <button
-                      onClick={() => handleSaveDay(day)}
-                      className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-1.5 rounded-xl font-bold text-xs transition-colors shadow-xs"
-                    >
-                      Save Day
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
-                      className="text-slate-200 border border-slate-500 bg-slate-600/50 hover:bg-slate-500/60 px-5 py-1.5 rounded-xl font-bold text-xs transition-colors"
-                    >
-                      Edit Day
-                    </button>
+                    <>
+                      <div className="w-px h-5 bg-slate-600 mx-1 shrink-0" />
+                      <button
+                        onClick={() => clearAllForDay(day)}
+                        className="text-red-300 font-extrabold uppercase text-[10px] hover:text-red-200 transition-colors px-2 py-1"
+                      >
+                        Clear Day
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1572,13 +2149,53 @@ function PlanNewWeekGridContent() {
                   setManagerReplacementBranch={setManagerReplacementBranch}
                   setColumnReplacementBranch={setColumnReplacementBranch}
                   onCellSet={setCell}
-                  onNoteChange={(key, value) =>
-                    setNotes(p => ({ ...p, [key]: value }))
-                  }
+                  onNoteChange={(key, value) => {
+                    pushHistory(`note:${key}`);
+                    setDirty(true);
+                    setNotes(p => ({ ...p, [key]: value }));
+                  }}
                   onClearColumn={clearColumnForDay}
                 />
               )}
             </div>
+
+            {/* Summary + Attendance live INSIDE this container so the sticky
+                day-tab bar stays pinned all the way down to the attendance table. */}
+            <SummaryTable
+              title="Weekly Hours Summary"
+              showAll={summaryShowAll}
+              onToggleShowAll={setSummaryShowAll}
+              dayLabel={selectedDay.slice(0, 3).toUpperCase()}
+              data={(summaryShowAll ? summaryData["All"] : summaryData[selectedDay]) ?? []}
+              colorFor={colorForName}
+              dateLabel={summaryDateLabel}
+              fullNameFor={fullNameFor}
+              collapsed={summaryCollapsed}
+              onToggleCollapsed={() => setSummaryCollapsed(c => !c)}
+            />
+
+            {(() => {
+              const iso = isoDateForDay(startStr, selectedDay);
+              const currentFor = (name: string) => (iso ? attnStatus[`${iso}::${name}`] : undefined);
+              const savedFor = (name: string) => (iso ? attnSaved[`${iso}::${name}`] : undefined);
+              return (
+                <AttendanceTable
+                  rows={attendanceRows}
+                  currentFor={currentFor}
+                  savedFor={savedFor}
+                  onSet={setAttendanceStatus}
+                  onSaveAll={saveAllAttendance}
+                  saving={attnSaving}
+                  fullNameFor={fullNameFor}
+                  editable={true}
+                  dateLabel={iso ? fmtNiceDate(iso) : ""}
+                  dayLocked={dayLocked}
+                  dayLockSaving={dayLockSaving}
+                  onToggleDayLock={toggleDayLock}
+                  canManageLock={canManageAttendanceLock}
+                />
+              );
+            })()}
           </div>
         ) : (
           /* ── CREATE / VIEW MODE: Single table ── */
@@ -1622,29 +2239,68 @@ function PlanNewWeekGridContent() {
                     </span>
                   </div>
 
-                  {/* Editing actions on the right */}
+                  {/* Editing actions on the right — column-count selectors +
+                      Clear All. Create/planning mode is always editable; the
+                      whole week is saved by the bottom "Save Plan" button. */}
                   <div className="flex items-center gap-3 relative z-10 ml-auto">
+                    {isEditing && (
+                      <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/60 rounded-xl px-3 py-1.5 shadow-xs text-[11px] select-none whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-slate-500">Coach:</span>
+                          <select
+                            value={coachCount}
+                            onChange={(e) => handleCountChange("coach", Number(e.target.value))}
+                            className="bg-white hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-slate-500">Exec:</span>
+                          <select
+                            value={execCount}
+                            onChange={(e) => handleCountChange("exec", Number(e.target.value))}
+                            className="bg-white hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-slate-500">Train:</span>
+                          <select
+                            value={trainingCount}
+                            onChange={(e) => handleCountChange("training", Number(e.target.value))}
+                            className="bg-white hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                          >
+                            {[0, 1].map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-slate-500">Star:</span>
+                          <select
+                            value={starCount}
+                            onChange={(e) => handleCountChange("star", Number(e.target.value))}
+                            className="bg-white hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
                     {isEditing && (
                       <button
                         onClick={() => clearAllForDay(day)}
                         className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1"
                       >
                         Clear All
-                      </button>
-                    )}
-                    {isEditing ? (
-                      <button
-                        onClick={() => handleSaveDay(day)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs transition-colors shadow-xs"
-                      >
-                        Save Day
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
-                        className="text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-5 py-2 rounded-xl font-bold text-xs transition-colors"
-                      >
-                        Edit Day
                       </button>
                     )}
                   </div>
@@ -1689,15 +2345,31 @@ function PlanNewWeekGridContent() {
           </div>
         )}
 
-        <SummaryTable title="Weekly Hours Summary" data={summaryData} />
+        {/* Summary for create/view modes (update mode renders it inside the
+            sticky container above). */}
+        {mode !== "update" && (
+          <SummaryTable
+            title="Weekly Hours Summary"
+            showAll={summaryShowAll}
+            onToggleShowAll={setSummaryShowAll}
+            dayLabel={selectedDay.slice(0, 3).toUpperCase()}
+            data={(summaryShowAll ? summaryData["All"] : summaryData[selectedDay]) ?? []}
+            colorFor={colorForName}
+            dateLabel={summaryDateLabel}
+            fullNameFor={fullNameFor}
+            collapsed={summaryCollapsed}
+            onToggleCollapsed={() => setSummaryCollapsed(c => !c)}
+          />
+        )}
 
-        {!isReadOnly && (
+        {/* ── CREATE / PLANNING: single Save Plan button ── */}
+        {mode === "create" && (
           <div className="mt-16 text-center pb-10">
             {errorMsg && (
               <p className="text-sm font-bold text-red-600 mb-4">{errorMsg}</p>
             )}
             <button
-              onClick={scheduleType === "actual" ? handleArchiveWeek : handleSaveWeeklyPlan}
+              onClick={handleSaveWeeklyPlan}
               disabled={saveState === "saving" || saveState === "saved"}
               className={`px-10 py-3.5 rounded-xl text-sm font-semibold shadow-sm transition-colors ${
                 saveState === "saved"
@@ -1707,8 +2379,7 @@ function PlanNewWeekGridContent() {
             >
               {saveState === "saving" && "Saving…"}
               {saveState === "saved" && "Saved — Redirecting…"}
-              {(saveState === "idle" || saveState === "error") &&
-                (scheduleType === "actual" ? "Final Submit & Archive" : "Save Weekly Plan")}
+              {(saveState === "idle" || saveState === "error") && "Save Plan"}
             </button>
           </div>
         )}
@@ -1815,7 +2486,7 @@ export default function PlanNewWeekGridPage() {
           </div>
         }
       >
-        <PlanNewWeekGridContent />
+        <PlanNewWeekGridContent userRole={userRole} />
       </Suspense>
     </AppShell>
   );

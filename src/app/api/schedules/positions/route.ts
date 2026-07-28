@@ -3,14 +3,79 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ─── Position type config ───
-const POSITION_TYPES: Record<string, { dbType: string; labelPrefix: string; baseOrder: number }> = {
-  coach:    { dbType: "coach",      labelPrefix: "Coach",      baseOrder: 100 },
-  exec:     { dbType: "exec",       labelPrefix: "Exec",       baseOrder: 200 },
-  training: { dbType: "coach",      labelPrefix: "Training",   baseOrder: 300 },
-  star:     { dbType: "coach",      labelPrefix: "Star Coach",  baseOrder: 400 },
-};
+// Maps the frontend seat-count keys (coach/exec/training/star) to the
+// authoritative position_type and the label/order scheme.
+const COUNT_TYPES: { key: string; type: string; prefix: string; base: number }[] = [
+  { key: "coach",    type: "coach",      prefix: "Coach",      base: 100 },
+  { key: "exec",     type: "exec",       prefix: "Exec",       base: 200 },
+  { key: "training", type: "training",   prefix: "Training",   base: 300 },
+  { key: "star",     type: "star_coach", prefix: "Star Coach", base: 400 },
+];
 
-// ─── GET: Return active positions for a branch ───
+function labelFor(type: string, seat: number): string {
+  const meta = COUNT_TYPES.find(t => t.type === type);
+  return meta ? `${meta.prefix} ${seat}` : `${type} ${seat}`;
+}
+function orderFor(type: string, seat: number): number {
+  const meta = COUNT_TYPES.find(t => t.type === type);
+  return meta ? meta.base + seat : seat;
+}
+function typeToCountKey(type: string): string | null {
+  return COUNT_TYPES.find(t => t.type === type)?.key ?? null;
+}
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Ensure a branch has its stable position DEFINITIONS. Seeds the default set
+// (1 Manager, 3 Coach, 3 Exec) the first time a branch is used. Idempotent.
+async function ensureDefinitions(branchId: number) {
+  const data: {
+    branch_id: number; position_type: string; seat_number: number;
+    position_label: string; display_order: number;
+  }[] = [
+    { branch_id: branchId, position_type: "manager", seat_number: 1, position_label: "Manager on Duty", display_order: 0 },
+  ];
+  for (let i = 1; i <= 3; i++) {
+    data.push({ branch_id: branchId, position_type: "coach", seat_number: i, position_label: `Coach ${i}`, display_order: 100 + i });
+    data.push({ branch_id: branchId, position_type: "exec",  seat_number: i, position_label: `Exec ${i}`,  display_order: 200 + i });
+  }
+  await prisma.branch_position.createMany({ data, skipDuplicates: true });
+}
+
+// Ensure a single DATE's activation rows exist for every definition. When a
+// date is opened for the first time, clone the activation from the SAME WEEKDAY
+// of the previous week (date - 7 days) so per-day patterns carry forward; if
+// there is none, activate by default.
+async function ensureDayActivation(branchId: number, date: Date, defs: { branch_position_id: number }[]) {
+  const existing = await prisma.branch_position_day.findMany({
+    where: { date, branch_position: { branch_id: branchId } },
+    select: { branch_position_id: true },
+  });
+  const existingIds = new Set(existing.map(r => r.branch_position_id));
+  const missing = defs.filter(d => !existingIds.has(d.branch_position_id));
+  if (missing.length === 0) return;
+
+  const prevDate = new Date(date);
+  prevDate.setUTCDate(prevDate.getUTCDate() - 7);
+  const prevRows = await prisma.branch_position_day.findMany({
+    where: { date: prevDate, branch_position: { branch_id: branchId } },
+  });
+  const activeMap: Record<number, boolean> = {};
+  prevRows.forEach(r => { activeMap[r.branch_position_id] = r.is_active; });
+
+  await prisma.branch_position_day.createMany({
+    data: missing.map(d => ({
+      branch_position_id: d.branch_position_id,
+      date,
+      is_active: activeMap[d.branch_position_id] ?? true,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+// ─── GET: per-day active seat counts for a branch's week ───
+// ?branch=&weekStartDate=  → { positions, days: { <ISO date>: {coach,exec,training,star} } }
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
@@ -20,12 +85,12 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const branchName = searchParams.get("branch");
   const weekStartDateStr = searchParams.get("weekStartDate");
-  
+
   if (!branchName || !weekStartDateStr) {
     return NextResponse.json({ success: false, error: "Missing branch or weekStartDate" }, { status: 400 });
   }
 
-  const weekStartDate = new Date(`${weekStartDateStr}T00:00:00Z`);
+  const weekStart = new Date(`${weekStartDateStr}T00:00:00Z`);
 
   try {
     const branch = await prisma.branch.findFirst({
@@ -36,118 +101,67 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, error: "Unknown branch" }, { status: 400 });
     }
 
-    let positions = await prisma.branch_duty_position.findMany({
-      where: { branch_id: branch.branch_id, week_start_date: weekStartDate },
+    // 1. Stable definitions (seed defaults on first use)
+    let defs = await prisma.branch_position.findMany({
+      where: { branch_id: branch.branch_id },
       orderBy: { display_order: "asc" },
     });
-
-    // If no positions exist for this week, we need to clone from a previous week or seed defaults
-    if (positions.length === 0) {
-      // Find the most recent week that has positions
-      const previousPositions = await prisma.branch_duty_position.findMany({
-        where: { branch_id: branch.branch_id, week_start_date: { lt: weekStartDate } },
-        orderBy: { week_start_date: "desc" },
+    if (defs.length === 0) {
+      await ensureDefinitions(branch.branch_id);
+      defs = await prisma.branch_position.findMany({
+        where: { branch_id: branch.branch_id },
+        orderBy: { display_order: "asc" },
       });
-
-      const positionsToCreate = [];
-
-      if (previousPositions.length > 0) {
-        // Clone from the most recent week
-        const mostRecentWeekDate = previousPositions[0].week_start_date;
-        const configToClone = previousPositions.filter(p => p.week_start_date.getTime() === mostRecentWeekDate.getTime());
-        
-        for (const p of configToClone) {
-          positionsToCreate.push({
-            branch_id: branch.branch_id,
-            week_start_date: weekStartDate,
-            position_label: p.position_label,
-            position_type: p.position_type,
-            display_order: p.display_order,
-            is_active: p.is_active,
-          });
-        }
-      } else {
-        // Seed default configuration (1 Mgr, 3 Coach, 3 Exec, 0 Train, 0 Star)
-        positionsToCreate.push({
-          branch_id: branch.branch_id,
-          week_start_date: weekStartDate,
-          position_label: "Manager on Duty",
-          position_type: "manager",
-          display_order: 0,
-          is_active: true,
-        });
-
-        for (let i = 1; i <= 3; i++) {
-          positionsToCreate.push({
-            branch_id: branch.branch_id, week_start_date: weekStartDate,
-            position_label: `Coach ${i}`, position_type: "coach", display_order: 100 + i, is_active: true,
-          });
-          positionsToCreate.push({
-            branch_id: branch.branch_id, week_start_date: weekStartDate,
-            position_label: `Exec ${i}`, position_type: "exec", display_order: 200 + i, is_active: true,
-          });
-        }
-      }
-
-      await prisma.branch_duty_position.createMany({ data: positionsToCreate });
-
-      // Fetch them again after creating
-      positions = await prisma.branch_duty_position.findMany({
-        where: { branch_id: branch.branch_id, week_start_date: weekStartDate },
+    }
+    if (!defs.some(d => d.position_type === "manager")) {
+      await prisma.branch_position.upsert({
+        where: { branch_id_position_type_seat_number: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1 } },
+        update: {},
+        create: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1, position_label: "Manager on Duty", display_order: 0 },
+      });
+      defs = await prisma.branch_position.findMany({
+        where: { branch_id: branch.branch_id },
         orderBy: { display_order: "asc" },
       });
     }
 
-    // Every branch+week must have a Manager seat — self-heal branches/weeks
-    // whose position rows predate this guarantee or were cloned from a week
-    // that was itself missing one, otherwise MANAGER-column assignments have
-    // no position_id to save against and are silently lost.
-    if (!positions.some(p => p.position_label === "Manager on Duty")) {
-      await prisma.branch_duty_position.upsert({
-        where: {
-          branch_id_week_start_date_position_label: {
-            branch_id: branch.branch_id,
-            week_start_date: weekStartDate,
-            position_label: "Manager on Duty",
-          },
-        },
-        update: { is_active: true },
-        create: {
-          branch_id: branch.branch_id,
-          week_start_date: weekStartDate,
-          position_label: "Manager on Duty",
-          position_type: "manager",
-          display_order: 0,
-          is_active: true,
-        },
-      });
-      positions = await prisma.branch_duty_position.findMany({
-        where: { branch_id: branch.branch_id, week_start_date: weekStartDate },
-        orderBy: { display_order: "asc" },
-      });
+    // 2. The seven dates of the week (Mon..Sun) and their activation
+    const weekDates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setUTCDate(d.getUTCDate() + i);
+      weekDates.push(d);
+    }
+    for (const d of weekDates) {
+      await ensureDayActivation(branch.branch_id, d, defs);
     }
 
-    // Count active positions per type
-    const counts: Record<string, number> = { coach: 0, exec: 0, training: 0, star: 0 };
-    for (const pos of positions) {
-      if (!pos.is_active) continue;
-      if (pos.position_label.startsWith("Coach")) counts.coach++;
-      else if (pos.position_type === "exec") counts.exec++;
-      else if (pos.position_label.startsWith("Training")) counts.training++;
-      else if (pos.position_label.startsWith("Star Coach")) counts.star++;
+    const dayRows = await prisma.branch_position_day.findMany({
+      where: { date: { in: weekDates }, branch_position: { branch_id: branch.branch_id } },
+    });
+    const defById = new Map(defs.map(d => [d.branch_position_id, d]));
+
+    // 3. Per-date counts (active seats by type)
+    const days: Record<string, { coach: number; exec: number; training: number; star: number }> = {};
+    for (const d of weekDates) days[isoDate(d)] = { coach: 0, exec: 0, training: 0, star: 0 };
+    for (const row of dayRows) {
+      if (!row.is_active) continue;
+      const def = defById.get(row.branch_position_id);
+      if (!def) continue;
+      const key = typeToCountKey(def.position_type);
+      if (key) days[isoDate(row.date)][key as "coach" | "exec" | "training" | "star"]++;
     }
 
     return NextResponse.json({
       success: true,
-      counts,
-      positions: positions
-        .filter(p => p.is_active)
-        .map(p => ({
-          position_id: p.position_id,
-          label: p.position_label,
-          type: p.position_type,
-          display_order: p.display_order,
-        })),
+      days,
+      positions: defs.map(p => ({
+        position_id: p.branch_position_id,
+        label: p.position_label,
+        type: p.position_type,
+        seat_number: p.seat_number,
+        display_order: p.display_order,
+      })),
     });
   } catch (err) {
     console.error("[GET /api/schedules/positions]", err);
@@ -155,8 +169,8 @@ export async function GET(req: Request) {
   }
 }
 
-// ─── POST: Manage seat counts ───
-// Body: { branch: string, weekStartDate: string, counts: { coach: 3, exec: 3, training: 0, star: 0 } }
+// ─── POST: set seat counts for a SINGLE date ───
+// Body: { branch, date, counts: { coach, exec, training, star } }
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
@@ -166,14 +180,14 @@ export async function POST(req: Request) {
   try {
     const raw = await req.json();
     const branchName = raw.branch as string;
-    const weekStartDateStr = raw.weekStartDate as string;
+    const dateStr = raw.date as string;
     const counts = raw.counts as Record<string, number>;
 
-    if (!branchName || !weekStartDateStr || !counts) {
-      return NextResponse.json({ success: false, error: "Missing branch, weekStartDate, or counts" }, { status: 400 });
+    if (!branchName || !dateStr || !counts) {
+      return NextResponse.json({ success: false, error: "Missing branch, date, or counts" }, { status: 400 });
     }
 
-    const weekStartDate = new Date(`${weekStartDateStr}T00:00:00Z`);
+    const date = new Date(`${dateStr}T00:00:00Z`);
 
     const branch = await prisma.branch.findFirst({
       where: { branch_name: branchName },
@@ -183,102 +197,67 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Unknown branch" }, { status: 400 });
     }
 
-    // Process each position type
-    for (const [typeKey, desiredCount] of Object.entries(counts)) {
-      const config = POSITION_TYPES[typeKey];
-      if (!config) continue;
+    // Manager is always present + active for the date.
+    const mgr = await prisma.branch_position.upsert({
+      where: { branch_id_position_type_seat_number: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1 } },
+      update: {},
+      create: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1, position_label: "Manager on Duty", display_order: 0 },
+    });
+    await prisma.branch_position_day.upsert({
+      where: { branch_position_id_date: { branch_position_id: mgr.branch_position_id, date } },
+      update: { is_active: true },
+      create: { branch_position_id: mgr.branch_position_id, date, is_active: true },
+    });
 
-      // Get ALL positions (active + inactive) of this type for this branch+week, ordered by label number
-      const allPositions = await prisma.branch_duty_position.findMany({
-        where: {
-          branch_id: branch.branch_id,
-          week_start_date: weekStartDate,
-          position_label: { startsWith: config.labelPrefix },
-        },
-        orderBy: { display_order: "asc" },
-      });
+    for (const { type } of COUNT_TYPES) {
+      const key = COUNT_TYPES.find(t => t.type === type)!.key;
+      const desired = Math.max(0, Math.floor(Number(counts[key] ?? 0)));
 
-      const activeCount = allPositions.filter(p => p.is_active).length;
-
-      if (desiredCount > activeCount) {
-        // Need more seats — first reactivate, then create
-        const inactiveOnes = allPositions.filter(p => !p.is_active).sort((a, b) => a.display_order - b.display_order);
-        let toActivate = desiredCount - activeCount;
-
-        // Reactivate existing inactive ones first
-        for (const pos of inactiveOnes) {
-          if (toActivate <= 0) break;
-          await prisma.branch_duty_position.update({
-            where: { position_id: pos.position_id },
-            data: { is_active: true },
-          });
-          toActivate--;
-        }
-
-        // If still need more, create new ones
-        if (toActivate > 0) {
-          // Find highest existing number for this prefix
-          let maxNum = 0;
-          for (const pos of allPositions) {
-            const m = pos.position_label.match(/(\d+)$/);
-            if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
-          }
-
-          for (let i = 0; i < toActivate; i++) {
-            maxNum++;
-            await prisma.branch_duty_position.create({
-              data: {
-                branch_id: branch.branch_id,
-                week_start_date: weekStartDate,
-                position_label: `${config.labelPrefix} ${maxNum}`,
-                position_type: config.dbType,
-                display_order: config.baseOrder + maxNum,
-                is_active: true,
-              },
-            });
-          }
-        }
-      } else if (desiredCount < activeCount) {
-        // Need fewer seats — deactivate highest-numbered active ones
-        const activeOnes = allPositions.filter(p => p.is_active).sort((a, b) => b.display_order - a.display_order);
-        let toDeactivate = activeCount - desiredCount;
-
-        for (const pos of activeOnes) {
-          if (toDeactivate <= 0) break;
-          await prisma.branch_duty_position.update({
-            where: { position_id: pos.position_id },
-            data: { is_active: false },
-          });
-          toDeactivate--;
-        }
+      // Ensure definitions exist for seats 1..desired.
+      for (let seat = 1; seat <= desired; seat++) {
+        await prisma.branch_position.upsert({
+          where: { branch_id_position_type_seat_number: { branch_id: branch.branch_id, position_type: type, seat_number: seat } },
+          update: {},
+          create: {
+            branch_id: branch.branch_id,
+            position_type: type,
+            seat_number: seat,
+            position_label: labelFor(type, seat),
+            display_order: orderFor(type, seat),
+          },
+        });
       }
-      // If desiredCount === activeCount, nothing to do
+
+      // Activate seats 1..desired for THIS date, deactivate the rest.
+      const typeDefs = await prisma.branch_position.findMany({
+        where: { branch_id: branch.branch_id, position_type: type },
+        orderBy: { seat_number: "asc" },
+      });
+      for (const d of typeDefs) {
+        const active = d.seat_number <= desired;
+        await prisma.branch_position_day.upsert({
+          where: { branch_position_id_date: { branch_position_id: d.branch_position_id, date } },
+          update: { is_active: active },
+          create: { branch_position_id: d.branch_position_id, date, is_active: active },
+        });
+      }
     }
 
-    // Return the updated state
-    const updatedPositions = await prisma.branch_duty_position.findMany({
-      where: { branch_id: branch.branch_id, week_start_date: weekStartDate, is_active: true },
-      orderBy: { display_order: "asc" },
+    // Return this date's resulting counts.
+    const defs = await prisma.branch_position.findMany({ where: { branch_id: branch.branch_id } });
+    const activeRows = await prisma.branch_position_day.findMany({
+      where: { date, is_active: true, branch_position: { branch_id: branch.branch_id } },
     });
-
+    const defById = new Map(defs.map(d => [d.branch_position_id, d]));
     const updatedCounts: Record<string, number> = { coach: 0, exec: 0, training: 0, star: 0 };
-    for (const pos of updatedPositions) {
-      if (pos.position_label.startsWith("Coach")) updatedCounts.coach++;
-      else if (pos.position_type === "exec") updatedCounts.exec++;
-      else if (pos.position_label.startsWith("Training")) updatedCounts.training++;
-      else if (pos.position_label.startsWith("Star Coach")) updatedCounts.star++;
+    for (const row of activeRows) {
+      const def = defById.get(row.branch_position_id);
+      if (!def) continue;
+      const key = typeToCountKey(def.position_type);
+      if (key) updatedCounts[key]++;
     }
 
-    return NextResponse.json({
-      success: true,
-      counts: updatedCounts,
-      positions: updatedPositions.map(p => ({
-        position_id: p.position_id,
-        label: p.position_label,
-        type: p.position_type,
-        display_order: p.display_order,
-      })),
-    });
+    return NextResponse.json({ success: true, date: dateStr, counts: updatedCounts });
   } catch (err) {
     console.error("[POST /api/schedules/positions]", err);
     return NextResponse.json({ success: false, error: "Failed to update positions" }, { status: 500 });
