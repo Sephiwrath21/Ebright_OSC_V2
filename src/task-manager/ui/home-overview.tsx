@@ -43,6 +43,27 @@ export function HomeTaskOverview({
     `${departmentOverviewHref}${sep}department=${encodeURIComponent(department)}`;
   const raw = dateFilterParams ?? {};
 
+  // One picker per period, mounted on BOTH that period's sections
+  // (departments + branch regions). They share a URL param, so the two
+  // Daily pickers (and the two Monthly ones) always show the same date and
+  // either can drive it.
+  const dailyPicker = dailyDate && (
+    <DailyDatePicker
+      value={dailyDate}
+      basePath="/home"
+      extraParams={raw.mdate ? { mdate: raw.mdate } : {}}
+    />
+  );
+  const monthlyPicker = monthlyDate && (
+    <DailyDatePicker
+      value={monthlyDate}
+      basePath="/home"
+      param="mdate"
+      step="month"
+      extraParams={raw.date ? { date: raw.date } : {}}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
@@ -50,32 +71,14 @@ export function HomeTaskOverview({
         title="All Departments — Daily"
         entities={dailyOrg.departments}
         nameHref={deptHref}
-        action={
-          dailyDate && (
-            <DailyDatePicker
-              value={dailyDate}
-              basePath="/home"
-              extraParams={raw.mdate ? { mdate: raw.mdate } : {}}
-            />
-          )
-        }
+        action={dailyPicker}
       />
       {monthlyOrg && (
         <EntityDonutGrid
           title="All Departments — Monthly"
           entities={monthlyOrg.departments}
           nameHref={deptHref}
-          action={
-            monthlyDate && (
-              <DailyDatePicker
-                value={monthlyDate}
-                basePath="/home"
-                param="mdate"
-                step="month"
-                extraParams={raw.date ? { date: raw.date } : {}}
-              />
-            )
-          }
+          action={monthlyPicker}
         />
       )}
       {/* Branch status grouped by region — Daily combines all three staff
@@ -84,6 +87,7 @@ export function HomeTaskOverview({
       <RegionDonutGrids
         title="Branch Status by Region — Daily"
         regions={dailyOrg.regions}
+        action={dailyPicker}
       />
       {monthlyOrg && (
         <RegionDonutGrids
@@ -91,6 +95,7 @@ export function HomeTaskOverview({
           regions={
             monthlyOrg.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []
           }
+          action={monthlyPicker}
         />
       )}
       {adhocByRegion && (
