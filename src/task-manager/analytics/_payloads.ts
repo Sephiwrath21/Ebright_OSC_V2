@@ -15,6 +15,7 @@ import {
   groupBranchesByRegion,
   groupByAssignerRole,
   groupByDimension,
+  memberSortRank,
   withAllDepartments,
   resolveWindow,
   sortTaskRows,
@@ -225,11 +226,17 @@ export async function getEntityPayload(
         employmentType: u?.employmentType ?? null,
         department: u?.department ?? null,
         branch: u?.branch ?? null,
+        // Not emitted on the wire — sort key only (see the sort below).
+        _rank: memberSortRank(u?.employmentType, u?.coachSchedule),
         done: tally.done,
         notDone: tally.notDone,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Role priority first (HOD → HQ Exec → Full Time → Part Time → Intern;
+    // Manager → Branch Exec → FT Coach → PT Coach), then name — the
+    // 2026-07-25 roster-ordering decision. memberSortRank in _lib.ts.
+    .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
+    .map(({ _rank, ...member }) => member);
 
   return { totals: countBuckets(blocks), tasks, members };
 }
