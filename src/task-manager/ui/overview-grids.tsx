@@ -132,6 +132,7 @@ export function RegionDonutGrids({
   title,
   regions,
   roleVariants,
+  action,
 }: {
   title: string;
   regions: { name: string; branches: FlowEntityRollup[] }[];
@@ -139,6 +140,9 @@ export function RegionDonutGrids({
     role: string;
     regions: { name: string; branches: FlowEntityRollup[] }[];
   }[];
+  /** Right-aligned control in the heading row (e.g. the date filter) —
+   *  rendered after the role pills when both are present. */
+  action?: React.ReactNode;
 }) {
   const [selectedRole, setSelectedRole] = React.useState("All");
   const shown =
@@ -150,20 +154,25 @@ export function RegionDonutGrids({
     <SectionCard
       title={title}
       action={
-        roleVariants && (
-          <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
-            {["All", ...roleVariants.map((v) => v.role)].map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setSelectedRole(r)}
-                className={`rounded-md px-2.5 py-1 ${
-                  selectedRole === r ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
+        (roleVariants || action) && (
+          <div className="flex items-center gap-2">
+            {roleVariants && (
+              <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
+                {["All", ...roleVariants.map((v) => v.role)].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setSelectedRole(r)}
+                    className={`rounded-md px-2.5 py-1 ${
+                      selectedRole === r ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            )}
+            {action}
           </div>
         )
       }
