@@ -106,6 +106,7 @@ export default async function TaskManagerPage({
     department?: string;
     branch?: string;
     date?: string;
+    mdate?: string;
   }>;
 }) {
   const session = await auth();
@@ -116,9 +117,12 @@ export default async function TaskManagerPage({
   const sp = await searchParams;
   const period = sp.period === "monthly" ? "monthly" : "daily";
   const href = (p: string) => `/task-manager?period=${p}`;
-  // Daily date filter (2026-07-25): drives the DAILY window only — Monthly
-  // sections always stay on the current month. Undefined = today.
+  // Date filters: ?date= drives every DAILY surface (entity Details AND the
+  // personal Daily donut/list, 2026-07-28); ?mdate= drives the personal
+  // Monthly pair (any picked date = that date's whole month). Undefined =
+  // today / current month.
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
+  const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
@@ -342,8 +346,8 @@ export default async function TaskManagerPage({
   let headerAction: ReactNode = null;
   try {
     const [daily, monthly, { staff }] = await Promise.all([
-      getFlowDetail(email, "daily"),
-      getFlowDetail(email, "monthly"),
+      getFlowDetail(email, "daily", dailyDate),
+      getFlowDetail(email, "monthly", monthlyDate),
       getFlowStaff(),
     ]);
     const role = daily.me.me.role;
@@ -528,9 +532,35 @@ export default async function TaskManagerPage({
       const detail = await getDepartmentDetail(email, daily.department.name, "daily", dailyDate);
       departmentDaily = detail.department;
       departmentDailyControl = (
-        <DailyDatePicker value={detail.date} basePath="/task-manager" extraParams={{}} />
+        <DailyDatePicker
+          value={detail.date}
+          basePath="/task-manager"
+          extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+        />
       );
     }
+
+    // Personal date filters (2026-07-28): one control per period, mounted by
+    // the view on BOTH that period's personal surfaces (donut card + "My
+    // Tasks" heading) — a single ?date=/?mdate= selection drives donut and
+    // list together. Each carries the other's param so the two selections
+    // never reset each other. Not for the CEO (un-windowed combined list).
+    const personalDailyControl = (
+      <DailyDatePicker
+        value={daily.date}
+        basePath="/task-manager"
+        extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+      />
+    );
+    const personalMonthlyControl = (
+      <DailyDatePicker
+        value={monthly.date}
+        basePath="/task-manager"
+        param="mdate"
+        step="month"
+        extraParams={dailyDate ? { date: dailyDate } : {}}
+      />
+    );
 
     body = (
       <TaskManagerView
@@ -550,6 +580,8 @@ export default async function TaskManagerPage({
         hodKanban={hodKanban}
         departmentDaily={departmentDaily}
         departmentDailyControl={departmentDailyControl}
+        personalDailyControl={personalDailyControl}
+        personalMonthlyControl={personalMonthlyControl}
       />
     );
   } catch (err) {

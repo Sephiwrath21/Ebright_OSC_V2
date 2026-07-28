@@ -91,16 +91,26 @@ export interface MePayload {
   adhocAll: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
 }
 
-/** Personal overview: my blocks, split by assigner role, plus delegated work. */
+/** Personal overview: my blocks, split by assigner role, plus delegated work.
+ *
+ *  `strictWindow` (2026-07-28, the personal view's date filters): the
+ *  periodized `mine`/`delegated` sets must belong to the SELECTED day/month
+ *  (dueAt-else-startedAt), not to every day — same rule as the entity/org
+ *  payloads. The all-time sets (`streamsAll`/`delegatedAll`/`adhocAll`) are
+ *  never windowed either way. Off = the original wide semantics (all
+ *  same-cadence blocks) — kept for the CEO's combined list and the Home
+ *  dashboard's personal progress card. */
 export async function getMePayload(
   user: MeUser,
   period: Period,
   date?: string,
+  opts: { strictWindow?: boolean } = {},
 ): Promise<MePayload> {
   const window = resolveWindow(period, date);
+  const strictWindow = opts.strictWindow ?? false;
   const [mine, delegatedBlocks, mineAll, delegatedAllBlocks] = await Promise.all([
-    fetchPeriodBlocks(window, { assigneeId: user.id }),
-    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id }),
+    fetchPeriodBlocks(window, { assigneeId: user.id, strictWindow }),
+    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id, strictWindow }),
     fetchPeriodBlocks(null, { assigneeId: user.id }),
     fetchPeriodBlocks(null, { startedById: user.id, excludeAssigneeId: user.id }),
   ]);
