@@ -408,6 +408,7 @@ export default async function TaskManagerPage({
               reassign={reassign}
               headerControl={
                 <DailyDatePicker
+                  key="admin-dept-daily-picker"
                   value={dailyDetail.date}
                   basePath="/task-manager"
                   extraParams={{ view: "department", department }}
@@ -449,6 +450,7 @@ export default async function TaskManagerPage({
               reassign={reassign}
               headerControl={
                 <DailyDatePicker
+                  key="admin-branch-daily-picker"
                   value={dailyDetail.date}
                   basePath="/task-manager"
                   extraParams={{ view: "branch", branch }}
@@ -533,6 +535,7 @@ export default async function TaskManagerPage({
       departmentDaily = detail.department;
       departmentDailyControl = (
         <DailyDatePicker
+          key="dept-daily-picker"
           value={detail.date}
           basePath="/task-manager"
           extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
@@ -547,6 +550,7 @@ export default async function TaskManagerPage({
     // never reset each other. Not for the CEO (un-windowed combined list).
     const personalDailyControl = (
       <DailyDatePicker
+        key="personal-daily-picker"
         value={daily.date}
         basePath="/task-manager"
         extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
@@ -554,6 +558,7 @@ export default async function TaskManagerPage({
     );
     const personalMonthlyControl = (
       <DailyDatePicker
+        key="personal-monthly-picker"
         value={monthly.date}
         basePath="/task-manager"
         param="mdate"

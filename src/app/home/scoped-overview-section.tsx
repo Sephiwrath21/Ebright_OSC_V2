@@ -64,10 +64,16 @@ export async function HomeScopedOverviewSection({
         Object.entries(raw).filter(([k, v]) => v && k !== except),
       ) as Record<string, string>;
     const dailyPicker = (
-      <DailyDatePicker value={daily.date} basePath="/home" extraParams={carry("date")} />
+      <DailyDatePicker
+        key="home-daily-picker"
+        value={daily.date}
+        basePath="/home"
+        extraParams={carry("date")}
+      />
     );
     const monthlyPicker = (
       <DailyDatePicker
+        key="home-monthly-picker"
         value={monthly.date}
         basePath="/home"
         param="mdate"
@@ -190,6 +196,7 @@ export async function HomeScopedOverviewSection({
         tasks={hodBuckets}
         action={
           <DailyDatePicker
+            key="home-hod-picker"
             value={hodAnchor}
             basePath="/home"
             param="hdate"

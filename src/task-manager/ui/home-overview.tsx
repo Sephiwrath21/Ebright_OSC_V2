@@ -59,10 +59,16 @@ export function HomeTaskOverview({
   // Daily pickers (and the two Monthly ones) always show the same date and
   // either can drive it.
   const dailyPicker = dailyDate && (
-    <DailyDatePicker value={dailyDate} basePath="/home" extraParams={carry("date")} />
+    <DailyDatePicker
+      key="org-daily-picker"
+      value={dailyDate}
+      basePath="/home"
+      extraParams={carry("date")}
+    />
   );
   const monthlyPicker = monthlyDate && (
     <DailyDatePicker
+      key="org-monthly-picker"
       value={monthlyDate}
       basePath="/home"
       param="mdate"
@@ -72,6 +78,7 @@ export function HomeTaskOverview({
   );
   const adhocPicker = adhocDate && (
     <DailyDatePicker
+      key="org-adhoc-picker"
       value={adhocDate}
       basePath="/home"
       param="adate"
