@@ -183,9 +183,9 @@ export function AssignTaskForm({
           </div>
         </div>
 
-        {/* Weekly recurrence is NOT set at creation (2026-07-25 correction):
-            it's the standalone "Auto Refresh" action on existing tasks in
-            the task lists — see EntityDrillModal's AutoRefreshControl. */}
+        {/* No recurrence control here: since 2026-07-25 (final decision)
+            EVERY Daily task auto-recurs weekly, system-wide — see
+            engine/recurrence.ts. */}
         {showDay && (
           <div className="max-w-md">
             <p className="text-sm text-gray-600">Day</p>

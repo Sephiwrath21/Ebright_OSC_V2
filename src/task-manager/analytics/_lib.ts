@@ -479,12 +479,6 @@ export interface TaskRow {
   runName: string;
   flowName: string;
   assigneeId: string;
-  /** Cadence tag (null = untagged engine-flow task) — the Auto Refresh
-   *  control only renders for DAILY rows. */
-  cadence: "DAILY" | "MONTHLY" | "ADHOC" | null;
-  /** Weekly auto-recurrence flag (engine/recurrence.ts) — surfaced so task
-   *  lists can show and toggle the "Auto Refresh" state. */
-  repeatWeekly: boolean;
   dueAt: string | null; // ISO — converted from the RunBlock's Date in toTaskRow.
   // (The donor's NextResponse.json did this conversion implicitly at the HTTP
   // boundary; native()'s in-process data layer has no such boundary, so it
@@ -516,8 +510,6 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     runName: b.run.name,
     flowName: b.run.flow.name,
     assigneeId: b.assigneeId,
-    cadence: b.cadence,
-    repeatWeekly: b.repeatWeekly,
     dueAt: b.dueAt ? b.dueAt.toISOString() : null,
     status: b.status,
     fromSchedule: b.scheduleSlotId !== null,
@@ -550,7 +542,6 @@ export interface PeriodBlock {
   startedAt: Date | null;
   scheduleSlotId: string | null;
   cadence: Cadence | null;
-  repeatWeekly: boolean;
   /** Minimal shape — just enough to compute quick-complete eligibility,
    *  not the full item (label/config/value aren't needed here). */
   runItems: { required: boolean; type: ItemType }[];
@@ -631,7 +622,6 @@ export async function fetchPeriodBlocks(
       startedAt: true,
       scheduleSlotId: true,
       cadence: true,
-      repeatWeekly: true,
       runItems: { select: { required: true, type: true } },
       run: {
         select: {
