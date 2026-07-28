@@ -24,6 +24,7 @@ import {
   EXTRA_USERS,
   mapHrfsUser,
   mapPortalEmployee,
+  normalizeSourceDepartment,
   type HrfsUserRow,
   type MappedUser,
   type PortalEmployeeRow,
@@ -123,8 +124,10 @@ async function fetchPortalDepartments(): Promise<Map<string, string>> {
     );
     const byEmail = new Map<string, string>();
     for (const r of result.rows) {
-      if ((FLOW_DEPARTMENTS as readonly string[]).includes(r.department_name)) {
-        byEmail.set(r.email, r.department_name);
+      // Portal still says "Operation" — normalize to the renamed value.
+      const dept = normalizeSourceDepartment(r.department_name);
+      if (dept && (FLOW_DEPARTMENTS as readonly string[]).includes(dept)) {
+        byEmail.set(r.email, dept);
       }
     }
     return byEmail;
@@ -343,7 +346,7 @@ async function provisionUtilityFlows(): Promise<void> {
 
   await prisma.workspace.upsert({
     where: { id: "ws-operations" },
-    create: { id: "ws-operations", name: "Operations", icon: "🛠️", ownerId, department: "Operation", order: 1 },
+    create: { id: "ws-operations", name: "Operations", icon: "🛠️", ownerId, department: "Operations", order: 1 },
     update: {},
   });
 

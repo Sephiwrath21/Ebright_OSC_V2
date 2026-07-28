@@ -486,7 +486,7 @@ describe("FLOW_STAFF_ROLES / BRANCH_STAFF_ROLES equivalence", () => {
 describe("diffUserFields", () => {
   const base: DiffableUserFields = {
     role: "MEMBER",
-    department: "Operation",
+    department: "Operations",
     branch: null,
     employmentType: "Full Time",
     coachSchedule: null,
@@ -505,7 +505,7 @@ describe("diffUserFields", () => {
     const next: DiffableUserFields = { ...base, department: null, branch: "Klang" };
     expect(diffUserFields(existing, next)).toEqual([
       "role HOD→MEMBER",
-      "department Operation→(none)",
+      "department Operations→(none)",
       "branch (none)→Klang",
     ]);
   });

@@ -22,39 +22,50 @@ export function DailyDatePicker({
   value,
   basePath,
   extraParams = {},
+  param = "date",
+  step = "day",
 }: {
   /** The resolved date currently shown, YYYY-MM-DD (server echoes it back). */
   value: string;
   basePath: string;
   extraParams?: Record<string, string>;
+  /** Query param the picked date rides in (default "date" — the Home page's
+   *  Monthly section uses "mdate" so its filter stays independent of Daily). */
+  param?: string;
+  /** Arrow-button stride. "month" is for month-anchored sections (Monthly
+   *  grids): arrows jump to the 1st of the prev/next month, and any date
+   *  picked in the calendar field selects that date's whole month. */
+  step?: "day" | "month";
 }) {
   const router = useRouter();
   const navigate = (v: string) => {
-    const qs = new URLSearchParams({ ...extraParams, date: v });
+    const qs = new URLSearchParams({ ...extraParams, [param]: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
-  const shift = (days: number) => {
+  const shift = (by: number) => {
     const [y, m, d] = value.split("-").map(Number);
-    const dt = new Date(y, m - 1, d + days);
+    const dt =
+      step === "month" ? new Date(y, m - 1 + by, 1) : new Date(y, m - 1, d + by);
     const pad = (n: number) => String(n).padStart(2, "0");
     navigate(`${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`);
   };
+  const unit = step === "month" ? "month" : "day";
   const arrowClass =
     "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600";
 
   return (
     <div className="flex items-center gap-1.5">
-      <button type="button" aria-label="Previous day" onClick={() => shift(-1)} className={arrowClass}>
+      <button type="button" aria-label={`Previous ${unit}`} onClick={() => shift(-1)} className={arrowClass}>
         ◀
       </button>
       <input
         type="date"
         value={value}
         onChange={(e) => e.target.value && navigate(e.target.value)}
-        aria-label="Daily date"
+        aria-label={`${unit === "month" ? "Monthly" : "Daily"} date`}
         className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
       />
-      <button type="button" aria-label="Next day" onClick={() => shift(1)} className={arrowClass}>
+      <button type="button" aria-label={`Next ${unit}`} onClick={() => shift(1)} className={arrowClass}>
         ▶
       </button>
     </div>

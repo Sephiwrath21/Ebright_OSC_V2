@@ -56,213 +56,6 @@ import {
   type ReassignControl,
 } from "./bits";
 
-const WEEKDAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
-interface DayGroup {
-  /** Weekday index (0=Sun..6=Sat) as a string, or "unscheduled". */
-  key: string;
-  label: string;
-  tasks: FlowTaskRow[];
-}
-
-/** Groups tasks by the weekday their OWN dueAt falls on — NOT a stored "day"
- *  field (there isn't one; see the comment on DailyTasksByDay below) — so
- *  each task lands in exactly one group. Ordered starting from today (today
- *  first, then tomorrow, ... wrapping around), matching "what's coming up"
- *  reading order; "Unscheduled" (no dueAt at all — a Daily-tagged task with
- *  no due date ever set) sorts last so it's never silently dropped. Only
- *  weekdays that actually have a task appear at all — no empty tabs. */
-function groupTasksByWeekday(tasks: FlowTaskRow[]): DayGroup[] {
-  const byWeekday = new Map<number, FlowTaskRow[]>();
-  const unscheduled: FlowTaskRow[] = [];
-  for (const t of tasks) {
-    if (!t.dueAt) {
-      unscheduled.push(t);
-      continue;
-    }
-    const idx = new Date(t.dueAt).getDay();
-    const bucket = byWeekday.get(idx);
-    if (bucket) bucket.push(t);
-    else byWeekday.set(idx, [t]);
-  }
-
-  const todayIdx = new Date().getDay();
-  const groups: DayGroup[] = [];
-  for (let offset = 0; offset < 7; offset++) {
-    const idx = (todayIdx + offset) % 7;
-    const bucket = byWeekday.get(idx);
-    if (bucket && bucket.length > 0) {
-      groups.push({ key: String(idx), label: WEEKDAY_NAMES[idx], tasks: bucket });
-    }
-  }
-  if (unscheduled.length > 0) {
-    groups.push({ key: "unscheduled", label: "Unscheduled", tasks: unscheduled });
-  }
-  return groups;
-}
-
-/** Collapsed pill showing the active day + its open count ("Wednesday 5 ▾");
- *  click opens a list of every day that currently has a task (plus
- *  "Unscheduled" when relevant) — same hand-rolled popover pattern as
- *  StatusDropdown/BulkActionsButton (outside-click/Escape to close). */
-function DayDropdown({
-  groups,
-  activeKey,
-  onSelect,
-  openCount,
-}: {
-  groups: DayGroup[];
-  activeKey: string;
-  onSelect: (key: string) => void;
-  openCount: (g: DayGroup) => number;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const active = groups.find((g) => g.key === activeKey) ?? groups[0];
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={containerRef} className="relative mb-3 inline-block">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-full border border-blue-600 bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-      >
-        {active.label} {openCount(active)}
-        <span className="text-xs">▾</span>
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute left-0 top-10 z-20 w-48 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
-        >
-          {groups.map((g) => {
-            const isActive = g.key === active.key;
-            return (
-              <button
-                key={g.key}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onSelect(g.key);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
-                  isActive ? "bg-blue-50 font-semibold text-blue-700" : "text-gray-700"
-                }`}
-              >
-                <span>{g.label}</span>
-                <span className={isActive ? "text-blue-700" : "text-gray-400"}>{openCount(g)}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * "My Tasks — Daily" ONLY (Monthly/Ad hoc stay flat lists — they don't have
- * a comparable per-weekday shape). A DayDropdown collapsed pill ("{Weekday}
- * {open count} ▾") that expands into a list of every weekday that actually
- * has a task (DONE/SKIPPED excluded from the count — matches what's visible
- * by default), filtering the list to one day at a time; today's weekday is
- * the default selection, falling back to the earliest upcoming day if today
- * has nothing. Reuses ResizableTaskList unmodified for the active day's
- * rows, so completion/N-A/resize/"Show Completed" all keep working exactly
- * as they do elsewhere.
- *
- * NOTE: this is a DERIVED grouping, not a stored one — RunBlock/FlowTaskRow
- * has no "day"/"days" field. The assign form's "Day" picker (still single-
- * select) is consumed once at creation to produce a single concrete dueAt;
- * nothing about "which weekday(s) this task belongs to" survives past that.
- * A task therefore always lands in exactly one day here, never several.
- */
-function DailyTasksByDay({
-  tasks,
-  myUserId,
-  onComplete,
-  onSkip,
-  onReopen,
-  emptyLabel,
-}: {
-  tasks: FlowTaskRow[];
-  myUserId?: string;
-  onComplete?: (runBlockId: string) => Promise<ActionResult>;
-  onSkip?: (runBlockId: string) => Promise<ActionResult>;
-  onReopen?: (runBlockId: string) => Promise<ActionResult>;
-  emptyLabel: string;
-}) {
-  const groups = React.useMemo(() => groupTasksByWeekday(tasks), [tasks]);
-  const todayKey = String(new Date().getDay());
-  // No tasks at all yet — still show a single "today" pill (count 0) rather
-  // than dropping the day-tab row entirely, so the tab UI (and its "which
-  // day am I looking at" context) is always present, not just once a task
-  // happens to exist.
-  const displayGroups = groups.length > 0 ? groups : [{ key: todayKey, label: WEEKDAY_NAMES[Number(todayKey)], tasks: [] }];
-  const defaultKey = displayGroups.some((g) => g.key === todayKey) ? todayKey : displayGroups[0].key;
-  const [activeKey, setActiveKey] = React.useState(defaultKey);
-
-  // Re-pick a valid tab if the active one disappears (e.g. its last task was
-  // just completed/marked N/A and removed from `tasks` entirely on refetch).
-  const groupKeys = displayGroups.map((g) => g.key).join(",");
-  React.useEffect(() => {
-    if (!displayGroups.some((g) => g.key === activeKey)) {
-      setActiveKey(displayGroups.some((g) => g.key === todayKey) ? todayKey : displayGroups[0].key);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupKeys]);
-
-  const active = displayGroups.find((g) => g.key === activeKey) ?? displayGroups[0];
-  const dayOpenCount = (g: DayGroup) => g.tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED").length;
-
-  return (
-    <div>
-      <DayDropdown
-        groups={displayGroups}
-        activeKey={active.key}
-        onSelect={setActiveKey}
-        openCount={dayOpenCount}
-      />
-      <ResizableTaskList
-        tasks={active.tasks}
-        myUserId={myUserId}
-        onComplete={onComplete}
-        onSkip={onSkip}
-        onReopen={onReopen}
-        emptyLabel={emptyLabel}
-        hideCompleted
-      />
-    </div>
-  );
-}
-
 function MemberRow({
   member,
   tasks,
@@ -327,6 +120,8 @@ export function TaskManagerView({
   hodKanban,
   departmentDaily,
   departmentDailyControl,
+  personalDailyControl,
+  personalMonthlyControl,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -357,6 +152,13 @@ export function TaskManagerView({
   departmentDaily?: FlowEntityDetail;
   /** The Daily date filter, rendered on that section's heading row. */
   departmentDailyControl?: React.ReactNode;
+  /** Personal date filters (2026-07-28, ?date=/?mdate=): each is mounted on
+   *  BOTH its period's personal surfaces — the top Daily/Monthly donut card
+   *  and the matching "My Tasks" heading — so one selection drives the donut
+   *  AND the list. The daily one shares ?date= with departmentDailyControl,
+   *  keeping every Daily surface on the page on the same day. */
+  personalDailyControl?: React.ReactNode;
+  personalMonthlyControl?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -483,6 +285,8 @@ export function TaskManagerView({
                 title="Daily"
                 totals={daily.me.totals}
                 tasks={flowBucketize(daily.me.tasks)}
+                action={personalDailyControl}
+                actionPlacement="row"
                 {...completeProps}
               />
               {/* Branch-side MEMBER (Branch Exec/Coach) — Daily donut only, no
@@ -492,6 +296,8 @@ export function TaskManagerView({
                   title="Monthly"
                   totals={monthly.me.totals}
                   tasks={flowBucketize(monthly.me.tasks)}
+                  action={personalMonthlyControl}
+                  actionPlacement="row"
                   {...completeProps}
                 />
               )}
@@ -619,8 +425,9 @@ export function TaskManagerView({
               ResizableTaskList as every other "My Tasks" list — single-line
               rows, fixed due date, status-dropdown circle, checkbox/select-
               all/bulk actions, Show Completed toggle, assignee-only
-              completion. No day-of-week grouping (that's Daily-only,
-              DailyTasksByDay) since this list mixes cadences. */}
+              completion. No date filter here either — the CEO's me-payload
+              deliberately stays un-windowed (see getFlowDetail), since this
+              single list mixes cadences and shows everything at once. */}
           <SectionCard title="My Tasks">
             <ResizableTaskList
               tasks={flowDedupeTasks([
@@ -736,15 +543,20 @@ export function TaskManagerView({
         me.me.role !== "DEPT_SITE" &&
         me.me.role !== "BRANCH_SITE" && (
           <>
-            <SectionCard title="My Tasks — Daily">
-              <DailyTasksByDay
+            {/* The weekday dropdown (DailyTasksByDay) was replaced by the
+                shared ?date= picker (2026-07-28): the payload is now windowed
+                to the selected single day, so a week-tab grouping has nothing
+                to group — the picker's ◀ ▶ arrows step days instead. */}
+            <SectionCard title="My Tasks — Daily" action={personalDailyControl}>
+              <ResizableTaskList
                 tasks={daily.me.tasks}
                 {...completeProps}
                 emptyLabel="No tasks assigned to you this period."
+                hideCompleted
               />
             </SectionCard>
             {!branchSideMember && (
-              <SectionCard title="My Tasks — Monthly">
+              <SectionCard title="My Tasks — Monthly" action={personalMonthlyControl}>
                 <ResizableTaskList
                   tasks={monthly.me.tasks}
                   {...completeProps}

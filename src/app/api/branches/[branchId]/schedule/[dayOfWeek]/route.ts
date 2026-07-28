@@ -26,7 +26,7 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    const { open_time, close_time, is_active, slots, positions } = body;
+    const { open_time, close_time, is_active, slots } = body;
 
     const opDay = await prisma.branch_operating_day.findFirst({
       where: {
@@ -71,21 +71,8 @@ export async function PUT(
         });
       }
 
-      // 3. Optional: Sync positions if provided
-      if (positions) {
-        await tx.branch_duty_position.deleteMany({
-          where: { branch_id: bId },
-        });
-        if (positions.length > 0) {
-          await tx.branch_duty_position.createMany({
-            data: positions.map((p: any) => ({
-              branch_id: bId,
-              position_label: p.position_label,
-              position_type: p.position_type,
-            })),
-          });
-        }
-      }
+      // Duty positions are owned by /api/schedules/positions now
+      // (stable branch_position + per-week activation), not synced here.
     });
 
     return NextResponse.json({ success: true });

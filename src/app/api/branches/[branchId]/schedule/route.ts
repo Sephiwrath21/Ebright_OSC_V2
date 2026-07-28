@@ -120,23 +120,32 @@ export async function GET(
       }
     }
 
-    // Auto-seed positions if they don't exist
-    const posCount = await prisma.branch_duty_position.count({ where: { branch_id: bId } });
+    // Auto-seed stable position definitions if this branch has none.
+    const posCount = await prisma.branch_position.count({ where: { branch_id: bId } });
     if (posCount === 0) {
+      const normType = (t: string) => (t === "star" ? "star_coach" : t);
+      const seatOf = (label: string, type: string) => {
+        if (type === "manager") return 1;
+        const m = label.match(/(\d+)$/);
+        return m ? parseInt(m[1], 10) : 1;
+      };
+      const orderBase: Record<string, number> = { manager: 0, coach: 100, exec: 200, training: 300, star_coach: 400 };
       const defaultPositions = [
         { label: "Manager on Duty", type: "manager" },
-        ...COLUMNS.map((col, idx) => ({
-          label: col.label,
-          type: col.type,
-        })),
+        ...COLUMNS.map((col) => ({ label: col.label, type: normType(col.type) })),
       ];
-      await prisma.branch_duty_position.createMany({
-        data: defaultPositions.map(p => ({
-          branch_id: bId,
-          week_start_date: new Date(),
-          position_label: p.label,
-          position_type: p.type,
-        })),
+      await prisma.branch_position.createMany({
+        data: defaultPositions.map(p => {
+          const seat = seatOf(p.label, p.type);
+          return {
+            branch_id: bId,
+            position_type: p.type,
+            seat_number: seat,
+            position_label: p.label,
+            display_order: (orderBase[p.type] ?? 0) + seat,
+          };
+        }),
+        skipDuplicates: true,
       });
     }
 
@@ -152,9 +161,9 @@ export async function GET(
       }
     });
 
-    const positions = await prisma.branch_duty_position.findMany({
+    const positions = await prisma.branch_position.findMany({
       where: { branch_id: bId },
-      orderBy: { position_id: "asc" }
+      orderBy: { display_order: "asc" }
     });
 
     const mappedDays = operatingDays.map(od => ({
@@ -176,7 +185,7 @@ export async function GET(
       success: true,
       operatingDays: mappedDays,
       positions: positions.map(p => ({
-        position_id: p.position_id,
+        position_id: p.branch_position_id,
         position_label: p.position_label,
         position_type: p.position_type
       }))

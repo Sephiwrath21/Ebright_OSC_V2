@@ -52,9 +52,9 @@ export async function GET(req: Request) {
       orderBy: { branch_operating_day_id: "asc" },
     });
 
-    const positions = await prisma.branch_duty_position.findMany({
+    const positions = await prisma.branch_position.findMany({
       where:   { branch_id: branch.branch_id },
-      orderBy: { position_id: "asc" },
+      orderBy: { display_order: "asc" },
     });
 
     const mappedDays = operatingDays.map((od) => ({
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
       success: true,
       operatingDays: mappedDays,
       positions: positions.map((p) => ({
-        position_id:    p.position_id,
+        position_id:    p.branch_position_id,
         position_label: p.position_label,
         position_type:  p.position_type,
       })),
@@ -104,7 +104,6 @@ export async function POST(req: Request) {
     const body          = await req.json();
     const branchName    = body.branchName    as string;
     const operatingDays = body.operatingDays as any[];
-    const positions     = body.positions     as any[] | undefined;
 
     if (!branchName) {
       return NextResponse.json({ success: false, error: "branchName is required" }, { status: 400 });
@@ -186,20 +185,10 @@ export async function POST(req: Request) {
         }
       }
 
-      // Re-sync duty positions (only if provided)
-      if (Array.isArray(positions)) {
-        await tx.branch_duty_position.deleteMany({ where: { branch_id: branch.branch_id } });
-        if (positions.length > 0) {
-          await tx.branch_duty_position.createMany({
-            data: positions.map((p: any) => ({
-              branch_id:      branch.branch_id,
-              week_start_date: new Date(),
-              position_label: p.position_label,
-              position_type:  p.position_type,
-            })),
-          });
-        }
-      }
+      // NOTE: duty positions are NOT managed here anymore. They are owned by
+      // /api/schedules/positions (stable branch_position definitions + per-week
+      // activation). The settings screen never sent positions, and the old
+      // delete-all/recreate here would break manpower_schedule's FK. Removed.
     });
 
     // Fetch the final state of operating days to return to frontend
@@ -226,16 +215,16 @@ export async function POST(req: Request) {
       })),
     }));
 
-    const positionsFinal = await prisma.branch_duty_position.findMany({
+    const positionsFinal = await prisma.branch_position.findMany({
       where: { branch_id: branch.branch_id },
-      orderBy: { position_id: "asc" },
+      orderBy: { display_order: "asc" },
     });
 
     return NextResponse.json({
       success: true,
       operatingDays: mappedDays,
       positions: positionsFinal.map((p) => ({
-        position_id:    p.position_id,
+        position_id:    p.branch_position_id,
         position_label: p.position_label,
         position_type:  p.position_type,
       })),

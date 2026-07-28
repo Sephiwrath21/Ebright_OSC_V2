@@ -15,6 +15,7 @@ import {
   groupBranchesByRegion,
   groupByAssignerRole,
   groupByDimension,
+  memberSortRank,
   withAllDepartments,
   resolveWindow,
   sortTaskRows,
@@ -90,16 +91,26 @@ export interface MePayload {
   adhocAll: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
 }
 
-/** Personal overview: my blocks, split by assigner role, plus delegated work. */
+/** Personal overview: my blocks, split by assigner role, plus delegated work.
+ *
+ *  `strictWindow` (2026-07-28, the personal view's date filters): the
+ *  periodized `mine`/`delegated` sets must belong to the SELECTED day/month
+ *  (dueAt-else-startedAt), not to every day — same rule as the entity/org
+ *  payloads. The all-time sets (`streamsAll`/`delegatedAll`/`adhocAll`) are
+ *  never windowed either way. Off = the original wide semantics (all
+ *  same-cadence blocks) — kept for the CEO's combined list and the Home
+ *  dashboard's personal progress card. */
 export async function getMePayload(
   user: MeUser,
   period: Period,
   date?: string,
+  opts: { strictWindow?: boolean } = {},
 ): Promise<MePayload> {
   const window = resolveWindow(period, date);
+  const strictWindow = opts.strictWindow ?? false;
   const [mine, delegatedBlocks, mineAll, delegatedAllBlocks] = await Promise.all([
-    fetchPeriodBlocks(window, { assigneeId: user.id }),
-    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id }),
+    fetchPeriodBlocks(window, { assigneeId: user.id, strictWindow }),
+    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id, strictWindow }),
     fetchPeriodBlocks(null, { assigneeId: user.id }),
     fetchPeriodBlocks(null, { startedById: user.id, excludeAssigneeId: user.id }),
   ]);
@@ -225,11 +236,17 @@ export async function getEntityPayload(
         employmentType: u?.employmentType ?? null,
         department: u?.department ?? null,
         branch: u?.branch ?? null,
+        // Not emitted on the wire — sort key only (see the sort below).
+        _rank: memberSortRank(u?.employmentType, u?.coachSchedule),
         done: tally.done,
         notDone: tally.notDone,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Role priority first (HOD → HQ Exec → Full Time → Part Time → Intern;
+    // Manager → Branch Exec → FT Coach → PT Coach), then name — the
+    // 2026-07-25 roster-ordering decision. memberSortRank in _lib.ts.
+    .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
+    .map(({ _rank, ...member }) => member);
 
   return { totals: countBuckets(blocks), tasks, members };
 }
@@ -329,9 +346,16 @@ export interface AdhocRegionsPayload {
  * mentType "Manager" — allowedCadenceOptions in assign/route.ts), so every
  * tagged block already satisfies it; Coach/Branch Exec assignees never see
  * the Ad hoc Cadence option at all. Grouped by branch then Region A/B/C.
- * All-time, not period-windowed.
+ *
+ * `date` (YYYY-MM-DD, 2026-07-28): window to that single day by the
+ * dueAt-else-startedAt rule — the Home overview's Ad hoc date filter.
+ * Omitted = ALL-TIME (the original semantics; the /task-manager payloads
+ * still use this). The ADHOC cadence tag never binds a block to a period,
+ * so the day window is applied here in JS, not via fetchPeriodBlocks'
+ * tag-aware window query.
  */
-export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
+export async function getAdhocRegionsPayload(date?: string): Promise<AdhocRegionsPayload> {
+  const window = date ? resolveWindow("daily", date) : null;
   const all = await fetchPeriodBlocks(null);
   const [users, starters] = await Promise.all([
     getAssigneeMap(all),
@@ -340,6 +364,10 @@ export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
   const blocks = all.filter((b) => {
     const isAdhoc = starters.get(b.run.startedById)?.role === "BRANCH" || b.cadence === "ADHOC";
     if (!isAdhoc) return false;
+    if (window) {
+      const ts = b.dueAt ?? b.startedAt;
+      if (!ts || ts < window.start || ts >= window.end) return false;
+    }
     return users.get(b.assigneeId)?.employmentType === "Manager";
   });
   const branches = attachEntityTasks(
@@ -372,7 +400,10 @@ export interface OrgPayload {
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
 export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
   const window = resolveWindow(period, date);
-  const blocks = await fetchPeriodBlocks(window);
+  // strictWindow: the org grids are date-filterable (Home overview's Daily/
+  // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
+  // cadence-tagged tasks appear identically on every selected date.
+  const blocks = await fetchPeriodBlocks(window, { strictWindow: true });
   const users = await getAssigneeMap(blocks);
   const branches = attachEntityTasks(
     groupByDimension(blocks, (id) => users.get(id)?.branch),

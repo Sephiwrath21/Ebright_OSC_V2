@@ -6,13 +6,31 @@
 // never break or nag because of Task Manager state; /task-manager is where
 // those states surface as status cards.
 import { getFlowDetail } from "@/task-manager/data";
+import { formatLocalDate } from "@/task-manager/analytics/_lib";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 
-export async function HomeOverviewSection({ email }: { email: string }) {
+export async function HomeOverviewSection({
+  email,
+  dailyDate,
+  monthlyDate,
+  adhocDate,
+}: {
+  email: string;
+  /** Optional YYYY-MM-DD anchors from ?date= / ?mdate= / ?adate= —
+   *  independent date filters for the Daily, Monthly and Ad hoc parts of
+   *  the overview (departments AND branch regions each follow their own
+   *  section's anchor). Omitted = today / current month. */
+  dailyDate?: string;
+  monthlyDate?: string;
+  adhocDate?: string;
+}) {
   try {
+    // Ad hoc always gets a concrete day (default today) — the payload's
+    // dateless form means ALL-TIME, which the Home section no longer shows.
+    const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
     const [daily, monthly] = await Promise.all([
-      getFlowDetail(email, "daily"),
-      getFlowDetail(email, "monthly"),
+      getFlowDetail(email, "daily", dailyDate, { adhocDate: adhocAnchor }),
+      getFlowDetail(email, "monthly", monthlyDate),
     ]);
     if (daily.me.me.role !== "ADMIN" || !daily.org) return null;
     return (
@@ -21,6 +39,10 @@ export async function HomeOverviewSection({ email }: { email: string }) {
         monthlyOrg={monthly.org}
         adhocByRegion={daily.adhocByRegion}
         departmentOverviewHref="/task-manager?view=department"
+        dailyDate={daily.date}
+        monthlyDate={monthly.date}
+        adhocDate={adhocAnchor}
+        dateFilterParams={{ date: dailyDate, mdate: monthlyDate, adate: adhocDate }}
       />
     );
   } catch {

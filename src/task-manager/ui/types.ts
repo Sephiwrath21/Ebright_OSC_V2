@@ -227,7 +227,10 @@ export const FLOW_BRANCH_REGIONS = [
 export const FLOW_STAFF_ROLES = ["Manager", "Branch Exec", "Coach"] as const;
 export const FLOW_DAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 export const FLOW_DEPARTMENTS = [
-  "Operation",
+  // Renamed from "Operation" 2026-07-25 (user spelling correction). The
+  // SOURCE systems (portal hrfs department table, HRFS markers) still say
+  // "Operation" — hrfs-map.ts's normalizeSourceDepartment shims imports.
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",
@@ -250,9 +253,9 @@ export interface FlowAssignInput {
    *  see assign/route.ts. They're independent, separately-completable
    *  instances that happen to share a title, not one recurring task. */
   days?: (typeof FLOW_DAYS)[number][];
-  /** "Repeat weekly" opt-in (Daily cadence only, default off): when the due
-   *  day passes, next week's occurrence is auto-created in the same series
-   *  — see engine/recurrence.ts. Ignored for Monthly/Ad hoc. */
+  /** RETIRED (2026-07-25 final decision): every Daily task auto-recurs
+   *  weekly, system-wide — nothing sends this anymore; the server accepts
+   *  and ignores it for API stability. */
   repeatWeekly?: boolean;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];

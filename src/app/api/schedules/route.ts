@@ -168,7 +168,7 @@ export async function GET(req: Request) {
               branch_operating_day: true
             }
           },
-          branch_duty_position: true,
+          branch_position: true,
           user_profile: true,
         }
       });
@@ -179,13 +179,30 @@ export async function GET(req: Request) {
       rows.forEach(r => {
         const dayName = DAYS_LIST[r.date.getUTCDay()];
         const slotText = formatSlotTime(r.slot.slot_start, r.slot.slot_end);
-        const colId = normalizePositionToColId(r.branch_duty_position.position_label);
+        const colId = normalizePositionToColId(r.branch_position.position_label);
         const selectionKey = `${dayName}-${slotText}-${colId}`;
         selections[selectionKey] = r.user_profile.nick_name || r.user_profile.full_name;
         
         if (r.updated_at && r.updated_at.getTime() > maxUpdatedAt.getTime()) {
           maxUpdatedAt = r.updated_at;
         }
+      });
+
+      // Per-slot remarks for this branch/week/type, keyed to match the grid's
+      // note cells: `${dayName}-${slotText}-notes`.
+      const noteRows = await prisma.manpower_schedule_note.findMany({
+        where: {
+          date: { gte: startDate, lte: endDate },
+          schedule_type: scheduleType,
+          slot: { branch_operating_day: { branch_id: branch.branch_id } },
+        },
+        include: { slot: true },
+      });
+      const notes: Record<string, string> = {};
+      noteRows.forEach(n => {
+        const dayName = DAYS_LIST[n.date.getUTCDay()];
+        const slotText = formatSlotTime(n.slot.slot_start, n.slot.slot_end);
+        notes[`${dayName}-${slotText}-notes`] = n.remark;
       });
 
       // Get status — only meaningful for the 'actual' schedule; planning is never archived
@@ -215,7 +232,7 @@ export async function GET(req: Request) {
           startDate: startDateStr,
           endDate: endDateStr,
           selections,
-          notes: {},
+          notes,
           status: status === "archived" ? "Finalized" : "Updated", // maps to existing frontend
           periodStatus: status, // raw 'draft' | 'archived'
           changedSinceArchive: !!changedSinceArchive,
@@ -235,7 +252,7 @@ export async function GET(req: Request) {
             },
           },
         },
-        branch_duty_position: true,
+        branch_position: true,
         user_profile: true,
       },
       orderBy: { date: "desc" },
@@ -274,7 +291,7 @@ export async function GET(req: Request) {
       const g = groups.get(key)!;
       const dayName = DAYS_LIST[rowDate.getUTCDay()];
       const slotText = formatSlotTime(r.slot.slot_start, r.slot.slot_end);
-      const colId = normalizePositionToColId(r.branch_duty_position.position_label);
+      const colId = normalizePositionToColId(r.branch_position.position_label);
       
       const selectionKey = `${dayName}-${slotText}-${colId}`;
       g.selections[selectionKey] = r.user_profile.nick_name || r.user_profile.full_name;
@@ -330,6 +347,7 @@ export async function POST(req: Request) {
     const endDateStr = raw.endDate as string;
     const saveDateStr = raw.date as string | undefined; // optional single date draft
     const selections = (raw.selections ?? {}) as Record<string, string>;
+    const notes = (raw.notes ?? {}) as Record<string, string>;
     const scheduleType = (raw.scheduleType ?? "actual") as "planning" | "actual";
 
     if (!branchName || !startDateStr || !endDateStr) {
@@ -358,33 +376,18 @@ export async function POST(req: Request) {
       }
     });
 
-    let positions = await prisma.branch_duty_position.findMany({
-      where: { branch_id: branch.branch_id, week_start_date: startDate, is_active: true }
-    });
-
-    // Every branch+week must have a Manager seat, or anything typed into the
-    // MANAGER column has no position_id to save against and is silently lost.
-    // Self-heal rather than assume it always exists.
-    if (!positions.some(p => p.position_label === "Manager on Duty")) {
-      const managerPosition = await prisma.branch_duty_position.upsert({
-        where: {
-          branch_id_week_start_date_position_label: {
-            branch_id: branch.branch_id,
-            week_start_date: startDate,
-            position_label: "Manager on Duty",
-          },
-        },
-        update: { is_active: true },
-        create: {
-          branch_id: branch.branch_id,
-          week_start_date: startDate,
-          position_label: "Manager on Duty",
-          position_type: "manager",
-          display_order: 0,
-          is_active: true,
-        },
+    // Stable position definitions for this branch. Active positions are
+    // resolved PER DATE inside the loop (per-day columns). These serve as the
+    // fallback (never silently drop an assignment) and the Manager guarantee.
+    const allDefs = await prisma.branch_position.findMany({ where: { branch_id: branch.branch_id } });
+    let managerDef = allDefs.find(d => d.position_type === "manager");
+    if (!managerDef) {
+      managerDef = await prisma.branch_position.upsert({
+        where: { branch_id_position_type_seat_number: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1 } },
+        update: {},
+        create: { branch_id: branch.branch_id, position_type: "manager", seat_number: 1, position_label: "Manager on Duty", display_order: 0 },
       });
-      positions = [...positions, managerPosition];
+      allDefs.push(managerDef);
     }
 
     // Which days are actually in scope for this branch — driven by
@@ -396,6 +399,31 @@ export async function POST(req: Request) {
     const workingDays = activeOperatingDays
       .map(od => ABBREV_TO_DAY[od.day_of_week] || od.day_of_week)
       .filter(Boolean);
+
+    // Resolve every selected staff name to a profile_id in ONE query up front,
+    // instead of a findFirst per grid cell (which added hundreds of round-trips
+    // inside the transaction and blew the 5s interactive-transaction timeout).
+    const NONE_VALUES = new Set(["None", "", "-- Select --", "Select staff"]);
+    const wantedNames = Array.from(
+      new Set(
+        Object.values(selections)
+          .map(v => (v ?? "").trim())
+          .filter(n => n && !NONE_VALUES.has(n)),
+      ),
+    );
+    const profileRows = wantedNames.length
+      ? await prisma.user_profile.findMany({
+          where: {
+            OR: [{ full_name: { in: wantedNames } }, { nick_name: { in: wantedNames } }],
+          },
+          select: { profile_id: true, full_name: true, nick_name: true },
+        })
+      : [];
+    const profileByName = new Map<string, number>();
+    for (const p of profileRows) {
+      if (p.full_name) profileByName.set(p.full_name.toLowerCase(), p.profile_id);
+      if (p.nick_name) profileByName.set(p.nick_name.toLowerCase(), p.profile_id);
+    }
 
     // Build a set of all (date, slot_id, position_id) combos we need to process
     // Then for each combo, either upsert or delete based on the selection value
@@ -417,6 +445,46 @@ export async function POST(req: Request) {
       for (const { dayName, date } of datesToProcess) {
         const dayAbbrev = DAY_TO_ABBREV[dayName] || dayName.slice(0, 3);
 
+        // Positions ACTIVE for THIS date (per-day columns). Fall back to all
+        // definitions if the date was never activated, so assignments are never
+        // silently dropped; and guarantee the Manager seat is active.
+        const activeDayRows = await tx.branch_position_day.findMany({
+          where: { date, is_active: true, branch_position: { branch_id: branch.branch_id } },
+          include: { branch_position: true },
+        });
+        let positions = activeDayRows.map(r => ({
+          position_id: r.branch_position.branch_position_id,
+          position_label: r.branch_position.position_label,
+          position_type: r.branch_position.position_type,
+          seat_number: r.branch_position.seat_number,
+        }));
+        if (positions.length === 0) {
+          positions = allDefs.map(d => ({
+            position_id: d.branch_position_id,
+            position_label: d.position_label,
+            position_type: d.position_type,
+            seat_number: d.seat_number,
+          }));
+        }
+        if (managerDef && !positions.some(p => p.position_type === "manager")) {
+          await tx.branch_position_day.upsert({
+            where: { branch_position_id_date: { branch_position_id: managerDef.branch_position_id, date } },
+            update: { is_active: true },
+            create: { branch_position_id: managerDef.branch_position_id, date, is_active: true },
+          });
+          positions = [...positions, {
+            position_id: managerDef.branch_position_id,
+            position_label: managerDef.position_label,
+            position_type: managerDef.position_type,
+            seat_number: managerDef.seat_number,
+          }];
+        }
+
+        // Track the highest seat_number of each position_type that actually
+        // received an assignment this date, so we can auto-collapse trailing
+        // empty columns after saving (e.g. Exec 2 left blank → Exec shows 1).
+        const maxFilledSeat: Record<string, number> = {};
+
         // Get the slots for this day
         const daySlots = slots.filter(s =>
           s.branch_operating_day.day_of_week === dayAbbrev
@@ -433,7 +501,7 @@ export async function POST(req: Request) {
             const selectionKey = `${dayName}-${slotText}-${colId}`;
             const selectedName = selections[selectionKey];
 
-            const isNone = !selectedName || selectedName === "None" || selectedName === "" || selectedName === "-- Select --" || selectedName === "Select staff";
+            const isNone = !selectedName || NONE_VALUES.has(selectedName.trim());
 
             if (isNone) {
               // Delete row if one exists for this combo
@@ -446,49 +514,76 @@ export async function POST(req: Request) {
                 }
               });
             } else {
-              // Find user_profile by name
-              const profile = await tx.user_profile.findFirst({
-                where: {
-                  OR: [
-                    { full_name: { mode: "insensitive", equals: selectedName.trim() } },
-                    { nick_name: { mode: "insensitive", equals: selectedName.trim() } },
-                  ]
-                },
-                select: { profile_id: true }
-              });
-              if (!profile) continue;
+              const profileId = profileByName.get(selectedName.trim().toLowerCase());
+              if (!profileId) continue;
 
-              // Upsert: check if row exists, then update or create
-              const existing = await tx.manpower_schedule.findFirst({
-                where: {
-                  date: date,
-                  slot_id: slot.slot_id,
-                  position_id: pos.position_id,
-                  schedule_type: scheduleType,
-                }
-              });
+              // Mark this seat as filled for the date (for auto-collapse below).
+              maxFilledSeat[pos.position_type] = Math.max(
+                maxFilledSeat[pos.position_type] ?? 0,
+                pos.seat_number,
+              );
 
-              if (existing) {
-                await tx.manpower_schedule.update({
-                  where: { mp_schedule_id: existing.mp_schedule_id },
-                  data: {
-                    profile_id: profile.profile_id,
-                    updated_at: new Date(),
-                  },
-                });
-              } else {
-                await tx.manpower_schedule.create({
-                  data: {
+              // Single upsert on the (date, slot_id, position_id, schedule_type)
+              // unique key — no separate existence check.
+              await tx.manpower_schedule.upsert({
+                where: {
+                  date_slot_id_position_id_schedule_type: {
                     date: date,
                     slot_id: slot.slot_id,
                     position_id: pos.position_id,
-                    profile_id: profile.profile_id,
                     schedule_type: scheduleType,
-                    updated_at: new Date(),
                   },
-                });
-              }
+                },
+                update: { profile_id: profileId, updated_at: new Date() },
+                create: {
+                  date: date,
+                  slot_id: slot.slot_id,
+                  position_id: pos.position_id,
+                  profile_id: profileId,
+                  schedule_type: scheduleType,
+                  updated_at: new Date(),
+                },
+              });
             }
+          }
+
+          // Per-slot remark (independent of staff assignments). One remark per
+          // (date, slot, schedule_type). Blank remark → delete any existing row.
+          const noteKey = `${dayName}-${slotText}-notes`;
+          const remark = (notes[noteKey] ?? "").trim();
+          if (!remark) {
+            await tx.manpower_schedule_note.deleteMany({
+              where: { date: date, slot_id: slot.slot_id, schedule_type: scheduleType },
+            });
+          } else {
+            await tx.manpower_schedule_note.upsert({
+              where: {
+                date_slot_id_schedule_type: {
+                  date: date,
+                  slot_id: slot.slot_id,
+                  schedule_type: scheduleType,
+                },
+              },
+              update: { remark, updated_at: new Date() },
+              create: { date: date, slot_id: slot.slot_id, schedule_type: scheduleType, remark, updated_at: new Date() },
+            });
+          }
+        }
+
+        // Auto-collapse trailing empty columns: for each non-manager type,
+        // deactivate any seat whose number is above the highest filled seat for
+        // this date. Seats up to the highest filled one stay active so columns
+        // remain contiguous (an interior empty column is preserved). This is why
+        // Exec 2 left blank disappears, leaving a single Exec column.
+        for (const pos of positions) {
+          if (pos.position_type === "manager") continue;
+          const keep = maxFilledSeat[pos.position_type] ?? 0;
+          if (pos.seat_number > keep) {
+            await tx.branch_position_day.upsert({
+              where: { branch_position_id_date: { branch_position_id: pos.position_id, date } },
+              update: { is_active: false },
+              create: { branch_position_id: pos.position_id, date, is_active: false },
+            });
           }
         }
       }
@@ -520,7 +615,7 @@ export async function POST(req: Request) {
           });
         }
       }
-    });
+    }, { maxWait: 20000, timeout: 120000 });
 
     return NextResponse.json({
       success: true,

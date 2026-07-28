@@ -1,6 +1,8 @@
-// Weekly auto-recurrence — the "recurring series" model (2026-07-25 user
-// decisions: opt-in "Repeat weekly" toggle in + Task, DAILY cadence only,
-// lazy catch-up on read).
+// Weekly auto-recurrence — the "recurring series" model. FINAL design
+// (2026-07-25, superseding the earlier opt-in toggle iterations): recurrence
+// is UNIVERSAL and fully automatic — EVERY Daily-cadence task with a due day
+// recurs weekly, no toggle or setting anywhere. Triggered by the hourly
+// in-server sweep (src/instrumentation.ts) plus the lazy catch-up on read.
 //
 // When a recurring block's due DAY has passed, the catch-up creates NEXT
 // week's occurrence — same title/assignee/day, fresh items, status ACTIVE —
@@ -47,9 +49,12 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   lastCatchupAt = now.getTime();
 
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // UNIVERSAL: every DAILY task with a due day recurs — no flag (the
+  // repeatWeekly column is retired; see its schema comment). Manpower
+  // Schedule slot tasks are excluded by scheduleSlotId (and are ADHOC
+  // anyway); Monthly/Ad hoc never match the cadence gate.
   const due = await prisma.runBlock.findMany({
     where: {
-      repeatWeekly: true,
       cadence: "DAILY",
       scheduleSlotId: null,
       dueAt: { lt: todayStart },
@@ -86,7 +91,6 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           startedAt: now,
           dueAt: nextDueAt,
           cadence: "DAILY",
-          repeatWeekly: true,
           recurrenceOfId: block.id,
           runItems: {
             create: block.runItems.map((it) => ({

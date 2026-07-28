@@ -73,14 +73,19 @@ export default async function ProfilePage({
   const userRole = roleType;
   const userName = session.user.name ?? null;
 
+  const emp = me.employment[0];
+
+  // Superadmin's own org unit is now real data on its employment row.
+  const superadminDeptName =
+    emp?.department?.department_name ?? emp?.branch?.branch_name ?? null;
+  const superadminDeptCode = emp?.department?.department_code ?? "OPT";
+
   const canEditOrgUnit = roleType === "admin" || roleType === "ceo" || roleType === "staff" || roleType === "branch";
   const [branches, departments, team] = await Promise.all([
     canEditOrgUnit ? listBranches() : Promise.resolve([]),
     canEditOrgUnit ? listDepartments() : Promise.resolve([]),
-    roleType === "superadmin" ? listTeamMembersByDepartment("OPT", me.user_id) : Promise.resolve([] as TeamMember[]),
+    roleType === "superadmin" ? listTeamMembersByDepartment(superadminDeptCode, me.user_id) : Promise.resolve([] as TeamMember[]),
   ]);
-
-  const emp = me.employment[0];
   const defaultOrgUnit = emp?.branch_id
     ? `branch:${emp.branch_id}`
     : emp?.department_id
@@ -197,8 +202,8 @@ export default async function ProfilePage({
                   </div>
                 </header>
                 <dl className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                  <Item label="Name" value={displayName} />
-                  <Item label="Department" value="Optimisation" />
+                  <Item label="Name" value={normalizedFullName || null} />
+                  <Item label="Department" value={superadminDeptName} />
                 </dl>
                 <div className="px-6 pb-6">
                   <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
@@ -206,7 +211,7 @@ export default async function ProfilePage({
                   </h3>
                   {team.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                      No other members in the Optimisation department yet.
+                      No other members in the {superadminDeptName ?? "same"} department yet.
                     </div>
                   ) : (
                     <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
