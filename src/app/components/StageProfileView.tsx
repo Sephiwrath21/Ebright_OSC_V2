@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import { parsePhoneValue, composePhoneValue } from "@/lib/phoneEmail";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, positionGroup, type EmployeeStage } from "@/lib/employeeStages";
 import {
   STAGE_PROFILE_CONFIG,
@@ -38,6 +39,7 @@ import type {
 import {
   PanelHeading,
   RecordTable,
+  SidebarField,
   EmergencyContactPanel,
   PersonalInfoPanel,
   ResumePanel,
@@ -245,12 +247,10 @@ export default function StageProfileView({
               </span>
 
               <SidebarField label="Branch/Dept">
-                {employeeDetail?.branchCode || employeeDetail?.departmentCode
-                  ? [employeeDetail?.branchCode, employeeDetail?.departmentCode].filter(Boolean).join(" / ")
-                  : "--"}
+                {employeeDetail?.departmentName ?? employeeDetail?.branchName ?? "--"}
               </SidebarField>
               <SidebarField label="Position">{employeeDetail?.position || "--"}</SidebarField>
-              <SidebarField label="Phone Number">{employeeDetail?.phone || "--"}</SidebarField>
+              <SidebarField label="Phone Number">{formatDisplayPhone(employeeDetail?.phone)}</SidebarField>
               <SidebarField label="Email">{employeeDetail?.email || "--"}</SidebarField>
 
               {proceedButton && (
@@ -387,13 +387,14 @@ export default function StageProfileView({
   );
 }
 
-function SidebarField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="w-full">
-      <span className="block text-xs text-[#4b4949]">{label}</span>
-      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
-    </div>
-  );
+// Normalizes the sidebar's read-only phone display through the same
+// parse/compose pair PhoneField uses, so it always shows the standard
+// "+60 12-4680 797" style regardless of exactly how the stored string is
+// spaced/punctuated.
+function formatDisplayPhone(value: string | null | undefined): string {
+  if (!value) return "--";
+  const { countryCode, digits } = parsePhoneValue(value);
+  return composePhoneValue(countryCode, digits) || "--";
 }
 
 // Shared by both the current stage's own section and every history-tab

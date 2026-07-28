@@ -202,7 +202,7 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
                     {row.fullName}
                   </Link>
                   <span className="text-sm font-medium text-slate-600 truncate">
-                    {row.branchName ?? row.departmentName ?? "—"}
+                    {row.departmentName ?? row.branchName ?? "—"}
                   </span>
                   <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
                   <span>

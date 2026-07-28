@@ -101,6 +101,10 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         employeeName={employee.fullName}
         category={cat}
         sectionKey={section}
+        position={employee.position}
+        branchName={employee.branchName}
+        departmentName={employee.departmentName}
+        stage={employee.stage}
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
         resumeInfo={resumeInfo}

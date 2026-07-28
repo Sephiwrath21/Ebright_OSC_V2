@@ -109,7 +109,7 @@ export default function StageFlatListView({ stage, rows }: Props) {
                 className="relative grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0 hover:bg-slate-50 transition-colors"
               >
                 <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
-                <span className="text-sm font-medium text-slate-600 truncate">{row.branchName ?? row.departmentName ?? "—"}</span>
+                <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
                 <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
                 <span>
                   <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>

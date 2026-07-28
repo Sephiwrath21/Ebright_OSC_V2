@@ -62,6 +62,14 @@ import type {
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
+import {
+  COUNTRY_CODES,
+  parsePhoneValue,
+  formatLocalDigits,
+  composePhoneValue,
+  isValidPhoneDigits,
+  isValidEmail,
+} from "@/lib/phoneEmail";
 
 // Shared "inner white form card" primitives used by every tab across both the
 // stage-flow profile (Pre/Probation/Onboarding/Active/Exit) and the
@@ -115,6 +123,18 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
   );
 }
 
+// Small label-over-value display for a profile summary block (e.g. the stage
+// profile sidebar's Branch/Dept, Position, Phone Number, Email) — shared here
+// so Employee Record's own profile header can match that exact style.
+function SidebarField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="w-full">
+      <span className="block text-xs text-[#4b4949]">{label}</span>
+      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
+    </div>
+  );
+}
+
 // Parent-controlled field — real DB value, lifted to a useState the caller
 // owns (either to persist on Save, or, for Payroll's Salary Adjustment, to
 // feed a live calculation). Used for every field with real schema backing.
@@ -137,6 +157,121 @@ function EditableField({
       <span className={labelClass}>{label}</span>
       {editing ? (
         <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+      ) : value ? (
+        <span className={valueClass}>{value}</span>
+      ) : (
+        <span className={emptyClass}>Not provided</span>
+      )}
+    </div>
+  );
+}
+
+// Shared Phone Number field — country-code prefix picker (defaulting to
+// +60 Malaysia) + auto-formatted local number ("XX-NNNN NNN..."), used by
+// every Phone Number/Contact Number field across Personal Info/Guardian
+// Info/Emergency Contact/Reference Check. Storage stays the single combined
+// string it's always been ("+60 12-4680 797") — parsePhoneValue splits it
+// back into a country code + digits for editing, composePhoneValue joins
+// them again on every change. Validated on blur (not on every keystroke, so
+// a half-typed number doesn't show an error while still being entered).
+function PhoneField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  const parsed = parsePhoneValue(value);
+  const [countryCode, setCountryCode] = useState(parsed.countryCode);
+  const [digits, setDigits] = useState(parsed.digits);
+  const [touched, setTouched] = useState(false);
+
+  function commit(nextCountryCode: string, nextDigits: string) {
+    setCountryCode(nextCountryCode);
+    setDigits(nextDigits);
+    onChange(composePhoneValue(nextCountryCode, nextDigits));
+  }
+
+  const invalid = touched && digits.length > 0 && !isValidPhoneDigits(digits);
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <>
+          <div
+            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 ${
+              invalid ? "outline outline-2 outline-red-500" : "focus-within:outline-blue-500"
+            }`}
+          >
+            <select
+              value={countryCode}
+              onChange={(e) => commit(e.target.value, digits)}
+              aria-label={`${label} country code`}
+              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 pl-3 pr-1 text-sm text-[#4b4949] focus:outline-none"
+            >
+              {COUNTRY_CODES.map((c) => (
+                <option key={c.code} value={c.code} title={c.name}>
+                  {c.code} {c.abbr}
+                </option>
+              ))}
+            </select>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={formatLocalDigits(digits)}
+              onChange={(e) => commit(countryCode, e.target.value.replace(/\D/g, "").slice(0, 11))}
+              onBlur={() => setTouched(true)}
+              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+            />
+          </div>
+          {invalid && <span className="text-xs text-red-600">Enter a valid phone number.</span>}
+        </>
+      ) : value ? (
+        <span className={valueClass}>{composePhoneValue(parsed.countryCode, parsed.digits)}</span>
+      ) : (
+        <span className={emptyClass}>Not provided</span>
+      )}
+    </div>
+  );
+}
+
+// Shared Email field — same view/edit split as EditableField, plus format
+// validation (must look like name@domain.tld) shown on blur.
+function EmailField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  const [touched, setTouched] = useState(false);
+  const invalid = touched && value.length > 0 && !isValidEmail(value);
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <>
+          <input
+            type="email"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => setTouched(true)}
+            className={`${inputClass} ${invalid ? "outline outline-2 outline-red-500" : ""}`}
+          />
+          {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+        </>
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
@@ -574,18 +709,26 @@ export function ReferenceCheckPanel({
   const [contactNumber, setContactNumber] = useState(data?.contactNumber ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
 
+  function handleSave() {
+    if (contactNumber && !isValidPhoneDigits(parsePhoneValue(contactNumber).digits)) {
+      return { ok: false, error: "Enter a valid phone number." };
+    }
+    if (email && !isValidEmail(email)) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    return updateReferenceCheck(userId, { refName, company, relationship, position, contactNumber, email });
+  }
+
   return (
-    <EditableSection
-      onSave={() => updateReferenceCheck(userId, { refName, company, relationship, position, contactNumber, email })}
-    >
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Reference Check</PanelHeading>
       <FieldGrid>
         <EditableField label="Reference Name" value={refName} onChange={setRefName} full />
         <EditableField label="Company" value={company} onChange={setCompany} full />
         <EditableField label="Relationship" value={relationship} onChange={setRelationship} />
         <EditableField label="Position" value={position} onChange={setPosition} />
-        <EditableField label="Contact Number" value={contactNumber} onChange={setContactNumber} type="tel" full />
-        <EditableField label="Email" value={email} onChange={setEmail} type="email" full />
+        <PhoneField label="Contact Number" value={contactNumber} onChange={setContactNumber} full />
+        <EmailField label="Email" value={email} onChange={setEmail} full />
       </FieldGrid>
     </EditableSection>
   );
@@ -2121,8 +2264,15 @@ export function PersonalInfoPanel({
   const [nric, setNric] = useState(employee.nric ?? "");
   const [homeAddress, setHomeAddress] = useState(employee.homeAddress ?? "");
 
+  function handleSave() {
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) {
+      return { ok: false, error: "Enter a valid phone number." };
+    }
+    return updatePersonalInfo(employeeId, { dob, phone, gender, nric, homeAddress });
+  }
+
   return (
-    <EditableSection onSave={() => updatePersonalInfo(employeeId, { dob, phone, gender, nric, homeAddress })}>
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Personal Info</PanelHeading>
       <FieldGrid>
         <FieldDisplay label="Full Name" value={employee.fullName} />
@@ -2130,7 +2280,7 @@ export function PersonalInfoPanel({
         <EditableSelectField label="Gender" value={gender} onChange={setGender} options={GENDER_OPTIONS} />
         <EditableField label="IC/ Passport No." value={nric} onChange={setNric} />
         <FieldDisplay label="Email" value={employee.email} />
-        <EditableField label="Phone Number" value={phone} onChange={setPhone} />
+        <PhoneField label="Phone Number" value={phone} onChange={setPhone} />
         <EditableField label="Home Address" value={homeAddress} onChange={setHomeAddress} full />
         {showOfferLetter && <PlaceholderUploadField label="Signed Offer Letter" full />}
       </FieldGrid>
@@ -2139,11 +2289,9 @@ export function PersonalInfoPanel({
 }
 
 // Shared across Onboarding's "Emergency Contact" section and Employee
-// Record's Personal Info > Emergency Contact — same emergency_contact table.
-// Name/Phone/Relationship are real columns (lifted state, persisted on
-// Save); Email and Address are UI-only placeholders — emergency_contact has
-// no email/address column today, so nothing typed into them is saved. Adding
-// them would need two new nullable varchar columns on emergency_contact.
+// Record's Personal Info > Emergency Contact — same emergency_contact
+// table. All 5 fields (Name/Phone/Relationship/Email/Address) are real
+// columns, persisted on Save via the onSave prop the caller supplies.
 export function EmergencyContactPanel({
   employee,
   onSave,
@@ -2163,14 +2311,24 @@ export function EmergencyContactPanel({
   const [email, setEmail] = useState(employee.emergencyEmail ?? "");
   const [address, setAddress] = useState(employee.emergencyAddress ?? "");
 
+  function handleSave() {
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) {
+      return Promise.resolve({ ok: false, error: "Enter a valid phone number." });
+    }
+    if (email && !isValidEmail(email)) {
+      return Promise.resolve({ ok: false, error: "Enter a valid email address." });
+    }
+    return onSave({ name, phone, relation, email, address });
+  }
+
   return (
-    <EditableSection onSave={() => onSave({ name, phone, relation, email, address })}>
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Emergency Contact</PanelHeading>
       <FieldGrid>
         <EditableField label="Contact Name" value={name} onChange={setName} />
         <EditableField label="Relationship" value={relation} onChange={setRelation} />
-        <EditableField label="Phone Number" value={phone} onChange={setPhone} />
-        <EditableField label="Email" value={email} onChange={setEmail} type="email" />
+        <PhoneField label="Phone Number" value={phone} onChange={setPhone} />
+        <EmailField label="Email" value={email} onChange={setEmail} />
         <EditableField label="Address" value={address} onChange={setAddress} full />
       </FieldGrid>
     </EditableSection>
@@ -2185,9 +2343,12 @@ export {
   RecordTable,
   Checklist,
   FieldDisplay,
+  SidebarField,
   EditableField,
   EditableSelectField,
   EditableTextArea,
+  PhoneField,
+  EmailField,
   PlaceholderField,
   PlaceholderSelectField,
   PlaceholderTextArea,

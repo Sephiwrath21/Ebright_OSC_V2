@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
 import { EMPLOYEE_RECORD_CATEGORIES, type RecordCategory } from "@/lib/employeeRecordConfig";
+import { STAGE_LABELS, type EmployeeStage } from "@/lib/employeeStages";
 import {
   PanelHeading,
   Subsection,
@@ -75,6 +76,13 @@ interface Props {
   employeeName: string;
   category: RecordCategory;
   sectionKey: string;
+  /** Position/Branch/Department/current stage — from the same EmployeeOverviewRow
+   *  already fetched unconditionally on every page load (for the notFound() check),
+   *  so this profile summary shows on every category/section, not just Personal Info. */
+  position?: string | null;
+  branchName?: string | null;
+  departmentName?: string | null;
+  stage?: EmployeeStage;
   /** Real user_profile/bank_details/emergency_contact data — only fetched for Personal Info's 3 data sections. */
   employeeDetail?: EmployeeDetailFull | null;
   /** Real leave_request rows — only fetched for Active Employment > Leave. */
@@ -122,6 +130,10 @@ export default function EmployeeRecordView({
   employeeName,
   category,
   sectionKey,
+  position,
+  branchName,
+  departmentName,
+  stage,
   employeeDetail,
   leaveHistory,
   resumeInfo,
@@ -163,13 +175,16 @@ export default function EmployeeRecordView({
           <span className="text-slate-900 font-medium">Employee Record</span>
         </nav>
 
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-start gap-4 mb-4">
           <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-lg flex items-center justify-center shrink-0">
             {initialsFromName(employeeName)}
           </div>
-          <div>
+          <div className="flex flex-col gap-1.5">
             <h1 className="text-xl font-semibold text-slate-900">{employeeName}</h1>
-            <p className="text-sm text-slate-500">Employee Record</p>
+            <span className="block text-xs text-slate-500">
+              {departmentName ?? branchName ?? "--"} · {position || "--"}
+            </span>
+            <span className="block text-xs text-slate-500">{stage ? STAGE_LABELS[stage] : "--"}</span>
           </div>
         </div>
 

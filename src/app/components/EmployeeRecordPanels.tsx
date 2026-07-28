@@ -16,16 +16,21 @@ import {
   EditableSelectField,
   EditableTextArea,
   RealFileField,
+  PhoneField,
+  EmailField,
   type SalaryRevisionHandle,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   addGuardianInfo,
   updateGuardianInfo,
+  deleteGuardianInfo,
   updatePerformanceReview,
   updatePayslip,
 } from "@/lib/employeeRecordActions";
 import type { SalaryRevisionEntry, GuardianInfoEntry, PerformanceReviewInfo, PayslipInfo } from "@/lib/employeeQueries";
+import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
 
 // category_shared.css's field-grid/field-control/upload-field/record-table
 // are byte-identical in color/spacing to active_*.css's — confirmed by
@@ -81,6 +86,24 @@ function AddAnotherGuardianButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+// "−" delete for Guardian 2+ only — Guardian 1 always stays (there should
+// always be at least one guardian section present). Same edit-mode gating
+// as AddAnotherGuardianButton.
+function RemoveGuardianButton({ onClick }: { onClick: () => void }) {
+  const editing = useEditMode();
+  if (!editing) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Remove this guardian"
+      className="text-slate-400 hover:text-red-600 text-lg leading-none font-semibold"
+    >
+      −
+    </button>
+  );
+}
+
 // Personal Info > Guardian Info is real now — repeatable (confirmed via the
 // mock's own real "Add Another" button, pinfo_guardianInfo.html), but shown
 // as label/value form sections ("Guardian 1", "Guardian 2", ...) under one
@@ -93,6 +116,9 @@ function AddAnotherGuardianButton({ onClick }: { onClick: () => void }) {
 export function GuardianInfoPanel({ userId, data }: { userId: number; data: GuardianInfoEntry[] }) {
   const router = useRouter();
   const [guardians, setGuardians] = useState<GuardianDraft[]>(() => toDrafts(data));
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Re-sync whenever the saved data actually changes identity (a save
   // created new rows, so their ids are now known) — render-time adjustment,
@@ -112,11 +138,53 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
     setGuardians((prev) => [...prev, blankGuardianDraft()]);
   }
 
+  // A draft never saved this session (id === null) is just dropped locally
+  // — nothing real to lose, no confirmation needed. An already-saved
+  // guardian needs a real delete + confirmation, same as every other
+  // repeatable table's delete.
+  function removeGuardian(index: number) {
+    const g = guardians[index];
+    if (g.id === null) {
+      setGuardians((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setPendingDeleteIndex(index);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (pendingDeleteIndex === null) return;
+    const g = guardians[pendingDeleteIndex];
+    if (g.id === null) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteGuardianInfo(userId, g.id);
+      if (result && result.ok === false) {
+        setDeleteError(result.error ?? "Delete failed.");
+        setDeleting(false);
+        return;
+      }
+      setDeleting(false);
+      setPendingDeleteIndex(null);
+      router.refresh();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Delete failed.");
+      setDeleting(false);
+    }
+  }
+
   async function handleSave(): Promise<SaveResult> {
     for (const g of guardians) {
       const isBlankNewDraft =
         g.id === null && !g.name && !g.relationship && !g.gender && !g.email && !g.phone && !g.address;
       if (isBlankNewDraft) continue;
+
+      if (g.phone && !isValidPhoneDigits(parsePhoneValue(g.phone).digits)) {
+        return { ok: false, error: `Guardian ${guardians.indexOf(g) + 1}: enter a valid phone number.` };
+      }
+      if (g.email && !isValidEmail(g.email)) {
+        return { ok: false, error: `Guardian ${guardians.indexOf(g) + 1}: enter a valid email address.` };
+      }
 
       const input = {
         name: g.name,
@@ -138,18 +206,32 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
       <PanelHeading>Guardian Info</PanelHeading>
       {guardians.map((g, i) => (
         <div key={g.id ?? `new-${i}`} className="mb-7 last:mb-0">
-          <SubsectionHeading>Guardian {i + 1}</SubsectionHeading>
+          <div className="flex items-center justify-between">
+            <SubsectionHeading>Guardian {i + 1}</SubsectionHeading>
+            {i > 0 && <RemoveGuardianButton onClick={() => removeGuardian(i)} />}
+          </div>
           <FieldGrid>
             <EditableField label="Full Name" value={g.name} onChange={(v) => updateGuardianField(i, "name", v)} />
             <EditableField label="Relationship" value={g.relationship} onChange={(v) => updateGuardianField(i, "relationship", v)} />
             <EditableField label="Gender" value={g.gender} onChange={(v) => updateGuardianField(i, "gender", v)} />
-            <EditableField label="Email" value={g.email} onChange={(v) => updateGuardianField(i, "email", v)} type="email" />
-            <EditableField label="Phone Number" value={g.phone} onChange={(v) => updateGuardianField(i, "phone", v)} type="tel" />
+            <EmailField label="Email" value={g.email} onChange={(v) => updateGuardianField(i, "email", v)} />
+            <PhoneField label="Phone Number" value={g.phone} onChange={(v) => updateGuardianField(i, "phone", v)} />
             <EditableField label="Address" value={g.address} onChange={(v) => updateGuardianField(i, "address", v)} />
           </FieldGrid>
         </div>
       ))}
       <AddAnotherGuardianButton onClick={addBlank} />
+      {pendingDeleteIndex !== null && (
+        <ConfirmDialog
+          message={deleteError ?? "Delete this guardian? This cannot be undone."}
+          confirmLabel={deleting ? "Deleting…" : "Delete"}
+          onCancel={() => {
+            setPendingDeleteIndex(null);
+            setDeleteError(null);
+          }}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </EditableSection>
   );
 }
