@@ -72,6 +72,64 @@ export function DailyDatePicker({
   );
 }
 
+const WEEKDAY_PILL_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Mon–Sun quick-jump pills for the week containing `value` (2026-07-28,
+ *  restoring one-click day browsing after the weekday dropdown was replaced
+ *  by the single-day picker): clicking a day navigates the shared date
+ *  param — same URL-driven pattern as DailyDatePicker — so the donut, the
+ *  task list, and the picker itself all follow. */
+export function WeekdayJumpPills({
+  value,
+  basePath,
+  extraParams = {},
+  param = "date",
+}: {
+  /** The resolved date currently shown, YYYY-MM-DD. */
+  value: string;
+  basePath: string;
+  extraParams?: Record<string, string>;
+  param?: string;
+}) {
+  const router = useRouter();
+  const [y, m, d] = value.split("-").map(Number);
+  const selected = new Date(y, m - 1, d);
+  // Monday of the selected date's week (getDay(): Sun=0 … Sat=6).
+  const monday = new Date(y, m - 1, d - ((selected.getDay() + 6) % 7));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+    return {
+      label: WEEKDAY_PILL_LABELS[i],
+      dayNum: dt.getDate(),
+      date: `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`,
+    };
+  });
+  const navigate = (v: string) => {
+    const qs = new URLSearchParams({ ...extraParams, [param]: v });
+    router.push(`${basePath}?${qs.toString()}`);
+  };
+
+  return (
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      {days.map((day) => (
+        <button
+          key={day.date}
+          type="button"
+          onClick={() => navigate(day.date)}
+          className={
+            day.date === value
+              ? "rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white"
+              : "rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600"
+          }
+        >
+          {day.label} {day.dayNum}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function EntityPicker({
   label,
   value,

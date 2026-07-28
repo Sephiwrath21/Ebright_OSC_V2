@@ -44,14 +44,15 @@ export default async function HomePage({
   searchParams,
 }: {
   // Overview date filters: ?date= anchors the Daily half, ?mdate= the
-  // Monthly half, ?adate= the Ad hoc regions (org views only) — all
-  // independent of each other.
-  searchParams: Promise<{ date?: string; mdate?: string; adate?: string }>;
+  // Monthly half, ?adate= the Ad hoc regions (org views only), ?hdate= the
+  // HOD-assigned card (staff view) — all independent of each other.
+  searchParams: Promise<{ date?: string; mdate?: string; adate?: string; hdate?: string }>;
 }) {
   const sp = await searchParams;
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
+  const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -131,6 +132,7 @@ export default async function HomePage({
         dailyDate={dailyDate}
         monthlyDate={monthlyDate}
         adhocDate={adhocDate}
+        hodDate={hodDate}
         actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask }}
       />
     </Suspense>

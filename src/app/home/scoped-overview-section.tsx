@@ -17,7 +17,7 @@
 // no account, bridge failure) renders nothing — Home must never break
 // because of Task Manager state.
 import { getFlowDetail } from "@/task-manager/data";
-import { formatLocalDate } from "@/task-manager/analytics/_lib";
+import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
 import { DailyDatePicker } from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { EntityDonutGrid } from "@/task-manager/ui/overview-grids";
@@ -30,6 +30,7 @@ export async function HomeScopedOverviewSection({
   dailyDate,
   monthlyDate,
   adhocDate,
+  hodDate,
   actions,
 }: {
   email: string;
@@ -38,6 +39,7 @@ export async function HomeScopedOverviewSection({
   dailyDate?: string;
   monthlyDate?: string;
   adhocDate?: string;
+  hodDate?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -56,7 +58,7 @@ export async function HomeScopedOverviewSection({
       getFlowDetail(email, "monthly", monthlyDate),
     ]);
 
-    const raw = { date: dailyDate, mdate: monthlyDate, adate: adhocDate };
+    const raw = { date: dailyDate, mdate: monthlyDate, adate: adhocDate, hdate: hodDate };
     const carry = (except: string) =>
       Object.fromEntries(
         Object.entries(raw).filter(([k, v]) => v && k !== except),
@@ -162,15 +164,39 @@ export async function HomeScopedOverviewSection({
     // 3-section requirement: Daily · Monthly · HOD Assigned), zero-filled
     // when this person has no HOD-assigned tasks yet. streamsAll only
     // carries streams that HAVE tasks, so the card must not depend on the
-    // stream existing. ALL-TIME, deliberately not date-windowed — same as
-    // the Task Manager page's stream cards.
+    // stream existing. Day-windowed by its OWN ?hdate= filter (2026-07-28,
+    // default today) on each task's due date — cadence-agnostic, so daily-
+    // AND monthly-cadence HOD assignments due that day both count; tasks
+    // with no due date at all only match no specific day.
+    const hodAnchor = hodDate ?? formatLocalDate(new Date());
+    const hodWin = resolveWindow("daily", hodAnchor);
     const hodStream = daily.me.streamsAll.find((s) => s.key === "HOD");
+    const hodBuckets = flowBucketize(
+      (hodStream?.tasks ?? []).filter((t) => {
+        if (!t.dueAt) return false;
+        const due = new Date(t.dueAt);
+        return due >= hodWin.start && due < hodWin.end;
+      }),
+    );
     const hodCard = (
       <StatusOverviewCard
         title={flowStreamLabel("HOD")}
         subtitle="From HOD"
-        totals={hodStream?.totals ?? { completed: 0, pending: 0, na: 0 }}
-        tasks={flowBucketize(hodStream?.tasks ?? [])}
+        totals={{
+          completed: hodBuckets.completed.length,
+          pending: hodBuckets.pending.length,
+          na: hodBuckets.na.length,
+        }}
+        tasks={hodBuckets}
+        action={
+          <DailyDatePicker
+            value={hodAnchor}
+            basePath="/home"
+            param="hdate"
+            extraParams={carry("hdate")}
+          />
+        }
+        actionPlacement="row"
         {...completeProps}
       />
     );

@@ -47,7 +47,7 @@ import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
-import { DailyDatePicker, EntityPicker } from "@/task-manager/ui/entity-picker";
+import { DailyDatePicker, EntityPicker, WeekdayJumpPills } from "@/task-manager/ui/entity-picker";
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
@@ -561,6 +561,16 @@ export default async function TaskManagerPage({
         extraParams={dailyDate ? { date: dailyDate } : {}}
       />
     );
+    // Mon–Sun quick-jump pills for "My Tasks — Daily" (2026-07-28): one-click
+    // day browsing within the selected week, navigating the same ?date= the
+    // picker uses — donut, list, and picker all follow.
+    const personalDailyWeekPills = (
+      <WeekdayJumpPills
+        value={daily.date}
+        basePath="/task-manager"
+        extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+      />
+    );
 
     body = (
       <TaskManagerView
@@ -582,6 +592,7 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
+        personalDailyWeekPills={personalDailyWeekPills}
       />
     );
   } catch (err) {

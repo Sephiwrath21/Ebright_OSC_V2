@@ -122,6 +122,7 @@ export function TaskManagerView({
   departmentDailyControl,
   personalDailyControl,
   personalMonthlyControl,
+  personalDailyWeekPills,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -159,6 +160,10 @@ export function TaskManagerView({
    *  keeping every Daily surface on the page on the same day. */
   personalDailyControl?: React.ReactNode;
   personalMonthlyControl?: React.ReactNode;
+  /** Mon–Sun quick-jump pills (WeekdayJumpPills) rendered above the "My
+   *  Tasks — Daily" list — one-click day browsing within the selected week,
+   *  driving the same shared ?date=. */
+  personalDailyWeekPills?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -548,6 +553,7 @@ export function TaskManagerView({
                 to the selected single day, so a week-tab grouping has nothing
                 to group — the picker's ◀ ▶ arrows step days instead. */}
             <SectionCard title="My Tasks — Daily" action={personalDailyControl}>
+              {personalDailyWeekPills}
               <ResizableTaskList
                 tasks={daily.me.tasks}
                 {...completeProps}
