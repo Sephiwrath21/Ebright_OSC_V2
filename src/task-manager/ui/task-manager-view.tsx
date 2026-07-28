@@ -286,6 +286,7 @@ export function TaskManagerView({
                 totals={daily.me.totals}
                 tasks={flowBucketize(daily.me.tasks)}
                 action={personalDailyControl}
+                actionPlacement="row"
                 {...completeProps}
               />
               {/* Branch-side MEMBER (Branch Exec/Coach) — Daily donut only, no
@@ -296,6 +297,7 @@ export function TaskManagerView({
                   totals={monthly.me.totals}
                   tasks={flowBucketize(monthly.me.tasks)}
                   action={personalMonthlyControl}
+                  actionPlacement="row"
                   {...completeProps}
                 />
               )}
