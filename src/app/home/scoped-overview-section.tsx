@@ -22,14 +22,15 @@ import { DailyDatePicker } from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { EntityDonutGrid } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
-import { flowBucketize } from "@/task-manager/ui/types";
-import type { FlowBucketTotals, FlowDrillTask } from "@/task-manager/ui/types";
+import { flowBucketize, flowStreamLabel, visibleAssignerStreams } from "@/task-manager/ui/types";
+import type { ActionResult, FlowBucketTotals, FlowDrillTask } from "@/task-manager/ui/types";
 
 export async function HomeScopedOverviewSection({
   email,
   dailyDate,
   monthlyDate,
   adhocDate,
+  actions,
 }: {
   email: string;
   /** Raw YYYY-MM-DD values from ?date= / ?mdate= / ?adate= (already
@@ -37,6 +38,16 @@ export async function HomeScopedOverviewSection({
   dailyDate?: string;
   monthlyDate?: string;
   adhocDate?: string;
+  /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
+   *  into the PERSONAL cards' drill modals (with the viewer's own userId,
+   *  so the status circle is clickable exactly on the viewer's own tasks —
+   *  the "assignee only" rule). Aggregate views (org/departments/branch)
+   *  stay read-only, same principle as the Task Manager page. */
+  actions?: {
+    complete: (runBlockId: string) => Promise<ActionResult>;
+    skip: (runBlockId: string) => Promise<ActionResult>;
+    reopen: (runBlockId: string) => Promise<ActionResult>;
+  };
 }) {
   try {
     const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
@@ -137,11 +148,51 @@ export async function HomeScopedOverviewSection({
     if (daily.branch && monthly.branch) {
       return pair(daily.branch, monthly.branch, daily.branch.name);
     }
-    // MEMBER — personal tasks (flat list; bucketize for the drill modal).
-    return pair(
-      { totals: daily.me.totals, tasks: flowBucketize(daily.me.tasks) },
-      { totals: monthly.me.totals, tasks: flowBucketize(monthly.me.tasks) },
-      "My Tasks",
+
+    // MEMBER — personal cards, clickable per the "assignee only" rule: the
+    // viewer's own userId + the complete/N-A/reopen actions make their own
+    // tasks' status circles live in the drill modal, same as /task-manager.
+    const completeProps = actions && {
+      myUserId: daily.me.me.userId,
+      onComplete: actions.complete,
+      onSkip: actions.skip,
+      onReopen: actions.reopen,
+    };
+    // Assigner-stream cards ("HOD assigned tasks" / "CEO assigned tasks"):
+    // ALL-TIME, deliberately not date-windowed — same as the Task Manager
+    // page's stream cards. Admin/Ops streams stay hidden per the "no special
+    // Admin Assigned Task category" spec (visibleAssignerStreams).
+    const streamCards = visibleAssignerStreams(daily.me.streamsAll).map((s) => (
+      <StatusOverviewCard
+        key={s.key}
+        title={flowStreamLabel(s.key)}
+        totals={s.totals}
+        tasks={flowBucketize(s.tasks)}
+        {...completeProps}
+      />
+    ));
+    return (
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+        <StatusOverviewCard
+          title="Daily"
+          subtitle="My Tasks"
+          totals={daily.me.totals}
+          tasks={flowBucketize(daily.me.tasks)}
+          action={dailyPicker}
+          actionPlacement="row"
+          {...completeProps}
+        />
+        <StatusOverviewCard
+          title="Monthly"
+          subtitle="My Tasks"
+          totals={monthly.me.totals}
+          tasks={flowBucketize(monthly.me.tasks)}
+          action={monthlyPicker}
+          actionPlacement="row"
+          {...completeProps}
+        />
+        {streamCards}
+      </div>
     );
   } catch {
     return null;

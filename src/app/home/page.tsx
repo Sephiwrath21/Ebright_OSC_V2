@@ -8,7 +8,16 @@
 // widget data exactly as before.
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { requireLiveSession } from "@/task-manager/action-session";
+import {
+  completeFlowTask,
+  reopenFlowTask,
+  skipFlowTask,
+  FlowBridgeError,
+} from "@/task-manager/data";
+import type { ActionResult } from "@/task-manager/ui/types";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
@@ -71,6 +80,47 @@ export default async function HomePage({
   const isBranch = userRole.toLowerCase() === "branch";
   const isHr = userRole.toLowerCase() === "hr" || userId === "175";
 
+  // Personal-task actions for the overview's drill modals (same expected-
+  // errors-are-RETURNED pattern as /task-manager — production masks thrown
+  // server-action messages). The data layer enforces assignee-only.
+  const FALLBACK_MESSAGE = "Something went wrong — please try again";
+  async function completeTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await completeFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function skipTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await skipFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function reopenTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await reopenFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   // One overview for every account type — the section itself resolves the
   // Task Manager role and scopes/routes accordingly (and renders nothing on
   // any Task Manager failure, so no dashboard can break because of it).
@@ -81,6 +131,7 @@ export default async function HomePage({
         dailyDate={dailyDate}
         monthlyDate={monthlyDate}
         adhocDate={adhocDate}
+        actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask }}
       />
     </Suspense>
   );
