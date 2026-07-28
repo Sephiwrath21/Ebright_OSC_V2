@@ -34,7 +34,6 @@ import {
   moveKanbanCard,
   moveKanbanColumn,
   reassignFlowTask,
-  setTaskAutoRefresh,
   recolorKanbanColumn,
   renameKanbanColumn,
   reopenFlowTask,
@@ -185,19 +184,6 @@ export default async function TaskManagerPage({
     if (stale) return stale;
     try {
       await reassignFlowTask(email, runBlockId, newAssigneeId);
-      revalidatePath("/task-manager");
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
-    }
-  }
-
-  async function autoRefreshTask(runBlockId: string, enabled: boolean): Promise<ActionResult> {
-    "use server";
-    const stale = await requireLiveSession(email);
-    if (stale) return stale;
-    try {
-      await setTaskAutoRefresh(email, runBlockId, enabled);
       revalidatePath("/task-manager");
       return { ok: true };
     } catch (err) {
@@ -370,8 +356,6 @@ export default async function TaskManagerPage({
     const canReassign =
       role === "ADMIN" || role === "CEO" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
-    // "Auto Refresh" (weekly recurrence toggle from task lists) — same gate.
-    const autoRefresh = canReassign ? { action: autoRefreshTask } : undefined;
 
     if (role === "ADMIN" || elevatedDeptSite) {
       // Superadmin + elevated department sites (Operation/Optimisation):
@@ -417,7 +401,7 @@ export default async function TaskManagerPage({
               label="Daily"
               entity={dailyDetail.department}
               kind="department"
-              reassign={reassign} autoRefresh={autoRefresh}
+              reassign={reassign}
               headerControl={
                 <DailyDatePicker
                   value={dailyDetail.date}
@@ -430,7 +414,7 @@ export default async function TaskManagerPage({
               label="Monthly"
               entity={monthlyDetail.department}
               kind="department"
-              reassign={reassign} autoRefresh={autoRefresh}
+              reassign={reassign}
             />
           </>
         );
@@ -458,7 +442,7 @@ export default async function TaskManagerPage({
               label="Daily"
               entity={dailyDetail.branch}
               kind="branch"
-              reassign={reassign} autoRefresh={autoRefresh}
+              reassign={reassign}
               headerControl={
                 <DailyDatePicker
                   value={dailyDetail.date}
@@ -471,7 +455,7 @@ export default async function TaskManagerPage({
               label="Monthly"
               entity={monthlyDetail.branch}
               kind="branch"
-              reassign={reassign} autoRefresh={autoRefresh}
+              reassign={reassign}
             />
           </>
         );
@@ -559,7 +543,7 @@ export default async function TaskManagerPage({
         completeTaskAction={completeTask}
         skipTaskAction={skipTask}
         reopenTaskAction={reopenTask}
-        reassign={reassign} autoRefresh={autoRefresh}
+        reassign={reassign}
         manpowerScheduleHref="/task-manager/manpower-schedule"
         ceoDashboard={ceoDashboard}
         staff={staff}

@@ -17,7 +17,6 @@ import {
   InitialAvatar,
   StatusDonut,
   StatusOverviewCard,
-  type AutoRefreshControl,
   type ReassignControl,
 } from "./bits";
 
@@ -247,7 +246,6 @@ export function EntityOverviewSection({
   entity,
   kind = "department",
   reassign,
-  autoRefresh,
   headerControl,
 }: {
   label: string;
@@ -257,8 +255,6 @@ export function EntityOverviewSection({
   kind?: "department" | "branch";
   /** "Assign to Others" control for the status donut's Pending drill modal. */
   reassign?: ReassignControl;
-  /** "Auto Refresh" control for the same drill modal's rows. */
-  autoRefresh?: AutoRefreshControl;
   /** Rendered right-aligned on the "{name} — {label}" heading row — the
    *  Daily sections put the date filter here. */
   headerControl?: React.ReactNode;
@@ -306,7 +302,7 @@ export function EntityOverviewSection({
           title={label}
           totals={entity.totals}
           tasks={entity.tasks}
-          reassign={reassign} autoRefresh={autoRefresh}
+          reassign={reassign}
         />
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
