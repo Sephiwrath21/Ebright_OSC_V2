@@ -191,7 +191,7 @@ async function main() {
         email: "amelia@ebright.my",
         name: "Amelia Ong",
         role: "ADMIN",
-        department: "Operation",
+        department: "Operations",
         branch: null,
         employmentType: "HOD",
       },
@@ -232,7 +232,7 @@ async function main() {
         email: "daniel@ebright.my",
         name: "Daniel Lim",
         role: "HOD",
-        department: "Operation",
+        department: "Operations",
         branch: null,
         employmentType: "HOD",
       },
@@ -283,7 +283,7 @@ async function main() {
         email: "sarah@ebright.my",
         name: "Sarah Lim",
         role: "MEMBER",
-        department: "Operation",
+        department: "Operations",
         branch: null,
         employmentType: "Intern",
       },
@@ -406,9 +406,9 @@ async function main() {
   // Full Time, some Intern.
   const DEPT_STAFF = [
     // Operation (HOD: Daniel Lim, Intern: Sarah Lim — both existing)
-    { key: "amran", name: "Amran Yusof", dept: "Operation", et: "Full Time", status: "DONE" as BlockStatus, hour: 10 },
-    { key: "christine", name: "Christine Lau", dept: "Operation", et: "Full Time", status: "PENDING" as BlockStatus, hour: 14 },
-    { key: "firdaus", name: "Firdaus Aziz", dept: "Operation", et: "Full Time", status: "ACTIVE" as BlockStatus, hour: 9 },
+    { key: "amran", name: "Amran Yusof", dept: "Operations", et: "Full Time", status: "DONE" as BlockStatus, hour: 10 },
+    { key: "christine", name: "Christine Lau", dept: "Operations", et: "Full Time", status: "PENDING" as BlockStatus, hour: 14 },
+    { key: "firdaus", name: "Firdaus Aziz", dept: "Operations", et: "Full Time", status: "ACTIVE" as BlockStatus, hour: 9 },
     // Academy
     { key: "rosnah", name: "Rosnah Kamal", dept: "Academy", et: "HOD", hodRole: true, status: "DONE" as BlockStatus, hour: 11 },
     { key: "melissa", name: "Melissa Tan", dept: "Academy", et: "HQ Exec", status: "PENDING" as BlockStatus, hour: 15 },
@@ -516,7 +516,7 @@ async function main() {
   // accounts only for the 5 branches with a full built-out roster (matching
   // BRANCH_STAFF above), not all 28 official branches.
   const DEPT_SITE_ACCOUNTS = [
-    { key: "dept-operation", email: "dept-operation@ebright.my", name: "Operation Department", dept: "Operation" },
+    { key: "dept-operation", email: "dept-operation@ebright.my", name: "Operations Department", dept: "Operations" },
     { key: "dept-academy", email: "dept-academy@ebright.my", name: "Academy Department", dept: "Academy" },
     { key: "dept-marketing", email: "dept-marketing@ebright.my", name: "Marketing Department", dept: "Marketing" },
     { key: "dept-optimisation", email: "dept-optimisation@ebright.my", name: "Optimisation Department", dept: "Optimisation" },
@@ -558,10 +558,10 @@ async function main() {
     data: [
       {
         id: "ws-operations",
-        name: "Operation",
+        name: "Operations",
         icon: "🏢",
         ownerId: USERS.admin,
-        department: "Operation",
+        department: "Operations",
         order: 0,
       },
       {
@@ -759,7 +759,7 @@ async function main() {
       description:
         "From signed proposal to fully provisioned client — sales handoff, contract, and setup.",
       ownerId: USERS.daniel,
-      department: "Operation",
+      department: "Operations",
       order: 0,
       version: 2,
       isPublished: true,
@@ -865,7 +865,7 @@ async function main() {
     item("item-eo-account", 0, "CHECKBOX", "Create email & SSO accounts"),
     item("item-eo-laptop", 1, "CHECKBOX", "Issue laptop and peripherals"),
     item("item-eo-dept", 2, "DROPDOWN", "Assign to department", true, {
-      options: ["Operation", "Marketing", "Human Resource", "Finance"],
+      options: ["Operations", "Marketing", "Human Resource", "Finance"],
     }),
     item("item-eo-firstday", 3, "DUE_DATE", "Confirmed first day", true, {
       setsBlockDue: true,
@@ -1040,7 +1040,7 @@ async function main() {
       icon: "📋",
       description: "Recurring internal audit — draft, not yet published.",
       ownerId: USERS.daniel,
-      department: "Operation",
+      department: "Operations",
       order: 1,
       version: 1,
       isPublished: false,
@@ -1129,7 +1129,7 @@ async function main() {
       icon: "⚡",
       description: "One-off tasks assigned from the '+ Assigned task' quick form.",
       ownerId: USERS.superadmin,
-      department: "Operation",
+      department: "Operations",
       order: 2,
       version: 1,
       isPublished: true,
@@ -1182,7 +1182,7 @@ async function main() {
       icon: "📌",
       description: "Tasks assigned from the CEO's '+ Add Task' quick form.",
       ownerId: USERS.superadmin,
-      department: "Operation",
+      department: "Operations",
       order: 3,
       version: 1,
       isPublished: true,
@@ -1237,7 +1237,7 @@ async function main() {
       icon: "📋",
       description: "Tasks assigned from an HOD's own 'Assign Task' form.",
       ownerId: USERS.superadmin,
-      department: "Operation",
+      department: "Operations",
       order: 4,
       version: 1,
       isPublished: true,
@@ -1295,7 +1295,7 @@ async function main() {
       icon: "🛡️",
       description: "Tasks assigned from Superadmin's own '+ Assigned task' form.",
       ownerId: USERS.superadmin,
-      department: "Operation",
+      department: "Operations",
       order: 5,
       version: 1,
       isPublished: true,
@@ -1340,7 +1340,7 @@ async function main() {
       icon: "🗂️",
       description: "Tasks assigned from OPS's own '+ Assigned task' form.",
       ownerId: USERS.superadmin,
-      department: "Operation",
+      department: "Operations",
       order: 6,
       version: 1,
       isPublished: true,

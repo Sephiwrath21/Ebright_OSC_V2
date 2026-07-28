@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 interface StaffPayload {
   id: number;
   name: string;
+  fullName: string;
   branch: string;
   role: string | null;
   endDate: string | null;
@@ -100,6 +101,7 @@ export async function GET(req: Request) {
         {
           id: u.user_id,
           name: displayName,
+          fullName: u.user_profile?.full_name?.trim() || displayName,
           branch: branchName,
           role,
           endDate: emp.end_date ? emp.end_date.toISOString() : null,

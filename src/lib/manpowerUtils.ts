@@ -58,19 +58,28 @@ export function getEmployeeColor(name: string): string {
   return COLOR_PALETTE[colorIndex];
 }
 
-const SOFT_STAFF_PALETTE = [
-  "bg-blue-50 text-blue-800 border-blue-200",
-  "bg-emerald-50 text-emerald-800 border-emerald-200",
-  "bg-purple-50 text-purple-800 border-purple-200",
-  "bg-pink-50 text-pink-800 border-pink-200",
-  "bg-amber-50 text-amber-800 border-amber-200",
-  "bg-rose-50 text-rose-800 border-rose-200",
-  "bg-cyan-50 text-cyan-800 border-cyan-200",
-  "bg-teal-50 text-teal-800 border-teal-200",
-  "bg-violet-50 text-violet-800 border-violet-200",
-  "bg-orange-50 text-orange-800 border-orange-200",
-  "bg-indigo-50 text-indigo-800 border-indigo-200",
-  "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200",
+// Brighter, more saturated pills so staff are easy to tell apart at a glance.
+// Stronger 200-level background + 400 border, with dark 900 text for contrast.
+// Ordered so adjacent hues differ; assigned by stable index for distinctness.
+export const SOFT_STAFF_PALETTE = [
+  "bg-blue-200 text-blue-900 border-blue-400",
+  "bg-orange-200 text-orange-900 border-orange-400",
+  "bg-emerald-200 text-emerald-900 border-emerald-400",
+  "bg-pink-200 text-pink-900 border-pink-400",
+  "bg-violet-200 text-violet-900 border-violet-400",
+  "bg-amber-200 text-amber-900 border-amber-400",
+  "bg-cyan-200 text-cyan-900 border-cyan-400",
+  "bg-rose-200 text-rose-900 border-rose-400",
+  "bg-lime-200 text-lime-900 border-lime-400",
+  "bg-purple-200 text-purple-900 border-purple-400",
+  "bg-teal-200 text-teal-900 border-teal-400",
+  "bg-red-200 text-red-900 border-red-400",
+  "bg-sky-200 text-sky-900 border-sky-400",
+  "bg-fuchsia-200 text-fuchsia-900 border-fuchsia-400",
+  "bg-yellow-200 text-yellow-900 border-yellow-400",
+  "bg-indigo-200 text-indigo-900 border-indigo-400",
+  "bg-green-200 text-green-900 border-green-400",
+  "bg-stone-200 text-stone-900 border-stone-400",
 ];
 
 export function getSoftStaffColor(name: string): string {

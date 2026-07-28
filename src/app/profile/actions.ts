@@ -326,7 +326,7 @@ export async function updateOrgUnit(
           user_id: userId,
           branch_id: branchId,
           department_id: departmentId,
-          position: user.role.role_type === "admin" ? "admin" : null,
+          position: user.role.role_type === "admin" ? "ADMIN" : null,
           status: "active",
         },
       });

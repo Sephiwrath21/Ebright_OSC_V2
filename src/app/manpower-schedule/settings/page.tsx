@@ -16,7 +16,6 @@ import {
   Save, 
   Undo,
   Calendar,
-  Building,
   AlertCircle,
   Copy,
   Clipboard
@@ -652,66 +651,60 @@ function ScheduleSettingsContent() {
           <span className="text-slate-900 font-medium">Schedule Settings</span>
         </nav>
 
-        {/* Page Header */}
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Schedule Settings</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Configure active hours and recurring timetables for Ebright branches.
-          </p>
-        </header>
+        {/* Page Header: title (left) + day tabs & branch dropdown on one line (right) */}
+        <header className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Schedule Settings</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Configure active hours and recurring timetables for Ebright branches.
+            </p>
+          </div>
 
-        {/* Combined Branch & Day Selector Row */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Left: Branch selector */}
-          <div className="flex items-center gap-2.5 flex-1 max-w-md">
-            <div className="flex items-center gap-2 text-slate-700 shrink-0">
-              <Building className="w-5 h-5 text-slate-400" />
-              <span className="font-semibold text-sm">Branch:</span>
+          {/* Right: day tabs + branch dropdown side by side */}
+          <div className="flex items-end gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map(day => {
+                const isSelected = selectedDay === day;
+                const isOpenOnDay = schedules[`${selectedBranch}-${day}`]?.isOpen;
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() => setSelectedDay(day)}
+                    className={`
+                      px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all duration-200 shrink-0
+                      ${isSelected
+                        ? "border-blue-500 bg-blue-50/50 text-blue-600 shadow-sm"
+                        : isOpenOnDay
+                          ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          : "border-slate-100 bg-white text-slate-300 border-dashed hover:text-slate-400"
+                      }
+                    `}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
             </div>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            >
-              {ALL_BRANCHES.map(branch => (
-                <option key={branch} value={branch}>
-                  {branch}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {/* Right: Days selector */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-            {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map(day => {
-              const isSelected = selectedDay === day;
-              // Check if open on this day
-              const isOpenOnDay = schedules[`${selectedBranch}-${day}`]?.isOpen;
-              
-              return (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={`
-                    px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 shrink-0
-                    ${isSelected 
-                      ? "border-blue-500 bg-blue-50/50 text-blue-600 shadow-sm" 
-                      : isOpenOnDay
-                        ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                        : "border-slate-100 bg-white text-slate-300 border-dashed hover:text-slate-400"
-                    }
-                  `}
-                >
-                  {day}
-                </button>
-              );
-            })}
-
-            <button className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shrink-0">
-              <span className="text-xl leading-none font-bold">···</span>
-            </button>
+            <div className="w-40 sm:w-56 shrink-0">
+              <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+                Branch
+              </label>
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                {ALL_BRANCHES.map(branch => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        </header>
 
         {/* Main Configuration Card */}
         <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-6">

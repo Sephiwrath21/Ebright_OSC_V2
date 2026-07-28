@@ -12,7 +12,13 @@
 import * as React from "react";
 import type { FlowEntityDetail, FlowMemberRollup, FlowTaskRow } from "./types";
 import { flowCompletionPct, formatDueDate } from "./types";
-import { CalendarIcon, InitialAvatar, StatusDonut, StatusOverviewCard } from "./bits";
+import {
+  CalendarIcon,
+  InitialAvatar,
+  StatusDonut,
+  StatusOverviewCard,
+  type ReassignControl,
+} from "./bits";
 
 function CheckIcon() {
   return (
@@ -239,12 +245,19 @@ export function EntityOverviewSection({
   label,
   entity,
   kind = "department",
+  reassign,
+  headerControl,
 }: {
   label: string;
   entity: FlowEntityDetail;
   /** Which scope the roster belongs to — drives the member-detail header's
    *  "{role} - {scope}" line. */
   kind?: "department" | "branch";
+  /** "Assign to Others" control for the status donut's Pending drill modal. */
+  reassign?: ReassignControl;
+  /** Rendered right-aligned on the "{name} — {label}" heading row — the
+   *  Daily sections put the date filter here. */
+  headerControl?: React.ReactNode;
 }) {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const selectedMember = selectedMemberId
@@ -273,7 +286,10 @@ export function EntityOverviewSection({
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="text-lg font-semibold text-gray-900">{entity.name} — {label}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-gray-900">{entity.name} — {label}</h2>
+        {headerControl}
+      </div>
 
       <div className="flex gap-3">
         <SummaryChip label="Members" count={entity.members.length} tone="neutral" />
@@ -286,6 +302,7 @@ export function EntityOverviewSection({
           title={label}
           totals={entity.totals}
           tasks={entity.tasks}
+          reassign={reassign}
         />
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">

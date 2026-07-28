@@ -9,6 +9,7 @@ import { format, parseISO } from "date-fns";
 import { Home as HomeIcon, ChevronRight, RefreshCw } from "lucide-react";
 import AppShell from "@/app/components/AppShell";
 import { ALL_BRANCHES } from "@/lib/manpowerUtils";
+import BranchSearchSelect from "@/app/components/BranchSearchSelect";
 
 interface ScheduleRecord {
   id: string;
@@ -140,32 +141,27 @@ function UpdateScheduleContent() {
           <span className="text-slate-900 font-medium">Update Manpower Schedule</span>
         </nav>
 
-        {/* Page heading */}
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Update Manpower Schedule</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Adjust shifts and assignments for active weeks after the fact.</p>
+        {/* Page heading + branch filter on one line */}
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Update Manpower Schedule</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Adjust shifts and assignments for active weeks after the fact.</p>
+          </div>
+          <div className="w-full sm:w-64 shrink-0">
+            <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+              Branch
+            </label>
+            <BranchSearchSelect
+              value={filterBranch}
+              onChange={v => {
+                setFilterBranch(v);
+                setDrillYear(null);
+                setDrillMonth(null);
+              }}
+              branches={ALL_BRANCHES}
+            />
+          </div>
         </header>
-
-        {/* Branch filter */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-md">
-          <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
-            Branch
-          </label>
-          <select
-            value={filterBranch}
-            onChange={e => {
-              setFilterBranch(e.target.value);
-              setDrillYear(null);
-              setDrillMonth(null);
-            }}
-            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-blue-500 transition-colors"
-          >
-            <option value="">All Branches</option>
-            {ALL_BRANCHES.map(b => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-        </div>
 
         {/* List body */}
         {loading ? (
@@ -180,12 +176,6 @@ function UpdateScheduleContent() {
         ) : drillYear !== null && drillMonth !== null ? (
           <div>
             <div className="flex items-center gap-3 mb-5">
-              <button
-                onClick={() => setDrillMonth(null)}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-black transition-colors shadow-sm"
-              >
-                ← Back
-              </button>
               <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">
                 {drillYear} <span className="text-slate-400">›</span>{" "}
                 {MONTH_NAMES[drillMonth]}

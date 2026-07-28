@@ -18,7 +18,17 @@
 import { Pool } from "pg";
 import { Prisma } from "../../src/generated/task-manager-client";
 import { prisma } from "../../src/task-manager/prisma";
-import { diffUserFields, EXTRA_USERS, mapHrfsUser, type HrfsUserRow, type MappedUser } from "./hrfs-map";
+import { FLOW_DEPARTMENTS } from "../../src/task-manager/ui/types";
+import {
+  diffUserFields,
+  EXTRA_USERS,
+  mapHrfsUser,
+  mapPortalEmployee,
+  normalizeSourceDepartment,
+  type HrfsUserRow,
+  type MappedUser,
+  type PortalEmployeeRow,
+} from "./hrfs-map";
 
 const UTILITY_FLOWS = [
   { flowId: "flow-adhoc",        name: "Ad hoc Tasks",        icon: "⚡",  description: "One-off tasks assigned from the '+ Assigned task' quick form.", order: 2, blockId: "block-adhoc",        nodeId: "node-adhoc",        blockTitle: "Ad hoc task",        itemId: "item-adhoc-done" },
@@ -68,6 +78,106 @@ async function fetchHrfsRows(): Promise<HrfsUserRow[]> {
       branchName: r.branchName,
       status: r.status,
     }));
+  } finally {
+    await pool.end();
+  }
+}
+
+/** OSC_PORTAL_DATABASE_URL wins if set; otherwise fall back to
+ *  TASK_MANAGER_DATABASE_URL with the DB name (pathname) swapped to `hrfs` —
+ *  the OSC portal's own database, same Postgres server, same credentials, by
+ *  convention (same pattern as resolveHrfsUrl above). */
+function resolvePortalUrl(): string {
+  if (process.env.OSC_PORTAL_DATABASE_URL) return process.env.OSC_PORTAL_DATABASE_URL;
+  const base = process.env.TASK_MANAGER_DATABASE_URL;
+  if (!base) {
+    throw new Error(
+      "bootstrap: neither OSC_PORTAL_DATABASE_URL nor TASK_MANAGER_DATABASE_URL is set — cannot locate the portal database.",
+    );
+  }
+  const url = new URL(base);
+  url.pathname = "/hrfs";
+  return url.toString();
+}
+
+/** Read-only: department per (lowercased) login email from the OSC portal's
+ *  employment records — the same data the portal's HR staff directory
+ *  displays. 2026-07-25 root-cause finding: ebright_hrfs.User has NO
+ *  department column at all, so mapping alone imported every generic staff
+ *  member department-less; the real assignments live HERE (hrfs database:
+ *  users -> employment -> department). Only ACTIVE employments count, and
+ *  only department names that are real FLOW_DEPARTMENTS values — the portal
+ *  also carries non-Task-Manager units ("IOP", "CEO"), which are skipped. */
+async function fetchPortalDepartments(): Promise<Map<string, string>> {
+  const pool = new Pool({
+    connectionString: resolvePortalUrl(),
+    max: 3,
+    connectionTimeoutMillis: 10_000,
+  });
+  try {
+    const result = await pool.query<{ email: string; department_name: string }>(
+      `select lower(u.email) as email, d.department_name
+       from users u
+       join employment e on e.user_id = u.user_id
+       join department d on d.department_id = e.department_id
+       where e.status = 'active' and u.deleted_at is null`,
+    );
+    const byEmail = new Map<string, string>();
+    for (const r of result.rows) {
+      // Portal still says "Operation" — normalize to the renamed value.
+      const dept = normalizeSourceDepartment(r.department_name);
+      if (dept && (FLOW_DEPARTMENTS as readonly string[]).includes(dept)) {
+        byEmail.set(r.email, dept);
+      }
+    }
+    return byEmail;
+  } finally {
+    await pool.end();
+  }
+}
+
+/** Fill department for department-side staff the mapping left department-
+ *  less. Never touches branch staff (branch/department mutual exclusivity)
+ *  and never overwrites an already-set department — ROLE_MAP's fixed values
+ *  (ACADEMY/HR) and OVERRIDES both win simply by already being set. Returns
+ *  how many users were filled. */
+function enrichDepartments(toImport: MappedUser[], byEmail: Map<string, string>): number {
+  let filled = 0;
+  for (const user of toImport) {
+    if (user.department !== null || user.branch !== null) continue;
+    if (user.role !== "MEMBER" && user.role !== "HOD") continue;
+    const dept = byEmail.get(user.email.toLowerCase());
+    if (!dept) continue;
+    user.department = dept;
+    filled++;
+  }
+  return filled;
+}
+
+/** Read-only: ACTIVE portal employees (active login + their ACTIVE
+ *  employment's position/department/branch). Employees with NO active
+ *  employment row still return (position null) so they surface as loud
+ *  unknown-position skips instead of silently vanishing. Second bootstrap
+ *  source — see mapPortalEmployee's header in hrfs-map.ts. */
+async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
+  const pool = new Pool({
+    connectionString: resolvePortalUrl(),
+    max: 3,
+    connectionTimeoutMillis: 10_000,
+  });
+  try {
+    const result = await pool.query<PortalEmployeeRow>(
+      `select lower(u.email) as email, up.full_name as name, e.position,
+              d.department_name as department, b.branch_name as branch
+       from users u
+       join user_profile up on up.user_id = u.user_id
+       left join employment e on e.user_id = u.user_id and e.status = 'active'
+       left join department d on d.department_id = e.department_id
+       left join branch b on b.branch_id = e.branch_id
+       where u.deleted_at is null and u.status = 'active'
+       order by u.email`,
+    );
+    return result.rows;
   } finally {
     await pool.end();
   }
@@ -236,7 +346,7 @@ async function provisionUtilityFlows(): Promise<void> {
 
   await prisma.workspace.upsert({
     where: { id: "ws-operations" },
-    create: { id: "ws-operations", name: "Operations", icon: "🛠️", ownerId, department: "Operation", order: 1 },
+    create: { id: "ws-operations", name: "Operations", icon: "🛠️", ownerId, department: "Operations", order: 1 },
     update: {},
   });
 
@@ -302,6 +412,66 @@ async function main() {
 
   const rows = await fetchHrfsRows();
   const result = mapAll(rows);
+
+  // SECOND SOURCE (2026-07-25): active portal employees ebright_hrfs doesn't
+  // cover — 63 of the Employee Management page's active staff had no
+  // ebright_hrfs row at all. Primary-source emails always win; duplicates
+  // within the portal result (multiple active employments) collapse to the
+  // first row.
+  try {
+    const portalEmployees = await fetchPortalEmployees();
+    const covered = new Set(result.toImport.map((u) => u.email.toLowerCase()));
+    let added = 0;
+    const portalSkipped: SkippedRow[] = [];
+    const portalWarnings: string[] = [];
+    for (const row of portalEmployees) {
+      const email = (row.email ?? "").trim().toLowerCase();
+      if (!email || covered.has(email)) continue;
+      covered.add(email);
+      const mapped = mapPortalEmployee(row);
+      if (mapped.ok) {
+        result.toImport.push(mapped.user);
+        added++;
+        portalWarnings.push(...mapped.warnings);
+      } else {
+        portalSkipped.push({ email, reason: mapped.reason });
+      }
+    }
+    console.log(
+      `[bootstrap] portal second source: ${portalEmployees.length} active employees checked, ${added} added from the portal, ${portalSkipped.length} skipped`,
+    );
+    for (const s of portalSkipped) console.log(`  - ${s.reason}`);
+    for (const w of portalWarnings) console.log(`  - WARN ${w}`);
+  } catch (err) {
+    console.warn(
+      `[bootstrap] WARNING: portal database unreachable — portal-only employees NOT imported (${err instanceof Error ? err.message : err})`,
+    );
+  }
+
+  // Department enrichment from the portal DB (read-only — runs in dry-run
+  // too). Non-fatal: if the portal database is unreachable, the import still
+  // proceeds exactly as before, just without filled departments.
+  let filled = 0;
+  try {
+    const portalDepartments = await fetchPortalDepartments();
+    filled = enrichDepartments(result.toImport, portalDepartments);
+    // Drop the "no department" warnings that enrichment just resolved, so
+    // the printed report reflects what will actually be imported.
+    if (filled > 0) {
+      const deptByEmail = new Map(result.toImport.map((u) => [u.email.toLowerCase(), u.department]));
+      result.warnings = result.warnings.filter((w) => {
+        if (!w.includes("no department override")) return true;
+        const email = w.split(":")[0]?.trim().toLowerCase();
+        return !(email && deptByEmail.get(email));
+      });
+    }
+  } catch (err) {
+    console.warn(
+      `[bootstrap] WARNING: portal database unreachable — departments NOT enriched (${err instanceof Error ? err.message : err})`,
+    );
+  }
+  console.log(`[bootstrap] departments filled from portal HR records: ${filled}`);
+
   printSummary(result, { dryRun });
 
   if (dryRun) {

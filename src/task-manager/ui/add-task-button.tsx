@@ -39,10 +39,10 @@ export function AddTaskButton({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3">
               <p className="text-sm font-semibold text-gray-900">Add Task</p>
               <button
                 type="button"

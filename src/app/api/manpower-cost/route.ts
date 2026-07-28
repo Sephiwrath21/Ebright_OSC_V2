@@ -1,13 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  COLUMNS,
-  getTimeSlotsForDay,
-  getWorkingDaysForBranch,
-  isAdminSlot,
-  isOpeningClosingSlot,
-} from "@/lib/manpowerUtils";
 
 // Executive rate is fixed for all PT staff. Mirrors the old project.
 const EXECUTIVE_RATE = 11;
@@ -26,6 +19,7 @@ interface DailyHour {
   coachHrs: number;
   execHrs: number;
   totalHrs: number;
+  classes: number;
   scheduleBranch?: string;
 }
 
@@ -40,88 +34,11 @@ interface StaffResult {
   coachHrs: number;
   execHrs: number;
   totalHrs: number;
+  classes: number;
   coachPay: number;
   execPay: number;
   totalPay: number;
   days: DailyHour[];
-}
-
-// Walk a schedule's selections and accumulate coach/exec hours per name per day.
-function calculateHoursFromSelections(
-  selections: Record<string, string>,
-  branch: string,
-): Record<string, { coachHrs: number; execHrs: number; totalHrs: number; days: { day: string; coachHrs: number; execHrs: number; totalHrs: number }[] }> {
-  const allNames = new Set<string>();
-  Object.values(selections).forEach(v => {
-    if (v && v !== "None") allNames.add(v);
-  });
-
-  const stats: Record<
-    string,
-    {
-      coachHrs: number;
-      execHrs: number;
-      totalHrs: number;
-      days: { day: string; coachHrs: number; execHrs: number; totalHrs: number }[];
-    }
-  > = {};
-  allNames.forEach(n => {
-    stats[n] = { coachHrs: 0, execHrs: 0, totalHrs: 0, days: [] };
-  });
-
-  getWorkingDaysForBranch(branch).forEach(dayName => {
-    const isWeekend = dayName === "Saturday" || dayName === "Sunday";
-    const dailyTarget = isWeekend ? 10.5 : 5.0;
-
-    allNames.forEach(emp => {
-      let coach = 0;
-      let worked = false;
-      getTimeSlotsForDay(dayName, branch).forEach(slot => {
-        if (isOpeningClosingSlot(slot, branch)) return;
-        COLUMNS.forEach(col => {
-          if (selections[`${dayName}-${slot}-${col.id}`] === emp) {
-            worked = true;
-            if (col.type === "coach") {
-              coach += isAdminSlot(slot, branch) ? 0.25 : 1.25;
-            }
-          }
-        });
-      });
-      if (worked) {
-        const exec = Math.max(0, dailyTarget - coach);
-        stats[emp].coachHrs += coach;
-        stats[emp].execHrs += exec;
-        stats[emp].totalHrs = stats[emp].coachHrs + stats[emp].execHrs;
-        stats[emp].days.push({
-          day: dayName,
-          coachHrs: coach,
-          execHrs: exec,
-          totalHrs: coach + exec,
-        });
-      }
-    });
-  });
-
-  return stats;
-}
-
-// Convert a day name + week start date to the actual ISO date for that day.
-function dayNameToDate(dayName: string, startDateISO: string): string {
-  const dayMap: Record<string, number> = {
-    Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
-    Thursday: 4, Friday: 5, Saturday: 6,
-  };
-  const [sy, sm, sd] = startDateISO.split("-").map(Number);
-  const start = new Date(sy, sm - 1, sd);
-  const startDow = start.getDay();
-  const targetDow = dayMap[dayName] ?? 0;
-  let diff = targetDow - startDow;
-  if (diff < 0) diff += 7;
-  const result = new Date(sy, sm - 1, sd + diff);
-  const yyyy = result.getFullYear();
-  const mm = String(result.getMonth() + 1).padStart(2, "0");
-  const dd = String(result.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 // role_id 6 = staff. Combined with a coach position this triggers the
@@ -199,10 +116,26 @@ export async function GET(req: Request) {
     const monthStart = new Date(`${monthStartISO}T00:00:00Z`);
     const nextMonth = new Date(`${nextMonthISO}T00:00:00Z`);
 
-    // 1. Fetch manpower schedules whose date falls within the requested month
+    // 0. Which weeks have been Finalized & Archived — the cost report follows
+    //    the archived schedule, so only these weeks feed it. Keyed by
+    //    `${branchName}:::${periodStartISO}` (period_start is the Monday).
+    const archivedPeriods = await prisma.schedule_period_status.findMany({
+      where: { status: "archived" },
+      include: { branch: { select: { branch_name: true } } },
+    });
+    const archivedWeekKeys = new Set(
+      archivedPeriods.map(
+        p => `${p.branch.branch_name}:::${p.period_start.toISOString().slice(0, 10)}`,
+      ),
+    );
+
+    // 1. Fetch the ACTUAL manpower schedules whose date falls in the month.
+    //    (Planning/draft rows are ignored — the report tracks what actually
+    //    happened, and only for archived weeks, filtered below.)
     const rows = await prisma.manpower_schedule.findMany({
       where: {
         date: { gte: monthStart, lt: nextMonth },
+        schedule_type: "actual",
       },
       include: {
         slot: {
@@ -214,126 +147,63 @@ export async function GET(req: Request) {
             },
           },
         },
-        branch_duty_position: true,
+        branch_position: true,
         user_profile: true,
       },
     });
 
-    const groups = new Map<string, {
-      branchName: string;
-      mondayISO: string;
-      sundayISO: string;
-      start_date: Date;
-      end_date: Date;
-      selections: Record<string, string>;
-      branch: { branch_name: string };
-    }>();
-
     const DAYS_LIST = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const WD_ABBREV = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const toMin = (d: Date) => d.getUTCHours() * 60 + d.getUTCMinutes();
 
-    function parseSingleTime(t: string) {
-      const clean = t.toUpperCase().replace(/\s+/g, "");
-      const isPM = clean.includes("PM");
-      const timePart = clean.replace("AM", "").replace("PM", "");
-      const sep = timePart.includes(".") ? "." : ":";
-      const parts = timePart.split(sep);
-      if (parts.length === 0) return null;
-      let h = Number(parts[0]);
-      const m = parts.length > 1 ? Number(parts[1]) : 0;
-      if (isPM && h < 12) h += 12;
-      if (!isPM && h === 12) h = 0;
-      return { h, m };
-    }
-
-    function formatSlotTime(start: Date, end: Date): string {
-      const fmt = (d: Date) => {
-        const hours = d.getUTCHours();
-        const minutes = d.getUTCMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-        const displayMinutes = String(minutes).padStart(2, '0');
-        return `${displayHours}:${displayMinutes} ${ampm}`;
-      };
-      return `${fmt(start)} - ${fmt(end)}`;
-    }
-
-    function parseWireSlotTimeRange(wireSlot: string) {
-      const parts = wireSlot.split(/[-–—]/).map(s => s.trim());
-      if (parts.length !== 2) return null;
-      const start = parseSingleTime(parts[0]);
-      const end = parseSingleTime(parts[1]);
-      if (!start || !end) return null;
-      return {
-        startH: start.h,
-        startM: start.m,
-        endH: end.h,
-        endM: end.m,
-      };
-    }
-
-    function matchDbSlotToWireString(slotStart: Date, slotEnd: Date, branchName: string, dayName: string): string {
-      const startH = slotStart.getUTCHours();
-      const startM = slotStart.getUTCMinutes();
-      const endH = slotEnd.getUTCHours();
-      const endM = slotEnd.getUTCMinutes();
-
-      const availableSlots = getTimeSlotsForDay(dayName, branchName);
-      for (const wireSlot of availableSlots) {
-        const parsed = parseWireSlotTimeRange(wireSlot);
-        if (
-          parsed &&
-          parsed.startH === startH &&
-          parsed.startM === startM &&
-          parsed.endH === endH &&
-          parsed.endM === endM
-        ) {
-          return wireSlot;
-        }
+    // Operating span per (branch, weekday) — earliest slot start → latest slot
+    // end across ALL of the branch's slots that day (opening/closing included).
+    // Executive time = this span minus a person's class hours, mirroring the
+    // grid's Weekly Hours Summary so the report and the schedule always agree.
+    const branchNames = Array.from(
+      new Set(rows.map(r => r.slot.branch_operating_day.branch.branch_name)),
+    );
+    const branchSlots = branchNames.length
+      ? await prisma.slot.findMany({
+          where: {
+            branch_operating_day: {
+              is_active: true,
+              branch: { branch_name: { in: branchNames } },
+            },
+          },
+          include: {
+            branch_operating_day: { include: { branch: { select: { branch_name: true } } } },
+          },
+        })
+      : [];
+    const spanAgg = new Map<string, { min: number; max: number }>();
+    for (const s of branchSlots) {
+      const key = `${s.branch_operating_day.branch.branch_name}:::${s.branch_operating_day.day_of_week}`;
+      const start = toMin(s.slot_start);
+      const end = toMin(s.slot_end);
+      const cur = spanAgg.get(key);
+      if (!cur) spanAgg.set(key, { min: start, max: end });
+      else {
+        if (start < cur.min) cur.min = start;
+        if (end > cur.max) cur.max = end;
       }
-      return formatSlotTime(slotStart, slotEnd);
     }
+    const spanHrs = (branch: string, wd: string): number => {
+      const v = spanAgg.get(`${branch}:::${wd}`);
+      return v ? (v.max - v.min) / 60 : 0;
+    };
 
-    function normalizePositionToColId(label: string): string {
-      const clean = label.toLowerCase().replace(/\s+/g, "");
-      if (clean.includes("manager")) return "MANAGER";
-      return clean;
-    }
-
-    rows.forEach(r => {
-      const branchName = r.slot.branch_operating_day.branch.branch_name;
-      const rowDate = r.date;
-      
-      const dayOfWeek = rowDate.getUTCDay(); // 0 is Sunday, 1 is Monday...
-      const diff = rowDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      const monday = new Date(Date.UTC(rowDate.getUTCFullYear(), rowDate.getUTCMonth(), diff));
-      const mondayISO = monday.toISOString().slice(0, 10);
-
-      const sunday = new Date(monday);
-      sunday.setUTCDate(sunday.getUTCDate() + 6);
-
-      const key = `${branchName}:::${mondayISO}`;
-      if (!groups.has(key)) {
-        groups.set(key, {
-          branchName,
-          mondayISO,
-          sundayISO: sunday.toISOString().slice(0, 10),
-          start_date: monday,
-          end_date: sunday,
-          selections: {},
-          branch: { branch_name: branchName },
-        });
-      }
-
-      const g = groups.get(key)!;
-      const dayName = DAYS_LIST[rowDate.getUTCDay()];
-      const slotText = matchDbSlotToWireString(r.slot.slot_start, r.slot.slot_end, branchName, dayName);
-      const colId = normalizePositionToColId(r.branch_duty_position.position_label);
-      
-      const selectionKey = `${dayName}-${slotText}-${colId}`;
-      g.selections[selectionKey] = r.user_profile.nick_name || r.user_profile.full_name;
+    // Active seats per date (branch_position_day.is_active) — mirrors the grid's
+    // per-day column activation. An assignment left in a seat that was later
+    // DEACTIVATED (a "stale"/hidden column) is not shown in the schedule, so it
+    // must not count in the report either. Keyed `${position_id}:::${dateISO}`.
+    const activeDayRows = await prisma.branch_position_day.findMany({
+      where: { date: { gte: monthStart, lt: nextMonth }, is_active: true },
+      select: { branch_position_id: true, date: true },
     });
-
-    const schedules = Array.from(groups.values());
+    const activeSeatSet = new Set(
+      activeDayRows.map(r => `${r.branch_position_id}:::${r.date.toISOString().slice(0, 10)}`),
+    );
 
     // 2. Fetch all active employees with employment + profile, build name lookup
     const employees = await prisma.users.findMany({
@@ -413,68 +283,104 @@ export async function GET(req: Request) {
       );
     }
 
-    // 3. Walk every schedule, compute hours per employee per day
+    // 3. Accumulate hours per (person, date) DIRECTLY from the actual DB slots.
+    //    Class positions (coach / star_coach / training) contribute their real
+    //    slot duration as coach hours + one class each. Manager seats are skipped
+    //    entirely; executive time is the day's span remainder (computed below).
+    //    Only Finalized & Archived weeks are counted.
+    const CLASS_TYPES = new Set(["coach", "star_coach", "training"]);
+    type DayAcc = { branch: string; wd: string; coachHrs: number; classes: number };
+    const perPersonDate = new Map<string, Map<string, DayAcc>>();
+    const personMeta = new Map<string, { name: string; info?: EmpInfo; branch: string }>();
+    const weeksSet = new Set<string>();
+
+    for (const r of rows) {
+      if (r.branch_position.position_type === "manager") continue;
+      const branchName = r.slot.branch_operating_day.branch.branch_name;
+      const rawDate = r.date;
+      const dateISO = rawDate.toISOString().slice(0, 10);
+
+      // Skip assignments left in a seat that was deactivated for that date
+      // (hidden in the schedule → must not count in the report).
+      if (!activeSeatSet.has(`${r.position_id}:::${dateISO}`)) continue;
+
+      // Skip weeks that haven't been Finalized & Archived.
+      const dow = rawDate.getUTCDay();
+      const monDiff = rawDate.getUTCDate() - dow + (dow === 0 ? -6 : 1);
+      const monday = new Date(Date.UTC(rawDate.getUTCFullYear(), rawDate.getUTCMonth(), monDiff));
+      const mondayISO = monday.toISOString().slice(0, 10);
+      if (!archivedWeekKeys.has(`${branchName}:::${mondayISO}`)) continue;
+
+      const rawName = r.user_profile.nick_name || r.user_profile.full_name;
+      if (!rawName) continue;
+      const info = resolveEmployee(rawName, branchName);
+      const homeBranch = info?.branch ?? branchName;
+      const personKey = `${(info?.displayName ?? rawName).toLowerCase()}:::${homeBranch.toLowerCase()}`;
+      if (!personMeta.has(personKey)) {
+        personMeta.set(personKey, { name: info?.displayName ?? rawName, info, branch: homeBranch });
+      }
+
+      const wd = WD_ABBREV[dow];
+      let dm = perPersonDate.get(personKey);
+      if (!dm) { dm = new Map(); perPersonDate.set(personKey, dm); }
+      let acc = dm.get(dateISO);
+      if (!acc) { acc = { branch: branchName, wd, coachHrs: 0, classes: 0 }; dm.set(dateISO, acc); }
+
+      if (CLASS_TYPES.has(r.branch_position.position_type)) {
+        acc.coachHrs += (toMin(r.slot.slot_end) - toMin(r.slot.slot_start)) / 60;
+        acc.classes += 1;
+      }
+
+      const sunday = new Date(monday);
+      sunday.setUTCDate(sunday.getUTCDate() + 6);
+      weeksSet.add(`${mondayISO}:::${sunday.toISOString().slice(0, 10)}`);
+    }
+
+    // 4. Build a StaffResult per person; exec = day span − class hours per day.
     const aggregated = new Map<string, StaffResult>();
-
-    schedules.forEach(sch => {
-      const selections = (sch.selections ?? {}) as Record<string, string>;
-      if (Object.keys(selections).length === 0) return;
-      const branchName = sch.branch.branch_name;
-      const startISO = sch.start_date.toISOString().slice(0, 10);
-
-      const stats = calculateHoursFromSelections(selections, branchName);
-
-      Object.entries(stats).forEach(([name, hrs]) => {
-        if (hrs.totalHrs === 0) return;
-
-        // Map day names to actual dates, filter to days within the month
-        const daysInMonth = hrs.days
-          .map(d => ({ ...d, date: dayNameToDate(d.day, startISO) }))
-          .filter(d => d.date >= monthStartISO && d.date < nextMonthISO);
-        if (daysInMonth.length === 0) return;
-
-        const filteredCoach = daysInMonth.reduce((s, d) => s + d.coachHrs, 0);
-        const filteredExec = daysInMonth.reduce((s, d) => s + d.execHrs, 0);
-
-        // Resolve employee from selection name
-        const info = resolveEmployee(name, branchName);
-        const homeBranch = info?.branch ?? branchName;
-        const key = `${(info?.displayName ?? name).toLowerCase()}:::${homeBranch.toLowerCase()}`;
-
-        if (!aggregated.has(key)) {
-          aggregated.set(key, {
-            name: info?.displayName ?? name,
-            nickName: info?.nickName ?? null,
-            employeeId: info?.employeeId ?? null,
-            branch: homeBranch,
-            position: info?.position ?? null,
-            rate: info?.rate ?? null,
-            isPT: false,
-            coachHrs: 0,
-            execHrs: 0,
-            totalHrs: 0,
-            coachPay: 0,
-            execPay: 0,
-            totalPay: 0,
-            days: [],
-          });
-        }
-        const agg = aggregated.get(key)!;
-        agg.coachHrs += filteredCoach;
-        agg.execHrs += filteredExec;
-        agg.totalHrs += filteredCoach + filteredExec;
-        daysInMonth.forEach(d => {
-          agg.days.push({
-            day: d.day,
-            date: d.date,
-            coachHrs: d.coachHrs,
-            execHrs: d.execHrs,
-            totalHrs: d.totalHrs,
-            scheduleBranch: branchName !== homeBranch ? branchName : undefined,
-          });
+    for (const [personKey, dm] of perPersonDate) {
+      const meta = personMeta.get(personKey)!;
+      const info = meta.info;
+      const days: DailyHour[] = [];
+      let coachTotal = 0, execTotal = 0, classesTotal = 0;
+      for (const [dateISO, acc] of dm) {
+        if (dateISO < monthStartISO || dateISO >= nextMonthISO) continue;
+        const span = spanHrs(acc.branch, acc.wd);
+        const exec = Math.max(0, span - acc.coachHrs);
+        coachTotal += acc.coachHrs;
+        execTotal += exec;
+        classesTotal += acc.classes;
+        const dayName = DAYS_LIST[new Date(`${dateISO}T00:00:00Z`).getUTCDay()];
+        days.push({
+          day: dayName,
+          date: dateISO,
+          coachHrs: acc.coachHrs,
+          execHrs: exec,
+          totalHrs: acc.coachHrs + exec,
+          classes: acc.classes,
+          scheduleBranch: acc.branch !== meta.branch ? acc.branch : undefined,
         });
+      }
+      if (days.length === 0) continue;
+      days.sort((a, b) => a.date.localeCompare(b.date));
+      aggregated.set(personKey, {
+        name: meta.name,
+        nickName: info?.nickName ?? null,
+        employeeId: info?.employeeId ?? null,
+        branch: meta.branch,
+        position: info?.position ?? null,
+        rate: info?.rate ?? null,
+        isPT: false,
+        coachHrs: coachTotal,
+        execHrs: execTotal,
+        totalHrs: coachTotal + execTotal,
+        classes: classesTotal,
+        coachPay: 0,
+        execPay: 0,
+        totalPay: 0,
+        days,
       });
-    });
+    }
 
     // 4. Keep only PT/FT Coach positions (drops BM, CEO, HOD, EXEC, INTERN,
     //    unmatched/blank positions, and training rows).
@@ -542,13 +448,8 @@ export async function GET(req: Request) {
       executiveRate: EXECUTIVE_RATE,
     };
 
-    // Available weeks (for the week filter dropdown)
-    const weeksSet = new Set<string>();
-    schedules.forEach(s => {
-      const start = s.start_date.toISOString().slice(0, 10);
-      const end = s.end_date.toISOString().slice(0, 10);
-      weeksSet.add(`${start}:::${end}`);
-    });
+    // Available weeks (for the week filter dropdown) — the archived weeks seen
+    // while accumulating above.
     const availableWeeks = Array.from(weeksSet)
       .map(w => {
         const [start, end] = w.split(":::");

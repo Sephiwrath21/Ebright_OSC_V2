@@ -8,11 +8,23 @@
 import { getFlowDetail } from "@/task-manager/data";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 
-export async function HomeOverviewSection({ email }: { email: string }) {
+export async function HomeOverviewSection({
+  email,
+  dailyDate,
+  monthlyDate,
+}: {
+  email: string;
+  /** Optional YYYY-MM-DD anchors from ?date= / ?mdate= — independent date
+   *  filters for the Daily and Monthly halves of the overview (departments
+   *  AND branch regions each follow their own section's anchor). Omitted =
+   *  today / current month. */
+  dailyDate?: string;
+  monthlyDate?: string;
+}) {
   try {
     const [daily, monthly] = await Promise.all([
-      getFlowDetail(email, "daily"),
-      getFlowDetail(email, "monthly"),
+      getFlowDetail(email, "daily", dailyDate),
+      getFlowDetail(email, "monthly", monthlyDate),
     ]);
     if (daily.me.me.role !== "ADMIN" || !daily.org) return null;
     return (
@@ -21,6 +33,9 @@ export async function HomeOverviewSection({ email }: { email: string }) {
         monthlyOrg={monthly.org}
         adhocByRegion={daily.adhocByRegion}
         departmentOverviewHref="/task-manager?view=department"
+        dailyDate={daily.date}
+        monthlyDate={monthly.date}
+        dateFilterParams={{ date: dailyDate, mdate: monthlyDate }}
       />
     );
   } catch {

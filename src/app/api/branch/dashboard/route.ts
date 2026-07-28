@@ -36,14 +36,66 @@ const BRANCH_NAME_TO_CODE = Object.entries(BRANCHES_MAP).reduce((acc, [code, nam
   return acc;
 }, {} as Record<string, string>);
 
-// Extract branch prefix from e.g. "ebrightklg@gmail.com"
+// Map user email prefixes (both long names and short codes) to branch codes
+const EMAIL_PREFIX_TO_BRANCH: Record<string, string> = {
+  // Long names from user emails
+  "setiaalam": "SA",
+  "sripetaling": "SP",
+  "kotadamansara": "KD",
+  "putrajaya": "PJY",
+  "ampang": "AMP",
+  "cyberjaya": "CJY",
+  "denaialam": "DA",
+  "bandarbarubangi": "BBB",
+  "danaukota": "DK",
+  "shahalam": "SHA",
+  "bandartunhusseinonn": "BTHO",
+  "ecograndeur": "EGR",
+  "bandarseriputra": "BSP",
+  "rimbayu": "RBY",
+  "bandarrimbayu": "RBY",
+  "tamansrigombak": "TSG",
+  "kotawarisan": "KW",
+  "ttdigrove": "KTG",
+  "subangtaipan": "ST",
+  "online": "ONL",
+  "dataranpuchongutama": "DPU",
+  "tropicanasungaibuloh": "ONL", // fallback to online
+  "klang": "KLG",
+
+  // Short codes
+  "sa": "SA",
+  "sp": "SP",
+  "kd": "KD",
+  "pjy": "PJY",
+  "amp": "AMP",
+  "cjy": "CJY",
+  "da": "DA",
+  "bbb": "BBB",
+  "dk": "DK",
+  "sha": "SHA",
+  "btho": "BTHO",
+  "egr": "EGR",
+  "bsp": "BSP",
+  "rby": "RBY",
+  "tsg": "TSG",
+  "kw": "KW",
+  "ktg": "KTG",
+  "st": "ST",
+  "onl": "ONL",
+  "dpu": "DPU",
+  "klg": "KLG"
+};
+
+// Extract branch prefix from e.g. "ebrightklg@gmail.com" or "ebrightsetiaalam@gmail.com"
 function getBranchFromEmail(email: string): { code: string; name: string } | null {
   const lower = email.toLowerCase().trim();
-  const prefix = lower.split("@")[0]; // e.g. "ebrightklg"
+  const prefix = lower.split("@")[0]; // e.g. "ebrightklg" or "ebrightsetiaalam"
   if (prefix.startsWith("ebright")) {
-    const codePart = prefix.replace("ebright", "").toUpperCase();
-    if (BRANCHES_MAP[codePart]) {
-      return { code: codePart, name: BRANCHES_MAP[codePart] };
+    const cleanPrefix = prefix.replace("ebright", ""); // e.g. "klg" or "setiaalam"
+    const code = EMAIL_PREFIX_TO_BRANCH[cleanPrefix];
+    if (code && BRANCHES_MAP[code]) {
+      return { code, name: BRANCHES_MAP[code] };
     }
   }
   return null;

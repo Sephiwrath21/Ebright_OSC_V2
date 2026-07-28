@@ -14,8 +14,10 @@
 import * as React from "react";
 import {
   FLOW_DEPARTMENTS,
+  FLOW_GROUP_DEPT_NONE,
   FLOW_GROUPS,
   FLOW_GROUPS_NEEDING_SUBVALUE,
+  FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT,
   flowGroupMembers,
   type FlowGroup,
   type FlowStaffMember,
@@ -23,6 +25,51 @@ import {
 
 const selectClass =
   "w-full appearance-none rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-blue-500 focus:outline-none";
+
+/** The picker's search-input style — exported so other person pickers (e.g.
+ *  the drill modal's "Assign to Others") reuse the exact same look. */
+export const pickerSearchClass =
+  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none";
+
+/** "Name · Role" in one truncated span — THE person-row text format, shared
+ *  by every list this file renders and by SinglePersonPickList below. */
+export function personRowLabel(m: FlowStaffMember, showRole = true): string {
+  return showRole && m.employmentType ? `${m.name} · ${m.employmentType}` : m.name;
+}
+
+/** Single-select person list for one-shot picks (the drill modal's "Assign
+ *  to Others"): identical row styling to MemberDropdown's rows, but one
+ *  click = the pick — no checkboxes, no chips, no Done row. */
+export function SinglePersonPickList({
+  members,
+  onPick,
+  disabled = false,
+  emptyLabel,
+}: {
+  members: FlowStaffMember[];
+  onPick: (userId: string) => void;
+  disabled?: boolean;
+  emptyLabel: string;
+}) {
+  if (members.length === 0) {
+    return <p className="py-2 text-center text-xs text-gray-400">{emptyLabel}</p>;
+  }
+  return (
+    <div className="max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+      {members.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPick(m.id)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <span className="truncate">{personRowLabel(m)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function chipClass(active: boolean): string {
   return `rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -132,10 +179,7 @@ function MemberDropdown({
                 >
                   {isSelected && <CheckIcon />}
                 </span>
-                <span className="truncate">
-                  {m.name}
-                  {showRole && m.employmentType ? ` · ${m.employmentType}` : ""}
-                </span>
+                <span className="truncate">{personRowLabel(m, showRole)}</span>
               </button>
             );
           })}
@@ -237,6 +281,11 @@ export function RecipientPicker({
 
   const groupValue: FlowGroup | null = restrictToGroup ?? (group === "" ? null : group);
   const needsSub = groupValue !== null && FLOW_GROUPS_NEEDING_SUBVALUE.includes(groupValue);
+  // Optional department narrowing (e.g. "Intern → Operation") — renders the
+  // same department dropdown, but an empty pick means "All departments"
+  // rather than blocking the member list.
+  const optionalDeptSub =
+    groupValue !== null && FLOW_GROUPS_WITH_OPTIONAL_DEPARTMENT.includes(groupValue);
   const groupResults =
     groupValue !== null && (!needsSub || groupSub)
       ? flowGroupMembers(staff, groupValue, groupSub)
@@ -272,16 +321,19 @@ export function RecipientPicker({
     return (
       <div className="flex flex-col gap-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-3">
-          {needsSub && (
+          {(needsSub || optionalDeptSub) && (
             <select
               value={groupSub}
               onChange={(e) => setGroupSub(e.target.value)}
               className={`mb-2 ${selectClass}`}
             >
-              <option value="">Select a department…</option>
+              <option value="">{needsSub ? "Select a department…" : "All departments"}</option>
               {FLOW_DEPARTMENTS.map((v) => (
                 <option key={v}>{v}</option>
               ))}
+              {optionalDeptSub && (
+                <option value={FLOW_GROUP_DEPT_NONE}>{FLOW_GROUP_DEPT_NONE}</option>
+              )}
             </select>
           )}
           {needsSub && !groupSub ? (
@@ -317,7 +369,7 @@ export function RecipientPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search staff by name…"
-            className="mb-2 w-full rounded-full border border-gray-300 px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            className={`mb-2 ${pickerSearchClass}`}
           />
           <MemberDropdown
             members={personResults}
@@ -347,16 +399,19 @@ export function RecipientPicker({
             ))}
           </select>
 
-          {needsSub && groupValue !== null && (
+          {(needsSub || optionalDeptSub) && groupValue !== null && (
             <select
               value={groupSub}
               onChange={(e) => setGroupSub(e.target.value)}
               className={`mb-2 ${selectClass}`}
             >
-              <option value="">Select a department…</option>
+              <option value="">{needsSub ? "Select a department…" : "All departments"}</option>
               {FLOW_DEPARTMENTS.map((v) => (
                 <option key={v}>{v}</option>
               ))}
+              {optionalDeptSub && (
+                <option value={FLOW_GROUP_DEPT_NONE}>{FLOW_GROUP_DEPT_NONE}</option>
+              )}
             </select>
           )}
 

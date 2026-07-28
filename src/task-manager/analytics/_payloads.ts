@@ -4,6 +4,7 @@
 // lock-step — change a shape here and every consumer moves together.
 
 import { getUsersByIds } from "@/task-manager/lib/users";
+import { prisma } from "@/task-manager/prisma";
 import {
   BRANCH_STAFF_ROLES,
   bucketOf,
@@ -14,6 +15,7 @@ import {
   groupBranchesByRegion,
   groupByAssignerRole,
   groupByDimension,
+  memberSortRank,
   withAllDepartments,
   resolveWindow,
   sortTaskRows,
@@ -166,7 +168,10 @@ export async function getEntityPayload(
   date?: string,
 ): Promise<EntityPayload> {
   const window = resolveWindow(period, date);
-  const all = await fetchPeriodBlocks(window);
+  // strictWindow: this payload feeds the date-filterable entity overviews —
+  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
+  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
+  const all = await fetchPeriodBlocks(window, { strictWindow: true });
   const users = await getAssigneeMap(all);
 
   // Scope to this entity via the assignee's branch/department (null → Unassigned).
@@ -186,7 +191,25 @@ export async function getEntityPayload(
   tasks.na = sortTaskRows(tasks.na);
 
   // Member rollups: done = Completed count, notDone = Pending count (NA excluded).
+  //
+  // ROSTER-FIRST (2026-07-25): seed the map with EVERY real staff member of
+  // this entity, zero-filled, then overlay the task tallies. Previously
+  // members were derived from the period's task assignees only, so a
+  // task-less roster rendered completely empty — invisible while the demo
+  // data existed (it always had tasks) but glaring right after the real
+  // HRFS import landed 201 people and zero tasks. Site logins
+  // (DEPT_SITE/BRANCH_SITE) are view accounts, not people — excluded.
+  const roster = await prisma.user.findMany({
+    where: {
+      ...(type === "branch"
+        ? { branch: name === UNASSIGNED ? null : name }
+        : { department: name === UNASSIGNED ? null : name }),
+      role: { notIn: ["DEPT_SITE", "BRANCH_SITE"] },
+    },
+  });
+  const rosterById = new Map(roster.map((u) => [u.id, u]));
   const byMember = new Map<string, { done: number; notDone: number }>();
+  for (const u of roster) byMember.set(u.id, { done: 0, notDone: 0 });
   for (const b of blocks) {
     const tally = byMember.get(b.assigneeId) ?? { done: 0, notDone: 0 };
     const bucket = bucketOf(b.status);
@@ -196,18 +219,24 @@ export async function getEntityPayload(
   }
   const members = [...byMember.entries()]
     .map(([userId, tally]) => {
-      const u = users.get(userId);
+      const u = users.get(userId) ?? rosterById.get(userId);
       return {
         userId,
         name: u?.name ?? userId,
         employmentType: u?.employmentType ?? null,
         department: u?.department ?? null,
         branch: u?.branch ?? null,
+        // Not emitted on the wire — sort key only (see the sort below).
+        _rank: memberSortRank(u?.employmentType, u?.coachSchedule),
         done: tally.done,
         notDone: tally.notDone,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Role priority first (HOD → HQ Exec → Full Time → Part Time → Intern;
+    // Manager → Branch Exec → FT Coach → PT Coach), then name — the
+    // 2026-07-25 roster-ordering decision. memberSortRank in _lib.ts.
+    .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
+    .map(({ _rank, ...member }) => member);
 
   return { totals: countBuckets(blocks), tasks, members };
 }
@@ -350,7 +379,10 @@ export interface OrgPayload {
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
 export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
   const window = resolveWindow(period, date);
-  const blocks = await fetchPeriodBlocks(window);
+  // strictWindow: the org grids are date-filterable (Home overview's Daily/
+  // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
+  // cadence-tagged tasks appear identically on every selected date.
+  const blocks = await fetchPeriodBlocks(window, { strictWindow: true });
   const users = await getAssigneeMap(blocks);
   const branches = attachEntityTasks(
     groupByDimension(blocks, (id) => users.get(id)?.branch),

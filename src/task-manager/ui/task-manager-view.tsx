@@ -29,6 +29,7 @@ import type {
   AssignActionResult,
   FlowAssignInput,
   FlowDetailResponse,
+  FlowEntityDetail,
   FlowMemberRollup,
   FlowPeriod,
   FlowTaskRow,
@@ -52,6 +53,7 @@ import {
   ResizableTaskList,
   SectionCard,
   StatusOverviewCard,
+  type ReassignControl,
 } from "./bits";
 
 const WEEKDAY_NAMES = [
@@ -318,10 +320,13 @@ export function TaskManagerView({
   completeTaskAction,
   skipTaskAction,
   reopenTaskAction,
+  reassign,
   manpowerScheduleHref,
   ceoDashboard,
   staff,
   hodKanban,
+  departmentDaily,
+  departmentDailyControl,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -344,6 +349,14 @@ export function TaskManagerView({
   /** Status dropdown's "Pending" option — only actionable on an already-
    *  Completed/N-A task (reopen); omit to disable reopening everywhere. */
   reopenTaskAction?: (runBlockId: string) => Promise<ActionResult>;
+  /** "Assign to Others" control for every Pending drill modal on this page —
+   *  the page only provides it to the 5 assign-capable identities. */
+  reassign?: ReassignControl;
+  /** HOD/DEPT_SITE only: replaces daily.department in the inline Details
+   *  Daily section — the page re-fetches it for the selected ?date=. */
+  departmentDaily?: FlowEntityDetail;
+  /** The Daily date filter, rendered on that section's heading row. */
+  departmentDailyControl?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -399,6 +412,7 @@ export function TaskManagerView({
     onComplete: completeTaskAction,
     onSkip: skipTaskAction,
     onReopen: reopenTaskAction,
+    reassign,
   };
 
 
@@ -429,6 +443,7 @@ export function TaskManagerView({
       title="Tasks I Assigned"
       totals={me.delegatedAll.totals}
       tasks={flowBucketize(me.delegatedAll.tasks)}
+      reassign={reassign}
     />
   );
 
@@ -440,6 +455,7 @@ export function TaskManagerView({
       title="Ad hoc Tasks"
       totals={current.adhoc.totals}
       tasks={flowBucketize(current.adhoc.tasks)}
+      reassign={reassign}
     />
   );
 
@@ -500,8 +516,19 @@ export function TaskManagerView({
       {current.kind === "department" && daily.department && monthly.department && (
         <>
           <PageSectionHeading>Details</PageSectionHeading>
-          <EntityOverviewSection label="Daily" entity={daily.department} kind="department" />
-          <EntityOverviewSection label="Monthly" entity={monthly.department} kind="department" />
+          <EntityOverviewSection
+            label="Daily"
+            entity={departmentDaily ?? daily.department}
+            kind="department"
+            reassign={reassign}
+            headerControl={departmentDailyControl}
+          />
+          <EntityOverviewSection
+            label="Monthly"
+            entity={monthly.department}
+            kind="department"
+            reassign={reassign}
+          />
           {assignAction && staff && me.me.role === "HOD" && (
             <div className="flex justify-end">
               <AddTaskButton staff={staff} action={assignAction} />
@@ -525,6 +552,7 @@ export function TaskManagerView({
                 title="Daily"
                 totals={daily.branch.totals}
                 tasks={daily.branch.tasks}
+                reassign={reassign}
               />
             )}
             {monthly.branch && (
@@ -532,6 +560,7 @@ export function TaskManagerView({
                 title="Monthly"
                 totals={monthly.branch.totals}
                 tasks={monthly.branch.tasks}
+                reassign={reassign}
               />
             )}
             {/* Ad hoc oversight — Branch Manager only, not the view-only

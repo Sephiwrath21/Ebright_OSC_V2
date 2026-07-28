@@ -1062,6 +1062,7 @@ export async function submitStepEvidenceByToken(
     const uploaded = await uploadToDrive(file, {
       prefix: `step-${stepId}`,
       folderPath: ["induction-evidence", String(profile.id)],
+      folderEnvVar: "GOOGLE_DRIVE_INDUCTION_FOLDER_ID",
     });
     evidenceFileId = uploaded.id;
   } catch (e) {
