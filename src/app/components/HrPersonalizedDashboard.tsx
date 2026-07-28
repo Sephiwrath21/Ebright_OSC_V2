@@ -530,9 +530,6 @@ export default function HrPersonalizedDashboard({
         {/* Greeting header */}
         <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
 
-        {/* Task Manager — own-department status (server-rendered slot). */}
-        {taskOverview}
-
         {/* Section 2: Metric cards */}
         <section
           style={{
@@ -951,6 +948,11 @@ export default function HrPersonalizedDashboard({
             />
           </div>
         </section>
+
+        {/* Task Manager — own-department status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

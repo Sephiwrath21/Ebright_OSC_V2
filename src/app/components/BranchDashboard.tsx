@@ -437,9 +437,6 @@ export default function BranchDashboard({
           )}
         </div>
 
-        {/* Task Manager — own-branch status (server-rendered slot). */}
-        {taskOverview}
-
         {/* ── Priority band: 1) metrics, 2) ranking, 3) attendance ─────────── */}
         <div
           style={{
@@ -917,6 +914,11 @@ export default function BranchDashboard({
             </div>
           </div>
         </Panel>
+
+        {/* Task Manager — own-branch status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

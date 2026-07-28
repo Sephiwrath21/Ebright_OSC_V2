@@ -195,9 +195,6 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <GreetingHeader name={greetName} style={{ marginBottom: 32 }} />
 
-        {/* Task Manager — personal status (server-rendered slot). */}
-        {taskOverview && <div className="mb-6">{taskOverview}</div>}
-
         {/* ── Metric cards ───────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <MetricCard
@@ -357,6 +354,11 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
             </ul>
           </Card>
         </div>
+
+        {/* Task Manager — personal status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview && <div className="mt-6">{taskOverview}</div>}
       </div>
     </div>
   );

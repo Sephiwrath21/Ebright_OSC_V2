@@ -215,9 +215,6 @@ export default function FinanceDashboard({
           </p>
         </div>
 
-        {/* Task Manager — own-department status (server-rendered slot). */}
-        {taskOverview}
-
         {/* Stat bar */}
         <section className="rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3.5 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -498,6 +495,11 @@ export default function FinanceDashboard({
             )}
           </section>
         </div>
+
+        {/* Task Manager — own-department status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

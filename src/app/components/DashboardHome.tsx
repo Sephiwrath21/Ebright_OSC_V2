@@ -132,9 +132,6 @@ export default function DashboardHome({
           </p>
         </header>
 
-        {/* Task Manager — scoped status (server-rendered slot). */}
-        {taskOverview && <div className="mb-8">{taskOverview}</div>}
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {dashboards.map((dashboard) => {
             const isDisabled = isLocked(dashboard.id);
@@ -158,6 +155,11 @@ export default function DashboardHome({
             );
           })}
         </div>
+
+        {/* Task Manager — scoped status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview && <div className="mt-8">{taskOverview}</div>}
       </div>
     </div>
   );
