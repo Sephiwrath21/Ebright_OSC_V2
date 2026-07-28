@@ -72,14 +72,24 @@ export function DailyDatePicker({
   );
 }
 
-const WEEKDAY_PILL_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** Tuesday–Saturday, as offsets from the week's Monday (getDay(): Sun=0). */
+const SIDEBAR_DAYS = [
+  { label: "Tuesday", offset: 1 },
+  { label: "Wednesday", offset: 2 },
+  { label: "Thursday", offset: 3 },
+  { label: "Friday", offset: 4 },
+  { label: "Saturday", offset: 5 },
+];
 
-/** Mon–Sun quick-jump pills for the week containing `value` (2026-07-28,
- *  restoring one-click day browsing after the weekday dropdown was replaced
- *  by the single-day picker): clicking a day navigates the shared date
- *  param — same URL-driven pattern as DailyDatePicker — so the donut, the
- *  task list, and the picker itself all follow. */
-export function WeekdayJumpPills({
+/** Vertical weekday sidebar for "My Tasks — Daily" (2026-07-28 ClickUp-
+ *  reference redesign): the business week's day NAMES only (Tue–Sat, no
+ *  dates), listed vertically beside the task list. The top date filter is
+ *  the MASTER — it picks the exact calendar date, which sets both the week
+ *  and the highlighted day here; clicking a day navigates the SAME shared
+ *  date param to that weekday WITHIN the anchored week, so a past week's
+ *  date shows that week's exact occurrences (recurring-task history
+ *  browsing). Same URL-driven pattern as DailyDatePicker. */
+export function WeekdaySidebar({
   value,
   basePath,
   extraParams = {},
@@ -97,36 +107,34 @@ export function WeekdayJumpPills({
   // Monday of the selected date's week (getDay(): Sun=0 … Sat=6).
   const monday = new Date(y, m - 1, d - ((selected.getDay() + 6) % 7));
   const pad = (n: number) => String(n).padStart(2, "0");
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
-    return {
-      label: WEEKDAY_PILL_LABELS[i],
-      dayNum: dt.getDate(),
-      date: `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`,
-    };
-  });
   const navigate = (v: string) => {
     const qs = new URLSearchParams({ ...extraParams, [param]: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
 
   return (
-    <div className="mb-3 flex flex-wrap gap-1.5">
-      {days.map((day) => (
-        <button
-          key={day.date}
-          type="button"
-          onClick={() => navigate(day.date)}
-          className={
-            day.date === value
-              ? "rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white"
-              : "rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600"
-          }
-        >
-          {day.label} {day.dayNum}
-        </button>
-      ))}
-    </div>
+    <nav aria-label="Weekday" className="flex flex-col gap-1">
+      {SIDEBAR_DAYS.map((day) => {
+        const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day.offset);
+        const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+        const active = date === value;
+        return (
+          <button
+            key={day.label}
+            type="button"
+            onClick={() => navigate(date)}
+            aria-current={active ? "date" : undefined}
+            className={
+              active
+                ? "rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
+                : "rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }
+          >
+            {day.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 

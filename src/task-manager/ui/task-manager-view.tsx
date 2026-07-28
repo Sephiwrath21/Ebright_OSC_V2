@@ -122,7 +122,7 @@ export function TaskManagerView({
   departmentDailyControl,
   personalDailyControl,
   personalMonthlyControl,
-  personalDailyWeekPills,
+  personalDailyDaySidebar,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -160,10 +160,10 @@ export function TaskManagerView({
    *  keeping every Daily surface on the page on the same day. */
   personalDailyControl?: React.ReactNode;
   personalMonthlyControl?: React.ReactNode;
-  /** Mon–Sun quick-jump pills (WeekdayJumpPills) rendered above the "My
-   *  Tasks — Daily" list — one-click day browsing within the selected week,
-   *  driving the same shared ?date=. */
-  personalDailyWeekPills?: React.ReactNode;
+  /** Vertical Tue–Sat weekday sidebar (WeekdaySidebar) rendered BESIDE the
+   *  "My Tasks — Daily" list — switches days within the anchored week via
+   *  the same shared ?date= the date picker (the master control) drives. */
+  personalDailyDaySidebar?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -553,13 +553,22 @@ export function TaskManagerView({
                 to the selected single day, so a week-tab grouping has nothing
                 to group — the picker's ◀ ▶ arrows step days instead. */}
             <SectionCard title="My Tasks — Daily" action={personalDailyControl}>
-              {personalDailyWeekPills}
-              <ResizableTaskList
-                tasks={daily.me.tasks}
-                {...completeProps}
-                emptyLabel="No tasks assigned to you this period."
-                hideCompleted
-              />
+              {/* ClickUp-reference layout (2026-07-28): weekday sidebar on
+                  the left, task list on the right; stacked on small
+                  screens. */}
+              <div className="flex flex-col gap-4 sm:flex-row">
+                {personalDailyDaySidebar && (
+                  <div className="shrink-0 sm:w-40">{personalDailyDaySidebar}</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <ResizableTaskList
+                    tasks={daily.me.tasks}
+                    {...completeProps}
+                    emptyLabel="No tasks assigned to you this period."
+                    hideCompleted
+                  />
+                </div>
+              </div>
             </SectionCard>
             {!branchSideMember && (
               <SectionCard title="My Tasks — Monthly" action={personalMonthlyControl}>
