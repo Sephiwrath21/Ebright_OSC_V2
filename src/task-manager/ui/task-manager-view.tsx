@@ -142,11 +142,14 @@ export function TaskManagerView({
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     control?: React.ReactNode;
   };
-  /** Branch Manager's personal "Ad hoc" card (2026-07-29 audit) — same
-   *  contract, windowed by ?adate=. */
+  /** Branch Manager's personal "Ad hoc" card + list (2026-07-29 audit) —
+   *  same contract, windowed by ?adate=; `flatTasks` is the same windowed
+   *  set un-bucketized, feeding the ALWAYS-rendered "My Tasks — Ad hoc"
+   *  list so the card and list stay linked on one selected day. */
   personalAdhoc?: {
     totals: FlowBucketTotals;
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
+    flatTasks?: FlowTaskRow[];
     control?: React.ReactNode;
   };
   /** Assignable staff directory — enables the department assign form (superadmin). */
@@ -518,19 +521,34 @@ export function TaskManagerView({
               </SectionCard>
             )}
             {/* Ad hoc: routed by MY role as assignee (RunBlock.cadence),
-                never by who assigned it — hidden entirely when empty (only
-                Branch Manager assignees can ever be tagged ADHOC, per
-                assign/route.ts's allowedCadenceOptions, so this is empty for
-                almost everyone). All-time, like every other Ad hoc view. */}
-            {me.adhocAll && (
-              <SectionCard title="My Tasks — Ad hoc">
+                never by who assigned it. Branch Manager (2026-07-29 fix):
+                ALWAYS rendered — Daily/Monthly/Ad hoc is their confirmed
+                3-section My Tasks set — day-windowed by the same ?adate=
+                as the Ad hoc donut card (empty state, not a missing
+                section, when nothing is due). Other roles keep the old
+                hidden-when-empty all-time list (only Branch Manager
+                assignees can ever be tagged ADHOC, per assign/route.ts's
+                allowedCadenceOptions, so it's empty for almost everyone). */}
+            {me.me.role === "BRANCH" && personalAdhoc ? (
+              <SectionCard title="My Tasks — Ad hoc" action={personalAdhoc.control}>
                 <ResizableTaskList
-                  tasks={me.adhocAll.tasks}
+                  tasks={personalAdhoc.flatTasks ?? []}
                   {...completeProps}
-                  emptyLabel="No ad hoc tasks assigned to you."
+                  emptyLabel="No ad hoc tasks assigned to you this period."
                   hideCompleted
                 />
               </SectionCard>
+            ) : (
+              me.adhocAll && (
+                <SectionCard title="My Tasks — Ad hoc">
+                  <ResizableTaskList
+                    tasks={me.adhocAll.tasks}
+                    {...completeProps}
+                    emptyLabel="No ad hoc tasks assigned to you."
+                    hideCompleted
+                  />
+                </SectionCard>
+              )
             )}
           </>
         )}

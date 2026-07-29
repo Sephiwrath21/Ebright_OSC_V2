@@ -719,13 +719,15 @@ export default async function TaskManagerPage({
     if (daily.me.me.role === "BRANCH") {
       const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
       const adhocWin = resolveWindow("daily", adhocAnchor);
-      const buckets = flowBucketize(
-        (daily.me.adhocAll?.tasks ?? []).filter((t) => {
-          if (!t.dueAt) return false;
-          const due = new Date(t.dueAt);
-          return due >= adhocWin.start && due < adhocWin.end;
-        }),
-      );
+      // One windowed set feeds BOTH the donut card (bucketized) and the
+      // "My Tasks — Ad hoc" list (flat, source order = dueAt-sorted) — the
+      // card and list are linked on the same ?adate= day.
+      const windowed = (daily.me.adhocAll?.tasks ?? []).filter((t) => {
+        if (!t.dueAt) return false;
+        const due = new Date(t.dueAt);
+        return due >= adhocWin.start && due < adhocWin.end;
+      });
+      const buckets = flowBucketize(windowed);
       personalAdhoc = {
         totals: {
           completed: buckets.completed.length,
@@ -733,6 +735,7 @@ export default async function TaskManagerPage({
           na: buckets.na.length,
         },
         tasks: buckets,
+        flatTasks: windowed,
         control: (
           <DailyDatePicker
             key="personal-adate-picker"
