@@ -41,7 +41,6 @@ import {
   flowStreamLabel,
   visibleAssignerStreams,
 } from "./types";
-import { AddTaskButton } from "./add-task-button";
 import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
 import { EntityOverviewSection } from "./department-overview";
@@ -329,11 +328,8 @@ export function TaskManagerView({
 
       {current.kind === "org" && me.me.role === "CEO" && (
         <>
-          {assignAction && staff && (
-            <div className="flex justify-end">
-              <AddTaskButton staff={staff} action={assignAction} />
-            </div>
-          )}
+          {/* "+ Task" renders in the PAGE HEADER (2026-07-29 consistency
+              requirement) — no in-body button here anymore. */}
 
           {/* ---- Section 1: My Tasks — tasks assigned TO the CEO by any of
               the 5 assign-capable roles (Superadmin, Operation, Ops, HOD —
@@ -514,24 +510,17 @@ export function TaskManagerView({
           </>
         )}
 
-      {/* ---- My Board: HOD's personal drag-and-drop Kanban (+ Task lives
-          with it) — ABOVE the department overview, per the 2026-07-29
-          personal-first order. ---- */}
-      {current.kind === "department" && me.me.role === "HOD" && (
+      {/* ---- My Board: HOD's personal drag-and-drop Kanban — ABOVE the
+          department overview, per the 2026-07-29 personal-first order.
+          ("+ Task" renders in the PAGE HEADER, not here.) ---- */}
+      {current.kind === "department" && me.me.role === "HOD" && hodKanban && (
         <>
           <PageSectionHeading>My Board</PageSectionHeading>
-          {assignAction && staff && (
-            <div className="flex justify-end">
-              <AddTaskButton staff={staff} action={assignAction} />
-            </div>
-          )}
-          {hodKanban && (
-            <HodKanban
-              cards={hodKanban.cards}
-              columns={hodKanban.columns}
-              actions={hodKanban.actions}
-            />
-          )}
+          <HodKanban
+            cards={hodKanban.cards}
+            columns={hodKanban.columns}
+            actions={hodKanban.actions}
+          />
         </>
       )}
 
@@ -615,16 +604,8 @@ export function TaskManagerView({
         </>
       )}
 
-      {/* ---- Details: administrative actions (assign tasks) — OPS only:
-          bottom of the page, after her personal sections. ---- */}
-      {current.kind === "org" && me.me.role === "OPS" && assignAction && staff && (
-        <>
-          <PageSectionHeading>Details</PageSectionHeading>
-          <div className="flex justify-end">
-            <AddTaskButton staff={staff} action={assignAction} />
-          </div>
-        </>
-      )}
+      {/* OPS's assign form: "+ Task" renders in the PAGE HEADER (2026-07-29
+          consistency requirement) — the old bottom "Details" block is gone. */}
 
       {/* ---- Member roster (branch scope), Daily + Monthly ---- */}
       {[

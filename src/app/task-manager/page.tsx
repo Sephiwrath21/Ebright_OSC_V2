@@ -394,6 +394,14 @@ export default async function TaskManagerPage({
       role === "ADMIN" || role === "CEO" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
 
+    // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
+    // role (2026-07-29 consistency requirement) — CEO/OPS/HOD here; the
+    // superadmin + elevated-site branch below sets its own headerAction.
+    // Layout reshuffles below the header can never move it.
+    if (role === "CEO" || role === "OPS" || role === "HOD") {
+      headerAction = <AddTaskButton staff={staff} action={assign} />;
+    }
+
     if (role === "ADMIN" || elevatedDeptSite) {
       // Superadmin + elevated department sites (Operation/Optimisation):
       // dropdown-driven entity overview. ADMIN gets the Department|Branch
@@ -672,11 +680,14 @@ export default async function TaskManagerPage({
   return (
     <AppShell email={email} role={su.role} name={su.name}>
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
-        <div>
-          <h1 className="text-2xl font-bold">Task Manager</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Your tasks, team status, and assignments — daily and monthly.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Task Manager</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Your tasks, team status, and assignments — daily and monthly.
+            </p>
+          </div>
+          {headerAction}
         </div>
         {body}
       </div>
