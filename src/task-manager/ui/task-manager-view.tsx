@@ -323,97 +323,9 @@ export function TaskManagerView({
         </div>
       )}
 
-      {/* ---- Details: the full department view (chips + donut + click-
-          through member roster) rendered INLINE for HOD and DEPT_SITE — the
-          standalone Department Overview page was folded in here by the
-          2026-07-24 redesign (its old route now redirects to /task-manager).
-          Assign Task form + personal Kanban stay HOD-only; elevated
-          department sites (Operation/Optimisation) never reach this view —
-          the page routes them to the dropdown entity overview instead. ---- */}
-      {current.kind === "department" && daily.department && monthly.department && (
-        <>
-          <PageSectionHeading>Details</PageSectionHeading>
-          <EntityOverviewSection
-            label="Daily"
-            entity={departmentDaily ?? daily.department}
-            kind="department"
-            reassign={reassign}
-            headerControl={departmentDailyControl}
-          />
-          <EntityOverviewSection
-            label="Monthly"
-            entity={monthly.department}
-            kind="department"
-            reassign={reassign}
-          />
-          {assignAction && staff && me.me.role === "HOD" && (
-            <div className="flex justify-end">
-              <AddTaskButton staff={staff} action={assignAction} />
-            </div>
-          )}
-          {me.me.role === "HOD" && hodKanban && (
-            <HodKanban
-              cards={hodKanban.cards}
-              columns={hodKanban.columns}
-              actions={hodKanban.actions}
-            />
-          )}
-        </>
-      )}
-
-      {current.kind === "branch" && (
-        <>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {daily.branch && (
-              <StatusOverviewCard
-                title="Daily"
-                totals={daily.branch.totals}
-                tasks={daily.branch.tasks}
-                reassign={reassign}
-              />
-            )}
-            {monthly.branch && (
-              <StatusOverviewCard
-                title="Monthly"
-                totals={monthly.branch.totals}
-                tasks={monthly.branch.tasks}
-                reassign={reassign}
-              />
-            )}
-            {/* Ad hoc oversight — Branch Manager only, not the view-only
-                BRANCH_SITE login (spec only gives it Branch Status). */}
-            {me.me.role === "BRANCH" && adhocCard}
-            {/* CEO/HOD assigned-task cards — Branch Manager only, same as
-                every other role with a personal "My Task" view (this block
-                is kind-gated, unlike the role-gated "My Tasks —
-                Daily/Monthly/Ad hoc" section below, which already covers
-                BRANCH on its own). BRANCH_SITE stays view-only. */}
-            {me.me.role === "BRANCH" && assignedCards}
-          </div>
-
-          {/* ---- Details: manpower schedule (branch manager only, not
-              BRANCH_SITE) ---- */}
-          {me.me.role === "BRANCH" && manpowerScheduleHref && (
-            <>
-              <PageSectionHeading>Details</PageSectionHeading>
-              <a
-                href={manpowerScheduleHref}
-                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50"
-              >
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-                    Manpower Schedule
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Plan today's staffing grid — assignments sync straight to each coach's task list.
-                  </p>
-                </div>
-                <span className="text-sm font-medium text-blue-600">Open →</span>
-              </a>
-            </>
-          )}
-        </>
-      )}
+      {/* Personal-first order (2026-07-29, all roles): the department /
+          branch overview blocks that used to sit here render at the BOTTOM
+          of the page now — below My Tasks and My Board. */}
 
       {current.kind === "org" && me.me.role === "CEO" && (
         <>
@@ -524,20 +436,9 @@ export function TaskManagerView({
 
           {/* The org-wide overview grids (all-departments + branch-by-region
               + ad hoc by region, Superadmin only) moved to the OSC Home page
-              — see ui/home-overview.tsx. This page keeps the assign form. */}
-
-          {/* ---- Details: administrative actions (assign tasks) — OPS only
-              now: ADMIN no longer renders this view at all (the page routes
-              superadmin to the dropdown entity overview, with + Task in the
-              page header). ---- */}
-          {me.me.role === "OPS" && assignAction && staff && (
-            <>
-              <PageSectionHeading>Details</PageSectionHeading>
-              <div className="flex justify-end">
-                <AddTaskButton staff={staff} action={assignAction} />
-              </div>
-            </>
-          )}
+              — see ui/home-overview.tsx. This page keeps the assign form
+              (rendered at the bottom, after My Tasks — personal-first
+              order). */}
         </>
       )}
 
@@ -612,6 +513,118 @@ export function TaskManagerView({
             )}
           </>
         )}
+
+      {/* ---- My Board: HOD's personal drag-and-drop Kanban (+ Task lives
+          with it) — ABOVE the department overview, per the 2026-07-29
+          personal-first order. ---- */}
+      {current.kind === "department" && me.me.role === "HOD" && (
+        <>
+          <PageSectionHeading>My Board</PageSectionHeading>
+          {assignAction && staff && (
+            <div className="flex justify-end">
+              <AddTaskButton staff={staff} action={assignAction} />
+            </div>
+          )}
+          {hodKanban && (
+            <HodKanban
+              cards={hodKanban.cards}
+              columns={hodKanban.columns}
+              actions={hodKanban.actions}
+            />
+          )}
+        </>
+      )}
+
+      {/* ---- Department Overview: the full department view (chips + donut
+          + click-through member roster) rendered INLINE for HOD and
+          DEPT_SITE — the standalone Department Overview page was folded in
+          here by the 2026-07-24 redesign. LAST section on the page since
+          the 2026-07-29 personal-first reorder. Elevated department sites
+          (Operations/Optimisation) never reach this view — the page routes
+          them to the dropdown entity overview instead. ---- */}
+      {current.kind === "department" && daily.department && monthly.department && (
+        <>
+          <PageSectionHeading>Department Overview</PageSectionHeading>
+          <EntityOverviewSection
+            label="Daily"
+            entity={departmentDaily ?? daily.department}
+            kind="department"
+            reassign={reassign}
+            headerControl={departmentDailyControl}
+          />
+          <EntityOverviewSection
+            label="Monthly"
+            entity={monthly.department}
+            kind="department"
+            reassign={reassign}
+          />
+        </>
+      )}
+
+      {/* ---- Branch Overview (branch kind) — below My Tasks since the
+          2026-07-29 personal-first reorder. ---- */}
+      {current.kind === "branch" && (
+        <>
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {daily.branch && (
+              <StatusOverviewCard
+                title="Daily"
+                totals={daily.branch.totals}
+                tasks={daily.branch.tasks}
+                reassign={reassign}
+              />
+            )}
+            {monthly.branch && (
+              <StatusOverviewCard
+                title="Monthly"
+                totals={monthly.branch.totals}
+                tasks={monthly.branch.tasks}
+                reassign={reassign}
+              />
+            )}
+            {/* Ad hoc oversight — Branch Manager only, not the view-only
+                BRANCH_SITE login (spec only gives it Branch Status). */}
+            {me.me.role === "BRANCH" && adhocCard}
+            {/* CEO/HOD assigned-task cards — Branch Manager only, same as
+                every other role with a personal "My Task" view. BRANCH_SITE
+                stays view-only. */}
+            {me.me.role === "BRANCH" && assignedCards}
+          </div>
+
+          {/* ---- Details: manpower schedule (branch manager only, not
+              BRANCH_SITE) ---- */}
+          {me.me.role === "BRANCH" && manpowerScheduleHref && (
+            <>
+              <PageSectionHeading>Details</PageSectionHeading>
+              <a
+                href={manpowerScheduleHref}
+                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50"
+              >
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                    Manpower Schedule
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Plan today's staffing grid — assignments sync straight to each coach's task list.
+                  </p>
+                </div>
+                <span className="text-sm font-medium text-blue-600">Open →</span>
+              </a>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ---- Details: administrative actions (assign tasks) — OPS only:
+          bottom of the page, after her personal sections. ---- */}
+      {current.kind === "org" && me.me.role === "OPS" && assignAction && staff && (
+        <>
+          <PageSectionHeading>Details</PageSectionHeading>
+          <div className="flex justify-end">
+            <AddTaskButton staff={staff} action={assignAction} />
+          </div>
+        </>
+      )}
 
       {/* ---- Member roster (branch scope), Daily + Monthly ---- */}
       {[
