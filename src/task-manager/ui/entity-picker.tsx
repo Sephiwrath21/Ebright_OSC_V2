@@ -81,33 +81,57 @@ const SIDEBAR_DAYS = [
   { label: "Saturday", offset: 5 },
 ];
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Count badge for the sidebar rows (ClickUp-reference, 2026-07-29):
+ *  right-aligned number, HIDDEN when zero/undefined. */
+function CountBadge({ count, active }: { count?: number; active: boolean }) {
+  if (!count) return null;
+  return (
+    <span className={active ? "text-xs font-semibold text-white/80" : "text-xs font-medium text-gray-400"}>
+      {count}
+    </span>
+  );
+}
+
 /** Vertical weekday sidebar for "My Tasks — Daily" (2026-07-28 ClickUp-
  *  reference redesign): the business week's day NAMES only (Tue–Sat, no
- *  dates), listed vertically beside the task list. The top date filter is
- *  the MASTER — it picks the exact calendar date, which sets both the week
- *  and the highlighted day here; clicking a day navigates the SAME shared
- *  date param to that weekday WITHIN the anchored week, so a past week's
- *  date shows that week's exact occurrences (recurring-task history
- *  browsing). Same URL-driven pattern as DailyDatePicker. */
+ *  dates) with per-day pending-count badges, listed vertically beside the
+ *  task list. The top date filter is the MASTER — it picks the exact
+ *  calendar date, which sets both the week and the highlighted day here;
+ *  clicking a day navigates the SAME shared date param to that weekday
+ *  WITHIN the anchored week. Selection updates OPTIMISTICALLY (instant
+ *  highlight while the server round-trip runs — the 2026-07-29 lag fix),
+ *  then re-syncs from the echoed value. */
 export function WeekdaySidebar({
   value,
   basePath,
   extraParams = {},
   param = "date",
+  counts = {},
 }: {
   /** The resolved date currently shown, YYYY-MM-DD. */
   value: string;
   basePath: string;
   extraParams?: Record<string, string>;
   param?: string;
+  /** Per-day NOT-YET-COMPLETED counts (Pending only, N/A excluded), keyed
+   *  YYYY-MM-DD — getMySidebarCounts().weekdays. Zero/absent = no badge. */
+  counts?: Record<string, number>;
 }) {
   const router = useRouter();
+  // Optimistic selection: highlight instantly on click; cleared when the
+  // server's echoed `value` catches up (or changes for any other reason).
+  const [pendingDate, setPendingDate] = React.useState<string | null>(null);
+  React.useEffect(() => setPendingDate(null), [value]);
+  const shown = pendingDate ?? value;
+
   const [y, m, d] = value.split("-").map(Number);
-  const selected = new Date(y, m - 1, d);
-  // Monday of the selected date's week (getDay(): Sun=0 … Sat=6).
-  const monday = new Date(y, m - 1, d - ((selected.getDay() + 6) % 7));
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const anchor = new Date(y, m - 1, d);
+  // Monday of the anchored week (getDay(): Sun=0 … Sat=6).
+  const monday = new Date(y, m - 1, d - ((anchor.getDay() + 6) % 7));
   const navigate = (v: string) => {
+    setPendingDate(v);
     const qs = new URLSearchParams({ ...extraParams, [param]: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
@@ -116,8 +140,8 @@ export function WeekdaySidebar({
     <nav aria-label="Weekday" className="flex flex-col gap-1">
       {SIDEBAR_DAYS.map((day) => {
         const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day.offset);
-        const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-        const active = date === value;
+        const date = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+        const active = date === shown;
         return (
           <button
             key={day.label}
@@ -126,11 +150,12 @@ export function WeekdaySidebar({
             aria-current={active ? "date" : undefined}
             className={
               active
-                ? "rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
-                : "rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
+                : "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             }
           >
             {day.label}
+            <CountBadge count={counts[date]} active={active} />
           </button>
         );
       })}
@@ -139,8 +164,6 @@ export function WeekdaySidebar({
 }
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /** The month's 7-day chunks: 1-7 · 8-14 · 15-21 · 22-28 · 29-{last day}
  *  (the final chunk adjusts to the month's actual length; absent for
@@ -170,6 +193,8 @@ export function MonthSidebar({
   range,
   basePath,
   extraParams = {},
+  monthCounts = {},
+  chunkCounts = {},
 }: {
   /** The resolved Monthly anchor, YYYY-MM-DD. */
   value: string;
@@ -177,10 +202,30 @@ export function MonthSidebar({
   range?: string;
   basePath: string;
   extraParams?: Record<string, string>;
+  /** Per-month NOT-YET-COMPLETED counts (Pending only, N/A excluded) for
+   *  the stepper year, keyed 1..12 — getMySidebarCounts().months. */
+  monthCounts?: Record<number, number>;
+  /** The ANCHOR month's per-chunk counts, keyed "from-to" —
+   *  getMySidebarCounts().monthChunks. Only valid for the server-anchored
+   *  month, so they hide while an optimistic switch is in flight. */
+  chunkCounts?: Record<string, number>;
 }) {
   const router = useRouter();
-  const [y, m] = value.split("-").map(Number);
+  const [anchorY, anchorM] = value.split("-").map(Number);
+  // Optimistic selection (the 2026-07-29 lag fix): expand/highlight
+  // instantly on click; cleared when the server's echoed value/range
+  // catches up.
+  const [pending, setPending] = React.useState<{ y: number; m: number; range?: string } | null>(null);
+  React.useEffect(() => setPending(null), [value, range]);
+  const y = pending?.y ?? anchorY;
+  const m = pending?.m ?? anchorM;
+  const shownRange = pending ? pending.range : range;
+  // Chunk counts belong to the SERVER-anchored month — stale during an
+  // optimistic month/year switch, so hide them until the echo lands.
+  const chunkCountsValid = y === anchorY && m === anchorM;
+
   const navigate = (year: number, month: number, mrange?: string) => {
+    setPending({ y: year, m: month, range: mrange });
     const qs = new URLSearchParams({
       ...extraParams,
       mdate: `${year}-${pad2(month)}-01`,
@@ -192,8 +237,8 @@ export function MonthSidebar({
     "flex size-6 items-center justify-center rounded-md border border-gray-200 bg-white text-[10px] text-gray-500 hover:border-blue-300 hover:text-blue-600";
   const rangeClass = (active: boolean) =>
     active
-      ? "rounded-md bg-blue-50 px-3 py-1 text-left text-xs font-semibold text-blue-700"
-      : "rounded-md px-3 py-1 text-left text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900";
+      ? "flex items-center justify-between gap-2 rounded-md bg-blue-50 px-3 py-1 text-left text-xs font-semibold text-blue-700"
+      : "flex items-center justify-between gap-2 rounded-md px-3 py-1 text-left text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900";
 
   return (
     <nav aria-label="Month" className="flex flex-col gap-1">
@@ -217,16 +262,25 @@ export function MonthSidebar({
               aria-expanded={active}
               className={
                 active
-                  ? "rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
-                  : "rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
+                  : "flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }
             >
-              {label} {active ? "▾" : ""}
+              <span>
+                {label} {active ? "▾" : ""}
+              </span>
+              {/* Month counts are for the SERVER-anchored year — hide while
+                  an optimistic year step is in flight. */}
+              <CountBadge count={y === anchorY ? monthCounts[i + 1] : undefined} active={active} />
             </button>
             {active && (
               <div className="mb-1 ml-3 flex flex-col gap-0.5 border-l border-gray-200 pl-2">
-                <button type="button" onClick={() => navigate(y, m)} className={rangeClass(!range)}>
+                <button type="button" onClick={() => navigate(y, m)} className={rangeClass(!shownRange)}>
                   Full month
+                  <CountBadge
+                    count={chunkCountsValid ? monthCounts[m] : undefined}
+                    active={false}
+                  />
                 </button>
                 {monthDayChunks(y, m).map((c) => {
                   const v = `${c.from}-${c.to}`;
@@ -235,9 +289,10 @@ export function MonthSidebar({
                       key={v}
                       type="button"
                       onClick={() => navigate(y, m, v)}
-                      className={rangeClass(range === v)}
+                      className={rangeClass(shownRange === v)}
                     >
                       {chunkLabel(c)}
+                      <CountBadge count={chunkCountsValid ? chunkCounts[v] : undefined} active={false} />
                     </button>
                   );
                 })}

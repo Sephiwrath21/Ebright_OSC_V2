@@ -31,6 +31,7 @@ import {
   getFlowDetail,
   getFlowStaff,
   getHodKanban,
+  getMySidebarCounts,
   moveKanbanCard,
   moveKanbanColumn,
   reassignFlowTask,
@@ -375,10 +376,12 @@ export default async function TaskManagerPage({
   let body: ReactNode;
   let headerAction: ReactNode = null;
   try {
-    const [daily, monthly, { staff }] = await Promise.all([
+    const [daily, monthly, { staff }, sidebarCounts] = await Promise.all([
       getFlowDetail(email, "daily", dailyDate),
       getFlowDetail(email, "monthly", monthlyDate, monthlyRange ? { monthDays: monthlyRange } : undefined),
       getFlowStaff(),
+      // Pending-count badges for the personal sidebars (ClickUp reference).
+      getMySidebarCounts(email, dailyDate, monthlyDate),
     ]);
     const role = daily.me.me.role;
     const elevatedDeptSite = isElevatedDeptSite({
@@ -610,6 +613,8 @@ export default async function TaskManagerPage({
         range={monthlyRangeParam}
         basePath="/task-manager"
         extraParams={dailyCarry}
+        monthCounts={sidebarCounts.months}
+        chunkCounts={sidebarCounts.monthChunks}
       />
     );
     // Tue–Sat weekday sidebar for "My Tasks — Daily" (2026-07-28 redesign):
@@ -622,6 +627,7 @@ export default async function TaskManagerPage({
         value={daily.date}
         basePath="/task-manager"
         extraParams={monthlyCarry}
+        counts={sidebarCounts.weekdays}
       />
     );
 
