@@ -8,6 +8,7 @@ import { prisma } from "@/task-manager/prisma";
 import {
   BRANCH_STAFF_ROLES,
   bucketOf,
+  clampWindowToMonthDays,
   countBuckets,
   fetchPeriodBlocks,
   formatLocalDate,
@@ -104,9 +105,12 @@ export async function getMePayload(
   user: MeUser,
   period: Period,
   date?: string,
-  opts: { strictWindow?: boolean } = {},
+  opts: { strictWindow?: boolean; monthDays?: { from: number; to: number } } = {},
 ): Promise<MePayload> {
-  const window = resolveWindow(period, date);
+  let window = resolveWindow(period, date);
+  if (opts.monthDays) {
+    window = clampWindowToMonthDays(window, opts.monthDays.from, opts.monthDays.to);
+  }
   const strictWindow = opts.strictWindow ?? false;
   const [mine, delegatedBlocks, mineAll, delegatedAllBlocks] = await Promise.all([
     fetchPeriodBlocks(window, { assigneeId: user.id, strictWindow }),
@@ -176,8 +180,10 @@ export async function getEntityPayload(
   name: string,
   period: Period,
   date?: string,
+  monthDays?: { from: number; to: number },
 ): Promise<EntityPayload> {
-  const window = resolveWindow(period, date);
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
   // strictWindow: this payload feeds the date-filterable entity overviews —
   // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
   // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
@@ -398,8 +404,13 @@ export interface OrgPayload {
 
 /** Org overview: totals + per-branch and per-department bucket counts, each
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
-export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
-  const window = resolveWindow(period, date);
+export async function getOrgPayload(
+  period: Period,
+  date?: string,
+  monthDays?: { from: number; to: number },
+): Promise<OrgPayload> {
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
   // strictWindow: the org grids are date-filterable (Home overview's Daily/
   // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
   // cadence-tagged tasks appear identically on every selected date.

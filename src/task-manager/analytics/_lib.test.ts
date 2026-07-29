@@ -13,6 +13,7 @@ import {
   analyticsQuerySchema,
   bucketOf,
   CADENCE_FOR_PERIOD,
+  clampWindowToMonthDays,
   canViewEntity,
   canViewMember,
   canViewOrg,
@@ -84,6 +85,42 @@ describe("resolveWindow", () => {
   it("carries the period through, for fetchPeriodBlocks' cadence-tag branch", () => {
     expect(resolveWindow("daily", "2026-07-16").period).toBe("daily");
     expect(resolveWindow("monthly", "2026-07-16").period).toBe("monthly");
+  });
+});
+
+describe("clampWindowToMonthDays — the Monthly 7-day range dropdown (2026-07-29)", () => {
+  const july = resolveWindow("monthly", "2026-07-15");
+
+  it("1-7 → [1st, 8th) of the anchor month", () => {
+    const w = clampWindowToMonthDays(july, 1, 7);
+    expect(w.start).toEqual(new Date(2026, 6, 1));
+    expect(w.end).toEqual(new Date(2026, 6, 8));
+  });
+
+  it("29-31 (last partial chunk) → [29th, next month 1st)", () => {
+    const w = clampWindowToMonthDays(july, 29, 31);
+    expect(w.start).toEqual(new Date(2026, 6, 29));
+    expect(w.end).toEqual(new Date(2026, 7, 1));
+  });
+
+  it("29-30 in a 30-day month ends exactly at the next month", () => {
+    const june = resolveWindow("monthly", "2026-06-10");
+    const w = clampWindowToMonthDays(june, 29, 30);
+    expect(w.start).toEqual(new Date(2026, 5, 29));
+    expect(w.end).toEqual(new Date(2026, 6, 1));
+  });
+
+  it("out-of-range values only shrink, never widen (29-31 in 28-day Feb → empty)", () => {
+    const feb = resolveWindow("monthly", "2027-02-10"); // 2027: non-leap, 28 days
+    const w = clampWindowToMonthDays(feb, 29, 31);
+    // JS date overflow rolls Feb 29 into March; the clamp caps end at the
+    // window's own end, so start >= end — an empty range, not a leak.
+    expect(w.start >= w.end).toBe(true);
+  });
+
+  it("no-op for daily windows", () => {
+    const day = resolveWindow("daily", "2026-07-16");
+    expect(clampWindowToMonthDays(day, 1, 7)).toEqual(day);
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
 import { Compass, UserCheck, UserX, Activity, Calendar, Megaphone, Bell, Trash2, Plus } from "lucide-react";
 
@@ -8,6 +8,8 @@ interface BranchDashboardProps {
   userName?: string | null;
   userEmail?: string | null;
   branchName?: string | null;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 interface EventItem {
@@ -218,6 +220,7 @@ export default function BranchDashboard({
   userName,
   userEmail,
   branchName: sessionBranchName,
+  taskOverview,
 }: BranchDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [currentBranchName, setCurrentBranchName] = useState(sessionBranchName || "Klang");
@@ -911,6 +914,11 @@ export default function BranchDashboard({
             </div>
           </div>
         </Panel>
+
+        {/* Task Manager — own-branch status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

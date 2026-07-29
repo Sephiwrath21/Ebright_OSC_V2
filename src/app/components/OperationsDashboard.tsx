@@ -248,10 +248,6 @@ export default function OperationsDashboard({
 
           {/* Right Column (Width 5/12) */}
           <div className="lg:col-span-5 space-y-6">
-            
-            {/* Real department Task Manager status (server-rendered slot) —
-                replaced the legacy DEMO-MODE ClickUp widget (2026-07-28). */}
-            {taskOverview}
 
             {/* 4. Braindump Section */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
@@ -281,6 +277,11 @@ export default function OperationsDashboard({
           </div>
 
         </div>
+
+        {/* Real department Task Manager status (server-rendered slot) —
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

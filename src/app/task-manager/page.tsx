@@ -31,6 +31,7 @@ import {
   getFlowDetail,
   getFlowStaff,
   getHodKanban,
+  getMySidebarCounts,
   moveKanbanCard,
   moveKanbanColumn,
   reassignFlowTask,
@@ -43,14 +44,22 @@ import {
   NoAccountError,
   SetupPendingError,
 } from "@/task-manager/data";
-import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
+import { formatLocalDate, isElevatedDeptSite, resolveWindow } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
-import { DailyDatePicker, EntityPicker } from "@/task-manager/ui/entity-picker";
+import {
+  DailyDatePicker,
+  EntityPicker,
+  MonthDropdown,
+  MonthRangeDropdown,
+  MonthSidebar,
+  WeekdaySidebar,
+} from "@/task-manager/ui/entity-picker";
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
+  flowBucketize,
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
@@ -97,6 +106,18 @@ function ModeTabs({ active, date }: { active: "department" | "branch"; date?: st
  *  data layer's own default when `date` is omitted). */
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** ?mrange= — the Monthly 7-day chunk ("1-7" … "29-31"). Anything invalid
+ *  falls back to Full month. */
+const MRANGE_RE = /^(\d{1,2})-(\d{1,2})$/;
+
+function parseMonthRange(raw?: string): { from: number; to: number } | undefined {
+  const m = raw?.match(MRANGE_RE);
+  if (!m) return undefined;
+  const from = Number(m[1]);
+  const to = Number(m[2]);
+  return from >= 1 && from <= to && to <= 31 ? { from, to } : undefined;
+}
+
 export default async function TaskManagerPage({
   searchParams,
 }: {
@@ -107,6 +128,9 @@ export default async function TaskManagerPage({
     branch?: string;
     date?: string;
     mdate?: string;
+    mrange?: string;
+    cdate?: string;
+    hdate?: string;
   }>;
 }) {
   const session = await auth();
@@ -123,6 +147,30 @@ export default async function TaskManagerPage({
   // today / current month.
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
+  // Monthly 7-day chunk within the anchor month (2026-07-29 Monthly
+  // selector redesign) — undefined = Full month.
+  const monthlyRange = parseMonthRange(sp.mrange);
+  const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
+  // HOD's "CEO assigned tasks" card anchor (?cdate=) and staff's "HOD
+  // assigned tasks" card anchor (?hdate=) — same filters the Home versions
+  // use (2026-07-29). Undefined = today.
+  const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
+  const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
+  // Every control carries the OTHER filters' raw params along unchanged,
+  // so changing one date never resets the others.
+  const rawParams = {
+    date: dailyDate,
+    mdate: monthlyDate,
+    mrange: monthlyRangeParam,
+    cdate: ceoDate,
+    hdate: hodDate,
+  };
+  const carryTM = (...except: string[]) =>
+    Object.fromEntries(
+      Object.entries(rawParams).filter(([k, v]) => v && !except.includes(k)),
+    ) as Record<string, string>;
+  const monthlyCarry = carryTM("date");
+  const dailyCarry = carryTM("mdate", "mrange");
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
@@ -345,10 +393,12 @@ export default async function TaskManagerPage({
   let body: ReactNode;
   let headerAction: ReactNode = null;
   try {
-    const [daily, monthly, { staff }] = await Promise.all([
+    const [daily, monthly, { staff }, sidebarCounts] = await Promise.all([
       getFlowDetail(email, "daily", dailyDate),
-      getFlowDetail(email, "monthly", monthlyDate),
+      getFlowDetail(email, "monthly", monthlyDate, monthlyRange ? { monthDays: monthlyRange } : undefined),
       getFlowStaff(),
+      // Pending-count badges for the personal sidebars (ClickUp reference).
+      getMySidebarCounts(email, dailyDate, monthlyDate),
     ]);
     const role = daily.me.me.role;
     const elevatedDeptSite = isElevatedDeptSite({
@@ -360,6 +410,14 @@ export default async function TaskManagerPage({
     const canReassign =
       role === "ADMIN" || role === "CEO" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
+
+    // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
+    // role (2026-07-29 consistency requirement) — CEO/OPS/HOD here; the
+    // superadmin + elevated-site branch below sets its own headerAction.
+    // Layout reshuffles below the header can never move it.
+    if (role === "CEO" || role === "OPS" || role === "HOD") {
+      headerAction = <AddTaskButton staff={staff} action={assign} />;
+    }
 
     if (role === "ADMIN" || elevatedDeptSite) {
       // Superadmin + elevated department sites (Operation/Optimisation):
@@ -408,6 +466,7 @@ export default async function TaskManagerPage({
               reassign={reassign}
               headerControl={
                 <DailyDatePicker
+                  key="admin-dept-daily-picker"
                   value={dailyDetail.date}
                   basePath="/task-manager"
                   extraParams={{ view: "department", department }}
@@ -449,6 +508,7 @@ export default async function TaskManagerPage({
               reassign={reassign}
               headerControl={
                 <DailyDatePicker
+                  key="admin-branch-daily-picker"
                   value={dailyDetail.date}
                   basePath="/task-manager"
                   extraParams={{ view: "branch", branch }}
@@ -533,9 +593,10 @@ export default async function TaskManagerPage({
       departmentDaily = detail.department;
       departmentDailyControl = (
         <DailyDatePicker
+          key="dept-daily-picker"
           value={detail.date}
           basePath="/task-manager"
-          extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+          extraParams={monthlyCarry}
         />
       );
     }
@@ -547,20 +608,100 @@ export default async function TaskManagerPage({
     // never reset each other. Not for the CEO (un-windowed combined list).
     const personalDailyControl = (
       <DailyDatePicker
+        key="personal-daily-picker"
         value={daily.date}
         basePath="/task-manager"
-        extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+        extraParams={monthlyCarry}
       />
     );
+    // Monthly selector (2026-07-29 redesign — calendar picker removed):
+    // compact [Month ▾][Range ▾] pair for the donut card heading; the
+    // ACCORDION month sidebar beside the "My Tasks — Monthly" list (one
+    // click selects a month AND expands its 7-day ranges inline — no
+    // separate range dropdown there). All drive the shared
+    // ?mdate=/?mrange= — changing month resets to Full month.
     const personalMonthlyControl = (
-      <DailyDatePicker
+      <div key="personal-monthly-controls" className="flex items-center gap-1.5">
+        <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
+        <MonthRangeDropdown
+          value={monthly.date}
+          range={monthlyRangeParam}
+          basePath="/task-manager"
+          extraParams={dailyCarry}
+        />
+      </div>
+    );
+    const personalMonthlySidebar = (
+      <MonthSidebar
+        key="personal-month-sidebar"
         value={monthly.date}
+        range={monthlyRangeParam}
         basePath="/task-manager"
-        param="mdate"
-        step="month"
-        extraParams={dailyDate ? { date: dailyDate } : {}}
+        extraParams={dailyCarry}
+        monthCounts={sidebarCounts.months}
+        chunkCounts={sidebarCounts.monthChunks}
       />
     );
+    // Tue–Sat weekday sidebar for "My Tasks — Daily" (2026-07-28 redesign):
+    // the date picker is the MASTER (any specific occurrence, past/future);
+    // the sidebar switches days WITHIN the anchored week via the same
+    // shared ?date= — donut, sidebar highlight, and list always agree.
+    const personalDailyDaySidebar = (
+      <WeekdaySidebar
+        key="daily-day-sidebar"
+        value={daily.date}
+        basePath="/task-manager"
+        extraParams={monthlyCarry}
+        counts={sidebarCounts.weekdays}
+      />
+    );
+
+    // HOD's "CEO assigned tasks" card (2026-07-29) — same behavior as the
+    // Home version: ALWAYS rendered (zero-filled until the CEO assigns),
+    // day-windowed by its own ?cdate= (default today) on due date, no
+    // subtitle, clickable circles (assignee-only — wired in the view).
+    // Built here because the window math lives server-side.
+    // Dedicated assigner-stream cards, same behavior as the Home versions:
+    // ALWAYS rendered for their role (zero-filled), day-windowed by their
+    // own param (default today) on due date, no subtitle, clickable
+    // circles (assignee-only — wired in the view). Built here because the
+    // window math lives server-side.
+    const dayWindowedStream = (streamKey: "HOD" | "CEO", rawAnchor: string | undefined, param: string) => {
+      const anchor = rawAnchor ?? formatLocalDate(new Date());
+      const win = resolveWindow("daily", anchor);
+      const stream = daily.me.streamsAll.find((s) => s.key === streamKey);
+      const buckets = flowBucketize(
+        (stream?.tasks ?? []).filter((t) => {
+          if (!t.dueAt) return false;
+          const due = new Date(t.dueAt);
+          return due >= win.start && due < win.end;
+        }),
+      );
+      return {
+        totals: {
+          completed: buckets.completed.length,
+          pending: buckets.pending.length,
+          na: buckets.na.length,
+        },
+        tasks: buckets,
+        control: (
+          <DailyDatePicker
+            key={`personal-${param}-picker`}
+            value={anchor}
+            basePath="/task-manager"
+            param={param}
+            extraParams={carryTM(param)}
+          />
+        ),
+      };
+    };
+    // HOD ← CEO assignments; MEMBER (Full Time / Intern / HQ Exec / Part
+    // Time / Coach / Branch Exec) ← HOD assignments — matching what each
+    // role's HOME overview shows.
+    const personalCeo =
+      daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
+    const personalHod =
+      daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
 
     body = (
       <TaskManagerView
@@ -582,6 +723,10 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
+        personalMonthlySidebar={personalMonthlySidebar}
+        personalDailyDaySidebar={personalDailyDaySidebar}
+        personalCeo={personalCeo}
+        personalHod={personalHod}
       />
     );
   } catch (err) {
@@ -601,11 +746,14 @@ export default async function TaskManagerPage({
   return (
     <AppShell email={email} role={su.role} name={su.name}>
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
-        <div>
-          <h1 className="text-2xl font-bold">Task Manager</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Your tasks, team status, and assignments — daily and monthly.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Task Manager</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Your tasks, team status, and assignments — daily and monthly.
+            </p>
+          </div>
+          {headerAction}
         </div>
         {body}
       </div>

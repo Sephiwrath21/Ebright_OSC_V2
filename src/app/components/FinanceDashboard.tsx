@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -92,9 +92,12 @@ const typeLabel = (t: string) =>
 export default function FinanceDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
 }) {
   const greetName =
     userName?.split(" ")[0] ||
@@ -492,6 +495,11 @@ export default function FinanceDashboard({
             )}
           </section>
         </div>
+
+        {/* Task Manager — own-department status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

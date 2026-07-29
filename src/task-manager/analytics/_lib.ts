@@ -95,6 +95,25 @@ export function resolveWindow(period: Period, date?: string, now: Date = new Dat
   };
 }
 
+/** Clamp a MONTHLY window to a day-of-month range — the Monthly 7-day range
+ *  dropdown (2026-07-29): "1-7" → [1st, 8th), "29-31" → [29th, next month).
+ *  No-op for daily windows. Out-of-range values can only shrink the window
+ *  (never widen it), so an invalid range yields an empty result, not a leak. */
+export function clampWindowToMonthDays(
+  window: PeriodWindow,
+  fromDay: number,
+  toDay: number,
+): PeriodWindow {
+  if (window.period !== "monthly") return window;
+  const start = new Date(window.start.getFullYear(), window.start.getMonth(), fromDay);
+  const end = new Date(window.start.getFullYear(), window.start.getMonth(), toDay + 1);
+  return {
+    period: window.period,
+    start: start < window.start ? window.start : start,
+    end: end > window.end ? window.end : end,
+  };
+}
+
 // ---------- status buckets (brief §Status buckets — confirmed mapping) ----------
 
 export type Bucket = "completed" | "pending" | "na";
