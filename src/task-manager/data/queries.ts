@@ -53,6 +53,10 @@ export function getFlowDetail(
      *  date filter, 2026-07-28). Omitted = all-time, the original
      *  semantics — /task-manager keeps that. */
     adhocDate?: string;
+    /** Monthly 7-day range dropdown (2026-07-29): clamp the MONTHLY window
+     *  to these days of the anchor month (e.g. {from:1,to:7}). Only
+     *  meaningful when `period` is "monthly"; ignored for daily. */
+    monthDays?: { from: number; to: number };
   },
 ): Promise<FlowDetailResponse> {
   return native(async () => {
@@ -66,13 +70,17 @@ export function getFlowDetail(
     // combined "My Tasks" list deliberately mixes the whole daily+monthly
     // sets and has no picker; strict windows would silently drop their
     // upcoming tasks.
+    // Monthly-only day-range clamp (the range dropdown) — guard here so a
+    // stray mrange param can never affect the daily fetch.
+    const monthDays = q.period === "monthly" ? opts?.monthDays : undefined;
     const me = await getMePayload(user, q.period, q.date, {
       strictWindow: user.role !== "CEO",
+      monthDays,
     });
 
     if (canViewOrg(user.role)) {
       const [org, adhoc, adhocByRegion] = await Promise.all([
-        getOrgPayload(q.period, q.date),
+        getOrgPayload(q.period, q.date, monthDays),
         getAdhocPayload(null),
         user.role === "ADMIN" || user.role === "OPS"
           ? getAdhocRegionsPayload(opts?.adhocDate)
@@ -80,7 +88,7 @@ export function getFlowDetail(
       ]);
       if (user.role === "OPS") {
         const departmentName = user.department ?? UNASSIGNED;
-        const department = await getEntityPayload("department", departmentName, q.period, q.date);
+        const department = await getEntityPayload("department", departmentName, q.period, q.date, monthDays);
         return {
           kind: "org",
           period: q.period,
@@ -106,7 +114,7 @@ export function getFlowDetail(
     if (user.role === "BRANCH" || user.role === "BRANCH_SITE") {
       const branchName = user.branch ?? UNASSIGNED;
       const [branch, adhoc] = await Promise.all([
-        getEntityPayload("branch", branchName, q.period, q.date),
+        getEntityPayload("branch", branchName, q.period, q.date, monthDays),
         user.role === "BRANCH" ? getAdhocPayload(branchName) : Promise.resolve(null),
       ]);
       return {
@@ -128,8 +136,8 @@ export function getFlowDetail(
       // ELEVATED_DEPT_SITE_DEPARTMENTS).
       const elevated = isElevatedDeptSite({ role: user.role, department: user.department });
       const [department, org] = await Promise.all([
-        getEntityPayload("department", departmentName, q.period, q.date),
-        elevated ? getOrgPayload(q.period, q.date) : Promise.resolve(undefined),
+        getEntityPayload("department", departmentName, q.period, q.date, monthDays),
+        elevated ? getOrgPayload(q.period, q.date, monthDays) : Promise.resolve(undefined),
       ]);
       return {
         kind: "department",

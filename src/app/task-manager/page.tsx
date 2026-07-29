@@ -47,7 +47,14 @@ import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
-import { DailyDatePicker, EntityPicker, WeekdaySidebar } from "@/task-manager/ui/entity-picker";
+import {
+  DailyDatePicker,
+  EntityPicker,
+  MonthDropdown,
+  MonthRangeDropdown,
+  MonthSidebar,
+  WeekdaySidebar,
+} from "@/task-manager/ui/entity-picker";
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
@@ -97,6 +104,18 @@ function ModeTabs({ active, date }: { active: "department" | "branch"; date?: st
  *  data layer's own default when `date` is omitted). */
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** ?mrange= — the Monthly 7-day chunk ("1-7" … "29-31"). Anything invalid
+ *  falls back to Full month. */
+const MRANGE_RE = /^(\d{1,2})-(\d{1,2})$/;
+
+function parseMonthRange(raw?: string): { from: number; to: number } | undefined {
+  const m = raw?.match(MRANGE_RE);
+  if (!m) return undefined;
+  const from = Number(m[1]);
+  const to = Number(m[2]);
+  return from >= 1 && from <= to && to <= 31 ? { from, to } : undefined;
+}
+
 export default async function TaskManagerPage({
   searchParams,
 }: {
@@ -107,6 +126,7 @@ export default async function TaskManagerPage({
     branch?: string;
     date?: string;
     mdate?: string;
+    mrange?: string;
   }>;
 }) {
   const session = await auth();
@@ -123,6 +143,16 @@ export default async function TaskManagerPage({
   // today / current month.
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
+  // Monthly 7-day chunk within the anchor month (2026-07-29 Monthly
+  // selector redesign) — undefined = Full month.
+  const monthlyRange = parseMonthRange(sp.mrange);
+  const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
+  // Params each side's controls carry along unchanged.
+  const monthlyCarry: Record<string, string> = {
+    ...(monthlyDate ? { mdate: monthlyDate } : {}),
+    ...(monthlyRangeParam ? { mrange: monthlyRangeParam } : {}),
+  };
+  const dailyCarry: Record<string, string> = dailyDate ? { date: dailyDate } : {};
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
@@ -347,7 +377,7 @@ export default async function TaskManagerPage({
   try {
     const [daily, monthly, { staff }] = await Promise.all([
       getFlowDetail(email, "daily", dailyDate),
-      getFlowDetail(email, "monthly", monthlyDate),
+      getFlowDetail(email, "monthly", monthlyDate, monthlyRange ? { monthDays: monthlyRange } : undefined),
       getFlowStaff(),
     ]);
     const role = daily.me.me.role;
@@ -538,7 +568,7 @@ export default async function TaskManagerPage({
           key="dept-daily-picker"
           value={detail.date}
           basePath="/task-manager"
-          extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+          extraParams={monthlyCarry}
         />
       );
     }
@@ -553,17 +583,41 @@ export default async function TaskManagerPage({
         key="personal-daily-picker"
         value={daily.date}
         basePath="/task-manager"
-        extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+        extraParams={monthlyCarry}
       />
     );
+    // Monthly selector (2026-07-29 redesign — calendar picker removed):
+    // compact [Month ▾][Range ▾] pair for the donut card heading; the
+    // range dropdown alone for the "My Tasks — Monthly" heading (its month
+    // lives in the sidebar); the 12-month sidebar beside that list. All
+    // drive the shared ?mdate=/?mrange= — changing month resets to Full
+    // month.
     const personalMonthlyControl = (
-      <DailyDatePicker
-        key="personal-monthly-picker"
+      <div key="personal-monthly-controls" className="flex items-center gap-1.5">
+        <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
+        <MonthRangeDropdown
+          value={monthly.date}
+          range={monthlyRangeParam}
+          basePath="/task-manager"
+          extraParams={dailyCarry}
+        />
+      </div>
+    );
+    const personalMonthlyRangeControl = (
+      <MonthRangeDropdown
+        key="personal-monthly-range"
+        value={monthly.date}
+        range={monthlyRangeParam}
+        basePath="/task-manager"
+        extraParams={dailyCarry}
+      />
+    );
+    const personalMonthlySidebar = (
+      <MonthSidebar
+        key="personal-month-sidebar"
         value={monthly.date}
         basePath="/task-manager"
-        param="mdate"
-        step="month"
-        extraParams={dailyDate ? { date: dailyDate } : {}}
+        extraParams={dailyCarry}
       />
     );
     // Tue–Sat weekday sidebar for "My Tasks — Daily" (2026-07-28 redesign):
@@ -575,7 +629,7 @@ export default async function TaskManagerPage({
         key="daily-day-sidebar"
         value={daily.date}
         basePath="/task-manager"
-        extraParams={monthlyDate ? { mdate: monthlyDate } : {}}
+        extraParams={monthlyCarry}
       />
     );
 
@@ -599,6 +653,8 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
+        personalMonthlyRangeControl={personalMonthlyRangeControl}
+        personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
       />
     );

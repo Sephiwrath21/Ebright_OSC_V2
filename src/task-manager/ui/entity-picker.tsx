@@ -138,6 +138,163 @@ export function WeekdaySidebar({
   );
 }
 
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Vertical month sidebar for "My Tasks — Monthly" (2026-07-29 redesign,
+ *  replacing the calendar picker on Monthly): ◀ year ▶ stepper + Jan–Dec
+ *  list, same visual style as the Daily weekday sidebar. Navigates
+ *  ?mdate=YYYY-MM-01 and deliberately DROPS ?mrange= — a new month resets
+ *  to Full month (callers must pass extraParams WITHOUT mdate/mrange). */
+export function MonthSidebar({
+  value,
+  basePath,
+  extraParams = {},
+}: {
+  /** The resolved Monthly anchor, YYYY-MM-DD. */
+  value: string;
+  basePath: string;
+  extraParams?: Record<string, string>;
+}) {
+  const router = useRouter();
+  const [y, m] = value.split("-").map(Number);
+  const navigate = (year: number, month: number) => {
+    const qs = new URLSearchParams({ ...extraParams, mdate: `${year}-${pad2(month)}-01` });
+    router.push(`${basePath}?${qs.toString()}`);
+  };
+  const arrowClass =
+    "flex size-6 items-center justify-center rounded-md border border-gray-200 bg-white text-[10px] text-gray-500 hover:border-blue-300 hover:text-blue-600";
+
+  return (
+    <nav aria-label="Month" className="flex flex-col gap-1">
+      <div className="mb-1 flex items-center justify-between px-1">
+        <button type="button" aria-label="Previous year" onClick={() => navigate(y - 1, m)} className={arrowClass}>
+          ◀
+        </button>
+        <span className="text-sm font-semibold text-gray-900">{y}</span>
+        <button type="button" aria-label="Next year" onClick={() => navigate(y + 1, m)} className={arrowClass}>
+          ▶
+        </button>
+      </div>
+      {MONTH_LABELS.map((label, i) => {
+        const active = i + 1 === m;
+        return (
+          <button
+            key={label}
+            type="button"
+            onClick={() => navigate(y, i + 1)}
+            aria-current={active ? "date" : undefined}
+            className={
+              active
+                ? "rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
+                : "rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }
+          >
+            {label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Compact month selector for card/grid headings where the 12-row sidebar
+ *  can't fit: one dropdown spanning the anchor's previous, current, and
+ *  next year ("Jul 2026"), same navigation contract as MonthSidebar
+ *  (?mdate=YYYY-MM-01, drops ?mrange=). */
+export function MonthDropdown({
+  value,
+  basePath,
+  extraParams = {},
+}: {
+  /** The resolved Monthly anchor, YYYY-MM-DD. */
+  value: string;
+  basePath: string;
+  extraParams?: Record<string, string>;
+}) {
+  const router = useRouter();
+  const [y, m] = value.split("-").map(Number);
+  const current = `${y}-${pad2(m)}`;
+  const options = [y - 1, y, y + 1].flatMap((year) =>
+    MONTH_LABELS.map((label, i) => ({
+      value: `${year}-${pad2(i + 1)}`,
+      label: `${label} ${year}`,
+    })),
+  );
+  const navigate = (v: string) => {
+    const qs = new URLSearchParams({ ...extraParams, mdate: `${v}-01` });
+    router.push(`${basePath}?${qs.toString()}`);
+  };
+
+  return (
+    <select
+      value={current}
+      onChange={(e) => navigate(e.target.value)}
+      aria-label="Month"
+      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** 7-day range dropdown within the selected month (2026-07-29): Full month
+ *  (default) · 1–7 · 8–14 · 15–21 · 22–28 · 29–{last day} — the final chunk
+ *  is labeled with the month's ACTUAL last day (29–31 / 29–30 / bare 29 for
+ *  leap February; absent entirely for 28-day February). Navigates
+ *  ?mrange=from-to, omitted for Full month; pins ?mdate= so the anchor
+ *  month always survives (callers pass extraParams WITHOUT mdate/mrange). */
+export function MonthRangeDropdown({
+  value,
+  range,
+  basePath,
+  extraParams = {},
+}: {
+  /** The resolved Monthly anchor, YYYY-MM-DD — decides the month length. */
+  value: string;
+  /** The raw ?mrange= currently active ("" / undefined = Full month). */
+  range?: string;
+  basePath: string;
+  extraParams?: Record<string, string>;
+}) {
+  const router = useRouter();
+  const [y, m] = value.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const chunks: { from: number; to: number }[] = [];
+  for (let from = 1; from <= daysInMonth; from += 7) {
+    chunks.push({ from, to: Math.min(from + 6, daysInMonth) });
+  }
+  const navigate = (v: string) => {
+    const qs = new URLSearchParams({
+      ...extraParams,
+      mdate: value,
+      ...(v ? { mrange: v } : {}),
+    });
+    router.push(`${basePath}?${qs.toString()}`);
+  };
+
+  return (
+    <select
+      value={range ?? ""}
+      onChange={(e) => navigate(e.target.value)}
+      aria-label="Day range"
+      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
+    >
+      <option value="">Full month</option>
+      {chunks.map((c) => (
+        <option key={`${c.from}-${c.to}`} value={`${c.from}-${c.to}`}>
+          {c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function EntityPicker({
   label,
   value,

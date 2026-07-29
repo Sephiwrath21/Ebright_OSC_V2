@@ -8,7 +8,7 @@
 
 import type { FlowDetailResponse } from "./types";
 import { PageSectionHeading } from "./bits";
-import { DailyDatePicker } from "./entity-picker";
+import { DailyDatePicker, MonthDropdown, MonthRangeDropdown } from "./entity-picker";
 import { EntityDonutGrid, RegionDonutGrids } from "./overview-grids";
 
 export function HomeTaskOverview({
@@ -39,9 +39,9 @@ export function HomeTaskOverview({
    *  One picker only (Ad hoc is its own cadence, no Daily/Monthly split);
    *  the section shows that single day's ad hoc tasks. */
   adhocDate?: string;
-  /** The raw ?date=/?mdate=/?adate= values currently in the URL — each
-   *  picker carries the OTHERS along so the three filters stay independent. */
-  dateFilterParams?: { date?: string; mdate?: string; adate?: string };
+  /** The raw ?date=/?mdate=/?mrange=/?adate= values currently in the URL —
+   *  each control carries the OTHERS along so the filters stay independent. */
+  dateFilterParams?: { date?: string; mdate?: string; mrange?: string; adate?: string };
 }) {
   const sep = departmentOverviewHref.includes("?") ? "&" : "?";
   const deptHref = (department: string) =>
@@ -49,9 +49,9 @@ export function HomeTaskOverview({
   const raw = dateFilterParams ?? {};
   // Every picker carries the OTHER filters' raw params along unchanged, so
   // changing one date never resets the others.
-  const carry = (except: string) =>
+  const carry = (...except: string[]) =>
     Object.fromEntries(
-      Object.entries(raw).filter(([k, v]) => v && k !== except),
+      Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
     ) as Record<string, string>;
 
   // One picker per period, mounted on BOTH that period's sections
@@ -66,15 +66,18 @@ export function HomeTaskOverview({
       extraParams={carry("date")}
     />
   );
+  // Monthly selector (2026-07-29 redesign): compact [Month ▾][Range ▾]
+  // pair replaces the calendar picker on every Monthly grid heading.
   const monthlyPicker = monthlyDate && (
-    <DailyDatePicker
-      key="org-monthly-picker"
-      value={monthlyDate}
-      basePath="/home"
-      param="mdate"
-      step="month"
-      extraParams={carry("mdate")}
-    />
+    <div key="org-monthly-controls" className="flex items-center gap-1.5">
+      <MonthDropdown value={monthlyDate} basePath="/home" extraParams={carry("mdate", "mrange")} />
+      <MonthRangeDropdown
+        value={monthlyDate}
+        range={raw.mrange}
+        basePath="/home"
+        extraParams={carry("mdate", "mrange")}
+      />
+    </div>
   );
   const adhocPicker = adhocDate && (
     <DailyDatePicker

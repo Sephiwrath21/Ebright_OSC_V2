@@ -18,7 +18,11 @@
 // because of Task Manager state.
 import { getFlowDetail } from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
-import { DailyDatePicker } from "@/task-manager/ui/entity-picker";
+import {
+  DailyDatePicker,
+  MonthDropdown,
+  MonthRangeDropdown,
+} from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { EntityDonutGrid } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
@@ -29,6 +33,7 @@ export async function HomeScopedOverviewSection({
   email,
   dailyDate,
   monthlyDate,
+  monthlyRange,
   adhocDate,
   hodDate,
   actions,
@@ -38,6 +43,9 @@ export async function HomeScopedOverviewSection({
    *  format-validated by the page). Omitted = today / current month. */
   dailyDate?: string;
   monthlyDate?: string;
+  /** Monthly 7-day chunk within the anchor month (?mrange=, 2026-07-29).
+   *  Undefined = Full month. */
+  monthlyRange?: { from: number; to: number };
   adhocDate?: string;
   hodDate?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
@@ -53,15 +61,22 @@ export async function HomeScopedOverviewSection({
 }) {
   try {
     const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
+    const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
     const [daily, monthly] = await Promise.all([
       getFlowDetail(email, "daily", dailyDate, { adhocDate: adhocAnchor }),
-      getFlowDetail(email, "monthly", monthlyDate),
+      getFlowDetail(email, "monthly", monthlyDate, monthlyRange ? { monthDays: monthlyRange } : undefined),
     ]);
 
-    const raw = { date: dailyDate, mdate: monthlyDate, adate: adhocDate, hdate: hodDate };
-    const carry = (except: string) =>
+    const raw = {
+      date: dailyDate,
+      mdate: monthlyDate,
+      mrange: monthlyRangeParam,
+      adate: adhocDate,
+      hdate: hodDate,
+    };
+    const carry = (...except: string[]) =>
       Object.fromEntries(
-        Object.entries(raw).filter(([k, v]) => v && k !== except),
+        Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
       ) as Record<string, string>;
     const dailyPicker = (
       <DailyDatePicker
@@ -71,15 +86,20 @@ export async function HomeScopedOverviewSection({
         extraParams={carry("date")}
       />
     );
+    // Monthly selector (2026-07-29 redesign): compact [Month ▾][Range ▾]
+    // pair — the calendar picker is gone from every Monthly surface. Month
+    // and range controls both exclude mdate/mrange from the carried params
+    // (they own them; changing month resets to Full month).
     const monthlyPicker = (
-      <DailyDatePicker
-        key="home-monthly-picker"
-        value={monthly.date}
-        basePath="/home"
-        param="mdate"
-        step="month"
-        extraParams={carry("mdate")}
-      />
+      <div key="home-monthly-controls" className="flex items-center gap-1.5">
+        <MonthDropdown value={monthly.date} basePath="/home" extraParams={carry("mdate", "mrange")} />
+        <MonthRangeDropdown
+          value={monthly.date}
+          range={monthlyRangeParam}
+          basePath="/home"
+          extraParams={carry("mdate", "mrange")}
+        />
+      </div>
     );
 
     // Org roles (ADMIN/CEO/OPS): the full org-wide overview. CEO has no

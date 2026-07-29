@@ -122,6 +122,8 @@ export function TaskManagerView({
   departmentDailyControl,
   personalDailyControl,
   personalMonthlyControl,
+  personalMonthlyRangeControl,
+  personalMonthlySidebar,
   personalDailyDaySidebar,
 }: {
   daily: FlowDetailResponse;
@@ -164,6 +166,12 @@ export function TaskManagerView({
    *  "My Tasks — Daily" list — switches days within the anchored week via
    *  the same shared ?date= the date picker (the master control) drives. */
   personalDailyDaySidebar?: React.ReactNode;
+  /** Monthly selector redesign (2026-07-29): the 7-day range dropdown alone
+   *  for the "My Tasks — Monthly" heading, and the 12-month sidebar
+   *  (MonthSidebar) rendered beside that list — month via sidebar, range
+   *  via dropdown, both driving the shared ?mdate=/?mrange=. */
+  personalMonthlyRangeControl?: React.ReactNode;
+  personalMonthlySidebar?: React.ReactNode;
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -571,13 +579,25 @@ export function TaskManagerView({
               </div>
             </SectionCard>
             {!branchSideMember && (
-              <SectionCard title="My Tasks — Monthly" action={personalMonthlyControl}>
-                <ResizableTaskList
-                  tasks={monthly.me.tasks}
-                  {...completeProps}
-                  emptyLabel="No tasks assigned to you this period."
-                  hideCompleted
-                />
+              <SectionCard
+                title="My Tasks — Monthly"
+                action={personalMonthlyRangeControl ?? personalMonthlyControl}
+              >
+                {/* Month sidebar beside the list (2026-07-29 redesign),
+                    mirroring the Daily weekday sidebar layout. */}
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  {personalMonthlySidebar && (
+                    <div className="shrink-0 sm:w-40">{personalMonthlySidebar}</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <ResizableTaskList
+                      tasks={monthly.me.tasks}
+                      {...completeProps}
+                      emptyLabel="No tasks assigned to you this period."
+                      hideCompleted
+                    />
+                  </div>
+                </div>
               </SectionCard>
             )}
             {/* Ad hoc: routed by MY role as assignee (RunBlock.cadence),

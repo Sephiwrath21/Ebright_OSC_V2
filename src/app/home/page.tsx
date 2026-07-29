@@ -38,6 +38,17 @@ const FINANCE_EMAIL = "finance@ebright.my";
  *  /task-manager's Daily filter. */
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** ?mrange= — the Monthly 7-day chunk ("1-7" … "29-31"); invalid = Full month. */
+const MRANGE_RE = /^(\d{1,2})-(\d{1,2})$/;
+
+function parseMonthRange(raw?: string): { from: number; to: number } | undefined {
+  const m = raw?.match(MRANGE_RE);
+  if (!m) return undefined;
+  const from = Number(m[1]);
+  const to = Number(m[2]);
+  return from >= 1 && from <= to && to <= 31 ? { from, to } : undefined;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({
@@ -46,11 +57,18 @@ export default async function HomePage({
   // Overview date filters: ?date= anchors the Daily half, ?mdate= the
   // Monthly half, ?adate= the Ad hoc regions (org views only), ?hdate= the
   // HOD-assigned card (staff view) — all independent of each other.
-  searchParams: Promise<{ date?: string; mdate?: string; adate?: string; hdate?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    mdate?: string;
+    mrange?: string;
+    adate?: string;
+    hdate?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
+  const monthlyRange = parseMonthRange(sp.mrange);
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const session = await auth();
@@ -131,6 +149,7 @@ export default async function HomePage({
         email={userEmail}
         dailyDate={dailyDate}
         monthlyDate={monthlyDate}
+        monthlyRange={monthlyRange}
         adhocDate={adhocDate}
         hodDate={hodDate}
         actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask }}
