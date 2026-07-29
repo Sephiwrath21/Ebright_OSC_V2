@@ -650,6 +650,12 @@ export default async function TaskManagerPage({
     // the date picker is the MASTER (any specific occurrence, past/future);
     // the sidebar switches days WITHIN the anchored week via the same
     // shared ?date= — donut, sidebar highlight, and list always agree.
+    // Branch-side roles (Manager + branch MEMBERs: Branch Exec / Coaches)
+    // work weekends — their Daily sidebar runs Tue–SUN; department-side
+    // roles keep Tue–Sat (2026-07-29 decision).
+    const branchSide =
+      daily.me.me.branch !== null &&
+      (daily.me.me.role === "BRANCH" || daily.me.me.role === "MEMBER");
     const personalDailyDaySidebar = (
       <WeekdaySidebar
         key="daily-day-sidebar"
@@ -657,6 +663,7 @@ export default async function TaskManagerPage({
         basePath="/task-manager"
         extraParams={monthlyCarry}
         counts={sidebarCounts.weekdays}
+        includeSunday={branchSide}
       />
     );
 

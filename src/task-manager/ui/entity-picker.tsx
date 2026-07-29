@@ -72,7 +72,10 @@ export function DailyDatePicker({
   );
 }
 
-/** Tuesday–Saturday, as offsets from the week's Monday (getDay(): Sun=0). */
+/** Business-week day lists, as offsets from the week's Monday (getDay():
+ *  Sun=0). Department-side roles work Tue–Sat; branch-side roles (Manager /
+ *  Branch Exec / Coaches) work weekends too and get Tue–SUN (2026-07-29
+ *  decision — `includeSunday`). */
 const SIDEBAR_DAYS = [
   { label: "Tuesday", offset: 1 },
   { label: "Wednesday", offset: 2 },
@@ -80,6 +83,7 @@ const SIDEBAR_DAYS = [
   { label: "Friday", offset: 4 },
   { label: "Saturday", offset: 5 },
 ];
+const SIDEBAR_DAYS_WITH_SUNDAY = [...SIDEBAR_DAYS, { label: "Sunday", offset: 6 }];
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -109,6 +113,7 @@ export function WeekdaySidebar({
   extraParams = {},
   param = "date",
   counts = {},
+  includeSunday = false,
 }: {
   /** The resolved date currently shown, YYYY-MM-DD. */
   value: string;
@@ -118,6 +123,9 @@ export function WeekdaySidebar({
   /** Per-day NOT-YET-COMPLETED counts (Pending only, N/A excluded), keyed
    *  YYYY-MM-DD — getMySidebarCounts().weekdays. Zero/absent = no badge. */
   counts?: Record<string, number>;
+  /** Branch-side roles work weekends: true = Tue–Sun (6 days) instead of
+   *  the department-side Tue–Sat (5 days). */
+  includeSunday?: boolean;
 }) {
   const router = useRouter();
   // Optimistic selection: highlight instantly on click; cleared when the
@@ -138,7 +146,7 @@ export function WeekdaySidebar({
 
   return (
     <nav aria-label="Weekday" className="flex flex-col gap-1">
-      {SIDEBAR_DAYS.map((day) => {
+      {(includeSunday ? SIDEBAR_DAYS_WITH_SUNDAY : SIDEBAR_DAYS).map((day) => {
         const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day.offset);
         const date = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
         const active = date === shown;
