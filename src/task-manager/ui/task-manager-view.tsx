@@ -32,7 +32,6 @@ import type {
   FlowDetailResponse,
   FlowDrillTask,
   FlowEntityDetail,
-  FlowMemberRollup,
   FlowPeriod,
   FlowTaskRow,
 } from "./types";
@@ -48,61 +47,12 @@ import { CeoTaskTable } from "./ceo-task-table";
 import { EntityOverviewSection } from "./department-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
-  CompletionMeter,
-  InitialAvatar,
   PageSectionHeading,
   ResizableTaskList,
   SectionCard,
   StatusOverviewCard,
   type ReassignControl,
 } from "./bits";
-
-function MemberRow({
-  member,
-  tasks,
-}: {
-  member: FlowMemberRollup;
-  tasks: FlowTaskRow[];
-}) {
-  const [open, setOpen] = React.useState(false);
-  const total = member.done + member.notDone;
-  const allDone = total > 0 && member.notDone === 0;
-
-  return (
-    <div className="border-b border-gray-100 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 py-3 text-left"
-      >
-        <InitialAvatar name={member.name} id={member.userId} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-gray-900">{member.name}</p>
-          <p className="truncate text-xs text-gray-500">{member.employmentType || "—"}</p>
-        </div>
-        <div className="hidden w-32 shrink-0 sm:block">
-          <CompletionMeter done={member.done} total={total} />
-        </div>
-        <span className="w-24 shrink-0 text-right text-xs text-gray-500">
-          {member.done} done · {member.notDone} open
-        </span>
-        <span
-          className={`inline-flex w-24 shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            allDone ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-          }`}
-        >
-          {allDone ? "Completed" : "Pending"}
-        </span>
-        <span className="shrink-0 text-gray-300">{open ? "▾" : "▸"}</span>
-      </button>
-      {open && (
-        <div className="mb-2 rounded-xl bg-gray-50 px-4 py-1">
-          <ResizableTaskList tasks={tasks} emptyLabel="No tasks this period." />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function TaskManagerView({
   daily,
@@ -305,10 +255,9 @@ export function TaskManagerView({
     />
   );
 
-  // Branch scope only since the 2026-07-24 redesign — department rosters now
-  // render inside the inline EntityOverviewSection (Details area) instead.
-  const dailyRoster = current.kind === "branch" ? daily.branch : undefined;
-  const monthlyRoster = current.kind === "branch" ? monthly.branch : undefined;
+  // Rosters render inside EntityOverviewSection for BOTH scopes since
+  // 2026-07-29 (branch adopted the Department Overview pattern) — no
+  // separately-styled roster cards remain.
 
   return (
     <div className="flex flex-col gap-5">
@@ -627,40 +576,34 @@ export function TaskManagerView({
       )}
 
       {/* ---- Branch Overview (branch kind) — below My Tasks since the
-          2026-07-29 personal-first reorder; own heading + the shared
-          ?date=/?mdate= pickers (2026-07-29 audit fix: the data always
-          followed the params, the visible controls were missing). ---- */}
-      {current.kind === "branch" && (
+          2026-07-29 personal-first reorder. SAME component as Department
+          Overview (EntityOverviewSection, 2026-07-29 request): "{branch} —
+          Daily/Monthly" heading + date filter, stat chips, donut, and the
+          integrated click-through member roster (Manager → Branch Exec →
+          FT Coach → PT Coach sort, applied by the data layer). ---- */}
+      {current.kind === "branch" && daily.branch && monthly.branch && (
         <>
           <PageSectionHeading>Branch Overview</PageSectionHeading>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {daily.branch && (
-              <StatusOverviewCard
-                title="Daily"
-                subtitle={daily.branch.name}
-                totals={daily.branch.totals}
-                tasks={daily.branch.tasks}
-                action={personalDailyControl}
-                actionPlacement="row"
-                reassign={reassign}
-              />
-            )}
-            {monthly.branch && (
-              <StatusOverviewCard
-                title="Monthly"
-                subtitle={monthly.branch.name}
-                totals={monthly.branch.totals}
-                tasks={monthly.branch.tasks}
-                action={personalMonthlyControl}
-                actionPlacement="row"
-                reassign={reassign}
-              />
-            )}
-            {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
-                Manager only, not the view-only BRANCH_SITE login. The
-                manager's PERSONAL ad hoc card lives in the top row. */}
-            {me.me.role === "BRANCH" && adhocCard}
-          </div>
+          <EntityOverviewSection
+            label="Daily"
+            entity={daily.branch}
+            kind="branch"
+            reassign={reassign}
+            headerControl={personalDailyControl}
+          />
+          <EntityOverviewSection
+            label="Monthly"
+            entity={monthly.branch}
+            kind="branch"
+            reassign={reassign}
+            headerControl={personalMonthlyControl}
+          />
+          {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
+              Manager only, not the view-only BRANCH_SITE login. The
+              manager's PERSONAL ad hoc card lives in the top row. */}
+          {me.me.role === "BRANCH" && adhocCard && (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{adhocCard}</div>
+          )}
 
           {/* ---- Details: manpower schedule (branch manager only, not
               BRANCH_SITE) ---- */}
@@ -689,39 +632,6 @@ export function TaskManagerView({
       {/* OPS's assign form: "+ Task" renders in the PAGE HEADER (2026-07-29
           consistency requirement) — the old bottom "Details" block is gone. */}
 
-      {/* ---- Member roster (branch scope), Daily + Monthly ---- */}
-      {[
-        { period: "Daily", roster: dailyRoster },
-        { period: "Monthly", roster: monthlyRoster },
-      ].map(
-        ({ period: label, roster }) =>
-          roster && (
-            <SectionCard
-              key={label}
-              title={`Members — ${roster.name} (${label})`}
-              action={
-                <span className="text-xs text-gray-400">
-                  {roster.members.length} members
-                </span>
-              }
-            >
-              {roster.members.length === 0 ? (
-                <p className="py-6 text-center text-sm text-gray-400">
-                  No member activity this period.
-                </p>
-              ) : (
-                roster.members.map((m) => {
-                  const memberTasks = [
-                    ...roster.tasks.completed,
-                    ...roster.tasks.pending,
-                    ...roster.tasks.na,
-                  ].filter((t) => t.assigneeId === m.userId);
-                  return <MemberRow key={m.userId} member={m} tasks={memberTasks} />;
-                })
-              )}
-            </SectionCard>
-          ),
-      )}
     </div>
   );
 }
