@@ -7,15 +7,19 @@
 //   elevated DEPT_SITE ....... ALL departments Daily/Monthly grids (org
 //   (Operations/Optimisation)  payload with branch halves stripped — elevated
 //                              visibility is departments-only)
-//   other DEPT_SITE / HOD .... own department Daily + Monthly donuts
+//   other DEPT_SITE .......... own department Daily + Monthly donuts
+//   HOD ...................... FOUR sections (2026-07-29): personal Daily +
+//                              Monthly, CEO Assigned Tasks (?cdate=), and
+//                              own department status pair
 //   BRANCH / BRANCH_SITE ..... own branch Daily + Monthly donuts
-//   MEMBER (any staff) ....... personal Daily + Monthly donuts
+//   MEMBER (any staff) ....... personal Daily + Monthly + HOD Assigned
 //
 // Daily rides ?date=, Monthly ?mdate= (whole-month), Ad hoc ?adate= (org
 // view only) — independent, each picker carries the others along. Fail-safe
 // like its predecessors: any Task Manager problem (database not connected,
 // no account, bridge failure) renders nothing — Home must never break
 // because of Task Manager state.
+import type { ReactNode } from "react";
 import { getFlowDetail } from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
 import {
@@ -27,7 +31,7 @@ import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { EntityDonutGrid } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { flowBucketize, flowStreamLabel, visibleAssignerStreams } from "@/task-manager/ui/types";
-import type { ActionResult, FlowBucketTotals, FlowDrillTask } from "@/task-manager/ui/types";
+import type { ActionResult } from "@/task-manager/ui/types";
 
 export async function HomeScopedOverviewSection({
   email,
@@ -36,6 +40,7 @@ export async function HomeScopedOverviewSection({
   monthlyRange,
   adhocDate,
   hodDate,
+  ceoDate,
   actions,
 }: {
   email: string;
@@ -48,6 +53,8 @@ export async function HomeScopedOverviewSection({
   monthlyRange?: { from: number; to: number };
   adhocDate?: string;
   hodDate?: string;
+  /** HOD view's "CEO Assigned Tasks" day anchor (?cdate=). */
+  ceoDate?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -73,6 +80,7 @@ export async function HomeScopedOverviewSection({
       mrange: monthlyRangeParam,
       adate: adhocDate,
       hdate: hodDate,
+      cdate: ceoDate,
     };
     const carry = (...except: string[]) =>
       Object.fromEntries(
@@ -141,95 +149,168 @@ export async function HomeScopedOverviewSection({
       );
     }
 
-    // Scoped pair (department / branch / personal): two donut cards with
-    // their date pickers in the flow-row header slot (no-overlap layout).
-    // auto-fit off the CONTAINER width: side by side in wide dashboards,
-    // stacked in narrow columns.
-    const pair = (
-      d: { totals: FlowBucketTotals; tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]> },
-      m: { totals: FlowBucketTotals; tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]> },
-      subtitle: string,
-    ) => (
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        <StatusOverviewCard
-          title="Daily"
-          subtitle={subtitle}
-          totals={d.totals}
-          tasks={d.tasks}
-          action={dailyPicker}
-          actionPlacement="row"
-        />
-        <StatusOverviewCard
-          title="Monthly"
-          subtitle={subtitle}
-          totals={m.totals}
-          tasks={m.tasks}
-          action={monthlyPicker}
-          actionPlacement="row"
-        />
-      </div>
-    );
-
-    if (daily.department && monthly.department) {
-      return pair(daily.department, monthly.department, daily.department.name);
-    }
-    if (daily.branch && monthly.branch) {
-      return pair(daily.branch, monthly.branch, daily.branch.name);
-    }
-
-    // MEMBER — personal cards, clickable per the "assignee only" rule: the
-    // viewer's own userId + the complete/N-A/reopen actions make their own
-    // tasks' status circles live in the drill modal, same as /task-manager.
+    // "Assignee only" rule: the viewer's own userId + the complete/N-A/
+    // reopen actions make their own tasks' status circles live in the drill
+    // modal, same as /task-manager. Aggregate dept/branch cards never get
+    // these.
     const completeProps = actions && {
       myUserId: daily.me.me.userId,
       onComplete: actions.complete,
       onSkip: actions.skip,
       onReopen: actions.reopen,
     };
-    // Third section — "HOD assigned tasks": ALWAYS present for staff (the
-    // 3-section requirement: Daily · Monthly · HOD Assigned), zero-filled
-    // when this person has no HOD-assigned tasks yet. streamsAll only
-    // carries streams that HAVE tasks, so the card must not depend on the
-    // stream existing. Day-windowed by its OWN ?hdate= filter (2026-07-28,
-    // default today) on each task's due date — cadence-agnostic, so daily-
-    // AND monthly-cadence HOD assignments due that day both count; tasks
-    // with no due date at all only match no specific day.
-    const hodAnchor = hodDate ?? formatLocalDate(new Date());
-    const hodWin = resolveWindow("daily", hodAnchor);
-    const hodStream = daily.me.streamsAll.find((s) => s.key === "HOD");
-    const hodBuckets = flowBucketize(
-      (hodStream?.tasks ?? []).filter((t) => {
-        if (!t.dueAt) return false;
-        const due = new Date(t.dueAt);
-        return due >= hodWin.start && due < hodWin.end;
-      }),
+
+    // Assigner-stream card ("HOD assigned tasks" for staff, "CEO assigned
+    // tasks" for HODs) — ALWAYS rendered for its role (zero-filled when the
+    // stream doesn't exist yet; streamsAll only carries streams that HAVE
+    // tasks). Day-windowed by its OWN date param (default today) on each
+    // task's due date — cadence-agnostic, so daily- AND monthly-cadence
+    // assignments due that day both count; tasks with no due date at all
+    // match no specific day.
+    const streamCard = (
+      streamKey: "HOD" | "CEO",
+      rawAnchor: string | undefined,
+      param: string,
+      subtitle: string,
+    ) => {
+      const anchor = rawAnchor ?? formatLocalDate(new Date());
+      const win = resolveWindow("daily", anchor);
+      const stream = daily.me.streamsAll.find((s) => s.key === streamKey);
+      const buckets = flowBucketize(
+        (stream?.tasks ?? []).filter((t) => {
+          if (!t.dueAt) return false;
+          const due = new Date(t.dueAt);
+          return due >= win.start && due < win.end;
+        }),
+      );
+      return (
+        <StatusOverviewCard
+          key={`stream-${streamKey}`}
+          title={flowStreamLabel(streamKey)}
+          subtitle={subtitle}
+          totals={{
+            completed: buckets.completed.length,
+            pending: buckets.pending.length,
+            na: buckets.na.length,
+          }}
+          tasks={buckets}
+          action={
+            <DailyDatePicker
+              key={`home-${param}-picker`}
+              value={anchor}
+              basePath="/home"
+              param={param}
+              extraParams={carry(param)}
+            />
+          }
+          actionPlacement="row"
+          {...completeProps}
+        />
+      );
+    };
+
+    // Personal Daily/Monthly cards (clickable) — shared by the MEMBER view
+    // and the HOD view's sections 1–2. They ride the same ?date=/?mdate=
+    // as the department pair, keeping every Daily surface on one date.
+    const personalPair = (
+      <>
+        <StatusOverviewCard
+          key="personal-daily"
+          title="Daily"
+          subtitle="My Tasks"
+          totals={daily.me.totals}
+          tasks={flowBucketize(daily.me.tasks)}
+          action={dailyPicker}
+          actionPlacement="row"
+          {...completeProps}
+        />
+        <StatusOverviewCard
+          key="personal-monthly"
+          title="Monthly"
+          subtitle="My Tasks"
+          totals={monthly.me.totals}
+          tasks={flowBucketize(monthly.me.tasks)}
+          action={monthlyPicker}
+          actionPlacement="row"
+          {...completeProps}
+        />
+      </>
     );
-    const hodCard = (
-      <StatusOverviewCard
-        title={flowStreamLabel("HOD")}
-        subtitle="From HOD"
-        totals={{
-          completed: hodBuckets.completed.length,
-          pending: hodBuckets.pending.length,
-          na: hodBuckets.na.length,
-        }}
-        tasks={hodBuckets}
-        action={
-          <DailyDatePicker
-            key="home-hod-picker"
-            value={hodAnchor}
-            basePath="/home"
-            param="hdate"
-            extraParams={carry("hdate")}
+
+    const grid = (children: ReactNode) => (
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+        {children}
+      </div>
+    );
+
+    if (daily.department && monthly.department) {
+      const deptPair = (
+        <>
+          <StatusOverviewCard
+            key="dept-daily"
+            title="Daily"
+            subtitle={daily.department.name}
+            totals={daily.department.totals}
+            tasks={daily.department.tasks}
+            action={dailyPicker}
+            actionPlacement="row"
           />
-        }
-        actionPlacement="row"
-        {...completeProps}
-      />
-    );
-    // Any other visible assigner stream (e.g. "CEO assigned tasks") appends
-    // when non-empty; Admin/Ops streams stay hidden per the "no special
-    // Admin Assigned Task category" spec (visibleAssignerStreams).
+          <StatusOverviewCard
+            key="dept-monthly"
+            title="Monthly"
+            subtitle={monthly.department.name}
+            totals={monthly.department.totals}
+            tasks={monthly.department.tasks}
+            action={monthlyPicker}
+            actionPlacement="row"
+          />
+        </>
+      );
+      // HOD (2026-07-29): FOUR sections — personal Daily + Monthly, CEO
+      // Assigned Tasks (?cdate=, "From CEO"), then the department status
+      // pair. The view-only DEPT_SITE logins have no personal tasks and
+      // keep the department pair alone.
+      if (role === "HOD") {
+        return grid(
+          <>
+            {personalPair}
+            {streamCard("CEO", ceoDate, "cdate", "From CEO")}
+            {deptPair}
+          </>,
+        );
+      }
+      return grid(deptPair);
+    }
+
+    if (daily.branch && monthly.branch) {
+      return grid(
+        <>
+          <StatusOverviewCard
+            key="branch-daily"
+            title="Daily"
+            subtitle={daily.branch.name}
+            totals={daily.branch.totals}
+            tasks={daily.branch.tasks}
+            action={dailyPicker}
+            actionPlacement="row"
+          />
+          <StatusOverviewCard
+            key="branch-monthly"
+            title="Monthly"
+            subtitle={monthly.branch.name}
+            totals={monthly.branch.totals}
+            tasks={monthly.branch.tasks}
+            action={monthlyPicker}
+            actionPlacement="row"
+          />
+        </>,
+      );
+    }
+
+    // MEMBER — personal Daily + Monthly + "HOD assigned tasks" (?hdate=),
+    // plus any other visible assigner stream (e.g. CEO) when non-empty;
+    // Admin/Ops streams stay hidden per the "no special Admin Assigned
+    // Task category" spec (visibleAssignerStreams).
     const otherStreamCards = visibleAssignerStreams(daily.me.streamsAll)
       .filter((s) => s.key !== "HOD")
       .map((s) => (
@@ -241,29 +322,12 @@ export async function HomeScopedOverviewSection({
           {...completeProps}
         />
       ));
-    return (
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        <StatusOverviewCard
-          title="Daily"
-          subtitle="My Tasks"
-          totals={daily.me.totals}
-          tasks={flowBucketize(daily.me.tasks)}
-          action={dailyPicker}
-          actionPlacement="row"
-          {...completeProps}
-        />
-        <StatusOverviewCard
-          title="Monthly"
-          subtitle="My Tasks"
-          totals={monthly.me.totals}
-          tasks={flowBucketize(monthly.me.tasks)}
-          action={monthlyPicker}
-          actionPlacement="row"
-          {...completeProps}
-        />
-        {hodCard}
+    return grid(
+      <>
+        {personalPair}
+        {streamCard("HOD", hodDate, "hdate", "From HOD")}
         {otherStreamCards}
-      </div>
+      </>,
     );
   } catch {
     return null;

@@ -63,6 +63,7 @@ export default async function HomePage({
     mrange?: string;
     adate?: string;
     hdate?: string;
+    cdate?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -71,6 +72,7 @@ export default async function HomePage({
   const monthlyRange = parseMonthRange(sp.mrange);
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
+  const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -152,6 +154,7 @@ export default async function HomePage({
         monthlyRange={monthlyRange}
         adhocDate={adhocDate}
         hodDate={hodDate}
+        ceoDate={ceoDate}
         actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask }}
       />
     </Suspense>
