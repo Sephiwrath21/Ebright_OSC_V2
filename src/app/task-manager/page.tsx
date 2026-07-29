@@ -131,6 +131,7 @@ export default async function TaskManagerPage({
     mrange?: string;
     cdate?: string;
     hdate?: string;
+    adate?: string;
   }>;
 }) {
   const session = await auth();
@@ -156,6 +157,8 @@ export default async function TaskManagerPage({
   // use (2026-07-29). Undefined = today.
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
+  // Branch Manager's personal Ad hoc card anchor (?adate=).
+  const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
   // so changing one date never resets the others.
   const rawParams = {
@@ -164,6 +167,7 @@ export default async function TaskManagerPage({
     mrange: monthlyRangeParam,
     cdate: ceoDate,
     hdate: hodDate,
+    adate: adhocDate,
   };
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
@@ -702,6 +706,37 @@ export default async function TaskManagerPage({
       daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
     const personalHod =
       daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
+    // Branch Manager's personal Ad hoc card (2026-07-29 audit) — same
+    // day-windowed pattern, sourced from the ad hoc-tagged personal set.
+    let personalAdhoc: Parameters<typeof TaskManagerView>[0]["personalAdhoc"];
+    if (daily.me.me.role === "BRANCH") {
+      const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
+      const adhocWin = resolveWindow("daily", adhocAnchor);
+      const buckets = flowBucketize(
+        (daily.me.adhocAll?.tasks ?? []).filter((t) => {
+          if (!t.dueAt) return false;
+          const due = new Date(t.dueAt);
+          return due >= adhocWin.start && due < adhocWin.end;
+        }),
+      );
+      personalAdhoc = {
+        totals: {
+          completed: buckets.completed.length,
+          pending: buckets.pending.length,
+          na: buckets.na.length,
+        },
+        tasks: buckets,
+        control: (
+          <DailyDatePicker
+            key="personal-adate-picker"
+            value={adhocAnchor}
+            basePath="/task-manager"
+            param="adate"
+            extraParams={carryTM("adate")}
+          />
+        ),
+      };
+    }
 
     body = (
       <TaskManagerView
@@ -727,6 +762,7 @@ export default async function TaskManagerPage({
         personalDailyDaySidebar={personalDailyDaySidebar}
         personalCeo={personalCeo}
         personalHod={personalHod}
+        personalAdhoc={personalAdhoc}
       />
     );
   } catch (err) {

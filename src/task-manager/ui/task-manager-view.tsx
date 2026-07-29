@@ -127,6 +127,7 @@ export function TaskManagerView({
   personalDailyDaySidebar,
   personalCeo,
   personalHod,
+  personalAdhoc,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -187,6 +188,13 @@ export function TaskManagerView({
    *  personalCeo, windowed by ?hdate=; suppresses the generic HOD stream
    *  card when present. */
   personalHod?: {
+    totals: FlowBucketTotals;
+    tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
+    control?: React.ReactNode;
+  };
+  /** Branch Manager's personal "Ad hoc" card (2026-07-29 audit) — same
+   *  contract, windowed by ?adate=. */
+  personalAdhoc?: {
     totals: FlowBucketTotals;
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     control?: React.ReactNode;
@@ -310,12 +318,15 @@ export function TaskManagerView({
           with them too. */}
 
       {/* ---- Overview donuts (composition per role/site) ---- */}
-      {(current.kind === "member" || (current.kind === "department" && me.me.role === "HOD")) && (
+      {(current.kind === "member" ||
+        (current.kind === "department" && me.me.role === "HOD") ||
+        (current.kind === "branch" && me.me.role === "BRANCH")) && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {/* Personal cards — MEMBER always, HOD but NOT its view-only
-              DEPT_SITE counterpart (a "Department account" has no personal
-              tasks at all — its full department detail renders below). */}
-          {(current.kind === "member" || me.me.role === "HOD") && (
+          {/* Personal cards — MEMBER always; HOD and BRANCH (Manager) but
+              NOT their view-only DEPT_SITE/BRANCH_SITE counterparts (site
+              accounts have no personal tasks at all — their full entity
+              detail renders below). */}
+          {(current.kind === "member" || me.me.role === "HOD" || me.me.role === "BRANCH") && (
             <>
               <StatusOverviewCard
                 title="Daily"
@@ -359,6 +370,19 @@ export function TaskManagerView({
                   totals={personalHod.totals}
                   tasks={personalHod.tasks}
                   action={personalHod.control}
+                  actionPlacement="row"
+                  {...completeProps}
+                />
+              )}
+              {/* Branch Manager: the dedicated personal "Ad hoc" card
+                  (2026-07-29 audit) — own ?adate= filter, always rendered,
+                  same as the Home version. */}
+              {me.me.role === "BRANCH" && personalAdhoc && (
+                <StatusOverviewCard
+                  title="Ad hoc"
+                  totals={personalAdhoc.totals}
+                  tasks={personalAdhoc.tasks}
+                  action={personalAdhoc.control}
                   actionPlacement="row"
                   {...completeProps}
                 />
@@ -603,33 +627,39 @@ export function TaskManagerView({
       )}
 
       {/* ---- Branch Overview (branch kind) — below My Tasks since the
-          2026-07-29 personal-first reorder. ---- */}
+          2026-07-29 personal-first reorder; own heading + the shared
+          ?date=/?mdate= pickers (2026-07-29 audit fix: the data always
+          followed the params, the visible controls were missing). ---- */}
       {current.kind === "branch" && (
         <>
+          <PageSectionHeading>Branch Overview</PageSectionHeading>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {daily.branch && (
               <StatusOverviewCard
                 title="Daily"
+                subtitle={daily.branch.name}
                 totals={daily.branch.totals}
                 tasks={daily.branch.tasks}
+                action={personalDailyControl}
+                actionPlacement="row"
                 reassign={reassign}
               />
             )}
             {monthly.branch && (
               <StatusOverviewCard
                 title="Monthly"
+                subtitle={monthly.branch.name}
                 totals={monthly.branch.totals}
                 tasks={monthly.branch.tasks}
+                action={personalMonthlyControl}
+                actionPlacement="row"
                 reassign={reassign}
               />
             )}
-            {/* Ad hoc oversight — Branch Manager only, not the view-only
-                BRANCH_SITE login (spec only gives it Branch Status). */}
+            {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
+                Manager only, not the view-only BRANCH_SITE login. The
+                manager's PERSONAL ad hoc card lives in the top row. */}
             {me.me.role === "BRANCH" && adhocCard}
-            {/* CEO/HOD assigned-task cards — Branch Manager only, same as
-                every other role with a personal "My Task" view. BRANCH_SITE
-                stays view-only. */}
-            {me.me.role === "BRANCH" && assignedCards}
           </div>
 
           {/* ---- Details: manpower schedule (branch manager only, not

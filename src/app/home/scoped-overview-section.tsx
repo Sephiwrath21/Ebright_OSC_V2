@@ -289,7 +289,7 @@ export async function HomeScopedOverviewSection({
     }
 
     if (daily.branch && monthly.branch) {
-      return grid(
+      const branchPair = (
         <>
           <StatusOverviewCard
             key="branch-daily"
@@ -309,8 +309,57 @@ export async function HomeScopedOverviewSection({
             action={monthlyPicker}
             actionPlacement="row"
           />
-        </>,
+        </>
       );
+      // Branch Manager (2026-07-29 audit fix): personal-first like HOD —
+      // top row = personal Daily · Monthly · Ad hoc (Branch Manager is the
+      // ad hoc-cadence role; day-windowed by its own ?adate=, always
+      // rendered, clickable), then the own-branch status pair below its
+      // own heading. The view-only BRANCH_SITE login keeps the pair alone.
+      if (role === "BRANCH") {
+        const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
+        const adhocWin = resolveWindow("daily", adhocAnchor);
+        const adhocBuckets = flowBucketize(
+          (daily.me.adhocAll?.tasks ?? []).filter((t) => {
+            if (!t.dueAt) return false;
+            const due = new Date(t.dueAt);
+            return due >= adhocWin.start && due < adhocWin.end;
+          }),
+        );
+        return (
+          <div className="flex flex-col gap-5">
+            {grid(
+              <>
+                {personalPair}
+                <StatusOverviewCard
+                  key="personal-adhoc"
+                  title="Ad hoc"
+                  totals={{
+                    completed: adhocBuckets.completed.length,
+                    pending: adhocBuckets.pending.length,
+                    na: adhocBuckets.na.length,
+                  }}
+                  tasks={adhocBuckets}
+                  action={
+                    <DailyDatePicker
+                      key="home-adate-picker"
+                      value={adhocAnchor}
+                      basePath="/home"
+                      param="adate"
+                      extraParams={carry("adate")}
+                    />
+                  }
+                  actionPlacement="row"
+                  {...completeProps}
+                />
+              </>,
+            )}
+            <PageSectionHeading>Branch Overview</PageSectionHeading>
+            {grid(branchPair)}
+          </div>
+        );
+      }
+      return grid(branchPair);
     }
 
     // MEMBER — personal Daily + Monthly + "HOD assigned tasks" (?hdate=),
