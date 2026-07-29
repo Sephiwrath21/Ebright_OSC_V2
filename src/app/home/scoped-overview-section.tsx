@@ -352,10 +352,13 @@ export async function HomeScopedOverviewSection({
       return grid(branchPair);
     }
 
-    // MEMBER — personal Daily + Monthly + "HOD assigned tasks" (?hdate=),
-    // plus any other visible assigner stream (e.g. CEO) when non-empty;
-    // Admin/Ops streams stay hidden per the "no special Admin Assigned
-    // Task category" spec (visibleAssignerStreams).
+    // MEMBER — department-side staff (Intern / Full Time / HQ Exec) get
+    // personal Daily + Monthly + "HOD assigned tasks" (?hdate=) plus any
+    // other visible assigner stream when non-empty. Branch-side MEMBERs
+    // (Branch Exec / FT Coach / PT Coach) get ONLY the Daily card —
+    // nothing else (2026-07-29 final Coach spec: no Monthly, no Ad hoc,
+    // no HOD Assigned). Admin/Ops streams stay hidden per the "no special
+    // Admin Assigned Task category" spec (visibleAssignerStreams).
     const otherStreamCards = visibleAssignerStreams(daily.me.streamsAll)
       .filter((s) => s.key !== "HOD")
       .map((s) => (
@@ -370,8 +373,8 @@ export async function HomeScopedOverviewSection({
     return grid(
       <>
         {personalPair}
-        {streamCard("HOD", hodDate, "hdate", "From HOD")}
-        {otherStreamCards}
+        {!branchSideMember && streamCard("HOD", hodDate, "hdate", "From HOD")}
+        {!branchSideMember && otherStreamCards}
       </>,
     );
   } catch {

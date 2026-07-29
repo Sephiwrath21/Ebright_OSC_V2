@@ -336,12 +336,15 @@ export function TaskManagerView({
                   {...completeProps}
                 />
               )}
-              {assignedCards}
+              {/* Branch-side MEMBERs (Branch Exec / Coaches) show ONLY the
+                  Daily card — no assigner-stream or delegated cards
+                  (2026-07-29 final Coach spec). */}
+              {!branchSideMember && assignedCards}
               {/* Removed for HOD specifically — "Tasks I Assigned" stays
-                  available for MEMBER (the only other role that can reach
-                  this block) since the underlying StatusOverviewCard/
-                  delegatedCard pattern is shared, not HOD-specific. */}
-              {me.me.role !== "HOD" && delegatedCard}
+                  available for department-side MEMBERs since the underlying
+                  StatusOverviewCard/delegatedCard pattern is shared, not
+                  HOD-specific. */}
+              {me.me.role !== "HOD" && !branchSideMember && delegatedCard}
             </>
           )}
         </div>

@@ -704,13 +704,16 @@ export default async function TaskManagerPage({
         ),
       };
     };
-    // HOD ← CEO assignments; MEMBER (Full Time / Intern / HQ Exec / Part
-    // Time / Coach / Branch Exec) ← HOD assignments — matching what each
-    // role's HOME overview shows.
+    // HOD ← CEO assignments; DEPARTMENT-side MEMBERs (Intern / Full Time /
+    // HQ Exec) ← HOD assignments — matching what each role's HOME overview
+    // shows. Branch-side MEMBERs (Branch Exec / Coaches) get NO assigner
+    // card at all (2026-07-29 final Coach spec: Daily only).
     const personalCeo =
       daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
     const personalHod =
-      daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
+      daily.me.me.role === "MEMBER" && daily.me.me.branch === null
+        ? dayWindowedStream("HOD", hodDate, "hdate")
+        : undefined;
     // Branch Manager's personal Ad hoc card + list (2026-07-29
     // simplification: NO date filter — ad hoc tasks are one-off/irregular,
     // so both the card and the always-rendered list show the plain ALL-TIME
