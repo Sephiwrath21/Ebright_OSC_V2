@@ -142,29 +142,58 @@ const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** Vertical month sidebar for "My Tasks — Monthly" (2026-07-29 redesign,
- *  replacing the calendar picker on Monthly): ◀ year ▶ stepper + Jan–Dec
- *  list, same visual style as the Daily weekday sidebar. Navigates
- *  ?mdate=YYYY-MM-01 and deliberately DROPS ?mrange= — a new month resets
- *  to Full month (callers must pass extraParams WITHOUT mdate/mrange). */
+/** The month's 7-day chunks: 1-7 · 8-14 · 15-21 · 22-28 · 29-{last day}
+ *  (the final chunk adjusts to the month's actual length; absent for
+ *  28-day February). */
+function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const chunks: { from: number; to: number }[] = [];
+  for (let from = 1; from <= daysInMonth; from += 7) {
+    chunks.push({ from, to: Math.min(from + 6, daysInMonth) });
+  }
+  return chunks;
+}
+
+const chunkLabel = (c: { from: number; to: number }) =>
+  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
+
+/** Accordion month sidebar for "My Tasks — Monthly" (2026-07-29 corrected
+ *  interaction — no separate range dropdown here): ◀ year ▶ stepper +
+ *  Jan–Dec list, same visual style as the Daily weekday sidebar. ONE click
+ *  on a month selects it (Full month, ?mrange= dropped) AND expands its
+ *  7-day ranges inline beneath it; only the SELECTED month is ever
+ *  expanded, so picking another month collapses the previous one by
+ *  construction. Clicking an inline range filters to it (?mrange=).
+ *  Callers must pass extraParams WITHOUT mdate/mrange. */
 export function MonthSidebar({
   value,
+  range,
   basePath,
   extraParams = {},
 }: {
   /** The resolved Monthly anchor, YYYY-MM-DD. */
   value: string;
+  /** The raw ?mrange= currently active ("" / undefined = Full month). */
+  range?: string;
   basePath: string;
   extraParams?: Record<string, string>;
 }) {
   const router = useRouter();
   const [y, m] = value.split("-").map(Number);
-  const navigate = (year: number, month: number) => {
-    const qs = new URLSearchParams({ ...extraParams, mdate: `${year}-${pad2(month)}-01` });
+  const navigate = (year: number, month: number, mrange?: string) => {
+    const qs = new URLSearchParams({
+      ...extraParams,
+      mdate: `${year}-${pad2(month)}-01`,
+      ...(mrange ? { mrange } : {}),
+    });
     router.push(`${basePath}?${qs.toString()}`);
   };
   const arrowClass =
     "flex size-6 items-center justify-center rounded-md border border-gray-200 bg-white text-[10px] text-gray-500 hover:border-blue-300 hover:text-blue-600";
+  const rangeClass = (active: boolean) =>
+    active
+      ? "rounded-md bg-blue-50 px-3 py-1 text-left text-xs font-semibold text-blue-700"
+      : "rounded-md px-3 py-1 text-left text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900";
 
   return (
     <nav aria-label="Month" className="flex flex-col gap-1">
@@ -180,19 +209,41 @@ export function MonthSidebar({
       {MONTH_LABELS.map((label, i) => {
         const active = i + 1 === m;
         return (
-          <button
-            key={label}
-            type="button"
-            onClick={() => navigate(y, i + 1)}
-            aria-current={active ? "date" : undefined}
-            className={
-              active
-                ? "rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
-                : "rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }
-          >
-            {label}
-          </button>
+          <div key={label} className="flex flex-col gap-0.5">
+            <button
+              type="button"
+              onClick={() => navigate(y, i + 1)}
+              aria-current={active ? "date" : undefined}
+              aria-expanded={active}
+              className={
+                active
+                  ? "rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
+                  : "rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }
+            >
+              {label} {active ? "▾" : ""}
+            </button>
+            {active && (
+              <div className="mb-1 ml-3 flex flex-col gap-0.5 border-l border-gray-200 pl-2">
+                <button type="button" onClick={() => navigate(y, m)} className={rangeClass(!range)}>
+                  Full month
+                </button>
+                {monthDayChunks(y, m).map((c) => {
+                  const v = `${c.from}-${c.to}`;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => navigate(y, m, v)}
+                      className={rangeClass(range === v)}
+                    >
+                      {chunkLabel(c)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         );
       })}
     </nav>
@@ -264,11 +315,6 @@ export function MonthRangeDropdown({
 }) {
   const router = useRouter();
   const [y, m] = value.split("-").map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const chunks: { from: number; to: number }[] = [];
-  for (let from = 1; from <= daysInMonth; from += 7) {
-    chunks.push({ from, to: Math.min(from + 6, daysInMonth) });
-  }
   const navigate = (v: string) => {
     const qs = new URLSearchParams({
       ...extraParams,
@@ -286,9 +332,9 @@ export function MonthRangeDropdown({
       className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
     >
       <option value="">Full month</option>
-      {chunks.map((c) => (
+      {monthDayChunks(y, m).map((c) => (
         <option key={`${c.from}-${c.to}`} value={`${c.from}-${c.to}`}>
-          {c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`}
+          {chunkLabel(c)}
         </option>
       ))}
     </select>

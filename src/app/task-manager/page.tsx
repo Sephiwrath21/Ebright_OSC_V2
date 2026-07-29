@@ -588,10 +588,10 @@ export default async function TaskManagerPage({
     );
     // Monthly selector (2026-07-29 redesign — calendar picker removed):
     // compact [Month ▾][Range ▾] pair for the donut card heading; the
-    // range dropdown alone for the "My Tasks — Monthly" heading (its month
-    // lives in the sidebar); the 12-month sidebar beside that list. All
-    // drive the shared ?mdate=/?mrange= — changing month resets to Full
-    // month.
+    // ACCORDION month sidebar beside the "My Tasks — Monthly" list (one
+    // click selects a month AND expands its 7-day ranges inline — no
+    // separate range dropdown there). All drive the shared
+    // ?mdate=/?mrange= — changing month resets to Full month.
     const personalMonthlyControl = (
       <div key="personal-monthly-controls" className="flex items-center gap-1.5">
         <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
@@ -603,19 +603,11 @@ export default async function TaskManagerPage({
         />
       </div>
     );
-    const personalMonthlyRangeControl = (
-      <MonthRangeDropdown
-        key="personal-monthly-range"
-        value={monthly.date}
-        range={monthlyRangeParam}
-        basePath="/task-manager"
-        extraParams={dailyCarry}
-      />
-    );
     const personalMonthlySidebar = (
       <MonthSidebar
         key="personal-month-sidebar"
         value={monthly.date}
+        range={monthlyRangeParam}
         basePath="/task-manager"
         extraParams={dailyCarry}
       />
@@ -653,7 +645,6 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
-        personalMonthlyRangeControl={personalMonthlyRangeControl}
         personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
       />
