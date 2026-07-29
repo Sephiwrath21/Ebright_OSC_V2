@@ -131,7 +131,6 @@ export default async function TaskManagerPage({
     mrange?: string;
     cdate?: string;
     hdate?: string;
-    adate?: string;
   }>;
 }) {
   const session = await auth();
@@ -157,17 +156,16 @@ export default async function TaskManagerPage({
   // use (2026-07-29). Undefined = today.
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
-  // Branch Manager's personal Ad hoc card anchor (?adate=).
-  const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
-  // so changing one date never resets the others.
+  // so changing one date never resets the others. (Ad hoc is deliberately
+  // NOT date-filtered — 2026-07-29 simplification: one-off tasks, plain
+  // all-time list.)
   const rawParams = {
     date: dailyDate,
     mdate: monthlyDate,
     mrange: monthlyRangeParam,
     cdate: ceoDate,
     hdate: hodDate,
-    adate: adhocDate,
   };
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
@@ -713,21 +711,14 @@ export default async function TaskManagerPage({
       daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
     const personalHod =
       daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
-    // Branch Manager's personal Ad hoc card (2026-07-29 audit) — same
-    // day-windowed pattern, sourced from the ad hoc-tagged personal set.
+    // Branch Manager's personal Ad hoc card + list (2026-07-29
+    // simplification: NO date filter — ad hoc tasks are one-off/irregular,
+    // so both the card and the always-rendered list show the plain ALL-TIME
+    // personal set, matching every other Ad hoc view in the app).
     let personalAdhoc: Parameters<typeof TaskManagerView>[0]["personalAdhoc"];
     if (daily.me.me.role === "BRANCH") {
-      const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
-      const adhocWin = resolveWindow("daily", adhocAnchor);
-      // One windowed set feeds BOTH the donut card (bucketized) and the
-      // "My Tasks — Ad hoc" list (flat, source order = dueAt-sorted) — the
-      // card and list are linked on the same ?adate= day.
-      const windowed = (daily.me.adhocAll?.tasks ?? []).filter((t) => {
-        if (!t.dueAt) return false;
-        const due = new Date(t.dueAt);
-        return due >= adhocWin.start && due < adhocWin.end;
-      });
-      const buckets = flowBucketize(windowed);
+      const all = daily.me.adhocAll?.tasks ?? [];
+      const buckets = flowBucketize(all);
       personalAdhoc = {
         totals: {
           completed: buckets.completed.length,
@@ -735,16 +726,7 @@ export default async function TaskManagerPage({
           na: buckets.na.length,
         },
         tasks: buckets,
-        flatTasks: windowed,
-        control: (
-          <DailyDatePicker
-            key="personal-adate-picker"
-            value={adhocAnchor}
-            basePath="/task-manager"
-            param="adate"
-            extraParams={carryTM("adate")}
-          />
-        ),
+        flatTasks: all,
       };
     }
 
