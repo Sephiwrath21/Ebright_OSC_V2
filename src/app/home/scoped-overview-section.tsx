@@ -213,6 +213,11 @@ export async function HomeScopedOverviewSection({
     // cleanup) — shared by the MEMBER view and the HOD view's sections 1–2.
     // They ride the same ?date=/?mdate= as the department pair, keeping
     // every Daily surface on one date.
+    //
+    // Branch-side MEMBERs (Branch Exec / FT Coach / PT Coach) see DAILY
+    // ONLY — no Monthly — per the original role spec (same rule the Task
+    // Manager page has always applied; carried to Home 2026-07-29).
+    const branchSideMember = role === "MEMBER" && daily.me.me.branch !== null;
     const personalPair = (
       <>
         <StatusOverviewCard
@@ -224,15 +229,17 @@ export async function HomeScopedOverviewSection({
           actionPlacement="row"
           {...completeProps}
         />
-        <StatusOverviewCard
-          key="personal-monthly"
-          title="Monthly"
-          totals={monthly.me.totals}
-          tasks={flowBucketize(monthly.me.tasks)}
-          action={monthlyPicker}
-          actionPlacement="row"
-          {...completeProps}
-        />
+        {!branchSideMember && (
+          <StatusOverviewCard
+            key="personal-monthly"
+            title="Monthly"
+            totals={monthly.me.totals}
+            tasks={flowBucketize(monthly.me.tasks)}
+            action={monthlyPicker}
+            actionPlacement="row"
+            {...completeProps}
+          />
+        )}
       </>
     );
 
