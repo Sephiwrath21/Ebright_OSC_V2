@@ -22,6 +22,7 @@
 import type { ReactNode } from "react";
 import { getFlowDetail } from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
+import { resolveViewRole, shows } from "@/task-manager/role-views";
 import {
   DailyDatePicker,
   MonthDropdown,
@@ -110,11 +111,15 @@ export async function HomeScopedOverviewSection({
       </div>
     );
 
+    // ALL role gates below read role-views.ts (the single source of truth,
+    // 2026-07-29 centralization) — this section renders purely from the
+    // config via shows(view, "home", key).
+    const view = resolveViewRole(daily.me.me);
+
     // Org roles (ADMIN/CEO/OPS): the full org-wide overview. CEO has no
     // adhocByRegion (data layer only builds it for ADMIN/OPS) — the ad hoc
     // section and its picker simply don't render for them.
-    const role = daily.me.me.role;
-    if (daily.org && role !== "DEPT_SITE") {
+    if (daily.org && shows(view, "home", "orgGrids")) {
       return (
         <HomeTaskOverview
           dailyOrg={daily.org}
@@ -131,7 +136,7 @@ export async function HomeScopedOverviewSection({
 
     // Elevated department sites: ALL departments, Daily + Monthly (branch
     // halves are stripped server-side — see getFlowDetail).
-    if (daily.org && monthly.org) {
+    if (daily.org && monthly.org && shows(view, "home", "allDeptGrids")) {
       return (
         <div className="flex flex-col gap-5">
           <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
@@ -209,27 +214,23 @@ export async function HomeScopedOverviewSection({
       );
     };
 
-    // Personal Daily/Monthly cards (clickable, no subtitle — 2026-07-29
-    // cleanup) — shared by the MEMBER view and the HOD view's sections 1–2.
-    // They ride the same ?date=/?mdate= as the department pair, keeping
-    // every Daily surface on one date.
-    //
-    // Branch-side MEMBERs (Branch Exec / FT Coach / PT Coach) see DAILY
-    // ONLY — no Monthly — per the original role spec (same rule the Task
-    // Manager page has always applied; carried to Home 2026-07-29).
-    const branchSideMember = role === "MEMBER" && daily.me.me.branch !== null;
+    // Personal Daily/Monthly cards (clickable, no subtitle) — shared by
+    // every view whose config lists them. Which cards render is decided
+    // ENTIRELY by role-views.ts (e.g. BRANCH_MEMBER = Daily only).
     const personalPair = (
       <>
-        <StatusOverviewCard
-          key="personal-daily"
-          title="Daily"
-          totals={daily.me.totals}
-          tasks={flowBucketize(daily.me.tasks)}
-          action={dailyPicker}
-          actionPlacement="row"
-          {...completeProps}
-        />
-        {!branchSideMember && (
+        {shows(view, "home", "personalDaily") && (
+          <StatusOverviewCard
+            key="personal-daily"
+            title="Daily"
+            totals={daily.me.totals}
+            tasks={flowBucketize(daily.me.tasks)}
+            action={dailyPicker}
+            actionPlacement="row"
+            {...completeProps}
+          />
+        )}
+        {shows(view, "home", "personalMonthly") && (
           <StatusOverviewCard
             key="personal-monthly"
             title="Monthly"
@@ -272,19 +273,17 @@ export async function HomeScopedOverviewSection({
           />
         </>
       );
-      // HOD (2026-07-29 layout): TOP ROW = the three personal cards
-      // (Daily · Monthly · CEO Assigned, no subtitles); BELOW, clearly
-      // separated under its own heading, the Department Overview pair
-      // (aggregate, keeps the department-name subtitle). The view-only
-      // DEPT_SITE logins have no personal tasks and keep the department
-      // pair alone.
-      if (role === "HOD") {
+      // HOD layout: TOP ROW = personal cards (per config) + CEO Assigned;
+      // BELOW, clearly separated under its own heading, the Department
+      // Overview pair. View-only DEPT_SITE logins (no personal sections in
+      // their config) keep the department pair alone.
+      if (shows(view, "home", "personalDaily")) {
         return (
           <div className="flex flex-col gap-5">
             {grid(
               <>
                 {personalPair}
-                {streamCard("CEO", ceoDate, "cdate")}
+                {shows(view, "home", "ceoAssigned") && streamCard("CEO", ceoDate, "cdate")}
               </>,
             )}
             <PageSectionHeading>Department Overview</PageSectionHeading>
@@ -318,30 +317,31 @@ export async function HomeScopedOverviewSection({
           />
         </>
       );
-      // Branch Manager (2026-07-29): personal-first like HOD — top row =
-      // personal Daily · Monthly · Ad hoc, then the own-branch status pair
-      // below its own heading. The Ad hoc card is a plain ALL-TIME set,
-      // deliberately NO date filter (2026-07-29 simplification: ad hoc
-      // tasks are one-off/irregular). The view-only BRANCH_SITE login
-      // keeps the pair alone.
-      if (role === "BRANCH") {
+      // Branch Manager layout: personal-first — top row = personal cards
+      // (per config) + Ad hoc (plain ALL-TIME set, deliberately no date
+      // filter: ad hoc tasks are one-off/irregular), then the own-branch
+      // status pair below its own heading. View-only BRANCH_SITE logins
+      // (no personal sections in their config) keep the pair alone.
+      if (shows(view, "home", "personalDaily")) {
         const adhocBuckets = flowBucketize(daily.me.adhocAll?.tasks ?? []);
         return (
           <div className="flex flex-col gap-5">
             {grid(
               <>
                 {personalPair}
-                <StatusOverviewCard
-                  key="personal-adhoc"
-                  title="Ad hoc"
-                  totals={{
-                    completed: adhocBuckets.completed.length,
-                    pending: adhocBuckets.pending.length,
-                    na: adhocBuckets.na.length,
-                  }}
-                  tasks={adhocBuckets}
-                  {...completeProps}
-                />
+                {shows(view, "home", "personalAdhoc") && (
+                  <StatusOverviewCard
+                    key="personal-adhoc"
+                    title="Ad hoc"
+                    totals={{
+                      completed: adhocBuckets.completed.length,
+                      pending: adhocBuckets.pending.length,
+                      na: adhocBuckets.na.length,
+                    }}
+                    tasks={adhocBuckets}
+                    {...completeProps}
+                  />
+                )}
               </>,
             )}
             <PageSectionHeading>Branch Overview</PageSectionHeading>
@@ -352,13 +352,11 @@ export async function HomeScopedOverviewSection({
       return grid(branchPair);
     }
 
-    // MEMBER — department-side staff (Intern / Full Time / HQ Exec) get
-    // personal Daily + Monthly + "HOD assigned tasks" (?hdate=) plus any
-    // other visible assigner stream when non-empty. Branch-side MEMBERs
-    // (Branch Exec / FT Coach / PT Coach) get ONLY the Daily card —
-    // nothing else (2026-07-29 final Coach spec: no Monthly, no Ad hoc,
-    // no HOD Assigned). Admin/Ops streams stay hidden per the "no special
-    // Admin Assigned Task category" spec (visibleAssignerStreams).
+    // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
+    // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
+    // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
+    // Admin/Ops streams stay hidden per the "no special Admin Assigned
+    // Task category" spec (visibleAssignerStreams).
     const otherStreamCards = visibleAssignerStreams(daily.me.streamsAll)
       .filter((s) => s.key !== "HOD")
       .map((s) => (
@@ -373,8 +371,8 @@ export async function HomeScopedOverviewSection({
     return grid(
       <>
         {personalPair}
-        {!branchSideMember && streamCard("HOD", hodDate, "hdate", "From HOD")}
-        {!branchSideMember && otherStreamCards}
+        {shows(view, "home", "hodAssigned") && streamCard("HOD", hodDate, "hdate", "From HOD")}
+        {shows(view, "home", "assignerStreams") && otherStreamCards}
       </>,
     );
   } catch {

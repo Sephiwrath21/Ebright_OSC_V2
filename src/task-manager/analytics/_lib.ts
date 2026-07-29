@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { BlockStatus, Cadence, ItemType, Role, RunStatus } from "@/generated/task-manager-client";
 import { prisma } from "@/task-manager/prisma";
 import { getUsersByIds } from "@/task-manager/lib/users";
+import { isElevatedDeptSite } from "../role-views";
 
 // ---------- query validation ----------
 
@@ -205,23 +206,11 @@ export function canViewOrg(role: Role): boolean {
   return role === "ADMIN" || role === "CEO" || role === "OPS";
 }
 
-/** Department-site accounts with org-wide DEPARTMENT visibility (still no
- *  branch data) AND the unrestricted "+ Task" assign form (data/tasks.ts):
- *  Operations (whose donor-era special case was assign-only) and Optimisation
- *  — per the 2026-07-24 product decision. Every other DEPT_SITE stays locked
- *  to its own department. ("Operations" since the 2026-07-25 rename.) */
-export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operations", "Optimisation"] as const;
-
-export function isElevatedDeptSite(user: {
-  role: string;
-  department: string | null;
-}): boolean {
-  return (
-    user.role === "DEPT_SITE" &&
-    user.department !== null &&
-    (ELEVATED_DEPT_SITE_DEPARTMENTS as readonly string[]).includes(user.department)
-  );
-}
+// Elevated-department-site rule: MOVED to role-views.ts (the pure, client-
+// safe role-config module — 2026-07-29 centralization) and re-exported here
+// so the data layer's authorization checks and existing imports keep
+// working unchanged.
+export { ELEVATED_DEPT_SITE_DEPARTMENTS, isElevatedDeptSite } from "../role-views";
 
 /**
  * Entity detail: org roles see any; HOD/DEPT_SITE only their own department

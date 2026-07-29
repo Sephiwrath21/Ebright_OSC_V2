@@ -45,6 +45,12 @@ import {
   SetupPendingError,
 } from "@/task-manager/data";
 import { formatLocalDate, isElevatedDeptSite, resolveWindow } from "@/task-manager/analytics/_lib";
+import {
+  resolveViewRole,
+  shows,
+  showsAddTaskHeader,
+  weekdayIncludesSunday,
+} from "@/task-manager/role-views";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
@@ -407,6 +413,9 @@ export default async function TaskManagerPage({
       role,
       department: daily.me.me.department ?? null,
     });
+    // ALL role gates below read role-views.ts (the single source of truth,
+    // 2026-07-29 centralization).
+    const viewRole = resolveViewRole(daily.me.me);
     // "Assign to Others" — same 5 identities as the assign form; the data
     // layer re-checks (incl. HOD's own-department scoping) on every call.
     const canReassign =
@@ -414,21 +423,18 @@ export default async function TaskManagerPage({
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
-    // role (2026-07-29 consistency requirement) — CEO/OPS/HOD here; the
-    // superadmin + elevated-site branch below sets its own headerAction.
-    // Layout reshuffles below the header can never move it.
-    if (role === "CEO" || role === "OPS" || role === "HOD") {
+    // role per the config — layout reshuffles below the header can never
+    // move it.
+    if (showsAddTaskHeader(viewRole)) {
       headerAction = <AddTaskButton staff={staff} action={assign} />;
     }
 
-    if (role === "ADMIN" || elevatedDeptSite) {
+    if (shows(viewRole, "taskManager", "entityDropdowns")) {
       // Superadmin + elevated department sites (Operation/Optimisation):
       // dropdown-driven entity overview. ADMIN gets the Department|Branch
       // toggle; elevated sites are department-only (no branch visibility by
-      // design — getBranchDetail would 403 them anyway). "+ Task" renders in
-      // the page header, above whatever mode is active.
-      headerAction = <AddTaskButton staff={staff} action={assign} />;
-
+      // design — getBranchDetail would 403 them anyway). "+ Task" already
+      // sits in the page header via the config above.
       const view: "department" | "branch" =
         role === "ADMIN" && sp.view === "branch" ? "branch" : "department";
 
@@ -648,12 +654,8 @@ export default async function TaskManagerPage({
     // the date picker is the MASTER (any specific occurrence, past/future);
     // the sidebar switches days WITHIN the anchored week via the same
     // shared ?date= — donut, sidebar highlight, and list always agree.
-    // Branch-side roles (Manager + branch MEMBERs: Branch Exec / Coaches)
-    // work weekends — their Daily sidebar runs Tue–SUN; department-side
-    // roles keep Tue–Sat (2026-07-29 decision).
-    const branchSide =
-      daily.me.me.branch !== null &&
-      (daily.me.me.role === "BRANCH" || daily.me.me.role === "MEMBER");
+    // Weekday range (Tue–Sat vs Tue–SUN for branch-side roles) comes from
+    // the role config.
     const personalDailyDaySidebar = (
       <WeekdaySidebar
         key="daily-day-sidebar"
@@ -661,7 +663,7 @@ export default async function TaskManagerPage({
         basePath="/task-manager"
         extraParams={monthlyCarry}
         counts={sidebarCounts.weekdays}
-        includeSunday={branchSide}
+        includeSunday={weekdayIncludesSunday(viewRole)}
       />
     );
 
@@ -704,22 +706,21 @@ export default async function TaskManagerPage({
         ),
       };
     };
-    // HOD ← CEO assignments; DEPARTMENT-side MEMBERs (Intern / Full Time /
-    // HQ Exec) ← HOD assignments — matching what each role's HOME overview
-    // shows. Branch-side MEMBERs (Branch Exec / Coaches) get NO assigner
-    // card at all (2026-07-29 final Coach spec: Daily only).
-    const personalCeo =
-      daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
-    const personalHod =
-      daily.me.me.role === "MEMBER" && daily.me.me.branch === null
-        ? dayWindowedStream("HOD", hodDate, "hdate")
-        : undefined;
+    // Dedicated assigner cards — who gets which is decided by
+    // role-views.ts (HOD ← CEO assignments; department-side staff ← HOD
+    // assignments; branch-side staff none).
+    const personalCeo = shows(viewRole, "taskManager", "ceoAssigned")
+      ? dayWindowedStream("CEO", ceoDate, "cdate")
+      : undefined;
+    const personalHod = shows(viewRole, "taskManager", "hodAssigned")
+      ? dayWindowedStream("HOD", hodDate, "hdate")
+      : undefined;
     // Branch Manager's personal Ad hoc card + list (2026-07-29
     // simplification: NO date filter — ad hoc tasks are one-off/irregular,
     // so both the card and the always-rendered list show the plain ALL-TIME
     // personal set, matching every other Ad hoc view in the app).
     let personalAdhoc: Parameters<typeof TaskManagerView>[0]["personalAdhoc"];
-    if (daily.me.me.role === "BRANCH") {
+    if (shows(viewRole, "taskManager", "personalAdhoc")) {
       const all = daily.me.adhocAll?.tasks ?? [];
       const buckets = flowBucketize(all);
       personalAdhoc = {
