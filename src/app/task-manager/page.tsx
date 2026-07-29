@@ -44,7 +44,7 @@ import {
   NoAccountError,
   SetupPendingError,
 } from "@/task-manager/data";
-import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
+import { formatLocalDate, isElevatedDeptSite, resolveWindow } from "@/task-manager/analytics/_lib";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
@@ -59,6 +59,7 @@ import {
 import {
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
+  flowBucketize,
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
@@ -128,6 +129,7 @@ export default async function TaskManagerPage({
     date?: string;
     mdate?: string;
     mrange?: string;
+    cdate?: string;
   }>;
 }) {
   const session = await auth();
@@ -148,12 +150,23 @@ export default async function TaskManagerPage({
   // selector redesign) — undefined = Full month.
   const monthlyRange = parseMonthRange(sp.mrange);
   const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
-  // Params each side's controls carry along unchanged.
-  const monthlyCarry: Record<string, string> = {
-    ...(monthlyDate ? { mdate: monthlyDate } : {}),
-    ...(monthlyRangeParam ? { mrange: monthlyRangeParam } : {}),
+  // HOD's "CEO assigned tasks" card anchor (?cdate=, 2026-07-29 — same
+  // filter the Home version uses). Undefined = today.
+  const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
+  // Every control carries the OTHER filters' raw params along unchanged,
+  // so changing one date never resets the others.
+  const rawParams = {
+    date: dailyDate,
+    mdate: monthlyDate,
+    mrange: monthlyRangeParam,
+    cdate: ceoDate,
   };
-  const dailyCarry: Record<string, string> = dailyDate ? { date: dailyDate } : {};
+  const carryTM = (...except: string[]) =>
+    Object.fromEntries(
+      Object.entries(rawParams).filter(([k, v]) => v && !except.includes(k)),
+    ) as Record<string, string>;
+  const monthlyCarry = carryTM("date");
+  const dailyCarry = carryTM("mdate", "mrange");
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
@@ -639,6 +652,42 @@ export default async function TaskManagerPage({
       />
     );
 
+    // HOD's "CEO assigned tasks" card (2026-07-29) — same behavior as the
+    // Home version: ALWAYS rendered (zero-filled until the CEO assigns),
+    // day-windowed by its own ?cdate= (default today) on due date, no
+    // subtitle, clickable circles (assignee-only — wired in the view).
+    // Built here because the window math lives server-side.
+    let personalCeo: Parameters<typeof TaskManagerView>[0]["personalCeo"];
+    if (daily.me.me.role === "HOD") {
+      const ceoAnchor = ceoDate ?? formatLocalDate(new Date());
+      const ceoWin = resolveWindow("daily", ceoAnchor);
+      const ceoStream = daily.me.streamsAll.find((s) => s.key === "CEO");
+      const buckets = flowBucketize(
+        (ceoStream?.tasks ?? []).filter((t) => {
+          if (!t.dueAt) return false;
+          const due = new Date(t.dueAt);
+          return due >= ceoWin.start && due < ceoWin.end;
+        }),
+      );
+      personalCeo = {
+        totals: {
+          completed: buckets.completed.length,
+          pending: buckets.pending.length,
+          na: buckets.na.length,
+        },
+        tasks: buckets,
+        control: (
+          <DailyDatePicker
+            key="personal-ceo-picker"
+            value={ceoAnchor}
+            basePath="/task-manager"
+            param="cdate"
+            extraParams={carryTM("cdate")}
+          />
+        ),
+      };
+    }
+
     body = (
       <TaskManagerView
         daily={daily}
@@ -661,6 +710,7 @@ export default async function TaskManagerPage({
         personalMonthlyControl={personalMonthlyControl}
         personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
+        personalCeo={personalCeo}
       />
     );
   } catch (err) {

@@ -28,7 +28,9 @@ import type {
   ActionResult,
   AssignActionResult,
   FlowAssignInput,
+  FlowBucketTotals,
   FlowDetailResponse,
+  FlowDrillTask,
   FlowEntityDetail,
   FlowMemberRollup,
   FlowPeriod,
@@ -123,6 +125,7 @@ export function TaskManagerView({
   personalMonthlyControl,
   personalMonthlySidebar,
   personalDailyDaySidebar,
+  personalCeo,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -169,6 +172,16 @@ export function TaskManagerView({
    *  ranges inline) rendered beside the "My Tasks — Monthly" list, driving
    *  the shared ?mdate=/?mrange=. */
   personalMonthlySidebar?: React.ReactNode;
+  /** HOD's "CEO assigned tasks" card (2026-07-29) — same behavior as the
+   *  Home version: pre-windowed to the ?cdate= day server-side, always
+   *  rendered (zero-filled), no subtitle; `control` is its date picker.
+   *  When present, the generic assigner-stream CEO card is suppressed so
+   *  the card never appears twice. */
+  personalCeo?: {
+    totals: FlowBucketTotals;
+    tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
+    control?: React.ReactNode;
+  };
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -234,7 +247,11 @@ export function TaskManagerView({
   // Admin/Ops assigned tasks do NOT get their own card (visibleAssignerStreams)
   // — those tasks still land in the normal Daily/Monthly/Ad hoc lists via
   // their Cadence tag, just without a separate "assigned by admin" badge.
-  const assignedCards = visibleAssignerStreams(me.streamsAll).map((s) => (
+  const assignedCards = visibleAssignerStreams(me.streamsAll)
+    // The dedicated (date-filtered, always-rendered) CEO card replaces the
+    // generic all-time CEO stream card when the page provides it.
+    .filter((s) => !(personalCeo && s.key === "CEO"))
+    .map((s) => (
       <StatusOverviewCard
         key={s.key}
         title={flowStreamLabel(s.key)}
@@ -307,6 +324,18 @@ export function TaskManagerView({
                   totals={monthly.me.totals}
                   tasks={flowBucketize(monthly.me.tasks)}
                   action={personalMonthlyControl}
+                  actionPlacement="row"
+                  {...completeProps}
+                />
+              )}
+              {/* HOD: the dedicated "CEO assigned tasks" card — same as the
+                  Home version (own ?cdate= filter, always rendered). */}
+              {me.me.role === "HOD" && personalCeo && (
+                <StatusOverviewCard
+                  title="CEO assigned tasks"
+                  totals={personalCeo.totals}
+                  tasks={personalCeo.tasks}
+                  action={personalCeo.control}
                   actionPlacement="row"
                   {...completeProps}
                 />
