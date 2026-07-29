@@ -20,17 +20,17 @@ export type ViewRole =
   | "CEO"
   | "OPS" // Nurul — org role, personal-staff page
   | "HOD"
-  | "ELEVATED_DEPT_SITE" // Operations / Optimisation department accounts
+  | "ELEVATED_DEPT_SITE" // Operations / Optimisation — superadmin-equivalent
   | "DEPT_SITE" // Finance / Marketing / Academy / HR department accounts
   | "BRANCH_MANAGER" // role BRANCH
   | "BRANCH_SITE" // view-only branch login
   | "DEPT_MEMBER" // Intern / Full Time / HQ Exec / Part Time (department side)
-  | "BRANCH_MEMBER"; // Branch Exec / FT Coach / PT Coach — Daily ONLY
+  | "BRANCH_MEMBER" // Branch Exec — Daily ONLY, Tue–Sun
+  | "COACH"; // FT/PT Coach — Daily ONLY, Wed–Sun (2026-07-29 final spec)
 
 export type SectionKey =
   // org-level overviews
   | "orgGrids" // all-departments + branch-regions (+ ad hoc regions) grids
-  | "allDeptGrids" // elevated sites: all-departments Daily/Monthly only
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
   | "departmentOverview" // own-department detail (chips + donut + roster)
   | "branchOverview" // own-branch detail (same component as department)
@@ -54,13 +54,17 @@ export type SectionKey =
   | "ceoTaskTable"
   | "ceoKanban";
 
+/** Daily weekday sidebar range — three distinct ranges per the 2026-07-29
+ *  final spec: department-side Tue–Sat; Branch Manager + Branch Exec
+ *  Tue–Sun; Coaches Wed–Sun. */
+export type WeekdayRange = "tue-sat" | "tue-sun" | "wed-sun";
+
 export interface RoleViewConfig {
   /** Sections on the HOME page overview, in render order. */
   home: readonly SectionKey[];
   /** Sections on the TASK MANAGER page, in render order. */
   taskManager: readonly SectionKey[];
-  /** Daily weekday sidebar range — branch-side staff work weekends. */
-  weekdayRange: "tue-sat" | "tue-sun";
+  weekdayRange: WeekdayRange;
   /** "+ Task" button in the Task Manager page header. */
   addTaskHeader: boolean;
 }
@@ -98,8 +102,11 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
+  // Superadmin-equivalent (2026-07-29 final spec): full org grids on Home
+  // (departments + branches + ad hoc regions) and the Department | Branch
+  // dropdown toggle on the Task Manager page.
   ELEVATED_DEPT_SITE: {
-    home: ["allDeptGrids"],
+    home: ["orgGrids"],
     taskManager: ["entityDropdowns"],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
@@ -116,8 +123,6 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
       "personalDaily",
       "personalMonthly",
       "personalAdhoc",
-      "assignerStreams",
-      "delegated",
       "myTasksDaily",
       "myTasksMonthly",
       "myTasksAdhoc",
@@ -128,33 +133,35 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     weekdayRange: "tue-sun",
     addTaskHeader: false,
   },
+  // Branch sites see Daily, Monthly AND the branch-wide ad hoc set
+  // (read-only) — 2026-07-29 final spec.
   BRANCH_SITE: {
-    home: ["branchOverview"],
-    taskManager: ["branchOverview"],
+    home: ["branchOverview", "adhocOversight"],
+    taskManager: ["branchOverview", "adhocOversight"],
     weekdayRange: "tue-sat",
     addTaskHeader: false,
   },
+  // Personal ONLY: Daily, Monthly, HOD Assigned — exactly the 2026-07-29
+  // final spec (no generic stream/delegated cards).
   DEPT_MEMBER: {
-    home: ["personalDaily", "personalMonthly", "hodAssigned", "assignerStreams"],
-    taskManager: [
-      "personalDaily",
-      "personalMonthly",
-      "hodAssigned",
-      "assignerStreams",
-      "delegated",
-      "myTasksDaily",
-      "myTasksMonthly",
-    ],
+    home: ["personalDaily", "personalMonthly", "hodAssigned"],
+    taskManager: ["personalDaily", "personalMonthly", "hodAssigned", "myTasksDaily", "myTasksMonthly"],
     weekdayRange: "tue-sat",
     addTaskHeader: false,
   },
-  // Branch Exec / FT Coach / PT Coach — Daily ONLY, nothing else
-  // (2026-07-29 final spec, Branch Exec grouped with coaches per the
-  // original role spec).
+  // Branch Exec — Daily ONLY, Tue–Sun (2026-07-29 final spec).
   BRANCH_MEMBER: {
     home: ["personalDaily"],
     taskManager: ["personalDaily", "myTasksDaily"],
     weekdayRange: "tue-sun",
+    addTaskHeader: false,
+  },
+  // FT/PT Coach — Daily ONLY, Wed–SUN (the THIRD distinct range,
+  // 2026-07-29 final spec).
+  COACH: {
+    home: ["personalDaily"],
+    taskManager: ["personalDaily", "myTasksDaily"],
+    weekdayRange: "wed-sun",
     addTaskHeader: false,
   },
 };
@@ -178,11 +185,12 @@ export function isElevatedDeptSite(user: {
   );
 }
 
-/** Raw role (+ department/branch) → UI view identity. */
+/** Raw role (+ department/branch/employmentType) → UI view identity. */
 export function resolveViewRole(user: {
   role: string;
   department: string | null;
   branch: string | null;
+  employmentType?: string | null;
 }): ViewRole {
   switch (user.role) {
     case "ADMIN":
@@ -201,8 +209,11 @@ export function resolveViewRole(user: {
       return "BRANCH_SITE";
     default:
       // MEMBER (and any future unknown role degrades to the member view):
-      // branch membership decides the branch-side vs department-side split.
-      return user.branch !== null ? "BRANCH_MEMBER" : "DEPT_MEMBER";
+      // branch membership decides the branch-side vs department-side
+      // split, and Coaches split off branch members for their own
+      // Wed–Sun weekday range (2026-07-29 final spec).
+      if (user.branch === null) return "DEPT_MEMBER";
+      return user.employmentType === "Coach" ? "COACH" : "BRANCH_MEMBER";
   }
 }
 
@@ -212,8 +223,8 @@ export function shows(view: ViewRole, page: "home" | "taskManager", key: Section
   return ROLE_VIEWS[view][page].includes(key);
 }
 
-export function weekdayIncludesSunday(view: ViewRole): boolean {
-  return ROLE_VIEWS[view].weekdayRange === "tue-sun";
+export function weekdayRangeOf(view: ViewRole): WeekdayRange {
+  return ROLE_VIEWS[view].weekdayRange;
 }
 
 export function showsAddTaskHeader(view: ViewRole): boolean {

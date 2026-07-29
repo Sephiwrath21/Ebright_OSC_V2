@@ -49,7 +49,7 @@ import {
   resolveViewRole,
   shows,
   showsAddTaskHeader,
-  weekdayIncludesSunday,
+  weekdayRangeOf,
 } from "@/task-manager/role-views";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
@@ -430,13 +430,13 @@ export default async function TaskManagerPage({
     }
 
     if (shows(viewRole, "taskManager", "entityDropdowns")) {
-      // Superadmin + elevated department sites (Operation/Optimisation):
-      // dropdown-driven entity overview. ADMIN gets the Department|Branch
-      // toggle; elevated sites are department-only (no branch visibility by
-      // design — getBranchDetail would 403 them anyway). "+ Task" already
-      // sits in the page header via the config above.
+      // Superadmin + elevated department sites (Operations/Optimisation):
+      // dropdown-driven entity overview with the Department | Branch toggle
+      // — elevated sites are superadmin-equivalent since the 2026-07-29
+      // final role spec. "+ Task" already sits in the page header via the
+      // config above.
       const view: "department" | "branch" =
-        role === "ADMIN" && sp.view === "branch" ? "branch" : "department";
+        sp.view === "branch" ? "branch" : "department";
 
       let overview: ReactNode;
       if (view === "department") {
@@ -535,7 +535,7 @@ export default async function TaskManagerPage({
 
       body = (
         <div className="flex flex-col gap-6">
-          {role === "ADMIN" && <ModeTabs active={view} date={dailyDate} />}
+          <ModeTabs active={view} date={dailyDate} />
           {overview}
         </div>
       );
@@ -654,8 +654,8 @@ export default async function TaskManagerPage({
     // the date picker is the MASTER (any specific occurrence, past/future);
     // the sidebar switches days WITHIN the anchored week via the same
     // shared ?date= — donut, sidebar highlight, and list always agree.
-    // Weekday range (Tue–Sat vs Tue–SUN for branch-side roles) comes from
-    // the role config.
+    // Weekday range (Tue–Sat / Tue–Sun / Wed–Sun) comes from the role
+    // config.
     const personalDailyDaySidebar = (
       <WeekdaySidebar
         key="daily-day-sidebar"
@@ -663,7 +663,7 @@ export default async function TaskManagerPage({
         basePath="/task-manager"
         extraParams={monthlyCarry}
         counts={sidebarCounts.weekdays}
-        includeSunday={weekdayIncludesSunday(viewRole)}
+        range={weekdayRangeOf(viewRole)}
       />
     );
 

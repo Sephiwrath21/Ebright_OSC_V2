@@ -29,7 +29,6 @@ import {
   MonthRangeDropdown,
 } from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
-import { EntityDonutGrid } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { flowBucketize, flowStreamLabel, visibleAssignerStreams } from "@/task-manager/ui/types";
 import type { ActionResult } from "@/task-manager/ui/types";
@@ -134,25 +133,8 @@ export async function HomeScopedOverviewSection({
       );
     }
 
-    // Elevated department sites: ALL departments, Daily + Monthly (branch
-    // halves are stripped server-side — see getFlowDetail).
-    if (daily.org && monthly.org && shows(view, "home", "allDeptGrids")) {
-      return (
-        <div className="flex flex-col gap-5">
-          <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
-          <EntityDonutGrid
-            title="All Departments — Daily"
-            entities={daily.org.departments}
-            action={dailyPicker}
-          />
-          <EntityDonutGrid
-            title="All Departments — Monthly"
-            entities={monthly.org.departments}
-            action={monthlyPicker}
-          />
-        </div>
-      );
-    }
+    // (Elevated department sites take the full orgGrids path above since
+    // the 2026-07-29 final role spec — superadmin-equivalent visibility.)
 
     // "Assignee only" rule: the viewer's own userId + the complete/N-A/
     // reopen actions make their own tasks' status circles live in the drill
@@ -317,6 +299,19 @@ export async function HomeScopedOverviewSection({
           />
         </>
       );
+      // Branch-site Ad hoc card (2026-07-29 final spec): the branch-wide
+      // ALL-TIME ad hoc set, read-only — rendered with the pair for the
+      // view-only site login.
+      const siteAdhocCard = shows(view, "home", "adhocOversight") && daily.adhoc && (
+        <StatusOverviewCard
+          key="site-adhoc"
+          title="Ad hoc"
+          subtitle={daily.branch.name}
+          totals={daily.adhoc.totals}
+          tasks={flowBucketize(daily.adhoc.tasks)}
+        />
+      );
+
       // Branch Manager layout: personal-first — top row = personal cards
       // (per config) + Ad hoc (plain ALL-TIME set, deliberately no date
       // filter: ad hoc tasks are one-off/irregular), then the own-branch
@@ -349,7 +344,12 @@ export async function HomeScopedOverviewSection({
           </div>
         );
       }
-      return grid(branchPair);
+      return grid(
+        <>
+          {branchPair}
+          {siteAdhocCard}
+        </>,
+      );
     }
 
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:

@@ -9,7 +9,7 @@ import {
   resolveViewRole,
   shows,
   showsAddTaskHeader,
-  weekdayIncludesSunday,
+  weekdayRangeOf,
   type ViewRole,
 } from "./role-views";
 
@@ -29,18 +29,52 @@ describe("resolveViewRole", () => {
     expect(resolveViewRole({ role: "DEPT_SITE", department: "Finance", branch: null })).toBe("DEPT_SITE");
   });
 
-  it("MEMBER splits by branch membership", () => {
+  it("MEMBER splits by branch membership, and Coaches split off branch members", () => {
     expect(resolveViewRole({ role: "MEMBER", department: "Marketing", branch: null })).toBe("DEPT_MEMBER");
-    expect(resolveViewRole({ role: "MEMBER", department: null, branch: "Klang" })).toBe("BRANCH_MEMBER");
+    expect(
+      resolveViewRole({ role: "MEMBER", department: null, branch: "Klang", employmentType: "Branch Exec" }),
+    ).toBe("BRANCH_MEMBER");
+    expect(
+      resolveViewRole({ role: "MEMBER", department: null, branch: "Klang", employmentType: "Coach" }),
+    ).toBe("COACH");
     // no department AND no branch (the 61 unplaced real staff) → dept-side view
     expect(resolveViewRole({ role: "MEMBER", department: null, branch: null })).toBe("DEPT_MEMBER");
   });
 });
 
-describe("ROLE_VIEWS — confirmed role specs", () => {
-  it("BRANCH_MEMBER (Branch Exec / Coaches) is Daily ONLY on both pages", () => {
-    expect(ROLE_VIEWS.BRANCH_MEMBER.home).toEqual(["personalDaily"]);
-    expect(ROLE_VIEWS.BRANCH_MEMBER.taskManager).toEqual(["personalDaily", "myTasksDaily"]);
+describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
+  it("Branch Exec and Coaches are Daily ONLY on both pages", () => {
+    for (const v of ["BRANCH_MEMBER", "COACH"] as ViewRole[]) {
+      expect(ROLE_VIEWS[v].home).toEqual(["personalDaily"]);
+      expect(ROLE_VIEWS[v].taskManager).toEqual(["personalDaily", "myTasksDaily"]);
+    }
+  });
+
+  it("the THREE weekday ranges: dept Tue–Sat, Manager/Exec Tue–Sun, Coach Wed–Sun", () => {
+    expect(weekdayRangeOf("DEPT_MEMBER")).toBe("tue-sat");
+    expect(weekdayRangeOf("HOD")).toBe("tue-sat");
+    expect(weekdayRangeOf("BRANCH_MANAGER")).toBe("tue-sun");
+    expect(weekdayRangeOf("BRANCH_MEMBER")).toBe("tue-sun");
+    expect(weekdayRangeOf("COACH")).toBe("wed-sun");
+  });
+
+  it("elevated sites are superadmin-equivalent: full org grids + dropdowns + assign", () => {
+    expect(ROLE_VIEWS.ELEVATED_DEPT_SITE.home).toEqual(["orgGrids"]);
+    expect(ROLE_VIEWS.ELEVATED_DEPT_SITE.taskManager).toEqual(["entityDropdowns"]);
+    expect(showsAddTaskHeader("ELEVATED_DEPT_SITE")).toBe(true);
+  });
+
+  it("branch sites see Daily, Monthly AND the branch-wide Ad hoc set", () => {
+    expect(shows("BRANCH_SITE", "home", "adhocOversight")).toBe(true);
+    expect(shows("BRANCH_SITE", "taskManager", "adhocOversight")).toBe(true);
+  });
+
+  it("department staff see EXACTLY Daily/Monthly/HOD Assigned — no stream or delegated extras", () => {
+    expect(shows("DEPT_MEMBER", "home", "assignerStreams")).toBe(false);
+    expect(shows("DEPT_MEMBER", "taskManager", "assignerStreams")).toBe(false);
+    expect(shows("DEPT_MEMBER", "taskManager", "delegated")).toBe(false);
+    expect(shows("BRANCH_MANAGER", "taskManager", "assignerStreams")).toBe(false);
+    expect(shows("BRANCH_MANAGER", "taskManager", "delegated")).toBe(false);
   });
 
   it("HOD has the four confirmed Home sections in order", () => {
@@ -57,14 +91,11 @@ describe("ROLE_VIEWS — confirmed role specs", () => {
     expect(shows("DEPT_MEMBER", "taskManager", "hodAssigned")).toBe(true);
   });
 
-  it("Branch Manager: Daily/Monthly/Ad hoc personal + Branch Overview, Tue–Sun", () => {
+  it("Branch Manager: Daily/Monthly/Ad hoc personal + Branch Overview + Manpower link", () => {
     expect(shows("BRANCH_MANAGER", "home", "personalAdhoc")).toBe(true);
     expect(shows("BRANCH_MANAGER", "taskManager", "myTasksAdhoc")).toBe(true);
     expect(shows("BRANCH_MANAGER", "home", "branchOverview")).toBe(true);
-    expect(weekdayIncludesSunday("BRANCH_MANAGER")).toBe(true);
-    expect(weekdayIncludesSunday("BRANCH_MEMBER")).toBe(true);
-    expect(weekdayIncludesSunday("DEPT_MEMBER")).toBe(false);
-    expect(weekdayIncludesSunday("HOD")).toBe(false);
+    expect(shows("BRANCH_MANAGER", "taskManager", "manpowerLink")).toBe(true);
   });
 
   it("view-only site logins have no personal sections and no + Task", () => {
@@ -102,8 +133,7 @@ describe("cross-page consistency invariants", () => {
 
   it("non-org-home roles have IDENTICAL personal cards on both pages", () => {
     const personalKeys = ["personalDaily", "personalMonthly", "personalAdhoc", "ceoAssigned", "hodAssigned"] as const;
-    const orgHome = (v: ViewRole) =>
-      shows(v, "home", "orgGrids") || shows(v, "home", "allDeptGrids");
+    const orgHome = (v: ViewRole) => shows(v, "home", "orgGrids");
     for (const v of (Object.keys(ROLE_VIEWS) as ViewRole[]).filter((v) => !orgHome(v))) {
       for (const key of personalKeys) {
         expect(

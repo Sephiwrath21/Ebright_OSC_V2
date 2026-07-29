@@ -214,14 +214,15 @@ export { ELEVATED_DEPT_SITE_DEPARTMENTS, isElevatedDeptSite } from "../role-view
 
 /**
  * Entity detail: org roles see any; HOD/DEPT_SITE only their own department
- * — EXCEPT the elevated department sites (Operation/Optimisation), which see
- * ANY department (never branches); BRANCH/BRANCH_SITE only their own branch;
- * MEMBER none. DEPT_SITE and BRANCH_SITE are the view-only department/branch
- * logins (see Role enum comment in schema.prisma) — this is the ONLY
- * authorization boundary for them (unlike the donor, which additionally
- * gated everything behind a shared internal secret), so they must resolve
- * their own entity here exactly like HOD/BRANCH rather than falling through
- * to deny.
+ * — EXCEPT the elevated department sites (Operations/Optimisation), which
+ * see ANY department AND ANY branch (superadmin-equivalent visibility per
+ * the 2026-07-29 final role spec, reversing the earlier departments-only
+ * rule); BRANCH/BRANCH_SITE only their own branch; MEMBER none. DEPT_SITE
+ * and BRANCH_SITE are the view-only department/branch logins (see Role enum
+ * comment in schema.prisma) — this is the ONLY authorization boundary for
+ * them (unlike the donor, which additionally gated everything behind a
+ * shared internal secret), so they must resolve their own entity here
+ * exactly like HOD/BRANCH rather than falling through to deny.
  */
 export function canViewEntity(
   user: ScopeUser,
@@ -233,8 +234,8 @@ export function canViewEntity(
     return type === "department" && name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "DEPT_SITE") {
-    if (type !== "department") return false;
-    return isElevatedDeptSite(user) || name === (user.department ?? UNASSIGNED);
+    if (isElevatedDeptSite(user)) return true;
+    return type === "department" && name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "BRANCH") {
     return type === "branch" && name === (user.branch ?? UNASSIGNED);

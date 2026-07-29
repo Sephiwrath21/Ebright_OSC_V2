@@ -246,10 +246,12 @@ export function TaskManagerView({
     />
   );
 
-  // Ad hoc tasks — all-time (Branch site + superadmin/OPS org view). No
-  // click-to-complete: this is the branch manager's oversight view across
-  // her whole branch's staff, not her own personal task list.
-  const adhocCard = current.adhoc && flowBucketTotal(current.adhoc.totals) > 0 && (
+  // Ad hoc tasks — all-time, branch-wide oversight (Branch Manager AND the
+  // view-only branch site since the 2026-07-29 final spec). Always rendered
+  // when the payload carries it (zero-filled, never a missing section). No
+  // click-to-complete: this is oversight across the whole branch's staff,
+  // not a personal task list.
+  const adhocCard = current.adhoc && (
     <StatusOverviewCard
       title="Ad hoc Tasks"
       totals={current.adhoc.totals}
