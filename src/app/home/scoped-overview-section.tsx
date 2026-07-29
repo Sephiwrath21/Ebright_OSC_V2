@@ -171,7 +171,7 @@ export async function HomeScopedOverviewSection({
       streamKey: "HOD" | "CEO",
       rawAnchor: string | undefined,
       param: string,
-      subtitle: string,
+      subtitle?: string,
     ) => {
       const anchor = rawAnchor ?? formatLocalDate(new Date());
       const win = resolveWindow("daily", anchor);
@@ -209,15 +209,15 @@ export async function HomeScopedOverviewSection({
       );
     };
 
-    // Personal Daily/Monthly cards (clickable) — shared by the MEMBER view
-    // and the HOD view's sections 1–2. They ride the same ?date=/?mdate=
-    // as the department pair, keeping every Daily surface on one date.
+    // Personal Daily/Monthly cards (clickable, no subtitle — 2026-07-29
+    // cleanup) — shared by the MEMBER view and the HOD view's sections 1–2.
+    // They ride the same ?date=/?mdate= as the department pair, keeping
+    // every Daily surface on one date.
     const personalPair = (
       <>
         <StatusOverviewCard
           key="personal-daily"
           title="Daily"
-          subtitle="My Tasks"
           totals={daily.me.totals}
           tasks={flowBucketize(daily.me.tasks)}
           action={dailyPicker}
@@ -227,7 +227,6 @@ export async function HomeScopedOverviewSection({
         <StatusOverviewCard
           key="personal-monthly"
           title="Monthly"
-          subtitle="My Tasks"
           totals={monthly.me.totals}
           tasks={flowBucketize(monthly.me.tasks)}
           action={monthlyPicker}
@@ -266,17 +265,24 @@ export async function HomeScopedOverviewSection({
           />
         </>
       );
-      // HOD (2026-07-29): FOUR sections — personal Daily + Monthly, CEO
-      // Assigned Tasks (?cdate=, "From CEO"), then the department status
-      // pair. The view-only DEPT_SITE logins have no personal tasks and
-      // keep the department pair alone.
+      // HOD (2026-07-29 layout): TOP ROW = the three personal cards
+      // (Daily · Monthly · CEO Assigned, no subtitles); BELOW, clearly
+      // separated under its own heading, the Department Overview pair
+      // (aggregate, keeps the department-name subtitle). The view-only
+      // DEPT_SITE logins have no personal tasks and keep the department
+      // pair alone.
       if (role === "HOD") {
-        return grid(
-          <>
-            {personalPair}
-            {streamCard("CEO", ceoDate, "cdate", "From CEO")}
-            {deptPair}
-          </>,
+        return (
+          <div className="flex flex-col gap-5">
+            {grid(
+              <>
+                {personalPair}
+                {streamCard("CEO", ceoDate, "cdate")}
+              </>,
+            )}
+            <PageSectionHeading>Department Overview</PageSectionHeading>
+            {grid(deptPair)}
+          </div>
         );
       }
       return grid(deptPair);
