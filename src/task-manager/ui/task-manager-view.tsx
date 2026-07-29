@@ -126,6 +126,7 @@ export function TaskManagerView({
   personalMonthlySidebar,
   personalDailyDaySidebar,
   personalCeo,
+  personalHod,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -178,6 +179,14 @@ export function TaskManagerView({
    *  When present, the generic assigner-stream CEO card is suppressed so
    *  the card never appears twice. */
   personalCeo?: {
+    totals: FlowBucketTotals;
+    tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
+    control?: React.ReactNode;
+  };
+  /** Staff's "HOD assigned tasks" card (2026-07-29) — same contract as
+   *  personalCeo, windowed by ?hdate=; suppresses the generic HOD stream
+   *  card when present. */
+  personalHod?: {
     totals: FlowBucketTotals;
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     control?: React.ReactNode;
@@ -248,9 +257,9 @@ export function TaskManagerView({
   // — those tasks still land in the normal Daily/Monthly/Ad hoc lists via
   // their Cadence tag, just without a separate "assigned by admin" badge.
   const assignedCards = visibleAssignerStreams(me.streamsAll)
-    // The dedicated (date-filtered, always-rendered) CEO card replaces the
-    // generic all-time CEO stream card when the page provides it.
-    .filter((s) => !(personalCeo && s.key === "CEO"))
+    // The dedicated (date-filtered, always-rendered) CEO/HOD cards replace
+    // the generic all-time stream cards when the page provides them.
+    .filter((s) => !(personalCeo && s.key === "CEO") && !(personalHod && s.key === "HOD"))
     .map((s) => (
       <StatusOverviewCard
         key={s.key}
@@ -336,6 +345,20 @@ export function TaskManagerView({
                   totals={personalCeo.totals}
                   tasks={personalCeo.tasks}
                   action={personalCeo.control}
+                  actionPlacement="row"
+                  {...completeProps}
+                />
+              )}
+              {/* Staff (MEMBER — Full Time / Intern / HQ Exec / Part Time /
+                  Coach / Branch Exec): the dedicated "HOD assigned tasks"
+                  card — same as the Home version (own ?hdate= filter,
+                  always rendered). */}
+              {me.me.role === "MEMBER" && personalHod && (
+                <StatusOverviewCard
+                  title="HOD assigned tasks"
+                  totals={personalHod.totals}
+                  tasks={personalHod.tasks}
+                  action={personalHod.control}
                   actionPlacement="row"
                   {...completeProps}
                 />

@@ -130,6 +130,7 @@ export default async function TaskManagerPage({
     mdate?: string;
     mrange?: string;
     cdate?: string;
+    hdate?: string;
   }>;
 }) {
   const session = await auth();
@@ -150,9 +151,11 @@ export default async function TaskManagerPage({
   // selector redesign) — undefined = Full month.
   const monthlyRange = parseMonthRange(sp.mrange);
   const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
-  // HOD's "CEO assigned tasks" card anchor (?cdate=, 2026-07-29 — same
-  // filter the Home version uses). Undefined = today.
+  // HOD's "CEO assigned tasks" card anchor (?cdate=) and staff's "HOD
+  // assigned tasks" card anchor (?hdate=) — same filters the Home versions
+  // use (2026-07-29). Undefined = today.
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
+  const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
   // so changing one date never resets the others.
   const rawParams = {
@@ -160,6 +163,7 @@ export default async function TaskManagerPage({
     mdate: monthlyDate,
     mrange: monthlyRangeParam,
     cdate: ceoDate,
+    hdate: hodDate,
   };
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
@@ -657,19 +661,23 @@ export default async function TaskManagerPage({
     // day-windowed by its own ?cdate= (default today) on due date, no
     // subtitle, clickable circles (assignee-only — wired in the view).
     // Built here because the window math lives server-side.
-    let personalCeo: Parameters<typeof TaskManagerView>[0]["personalCeo"];
-    if (daily.me.me.role === "HOD") {
-      const ceoAnchor = ceoDate ?? formatLocalDate(new Date());
-      const ceoWin = resolveWindow("daily", ceoAnchor);
-      const ceoStream = daily.me.streamsAll.find((s) => s.key === "CEO");
+    // Dedicated assigner-stream cards, same behavior as the Home versions:
+    // ALWAYS rendered for their role (zero-filled), day-windowed by their
+    // own param (default today) on due date, no subtitle, clickable
+    // circles (assignee-only — wired in the view). Built here because the
+    // window math lives server-side.
+    const dayWindowedStream = (streamKey: "HOD" | "CEO", rawAnchor: string | undefined, param: string) => {
+      const anchor = rawAnchor ?? formatLocalDate(new Date());
+      const win = resolveWindow("daily", anchor);
+      const stream = daily.me.streamsAll.find((s) => s.key === streamKey);
       const buckets = flowBucketize(
-        (ceoStream?.tasks ?? []).filter((t) => {
+        (stream?.tasks ?? []).filter((t) => {
           if (!t.dueAt) return false;
           const due = new Date(t.dueAt);
-          return due >= ceoWin.start && due < ceoWin.end;
+          return due >= win.start && due < win.end;
         }),
       );
-      personalCeo = {
+      return {
         totals: {
           completed: buckets.completed.length,
           pending: buckets.pending.length,
@@ -678,15 +686,22 @@ export default async function TaskManagerPage({
         tasks: buckets,
         control: (
           <DailyDatePicker
-            key="personal-ceo-picker"
-            value={ceoAnchor}
+            key={`personal-${param}-picker`}
+            value={anchor}
             basePath="/task-manager"
-            param="cdate"
-            extraParams={carryTM("cdate")}
+            param={param}
+            extraParams={carryTM(param)}
           />
         ),
       };
-    }
+    };
+    // HOD ← CEO assignments; MEMBER (Full Time / Intern / HQ Exec / Part
+    // Time / Coach / Branch Exec) ← HOD assignments — matching what each
+    // role's HOME overview shows.
+    const personalCeo =
+      daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
+    const personalHod =
+      daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
 
     body = (
       <TaskManagerView
@@ -711,6 +726,7 @@ export default async function TaskManagerPage({
         personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
         personalCeo={personalCeo}
+        personalHod={personalHod}
       />
     );
   } catch (err) {
