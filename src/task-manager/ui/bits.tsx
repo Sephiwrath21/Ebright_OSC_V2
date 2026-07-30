@@ -7,6 +7,7 @@
 // + count everywhere).
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import type {
   ActionResult,
   FlowBucketTotals,
@@ -472,7 +473,10 @@ function GuidelineIndicator({
       >
         📎 Guideline
       </button>
-      {open && (
+      {/* Portal to <body> (2026-07-30): same completed-row opacity fix as
+          ProofCell's modals — see the comment there. */}
+      {open &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setOpen(false)}
@@ -516,7 +520,8 @@ function GuidelineIndicator({
               </a>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
@@ -638,9 +643,11 @@ function ProofCell({
       cameraRef.current?.click();
       return;
     }
+    // On failure: SHOW the reason and stay in the popover — auto-opening
+    // the file picker here made it look like Take Photo "was" the picker
+    // (the reported bug); the Upload file button is right next to it.
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Camera not supported here (needs HTTPS) — opening the file picker instead.");
-      cameraRef.current?.click();
+      setCameraError("Camera needs a secure connection (HTTPS) — use Upload file instead.");
       return;
     }
     try {
@@ -651,8 +658,9 @@ function ProofCell({
       streamRef.current = stream;
       setCameraOpen(true);
     } catch {
-      setCameraError("Webcam unavailable or permission denied — opening the file picker instead.");
-      cameraRef.current?.click();
+      setCameraError(
+        "Webcam unavailable or permission denied (check the camera icon in the address bar) — use Upload file instead.",
+      );
     }
   };
 
@@ -768,7 +776,12 @@ function ProofCell({
         <span className="text-xs text-gray-300">—</span>
       )}
       {errorText && !attachOpen && <InlineActionError text={errorText} />}
-      {attachOpen && (
+      {/* Both modals render through a PORTAL to <body> (2026-07-30 fix):
+          completed rows carry opacity-60, and CSS opacity on an ancestor
+          dims even position:fixed descendants — rendered in place, the
+          whole modal (white card included) went see-through. */}
+      {attachOpen &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setAttachOpen(false)}
@@ -870,9 +883,12 @@ function ProofCell({
             {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
             <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 2 MB</p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-      {viewerOpen && imageSrc && (
+      {viewerOpen &&
+        imageSrc &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setViewerOpen(false)}
@@ -918,7 +934,8 @@ function ProofCell({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   );
