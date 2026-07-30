@@ -706,12 +706,13 @@ export function TaskRowLine({
   /** The Proof column's upload action — see ProofCell. Omit to make every
    *  proof cell view-only (📎 still shows where proof exists). */
   onUploadProof?: ProofUploadHandler;
-  nameWidth?: number;
-  /** Shared Proof / Assigned-by column widths (2026-07-30) — set by
-   *  ResizableTaskList's header drag handles, same contract as nameWidth
-   *  (undefined = the pre-table fallback layout). */
-  proofWidth?: number;
-  assignerWidth?: number;
+  /** Column widths (2026-07-30): a number OR a CSS length/var() string —
+   *  ResizableTaskList passes "var(--tm-col-*)" so a header drag updates
+   *  every row without re-rendering them (see its startResize).
+   *  undefined = the pre-table fallback layout (title flex-fills). */
+  nameWidth?: number | string;
+  proofWidth?: number | string;
+  assignerWidth?: number | string;
   onResizeStart?: (e: React.PointerEvent) => void;
   /** "My Tasks" personal-list mode — see doc comment above. */
   hideCompleted?: boolean;
@@ -1034,27 +1035,48 @@ export function ResizableTaskList({
   // status; only DONE is ever hidden here.
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const dragRef = React.useRef<{ col: ResizableColumn; x: number; width: number } | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const dragRef = React.useRef<{ col: ResizableColumn; x: number; width: number; latest: number } | null>(null);
+
+  // Header and rows all read their column widths from CSS variables on the
+  // list container, NOT from React state directly. During a drag the
+  // pointermove handler writes the variable straight onto the DOM node —
+  // zero React re-renders per mouse move (re-rendering every TaskRowLine
+  // per move is what made dragging visibly lag) — and the width is
+  // committed to state ONCE on pointerup so later re-renders keep it.
+  const COL_VARS: Record<ResizableColumn, string> = {
+    name: "--tm-col-name",
+    proof: "--tm-col-proof",
+    assigner: "--tm-col-assigner",
+  };
+  const containerStyle = {
+    "--tm-col-name": `${colWidths.name}px`,
+    "--tm-col-proof": `${colWidths.proof}px`,
+    "--tm-col-assigner": `${colWidths.assigner}px`,
+  } as React.CSSProperties;
 
   const startResize = (col: ResizableColumn) => (e: React.PointerEvent) => {
     e.preventDefault();
-    dragRef.current = { col, x: e.clientX, width: colWidths[col] };
+    dragRef.current = { col, x: e.clientX, width: colWidths[col], latest: colWidths[col] };
     const onMove = (ev: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag) return;
       const { min, max } = RESIZABLE_COLUMNS[drag.col];
       const next = Math.min(max, Math.max(min, drag.width + (ev.clientX - drag.x)));
-      setColWidths((w) => ({ ...w, [drag.col]: next }));
+      drag.latest = next;
+      containerRef.current?.style.setProperty(COL_VARS[drag.col], `${next}px`);
     };
     const onUp = () => {
+      const drag = dragRef.current;
       dragRef.current = null;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      if (drag) setColWidths((w) => ({ ...w, [drag.col]: drag.latest }));
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
-  const nameWidth = colWidths.name;
+  const nameWidth = "var(--tm-col-name)";
   const onResizeStart = startResize("name");
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
@@ -1183,26 +1205,27 @@ export function ResizableTaskList({
   }
 
   return (
-    <div>
+    <div ref={containerRef} style={containerStyle}>
       {controlBar}
       {/* Column header row (2026-07-30, ClickUp reference) — personal My
           Tasks lists only. Spacers mirror the rows' leading checkbox +
           status circle; Task/Proof/Assigned by each carry a drag handle
-          and share their width with every row below; Due date is pinned
-          to the right edge (ml-auto) and takes whatever remains. */}
+          and share their width with every row below (via the container's
+          CSS variables); Due date is pinned to the right edge (ml-auto)
+          and takes whatever remains. */}
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
           <span className="w-3 shrink-0" aria-hidden />
-          <span className="relative shrink-0 truncate" style={{ width: colWidths.name }}>
+          <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
             <HeaderResizeHandle onPointerDown={startResize("name")} />
           </span>
-          <span className="relative shrink-0 truncate text-center" style={{ width: colWidths.proof }}>
+          <span className="relative shrink-0 truncate text-center" style={{ width: "var(--tm-col-proof)" }}>
             Proof
             <HeaderResizeHandle onPointerDown={startResize("proof")} />
           </span>
-          <span className="relative shrink-0 truncate" style={{ width: colWidths.assigner }}>
+          <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-assigner)" }}>
             Assigned by
             <HeaderResizeHandle onPointerDown={startResize("assigner")} />
           </span>
@@ -1220,8 +1243,8 @@ export function ResizableTaskList({
             onReopen={onReopen}
             onUploadProof={onUploadProof}
             nameWidth={nameWidth}
-            proofWidth={colWidths.proof}
-            assignerWidth={colWidths.assigner}
+            proofWidth="var(--tm-col-proof)"
+            assignerWidth="var(--tm-col-assigner)"
             onResizeStart={onResizeStart}
             hideCompleted={hideCompleted}
             selected={selectedIds.has(t.runBlockId)}
