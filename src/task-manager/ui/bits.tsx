@@ -825,17 +825,13 @@ const RESIZABLE_TASK_NAME_MIN = 120;
 const RESIZABLE_TASK_NAME_MAX = 480;
 const RESIZABLE_TASK_NAME_DEFAULT = 220;
 
-/** Per-column drag bounds/defaults for the My Tasks table (2026-07-30:
- *  every header except Due date gets a resize handle — Due date is pinned
- *  to the right edge and takes whatever remains). */
-const RESIZABLE_COLUMNS = {
-  name: { min: RESIZABLE_TASK_NAME_MIN, max: RESIZABLE_TASK_NAME_MAX, default: RESIZABLE_TASK_NAME_DEFAULT },
-  proof: { min: 40, max: 160, default: 48 },
-  assigner: { min: 80, max: 320, default: 180 },
-} as const;
-type ResizableColumn = keyof typeof RESIZABLE_COLUMNS;
+/** Fixed widths for the non-resizable My Tasks columns (2026-07-30 final:
+ *  ONLY Task is draggable — long names are the one thing worth revealing;
+ *  Proof / Assigned by / Due date keep constant size, no handles). */
+const PROOF_COL_WIDTH = 48;
+const ASSIGNER_COL_WIDTH = 180;
 
-/** The header-cell drag handle — same visual as TaskRowLine's in-row Task
+/** The Task header's drag handle — same visual as TaskRowLine's in-row
  *  handle (thin divider that thickens/blues on hover). */
 function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
   return (
@@ -1024,11 +1020,7 @@ export function ResizableTaskList({
   emptyLabel: string;
   hideCompleted?: boolean;
 }) {
-  const [colWidths, setColWidths] = React.useState<Record<ResizableColumn, number>>({
-    name: RESIZABLE_COLUMNS.name.default,
-    proof: RESIZABLE_COLUMNS.proof.default,
-    assigner: RESIZABLE_COLUMNS.assigner.default,
-  });
+  const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // Defaults to ON — completed tasks are visible immediately; toggling off
   // declutters down to Pending/N-A. N/A tasks have no toggle of their own —
   // they're always shown alongside Pending, same as any other non-terminal
@@ -1036,48 +1028,40 @@ export function ResizableTaskList({
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const dragRef = React.useRef<{ col: ResizableColumn; x: number; width: number; latest: number } | null>(null);
+  const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
 
-  // Header and rows all read their column widths from CSS variables on the
-  // list container, NOT from React state directly. During a drag the
+  // Header and rows read the Task column's width from a CSS variable on
+  // the list container, NOT from React state directly. During a drag the
   // pointermove handler writes the variable straight onto the DOM node —
   // zero React re-renders per mouse move (re-rendering every TaskRowLine
   // per move is what made dragging visibly lag) — and the width is
   // committed to state ONCE on pointerup so later re-renders keep it.
-  const COL_VARS: Record<ResizableColumn, string> = {
-    name: "--tm-col-name",
-    proof: "--tm-col-proof",
-    assigner: "--tm-col-assigner",
-  };
-  const containerStyle = {
-    "--tm-col-name": `${colWidths.name}px`,
-    "--tm-col-proof": `${colWidths.proof}px`,
-    "--tm-col-assigner": `${colWidths.assigner}px`,
-  } as React.CSSProperties;
+  const containerStyle = { "--tm-col-name": `${nameWidthPx}px` } as React.CSSProperties;
 
-  const startResize = (col: ResizableColumn) => (e: React.PointerEvent) => {
+  const onResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
-    dragRef.current = { col, x: e.clientX, width: colWidths[col], latest: colWidths[col] };
+    dragRef.current = { x: e.clientX, width: nameWidthPx, latest: nameWidthPx };
     const onMove = (ev: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag) return;
-      const { min, max } = RESIZABLE_COLUMNS[drag.col];
-      const next = Math.min(max, Math.max(min, drag.width + (ev.clientX - drag.x)));
+      const next = Math.min(
+        RESIZABLE_TASK_NAME_MAX,
+        Math.max(RESIZABLE_TASK_NAME_MIN, drag.width + (ev.clientX - drag.x)),
+      );
       drag.latest = next;
-      containerRef.current?.style.setProperty(COL_VARS[drag.col], `${next}px`);
+      containerRef.current?.style.setProperty("--tm-col-name", `${next}px`);
     };
     const onUp = () => {
       const drag = dragRef.current;
       dragRef.current = null;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
-      if (drag) setColWidths((w) => ({ ...w, [drag.col]: drag.latest }));
+      if (drag) setNameWidthPx(drag.latest);
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
   const nameWidth = "var(--tm-col-name)";
-  const onResizeStart = startResize("name");
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
   const visibleTasks = hideCompleted
@@ -1209,25 +1193,23 @@ export function ResizableTaskList({
       {controlBar}
       {/* Column header row (2026-07-30, ClickUp reference) — personal My
           Tasks lists only. Spacers mirror the rows' leading checkbox +
-          status circle; Task/Proof/Assigned by each carry a drag handle
-          and share their width with every row below (via the container's
-          CSS variables); Due date is pinned to the right edge (ml-auto)
-          and takes whatever remains. */}
+          status circle. ONLY the Task header carries a drag handle (its
+          width lives in the container's CSS variable); Proof and Assigned
+          by are fixed-width, and Due date is pinned to the right edge
+          (ml-auto) taking whatever remains. */}
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
-            <HeaderResizeHandle onPointerDown={startResize("name")} />
+            <HeaderResizeHandle onPointerDown={onResizeStart} />
           </span>
-          <span className="relative shrink-0 truncate text-center" style={{ width: "var(--tm-col-proof)" }}>
+          <span className="shrink-0 truncate text-center" style={{ width: PROOF_COL_WIDTH }}>
             Proof
-            <HeaderResizeHandle onPointerDown={startResize("proof")} />
           </span>
-          <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-assigner)" }}>
+          <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
             Assigned by
-            <HeaderResizeHandle onPointerDown={startResize("assigner")} />
           </span>
           <span className="ml-auto shrink-0">Due date</span>
         </div>
@@ -1243,8 +1225,8 @@ export function ResizableTaskList({
             onReopen={onReopen}
             onUploadProof={onUploadProof}
             nameWidth={nameWidth}
-            proofWidth="var(--tm-col-proof)"
-            assignerWidth="var(--tm-col-assigner)"
+            proofWidth={PROOF_COL_WIDTH}
+            assignerWidth={ASSIGNER_COL_WIDTH}
             onResizeStart={onResizeStart}
             hideCompleted={hideCompleted}
             selected={selectedIds.has(t.runBlockId)}
