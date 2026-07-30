@@ -176,150 +176,109 @@ export function WeekdaySidebar({
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** The month's 7-day chunks: 1-7 · 8-14 · 15-21 · 22-28 · 29-{last day}
- *  (the final chunk adjusts to the month's actual length; absent for
- *  28-day February). */
+/** The month's range chunks — FOUR, per the 2026-07-30 confirmation
+ *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
+ *  (22-31 / 22-30 / 22-28 depending on the month's actual length). */
 function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
   const daysInMonth = new Date(year, month, 0).getDate();
-  const chunks: { from: number; to: number }[] = [];
-  for (let from = 1; from <= daysInMonth; from += 7) {
-    chunks.push({ from, to: Math.min(from + 6, daysInMonth) });
-  }
-  return chunks;
+  return [
+    { from: 1, to: 7 },
+    { from: 8, to: 14 },
+    { from: 15, to: 21 },
+    { from: 22, to: daysInMonth },
+  ];
 }
 
 const chunkLabel = (c: { from: number; to: number }) =>
   c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
 
-/** Accordion month sidebar for "My Tasks — Monthly" (2026-07-29 corrected
- *  interaction — no separate range dropdown here): ◀ year ▶ stepper +
- *  Jan–Dec list, same visual style as the Daily weekday sidebar. ONE click
- *  on a month selects it (Full month, ?mrange= dropped) AND expands its
- *  7-day ranges inline beneath it; only the SELECTED month is ever
- *  expanded, so picking another month collapses the previous one by
- *  construction. Clicking an inline range filters to it (?mrange=).
- *  Callers must pass extraParams WITHOUT mdate/mrange. */
-export function MonthSidebar({
+/** Vertical range sidebar for "My Tasks — Monthly" (2026-07-30 layout):
+ *  "Full month" + the selected month's four range chunks, same visual
+ *  style/position as the Daily weekday sidebar, each with a pending-count
+ *  badge. The MONTH itself is picked by the compact MonthDropdown in the
+ *  section heading — no 12-month list here. Selection updates
+ *  OPTIMISTICALLY (instant highlight while the server round-trip runs),
+ *  then re-syncs from the echoed values. Callers must pass extraParams
+ *  WITHOUT mdate/mrange. */
+export function MonthRangeSidebar({
   value,
   range,
   basePath,
   extraParams = {},
-  monthCounts = {},
+  fullCount,
   chunkCounts = {},
 }: {
-  /** The resolved Monthly anchor, YYYY-MM-DD. */
+  /** The resolved Monthly anchor, YYYY-MM-DD (decides the month length). */
   value: string;
   /** The raw ?mrange= currently active ("" / undefined = Full month). */
   range?: string;
   basePath: string;
   extraParams?: Record<string, string>;
-  /** Per-month NOT-YET-COMPLETED counts (Pending only, N/A excluded) for
-   *  the stepper year, keyed 1..12 — getMySidebarCounts().months. */
-  monthCounts?: Record<number, number>;
-  /** The ANCHOR month's per-chunk counts, keyed "from-to" —
-   *  getMySidebarCounts().monthChunks. Only valid for the server-anchored
-   *  month, so they hide while an optimistic switch is in flight. */
+  /** The anchor month's total pending count (the "Full month" badge) —
+   *  getMySidebarCounts().months[anchor month]. */
+  fullCount?: number;
+  /** The anchor month's per-chunk pending counts, keyed "from-to" —
+   *  getMySidebarCounts().monthChunks. Zero/absent = no badge. */
   chunkCounts?: Record<string, number>;
 }) {
   const router = useRouter();
-  const [anchorY, anchorM] = value.split("-").map(Number);
-  // Optimistic selection (the 2026-07-29 lag fix): expand/highlight
-  // instantly on click; cleared when the server's echoed value/range
-  // catches up.
-  const [pending, setPending] = React.useState<{ y: number; m: number; range?: string } | null>(null);
-  React.useEffect(() => setPending(null), [value, range]);
-  const y = pending?.y ?? anchorY;
-  const m = pending?.m ?? anchorM;
-  const shownRange = pending ? pending.range : range;
-  // Chunk counts belong to the SERVER-anchored month — stale during an
-  // optimistic month/year switch, so hide them until the echo lands.
-  const chunkCountsValid = y === anchorY && m === anchorM;
+  // Optimistic selection: highlight instantly on click; cleared when the
+  // server's echoed value/range catches up. `undefined` = no pending pick;
+  // "" = Full month picked.
+  const [pending, setPending] = React.useState<string | undefined>(undefined);
+  React.useEffect(() => setPending(undefined), [value, range]);
+  const shown = pending !== undefined ? pending : (range ?? "");
 
-  const navigate = (year: number, month: number, mrange?: string) => {
-    setPending({ y: year, m: month, range: mrange });
+  const [y, m] = value.split("-").map(Number);
+  const navigate = (v: string) => {
+    setPending(v);
     const qs = new URLSearchParams({
       ...extraParams,
-      mdate: `${year}-${pad2(month)}-01`,
-      ...(mrange ? { mrange } : {}),
+      mdate: value,
+      ...(v ? { mrange: v } : {}),
     });
     router.push(`${basePath}?${qs.toString()}`);
   };
-  const arrowClass =
-    "flex size-6 items-center justify-center rounded-md border border-gray-200 bg-white text-[10px] text-gray-500 hover:border-blue-300 hover:text-blue-600";
-  const rangeClass = (active: boolean) =>
+  const itemClass = (active: boolean) =>
     active
-      ? "flex items-center justify-between gap-2 rounded-md bg-blue-50 px-3 py-1 text-left text-xs font-semibold text-blue-700"
-      : "flex items-center justify-between gap-2 rounded-md px-3 py-1 text-left text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900";
+      ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
+      : "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900";
 
   return (
-    <nav aria-label="Month" className="flex flex-col gap-1">
-      <div className="mb-1 flex items-center justify-between px-1">
-        <button type="button" aria-label="Previous year" onClick={() => navigate(y - 1, m)} className={arrowClass}>
-          ◀
-        </button>
-        <span className="text-sm font-semibold text-gray-900">{y}</span>
-        <button type="button" aria-label="Next year" onClick={() => navigate(y + 1, m)} className={arrowClass}>
-          ▶
-        </button>
-      </div>
-      {MONTH_LABELS.map((label, i) => {
-        const active = i + 1 === m;
+    <nav aria-label="Day range" className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => navigate("")}
+        aria-current={shown === "" ? "true" : undefined}
+        className={itemClass(shown === "")}
+      >
+        Full month
+        <CountBadge count={fullCount} active={shown === ""} />
+      </button>
+      {monthDayChunks(y, m).map((c) => {
+        const v = `${c.from}-${c.to}`;
+        const active = shown === v;
         return (
-          <div key={label} className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              onClick={() => navigate(y, i + 1)}
-              aria-current={active ? "date" : undefined}
-              aria-expanded={active}
-              className={
-                active
-                  ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-left text-sm font-semibold text-white"
-                  : "flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }
-            >
-              <span>
-                {label} {active ? "▾" : ""}
-              </span>
-              {/* Month counts are for the SERVER-anchored year — hide while
-                  an optimistic year step is in flight. */}
-              <CountBadge count={y === anchorY ? monthCounts[i + 1] : undefined} active={active} />
-            </button>
-            {active && (
-              <div className="mb-1 ml-3 flex flex-col gap-0.5 border-l border-gray-200 pl-2">
-                <button type="button" onClick={() => navigate(y, m)} className={rangeClass(!shownRange)}>
-                  Full month
-                  <CountBadge
-                    count={chunkCountsValid ? monthCounts[m] : undefined}
-                    active={false}
-                  />
-                </button>
-                {monthDayChunks(y, m).map((c) => {
-                  const v = `${c.from}-${c.to}`;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => navigate(y, m, v)}
-                      className={rangeClass(shownRange === v)}
-                    >
-                      {chunkLabel(c)}
-                      <CountBadge count={chunkCountsValid ? chunkCounts[v] : undefined} active={false} />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <button
+            key={v}
+            type="button"
+            onClick={() => navigate(v)}
+            aria-current={active ? "true" : undefined}
+            className={itemClass(active)}
+          >
+            {chunkLabel(c)}
+            <CountBadge count={chunkCounts[v]} active={active} />
+          </button>
         );
       })}
     </nav>
   );
 }
 
-/** Compact month selector for card/grid headings where the 12-row sidebar
- *  can't fit: one dropdown spanning the anchor's previous, current, and
- *  next year ("Jul 2026"), same navigation contract as MonthSidebar
- *  (?mdate=YYYY-MM-01, drops ?mrange=). */
+/** Compact month + year selector ("Jul 2026 ▾") — the Monthly section
+ *  heading and card/grid headings. One dropdown spanning the anchor's
+ *  previous, current, and next year; navigates ?mdate=YYYY-MM-01 and drops
+ *  ?mrange= (a new month resets to Full month). */
 export function MonthDropdown({
   value,
   basePath,

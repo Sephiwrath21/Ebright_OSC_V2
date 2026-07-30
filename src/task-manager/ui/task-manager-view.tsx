@@ -74,6 +74,7 @@ export function TaskManagerView({
   departmentDailyControl,
   personalDailyControl,
   personalMonthlyControl,
+  personalMonthlyMonthControl,
   personalMonthlySidebar,
   personalDailyDaySidebar,
   personalCeo,
@@ -120,10 +121,12 @@ export function TaskManagerView({
    *  "My Tasks — Daily" list — switches days within the anchored week via
    *  the same shared ?date= the date picker (the master control) drives. */
   personalDailyDaySidebar?: React.ReactNode;
-  /** Monthly selector redesign (2026-07-29): the ACCORDION month sidebar
-   *  (MonthSidebar — one click selects a month and expands its 7-day
-   *  ranges inline) rendered beside the "My Tasks — Monthly" list, driving
-   *  the shared ?mdate=/?mrange=. */
+  /** Monthly selector (2026-07-30 layout): the compact [Month ▾] dropdown
+   *  for the "My Tasks — Monthly" section heading, and the vertical range
+   *  sidebar (MonthRangeSidebar — Full month + four chunks with pending
+   *  counts) rendered beside that list, driving the shared
+   *  ?mdate=/?mrange=. */
+  personalMonthlyMonthControl?: React.ReactNode;
   personalMonthlySidebar?: React.ReactNode;
   /** HOD's "CEO assigned tasks" card (2026-07-29) — same behavior as the
    *  Home version: pre-windowed to the ?cdate= day server-side, always
@@ -460,9 +463,10 @@ export function TaskManagerView({
               </div>
             </SectionCard>
             {shows(view, "taskManager", "myTasksMonthly") && (
-              <SectionCard title="My Tasks — Monthly">
-                {/* Month sidebar beside the list (2026-07-29 redesign),
-                    mirroring the Daily weekday sidebar layout. */}
+              <SectionCard title="My Tasks — Monthly" action={personalMonthlyMonthControl}>
+                {/* Month dropdown in the heading; range sidebar beside the
+                    list (2026-07-30 layout), mirroring Daily's weekday
+                    sidebar. */}
                 <div className="flex flex-col gap-4 sm:flex-row">
                   {personalMonthlySidebar && (
                     <div className="shrink-0 sm:w-40">{personalMonthlySidebar}</div>

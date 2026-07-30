@@ -235,8 +235,11 @@ export function getMySidebarCounts(
       const m = d.getMonth() + 1;
       months[m] = (months[m] ?? 0) + 1;
       if (d.getMonth() === anchorMonth) {
-        const from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
-        const to = Math.min(from + 6, daysInAnchorMonth);
+        // FOUR chunks (2026-07-30 confirmation): 1-7 · 8-14 · 15-21 ·
+        // 22-{last day} — keys must match monthDayChunks() in the UI.
+        let from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
+        if (from > 22) from = 22;
+        const to = from === 22 ? daysInAnchorMonth : from + 6;
         const k = `${from}-${to}`;
         monthChunks[k] = (monthChunks[k] ?? 0) + 1;
       }

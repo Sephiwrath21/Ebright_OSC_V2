@@ -59,7 +59,7 @@ import {
   EntityPicker,
   MonthDropdown,
   MonthRangeDropdown,
-  MonthSidebar,
+  MonthRangeSidebar,
   WeekdaySidebar,
 } from "@/task-manager/ui/entity-picker";
 import {
@@ -622,12 +622,13 @@ export default async function TaskManagerPage({
         extraParams={monthlyCarry}
       />
     );
-    // Monthly selector (2026-07-29 redesign — calendar picker removed):
-    // compact [Month ▾][Range ▾] pair for the donut card heading; the
-    // ACCORDION month sidebar beside the "My Tasks — Monthly" list (one
-    // click selects a month AND expands its 7-day ranges inline — no
-    // separate range dropdown there). All drive the shared
-    // ?mdate=/?mrange= — changing month resets to Full month.
+    // Monthly selector (2026-07-30 layout): compact [Month ▾][Range ▾]
+    // pair for the donut card heading; on "My Tasks — Monthly" the compact
+    // [Month ▾] dropdown sits in the section heading and the range chunks
+    // (Full month · 1-7 · 8-14 · 15-21 · 22-{end}) render as a vertical
+    // sidebar with pending counts, mirroring Daily's weekday sidebar. All
+    // drive the shared ?mdate=/?mrange= — changing month resets to Full
+    // month.
     const personalMonthlyControl = (
       <div key="personal-monthly-controls" className="flex items-center gap-1.5">
         <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
@@ -639,14 +640,23 @@ export default async function TaskManagerPage({
         />
       </div>
     );
+    const personalMonthlyMonthControl = (
+      <MonthDropdown
+        key="personal-monthly-month"
+        value={monthly.date}
+        basePath="/task-manager"
+        extraParams={dailyCarry}
+      />
+    );
+    const anchorMonthNumber = Number(monthly.date.split("-")[1]);
     const personalMonthlySidebar = (
-      <MonthSidebar
-        key="personal-month-sidebar"
+      <MonthRangeSidebar
+        key="personal-month-range-sidebar"
         value={monthly.date}
         range={monthlyRangeParam}
         basePath="/task-manager"
         extraParams={dailyCarry}
-        monthCounts={sidebarCounts.months}
+        fullCount={sidebarCounts.months[anchorMonthNumber]}
         chunkCounts={sidebarCounts.monthChunks}
       />
     );
@@ -754,6 +764,7 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
+        personalMonthlyMonthControl={personalMonthlyMonthControl}
         personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
         personalCeo={personalCeo}
