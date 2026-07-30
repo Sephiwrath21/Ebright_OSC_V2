@@ -609,6 +609,91 @@ function ProofCell({
     if (file) void uploadFile(file);
   };
 
+  // ---- "Take Photo" (2026-07-30 fix) ----------------------------------
+  // The capture="environment" input only opens a camera on PHONES/TABLETS
+  // — desktop browsers ignore `capture` and show the ordinary file dialog
+  // (that was the reported bug). So: mobile keeps the native camera input,
+  // desktop gets a real in-popover webcam preview via getUserMedia, and
+  // anything without a usable camera falls back to the picker with a hint.
+  // getUserMedia needs a secure context (HTTPS or localhost).
+  const [cameraOpen, setCameraOpen] = React.useState(false);
+  const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+
+  const stopCamera = React.useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  }, []);
+
+  const openCamera = async () => {
+    setCameraError(null);
+    // Phones/tablets: the native camera app beats an in-page preview.
+    // (iPadOS reports itself as "Mac" but has >1 touch point.)
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+    if (isMobile) {
+      cameraRef.current?.click();
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera not supported here (needs HTTPS) — opening the file picker instead.");
+      cameraRef.current?.click();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+    } catch {
+      setCameraError("Webcam unavailable or permission denied — opening the file picker instead.");
+      cameraRef.current?.click();
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        stopCamera();
+        // Same path as every other method — validation, 2 MB cap, upload.
+        void uploadFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      0.9,
+    );
+  };
+
+  // Wire the stream to the <video> once it's mounted; stop the webcam
+  // whenever the popover closes (Esc/click-outside included) or the row
+  // unmounts — never leave the camera light on.
+  React.useEffect(() => {
+    if (cameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      void videoRef.current.play().catch(() => {});
+    }
+  }, [cameraOpen]);
+  React.useEffect(() => {
+    if (!attachOpen && streamRef.current) stopCamera();
+  }, [attachOpen, stopCamera]);
+  React.useEffect(
+    () => () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    },
+    [],
+  );
+
   // While the popover is open: Ctrl/Cmd+V anywhere attaches the clipboard
   // image (screenshot-paste workflow), Escape closes. Document-level so
   // the user doesn't have to focus anything first.
@@ -706,47 +791,82 @@ function ProofCell({
                 ✕
               </button>
             </div>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                const file = e.dataTransfer.files?.[0];
-                if (file) void uploadFile(file);
-              }}
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
-                dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
-              }`}
-            >
-              <span className="text-xl" aria-hidden>
-                🖼️
-              </span>
-              <p className="text-sm font-medium text-gray-600">Drop an image here</p>
-              <p className="text-xs text-gray-400">or paste (Ctrl+V)</p>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => inputRef.current?.click()}
-                className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
-              >
-                📁 Upload file
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => cameraRef.current?.click()}
-                className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
-              >
-                📷 Take Photo
-              </button>
-            </div>
+            {cameraOpen ? (
+              <>
+                {/* Live desktop webcam preview (getUserMedia) — 📸 draws
+                    the current frame to a canvas and uploads it as JPEG. */}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="aspect-video w-full rounded-xl bg-black object-cover"
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={capturePhoto}
+                    className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    📸 Capture
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) void uploadFile(file);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                    dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
+                  }`}
+                >
+                  <span className="text-xl" aria-hidden>
+                    🖼️
+                  </span>
+                  <p className="text-sm font-medium text-gray-600">Drop an image here</p>
+                  <p className="text-xs text-gray-400">or paste (Ctrl+V)</p>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => inputRef.current?.click()}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    📁 Upload file
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void openCamera()}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    📷 Take Photo
+                  </button>
+                </div>
+              </>
+            )}
             {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
+            {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
             <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 2 MB</p>
           </div>
