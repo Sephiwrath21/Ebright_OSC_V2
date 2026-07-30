@@ -978,6 +978,21 @@ export function ResizableTaskList({
   return (
     <div>
       {controlBar}
+      {/* Column header row (2026-07-30, ClickUp reference) — personal My
+          Tasks lists only. Spacers mirror the rows' leading checkbox +
+          status circle; the Task label shares the resizable nameWidth so
+          it tracks column drags. */}
+      {hideCompleted && (
+        <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+          <span className="w-4 shrink-0" aria-hidden />
+          <span className="w-3 shrink-0" aria-hidden />
+          <span className="shrink-0" style={{ width: nameWidth }}>
+            Task
+          </span>
+          <span className="min-w-0 flex-1">Assigned by</span>
+          <span className="shrink-0">Due date</span>
+        </div>
+      )}
       <div className="divide-y divide-gray-100">
         {visibleTasks.map((t) => (
           <TaskRowLine
@@ -1322,7 +1337,14 @@ export function EntityDrillModal({
             No {meta.label.toLowerCase()} tasks this period.
           </p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <>
+            {/* Slim column header (2026-07-30) — the modal is too narrow
+                for the full three-column header, so just Task | Due date. */}
+            <div className="flex items-center justify-between gap-2.5 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <span>Task</span>
+              <span>Due date</span>
+            </div>
+            <div className="divide-y divide-gray-100">
             {rows.map((t) => {
               const due = t.dueAt ? new Date(t.dueAt) : null;
               const dueDisplay = formatDueDate(due);
@@ -1398,7 +1420,8 @@ export function EntityDrillModal({
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </div>
     </div>
