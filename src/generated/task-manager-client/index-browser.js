@@ -246,7 +246,8 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   cadence: 'cadence',
   repeatWeekly: 'repeatWeekly',
   recurrenceOfId: 'recurrenceOfId',
-  guidelineId: 'guidelineId'
+  guidelineId: 'guidelineId',
+  parentId: 'parentId'
 };
 
 exports.Prisma.GuidelineScalarFieldEnum = {

@@ -308,11 +308,23 @@ model RunBlock {
   // successors — it's evidence for THIS occurrence only.
   proof Proof?
 
+  // Main Task ↔ Subtask link (2026-07-30): a subtask is a FULL RunBlock in
+  // its own run (own status/proof/due — completion fully independent of
+  // the parent, per the confirmed spec), created by the "+ Task" Subtasks
+  // builder with parentId = the parent's block. Weekly recurrence advances
+  // PARENTS only (engine/recurrence.ts skips parentId ≠ null) and clones
+  // subtasks under the new parent. SET NULL on parent delete — an orphaned
+  // subtask degrades to a normal top-level task.
+  parentId String?
+  parent   RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  subtasks RunBlock[] @relation("BlockSubtasks")
+
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
   @@index([repeatWeekly, dueAt])
+  @@index([parentId])
 }
 
 /// Optional assigner-attached reference material for a task (link and/or

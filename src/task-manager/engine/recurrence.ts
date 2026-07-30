@@ -52,13 +52,17 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   // UNIVERSAL: every DAILY task with a due day recurs — no flag (the
   // repeatWeekly column is retired; see its schema comment). Manpower
   // Schedule slot tasks are excluded by scheduleSlotId (and are ADHOC
-  // anyway); Monthly/Ad hoc never match the cadence gate.
+  // anyway); Monthly/Ad hoc never match the cadence gate. SUBTASKS
+  // (parentId set) are excluded too: they never advance on their own —
+  // the second pass below clones them under their parent's successor, so
+  // the tree recurs as a unit.
   const due = await prisma.runBlock.findMany({
     where: {
       cadence: "DAILY",
       scheduleSlotId: null,
       dueAt: { lt: todayStart },
       successor: null,
+      parentId: null,
     },
     include: { run: true, runItems: true },
   });
@@ -126,6 +130,94 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           previousStatus: block.status,
           previousDueAt: block.dueAt.toISOString(),
           nextDueAt: nextDueAt.toISOString(),
+        },
+      },
+    });
+    created++;
+  }
+
+  // ---- Second pass: subtasks (2026-07-30). A subtask advances iff its
+  // PARENT's successor already exists (created above, or by an earlier
+  // sweep that crashed before finishing the family) — the clone lands
+  // under that successor, so next week's parent arrives with next week's
+  // subtasks. Idempotent the same way as the main loop: recurrenceOfId is
+  // unique, and running this query re-checks `successor: null` each sweep.
+  const dueSubtasks = await prisma.runBlock.findMany({
+    where: {
+      cadence: "DAILY",
+      scheduleSlotId: null,
+      dueAt: { lt: todayStart },
+      successor: null,
+      parentId: { not: null },
+      parent: { successor: { isNot: null } },
+    },
+    include: {
+      run: true,
+      runItems: true,
+      parent: { select: { successor: { select: { id: true } } } },
+    },
+  });
+  for (const sub of dueSubtasks) {
+    const newParentId = sub.parent?.successor?.id;
+    if (!sub.dueAt || !newParentId) continue;
+    const nextDueAt = nextWeeklyDueAt(sub.dueAt, todayStart);
+
+    const run = await prisma.flowRun.create({
+      data: {
+        flowId: sub.run.flowId,
+        flowVersion: sub.run.flowVersion,
+        templateSnapshot: sub.run.templateSnapshot as Prisma.InputJsonValue,
+        name: sub.run.name,
+        startedById: sub.run.startedById,
+        triggerType: "MANUAL",
+        status: "ACTIVE",
+      },
+    });
+    try {
+      await prisma.runBlock.create({
+        data: {
+          runId: run.id,
+          blockId: sub.blockId,
+          nodeId: sub.nodeId,
+          title: sub.title,
+          assigneeId: sub.assigneeId,
+          status: "ACTIVE",
+          startedAt: now,
+          dueAt: nextDueAt,
+          cadence: "DAILY",
+          recurrenceOfId: sub.id,
+          parentId: newParentId,
+          guidelineId: sub.guidelineId,
+          runItems: {
+            create: sub.runItems.map((it) => ({
+              itemId: it.itemId,
+              order: it.order,
+              type: it.type,
+              label: it.label,
+              required: it.required,
+              config: it.config as Prisma.InputJsonValue,
+            })),
+          },
+        },
+      });
+    } catch (err) {
+      await prisma.flowRun.delete({ where: { id: run.id } }).catch(() => {});
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        continue;
+      }
+      throw err;
+    }
+    await prisma.auditLog.create({
+      data: {
+        runId: run.id,
+        actorId: sub.run.startedById,
+        action: "BLOCK_RECURRED",
+        detail: {
+          from: sub.id,
+          previousStatus: sub.status,
+          previousDueAt: sub.dueAt.toISOString(),
+          nextDueAt: nextDueAt.toISOString(),
+          subtaskOf: newParentId,
         },
       },
     });

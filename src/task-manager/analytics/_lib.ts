@@ -506,6 +506,9 @@ export interface TaskRow {
    *  column) — null until uploaded. The image itself is served by
    *  /api/task-manager/proof-image/[id]. */
   proofId: string | null;
+  /** Main Task ↔ Subtask link (2026-07-30) — the parent RunBlock's id, or
+   *  null for a top-level task. Drives the My Tasks tree display. */
+  parentId: string | null;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
    *  isn't already closed and has exactly one required item, a CHECKBOX.
    *  Anything else (multiple required items, or a non-checkbox required
@@ -539,6 +542,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
       : null,
     assignerId: b.run.startedById,
     proofId: b.proof?.id ?? null,
+    parentId: b.parentId,
     quickCompletable: isQuickCompletable(b),
   };
 }
@@ -573,6 +577,8 @@ export interface PeriodBlock {
   guideline: { id: string; url: string | null; imageMime: string | null } | null;
   /** Assignee-uploaded proof — id only, bytes served by their own route. */
   proof: { id: string } | null;
+  /** Parent RunBlock id for subtasks, null for top-level tasks. */
+  parentId: string | null;
   /** Minimal shape — just enough to compute quick-complete eligibility,
    *  not the full item (label/config/value aren't needed here). */
   runItems: { required: boolean; type: ItemType }[];
@@ -655,6 +661,7 @@ export async function fetchPeriodBlocks(
       cadence: true,
       guideline: { select: { id: true, url: true, imageMime: true } },
       proof: { select: { id: true } },
+      parentId: true,
       runItems: { select: { required: true, type: true } },
       run: {
         select: {

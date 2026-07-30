@@ -3010,10 +3010,12 @@ export namespace Prisma {
 
   export type RunBlockCountOutputType = {
     runItems: number
+    subtasks: number
   }
 
   export type RunBlockCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runItems?: boolean | RunBlockCountOutputTypeCountRunItemsArgs
+    subtasks?: boolean | RunBlockCountOutputTypeCountSubtasksArgs
   }
 
   // Custom InputTypes
@@ -3032,6 +3034,13 @@ export namespace Prisma {
    */
   export type RunBlockCountOutputTypeCountRunItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RunItemWhereInput
+  }
+
+  /**
+   * RunBlockCountOutputType without action
+   */
+  export type RunBlockCountOutputTypeCountSubtasksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RunBlockWhereInput
   }
 
 
@@ -14621,6 +14630,7 @@ export namespace Prisma {
     repeatWeekly: boolean | null
     recurrenceOfId: string | null
     guidelineId: string | null
+    parentId: string | null
   }
 
   export type RunBlockMaxAggregateOutputType = {
@@ -14641,6 +14651,7 @@ export namespace Prisma {
     repeatWeekly: boolean | null
     recurrenceOfId: string | null
     guidelineId: string | null
+    parentId: string | null
   }
 
   export type RunBlockCountAggregateOutputType = {
@@ -14661,6 +14672,7 @@ export namespace Prisma {
     repeatWeekly: number
     recurrenceOfId: number
     guidelineId: number
+    parentId: number
     _all: number
   }
 
@@ -14691,6 +14703,7 @@ export namespace Prisma {
     repeatWeekly?: true
     recurrenceOfId?: true
     guidelineId?: true
+    parentId?: true
   }
 
   export type RunBlockMaxAggregateInputType = {
@@ -14711,6 +14724,7 @@ export namespace Prisma {
     repeatWeekly?: true
     recurrenceOfId?: true
     guidelineId?: true
+    parentId?: true
   }
 
   export type RunBlockCountAggregateInputType = {
@@ -14731,6 +14745,7 @@ export namespace Prisma {
     repeatWeekly?: true
     recurrenceOfId?: true
     guidelineId?: true
+    parentId?: true
     _all?: true
   }
 
@@ -14838,6 +14853,7 @@ export namespace Prisma {
     repeatWeekly: boolean
     recurrenceOfId: string | null
     guidelineId: string | null
+    parentId: string | null
     _count: RunBlockCountAggregateOutputType | null
     _avg: RunBlockAvgAggregateOutputType | null
     _sum: RunBlockSumAggregateOutputType | null
@@ -14877,12 +14893,15 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
     guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
     proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
+    subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
@@ -14904,9 +14923,11 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
     guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -14927,9 +14948,11 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
     guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectScalar = {
@@ -14950,9 +14973,10 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
     guidelineId?: boolean
+    parentId?: boolean
   }
 
-  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId" | "guidelineId", ExtArgs["result"]["runBlock"]>
+  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId" | "guidelineId" | "parentId", ExtArgs["result"]["runBlock"]>
   export type RunBlockInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
@@ -14960,17 +14984,21 @@ export namespace Prisma {
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
     proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
+    subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type RunBlockIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }
   export type RunBlockIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }
 
   export type $RunBlockPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14982,6 +15010,8 @@ export namespace Prisma {
       successor: Prisma.$RunBlockPayload<ExtArgs> | null
       guideline: Prisma.$GuidelinePayload<ExtArgs> | null
       proof: Prisma.$ProofPayload<ExtArgs> | null
+      parent: Prisma.$RunBlockPayload<ExtArgs> | null
+      subtasks: Prisma.$RunBlockPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -15001,6 +15031,7 @@ export namespace Prisma {
       repeatWeekly: boolean
       recurrenceOfId: string | null
       guidelineId: string | null
+      parentId: string | null
     }, ExtArgs["result"]["runBlock"]>
     composites: {}
   }
@@ -15401,6 +15432,8 @@ export namespace Prisma {
     successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     guideline<T extends RunBlock$guidelineArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$guidelineArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     proof<T extends RunBlock$proofArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    parent<T extends RunBlock$parentArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$parentArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    subtasks<T extends RunBlock$subtasksArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$subtasksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15447,6 +15480,7 @@ export namespace Prisma {
     readonly repeatWeekly: FieldRef<"RunBlock", 'Boolean'>
     readonly recurrenceOfId: FieldRef<"RunBlock", 'String'>
     readonly guidelineId: FieldRef<"RunBlock", 'String'>
+    readonly parentId: FieldRef<"RunBlock", 'String'>
   }
     
 
@@ -15945,6 +15979,49 @@ export namespace Prisma {
      */
     include?: ProofInclude<ExtArgs> | null
     where?: ProofWhereInput
+  }
+
+  /**
+   * RunBlock.parent
+   */
+  export type RunBlock$parentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+  }
+
+  /**
+   * RunBlock.subtasks
+   */
+  export type RunBlock$subtasksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+    orderBy?: RunBlockOrderByWithRelationInput | RunBlockOrderByWithRelationInput[]
+    cursor?: RunBlockWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: RunBlockScalarFieldEnum | RunBlockScalarFieldEnum[]
   }
 
   /**
@@ -26769,7 +26846,8 @@ export namespace Prisma {
     cadence: 'cadence',
     repeatWeekly: 'repeatWeekly',
     recurrenceOfId: 'recurrenceOfId',
-    guidelineId: 'guidelineId'
+    guidelineId: 'guidelineId',
+    parentId: 'parentId'
   };
 
   export type RunBlockScalarFieldEnum = (typeof RunBlockScalarFieldEnum)[keyof typeof RunBlockScalarFieldEnum]
@@ -27917,12 +27995,15 @@ export namespace Prisma {
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
     proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    subtasks?: RunBlockListRelationFilter
   }
 
   export type RunBlockOrderByWithRelationInput = {
@@ -27943,12 +28024,15 @@ export namespace Prisma {
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrderInput | SortOrder
     guidelineId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
     run?: FlowRunOrderByWithRelationInput
     runItems?: RunItemOrderByRelationAggregateInput
     recurrenceOf?: RunBlockOrderByWithRelationInput
     successor?: RunBlockOrderByWithRelationInput
     guideline?: GuidelineOrderByWithRelationInput
     proof?: ProofOrderByWithRelationInput
+    parent?: RunBlockOrderByWithRelationInput
+    subtasks?: RunBlockOrderByRelationAggregateInput
   }
 
   export type RunBlockWhereUniqueInput = Prisma.AtLeast<{
@@ -27973,12 +28057,15 @@ export namespace Prisma {
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
     proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    subtasks?: RunBlockListRelationFilter
   }, "id" | "recurrenceOfId" | "runId_nodeId">
 
   export type RunBlockOrderByWithAggregationInput = {
@@ -27999,6 +28086,7 @@ export namespace Prisma {
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrderInput | SortOrder
     guidelineId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
     _count?: RunBlockCountOrderByAggregateInput
     _avg?: RunBlockAvgOrderByAggregateInput
     _max?: RunBlockMaxOrderByAggregateInput
@@ -28027,6 +28115,7 @@ export namespace Prisma {
     repeatWeekly?: BoolWithAggregatesFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
+    parentId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
   }
 
   export type GuidelineWhereInput = {
@@ -29473,6 +29562,8 @@ export namespace Prisma {
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateInput = {
@@ -29493,9 +29584,11 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUpdateInput = {
@@ -29519,6 +29612,8 @@ export namespace Prisma {
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateInput = {
@@ -29539,9 +29634,11 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockCreateManyInput = {
@@ -29562,6 +29659,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
   }
 
   export type RunBlockUpdateManyMutationInput = {
@@ -29599,6 +29697,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type GuidelineCreateInput = {
@@ -31183,6 +31282,7 @@ export namespace Prisma {
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockAvgOrderByAggregateInput = {
@@ -31207,6 +31307,7 @@ export namespace Prisma {
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockMinOrderByAggregateInput = {
@@ -31227,6 +31328,7 @@ export namespace Prisma {
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockSumOrderByAggregateInput = {
@@ -32313,6 +32415,19 @@ export namespace Prisma {
     connect?: ProofWhereUniqueInput
   }
 
+  export type RunBlockCreateNestedOneWithoutSubtasksInput = {
+    create?: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSubtasksInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
+  export type RunBlockCreateNestedManyWithoutParentInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+  }
+
   export type RunItemUncheckedCreateNestedManyWithoutRunBlockInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -32330,6 +32445,13 @@ export namespace Prisma {
     create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
     connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
     connect?: ProofWhereUniqueInput
+  }
+
+  export type RunBlockUncheckedCreateNestedManyWithoutParentInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
   }
 
   export type EnumBlockStatusFieldUpdateOperationsInput = {
@@ -32402,6 +32524,30 @@ export namespace Prisma {
     update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
   }
 
+  export type RunBlockUpdateOneWithoutSubtasksNestedInput = {
+    create?: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSubtasksInput
+    upsert?: RunBlockUpsertWithoutSubtasksInput
+    disconnect?: RunBlockWhereInput | boolean
+    delete?: RunBlockWhereInput | boolean
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutSubtasksInput, RunBlockUpdateWithoutSubtasksInput>, RunBlockUncheckedUpdateWithoutSubtasksInput>
+  }
+
+  export type RunBlockUpdateManyWithoutParentNestedInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutParentInput | RunBlockUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutParentInput | RunBlockUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutParentInput | RunBlockUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
   export type RunItemUncheckedUpdateManyWithoutRunBlockNestedInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -32434,6 +32580,20 @@ export namespace Prisma {
     delete?: ProofWhereInput | boolean
     connect?: ProofWhereUniqueInput
     update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutParentNestedInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutParentInput | RunBlockUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutParentInput | RunBlockUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutParentInput | RunBlockUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
   }
 
   export type RunBlockCreateNestedManyWithoutGuidelineInput = {
@@ -34191,6 +34351,8 @@ export namespace Prisma {
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunInput = {
@@ -34210,9 +34372,11 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunInput = {
@@ -34315,6 +34479,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
   }
 
   export type FlowRunCreateWithoutRunBlocksInput = {
@@ -34404,6 +34569,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutSuccessorInput = {
@@ -34424,8 +34591,10 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutSuccessorInput = {
@@ -34453,6 +34622,8 @@ export namespace Prisma {
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRecurrenceOfInput = {
@@ -34472,9 +34643,11 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRecurrenceOfInput = {
@@ -34520,6 +34693,117 @@ export namespace Prisma {
   export type ProofCreateOrConnectWithoutRunBlockInput = {
     where: ProofWhereUniqueInput
     create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+  }
+
+  export type RunBlockCreateWithoutSubtasksInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutSubtasksInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutSubtasksInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+  }
+
+  export type RunBlockCreateWithoutParentInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutParentInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput>
+  }
+
+  export type RunBlockCreateManyParentInputEnvelope = {
+    data: RunBlockCreateManyParentInput | RunBlockCreateManyParentInput[]
+    skipDuplicates?: boolean
   }
 
   export type FlowRunUpsertWithoutRunBlocksInput = {
@@ -34623,6 +34907,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutSuccessorInput = {
@@ -34643,8 +34929,10 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUpsertWithoutRecurrenceOfInput = {
@@ -34678,6 +34966,8 @@ export namespace Prisma {
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRecurrenceOfInput = {
@@ -34697,9 +34987,11 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type GuidelineUpsertWithoutBlocksInput = {
@@ -34754,6 +35046,81 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type RunBlockUpsertWithoutSubtasksInput = {
+    update: XOR<RunBlockUpdateWithoutSubtasksInput, RunBlockUncheckedUpdateWithoutSubtasksInput>
+    create: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutSubtasksInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutSubtasksInput, RunBlockUncheckedUpdateWithoutSubtasksInput>
+  }
+
+  export type RunBlockUpdateWithoutSubtasksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutSubtasksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+  }
+
+  export type RunBlockUpsertWithWhereUniqueWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    update: XOR<RunBlockUpdateWithoutParentInput, RunBlockUncheckedUpdateWithoutParentInput>
+    create: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput>
+  }
+
+  export type RunBlockUpdateWithWhereUniqueWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    data: XOR<RunBlockUpdateWithoutParentInput, RunBlockUncheckedUpdateWithoutParentInput>
+  }
+
+  export type RunBlockUpdateManyWithWhereWithoutParentInput = {
+    where: RunBlockScalarWhereInput
+    data: XOR<RunBlockUpdateManyMutationInput, RunBlockUncheckedUpdateManyWithoutParentInput>
+  }
+
   export type RunBlockCreateWithoutGuidelineInput = {
     id?: string
     blockId: string
@@ -34774,6 +35141,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutGuidelineInput = {
@@ -34793,9 +35162,11 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutGuidelineInput = {
@@ -34844,6 +35215,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutProofInput = {
@@ -34864,8 +35237,10 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutProofInput = {
@@ -34904,6 +35279,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutProofInput = {
@@ -34924,8 +35301,10 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockCreateWithoutRunItemsInput = {
@@ -34948,6 +35327,8 @@ export namespace Prisma {
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
     proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunItemsInput = {
@@ -34968,8 +35349,10 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunItemsInput = {
@@ -35008,6 +35391,8 @@ export namespace Prisma {
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunItemsInput = {
@@ -35028,8 +35413,10 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type FlowCreateWithoutDocInput = {
@@ -35599,6 +35986,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    parentId?: string | null
   }
 
   export type RunBlockUpdateWithoutRunInput = {
@@ -35621,6 +36009,8 @@ export namespace Prisma {
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunInput = {
@@ -35640,9 +36030,11 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutRunInput = {
@@ -35662,6 +36054,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RunItemCreateManyRunBlockInput = {
@@ -35675,6 +36068,26 @@ export namespace Prisma {
     value?: NullableJsonNullValueInput | InputJsonValue
     completedAt?: Date | string | null
     completedBy?: string | null
+  }
+
+  export type RunBlockCreateManyParentInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
   }
 
   export type RunItemUpdateWithoutRunBlockInput = {
@@ -35716,6 +36129,74 @@ export namespace Prisma {
     completedBy?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
+  export type RunBlockUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
   export type RunBlockCreateManyGuidelineInput = {
     id?: string
     runId: string
@@ -35733,6 +36214,7 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    parentId?: string | null
   }
 
   export type RunBlockUpdateWithoutGuidelineInput = {
@@ -35755,6 +36237,8 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutGuidelineInput = {
@@ -35774,9 +36258,11 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutGuidelineInput = {
@@ -35796,6 +36282,7 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ScheduleSlotCreateManyScheduleInput = {

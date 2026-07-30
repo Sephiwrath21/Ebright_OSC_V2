@@ -691,6 +691,7 @@ export function TaskRowLine({
   hideCompleted,
   selected,
   onToggleSelect,
+  tree,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -721,11 +722,34 @@ export function TaskRowLine({
    *  provides onToggleSelect. */
   selected?: boolean;
   onToggleSelect?: (runBlockId: string) => void;
+  /** Main Task ↔ Subtask tree slot (2026-07-30, table mode only; omitted =
+   *  list has no subtasks, layout unchanged): "parent" renders the ▾/▸
+   *  chevron + count badge; "flat" reserves the chevron's width so circles
+   *  stay aligned; "child" indents the row (and shaves the indent off the
+   *  Task column so Proof/Assignee/Due Date stay aligned). */
+  tree?:
+    | { kind: "parent"; count: number; expanded: boolean; onToggle: () => void }
+    | { kind: "flat" }
+    | { kind: "child" };
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned;
+
+  // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
+  // shave that off the Task column so Proof/Assignee/Due Date columns stay
+  // exactly where the header puts them.
+  const CHILD_INDENT = 32;
+  const isChild = tree?.kind === "child";
+  const effectiveNameWidth =
+    nameWidth === undefined
+      ? undefined
+      : isChild
+        ? typeof nameWidth === "number"
+          ? nameWidth - CHILD_INDENT
+          : `calc(${nameWidth} - ${CHILD_INDENT}px)`
+        : nameWidth;
 
   return (
     <div
@@ -742,6 +766,26 @@ export function TaskRowLine({
           className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
         />
       )}
+      {/* Tree slot (see the `tree` prop): chevron on parents, matching
+          spacer on subtask-less rows, spacer + indent on subtask rows.
+          (No aria-expanded on the chevron — the row's
+          [&:has(button[aria-expanded])] z-index trick is reserved for the
+          dropdown popovers.) */}
+      {tree &&
+        (tree.kind === "parent" ? (
+          <button
+            type="button"
+            onClick={tree.onToggle}
+            title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
+            aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
+            className="flex w-4 shrink-0 items-center justify-center text-[10px] text-gray-400 hover:text-gray-600"
+          >
+            {tree.expanded ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" aria-hidden />
+        ))}
+      {isChild && <span className="w-5 shrink-0" aria-hidden />}
       {hideCompleted ? (
         <StatusDropdown task={task} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
       ) : task.status === "DONE" ? (
@@ -754,8 +798,8 @@ export function TaskRowLine({
         <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white" />
       )}
       <div
-        className={`relative min-w-0 ${nameWidth === undefined ? "flex-1" : "shrink-0"}`}
-        style={nameWidth === undefined ? undefined : { width: nameWidth }}
+        className={`relative min-w-0 ${effectiveNameWidth === undefined ? "flex-1" : "shrink-0"}`}
+        style={effectiveNameWidth === undefined ? undefined : { width: effectiveNameWidth }}
       >
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
@@ -765,6 +809,11 @@ export function TaskRowLine({
           >
             {task.blockTitle}
           </p>
+          {tree?.kind === "parent" && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+              {tree.count}
+            </span>
+          )}
           {task.fromSchedule && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600">
               <span className="size-1 rounded-full bg-violet-500" />
@@ -1043,6 +1092,9 @@ export function ResizableTaskList({
   // status; only DONE is ever hidden here.
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  /** Parents the viewer has collapsed — everything ELSE is expanded (the
+   *  2026-07-30 confirmed default). */
+  const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
   const containerRef = React.useRef<HTMLDivElement>(null);
   const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
 
@@ -1083,6 +1135,38 @@ export function ResizableTaskList({
   const visibleTasks = hideCompleted
     ? tasks.filter((t) => (t.status === "DONE" ? showCompleted : true))
     : tasks;
+
+  // Main Task ↔ Subtask tree (2026-07-30, table mode only): group rows
+  // under their parent, chevron-expandable (EXPANDED by default —
+  // collapsedIds tracks the exceptions). A subtask whose parent isn't in
+  // this list (different period window, or parent hidden by Show
+  // Completed) renders as a top-level row instead of vanishing.
+  const visibleIds = new Set(visibleTasks.map((t) => t.runBlockId));
+  const childrenOf = new Map<string, FlowTaskRow[]>();
+  if (hideCompleted) {
+    for (const t of visibleTasks) {
+      if (t.parentId && visibleIds.has(t.parentId)) {
+        const kids = childrenOf.get(t.parentId);
+        if (kids) kids.push(t);
+        else childrenOf.set(t.parentId, [t]);
+      }
+    }
+    // cuid ids sort in creation order = the order typed into the form.
+    for (const kids of childrenOf.values()) {
+      kids.sort((a, b) => (a.runBlockId < b.runBlockId ? -1 : 1));
+    }
+  }
+  const topLevelTasks = hideCompleted
+    ? visibleTasks.filter((t) => !t.parentId || !visibleIds.has(t.parentId))
+    : visibleTasks;
+  const hasTree = childrenOf.size > 0;
+  const toggleExpand = (id: string) =>
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Bulk-select/actions only ever apply to the viewer's OWN rows — same
   // assignee-only rule as the per-row dropdown (StatusDropdown) and
@@ -1216,6 +1300,7 @@ export function ResizableTaskList({
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
+          {hasTree && <span className="w-4 shrink-0" aria-hidden />}
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
@@ -1236,24 +1321,50 @@ export function ResizableTaskList({
         </div>
       )}
       <div className="divide-y divide-gray-100">
-        {visibleTasks.map((t) => (
-          <TaskRowLine
-            key={t.runBlockId}
-            task={t}
-            myUserId={myUserId}
-            onComplete={onComplete}
-            onSkip={onSkip}
-            onReopen={onReopen}
-            onUploadProof={onUploadProof}
-            nameWidth={nameWidth}
-            proofWidth={PROOF_COL_WIDTH}
-            assignerWidth={ASSIGNER_COL_WIDTH}
-            onResizeStart={onResizeStart}
-            hideCompleted={hideCompleted}
-            selected={selectedIds.has(t.runBlockId)}
-            onToggleSelect={hideCompleted ? toggleSelect : undefined}
-          />
-        ))}
+        {topLevelTasks.map((t) => {
+          const kids = childrenOf.get(t.runBlockId) ?? [];
+          const expanded = !collapsedIds.has(t.runBlockId);
+          const shared = {
+            myUserId,
+            onComplete,
+            onSkip,
+            onReopen,
+            onUploadProof,
+            nameWidth,
+            proofWidth: PROOF_COL_WIDTH,
+            assignerWidth: ASSIGNER_COL_WIDTH,
+            hideCompleted,
+          };
+          return (
+            <React.Fragment key={t.runBlockId}>
+              <TaskRowLine
+                task={t}
+                {...shared}
+                onResizeStart={onResizeStart}
+                selected={selectedIds.has(t.runBlockId)}
+                onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                tree={
+                  hasTree
+                    ? kids.length > 0
+                      ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleExpand(t.runBlockId) }
+                      : { kind: "flat" }
+                    : undefined
+                }
+              />
+              {expanded &&
+                kids.map((k) => (
+                  <TaskRowLine
+                    key={k.runBlockId}
+                    task={k}
+                    {...shared}
+                    selected={selectedIds.has(k.runBlockId)}
+                    onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                    tree={{ kind: "child" }}
+                  />
+                ))}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

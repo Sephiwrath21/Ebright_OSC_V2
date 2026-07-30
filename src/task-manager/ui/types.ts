@@ -58,6 +58,10 @@ export interface FlowTaskRow {
    *  /api/task-manager/proof-image/[id]. Optional so older payload shapes
    *  (undefined) render the same as "no proof". */
   proofId?: string | null;
+  /** Main Task ↔ Subtask link (2026-07-30): the parent task's runBlockId,
+   *  or null/undefined for a top-level task. ResizableTaskList groups rows
+   *  by this into the chevron/indent tree. */
+  parentId?: string | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as
@@ -282,6 +286,10 @@ export interface FlowAssignInput {
    *  submission. */
   guidelineUrl?: string;
   guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string };
+  /** Optional Subtasks (2026-07-30): each becomes a FULL task row of its
+   *  own (own status/proof/due, completion independent of the parent) for
+   *  every recipient × day, linked under the main task via parentId. */
+  subtasks?: string[];
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD

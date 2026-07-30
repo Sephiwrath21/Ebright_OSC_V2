@@ -60,6 +60,9 @@ const assignInputSchema = z.object({
       dataBase64: z.string().min(1).max(GUIDELINE_IMAGE_MAX_BASE64),
     })
     .optional(),
+  // Optional Subtasks (2026-07-30): each becomes a full task of its own
+  // linked under the main task (see the pairs loop below).
+  subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -256,7 +259,7 @@ export function assignFlowTask(
             status: "ACTIVE",
           },
         });
-        await prisma.runBlock.create({
+        const parentBlock = await prisma.runBlock.create({
           data: {
             runId: run.id,
             blockId: block.id,
@@ -280,6 +283,63 @@ export function assignFlowTask(
             },
           },
         });
+        // Subtasks (2026-07-30): each is a FULL task — its own run + block,
+        // same assignee/due/cadence, linked via parentId. Its own run keeps
+        // every existing path (complete/N-A/reopen, run auto-completion,
+        // proof, audit) working identically to a normal task; only the UI
+        // groups them. SEQUENTIAL inside one pair so the cuid creation
+        // order (= display order in the tree) matches the form's order.
+        for (const subtaskTitle of body.subtasks) {
+          const subRun = await prisma.flowRun.create({
+            data: {
+              flowId: flow.id,
+              flowVersion: flow.version,
+              templateSnapshot: snapshot,
+              name: `${subtaskTitle} — ${target.name}`,
+              startedById: actor.id,
+              triggerType: "MANUAL",
+              status: "ACTIVE",
+            },
+          });
+          await prisma.runBlock.create({
+            data: {
+              runId: subRun.id,
+              blockId: block.id,
+              nodeId: block.nodeId,
+              title: subtaskTitle,
+              assigneeId: target.id,
+              status: "ACTIVE",
+              startedAt: new Date(),
+              dueAt: occ.dueAt,
+              cadence,
+              parentId: parentBlock.id,
+              runItems: {
+                create: block.items.map((it) => ({
+                  itemId: it.id,
+                  order: it.order,
+                  type: it.type,
+                  label: it.label,
+                  required: it.required,
+                  config: it.config as Prisma.InputJsonValue,
+                })),
+              },
+            },
+          });
+          await prisma.auditLog.create({
+            data: {
+              runId: subRun.id,
+              actorId: actor.id,
+              action: "RUN_STARTED",
+              detail: {
+                runName: subtaskTitle,
+                trigger: "MANUAL",
+                adhoc: flowId === ADHOC_FLOW_ID,
+                assignee: target.name,
+                subtaskOf: parentBlock.id,
+              },
+            },
+          });
+        }
         await prisma.auditLog.create({
           data: {
             runId: run.id,
@@ -297,6 +357,8 @@ export function assignFlowTask(
       }),
     );
 
+    // Subtask runs aren't counted — "created" answers "how many tasks did
+    // this assignment fan out to" (recipients × days), same as before.
     return { created: runIds.length };
   }, "assignFlowTask");
 }
