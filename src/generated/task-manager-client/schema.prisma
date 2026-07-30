@@ -278,26 +278,49 @@ model RunBlock {
   // slot sync, engine flow runs) leaves this at its default (null) and is
   // completely unaffected.
   cadence        Cadence?
-  // Weekly auto-recurrence (2026-07-25, opt-in "+ Task" toggle, DAILY only —
-  // "recurring series" model): when this block's due day has passed, the
-  // lazy catch-up (engine/recurrence.ts, called from the data reads) creates
-  // NEXT week's occurrence and links it back via recurrenceOfId. The
-  // finished block is never touched, so per-day history (the Daily date
-  // filter) keeps showing what actually happened. recurrenceOfId is UNIQUE —
-  // a block can have at most ONE successor — which makes concurrent
-  // catch-ups idempotent (the losing racer hits the constraint and stops).
-  // Manpower-Schedule tasks (scheduleSlotId set, cadence ADHOC) never
-  // qualify.
+  // Weekly auto-recurrence — "recurring series" model: when a DAILY block's
+  // due day has passed, engine/recurrence.ts (hourly in-server sweep +
+  // lazy catch-up on read) creates NEXT week's occurrence and links it back
+  // via recurrenceOfId. The finished block is never touched, so per-day
+  // history (the Daily date filter) keeps showing what actually happened.
+  // recurrenceOfId is UNIQUE — at most ONE successor per block — making
+  // concurrent catch-ups idempotent. Manpower-Schedule tasks
+  // (scheduleSlotId set, cadence ADHOC) never qualify.
+  //
+  // repeatWeekly is RETIRED (2026-07-25 final decision: recurrence is
+  // UNIVERSAL for Daily tasks — no opt-in). Column kept to avoid a
+  // pointless destructive migration; nothing reads or writes it anymore.
   repeatWeekly   Boolean     @default(false)
   recurrenceOfId String?     @unique
   recurrenceOf   RunBlock?   @relation("BlockRecurrence", fields: [recurrenceOfId], references: [id])
   successor      RunBlock?   @relation("BlockRecurrence")
+
+  // Optional SOP/reference material attached by the assigner (2026-07-30,
+  // the "+ Task" Guideline section). ONE Guideline row is shared by every
+  // block the assignment created (all recipients × days) and by weekly-
+  // recurrence successors — the image bytes are stored once.
+  guidelineId String?
+  guideline   Guideline? @relation(fields: [guidelineId], references: [id])
 
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
   @@index([repeatWeekly, dueAt])
+}
+
+/// Optional assigner-attached reference material for a task (link and/or
+/// image, both optional — but a row only exists when at least one is set).
+/// Image bytes live here in the DB (capped at 2 MB by the assign action)
+/// so dev/staging/prod share them and Docker redeploys can't lose them;
+/// served via /api/task-manager/guideline-image/[id] (session-gated).
+model Guideline {
+  id        String     @id @default(cuid())
+  url       String?
+  imageMime String? // image/png | image/jpeg | image/webp
+  imageData Bytes?
+  createdAt DateTime   @default(now())
+  blocks    RunBlock[]
 }
 
 enum BlockStatus {
@@ -355,7 +378,7 @@ model AuditLog {
   runId      String?
   runBlockId String?
   actorId    String // user id, or "system" for engine/worker actions
-  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | REMINDER_SENT
+  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | BLOCK_AUTO_REFRESH (historical only) | REMINDER_SENT
   detail     Json?
   createdAt  DateTime @default(now())
 
