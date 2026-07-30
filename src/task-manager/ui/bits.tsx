@@ -1154,6 +1154,10 @@ const RESIZABLE_TASK_NAME_DEFAULT = 220;
  *  Proof / Assigned by / Due date keep constant size, no handles). Proof
  *  is 96px so its two-line "Proof of Completion" header label fits. */
 const PROOF_COL_WIDTH = 96;
+
+/** localStorage key for the unresolved-subtasks completion warning —
+ *  "off" suppresses the modal (per browser; default on). */
+const SUBTASK_WARNING_KEY = "tm-subtask-warning";
 const ASSIGNER_COL_WIDTH = 180;
 /** Due Date is a true fixed column too (2026-07-30 final spec) — constant
  *  width at a constant position right after Assignee, NOT pinned to the
@@ -1360,6 +1364,23 @@ export function ResizableTaskList({
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
   const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
+  // ---- Unresolved-subtasks completion guard (2026-07-30) --------------
+  // Marking a PARENT Completed while it still has unresolved (non-DONE,
+  // non-SKIPPED) subtasks opens a confirmation modal instead: "Continue
+  // without resolving" completes just the parent; "Resolve all N" bulk-
+  // completes the subtasks too. The warning can be switched off via the
+  // modal's Warning Settings (persisted per browser in localStorage).
+  const [confirmTarget, setConfirmTarget] = React.useState<{
+    parent: FlowTaskRow;
+    unresolved: FlowTaskRow[];
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = React.useState(false);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
+  const [confirmSubsOpen, setConfirmSubsOpen] = React.useState(false);
+  const [warnSettingsOpen, setWarnSettingsOpen] = React.useState(false);
+  const [warnEnabled, setWarnEnabled] = React.useState(() =>
+    typeof window === "undefined" ? true : window.localStorage.getItem(SUBTASK_WARNING_KEY) !== "off",
+  );
   const containerRef = React.useRef<HTMLDivElement>(null);
   const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
 
@@ -1432,6 +1453,54 @@ export function ResizableTaskList({
       else next.add(id);
       return next;
     });
+
+  const isUnresolved = (t: FlowTaskRow) => t.status !== "DONE" && t.status !== "SKIPPED";
+  /** Wraps onComplete for a PARENT row: intercepts when unresolved
+   *  subtasks exist (and the warning is on) — the modal takes over. */
+  const guardedComplete =
+    (parent: FlowTaskRow, kids: FlowTaskRow[]) =>
+    async (runBlockId: string): Promise<ActionResult> => {
+      const unresolved = kids.filter(isUnresolved);
+      if (unresolved.length === 0 || !warnEnabled) return onComplete!(runBlockId);
+      setConfirmError(null);
+      setConfirmSubsOpen(false);
+      setConfirmTarget({ parent, unresolved });
+      return { ok: true };
+    };
+  const closeConfirm = () => {
+    setConfirmTarget(null);
+    setConfirmError(null);
+    setConfirmSubsOpen(false);
+    setWarnSettingsOpen(false);
+  };
+  const continueWithoutResolving = async () => {
+    if (!onComplete || !confirmTarget) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    const result = await onComplete(confirmTarget.parent.runBlockId);
+    setConfirmBusy(false);
+    if (result.ok) closeConfirm();
+    else setConfirmError(result.message);
+  };
+  const resolveAll = async () => {
+    if (!onComplete || !confirmTarget) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    const targets = [...confirmTarget.unresolved, confirmTarget.parent];
+    const results = await Promise.allSettled(targets.map((t) => onComplete(t.runBlockId)));
+    setConfirmBusy(false);
+    const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
+    if (failed === 0) closeConfirm();
+    else setConfirmError(`${failed} of ${targets.length} tasks failed to update — the rest were completed.`);
+  };
+  const setWarning = (on: boolean) => {
+    setWarnEnabled(on);
+    try {
+      window.localStorage.setItem(SUBTASK_WARNING_KEY, on ? "on" : "off");
+    } catch {
+      /* private mode etc. — the toggle still works for this session */
+    }
+  };
 
   // Bulk-select/actions only ever apply to the viewer's OWN rows — same
   // assignee-only rule as the per-row dropdown (StatusDropdown) and
@@ -1605,6 +1674,7 @@ export function ResizableTaskList({
               <TaskRowLine
                 task={t}
                 {...shared}
+                onComplete={kids.length > 0 && onComplete ? guardedComplete(t, kids) : onComplete}
                 onResizeStart={onResizeStart}
                 selected={selectedIds.has(t.runBlockId)}
                 onToggleSelect={hideCompleted ? toggleSelect : undefined}
@@ -1631,6 +1701,103 @@ export function ResizableTaskList({
           );
         })}
       </div>
+      {/* Unresolved-subtasks confirmation modal (2026-07-30) — portal to
+          <body>, same escape-the-dimmed-row rationale as ProofCell's. */}
+      {confirmTarget &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={closeConfirm}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h4 className="text-base font-semibold text-gray-900">
+                  This task has {confirmTarget.unresolved.length} unresolved item
+                  {confirmTarget.unresolved.length === 1 ? "" : "s"}
+                </h4>
+                <button
+                  type="button"
+                  onClick={closeConfirm}
+                  aria-label="Close"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmSubsOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <span>
+                  {confirmTarget.unresolved.length} Subtask
+                  {confirmTarget.unresolved.length === 1 ? "" : "s"}
+                </span>
+                <span
+                  className={`text-gray-400 transition-transform ${confirmSubsOpen ? "rotate-90" : ""}`}
+                  aria-hidden
+                >
+                  ›
+                </span>
+              </button>
+              {confirmSubsOpen && (
+                <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
+                  {confirmTarget.unresolved.map((k) => (
+                    <li key={k.runBlockId} className="flex items-center gap-2 px-2 py-1 text-sm text-gray-700">
+                      <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
+                      <span className="min-w-0 flex-1 truncate">{k.blockTitle}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {confirmError && <p className="mt-3 text-xs text-red-600">{confirmError}</p>}
+              {warnSettingsOpen && (
+                <label className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={warnEnabled}
+                    onChange={(e) => setWarning(e.target.checked)}
+                    className="size-4 rounded border-gray-300 accent-blue-600"
+                  />
+                  Warn me when completing a task with unresolved subtasks
+                </label>
+              )}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWarnSettingsOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-600"
+                >
+                  <span aria-hidden>⚙️</span> Warning Settings
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => void continueWithoutResolving()}
+                    className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                  >
+                    Continue without resolving
+                  </button>
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => void resolveAll()}
+                    className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {confirmBusy
+                      ? "Updating…"
+                      : `Resolve all ${confirmTarget.unresolved.length} item${confirmTarget.unresolved.length === 1 ? "" : "s"}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
