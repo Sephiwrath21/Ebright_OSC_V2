@@ -1017,17 +1017,22 @@ export function TaskRowLine({
 
   return (
     <div
-      className={`flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
+      className={`group flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
         hideCompleted && (task.status === "DONE" || task.status === "SKIPPED") ? "opacity-60" : ""
       }`}
     >
+      {/* Hover-to-reveal (2026-07-30): the checkbox always OCCUPIES its
+          slot (no layout shift) but is invisible until the row is hovered
+          or keyboard-focused — except a CHECKED box, which stays visible. */}
       {hideCompleted && isOwned && onToggleSelect && (
         <input
           type="checkbox"
           checked={selected ?? false}
           onChange={() => onToggleSelect(task.runBlockId)}
           aria-label={`Select ${task.blockTitle}`}
-          className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+          className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 transition-opacity ${
+            selected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+          }`}
         />
       )}
       {/* Tree slot (see the `tree` prop): chevron on parents, matching
@@ -1590,12 +1595,16 @@ export function ResizableTaskList({
       <div className="flex items-center gap-3">
         {ownedVisibleTasks.length > 0 && (
           <>
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+            {/* Same hover-to-reveal as the row checkboxes (space always
+                reserved); stays visible while checked. */}
+            <label className="group flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600">
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600"
+                className={`size-4 rounded border-gray-300 accent-blue-600 transition-opacity ${
+                  allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                }`}
               />
               Select all
             </label>
