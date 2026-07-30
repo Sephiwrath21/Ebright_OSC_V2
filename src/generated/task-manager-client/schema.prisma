@@ -319,12 +319,21 @@ model RunBlock {
   parent   RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   subtasks RunBlock[] @relation("BlockSubtasks")
 
+  // Which TaskTemplate this block was created from (2026-07-31): set on
+  // every block of an assignment that used "Start from a template" OR
+  // "Save as Template" (the originating assignment). Plain string, no FK —
+  // same loose coupling as user ids — so template deletion can cancel the
+  // template's PENDING assignments (see deleteTaskTemplate) while
+  // completed history keeps its (now dangling) reference untouched.
+  templateId String?
+
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
   @@index([repeatWeekly, dueAt])
   @@index([parentId])
+  @@index([templateId])
 }
 
 /// Optional assigner-attached reference material for a task (link and/or

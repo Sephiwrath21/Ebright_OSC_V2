@@ -40,6 +40,7 @@ import {
   reopenFlowTask,
   deleteTaskTemplate,
   getTaskTemplate,
+  getTemplateDeletionImpact,
   listTaskTemplates,
   renameTaskTemplate,
   saveCeoDashboardConfig,
@@ -286,13 +287,29 @@ export default async function TaskManagerPage({
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
   }
+  async function templateImpact(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateImpactResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const impact = await getTemplateDeletionImpact(email, templateId);
+      return { ok: true, ...impact };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
   async function deleteTemplate(templateId: string): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
       await deleteTaskTemplate(email, templateId);
+      // Cancelling pending assignments changes OTHER people's lists too —
+      // refresh both task surfaces.
       revalidatePath("/task-manager");
+      revalidatePath("/home");
       return { ok: true };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
@@ -497,6 +514,7 @@ export default async function TaskManagerPage({
           templates={{
             list: templateList,
             load: loadTemplate,
+            impact: templateImpact,
             rename: renameTemplate,
             remove: deleteTemplate,
           }}

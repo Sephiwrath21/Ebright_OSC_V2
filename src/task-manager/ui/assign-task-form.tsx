@@ -233,6 +233,7 @@ export function AssignTaskForm({
         saveAsTemplate: saveTemplate
           ? { name: templateName.trim() || title.trim() }
           : undefined,
+        fromTemplateId: templateId || undefined,
       });
       if (result.ok) {
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
@@ -357,14 +358,31 @@ export function AssignTaskForm({
                         </button>
                         <button
                           type="button"
+                          disabled={templateBusy}
                           onClick={() => {
-                            if (!window.confirm(`Delete template "${t.name}"? Existing tasks are not affected.`)) return;
-                            if (templateId === t.id) setTemplateId("");
-                            void templates.remove(t.id).then((r) => {
-                              if (!r.ok) setMessage({ ok: false, text: r.message });
+                            // Impact-first confirmation (2026-07-31):
+                            // deleting a template also CANCELS its still-
+                            // pending assignments (completed records are
+                            // kept) — say exactly how many before acting.
+                            setTemplateBusy(true);
+                            void templates.impact(t.id).then((impact) => {
+                              setTemplateBusy(false);
+                              if (!impact.ok) {
+                                setMessage({ ok: false, text: impact.message });
+                                return;
+                              }
+                              const warning =
+                                impact.pendingTasks > 0
+                                  ? `This will remove this task from ${impact.pendingEmployees} employee${impact.pendingEmployees === 1 ? "" : "s"} who ${impact.pendingEmployees === 1 ? "hasn't" : "haven't"} completed it yet (${impact.pendingTasks} pending task${impact.pendingTasks === 1 ? "" : "s"}). ${impact.completedKept} completed record${impact.completedKept === 1 ? "" : "s"} will be kept.`
+                                  : `No pending assignments — ${impact.completedKept} completed record${impact.completedKept === 1 ? "" : "s"} will be kept.`;
+                              if (!window.confirm(`Delete template "${t.name}"?\n\n${warning}`)) return;
+                              if (templateId === t.id) setTemplateId("");
+                              void templates.remove(t.id).then((r) => {
+                                if (!r.ok) setMessage({ ok: false, text: r.message });
+                              });
                             });
                           }}
-                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-red-600"
+                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-red-600 disabled:opacity-40"
                         >
                           Delete
                         </button>

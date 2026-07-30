@@ -294,6 +294,10 @@ export interface FlowAssignInput {
    *  assignment's structure as a reusable template under `name` — a
    *  same-name save overwrites (the edit path). */
   saveAsTemplate?: { name: string };
+  /** Set when the form was pre-filled via "Start from a template" — links
+   *  the created tasks to that template (template deletion cancels its
+   *  still-pending assignments). */
+  fromTemplateId?: string;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -335,11 +339,19 @@ export type TemplateLoadResult =
   | { ok: true; template: FlowTemplateDetail }
   | { ok: false; message: string };
 
+export type TemplateImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
 /** Everything the "+ Task" form needs for templates, bundled as ONE
- *  optional prop: the saved list plus load/rename/delete server actions. */
+ *  optional prop: the saved list plus load/impact/rename/delete server
+ *  actions. `impact` feeds the pre-deletion confirmation ("removes N
+ *  pending tasks from M employees; completed records kept"); `remove`
+ *  then cancels those pending assignments and deletes the template. */
 export interface FlowTemplateControl {
   list: FlowTemplateSummary[];
   load: (templateId: string) => Promise<TemplateLoadResult>;
+  impact: (templateId: string) => Promise<TemplateImpactResult>;
   rename: (templateId: string, name: string) => Promise<ActionResult>;
   remove: (templateId: string) => Promise<ActionResult>;
 }
