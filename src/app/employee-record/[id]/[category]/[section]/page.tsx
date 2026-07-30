@@ -4,7 +4,7 @@ import AppShell from "@/app/components/AppShell";
 import EmployeeRecordView from "@/app/components/EmployeeRecordView";
 import {
   getEmployeeById,
-  listEmployeeOverviewRows,
+  getEmployeeOverviewRowById,
   listLeaveHistory,
   getResumeInfo,
   getReferenceCheck,
@@ -22,6 +22,12 @@ import {
   listSuspensionLetters,
   listShowcauseWarningLetters,
   listPips,
+  listGuardianInfo,
+  getPaymentInfo,
+  getPerformanceReview,
+  getPayslip,
+  listBranches,
+  listDepartments,
 } from "@/lib/employeeQueries";
 import { findRecordCategory } from "@/lib/employeeRecordConfig";
 
@@ -45,8 +51,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const numId = Number(id);
   if (Number.isNaN(numId)) notFound();
 
-  const rows = await listEmployeeOverviewRows();
-  const employee = rows.find((r) => r.id === numId);
+  const employee = await getEmployeeOverviewRowById(numId);
   if (!employee) notFound();
 
   // Personal Info's own 3 data sections (not Guardian Info) map cleanly onto
@@ -58,28 +63,63 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   // Payment & Bank Info.
   const needsEmployeeDetail =
     (category === "personal-info" && PERSONAL_INFO_SECTIONS.has(section)) || (category === "finance" && section === "tax-info");
-  const employeeDetail = needsEmployeeDetail ? await getEmployeeById(numId) : null;
-  const leaveHistory = category === "active-employment" && section === "leave" ? await listLeaveHistory(numId) : undefined;
-  const resumeInfo = category === "hr-info" && section === "resume" ? await getResumeInfo(numId) : undefined;
-  const referenceCheck = category === "hr-info" && section === "reference" ? await getReferenceCheck(numId) : undefined;
-  const medicalCheck = category === "hr-info" && section === "medical-check" ? await getMedicalCheck(numId) : undefined;
-  const documentsInfo = category === "hr-info" && section === "handbook" ? await getDocuments(numId) : undefined;
-  const payrollInfo = category === "finance" && section === "tax-info" ? await getPayrollInfo(numId) : undefined;
-  const achievements = category === "active-employment" && section === "cert" ? await listAchievements(numId) : undefined;
-  const salaryRevisions = category === "finance" && section === "payroll" ? await listSalaryRevisions(numId) : undefined;
-  const promotions = category === "active-employment" && section === "promotion" ? await listPromotions(numId) : undefined;
-  const transfers = category === "active-employment" && section === "transfer" ? await listTransfers(numId) : undefined;
-  const trainings = category === "active-employment" && section === "training" ? await listTrainings(numId) : undefined;
-  const needsNdaNc = category === "hr-info" && section === "nda-nc";
-  const ndaInfo = needsNdaNc ? await getNda(numId) : undefined;
-  const nonCompeteInfo = needsNdaNc ? await getNonCompete(numId) : undefined;
-  const domesticInquiries =
-    category === "disciplinary" && section === "domestic-inquiry" ? await listDomesticInquiries(numId) : undefined;
-  const suspensionLetters =
-    category === "disciplinary" && section === "suspension" ? await listSuspensionLetters(numId) : undefined;
-  const showcauseWarningLetters =
-    category === "disciplinary" && section === "showcause" ? await listShowcauseWarningLetters(numId) : undefined;
-  const pips = category === "disciplinary" && section === "pip" ? await listPips(numId) : undefined;
+  const needsLocationOptions = category === "active-employment" && section === "transfer";
+
+  // Every section's data fetch is independent (keyed only by numId, at most
+  // one or two are ever real queries on a given page — the rest resolve
+  // immediately) but were previously awaited one at a time, which serialized
+  // the odd case where two conditions both apply (e.g. Finance > Tax Info
+  // needs both employeeDetail and payrollInfo). Batched into one Promise.all
+  // so they run concurrently instead.
+  const [
+    employeeDetail,
+    leaveHistory,
+    resumeInfo,
+    referenceCheck,
+    medicalCheck,
+    documentsInfo,
+    payrollInfo,
+    achievements,
+    salaryRevisions,
+    promotions,
+    transfers,
+    [branches, departments],
+    trainings,
+    ndaInfo,
+    nonCompeteInfo,
+    domesticInquiries,
+    suspensionLetters,
+    showcauseWarningLetters,
+    pips,
+    guardianInfo,
+    paymentInfo,
+    performanceReview,
+    payslip,
+  ] = await Promise.all([
+    needsEmployeeDetail ? getEmployeeById(numId) : Promise.resolve(null),
+    category === "active-employment" && section === "leave" ? listLeaveHistory(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "resume" ? getResumeInfo(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "reference" ? getReferenceCheck(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "medical-check" ? getMedicalCheck(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "handbook" ? getDocuments(numId) : Promise.resolve(undefined),
+    category === "finance" && section === "tax-info" ? getPayrollInfo(numId) : Promise.resolve(undefined),
+    category === "active-employment" && section === "cert" ? listAchievements(numId) : Promise.resolve(undefined),
+    category === "finance" && section === "payroll" ? listSalaryRevisions(numId) : Promise.resolve(undefined),
+    category === "active-employment" && section === "promotion" ? listPromotions(numId) : Promise.resolve(undefined),
+    needsLocationOptions ? listTransfers(numId) : Promise.resolve(undefined),
+    needsLocationOptions ? Promise.all([listBranches(), listDepartments()]) : Promise.resolve([undefined, undefined] as const),
+    category === "active-employment" && section === "training" ? listTrainings(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "nda-nc" ? getNda(numId) : Promise.resolve(undefined),
+    category === "hr-info" && section === "nda-nc" ? getNonCompete(numId) : Promise.resolve(undefined),
+    category === "disciplinary" && section === "domestic-inquiry" ? listDomesticInquiries(numId) : Promise.resolve(undefined),
+    category === "disciplinary" && section === "suspension" ? listSuspensionLetters(numId) : Promise.resolve(undefined),
+    category === "disciplinary" && section === "showcause" ? listShowcauseWarningLetters(numId) : Promise.resolve(undefined),
+    category === "disciplinary" && section === "pip" ? listPips(numId) : Promise.resolve(undefined),
+    category === "personal-info" && section === "guardian-info" ? listGuardianInfo(numId) : Promise.resolve(undefined),
+    category === "personal-info" && section === "payment" ? getPaymentInfo(numId) : Promise.resolve(undefined),
+    category === "active-employment" && section === "performance-review" ? getPerformanceReview(numId) : Promise.resolve(undefined),
+    category === "finance" && section === "payroll" ? getPayslip(numId) : Promise.resolve(undefined),
+  ]);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -92,6 +132,10 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         employeeName={employee.fullName}
         category={cat}
         sectionKey={section}
+        position={employee.position}
+        branchName={employee.branchName}
+        departmentName={employee.departmentName}
+        stage={employee.stage}
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
         resumeInfo={resumeInfo}
@@ -103,6 +147,8 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         salaryRevisions={salaryRevisions}
         promotions={promotions}
         transfers={transfers}
+        branches={branches}
+        departments={departments}
         trainings={trainings}
         ndaInfo={ndaInfo}
         nonCompeteInfo={nonCompeteInfo}
@@ -110,6 +156,10 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         suspensionLetters={suspensionLetters}
         showcauseWarningLetters={showcauseWarningLetters}
         pips={pips}
+        guardianInfo={guardianInfo}
+        paymentInfo={paymentInfo}
+        performanceReview={performanceReview}
+        payslip={payslip}
       />
     </AppShell>
   );

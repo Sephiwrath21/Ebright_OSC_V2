@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import { parsePhoneValue, composePhoneValue } from "@/lib/phoneEmail";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, positionGroup, type EmployeeStage } from "@/lib/employeeStages";
 import {
   STAGE_PROFILE_CONFIG,
@@ -16,6 +18,8 @@ import {
 import type {
   LeaveHistoryRow,
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   ResumeInfo,
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
@@ -31,10 +35,14 @@ import type {
   NdaInfo,
   NonCompeteInfo,
   DisciplinarySummaryRow,
+  ResignationInfo,
+  ReferenceLetterInfo,
+  ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
 import {
   PanelHeading,
   RecordTable,
+  SidebarField,
   EmergencyContactPanel,
   PersonalInfoPanel,
   ResumePanel,
@@ -53,9 +61,18 @@ import {
   NonCompetePanel,
   DisciplinarySummaryPanel,
   RealAttachmentLink,
+  ResignationPanel,
+  ReferenceLetterPanel,
+  ExitInterviewNotesPanel,
 } from "@/app/components/ActiveProfilePanels";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
-import { updateEmergencyContact } from "@/lib/employeeRecordActions";
+import {
+  updateEmergencyContact,
+  proceedFromPreStage,
+  proceedFromProbation,
+  proceedFromOnboarding,
+  proceedFromActive,
+} from "@/lib/employeeRecordActions";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface Props {
@@ -82,6 +99,12 @@ interface Props {
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  resignationInfo?: ResignationInfo | null;
+  referenceLetterInfo?: ReferenceLetterInfo | null;
+  exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   /** Which branch/dept-scoped namelist this employee was opened from — null
    *  for Pre/Probation (no location layer) or when opened without that
    *  context. Drives the breadcrumb's dynamic branch/dept segment, mirroring
@@ -122,6 +145,11 @@ export default function StageProfileView({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  resignationInfo,
+  referenceLetterInfo,
+  exitInterviewNoteInfo,
+  branches,
+  departments,
   locationGroup,
   locationCode,
   locationName,
@@ -150,8 +178,19 @@ export default function StageProfileView({
   const isFullTime = positionGroup(employeeDetail?.position ?? null) === "Full Time";
   const historyGroups = STAGE_HISTORY_GROUPS[stage].filter((g) => g.stage !== "probation" || isFullTime);
 
+  const router = useRouter();
   const proceedButton = STAGE_PROCEED_BUTTON[stage];
+  // Pre's own "Proceed" target depends on the employee's position (see
+  // isFullTime above) rather than the static nextStage every other stage's
+  // button uses — Full Time goes to Probation, everything else skips
+  // straight to Onboarding, same split js/pre-proceed.js already encodes.
+  const proceedTargetStage = stage === "pre" ? (isFullTime ? "probation" : "onboarding") : proceedButton?.nextStage;
+  // Probation's own "Next" only makes sense once Probation Status is
+  // actually Confirmed — In Progress/Extended/Stopped all keep the button
+  // disabled (re-checked server-side too, in proceedFromProbation).
+  const probationConfirmed = probationInfo?.probationStatus === "Confirmed";
   const [confirmingProceed, setConfirmingProceed] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
   const [proceedNotice, setProceedNotice] = useState<string | null>(null);
 
   const locationQuery = locationGroup && locationCode ? `?locGroup=${locationGroup}&locCode=${encodeURIComponent(locationCode)}` : "";
@@ -233,22 +272,22 @@ export default function StageProfileView({
               </span>
 
               <SidebarField label="Branch/Dept">
-                {employeeDetail?.branchCode || employeeDetail?.departmentCode
-                  ? [employeeDetail?.branchCode, employeeDetail?.departmentCode].filter(Boolean).join(" / ")
-                  : "--"}
+                {employeeDetail?.departmentName ?? employeeDetail?.branchName ?? "--"}
               </SidebarField>
               <SidebarField label="Position">{employeeDetail?.position || "--"}</SidebarField>
-              <SidebarField label="Phone Number">{employeeDetail?.phone || "--"}</SidebarField>
+              <SidebarField label="Phone Number">{formatDisplayPhone(employeeDetail?.phone)}</SidebarField>
               <SidebarField label="Email">{employeeDetail?.email || "--"}</SidebarField>
 
               {proceedButton && (
                 <div className="relative mt-1 w-full">
                   <button
                     type="button"
+                    disabled={proceeding || (stage === "probation" && !probationConfirmed)}
+                    title={stage === "probation" && !probationConfirmed ? "Probation Status must be Confirmed first" : undefined}
                     onClick={() => setConfirmingProceed(true)}
-                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors"
+                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
                   >
-                    {proceedButton.label}
+                    {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
                   {proceedNotice && (
                     <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
@@ -283,6 +322,11 @@ export default function StageProfileView({
                 ndaInfo,
                 nonCompeteInfo,
                 disciplinarySummary,
+                resignationInfo,
+                referenceLetterInfo,
+                exitInterviewNoteInfo,
+                branches,
+                departments,
                 employeeId,
               })}
             </div>
@@ -357,14 +401,38 @@ export default function StageProfileView({
         </div>
       </div>
 
-      {confirmingProceed && proceedButton && (
+      {confirmingProceed && proceedButton && proceedTargetStage && (
         <ConfirmDialog
-          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedButton.nextStage]}?`}
+          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedTargetStage]}?`}
           onCancel={() => setConfirmingProceed(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
+            // Every stage with a Proceed/Next button is now wired to a real
+            // employment update — Exit is terminal, so there's no button (and
+            // no placeholder branch) left for it.
+            setProceeding(true);
+            const result =
+              stage === "pre"
+                ? await proceedFromPreStage(employeeId)
+                : stage === "probation"
+                  ? await proceedFromProbation(employeeId)
+                  : stage === "onboarding"
+                    ? await proceedFromOnboarding(employeeId)
+                    : await proceedFromActive(employeeId);
+            setProceeding(false);
             setConfirmingProceed(false);
-            setProceedNotice("Not moved — stage transitions aren't wired to a real employment-status update yet.");
-            setTimeout(() => setProceedNotice(null), 5000);
+            if (!result.ok) {
+              setProceedNotice(result.error ?? "Failed to proceed.");
+              setTimeout(() => setProceedNotice(null), 5000);
+              return;
+            }
+            // Deliberately no router.refresh() here — this navigates to a
+            // DIFFERENT route (the employee's new stage), which already
+            // fetches fresh server data on its own. Calling refresh() right
+            // after push() races with that pending navigation: it re-runs the
+            // OLD route's own data fetch, which now 404s (the employee no
+            // longer matches the old stage) and can swallow the navigation
+            // entirely — exactly the "stuck on the old page" bug this fixes.
+            router.push(profileUrlForStage(proceedTargetStage, employeeId));
           }}
         />
       )}
@@ -372,13 +440,27 @@ export default function StageProfileView({
   );
 }
 
-function SidebarField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="w-full">
-      <span className="block text-xs text-[#4b4949]">{label}</span>
-      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
-    </div>
-  );
+// Normalizes the sidebar's read-only phone display through the same
+// parse/compose pair PhoneField uses, so it always shows the standard
+// "+60 12-4680 797" style regardless of exactly how the stored string is
+// spaced/punctuated.
+function formatDisplayPhone(value: string | null | undefined): string {
+  if (!value) return "--";
+  const { countryCode, digits } = parsePhoneValue(value);
+  return composePhoneValue(countryCode, digits) || "--";
+}
+
+// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
+// Probation) have no section segment, "separate-pages" stages (Onboarding/
+// Active/Exit) land on their first section. Used to send "Proceed" straight
+// to the employee's new profile after a real stage move, whichever URL shape
+// that target stage actually uses.
+function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
+  const config = STAGE_PROFILE_CONFIG[stage];
+  if (config.profileMode === "separate-pages") {
+    return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
+  }
+  return `/employee-folder/${stage}/employee/${employeeId}`;
 }
 
 // Shared by both the current stage's own section and every history-tab
@@ -405,6 +487,11 @@ function resolvePanel({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  resignationInfo,
+  referenceLetterInfo,
+  exitInterviewNoteInfo,
+  branches,
+  departments,
   employeeId,
 }: {
   originStage: EmployeeStage;
@@ -426,6 +513,11 @@ function resolvePanel({
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  resignationInfo?: ResignationInfo | null;
+  referenceLetterInfo?: ReferenceLetterInfo | null;
+  exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   employeeId: number;
 }) {
   if (originStage === "active" && section.key === "mc-leave" && leaveHistory) {
@@ -486,10 +578,18 @@ function resolvePanel({
     return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} />;
   }
   if (section.key === "promotion" && promotions !== undefined) {
-    return <PromotionPanel userId={employeeId} data={promotions} />;
+    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} />;
   }
   if (section.key === "transfer" && transfers !== undefined) {
-    return <TransferPanel userId={employeeId} data={transfers} />;
+    return (
+      <TransferPanel
+        userId={employeeId}
+        data={transfers}
+        branches={branches ?? []}
+        departments={departments ?? []}
+        currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+      />
+    );
   }
   if (section.key === "training" && trainings !== undefined) {
     return <TrainingPanel userId={employeeId} data={trainings} />;
@@ -502,6 +602,18 @@ function resolvePanel({
   }
   if (section.key === "disciplinary" && disciplinarySummary !== undefined) {
     return <DisciplinarySummaryPanel data={disciplinarySummary} />;
+  }
+  // Exit stage's 3 real singleton tabs — Resignation/Reference Letter/Exit
+  // Interview Notes. Its 4 Clearance sub-tabs remain placeholders (no
+  // backing tables), still resolved via STAGE_CONTENT_PANELS below.
+  if (section.key === "resignation" && resignationInfo !== undefined) {
+    return <ResignationPanel userId={employeeId} data={resignationInfo} />;
+  }
+  if (section.key === "reference-letter" && referenceLetterInfo !== undefined) {
+    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} />;
+  }
+  if (section.key === "exit-interview-notes" && exitInterviewNoteInfo !== undefined) {
+    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} />;
   }
   if (STAGE_CONTENT_PANELS[section.key]) {
     const ContentPanel = STAGE_CONTENT_PANELS[section.key];
@@ -664,6 +776,20 @@ function ExitHistoryTiles({
 // listLeaveHistory). The mock's own MC/Leave columns are Leave Type/Date/
 // Duration/Attachment; Status and Reason are kept since they're real and
 // useful, beyond what the mock happened to show.
+// Start/end date stacked on their own line within the Date cell (rather than
+// squeezed onto one "start – end" line, which wraps messily) — each line is
+// its own whitespace-nowrap span so a single date never breaks mid-string.
+// Same-day leave shows just the one date, no second line.
+function LeaveDateCell({ startDate, endDate }: { startDate: string; endDate: string }) {
+  if (startDate === endDate) return <span className="whitespace-nowrap">{startDate}</span>;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="whitespace-nowrap">{startDate}</span>
+      <span className="whitespace-nowrap">{endDate}</span>
+    </div>
+  );
+}
+
 function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
   return (
     <div>
@@ -679,9 +805,9 @@ function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
         ]}
         rows={rows.map((r) => ({
           type: r.leaveTypeName,
-          dates: r.startDate === r.endDate ? r.startDate : `${r.startDate} – ${r.endDate}`,
-          days: `${r.totalDays} Day${r.totalDays === "1" ? "" : "s"}`,
-          status: <span className="capitalize">{r.status}</span>,
+          dates: <LeaveDateCell startDate={r.startDate} endDate={r.endDate} />,
+          days: <span className="whitespace-nowrap">{`${r.totalDays} Day${r.totalDays === "1" ? "" : "s"}`}</span>,
+          status: <span className="capitalize whitespace-nowrap">{r.status}</span>,
           reason: r.reason ?? "—",
           attachment: <RealAttachmentLink fileId={r.attachment} />,
         }))}

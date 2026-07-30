@@ -1,14 +1,24 @@
 // Home — server component (converted from useSession): resolves the session
 // server-side, same pattern as /task-manager, and routes to the right
-// per-account dashboard. Server-side so the superadmin (od@) branch can
-// compose the server-fetched Task Manager overview section into its
-// dashboard (ODDashboard's `taskOverview` slot), and the department
-// dashboards (Operations/Marketing/Academy) get their own-department
-// Task Manager section the same way — other client dashboards still
-// fetch their own widget data exactly as before.
+// per-account dashboard. EVERY dashboard receives the same server-fetched
+// Task Manager overview section (`taskOverview` slot) — scoped by the data
+// layer per role (org grids / all departments / own department / own branch
+// / personal) and always carrying the date filters (2026-07-28 "no
+// exceptions" requirement). Client dashboards still fetch their own other
+// widget data exactly as before.
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { requireLiveSession } from "@/task-manager/action-session";
+import {
+  completeFlowTask,
+  reopenFlowTask,
+  skipFlowTask,
+  uploadFlowTaskProof,
+  FlowBridgeError,
+} from "@/task-manager/data";
+import type { ActionResult, ProofUploadResult } from "@/task-manager/ui/types";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
@@ -20,8 +30,7 @@ import BranchDashboard from "@/app/components/BranchDashboard";
 import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
-import { HomeOverviewSection } from "./overview-section";
-import { HomeDeptOverviewSection } from "./dept-overview-section";
+import { HomeScopedOverviewSection } from "./scoped-overview-section";
 
 const FINANCE_EMAIL = "finance@ebright.my";
 
@@ -30,18 +39,41 @@ const FINANCE_EMAIL = "finance@ebright.my";
  *  /task-manager's Daily filter. */
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** ?mrange= — the Monthly 7-day chunk ("1-7" … "29-31"); invalid = Full month. */
+const MRANGE_RE = /^(\d{1,2})-(\d{1,2})$/;
+
+function parseMonthRange(raw?: string): { from: number; to: number } | undefined {
+  const m = raw?.match(MRANGE_RE);
+  if (!m) return undefined;
+  const from = Number(m[1]);
+  const to = Number(m[2]);
+  return from >= 1 && from <= to && to <= 31 ? { from, to } : undefined;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({
   searchParams,
 }: {
-  // Overview date filters (superadmin section): ?date= anchors the Daily
-  // half, ?mdate= the Monthly half — independent of each other.
-  searchParams: Promise<{ date?: string; mdate?: string }>;
+  // Overview date filters: ?date= anchors the Daily half, ?mdate= the
+  // Monthly half, ?adate= the Ad hoc regions (org views only), ?hdate= the
+  // HOD-assigned card (staff view) — all independent of each other.
+  searchParams: Promise<{
+    date?: string;
+    mdate?: string;
+    mrange?: string;
+    adate?: string;
+    hdate?: string;
+    cdate?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
+  const monthlyRange = parseMonthRange(sp.mrange);
+  const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
+  const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
+  const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -70,63 +102,114 @@ export default async function HomePage({
   const isBranch = userRole.toLowerCase() === "branch";
   const isHr = userRole.toLowerCase() === "hr" || userId === "175";
 
+  // Personal-task actions for the overview's drill modals (same expected-
+  // errors-are-RETURNED pattern as /task-manager — production masks thrown
+  // server-action messages). The data layer enforces assignee-only.
+  const FALLBACK_MESSAGE = "Something went wrong — please try again";
+  async function completeTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await completeFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function skipTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await skipFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function reopenTask(runBlockId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await reopenFlowTask(userEmail, runBlockId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function uploadProof(
+    runBlockId: string,
+    image: { mime: string; dataBase64: string },
+  ): Promise<ProofUploadResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      const { proofId } = await uploadFlowTaskProof(userEmail, runBlockId, image);
+      revalidatePath("/home");
+      return { ok: true, proofId };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  // One overview for every account type — the section itself resolves the
+  // Task Manager role and scopes/routes accordingly (and renders nothing on
+  // any Task Manager failure, so no dashboard can break because of it).
+  const taskOverview = (
+    <Suspense fallback={null}>
+      <HomeScopedOverviewSection
+        email={userEmail}
+        dailyDate={dailyDate}
+        monthlyDate={monthlyDate}
+        monthlyRange={monthlyRange}
+        adhocDate={adhocDate}
+        hodDate={hodDate}
+        ceoDate={ceoDate}
+        actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask, uploadProof }}
+      />
+    </Suspense>
+  );
+
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <HodPendingAlert position={userPosition} />
       {isOD ? (
-        <ODDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeOverviewSection
-                email={userEmail}
-                dailyDate={dailyDate}
-                monthlyDate={monthlyDate}
-              />
-            </Suspense>
-          }
-        />
+        <ODDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isOperations ? (
-        <OperationsDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
-        />
+        <OperationsDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isMarketing ? (
-        <MarketingDashboard
-          userName={userName}
-          userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
-        />
+        <MarketingDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isAcademy ? (
-        <AcademyDashboard
+        <AcademyDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
+      ) : isBranch ? (
+        <BranchDashboard
           userName={userName}
           userEmail={userEmail}
-          taskOverview={
-            <Suspense fallback={null}>
-              <HomeDeptOverviewSection email={userEmail} />
-            </Suspense>
-          }
+          branchName={branchName}
+          taskOverview={taskOverview}
         />
-      ) : isBranch ? (
-        <BranchDashboard userName={userName} userEmail={userEmail} branchName={branchName} />
       ) : isFinance ? (
-        <FinanceDashboard userName={userName} userEmail={userEmail} />
+        <FinanceDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
       ) : isStaff ? (
-        <EmployeeSelfServiceDashboard userName={userName} userEmail={userEmail} />
+        <EmployeeSelfServiceDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={taskOverview}
+        />
       ) : isHr ? (
-        <HrPersonalizedDashboard userName={userName} userEmail={userEmail} />
+        <HrPersonalizedDashboard
+          userName={userName}
+          userEmail={userEmail}
+          taskOverview={taskOverview}
+        />
       ) : (
-        <DashboardHome userRole={userRole} userEmail={userEmail} />
+        <DashboardHome userRole={userRole} userEmail={userEmail} taskOverview={taskOverview} />
       )}
     </AppShell>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 interface DashboardCard {
@@ -100,7 +101,15 @@ const dashboards: DashboardCard[] = [
   },
 ];
 
-export default function DashboardHome({ userRole }: { userRole?: string; userEmail?: string }) {
+export default function DashboardHome({
+  userRole,
+  taskOverview,
+}: {
+  userRole?: string;
+  userEmail?: string;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
+}) {
   const isSuperadmin = userRole === "superadmin";
   const isAdmin = userRole === "admin";
   const restrictedForAdmin = new Set<string>([]);
@@ -146,6 +155,11 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
             );
           })}
         </div>
+
+        {/* Task Manager — scoped status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview && <div className="mt-8">{taskOverview}</div>}
       </div>
     </div>
   );

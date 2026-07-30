@@ -69,6 +69,25 @@ export type FlowRun = $Result.DefaultSelection<Prisma.$FlowRunPayload>
  */
 export type RunBlock = $Result.DefaultSelection<Prisma.$RunBlockPayload>
 /**
+ * Model Guideline
+ * Optional assigner-attached reference material for a task (link and/or
+ * image, both optional — but a row only exists when at least one is set).
+ * Image bytes live here in the DB (capped at 2 MB by the assign action)
+ * so dev/staging/prod share them and Docker redeploys can't lose them;
+ * served via /api/task-manager/guideline-image/[id] (session-gated).
+ */
+export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
+/**
+ * Model Proof
+ * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
+ * image only, capped at 2 MB by the upload action). Optional: uploading
+ * proof never gates completion. Re-uploading replaces the row (upsert on
+ * runBlockId); deleting the block cascades the proof away. Bytes live in
+ * the DB for the same reason as Guideline.imageData; served via
+ * /api/task-manager/proof-image/[id] (session-gated).
+ */
+export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
+/**
  * Model RunItem
  * 
  */
@@ -462,6 +481,26 @@ export class PrismaClient<
     * ```
     */
   get runBlock(): Prisma.RunBlockDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.guideline`: Exposes CRUD operations for the **Guideline** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Guidelines
+    * const guidelines = await prisma.guideline.findMany()
+    * ```
+    */
+  get guideline(): Prisma.GuidelineDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.proof`: Exposes CRUD operations for the **Proof** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Proofs
+    * const proofs = await prisma.proof.findMany()
+    * ```
+    */
+  get proof(): Prisma.ProofDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.runItem`: Exposes CRUD operations for the **RunItem** model.
@@ -987,6 +1026,8 @@ export namespace Prisma {
     DecisionNode: 'DecisionNode',
     FlowRun: 'FlowRun',
     RunBlock: 'RunBlock',
+    Guideline: 'Guideline',
+    Proof: 'Proof',
     RunItem: 'RunItem',
     NotificationLog: 'NotificationLog',
     AuditLog: 'AuditLog',
@@ -1010,7 +1051,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1828,6 +1869,154 @@ export namespace Prisma {
           }
         }
       }
+      Guideline: {
+        payload: Prisma.$GuidelinePayload<ExtArgs>
+        fields: Prisma.GuidelineFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.GuidelineFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.GuidelineFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          findFirst: {
+            args: Prisma.GuidelineFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.GuidelineFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          findMany: {
+            args: Prisma.GuidelineFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>[]
+          }
+          create: {
+            args: Prisma.GuidelineCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          createMany: {
+            args: Prisma.GuidelineCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.GuidelineCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>[]
+          }
+          delete: {
+            args: Prisma.GuidelineDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          update: {
+            args: Prisma.GuidelineUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          deleteMany: {
+            args: Prisma.GuidelineDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.GuidelineUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.GuidelineUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>[]
+          }
+          upsert: {
+            args: Prisma.GuidelineUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GuidelinePayload>
+          }
+          aggregate: {
+            args: Prisma.GuidelineAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateGuideline>
+          }
+          groupBy: {
+            args: Prisma.GuidelineGroupByArgs<ExtArgs>
+            result: $Utils.Optional<GuidelineGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.GuidelineCountArgs<ExtArgs>
+            result: $Utils.Optional<GuidelineCountAggregateOutputType> | number
+          }
+        }
+      }
+      Proof: {
+        payload: Prisma.$ProofPayload<ExtArgs>
+        fields: Prisma.ProofFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ProofFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ProofFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findFirst: {
+            args: Prisma.ProofFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ProofFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findMany: {
+            args: Prisma.ProofFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          create: {
+            args: Prisma.ProofCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          createMany: {
+            args: Prisma.ProofCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ProofCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          delete: {
+            args: Prisma.ProofDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          update: {
+            args: Prisma.ProofUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          deleteMany: {
+            args: Prisma.ProofDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ProofUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ProofUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          upsert: {
+            args: Prisma.ProofUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          aggregate: {
+            args: Prisma.ProofAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateProof>
+          }
+          groupBy: {
+            args: Prisma.ProofGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ProofGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ProofCountArgs<ExtArgs>
+            result: $Utils.Optional<ProofCountAggregateOutputType> | number
+          }
+        }
+      }
       RunItem: {
         payload: Prisma.$RunItemPayload<ExtArgs>
         fields: Prisma.RunItemFieldRefs
@@ -2539,6 +2728,8 @@ export namespace Prisma {
     decisionNode?: DecisionNodeOmit
     flowRun?: FlowRunOmit
     runBlock?: RunBlockOmit
+    guideline?: GuidelineOmit
+    proof?: ProofOmit
     runItem?: RunItemOmit
     notificationLog?: NotificationLogOmit
     auditLog?: AuditLogOmit
@@ -2819,10 +3010,12 @@ export namespace Prisma {
 
   export type RunBlockCountOutputType = {
     runItems: number
+    subtasks: number
   }
 
   export type RunBlockCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runItems?: boolean | RunBlockCountOutputTypeCountRunItemsArgs
+    subtasks?: boolean | RunBlockCountOutputTypeCountSubtasksArgs
   }
 
   // Custom InputTypes
@@ -2841,6 +3034,44 @@ export namespace Prisma {
    */
   export type RunBlockCountOutputTypeCountRunItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RunItemWhereInput
+  }
+
+  /**
+   * RunBlockCountOutputType without action
+   */
+  export type RunBlockCountOutputTypeCountSubtasksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RunBlockWhereInput
+  }
+
+
+  /**
+   * Count Type GuidelineCountOutputType
+   */
+
+  export type GuidelineCountOutputType = {
+    blocks: number
+  }
+
+  export type GuidelineCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    blocks?: boolean | GuidelineCountOutputTypeCountBlocksArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * GuidelineCountOutputType without action
+   */
+  export type GuidelineCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GuidelineCountOutputType
+     */
+    select?: GuidelineCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * GuidelineCountOutputType without action
+   */
+  export type GuidelineCountOutputTypeCountBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RunBlockWhereInput
   }
 
 
@@ -14398,6 +14629,8 @@ export namespace Prisma {
     cadence: $Enums.Cadence | null
     repeatWeekly: boolean | null
     recurrenceOfId: string | null
+    guidelineId: string | null
+    parentId: string | null
   }
 
   export type RunBlockMaxAggregateOutputType = {
@@ -14417,6 +14650,8 @@ export namespace Prisma {
     cadence: $Enums.Cadence | null
     repeatWeekly: boolean | null
     recurrenceOfId: string | null
+    guidelineId: string | null
+    parentId: string | null
   }
 
   export type RunBlockCountAggregateOutputType = {
@@ -14436,6 +14671,8 @@ export namespace Prisma {
     cadence: number
     repeatWeekly: number
     recurrenceOfId: number
+    guidelineId: number
+    parentId: number
     _all: number
   }
 
@@ -14465,6 +14702,8 @@ export namespace Prisma {
     cadence?: true
     repeatWeekly?: true
     recurrenceOfId?: true
+    guidelineId?: true
+    parentId?: true
   }
 
   export type RunBlockMaxAggregateInputType = {
@@ -14484,6 +14723,8 @@ export namespace Prisma {
     cadence?: true
     repeatWeekly?: true
     recurrenceOfId?: true
+    guidelineId?: true
+    parentId?: true
   }
 
   export type RunBlockCountAggregateInputType = {
@@ -14503,6 +14744,8 @@ export namespace Prisma {
     cadence?: true
     repeatWeekly?: true
     recurrenceOfId?: true
+    guidelineId?: true
+    parentId?: true
     _all?: true
   }
 
@@ -14609,6 +14852,8 @@ export namespace Prisma {
     cadence: $Enums.Cadence | null
     repeatWeekly: boolean
     recurrenceOfId: string | null
+    guidelineId: string | null
+    parentId: string | null
     _count: RunBlockCountAggregateOutputType | null
     _avg: RunBlockAvgAggregateOutputType | null
     _sum: RunBlockSumAggregateOutputType | null
@@ -14647,10 +14892,16 @@ export namespace Prisma {
     cadence?: boolean
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
+    guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
+    subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
@@ -14671,8 +14922,12 @@ export namespace Prisma {
     cadence?: boolean
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
+    guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -14692,8 +14947,12 @@ export namespace Prisma {
     cadence?: boolean
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
+    guidelineId?: boolean
+    parentId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
   export type RunBlockSelectScalar = {
@@ -14713,23 +14972,33 @@ export namespace Prisma {
     cadence?: boolean
     repeatWeekly?: boolean
     recurrenceOfId?: boolean
+    guidelineId?: boolean
+    parentId?: boolean
   }
 
-  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId", ExtArgs["result"]["runBlock"]>
+  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId" | "guidelineId" | "parentId", ExtArgs["result"]["runBlock"]>
   export type RunBlockInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
+    subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type RunBlockIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }
   export type RunBlockIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
+    guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    parent?: boolean | RunBlock$parentArgs<ExtArgs>
   }
 
   export type $RunBlockPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14739,6 +15008,10 @@ export namespace Prisma {
       runItems: Prisma.$RunItemPayload<ExtArgs>[]
       recurrenceOf: Prisma.$RunBlockPayload<ExtArgs> | null
       successor: Prisma.$RunBlockPayload<ExtArgs> | null
+      guideline: Prisma.$GuidelinePayload<ExtArgs> | null
+      proof: Prisma.$ProofPayload<ExtArgs> | null
+      parent: Prisma.$RunBlockPayload<ExtArgs> | null
+      subtasks: Prisma.$RunBlockPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -14757,6 +15030,8 @@ export namespace Prisma {
       cadence: $Enums.Cadence | null
       repeatWeekly: boolean
       recurrenceOfId: string | null
+      guidelineId: string | null
+      parentId: string | null
     }, ExtArgs["result"]["runBlock"]>
     composites: {}
   }
@@ -15155,6 +15430,10 @@ export namespace Prisma {
     runItems<T extends RunBlock$runItemsArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$runItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     recurrenceOf<T extends RunBlock$recurrenceOfArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$recurrenceOfArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    guideline<T extends RunBlock$guidelineArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$guidelineArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    proof<T extends RunBlock$proofArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    parent<T extends RunBlock$parentArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$parentArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    subtasks<T extends RunBlock$subtasksArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$subtasksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15200,6 +15479,8 @@ export namespace Prisma {
     readonly cadence: FieldRef<"RunBlock", 'Cadence'>
     readonly repeatWeekly: FieldRef<"RunBlock", 'Boolean'>
     readonly recurrenceOfId: FieldRef<"RunBlock", 'String'>
+    readonly guidelineId: FieldRef<"RunBlock", 'String'>
+    readonly parentId: FieldRef<"RunBlock", 'String'>
   }
     
 
@@ -15663,6 +15944,87 @@ export namespace Prisma {
   }
 
   /**
+   * RunBlock.guideline
+   */
+  export type RunBlock$guidelineArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    where?: GuidelineWhereInput
+  }
+
+  /**
+   * RunBlock.proof
+   */
+  export type RunBlock$proofArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    where?: ProofWhereInput
+  }
+
+  /**
+   * RunBlock.parent
+   */
+  export type RunBlock$parentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+  }
+
+  /**
+   * RunBlock.subtasks
+   */
+  export type RunBlock$subtasksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+    orderBy?: RunBlockOrderByWithRelationInput | RunBlockOrderByWithRelationInput[]
+    cursor?: RunBlockWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: RunBlockScalarFieldEnum | RunBlockScalarFieldEnum[]
+  }
+
+  /**
    * RunBlock without action
    */
   export type RunBlockDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -15678,6 +16040,2144 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: RunBlockInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Guideline
+   */
+
+  export type AggregateGuideline = {
+    _count: GuidelineCountAggregateOutputType | null
+    _min: GuidelineMinAggregateOutputType | null
+    _max: GuidelineMaxAggregateOutputType | null
+  }
+
+  export type GuidelineMinAggregateOutputType = {
+    id: string | null
+    url: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type GuidelineMaxAggregateOutputType = {
+    id: string | null
+    url: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type GuidelineCountAggregateOutputType = {
+    id: number
+    url: number
+    imageMime: number
+    imageData: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type GuidelineMinAggregateInputType = {
+    id?: true
+    url?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type GuidelineMaxAggregateInputType = {
+    id?: true
+    url?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type GuidelineCountAggregateInputType = {
+    id?: true
+    url?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type GuidelineAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Guideline to aggregate.
+     */
+    where?: GuidelineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Guidelines to fetch.
+     */
+    orderBy?: GuidelineOrderByWithRelationInput | GuidelineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: GuidelineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Guidelines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Guidelines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Guidelines
+    **/
+    _count?: true | GuidelineCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: GuidelineMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: GuidelineMaxAggregateInputType
+  }
+
+  export type GetGuidelineAggregateType<T extends GuidelineAggregateArgs> = {
+        [P in keyof T & keyof AggregateGuideline]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateGuideline[P]>
+      : GetScalarType<T[P], AggregateGuideline[P]>
+  }
+
+
+
+
+  export type GuidelineGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GuidelineWhereInput
+    orderBy?: GuidelineOrderByWithAggregationInput | GuidelineOrderByWithAggregationInput[]
+    by: GuidelineScalarFieldEnum[] | GuidelineScalarFieldEnum
+    having?: GuidelineScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: GuidelineCountAggregateInputType | true
+    _min?: GuidelineMinAggregateInputType
+    _max?: GuidelineMaxAggregateInputType
+  }
+
+  export type GuidelineGroupByOutputType = {
+    id: string
+    url: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date
+    _count: GuidelineCountAggregateOutputType | null
+    _min: GuidelineMinAggregateOutputType | null
+    _max: GuidelineMaxAggregateOutputType | null
+  }
+
+  type GetGuidelineGroupByPayload<T extends GuidelineGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<GuidelineGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof GuidelineGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], GuidelineGroupByOutputType[P]>
+            : GetScalarType<T[P], GuidelineGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type GuidelineSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    url?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    blocks?: boolean | Guideline$blocksArgs<ExtArgs>
+    _count?: boolean | GuidelineCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["guideline"]>
+
+  export type GuidelineSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    url?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["guideline"]>
+
+  export type GuidelineSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    url?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["guideline"]>
+
+  export type GuidelineSelectScalar = {
+    id?: boolean
+    url?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+  }
+
+  export type GuidelineOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "url" | "imageMime" | "imageData" | "createdAt", ExtArgs["result"]["guideline"]>
+  export type GuidelineInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    blocks?: boolean | Guideline$blocksArgs<ExtArgs>
+    _count?: boolean | GuidelineCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type GuidelineIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type GuidelineIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $GuidelinePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Guideline"
+    objects: {
+      blocks: Prisma.$RunBlockPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      url: string | null
+      imageMime: string | null
+      imageData: Prisma.Bytes | null
+      createdAt: Date
+    }, ExtArgs["result"]["guideline"]>
+    composites: {}
+  }
+
+  type GuidelineGetPayload<S extends boolean | null | undefined | GuidelineDefaultArgs> = $Result.GetResult<Prisma.$GuidelinePayload, S>
+
+  type GuidelineCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<GuidelineFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: GuidelineCountAggregateInputType | true
+    }
+
+  export interface GuidelineDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Guideline'], meta: { name: 'Guideline' } }
+    /**
+     * Find zero or one Guideline that matches the filter.
+     * @param {GuidelineFindUniqueArgs} args - Arguments to find a Guideline
+     * @example
+     * // Get one Guideline
+     * const guideline = await prisma.guideline.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends GuidelineFindUniqueArgs>(args: SelectSubset<T, GuidelineFindUniqueArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Guideline that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {GuidelineFindUniqueOrThrowArgs} args - Arguments to find a Guideline
+     * @example
+     * // Get one Guideline
+     * const guideline = await prisma.guideline.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends GuidelineFindUniqueOrThrowArgs>(args: SelectSubset<T, GuidelineFindUniqueOrThrowArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Guideline that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineFindFirstArgs} args - Arguments to find a Guideline
+     * @example
+     * // Get one Guideline
+     * const guideline = await prisma.guideline.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends GuidelineFindFirstArgs>(args?: SelectSubset<T, GuidelineFindFirstArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Guideline that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineFindFirstOrThrowArgs} args - Arguments to find a Guideline
+     * @example
+     * // Get one Guideline
+     * const guideline = await prisma.guideline.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends GuidelineFindFirstOrThrowArgs>(args?: SelectSubset<T, GuidelineFindFirstOrThrowArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Guidelines that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Guidelines
+     * const guidelines = await prisma.guideline.findMany()
+     * 
+     * // Get first 10 Guidelines
+     * const guidelines = await prisma.guideline.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const guidelineWithIdOnly = await prisma.guideline.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends GuidelineFindManyArgs>(args?: SelectSubset<T, GuidelineFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Guideline.
+     * @param {GuidelineCreateArgs} args - Arguments to create a Guideline.
+     * @example
+     * // Create one Guideline
+     * const Guideline = await prisma.guideline.create({
+     *   data: {
+     *     // ... data to create a Guideline
+     *   }
+     * })
+     * 
+     */
+    create<T extends GuidelineCreateArgs>(args: SelectSubset<T, GuidelineCreateArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Guidelines.
+     * @param {GuidelineCreateManyArgs} args - Arguments to create many Guidelines.
+     * @example
+     * // Create many Guidelines
+     * const guideline = await prisma.guideline.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends GuidelineCreateManyArgs>(args?: SelectSubset<T, GuidelineCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Guidelines and returns the data saved in the database.
+     * @param {GuidelineCreateManyAndReturnArgs} args - Arguments to create many Guidelines.
+     * @example
+     * // Create many Guidelines
+     * const guideline = await prisma.guideline.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Guidelines and only return the `id`
+     * const guidelineWithIdOnly = await prisma.guideline.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends GuidelineCreateManyAndReturnArgs>(args?: SelectSubset<T, GuidelineCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Guideline.
+     * @param {GuidelineDeleteArgs} args - Arguments to delete one Guideline.
+     * @example
+     * // Delete one Guideline
+     * const Guideline = await prisma.guideline.delete({
+     *   where: {
+     *     // ... filter to delete one Guideline
+     *   }
+     * })
+     * 
+     */
+    delete<T extends GuidelineDeleteArgs>(args: SelectSubset<T, GuidelineDeleteArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Guideline.
+     * @param {GuidelineUpdateArgs} args - Arguments to update one Guideline.
+     * @example
+     * // Update one Guideline
+     * const guideline = await prisma.guideline.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends GuidelineUpdateArgs>(args: SelectSubset<T, GuidelineUpdateArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Guidelines.
+     * @param {GuidelineDeleteManyArgs} args - Arguments to filter Guidelines to delete.
+     * @example
+     * // Delete a few Guidelines
+     * const { count } = await prisma.guideline.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends GuidelineDeleteManyArgs>(args?: SelectSubset<T, GuidelineDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Guidelines.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Guidelines
+     * const guideline = await prisma.guideline.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends GuidelineUpdateManyArgs>(args: SelectSubset<T, GuidelineUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Guidelines and returns the data updated in the database.
+     * @param {GuidelineUpdateManyAndReturnArgs} args - Arguments to update many Guidelines.
+     * @example
+     * // Update many Guidelines
+     * const guideline = await prisma.guideline.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Guidelines and only return the `id`
+     * const guidelineWithIdOnly = await prisma.guideline.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends GuidelineUpdateManyAndReturnArgs>(args: SelectSubset<T, GuidelineUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Guideline.
+     * @param {GuidelineUpsertArgs} args - Arguments to update or create a Guideline.
+     * @example
+     * // Update or create a Guideline
+     * const guideline = await prisma.guideline.upsert({
+     *   create: {
+     *     // ... data to create a Guideline
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Guideline we want to update
+     *   }
+     * })
+     */
+    upsert<T extends GuidelineUpsertArgs>(args: SelectSubset<T, GuidelineUpsertArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Guidelines.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineCountArgs} args - Arguments to filter Guidelines to count.
+     * @example
+     * // Count the number of Guidelines
+     * const count = await prisma.guideline.count({
+     *   where: {
+     *     // ... the filter for the Guidelines we want to count
+     *   }
+     * })
+    **/
+    count<T extends GuidelineCountArgs>(
+      args?: Subset<T, GuidelineCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], GuidelineCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Guideline.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends GuidelineAggregateArgs>(args: Subset<T, GuidelineAggregateArgs>): Prisma.PrismaPromise<GetGuidelineAggregateType<T>>
+
+    /**
+     * Group by Guideline.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GuidelineGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends GuidelineGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: GuidelineGroupByArgs['orderBy'] }
+        : { orderBy?: GuidelineGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, GuidelineGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetGuidelineGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Guideline model
+   */
+  readonly fields: GuidelineFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Guideline.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__GuidelineClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    blocks<T extends Guideline$blocksArgs<ExtArgs> = {}>(args?: Subset<T, Guideline$blocksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Guideline model
+   */
+  interface GuidelineFieldRefs {
+    readonly id: FieldRef<"Guideline", 'String'>
+    readonly url: FieldRef<"Guideline", 'String'>
+    readonly imageMime: FieldRef<"Guideline", 'String'>
+    readonly imageData: FieldRef<"Guideline", 'Bytes'>
+    readonly createdAt: FieldRef<"Guideline", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Guideline findUnique
+   */
+  export type GuidelineFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter, which Guideline to fetch.
+     */
+    where: GuidelineWhereUniqueInput
+  }
+
+  /**
+   * Guideline findUniqueOrThrow
+   */
+  export type GuidelineFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter, which Guideline to fetch.
+     */
+    where: GuidelineWhereUniqueInput
+  }
+
+  /**
+   * Guideline findFirst
+   */
+  export type GuidelineFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter, which Guideline to fetch.
+     */
+    where?: GuidelineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Guidelines to fetch.
+     */
+    orderBy?: GuidelineOrderByWithRelationInput | GuidelineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Guidelines.
+     */
+    cursor?: GuidelineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Guidelines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Guidelines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Guidelines.
+     */
+    distinct?: GuidelineScalarFieldEnum | GuidelineScalarFieldEnum[]
+  }
+
+  /**
+   * Guideline findFirstOrThrow
+   */
+  export type GuidelineFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter, which Guideline to fetch.
+     */
+    where?: GuidelineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Guidelines to fetch.
+     */
+    orderBy?: GuidelineOrderByWithRelationInput | GuidelineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Guidelines.
+     */
+    cursor?: GuidelineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Guidelines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Guidelines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Guidelines.
+     */
+    distinct?: GuidelineScalarFieldEnum | GuidelineScalarFieldEnum[]
+  }
+
+  /**
+   * Guideline findMany
+   */
+  export type GuidelineFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter, which Guidelines to fetch.
+     */
+    where?: GuidelineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Guidelines to fetch.
+     */
+    orderBy?: GuidelineOrderByWithRelationInput | GuidelineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Guidelines.
+     */
+    cursor?: GuidelineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Guidelines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Guidelines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Guidelines.
+     */
+    distinct?: GuidelineScalarFieldEnum | GuidelineScalarFieldEnum[]
+  }
+
+  /**
+   * Guideline create
+   */
+  export type GuidelineCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Guideline.
+     */
+    data?: XOR<GuidelineCreateInput, GuidelineUncheckedCreateInput>
+  }
+
+  /**
+   * Guideline createMany
+   */
+  export type GuidelineCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Guidelines.
+     */
+    data: GuidelineCreateManyInput | GuidelineCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Guideline createManyAndReturn
+   */
+  export type GuidelineCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * The data used to create many Guidelines.
+     */
+    data: GuidelineCreateManyInput | GuidelineCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Guideline update
+   */
+  export type GuidelineUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Guideline.
+     */
+    data: XOR<GuidelineUpdateInput, GuidelineUncheckedUpdateInput>
+    /**
+     * Choose, which Guideline to update.
+     */
+    where: GuidelineWhereUniqueInput
+  }
+
+  /**
+   * Guideline updateMany
+   */
+  export type GuidelineUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Guidelines.
+     */
+    data: XOR<GuidelineUpdateManyMutationInput, GuidelineUncheckedUpdateManyInput>
+    /**
+     * Filter which Guidelines to update
+     */
+    where?: GuidelineWhereInput
+    /**
+     * Limit how many Guidelines to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Guideline updateManyAndReturn
+   */
+  export type GuidelineUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * The data used to update Guidelines.
+     */
+    data: XOR<GuidelineUpdateManyMutationInput, GuidelineUncheckedUpdateManyInput>
+    /**
+     * Filter which Guidelines to update
+     */
+    where?: GuidelineWhereInput
+    /**
+     * Limit how many Guidelines to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Guideline upsert
+   */
+  export type GuidelineUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Guideline to update in case it exists.
+     */
+    where: GuidelineWhereUniqueInput
+    /**
+     * In case the Guideline found by the `where` argument doesn't exist, create a new Guideline with this data.
+     */
+    create: XOR<GuidelineCreateInput, GuidelineUncheckedCreateInput>
+    /**
+     * In case the Guideline was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<GuidelineUpdateInput, GuidelineUncheckedUpdateInput>
+  }
+
+  /**
+   * Guideline delete
+   */
+  export type GuidelineDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+    /**
+     * Filter which Guideline to delete.
+     */
+    where: GuidelineWhereUniqueInput
+  }
+
+  /**
+   * Guideline deleteMany
+   */
+  export type GuidelineDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Guidelines to delete
+     */
+    where?: GuidelineWhereInput
+    /**
+     * Limit how many Guidelines to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Guideline.blocks
+   */
+  export type Guideline$blocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RunBlock
+     */
+    select?: RunBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RunBlock
+     */
+    omit?: RunBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RunBlockInclude<ExtArgs> | null
+    where?: RunBlockWhereInput
+    orderBy?: RunBlockOrderByWithRelationInput | RunBlockOrderByWithRelationInput[]
+    cursor?: RunBlockWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: RunBlockScalarFieldEnum | RunBlockScalarFieldEnum[]
+  }
+
+  /**
+   * Guideline without action
+   */
+  export type GuidelineDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Guideline
+     */
+    select?: GuidelineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Guideline
+     */
+    omit?: GuidelineOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GuidelineInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Proof
+   */
+
+  export type AggregateProof = {
+    _count: ProofCountAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  export type ProofMinAggregateOutputType = {
+    id: string | null
+    runBlockId: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type ProofMaxAggregateOutputType = {
+    id: string | null
+    runBlockId: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type ProofCountAggregateOutputType = {
+    id: number
+    runBlockId: number
+    imageMime: number
+    imageData: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type ProofMinAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type ProofMaxAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type ProofCountAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type ProofAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proof to aggregate.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Proofs
+    **/
+    _count?: true | ProofCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ProofMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type GetProofAggregateType<T extends ProofAggregateArgs> = {
+        [P in keyof T & keyof AggregateProof]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateProof[P]>
+      : GetScalarType<T[P], AggregateProof[P]>
+  }
+
+
+
+
+  export type ProofGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
+    orderBy?: ProofOrderByWithAggregationInput | ProofOrderByWithAggregationInput[]
+    by: ProofScalarFieldEnum[] | ProofScalarFieldEnum
+    having?: ProofScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ProofCountAggregateInputType | true
+    _min?: ProofMinAggregateInputType
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type ProofGroupByOutputType = {
+    id: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt: Date
+    _count: ProofCountAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  type GetProofGroupByPayload<T extends ProofGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ProofGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ProofGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ProofGroupByOutputType[P]>
+            : GetScalarType<T[P], ProofGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ProofSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectScalar = {
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+  }
+
+  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "imageMime" | "imageData" | "createdAt", ExtArgs["result"]["proof"]>
+  export type ProofInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+  export type ProofIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+  export type ProofIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+
+  export type $ProofPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Proof"
+    objects: {
+      runBlock: Prisma.$RunBlockPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      runBlockId: string
+      imageMime: string
+      imageData: Prisma.Bytes
+      createdAt: Date
+    }, ExtArgs["result"]["proof"]>
+    composites: {}
+  }
+
+  type ProofGetPayload<S extends boolean | null | undefined | ProofDefaultArgs> = $Result.GetResult<Prisma.$ProofPayload, S>
+
+  type ProofCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ProofFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ProofCountAggregateInputType | true
+    }
+
+  export interface ProofDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Proof'], meta: { name: 'Proof' } }
+    /**
+     * Find zero or one Proof that matches the filter.
+     * @param {ProofFindUniqueArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ProofFindUniqueArgs>(args: SelectSubset<T, ProofFindUniqueArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Proof that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ProofFindUniqueOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ProofFindUniqueOrThrowArgs>(args: SelectSubset<T, ProofFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Proof that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ProofFindFirstArgs>(args?: SelectSubset<T, ProofFindFirstArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Proof that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ProofFindFirstOrThrowArgs>(args?: SelectSubset<T, ProofFindFirstOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Proofs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Proofs
+     * const proofs = await prisma.proof.findMany()
+     * 
+     * // Get first 10 Proofs
+     * const proofs = await prisma.proof.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const proofWithIdOnly = await prisma.proof.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ProofFindManyArgs>(args?: SelectSubset<T, ProofFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Proof.
+     * @param {ProofCreateArgs} args - Arguments to create a Proof.
+     * @example
+     * // Create one Proof
+     * const Proof = await prisma.proof.create({
+     *   data: {
+     *     // ... data to create a Proof
+     *   }
+     * })
+     * 
+     */
+    create<T extends ProofCreateArgs>(args: SelectSubset<T, ProofCreateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Proofs.
+     * @param {ProofCreateManyArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ProofCreateManyArgs>(args?: SelectSubset<T, ProofCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Proofs and returns the data saved in the database.
+     * @param {ProofCreateManyAndReturnArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Proofs and only return the `id`
+     * const proofWithIdOnly = await prisma.proof.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ProofCreateManyAndReturnArgs>(args?: SelectSubset<T, ProofCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Proof.
+     * @param {ProofDeleteArgs} args - Arguments to delete one Proof.
+     * @example
+     * // Delete one Proof
+     * const Proof = await prisma.proof.delete({
+     *   where: {
+     *     // ... filter to delete one Proof
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ProofDeleteArgs>(args: SelectSubset<T, ProofDeleteArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Proof.
+     * @param {ProofUpdateArgs} args - Arguments to update one Proof.
+     * @example
+     * // Update one Proof
+     * const proof = await prisma.proof.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ProofUpdateArgs>(args: SelectSubset<T, ProofUpdateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Proofs.
+     * @param {ProofDeleteManyArgs} args - Arguments to filter Proofs to delete.
+     * @example
+     * // Delete a few Proofs
+     * const { count } = await prisma.proof.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ProofDeleteManyArgs>(args?: SelectSubset<T, ProofDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Proofs
+     * const proof = await prisma.proof.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ProofUpdateManyArgs>(args: SelectSubset<T, ProofUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Proofs and returns the data updated in the database.
+     * @param {ProofUpdateManyAndReturnArgs} args - Arguments to update many Proofs.
+     * @example
+     * // Update many Proofs
+     * const proof = await prisma.proof.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Proofs and only return the `id`
+     * const proofWithIdOnly = await prisma.proof.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ProofUpdateManyAndReturnArgs>(args: SelectSubset<T, ProofUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Proof.
+     * @param {ProofUpsertArgs} args - Arguments to update or create a Proof.
+     * @example
+     * // Update or create a Proof
+     * const proof = await prisma.proof.upsert({
+     *   create: {
+     *     // ... data to create a Proof
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Proof we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ProofUpsertArgs>(args: SelectSubset<T, ProofUpsertArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofCountArgs} args - Arguments to filter Proofs to count.
+     * @example
+     * // Count the number of Proofs
+     * const count = await prisma.proof.count({
+     *   where: {
+     *     // ... the filter for the Proofs we want to count
+     *   }
+     * })
+    **/
+    count<T extends ProofCountArgs>(
+      args?: Subset<T, ProofCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ProofCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ProofAggregateArgs>(args: Subset<T, ProofAggregateArgs>): Prisma.PrismaPromise<GetProofAggregateType<T>>
+
+    /**
+     * Group by Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ProofGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ProofGroupByArgs['orderBy'] }
+        : { orderBy?: ProofGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ProofGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetProofGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Proof model
+   */
+  readonly fields: ProofFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Proof.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ProofClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    runBlock<T extends RunBlockDefaultArgs<ExtArgs> = {}>(args?: Subset<T, RunBlockDefaultArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Proof model
+   */
+  interface ProofFieldRefs {
+    readonly id: FieldRef<"Proof", 'String'>
+    readonly runBlockId: FieldRef<"Proof", 'String'>
+    readonly imageMime: FieldRef<"Proof", 'String'>
+    readonly imageData: FieldRef<"Proof", 'Bytes'>
+    readonly createdAt: FieldRef<"Proof", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Proof findUnique
+   */
+  export type ProofFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findUniqueOrThrow
+   */
+  export type ProofFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findFirst
+   */
+  export type ProofFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findFirstOrThrow
+   */
+  export type ProofFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findMany
+   */
+  export type ProofFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proofs to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof create
+   */
+  export type ProofCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Proof.
+     */
+    data: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+  }
+
+  /**
+   * Proof createMany
+   */
+  export type ProofCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Proof createManyAndReturn
+   */
+  export type ProofCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Proof update
+   */
+  export type ProofUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Proof.
+     */
+    data: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+    /**
+     * Choose, which Proof to update.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof updateMany
+   */
+  export type ProofUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Proofs.
+     */
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyInput>
+    /**
+     * Filter which Proofs to update
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Proof updateManyAndReturn
+   */
+  export type ProofUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * The data used to update Proofs.
+     */
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyInput>
+    /**
+     * Filter which Proofs to update
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Proof upsert
+   */
+  export type ProofUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Proof to update in case it exists.
+     */
+    where: ProofWhereUniqueInput
+    /**
+     * In case the Proof found by the `where` argument doesn't exist, create a new Proof with this data.
+     */
+    create: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+    /**
+     * In case the Proof was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+  }
+
+  /**
+   * Proof delete
+   */
+  export type ProofDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter which Proof to delete.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof deleteMany
+   */
+  export type ProofDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proofs to delete
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Proof without action
+   */
+  export type ProofDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
   }
 
 
@@ -24345,10 +26845,34 @@ export namespace Prisma {
     scheduleSlotId: 'scheduleSlotId',
     cadence: 'cadence',
     repeatWeekly: 'repeatWeekly',
-    recurrenceOfId: 'recurrenceOfId'
+    recurrenceOfId: 'recurrenceOfId',
+    guidelineId: 'guidelineId',
+    parentId: 'parentId'
   };
 
   export type RunBlockScalarFieldEnum = (typeof RunBlockScalarFieldEnum)[keyof typeof RunBlockScalarFieldEnum]
+
+
+  export const GuidelineScalarFieldEnum: {
+    id: 'id',
+    url: 'url',
+    imageMime: 'imageMime',
+    imageData: 'imageData',
+    createdAt: 'createdAt'
+  };
+
+  export type GuidelineScalarFieldEnum = (typeof GuidelineScalarFieldEnum)[keyof typeof GuidelineScalarFieldEnum]
+
+
+  export const ProofScalarFieldEnum: {
+    id: 'id',
+    runBlockId: 'runBlockId',
+    imageMime: 'imageMime',
+    imageData: 'imageData',
+    createdAt: 'createdAt'
+  };
+
+  export type ProofScalarFieldEnum = (typeof ProofScalarFieldEnum)[keyof typeof ProofScalarFieldEnum]
 
 
   export const RunItemScalarFieldEnum: {
@@ -24667,6 +27191,20 @@ export namespace Prisma {
    * Reference to a field of type 'Cadence[]'
    */
   export type ListEnumCadenceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Cadence[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Bytes'
+   */
+  export type BytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes'>
+    
+
+
+  /**
+   * Reference to a field of type 'Bytes[]'
+   */
+  export type ListBytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes[]'>
     
 
 
@@ -25456,10 +27994,16 @@ export namespace Prisma {
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
+    guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
+    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    subtasks?: RunBlockListRelationFilter
   }
 
   export type RunBlockOrderByWithRelationInput = {
@@ -25479,10 +28023,16 @@ export namespace Prisma {
     cadence?: SortOrderInput | SortOrder
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrderInput | SortOrder
+    guidelineId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
     run?: FlowRunOrderByWithRelationInput
     runItems?: RunItemOrderByRelationAggregateInput
     recurrenceOf?: RunBlockOrderByWithRelationInput
     successor?: RunBlockOrderByWithRelationInput
+    guideline?: GuidelineOrderByWithRelationInput
+    proof?: ProofOrderByWithRelationInput
+    parent?: RunBlockOrderByWithRelationInput
+    subtasks?: RunBlockOrderByRelationAggregateInput
   }
 
   export type RunBlockWhereUniqueInput = Prisma.AtLeast<{
@@ -25506,10 +28056,16 @@ export namespace Prisma {
     scheduleSlotId?: StringNullableFilter<"RunBlock"> | string | null
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
+    guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
+    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
+    subtasks?: RunBlockListRelationFilter
   }, "id" | "recurrenceOfId" | "runId_nodeId">
 
   export type RunBlockOrderByWithAggregationInput = {
@@ -25529,6 +28085,8 @@ export namespace Prisma {
     cadence?: SortOrderInput | SortOrder
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrderInput | SortOrder
+    guidelineId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
     _count?: RunBlockCountOrderByAggregateInput
     _avg?: RunBlockAvgOrderByAggregateInput
     _max?: RunBlockMaxOrderByAggregateInput
@@ -25556,6 +28114,118 @@ export namespace Prisma {
     cadence?: EnumCadenceNullableWithAggregatesFilter<"RunBlock"> | $Enums.Cadence | null
     repeatWeekly?: BoolWithAggregatesFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
+    guidelineId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
+    parentId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
+  }
+
+  export type GuidelineWhereInput = {
+    AND?: GuidelineWhereInput | GuidelineWhereInput[]
+    OR?: GuidelineWhereInput[]
+    NOT?: GuidelineWhereInput | GuidelineWhereInput[]
+    id?: StringFilter<"Guideline"> | string
+    url?: StringNullableFilter<"Guideline"> | string | null
+    imageMime?: StringNullableFilter<"Guideline"> | string | null
+    imageData?: BytesNullableFilter<"Guideline"> | Bytes | null
+    createdAt?: DateTimeFilter<"Guideline"> | Date | string
+    blocks?: RunBlockListRelationFilter
+  }
+
+  export type GuidelineOrderByWithRelationInput = {
+    id?: SortOrder
+    url?: SortOrderInput | SortOrder
+    imageMime?: SortOrderInput | SortOrder
+    imageData?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    blocks?: RunBlockOrderByRelationAggregateInput
+  }
+
+  export type GuidelineWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: GuidelineWhereInput | GuidelineWhereInput[]
+    OR?: GuidelineWhereInput[]
+    NOT?: GuidelineWhereInput | GuidelineWhereInput[]
+    url?: StringNullableFilter<"Guideline"> | string | null
+    imageMime?: StringNullableFilter<"Guideline"> | string | null
+    imageData?: BytesNullableFilter<"Guideline"> | Bytes | null
+    createdAt?: DateTimeFilter<"Guideline"> | Date | string
+    blocks?: RunBlockListRelationFilter
+  }, "id">
+
+  export type GuidelineOrderByWithAggregationInput = {
+    id?: SortOrder
+    url?: SortOrderInput | SortOrder
+    imageMime?: SortOrderInput | SortOrder
+    imageData?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: GuidelineCountOrderByAggregateInput
+    _max?: GuidelineMaxOrderByAggregateInput
+    _min?: GuidelineMinOrderByAggregateInput
+  }
+
+  export type GuidelineScalarWhereWithAggregatesInput = {
+    AND?: GuidelineScalarWhereWithAggregatesInput | GuidelineScalarWhereWithAggregatesInput[]
+    OR?: GuidelineScalarWhereWithAggregatesInput[]
+    NOT?: GuidelineScalarWhereWithAggregatesInput | GuidelineScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Guideline"> | string
+    url?: StringNullableWithAggregatesFilter<"Guideline"> | string | null
+    imageMime?: StringNullableWithAggregatesFilter<"Guideline"> | string | null
+    imageData?: BytesNullableWithAggregatesFilter<"Guideline"> | Bytes | null
+    createdAt?: DateTimeWithAggregatesFilter<"Guideline"> | Date | string
+  }
+
+  export type ProofWhereInput = {
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    runBlockId?: StringFilter<"Proof"> | string
+    imageMime?: StringFilter<"Proof"> | string
+    imageData?: BytesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
+    runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
+  }
+
+  export type ProofOrderByWithRelationInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+    runBlock?: RunBlockOrderByWithRelationInput
+  }
+
+  export type ProofWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    runBlockId?: string
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    imageMime?: StringFilter<"Proof"> | string
+    imageData?: BytesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
+    runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
+  }, "id" | "runBlockId">
+
+  export type ProofOrderByWithAggregationInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+    _count?: ProofCountOrderByAggregateInput
+    _max?: ProofMaxOrderByAggregateInput
+    _min?: ProofMinOrderByAggregateInput
+  }
+
+  export type ProofScalarWhereWithAggregatesInput = {
+    AND?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    OR?: ProofScalarWhereWithAggregatesInput[]
+    NOT?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Proof"> | string
+    runBlockId?: StringWithAggregatesFilter<"Proof"> | string
+    imageMime?: StringWithAggregatesFilter<"Proof"> | string
+    imageData?: BytesWithAggregatesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
   }
 
   export type RunItemWhereInput = {
@@ -26890,6 +29560,10 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateInput = {
@@ -26909,8 +29583,12 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUpdateInput = {
@@ -26932,6 +29610,10 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateInput = {
@@ -26951,8 +29633,12 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockCreateManyInput = {
@@ -26972,6 +29658,8 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
   }
 
   export type RunBlockUpdateManyMutationInput = {
@@ -27008,6 +29696,123 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type GuidelineCreateInput = {
+    id?: string
+    url?: string | null
+    imageMime?: string | null
+    imageData?: Bytes | null
+    createdAt?: Date | string
+    blocks?: RunBlockCreateNestedManyWithoutGuidelineInput
+  }
+
+  export type GuidelineUncheckedCreateInput = {
+    id?: string
+    url?: string | null
+    imageMime?: string | null
+    imageData?: Bytes | null
+    createdAt?: Date | string
+    blocks?: RunBlockUncheckedCreateNestedManyWithoutGuidelineInput
+  }
+
+  export type GuidelineUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    blocks?: RunBlockUpdateManyWithoutGuidelineNestedInput
+  }
+
+  export type GuidelineUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    blocks?: RunBlockUncheckedUpdateManyWithoutGuidelineNestedInput
+  }
+
+  export type GuidelineCreateManyInput = {
+    id?: string
+    url?: string | null
+    imageMime?: string | null
+    imageData?: Bytes | null
+    createdAt?: Date | string
+  }
+
+  export type GuidelineUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GuidelineUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+    runBlock: RunBlockCreateNestedOneWithoutProofInput
+  }
+
+  export type ProofUncheckedCreateInput = {
+    id?: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
+  }
+
+  export type ProofUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runBlockId?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateManyInput = {
+    id?: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runBlockId?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type RunItemCreateInput = {
@@ -28440,6 +31245,16 @@ export namespace Prisma {
     isNot?: RunBlockWhereInput | null
   }
 
+  export type GuidelineNullableScalarRelationFilter = {
+    is?: GuidelineWhereInput | null
+    isNot?: GuidelineWhereInput | null
+  }
+
+  export type ProofNullableScalarRelationFilter = {
+    is?: ProofWhereInput | null
+    isNot?: ProofWhereInput | null
+  }
+
   export type RunItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -28466,6 +31281,8 @@ export namespace Prisma {
     cadence?: SortOrder
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
+    guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockAvgOrderByAggregateInput = {
@@ -28489,6 +31306,8 @@ export namespace Prisma {
     cadence?: SortOrder
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
+    guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockMinOrderByAggregateInput = {
@@ -28508,6 +31327,8 @@ export namespace Prisma {
     cadence?: SortOrder
     repeatWeekly?: SortOrder
     recurrenceOfId?: SortOrder
+    guidelineId?: SortOrder
+    parentId?: SortOrder
   }
 
   export type RunBlockSumOrderByAggregateInput = {
@@ -28533,6 +31354,93 @@ export namespace Prisma {
     _min?: NestedEnumCadenceNullableFilter<$PrismaModel>
     _max?: NestedEnumCadenceNullableFilter<$PrismaModel>
   }
+
+  export type BytesNullableFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableFilter<$PrismaModel> | Bytes | null
+  }
+
+  export type GuidelineCountOrderByAggregateInput = {
+    id?: SortOrder
+    url?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type GuidelineMaxOrderByAggregateInput = {
+    id?: SortOrder
+    url?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type GuidelineMinOrderByAggregateInput = {
+    id?: SortOrder
+    url?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BytesNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableWithAggregatesFilter<$PrismaModel> | Bytes | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBytesNullableFilter<$PrismaModel>
+    _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
+  export type BytesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  }
+
+  export type RunBlockScalarRelationFilter = {
+    is?: RunBlockWhereInput
+    isNot?: RunBlockWhereInput
+  }
+
+  export type ProofCountOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ProofMaxOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ProofMinOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BytesWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBytesFilter<$PrismaModel>
+    _max?: NestedBytesFilter<$PrismaModel>
+  }
   export type JsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
         Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
@@ -28555,11 +31463,6 @@ export namespace Prisma {
     gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
-
-  export type RunBlockScalarRelationFilter = {
-    is?: RunBlockWhereInput
-    isNot?: RunBlockWhereInput
   }
 
   export type RunItemCountOrderByAggregateInput = {
@@ -29500,6 +32403,31 @@ export namespace Prisma {
     connect?: RunBlockWhereUniqueInput
   }
 
+  export type GuidelineCreateNestedOneWithoutBlocksInput = {
+    create?: XOR<GuidelineCreateWithoutBlocksInput, GuidelineUncheckedCreateWithoutBlocksInput>
+    connectOrCreate?: GuidelineCreateOrConnectWithoutBlocksInput
+    connect?: GuidelineWhereUniqueInput
+  }
+
+  export type ProofCreateNestedOneWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    connect?: ProofWhereUniqueInput
+  }
+
+  export type RunBlockCreateNestedOneWithoutSubtasksInput = {
+    create?: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSubtasksInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
+  export type RunBlockCreateNestedManyWithoutParentInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+  }
+
   export type RunItemUncheckedCreateNestedManyWithoutRunBlockInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -29511,6 +32439,19 @@ export namespace Prisma {
     create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
     connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
     connect?: RunBlockWhereUniqueInput
+  }
+
+  export type ProofUncheckedCreateNestedOneWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    connect?: ProofWhereUniqueInput
+  }
+
+  export type RunBlockUncheckedCreateNestedManyWithoutParentInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
   }
 
   export type EnumBlockStatusFieldUpdateOperationsInput = {
@@ -29563,6 +32504,50 @@ export namespace Prisma {
     update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
   }
 
+  export type GuidelineUpdateOneWithoutBlocksNestedInput = {
+    create?: XOR<GuidelineCreateWithoutBlocksInput, GuidelineUncheckedCreateWithoutBlocksInput>
+    connectOrCreate?: GuidelineCreateOrConnectWithoutBlocksInput
+    upsert?: GuidelineUpsertWithoutBlocksInput
+    disconnect?: GuidelineWhereInput | boolean
+    delete?: GuidelineWhereInput | boolean
+    connect?: GuidelineWhereUniqueInput
+    update?: XOR<XOR<GuidelineUpdateToOneWithWhereWithoutBlocksInput, GuidelineUpdateWithoutBlocksInput>, GuidelineUncheckedUpdateWithoutBlocksInput>
+  }
+
+  export type ProofUpdateOneWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    upsert?: ProofUpsertWithoutRunBlockInput
+    disconnect?: ProofWhereInput | boolean
+    delete?: ProofWhereInput | boolean
+    connect?: ProofWhereUniqueInput
+    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
+  export type RunBlockUpdateOneWithoutSubtasksNestedInput = {
+    create?: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutSubtasksInput
+    upsert?: RunBlockUpsertWithoutSubtasksInput
+    disconnect?: RunBlockWhereInput | boolean
+    delete?: RunBlockWhereInput | boolean
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutSubtasksInput, RunBlockUpdateWithoutSubtasksInput>, RunBlockUncheckedUpdateWithoutSubtasksInput>
+  }
+
+  export type RunBlockUpdateManyWithoutParentNestedInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutParentInput | RunBlockUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutParentInput | RunBlockUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutParentInput | RunBlockUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
   export type RunItemUncheckedUpdateManyWithoutRunBlockNestedInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -29585,6 +32570,94 @@ export namespace Prisma {
     delete?: RunBlockWhereInput | boolean
     connect?: RunBlockWhereUniqueInput
     update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
+  }
+
+  export type ProofUncheckedUpdateOneWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    upsert?: ProofUpsertWithoutRunBlockInput
+    disconnect?: ProofWhereInput | boolean
+    delete?: ProofWhereInput | boolean
+    connect?: ProofWhereUniqueInput
+    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutParentNestedInput = {
+    create?: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput> | RunBlockCreateWithoutParentInput[] | RunBlockUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutParentInput | RunBlockCreateOrConnectWithoutParentInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutParentInput | RunBlockUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: RunBlockCreateManyParentInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutParentInput | RunBlockUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutParentInput | RunBlockUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
+  export type RunBlockCreateNestedManyWithoutGuidelineInput = {
+    create?: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput> | RunBlockCreateWithoutGuidelineInput[] | RunBlockUncheckedCreateWithoutGuidelineInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutGuidelineInput | RunBlockCreateOrConnectWithoutGuidelineInput[]
+    createMany?: RunBlockCreateManyGuidelineInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+  }
+
+  export type RunBlockUncheckedCreateNestedManyWithoutGuidelineInput = {
+    create?: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput> | RunBlockCreateWithoutGuidelineInput[] | RunBlockUncheckedCreateWithoutGuidelineInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutGuidelineInput | RunBlockCreateOrConnectWithoutGuidelineInput[]
+    createMany?: RunBlockCreateManyGuidelineInputEnvelope
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+  }
+
+  export type NullableBytesFieldUpdateOperationsInput = {
+    set?: Bytes | null
+  }
+
+  export type RunBlockUpdateManyWithoutGuidelineNestedInput = {
+    create?: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput> | RunBlockCreateWithoutGuidelineInput[] | RunBlockUncheckedCreateWithoutGuidelineInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutGuidelineInput | RunBlockCreateOrConnectWithoutGuidelineInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutGuidelineInput | RunBlockUpsertWithWhereUniqueWithoutGuidelineInput[]
+    createMany?: RunBlockCreateManyGuidelineInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutGuidelineInput | RunBlockUpdateWithWhereUniqueWithoutGuidelineInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutGuidelineInput | RunBlockUpdateManyWithWhereWithoutGuidelineInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutGuidelineNestedInput = {
+    create?: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput> | RunBlockCreateWithoutGuidelineInput[] | RunBlockUncheckedCreateWithoutGuidelineInput[]
+    connectOrCreate?: RunBlockCreateOrConnectWithoutGuidelineInput | RunBlockCreateOrConnectWithoutGuidelineInput[]
+    upsert?: RunBlockUpsertWithWhereUniqueWithoutGuidelineInput | RunBlockUpsertWithWhereUniqueWithoutGuidelineInput[]
+    createMany?: RunBlockCreateManyGuidelineInputEnvelope
+    set?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    disconnect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    delete?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    connect?: RunBlockWhereUniqueInput | RunBlockWhereUniqueInput[]
+    update?: RunBlockUpdateWithWhereUniqueWithoutGuidelineInput | RunBlockUpdateWithWhereUniqueWithoutGuidelineInput[]
+    updateMany?: RunBlockUpdateManyWithWhereWithoutGuidelineInput | RunBlockUpdateManyWithWhereWithoutGuidelineInput[]
+    deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
+  export type RunBlockCreateNestedOneWithoutProofInput = {
+    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
+  export type BytesFieldUpdateOperationsInput = {
+    set?: Bytes
+  }
+
+  export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
+    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+    upsert?: RunBlockUpsertWithoutProofInput
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofInput, RunBlockUpdateWithoutProofInput>, RunBlockUncheckedUpdateWithoutProofInput>
   }
 
   export type RunBlockCreateNestedOneWithoutRunItemsInput = {
@@ -30019,6 +33092,40 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedEnumCadenceNullableFilter<$PrismaModel>
     _max?: NestedEnumCadenceNullableFilter<$PrismaModel>
+  }
+
+  export type NestedBytesNullableFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableFilter<$PrismaModel> | Bytes | null
+  }
+
+  export type NestedBytesNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableWithAggregatesFilter<$PrismaModel> | Bytes | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBytesNullableFilter<$PrismaModel>
+    _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
+  export type NestedBytesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  }
+
+  export type NestedBytesWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBytesFilter<$PrismaModel>
+    _max?: NestedBytesFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -31242,6 +34349,10 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunInput = {
@@ -31260,8 +34371,12 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunInput = {
@@ -31363,6 +34478,8 @@ export namespace Prisma {
     cadence?: EnumCadenceNullableFilter<"RunBlock"> | $Enums.Cadence | null
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
+    guidelineId?: StringNullableFilter<"RunBlock"> | string | null
+    parentId?: StringNullableFilter<"RunBlock"> | string | null
   }
 
   export type FlowRunCreateWithoutRunBlocksInput = {
@@ -31450,6 +34567,10 @@ export namespace Prisma {
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutSuccessorInput = {
@@ -31469,7 +34590,11 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutSuccessorInput = {
@@ -31495,6 +34620,10 @@ export namespace Prisma {
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRecurrenceOfInput = {
@@ -31513,13 +34642,168 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    guidelineId?: string | null
+    parentId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRecurrenceOfInput = {
     where: RunBlockWhereUniqueInput
     create: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
+  }
+
+  export type GuidelineCreateWithoutBlocksInput = {
+    id?: string
+    url?: string | null
+    imageMime?: string | null
+    imageData?: Bytes | null
+    createdAt?: Date | string
+  }
+
+  export type GuidelineUncheckedCreateWithoutBlocksInput = {
+    id?: string
+    url?: string | null
+    imageMime?: string | null
+    imageData?: Bytes | null
+    createdAt?: Date | string
+  }
+
+  export type GuidelineCreateOrConnectWithoutBlocksInput = {
+    where: GuidelineWhereUniqueInput
+    create: XOR<GuidelineCreateWithoutBlocksInput, GuidelineUncheckedCreateWithoutBlocksInput>
+  }
+
+  export type ProofCreateWithoutRunBlockInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUncheckedCreateWithoutRunBlockInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofCreateOrConnectWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
+    create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+  }
+
+  export type RunBlockCreateWithoutSubtasksInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutSubtasksInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutSubtasksInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+  }
+
+  export type RunBlockCreateWithoutParentInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutParentInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput>
+  }
+
+  export type RunBlockCreateManyParentInputEnvelope = {
+    data: RunBlockCreateManyParentInput | RunBlockCreateManyParentInput[]
+    skipDuplicates?: boolean
   }
 
   export type FlowRunUpsertWithoutRunBlocksInput = {
@@ -31621,6 +34905,10 @@ export namespace Prisma {
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutSuccessorInput = {
@@ -31640,7 +34928,11 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUpsertWithoutRecurrenceOfInput = {
@@ -31672,6 +34964,10 @@ export namespace Prisma {
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRecurrenceOfInput = {
@@ -31690,8 +34986,325 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
+  }
+
+  export type GuidelineUpsertWithoutBlocksInput = {
+    update: XOR<GuidelineUpdateWithoutBlocksInput, GuidelineUncheckedUpdateWithoutBlocksInput>
+    create: XOR<GuidelineCreateWithoutBlocksInput, GuidelineUncheckedCreateWithoutBlocksInput>
+    where?: GuidelineWhereInput
+  }
+
+  export type GuidelineUpdateToOneWithWhereWithoutBlocksInput = {
+    where?: GuidelineWhereInput
+    data: XOR<GuidelineUpdateWithoutBlocksInput, GuidelineUncheckedUpdateWithoutBlocksInput>
+  }
+
+  export type GuidelineUpdateWithoutBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GuidelineUncheckedUpdateWithoutBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: NullableStringFieldUpdateOperationsInput | string | null
+    imageMime?: NullableStringFieldUpdateOperationsInput | string | null
+    imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUpsertWithoutRunBlockInput = {
+    update: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
+    create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    where?: ProofWhereInput
+  }
+
+  export type ProofUpdateToOneWithWhereWithoutRunBlockInput = {
+    where?: ProofWhereInput
+    data: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
+  export type ProofUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RunBlockUpsertWithoutSubtasksInput = {
+    update: XOR<RunBlockUpdateWithoutSubtasksInput, RunBlockUncheckedUpdateWithoutSubtasksInput>
+    create: XOR<RunBlockCreateWithoutSubtasksInput, RunBlockUncheckedCreateWithoutSubtasksInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutSubtasksInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutSubtasksInput, RunBlockUncheckedUpdateWithoutSubtasksInput>
+  }
+
+  export type RunBlockUpdateWithoutSubtasksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutSubtasksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+  }
+
+  export type RunBlockUpsertWithWhereUniqueWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    update: XOR<RunBlockUpdateWithoutParentInput, RunBlockUncheckedUpdateWithoutParentInput>
+    create: XOR<RunBlockCreateWithoutParentInput, RunBlockUncheckedCreateWithoutParentInput>
+  }
+
+  export type RunBlockUpdateWithWhereUniqueWithoutParentInput = {
+    where: RunBlockWhereUniqueInput
+    data: XOR<RunBlockUpdateWithoutParentInput, RunBlockUncheckedUpdateWithoutParentInput>
+  }
+
+  export type RunBlockUpdateManyWithWhereWithoutParentInput = {
+    where: RunBlockScalarWhereInput
+    data: XOR<RunBlockUpdateManyMutationInput, RunBlockUncheckedUpdateManyWithoutParentInput>
+  }
+
+  export type RunBlockCreateWithoutGuidelineInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutGuidelineInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    parentId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutGuidelineInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput>
+  }
+
+  export type RunBlockCreateManyGuidelineInputEnvelope = {
+    data: RunBlockCreateManyGuidelineInput | RunBlockCreateManyGuidelineInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type RunBlockUpsertWithWhereUniqueWithoutGuidelineInput = {
+    where: RunBlockWhereUniqueInput
+    update: XOR<RunBlockUpdateWithoutGuidelineInput, RunBlockUncheckedUpdateWithoutGuidelineInput>
+    create: XOR<RunBlockCreateWithoutGuidelineInput, RunBlockUncheckedCreateWithoutGuidelineInput>
+  }
+
+  export type RunBlockUpdateWithWhereUniqueWithoutGuidelineInput = {
+    where: RunBlockWhereUniqueInput
+    data: XOR<RunBlockUpdateWithoutGuidelineInput, RunBlockUncheckedUpdateWithoutGuidelineInput>
+  }
+
+  export type RunBlockUpdateManyWithWhereWithoutGuidelineInput = {
+    where: RunBlockScalarWhereInput
+    data: XOR<RunBlockUpdateManyMutationInput, RunBlockUncheckedUpdateManyWithoutGuidelineInput>
+  }
+
+  export type RunBlockCreateWithoutProofInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutProofInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutProofInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+  }
+
+  export type RunBlockUpsertWithoutProofInput = {
+    update: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutProofInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+  }
+
+  export type RunBlockUpdateWithoutProofInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutProofInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockCreateWithoutRunItemsInput = {
@@ -31712,6 +35325,10 @@ export namespace Prisma {
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    parent?: RunBlockCreateNestedOneWithoutSubtasksInput
+    subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunItemsInput = {
@@ -31731,7 +35348,11 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunItemsInput = {
@@ -31768,6 +35389,10 @@ export namespace Prisma {
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunItemsInput = {
@@ -31787,7 +35412,11 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type FlowCreateWithoutDocInput = {
@@ -32356,6 +35985,8 @@ export namespace Prisma {
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
+    guidelineId?: string | null
+    parentId?: string | null
   }
 
   export type RunBlockUpdateWithoutRunInput = {
@@ -32376,6 +36007,10 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunInput = {
@@ -32394,8 +36029,12 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutRunInput = {
@@ -32414,6 +36053,8 @@ export namespace Prisma {
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RunItemCreateManyRunBlockInput = {
@@ -32427,6 +36068,26 @@ export namespace Prisma {
     value?: NullableJsonNullValueInput | InputJsonValue
     completedAt?: Date | string | null
     completedBy?: string | null
+  }
+
+  export type RunBlockCreateManyParentInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
   }
 
   export type RunItemUpdateWithoutRunBlockInput = {
@@ -32466,6 +36127,162 @@ export namespace Prisma {
     value?: NullableJsonNullValueInput | InputJsonValue
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedBy?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type RunBlockUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type RunBlockCreateManyGuidelineInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    parentId?: string | null
+  }
+
+  export type RunBlockUpdateWithoutGuidelineInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
+    subtasks?: RunBlockUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutGuidelineInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateManyWithoutGuidelineInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ScheduleSlotCreateManyScheduleInput = {

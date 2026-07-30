@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
+import { POSITION_OPTIONS } from "@/lib/employeeStages";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   updatePersonalInfo,
@@ -34,9 +35,14 @@ import {
   deleteShowcauseWarningLetter,
   addPip,
   deletePip,
+  updateResignation,
+  updateReferenceLetter,
+  updateExitInterviewNote,
 } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
   MedicalCheckInfo,
@@ -55,7 +61,18 @@ import type {
   ShowcauseWarningLetterEntry,
   PipEntry,
   DisciplinarySummaryRow,
+  ResignationInfo,
+  ReferenceLetterInfo,
+  ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
+import {
+  COUNTRY_CODES,
+  parsePhoneValue,
+  formatLocalDigits,
+  composePhoneValue,
+  isValidPhoneDigits,
+  isValidEmail,
+} from "@/lib/phoneEmail";
 
 // Shared "inner white form card" primitives used by every tab across both the
 // stage-flow profile (Pre/Probation/Onboarding/Active/Exit) and the
@@ -109,6 +126,18 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
   );
 }
 
+// Small label-over-value display for a profile summary block (e.g. the stage
+// profile sidebar's Branch/Dept, Position, Phone Number, Email) — shared here
+// so Employee Record's own profile header can match that exact style.
+function SidebarField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="w-full">
+      <span className="block text-xs text-[#4b4949]">{label}</span>
+      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
+    </div>
+  );
+}
+
 // Parent-controlled field — real DB value, lifted to a useState the caller
 // owns (either to persist on Save, or, for Payroll's Salary Adjustment, to
 // feed a live calculation). Used for every field with real schema backing.
@@ -131,6 +160,121 @@ function EditableField({
       <span className={labelClass}>{label}</span>
       {editing ? (
         <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+      ) : value ? (
+        <span className={valueClass}>{value}</span>
+      ) : (
+        <span className={emptyClass}>Not provided</span>
+      )}
+    </div>
+  );
+}
+
+// Shared Phone Number field — country-code prefix picker (defaulting to
+// +60 Malaysia) + auto-formatted local number ("XX-NNNN NNN..."), used by
+// every Phone Number/Contact Number field across Personal Info/Guardian
+// Info/Emergency Contact/Reference Check. Storage stays the single combined
+// string it's always been ("+60 12-4680 797") — parsePhoneValue splits it
+// back into a country code + digits for editing, composePhoneValue joins
+// them again on every change. Validated on blur (not on every keystroke, so
+// a half-typed number doesn't show an error while still being entered).
+function PhoneField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  const parsed = parsePhoneValue(value);
+  const [countryCode, setCountryCode] = useState(parsed.countryCode);
+  const [digits, setDigits] = useState(parsed.digits);
+  const [touched, setTouched] = useState(false);
+
+  function commit(nextCountryCode: string, nextDigits: string) {
+    setCountryCode(nextCountryCode);
+    setDigits(nextDigits);
+    onChange(composePhoneValue(nextCountryCode, nextDigits));
+  }
+
+  const invalid = touched && digits.length > 0 && !isValidPhoneDigits(digits);
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <>
+          <div
+            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 ${
+              invalid ? "outline outline-2 outline-red-500" : "focus-within:outline-blue-500"
+            }`}
+          >
+            <select
+              value={countryCode}
+              onChange={(e) => commit(e.target.value, digits)}
+              aria-label={`${label} country code`}
+              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 pl-3 pr-1 text-sm text-[#4b4949] focus:outline-none"
+            >
+              {COUNTRY_CODES.map((c) => (
+                <option key={c.code} value={c.code} title={c.name}>
+                  {c.code} {c.abbr}
+                </option>
+              ))}
+            </select>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={formatLocalDigits(digits)}
+              onChange={(e) => commit(countryCode, e.target.value.replace(/\D/g, "").slice(0, 11))}
+              onBlur={() => setTouched(true)}
+              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+            />
+          </div>
+          {invalid && <span className="text-xs text-red-600">Enter a valid phone number.</span>}
+        </>
+      ) : value ? (
+        <span className={valueClass}>{composePhoneValue(parsed.countryCode, parsed.digits)}</span>
+      ) : (
+        <span className={emptyClass}>Not provided</span>
+      )}
+    </div>
+  );
+}
+
+// Shared Email field — same view/edit split as EditableField, plus format
+// validation (must look like name@domain.tld) shown on blur.
+function EmailField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  const [touched, setTouched] = useState(false);
+  const invalid = touched && value.length > 0 && !isValidEmail(value);
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <>
+          <input
+            type="email"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => setTouched(true)}
+            className={`${inputClass} ${invalid ? "outline outline-2 outline-red-500" : ""}`}
+          />
+          {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+        </>
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
@@ -568,18 +712,26 @@ export function ReferenceCheckPanel({
   const [contactNumber, setContactNumber] = useState(data?.contactNumber ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
 
+  function handleSave() {
+    if (contactNumber && !isValidPhoneDigits(parsePhoneValue(contactNumber).digits)) {
+      return { ok: false, error: "Enter a valid phone number." };
+    }
+    if (email && !isValidEmail(email)) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    return updateReferenceCheck(userId, { refName, company, relationship, position, contactNumber, email });
+  }
+
   return (
-    <EditableSection
-      onSave={() => updateReferenceCheck(userId, { refName, company, relationship, position, contactNumber, email })}
-    >
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Reference Check</PanelHeading>
       <FieldGrid>
         <EditableField label="Reference Name" value={refName} onChange={setRefName} full />
         <EditableField label="Company" value={company} onChange={setCompany} full />
         <EditableField label="Relationship" value={relationship} onChange={setRelationship} />
         <EditableField label="Position" value={position} onChange={setPosition} />
-        <EditableField label="Contact Number" value={contactNumber} onChange={setContactNumber} type="tel" full />
-        <EditableField label="Email" value={email} onChange={setEmail} type="email" full />
+        <PhoneField label="Contact Number" value={contactNumber} onChange={setContactNumber} full />
+        <EmailField label="Email" value={email} onChange={setEmail} full />
       </FieldGrid>
     </EditableSection>
   );
@@ -650,6 +802,7 @@ export function ProbationPanel({
   userId: number;
   data: ProbationInfo | null;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState(data?.probationStatus ?? "");
   const [startDate, setStartDate] = useState(data?.startDate ?? "");
   const [endDate, setEndDate] = useState(data?.endDate ?? "");
@@ -671,8 +824,8 @@ export function ProbationPanel({
 
   return (
     <EditableSection
-      onSave={() =>
-        updateProbationInfo(userId, {
+      onSave={async () => {
+        const result = await updateProbationInfo(userId, {
           probationStatus: status,
           startDate,
           endDate,
@@ -682,8 +835,16 @@ export function ProbationPanel({
           confirmationLetterFile: confirmationLetterPending,
           extensionLetterFileId,
           extensionLetterFile: extensionLetterPending,
-        })
-      }
+        });
+        // StageProfileView's own "Next" button gates on this same Probation
+        // Status (probationInfo prop, from the server) — without a refresh
+        // here, that prop stays stale after a save (it's a server-fetched
+        // prop, not something this panel's own local state feeds), so the
+        // button would keep reading the pre-save value even though this
+        // panel already shows the freshly-saved one.
+        if (!result || result.ok !== false) router.refresh();
+        return result;
+      }}
     >
       <PanelHeading>Probation</PanelHeading>
       <FieldGrid>
@@ -962,12 +1123,12 @@ function RecordTable({
               rows.map((row, i) => (
                 <tr key={rowIds?.[i] ?? i}>
                   {columns.map((c) => (
-                    <td key={c.key} className="px-3.5 py-3 text-sm text-[#4b4949] border-b border-black/5">
+                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5">
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
                   {showDeleteColumn && (
-                    <td className="px-3.5 py-3 text-center border-b border-black/5">
+                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5">
                       {rowIds?.[i] !== undefined && (
                         <button
                           type="button"
@@ -1014,8 +1175,18 @@ function RecordTable({
 export interface RecordField {
   key: string;
   label: string;
-  type: "text" | "date" | "textarea" | "file";
+  type: "text" | "date" | "textarea" | "file" | "select";
   full?: boolean;
+  /** Flat option list — required when type is "select" unless optionGroups is set. */
+  options?: { value: string; label: string }[];
+  /** Grouped option list (rendered as <optgroup>s) — takes priority over
+   *  `options` when both are set (e.g. Transfer's From/To: Branch group +
+   *  Department group, instead of one flattened list). */
+  optionGroups?: { label: string; options: { value: string; label: string }[] }[];
+  /** Pre-fills the field on modal open (e.g. Promotion's "Current Position"
+   *  auto-populated from the employee's position on record) — only applies
+   *  once, when the modal's own local values state is first initialized. */
+  defaultValue?: string;
 }
 
 const recordModalInputClass =
@@ -1036,7 +1207,9 @@ function RecordAddModal({
   onClose: () => void;
   onSave: (values: Record<string, string>, files: Record<string, File>) => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.filter((f) => f.defaultValue).map((f) => [f.key, f.defaultValue as string])),
+  );
   const [files, setFiles] = useState<Record<string, File>>({});
 
   function setField(key: string, value: string) {
@@ -1081,6 +1254,25 @@ function RecordAddModal({
                 />
               ) : f.type === "file" ? (
                 <FilePickerControl file={files[f.key] ?? null} onChange={(file) => setFileField(f.key, file)} editing />
+              ) : f.type === "select" ? (
+                <select value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} className={recordModalInputClass}>
+                  <option value=""></option>
+                  {f.optionGroups
+                    ? f.optionGroups.map((g) => (
+                        <optgroup key={g.label} label={g.label}>
+                          {g.options.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    : f.options?.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                </select>
               ) : (
                 <input
                   type={f.type}
@@ -1479,7 +1671,17 @@ export function SalaryRevisionPanel({ userId, data }: { userId: number; data: Sa
   );
 }
 
-export function PromotionPanel({ userId, data }: { userId: number; data: PromotionEntry[] }) {
+export function PromotionPanel({
+  userId,
+  data,
+  currentPosition,
+}: {
+  userId: number;
+  data: PromotionEntry[];
+  /** Employee's actual current position (employment.position) — pre-fills
+   *  "Current Position" so it doesn't need manual re-entry every time. */
+  currentPosition?: string | null;
+}) {
   return (
     <EditableSection>
       <RepeatableRecordSection
@@ -1488,8 +1690,14 @@ export function PromotionPanel({ userId, data }: { userId: number; data: Promoti
         fields={[
           { key: "promotionDate", label: "Promotion Date", type: "date" },
           { key: "effectiveDate", label: "Effective Date", type: "date" },
-          { key: "currentPosition", label: "Current Position", type: "text" },
-          { key: "newPosition", label: "New Position", type: "text" },
+          {
+            key: "currentPosition",
+            label: "Current Position",
+            type: "select",
+            options: POSITION_OPTIONS,
+            defaultValue: currentPosition ?? undefined,
+          },
+          { key: "newPosition", label: "New Position", type: "select", options: POSITION_OPTIONS },
           { key: "reason", label: "Reason", type: "textarea", full: true },
           { key: "approvedBy", label: "Approved By", type: "text", full: true },
           { key: "attachment", label: "Attachment", type: "file", full: true },
@@ -1526,7 +1734,32 @@ export function PromotionPanel({ userId, data }: { userId: number; data: Promoti
   );
 }
 
-export function TransferPanel({ userId, data }: { userId: number; data: TransferEntry[] }) {
+export function TransferPanel({
+  userId,
+  data,
+  branches,
+  departments,
+  currentLocation,
+}: {
+  userId: number;
+  data: TransferEntry[];
+  /** Combined Branch + Department option list — CEO is excluded from
+   *  Department per HR (an admin/management bucket, not a place staff
+   *  transfer to/from), same exclusion Exit's own Branch/Department filter
+   *  already applies. */
+  branches: BranchOpt[];
+  departments: DepartmentOpt[];
+  /** Employee's current Branch/Department (department-priority display) —
+   *  pre-fills "From" so it doesn't need manual re-entry every time. */
+  currentLocation?: string | null;
+}) {
+  const locationOptionGroups = [
+    { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) },
+    {
+      label: "Department",
+      options: departments.filter((d) => d.name.toUpperCase() !== "CEO").map((d) => ({ value: d.name, label: d.name })),
+    },
+  ];
   return (
     <EditableSection>
       <RepeatableRecordSection
@@ -1535,8 +1768,14 @@ export function TransferPanel({ userId, data }: { userId: number; data: Transfer
         fields={[
           { key: "type", label: "Type", type: "text" },
           { key: "effectiveDate", label: "Effective Date", type: "date" },
-          { key: "fromLocation", label: "From", type: "text" },
-          { key: "toLocation", label: "To", type: "text" },
+          {
+            key: "fromLocation",
+            label: "From",
+            type: "select",
+            optionGroups: locationOptionGroups,
+            defaultValue: currentLocation ?? undefined,
+          },
+          { key: "toLocation", label: "To", type: "select", optionGroups: locationOptionGroups },
           { key: "reason", label: "Reason", type: "textarea", full: true },
           { key: "attachment", label: "Attachment", type: "file", full: true },
         ]}
@@ -1942,6 +2181,153 @@ export function PipPanel({ userId, data }: { userId: number; data: PipEntry[] })
   );
 }
 
+// ─── Exit's 3 singleton tabs (resignation/reference_letter/
+// exit_interview_note) — Exit stage-flow only, no Employee Record equivalent
+// (mirrors probation's own placement). Resignation Letter/Acceptance Letter/
+// Issued Letter route to GOOGLE_DRIVE_LETTER_FOLDER_ID, same shared "letters"
+// folder as probation's confirmation/extension letters and (per this task)
+// suspension/showcause letters. ───
+
+const EXIT_TYPE_OPTIONS = [
+  { value: "Resignation", label: "Resignation" },
+  { value: "End of Contract", label: "End of Contract" },
+  { value: "Internship Completed", label: "Internship Completed" },
+  { value: "Termination/Dismissal", label: "Termination/Dismissal" },
+];
+
+export function ResignationPanel({ userId, data }: { userId: number; data: ResignationInfo | null }) {
+  const [submissionDate, setSubmissionDate] = useState(data?.submissionDate ?? "");
+  const [lastWorkingDate, setLastWorkingDate] = useState(data?.lastWorkingDate ?? "");
+  const [reason, setReason] = useState(data?.reason ?? "");
+  const [resignLetterFileId, setResignLetterFileId] = useState(data?.resignLetterFileId ?? null);
+  const [pendingResignLetter, setPendingResignLetter] = useState<File | null>(null);
+  const [acceptLetterFileId, setAcceptLetterFileId] = useState(data?.acceptLetterFileId ?? null);
+  const [pendingAcceptLetter, setPendingAcceptLetter] = useState<File | null>(null);
+  const [exitType, setExitType] = useState(data?.exitType ?? "");
+
+  function clearResignLetter() {
+    if (pendingResignLetter) setPendingResignLetter(null);
+    else setResignLetterFileId(null);
+  }
+  function clearAcceptLetter() {
+    if (pendingAcceptLetter) setPendingAcceptLetter(null);
+    else setAcceptLetterFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateResignation(userId, {
+          submissionDate,
+          lastWorkingDate,
+          reason,
+          resignLetterFileId,
+          resignLetterFile: pendingResignLetter,
+          acceptLetterFileId,
+          acceptLetterFile: pendingAcceptLetter,
+          exitType,
+        })
+      }
+    >
+      <PanelHeading>Resignation</PanelHeading>
+      <FieldGrid>
+        <EditableSelectField label="Exit Type" value={exitType} onChange={setExitType} options={EXIT_TYPE_OPTIONS} />
+        <EditableField label="Submission Date" value={submissionDate} onChange={setSubmissionDate} type="date" />
+        <EditableField label="Last Working Date" value={lastWorkingDate} onChange={setLastWorkingDate} type="date" />
+        <EditableTextArea label="Reason" value={reason} onChange={setReason} full />
+        <RealFileField
+          label="Resignation Letter"
+          existingFileId={resignLetterFileId}
+          pendingFile={pendingResignLetter}
+          onPick={setPendingResignLetter}
+          onClear={clearResignLetter}
+        />
+        <RealFileField
+          label="Acceptance Letter"
+          existingFileId={acceptLetterFileId}
+          pendingFile={pendingAcceptLetter}
+          onPick={setPendingAcceptLetter}
+          onClear={clearAcceptLetter}
+        />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+const REFERENCE_LETTER_TYPE_OPTIONS = [
+  { value: "employment", label: "Employment Confirmation" },
+  { value: "reference", label: "Character Reference" },
+  { value: "service", label: "Service / Experience Letter" },
+];
+
+export function ReferenceLetterPanel({ userId, data }: { userId: number; data: ReferenceLetterInfo | null }) {
+  const [requestDate, setRequestDate] = useState(data?.requestDate ?? "");
+  const [type, setType] = useState(data?.type ?? "");
+  const [issuedDate, setIssuedDate] = useState(data?.issuedDate ?? "");
+  const [issuedBy, setIssuedBy] = useState(data?.issuedBy ?? "");
+  const [remark, setRemark] = useState(data?.remark ?? "");
+  const [fileId, setFileId] = useState(data?.issuedLetterFileId ?? null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  function clearFile() {
+    if (pendingFile) setPendingFile(null);
+    else setFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateReferenceLetter(userId, {
+          requestDate,
+          type,
+          issuedDate,
+          issuedBy,
+          remark,
+          issuedLetterFileId: fileId,
+          issuedLetterFile: pendingFile,
+        })
+      }
+    >
+      <PanelHeading>Reference Letter</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Request Date" value={requestDate} onChange={setRequestDate} type="date" />
+        <EditableSelectField label="Letter Type" value={type} onChange={setType} options={REFERENCE_LETTER_TYPE_OPTIONS} />
+        <EditableField label="Issued Date" value={issuedDate} onChange={setIssuedDate} type="date" />
+        <EditableField label="Issued By" value={issuedBy} onChange={setIssuedBy} />
+        <EditableTextArea label="Remarks" value={remark} onChange={setRemark} full />
+        <RealFileField label="Issued Letter" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+const EXIT_REASON_OPTIONS = [
+  { value: "career", label: "Career Advancement" },
+  { value: "compensation", label: "Compensation" },
+  { value: "relocation", label: "Relocation" },
+  { value: "personal", label: "Personal Reasons" },
+  { value: "other", label: "Other" },
+];
+
+export function ExitInterviewNotesPanel({ userId, data }: { userId: number; data: ExitInterviewNoteInfo | null }) {
+  const [date, setDate] = useState(data?.date ?? "");
+  const [interviewer, setInterviewer] = useState(data?.interviewer ?? "");
+  const [reason, setReason] = useState(data?.reason ?? "");
+  const [note, setNote] = useState(data?.note ?? "");
+
+  return (
+    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })}>
+      <PanelHeading>Exit Interview Notes</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Interview Date" value={date} onChange={setDate} type="date" />
+        <EditableField label="Interviewer" value={interviewer} onChange={setInterviewer} />
+        <EditableSelectField label="Primary Reason for Leaving" value={reason} onChange={setReason} options={EXIT_REASON_OPTIONS} full />
+        <EditableTextArea label="Feedback / Notes" value={note} onChange={setNote} full />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
 const GENDER_OPTIONS = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },
@@ -1978,8 +2364,15 @@ export function PersonalInfoPanel({
   const [nric, setNric] = useState(employee.nric ?? "");
   const [homeAddress, setHomeAddress] = useState(employee.homeAddress ?? "");
 
+  function handleSave() {
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) {
+      return { ok: false, error: "Enter a valid phone number." };
+    }
+    return updatePersonalInfo(employeeId, { dob, phone, gender, nric, homeAddress });
+  }
+
   return (
-    <EditableSection onSave={() => updatePersonalInfo(employeeId, { dob, phone, gender, nric, homeAddress })}>
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Personal Info</PanelHeading>
       <FieldGrid>
         <FieldDisplay label="Full Name" value={employee.fullName} />
@@ -1987,7 +2380,7 @@ export function PersonalInfoPanel({
         <EditableSelectField label="Gender" value={gender} onChange={setGender} options={GENDER_OPTIONS} />
         <EditableField label="IC/ Passport No." value={nric} onChange={setNric} />
         <FieldDisplay label="Email" value={employee.email} />
-        <EditableField label="Phone Number" value={phone} onChange={setPhone} />
+        <PhoneField label="Phone Number" value={phone} onChange={setPhone} />
         <EditableField label="Home Address" value={homeAddress} onChange={setHomeAddress} full />
         {showOfferLetter && <PlaceholderUploadField label="Signed Offer Letter" full />}
       </FieldGrid>
@@ -1996,11 +2389,9 @@ export function PersonalInfoPanel({
 }
 
 // Shared across Onboarding's "Emergency Contact" section and Employee
-// Record's Personal Info > Emergency Contact — same emergency_contact table.
-// Name/Phone/Relationship are real columns (lifted state, persisted on
-// Save); Email and Address are UI-only placeholders — emergency_contact has
-// no email/address column today, so nothing typed into them is saved. Adding
-// them would need two new nullable varchar columns on emergency_contact.
+// Record's Personal Info > Emergency Contact — same emergency_contact
+// table. All 5 fields (Name/Phone/Relationship/Email/Address) are real
+// columns, persisted on Save via the onSave prop the caller supplies.
 export function EmergencyContactPanel({
   employee,
   onSave,
@@ -2020,14 +2411,24 @@ export function EmergencyContactPanel({
   const [email, setEmail] = useState(employee.emergencyEmail ?? "");
   const [address, setAddress] = useState(employee.emergencyAddress ?? "");
 
+  function handleSave() {
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) {
+      return Promise.resolve({ ok: false, error: "Enter a valid phone number." });
+    }
+    if (email && !isValidEmail(email)) {
+      return Promise.resolve({ ok: false, error: "Enter a valid email address." });
+    }
+    return onSave({ name, phone, relation, email, address });
+  }
+
   return (
-    <EditableSection onSave={() => onSave({ name, phone, relation, email, address })}>
+    <EditableSection onSave={handleSave}>
       <PanelHeading>Emergency Contact</PanelHeading>
       <FieldGrid>
         <EditableField label="Contact Name" value={name} onChange={setName} />
         <EditableField label="Relationship" value={relation} onChange={setRelation} />
-        <EditableField label="Phone Number" value={phone} onChange={setPhone} />
-        <EditableField label="Email" value={email} onChange={setEmail} type="email" />
+        <PhoneField label="Phone Number" value={phone} onChange={setPhone} />
+        <EmailField label="Email" value={email} onChange={setEmail} />
         <EditableField label="Address" value={address} onChange={setAddress} full />
       </FieldGrid>
     </EditableSection>
@@ -2042,8 +2443,12 @@ export {
   RecordTable,
   Checklist,
   FieldDisplay,
+  SidebarField,
   EditableField,
   EditableSelectField,
+  EditableTextArea,
+  PhoneField,
+  EmailField,
   PlaceholderField,
   PlaceholderSelectField,
   PlaceholderTextArea,

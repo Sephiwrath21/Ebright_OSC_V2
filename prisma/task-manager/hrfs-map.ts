@@ -482,6 +482,66 @@ export const EXTRA_USERS: MappedUser[] = [
     employmentType: null,
     coachSchedule: null,
   },
+
+  // ---- TEST accounts (2026-07-29, user-requested role-view testing) ----
+  // Deliberately named TEST-* so they're unmistakable next to real staff.
+  // Listed here so tm:bootstrap keeps them; matching hrfs login rows were
+  // created directly (role hod/staff/Branch Manager, temp password).
+  // Remove this block (and the hrfs rows) when role testing is done.
+  {
+    email: "test-hod-optimisation@ebright.my",
+    name: "TEST HOD Optimisation",
+    role: "HOD",
+    department: "Optimisation",
+    branch: null,
+    employmentType: "HOD",
+    coachSchedule: null,
+  },
+  {
+    email: "test-hod-finance@ebright.my",
+    name: "TEST HOD Finance",
+    role: "HOD",
+    department: "Finance",
+    branch: null,
+    employmentType: "HOD",
+    coachSchedule: null,
+  },
+  {
+    email: "test-hq-fulltime@ebright.my",
+    name: "TEST HQ Full Time",
+    role: "MEMBER",
+    department: "Marketing",
+    branch: null,
+    employmentType: "Full Time",
+    coachSchedule: null,
+  },
+  {
+    email: "test-branch-manager@ebright.my",
+    name: "TEST Branch Manager",
+    role: "BRANCH",
+    department: null,
+    branch: "Klang",
+    employmentType: "Manager",
+    coachSchedule: null,
+  },
+  {
+    email: "test-branch-exec@ebright.my",
+    name: "TEST Branch Exec",
+    role: "MEMBER",
+    department: null,
+    branch: "Klang",
+    employmentType: "Branch Exec",
+    coachSchedule: null,
+  },
+  {
+    email: "test-coach@ebright.my",
+    name: "TEST Coach",
+    role: "MEMBER",
+    department: null,
+    branch: "Klang",
+    employmentType: "Coach",
+    coachSchedule: "Full Time",
+  },
 ];
 
 // ---------------------------------------------------------------------------

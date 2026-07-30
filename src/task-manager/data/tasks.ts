@@ -38,6 +38,10 @@ const DAY_INDEX: Record<(typeof DAYS)[number], number> = {
   Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0,
 };
 
+/** Guideline image cap: 2 MB binary ≈ ~2.8M base64 chars. */
+const GUIDELINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
+const GUIDELINE_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
+
 const assignInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   branches: z.array(z.string().min(1).max(100)).max(50).default([]),
@@ -47,6 +51,18 @@ const assignInputSchema = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   cadence: z.enum(CADENCE_OPTIONS),
   repeatWeekly: z.boolean().optional().default(false),
+  // Optional Guideline (2026-07-30): SOP link and/or reference image —
+  // never required, never blocks submission.
+  guidelineUrl: z.string().trim().url().max(2000).optional(),
+  guidelineImage: z
+    .object({
+      mime: z.enum(GUIDELINE_IMAGE_MIMES),
+      dataBase64: z.string().min(1).max(GUIDELINE_IMAGE_MAX_BASE64),
+    })
+    .optional(),
+  // Optional Subtasks (2026-07-30): each becomes a full task of its own
+  // linked under the main task (see the pairs loop below).
+  subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -208,6 +224,23 @@ export function assignFlowTask(
     }
     const cadence: Cadence = CADENCE_ENUM[body.cadence];
 
+    // ONE shared Guideline row for the whole assignment (all recipients ×
+    // occurrences reference it; recurrence successors inherit the id) —
+    // the image bytes are stored exactly once.
+    let guidelineId: string | null = null;
+    if (body.guidelineUrl || body.guidelineImage) {
+      const guideline = await prisma.guideline.create({
+        data: {
+          url: body.guidelineUrl ?? null,
+          imageMime: body.guidelineImage?.mime ?? null,
+          imageData: body.guidelineImage
+            ? Buffer.from(body.guidelineImage.dataBase64, "base64")
+            : null,
+        },
+      });
+      guidelineId = guideline.id;
+    }
+
     // Pairs touch disjoint rows — no shared transaction ties them together
     // (each create was already its own implicit transaction in the donor's
     // loop form), so they run concurrently on purpose. Do not "fix" into a
@@ -226,7 +259,7 @@ export function assignFlowTask(
             status: "ACTIVE",
           },
         });
-        await prisma.runBlock.create({
+        const parentBlock = await prisma.runBlock.create({
           data: {
             runId: run.id,
             blockId: block.id,
@@ -237,6 +270,7 @@ export function assignFlowTask(
             startedAt: new Date(),
             dueAt: occ.dueAt,
             cadence,
+            guidelineId,
             runItems: {
               create: block.items.map((it) => ({
                 itemId: it.id,
@@ -249,6 +283,63 @@ export function assignFlowTask(
             },
           },
         });
+        // Subtasks (2026-07-30): each is a FULL task — its own run + block,
+        // same assignee/due/cadence, linked via parentId. Its own run keeps
+        // every existing path (complete/N-A/reopen, run auto-completion,
+        // proof, audit) working identically to a normal task; only the UI
+        // groups them. SEQUENTIAL inside one pair so the cuid creation
+        // order (= display order in the tree) matches the form's order.
+        for (const subtaskTitle of body.subtasks) {
+          const subRun = await prisma.flowRun.create({
+            data: {
+              flowId: flow.id,
+              flowVersion: flow.version,
+              templateSnapshot: snapshot,
+              name: `${subtaskTitle} — ${target.name}`,
+              startedById: actor.id,
+              triggerType: "MANUAL",
+              status: "ACTIVE",
+            },
+          });
+          await prisma.runBlock.create({
+            data: {
+              runId: subRun.id,
+              blockId: block.id,
+              nodeId: block.nodeId,
+              title: subtaskTitle,
+              assigneeId: target.id,
+              status: "ACTIVE",
+              startedAt: new Date(),
+              dueAt: occ.dueAt,
+              cadence,
+              parentId: parentBlock.id,
+              runItems: {
+                create: block.items.map((it) => ({
+                  itemId: it.id,
+                  order: it.order,
+                  type: it.type,
+                  label: it.label,
+                  required: it.required,
+                  config: it.config as Prisma.InputJsonValue,
+                })),
+              },
+            },
+          });
+          await prisma.auditLog.create({
+            data: {
+              runId: subRun.id,
+              actorId: actor.id,
+              action: "RUN_STARTED",
+              detail: {
+                runName: subtaskTitle,
+                trigger: "MANUAL",
+                adhoc: flowId === ADHOC_FLOW_ID,
+                assignee: target.name,
+                subtaskOf: parentBlock.id,
+              },
+            },
+          });
+        }
         await prisma.auditLog.create({
           data: {
             runId: run.id,
@@ -266,6 +357,8 @@ export function assignFlowTask(
       }),
     );
 
+    // Subtask runs aren't counted — "created" answers "how many tasks did
+    // this assignment fan out to" (recipients × days), same as before.
     return { created: runIds.length };
   }, "assignFlowTask");
 }
@@ -371,4 +464,43 @@ export function reopenFlowTask(
       runReopened: boolean;
     };
   }, "reopenFlowTask");
+}
+
+/** The My Tasks "Proof" column (2026-07-30): assignee-only upload of ONE
+ *  completion-evidence image per task. Always optional — never gates the
+ *  status-dot completion path above. Re-uploading replaces the previous
+ *  image (upsert on runBlockId). Same mime/size rules as the Guideline
+ *  image, so the two share their constants. */
+const proofImageSchema = z.object({
+  mime: z.enum(GUIDELINE_IMAGE_MIMES),
+  dataBase64: z.string().min(1).max(GUIDELINE_IMAGE_MAX_BASE64),
+});
+
+export function uploadFlowTaskProof(
+  actorEmail: string,
+  runBlockId: string,
+  image: { mime: string; dataBase64: string },
+): Promise<{ proofId: string }> {
+  return native(async () => {
+    const id = z.string().min(1).parse(runBlockId);
+    const img = proofImageSchema.parse(image);
+    const user = await requireUserByEmail(actorEmail);
+
+    const runBlock = await prisma.runBlock.findUnique({
+      where: { id },
+      select: { assigneeId: true },
+    });
+    if (!runBlock) throw new ApiHttpError(404, "Task not found");
+    if (runBlock.assigneeId !== user.id) {
+      throw new ApiHttpError(403, "You can only upload proof for your own tasks");
+    }
+
+    const imageData = Buffer.from(img.dataBase64, "base64");
+    const proof = await prisma.proof.upsert({
+      where: { runBlockId: id },
+      create: { runBlockId: id, imageMime: img.mime, imageData },
+      update: { imageMime: img.mime, imageData },
+    });
+    return { proofId: proof.id };
+  }, "uploadFlowTaskProof");
 }

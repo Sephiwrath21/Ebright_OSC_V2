@@ -11,7 +11,16 @@ import type {
 } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
-import { analyticsQuerySchema, canViewEntity, canViewOrg, UNASSIGNED } from "../analytics/_lib";
+import {
+  analyticsQuerySchema,
+  canViewEntity,
+  canViewOrg,
+  fetchPeriodBlocks,
+  formatLocalDate,
+  isElevatedDeptSite,
+  parseLocalDate,
+  UNASSIGNED,
+} from "../analytics/_lib";
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
@@ -42,6 +51,16 @@ export function getFlowDetail(
   email: string,
   period: FlowPeriod,
   date?: string,
+  opts?: {
+    /** Window `adhocByRegion` to this single day (Home overview's Ad hoc
+     *  date filter, 2026-07-28). Omitted = all-time, the original
+     *  semantics — /task-manager keeps that. */
+    adhocDate?: string;
+    /** Monthly 7-day range dropdown (2026-07-29): clamp the MONTHLY window
+     *  to these days of the anchor month (e.g. {from:1,to:7}). Only
+     *  meaningful when `period` is "monthly"; ignored for daily. */
+    monthDays?: { from: number; to: number };
+  },
 ): Promise<FlowDetailResponse> {
   return native(async () => {
     // Lazy weekly-recurrence catch-up (engine/recurrence.ts) — throttled
@@ -49,19 +68,34 @@ export function getFlowDetail(
     await advanceRecurringBlocks();
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    const me = await getMePayload(user, q.period, q.date);
+    // Personal sets are windowed to the anchor day/month (the personal
+    // view's date filters, 2026-07-28) — EXCEPT the CEO, whose single
+    // combined "My Tasks" list deliberately mixes the whole daily+monthly
+    // sets and has no picker; strict windows would silently drop their
+    // upcoming tasks.
+    // Monthly-only day-range clamp (the range dropdown) — guard here so a
+    // stray mrange param can never affect the daily fetch.
+    const monthDays = q.period === "monthly" ? opts?.monthDays : undefined;
+    const me = await getMePayload(user, q.period, q.date, {
+      strictWindow: user.role !== "CEO",
+      monthDays,
+    });
 
-    if (canViewOrg(user.role)) {
+    // Elevated department sites (Operations/Optimisation) get the FULL org
+    // view — departments AND branches AND ad hoc regions — per the
+    // 2026-07-29 final role spec (superadmin-equivalent visibility).
+    const elevated = isElevatedDeptSite(user);
+    if (canViewOrg(user.role) || elevated) {
       const [org, adhoc, adhocByRegion] = await Promise.all([
-        getOrgPayload(q.period, q.date),
+        getOrgPayload(q.period, q.date, monthDays),
         getAdhocPayload(null),
-        user.role === "ADMIN" || user.role === "OPS"
-          ? getAdhocRegionsPayload()
+        user.role === "ADMIN" || user.role === "OPS" || elevated
+          ? getAdhocRegionsPayload(opts?.adhocDate)
           : Promise.resolve(undefined),
       ]);
       if (user.role === "OPS") {
         const departmentName = user.department ?? UNASSIGNED;
-        const department = await getEntityPayload("department", departmentName, q.period, q.date);
+        const department = await getEntityPayload("department", departmentName, q.period, q.date, monthDays);
         return {
           kind: "org",
           period: q.period,
@@ -86,9 +120,11 @@ export function getFlowDetail(
 
     if (user.role === "BRANCH" || user.role === "BRANCH_SITE") {
       const branchName = user.branch ?? UNASSIGNED;
+      // Branch SITES get the branch-wide ad hoc set too since the
+      // 2026-07-29 final role spec (was Manager-only oversight).
       const [branch, adhoc] = await Promise.all([
-        getEntityPayload("branch", branchName, q.period, q.date),
-        user.role === "BRANCH" ? getAdhocPayload(branchName) : Promise.resolve(null),
+        getEntityPayload("branch", branchName, q.period, q.date, monthDays),
+        getAdhocPayload(branchName),
       ]);
       return {
         kind: "branch",
@@ -101,8 +137,16 @@ export function getFlowDetail(
     }
 
     if (user.role === "HOD" || user.role === "DEPT_SITE") {
+      // Elevated DEPT_SITEs never reach here (they take the org branch
+      // above since the 2026-07-29 final role spec).
       const departmentName = user.department ?? UNASSIGNED;
-      const department = await getEntityPayload("department", departmentName, q.period, q.date);
+      const department = await getEntityPayload(
+        "department",
+        departmentName,
+        q.period,
+        q.date,
+        monthDays,
+      );
       return {
         kind: "department",
         period: q.period,
@@ -119,6 +163,90 @@ export function getFlowDetail(
       me,
     } as FlowDetailResponse;
   }, "getFlowDetail");
+}
+
+/** Sidebar count badges (2026-07-29, ClickUp-reference): the viewer's OWN
+ *  not-yet-completed task counts — Pending/Active/Overdue/Escalated only;
+ *  DONE and SKIPPED (N/A) are excluded, per the confirmed rule.
+ *  - `weekdays`: per day of the DAILY anchor's Mon–Sun week, keyed
+ *    YYYY-MM-DD (the WeekdaySidebar's per-day badges);
+ *  - `months`: per month (1..12) of the MONTHLY anchor's year (the
+ *    MonthSidebar's per-month badges — stepping the year re-fetches);
+ *  - `monthChunks`: the anchor MONTH's 7-day chunks, keyed "from-to" (the
+ *    expanded accordion sub-items' badges).
+ *  Blocks with no dueAt fall back to startedAt for day/month keying, the
+ *  same dueAt-else-startedAt rule the windows use. */
+export function getMySidebarCounts(
+  email: string,
+  dailyDate?: string,
+  monthlyDate?: string,
+): Promise<{
+  weekdays: Record<string, number>;
+  months: Record<number, number>;
+  monthChunks: Record<string, number>;
+}> {
+  return native(async () => {
+    const user = await requireUserByEmail(email);
+
+    const dailyAnchor = dailyDate ? parseLocalDate(dailyDate) : new Date();
+    const monday = new Date(
+      dailyAnchor.getFullYear(),
+      dailyAnchor.getMonth(),
+      dailyAnchor.getDate() - ((dailyAnchor.getDay() + 6) % 7),
+    );
+    const weekWindow = {
+      start: monday,
+      end: new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7),
+      period: "daily" as const,
+    };
+
+    const monthlyAnchor = monthlyDate ? parseLocalDate(monthlyDate) : new Date();
+    const year = monthlyAnchor.getFullYear();
+    const yearWindow = {
+      start: new Date(year, 0, 1),
+      end: new Date(year + 1, 0, 1),
+      period: "monthly" as const,
+    };
+
+    const [weekBlocks, yearBlocks] = await Promise.all([
+      fetchPeriodBlocks(weekWindow, { assigneeId: user.id, strictWindow: true }),
+      fetchPeriodBlocks(yearWindow, { assigneeId: user.id, strictWindow: true }),
+    ]);
+    const isOpen = (b: { status: string }) => b.status !== "DONE" && b.status !== "SKIPPED";
+    const keyDate = (b: { dueAt: Date | null; startedAt: Date | null }) => b.dueAt ?? b.startedAt;
+
+    const weekdays: Record<string, number> = {};
+    for (const b of weekBlocks) {
+      if (!isOpen(b)) continue;
+      const kd = keyDate(b);
+      if (!kd) continue;
+      const k = formatLocalDate(kd);
+      weekdays[k] = (weekdays[k] ?? 0) + 1;
+    }
+
+    const months: Record<number, number> = {};
+    const monthChunks: Record<string, number> = {};
+    const anchorMonth = monthlyAnchor.getMonth();
+    const daysInAnchorMonth = new Date(year, anchorMonth + 1, 0).getDate();
+    for (const b of yearBlocks) {
+      if (!isOpen(b)) continue;
+      const d = keyDate(b);
+      if (!d) continue;
+      const m = d.getMonth() + 1;
+      months[m] = (months[m] ?? 0) + 1;
+      if (d.getMonth() === anchorMonth) {
+        // FOUR chunks (2026-07-30 confirmation): 1-7 · 8-14 · 15-21 ·
+        // 22-{last day} — keys must match monthDayChunks() in the UI.
+        let from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
+        if (from > 22) from = 22;
+        const to = from === 22 ? daysInAnchorMonth : from + 6;
+        const k = `${from}-${to}`;
+        monthChunks[k] = (monthChunks[k] ?? 0) + 1;
+      }
+    }
+
+    return { weekdays, months, monthChunks };
+  }, "getMySidebarCounts");
 }
 
 // Deliberately no per-user auth (donor parity): call sites must sit behind

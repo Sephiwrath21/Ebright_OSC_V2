@@ -648,7 +648,10 @@ export function HodKanban({
           </p>
         )}
       </div>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      {/* Stable id: dnd-kit otherwise numbers its aria-describedby ids with
+          a module counter ("DndDescribedBy-N"), and the server's count can
+          differ from the client's → React hydration-mismatch error. */}
+      <DndContext id="hod-kanban" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
           <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
             {orderedColumns.map((column) => (

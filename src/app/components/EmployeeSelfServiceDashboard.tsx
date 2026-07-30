@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
 import {
   Check,
@@ -80,6 +80,8 @@ interface DashboardData {
 interface Props {
   userName?:  string | null;
   userEmail?: string;
+  /** Server-rendered Task Manager overview (personal, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,7 +125,7 @@ function formatWeekRange(startIso: string, endIso: string): string {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Props) {
+export default function EmployeeSelfServiceDashboard({ userName, userEmail, taskOverview }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -352,6 +354,11 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
             </ul>
           </Card>
         </div>
+
+        {/* Task Manager — personal status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview && <div className="mt-6">{taskOverview}</div>}
       </div>
     </div>
   );

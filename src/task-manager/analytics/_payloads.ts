@@ -8,6 +8,7 @@ import { prisma } from "@/task-manager/prisma";
 import {
   BRANCH_STAFF_ROLES,
   bucketOf,
+  clampWindowToMonthDays,
   countBuckets,
   fetchPeriodBlocks,
   formatLocalDate,
@@ -91,16 +92,29 @@ export interface MePayload {
   adhocAll: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
 }
 
-/** Personal overview: my blocks, split by assigner role, plus delegated work. */
+/** Personal overview: my blocks, split by assigner role, plus delegated work.
+ *
+ *  `strictWindow` (2026-07-28, the personal view's date filters): the
+ *  periodized `mine`/`delegated` sets must belong to the SELECTED day/month
+ *  (dueAt-else-startedAt), not to every day — same rule as the entity/org
+ *  payloads. The all-time sets (`streamsAll`/`delegatedAll`/`adhocAll`) are
+ *  never windowed either way. Off = the original wide semantics (all
+ *  same-cadence blocks) — kept for the CEO's combined list and the Home
+ *  dashboard's personal progress card. */
 export async function getMePayload(
   user: MeUser,
   period: Period,
   date?: string,
+  opts: { strictWindow?: boolean; monthDays?: { from: number; to: number } } = {},
 ): Promise<MePayload> {
-  const window = resolveWindow(period, date);
+  let window = resolveWindow(period, date);
+  if (opts.monthDays) {
+    window = clampWindowToMonthDays(window, opts.monthDays.from, opts.monthDays.to);
+  }
+  const strictWindow = opts.strictWindow ?? false;
   const [mine, delegatedBlocks, mineAll, delegatedAllBlocks] = await Promise.all([
-    fetchPeriodBlocks(window, { assigneeId: user.id }),
-    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id }),
+    fetchPeriodBlocks(window, { assigneeId: user.id, strictWindow }),
+    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id, strictWindow }),
     fetchPeriodBlocks(null, { assigneeId: user.id }),
     fetchPeriodBlocks(null, { startedById: user.id, excludeAssigneeId: user.id }),
   ]);
@@ -109,9 +123,18 @@ export async function getMePayload(
     getUsersByIds(mineAll.map((b) => b.run.startedById)),
     getAssigneeMap([...delegatedBlocks, ...delegatedAllBlocks]),
   ]);
-  // `mine`/`mineAll` are always assigned to `user` — no lookup needed.
+  // `mine`/`mineAll` are always assigned to `user` — no lookup needed for
+  // the assignee; the ASSIGNER's name (the "Assigned by" column,
+  // 2026-07-30) resolves via the starters map (built from mineAll, a
+  // superset of every windowed subset).
   const toMine = (blocks: typeof mine): DrillTaskRow[] =>
-    sortTaskRows(blocks.map(toTaskRow)).map((t) => ({ ...t, assigneeName: user.name }));
+    sortTaskRows(
+      blocks.map((b) => ({
+        ...toTaskRow(b),
+        assigneeName: user.name,
+        assignerName: starters.get(b.run.startedById)?.name ?? null,
+      })),
+    );
   const toStreams = (blocks: typeof mine) =>
     groupByAssignerRole(blocks, user.id, (id) => starters.get(id)?.role).map((s) => ({
       key: s.key,
@@ -166,8 +189,10 @@ export async function getEntityPayload(
   name: string,
   period: Period,
   date?: string,
+  monthDays?: { from: number; to: number },
 ): Promise<EntityPayload> {
-  const window = resolveWindow(period, date);
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
   // strictWindow: this payload feeds the date-filterable entity overviews —
   // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
   // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
@@ -336,9 +361,16 @@ export interface AdhocRegionsPayload {
  * mentType "Manager" — allowedCadenceOptions in assign/route.ts), so every
  * tagged block already satisfies it; Coach/Branch Exec assignees never see
  * the Ad hoc Cadence option at all. Grouped by branch then Region A/B/C.
- * All-time, not period-windowed.
+ *
+ * `date` (YYYY-MM-DD, 2026-07-28): window to that single day by the
+ * dueAt-else-startedAt rule — the Home overview's Ad hoc date filter.
+ * Omitted = ALL-TIME (the original semantics; the /task-manager payloads
+ * still use this). The ADHOC cadence tag never binds a block to a period,
+ * so the day window is applied here in JS, not via fetchPeriodBlocks'
+ * tag-aware window query.
  */
-export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
+export async function getAdhocRegionsPayload(date?: string): Promise<AdhocRegionsPayload> {
+  const window = date ? resolveWindow("daily", date) : null;
   const all = await fetchPeriodBlocks(null);
   const [users, starters] = await Promise.all([
     getAssigneeMap(all),
@@ -347,6 +379,10 @@ export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
   const blocks = all.filter((b) => {
     const isAdhoc = starters.get(b.run.startedById)?.role === "BRANCH" || b.cadence === "ADHOC";
     if (!isAdhoc) return false;
+    if (window) {
+      const ts = b.dueAt ?? b.startedAt;
+      if (!ts || ts < window.start || ts >= window.end) return false;
+    }
     return users.get(b.assigneeId)?.employmentType === "Manager";
   });
   const branches = attachEntityTasks(
@@ -377,8 +413,13 @@ export interface OrgPayload {
 
 /** Org overview: totals + per-branch and per-department bucket counts, each
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
-export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
-  const window = resolveWindow(period, date);
+export async function getOrgPayload(
+  period: Period,
+  date?: string,
+  monthDays?: { from: number; to: number },
+): Promise<OrgPayload> {
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
   // strictWindow: the org grids are date-filterable (Home overview's Daily/
   // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
   // cadence-tagged tasks appear identically on every selected date.

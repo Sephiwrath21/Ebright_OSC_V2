@@ -63,8 +63,53 @@ export function AssignTaskForm({
   const [cadence, setCadence] = React.useState<CadenceOption | null>(null);
   const [days, setDays] = React.useState<NonNullable<FlowAssignInput["days"]>>([]);
   const [dueDate, setDueDate] = React.useState("");
+  // Guideline (optional, 2026-07-30): SOP link and/or reference image —
+  // both may stay empty; submission never depends on them.
+  const [subtasks, setSubtasks] = React.useState<string[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = React.useState("");
+  const [guidelineUrl, setGuidelineUrl] = React.useState("");
+  const [guidelineImage, setGuidelineImage] = React.useState<{
+    mime: "image/png" | "image/jpeg" | "image/webp";
+    dataBase64: string;
+    previewUrl: string;
+    name: string;
+  } | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+
+  const GUIDELINE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
+  const GUIDELINE_MAX_BYTES = 2 * 1024 * 1024;
+  const clearGuidelineImage = () => {
+    setGuidelineImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+  const onGuidelineImagePick = (file: File | undefined) => {
+    if (!file) return;
+    if (!(GUIDELINE_MIMES as readonly string[]).includes(file.type)) {
+      setMessage({ ok: false, text: "Guideline image must be PNG, JPG, or WebP." });
+      clearGuidelineImage();
+      return;
+    }
+    if (file.size > GUIDELINE_MAX_BYTES) {
+      setMessage({ ok: false, text: "Guideline image must be 2 MB or smaller." });
+      clearGuidelineImage();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string; // data:<mime>;base64,<data>
+      const dataBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      setGuidelineImage({
+        mime: file.type as (typeof GUIDELINE_MIMES)[number],
+        dataBase64,
+        previewUrl: dataUrl,
+        name: file.name,
+      });
+      setMessage(null);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Which Cadence pills to even offer depends on who's selected — Branch
   // Manager keeps all 3 (incl. Ad hoc), Coach/Branch Exec are Daily-only,
@@ -94,6 +139,20 @@ export function AssignTaskForm({
     setDays((prev) => (prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]));
   };
 
+  /** Subtasks builder (2026-07-30): add one at a time, ✕ to remove, max 20
+   *  (mirrors the server's cap). Duplicate titles are allowed — they become
+   *  separate, independently-completable rows, same as duplicate tasks. */
+  const SUBTASK_MAX = 20;
+  const addSubtask = () => {
+    const trimmed = subtaskDraft.trim();
+    if (!trimmed || subtasks.length >= SUBTASK_MAX) return;
+    setSubtasks((prev) => [...prev, trimmed]);
+    setSubtaskDraft("");
+  };
+  const removeSubtask = (index: number) => {
+    setSubtasks((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const submit = () => {
     if (!title.trim()) {
       setMessage({ ok: false, text: "Give the task a title first." });
@@ -107,6 +166,11 @@ export function AssignTaskForm({
       setMessage({ ok: false, text: "Pick a cadence." });
       return;
     }
+    const trimmedGuidelineUrl = guidelineUrl.trim();
+    if (trimmedGuidelineUrl && !/^https?:\/\//i.test(trimmedGuidelineUrl)) {
+      setMessage({ ok: false, text: "Guideline link must start with http:// or https://." });
+      return;
+    }
     startTransition(async () => {
       const result = await action({
         title: title.trim(),
@@ -114,6 +178,11 @@ export function AssignTaskForm({
         cadence,
         days,
         dueDate: dueDate || undefined,
+        guidelineUrl: trimmedGuidelineUrl || undefined,
+        guidelineImage: guidelineImage
+          ? { mime: guidelineImage.mime, dataBase64: guidelineImage.dataBase64 }
+          : undefined,
+        subtasks: subtasks.length > 0 ? subtasks : undefined,
       });
       if (result.ok) {
         setMessage({ ok: true, text: "Task Assigned" });
@@ -122,6 +191,10 @@ export function AssignTaskForm({
         setCadence(null);
         setDays([]);
         setDueDate("");
+        setGuidelineUrl("");
+        clearGuidelineImage();
+        setSubtasks([]);
+        setSubtaskDraft("");
       } else {
         setMessage({ ok: false, text: result.message });
       }
@@ -234,6 +307,106 @@ export function AssignTaskForm({
             className={`mt-1 ${selectClass}`}
           />
         </label>
+
+        {/* Subtasks (optional, 2026-07-30): checklist builder — each entry
+            becomes a FULL task row of its own (own status/proof/due,
+            completion independent of the main task) for every recipient ×
+            day, indented under the main task in My Tasks. Empty = a normal
+            single task; nothing here ever blocks submission. */}
+        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+          <p className="text-sm font-medium text-gray-600">Subtasks</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={subtaskDraft}
+              onChange={(e) => setSubtaskDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addSubtask();
+                }
+              }}
+              placeholder="Type a subtask..."
+              maxLength={200}
+              className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={addSubtask}
+              disabled={!subtaskDraft.trim() || subtasks.length >= SUBTASK_MAX}
+              className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
+            >
+              + Add
+            </button>
+          </div>
+          {subtasks.length > 0 && (
+            <ol className="mt-2 space-y-1">
+              {subtasks.map((s, i) => (
+                <li
+                  key={`${i}-${s}`}
+                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+                >
+                  <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
+                  <span className="min-w-0 flex-1 truncate">{s}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeSubtask(i)}
+                    aria-label={`Remove subtask ${s}`}
+                    className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          {subtasks.length >= SUBTASK_MAX && (
+            <p className="mt-1.5 text-xs text-gray-400">Maximum {SUBTASK_MAX} subtasks.</p>
+          )}
+        </div>
+
+        {/* Guideline (optional, 2026-07-30): SOP link and/or reference
+            image. Leaving both empty is fine — routine tasks need no
+            guidance; nothing here ever blocks submission. */}
+        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+          <p className="text-sm font-medium text-gray-600">Guidelines</p>
+          <label className="mt-2 block text-sm text-gray-600">
+            Link
+            <input
+              type="url"
+              value={guidelineUrl}
+              onChange={(e) => setGuidelineUrl(e.target.value)}
+              placeholder="https://… (SOP document, Google Doc, …)"
+              className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+          <label className="mt-2 block text-sm text-gray-600">
+            Image <span className="text-xs text-gray-400">(PNG / JPG / WebP, ≤ 2 MB)</span>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => onGuidelineImagePick(e.target.files?.[0])}
+              className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100"
+            />
+          </label>
+          {guidelineImage && (
+            <div className="mt-2 flex items-start gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={guidelineImage.previewUrl}
+                alt="Guideline preview"
+                className="max-h-28 rounded-lg border border-gray-200 object-contain"
+              />
+              <button
+                type="button"
+                onClick={clearGuidelineImage}
+                className="text-xs font-medium text-gray-400 hover:text-red-600"
+              >
+                ✕ remove {guidelineImage.name}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Sticky footer: OUTSIDE the scrollable fields region above, so the

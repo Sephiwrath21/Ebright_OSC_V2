@@ -35,48 +35,48 @@ describe("formatDueDate", () => {
     expect(formatDueDate(null)).toBeNull();
   });
 
-  it("is time-of-day independent — due later today is still 'Today'", () => {
+  it("is time-of-day independent — due later today is still 'D/M Today'", () => {
     expect(formatDueDate(daysFromToday(0, 23))).toEqual({
-      text: "Today",
+      text: "15/1 Today",
       className: "text-amber-600 font-medium",
     });
     expect(formatDueDate(daysFromToday(0, 0))).toEqual({
-      text: "Today",
+      text: "15/1 Today",
       className: "text-amber-600 font-medium",
     });
   });
 
   it("labels yesterday distinctly from older overdue dates", () => {
     expect(formatDueDate(daysFromToday(-1))).toEqual({
-      text: "Yesterday",
+      text: "14/1 Yesterday",
       className: "text-red-500 font-medium",
     });
   });
 
-  it("shows 'N days ago' for anything more than 1 day overdue", () => {
+  it("shows 'D/M N days ago' for anything more than 1 day overdue", () => {
     expect(formatDueDate(daysFromToday(-2))).toEqual({
-      text: "2 days ago",
+      text: "13/1 2 days ago",
       className: "text-red-500 font-medium",
     });
     expect(formatDueDate(daysFromToday(-10))).toEqual({
-      text: "10 days ago",
+      text: "5/1 10 days ago",
       className: "text-red-500 font-medium",
     });
   });
 
-  it("uses a short weekday name for the next 6 days, staying neutral gray", () => {
+  it("uses 'D/M + short weekday' for the next 6 days, staying neutral gray", () => {
     for (const offset of [1, 6]) {
       const result = formatDueDate(daysFromToday(offset));
       expect(result?.className).toBe("text-gray-400");
-      expect(result?.text).toMatch(/^[A-Za-z]{2,3}$/);
+      expect(result?.text).toMatch(/^\d{1,2}\/\d{1,2} [A-Za-z]{2,3}$/);
     }
   });
 
-  it("falls back to 'day month' once 7+ days out", () => {
-    const result = formatDueDate(daysFromToday(7));
-    expect(result?.className).toBe("text-gray-400");
-    // e.g. "Jan 22" — not a bare weekday abbreviation.
-    expect(result?.text).toMatch(/^[A-Za-z]+\s+\d{1,2}$/);
+  it("falls back to the bare 'D/M' date once 7+ days out", () => {
+    expect(formatDueDate(daysFromToday(7))).toEqual({
+      text: "22/1",
+      className: "text-gray-400",
+    });
   });
 });
 
