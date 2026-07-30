@@ -554,20 +554,26 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Relative, human-readable due-date label (ClickUp-style): "5 days ago" /
- *  "Yesterday" (red, overdue), "Today" (amber), a short weekday name for the
- *  next 6 days (neutral gray), or a plain "Jul 30" date beyond that (also
- *  neutral gray). Calendar-day difference, not a raw ms delta — a dueAt of
- *  17:00 today still reads as "Today" regardless of the current time of day.
- *  Returns null for no due date — callers keep rendering their own "—". */
+/** Due-date label: a "D/M" date followed by a relative qualifier — "25/7
+ *  5 days ago" / "29/7 Yesterday" (red, overdue), "30/7 Today" (amber), a
+ *  short weekday for the next 6 days ("2/8 Sun", neutral gray), or the bare
+ *  "15/8" date beyond a week (also neutral gray). Calendar-day difference,
+ *  not a raw ms delta — a dueAt of 17:00 today still reads as "Today"
+ *  regardless of the current time of day. Returns null for no due date —
+ *  callers keep rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays < -1) return { text: `${-diffDays} days ago`, className: "text-red-500 font-medium" };
-  if (diffDays === -1) return { text: "Yesterday", className: "text-red-500 font-medium" };
-  if (diffDays === 0) return { text: "Today", className: "text-amber-600 font-medium" };
-  if (diffDays <= 6) return { text: due.toLocaleDateString(undefined, { weekday: "short" }), className: "text-gray-400" };
-  return { text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }), className: "text-gray-400" };
+  if (diffDays < -1) return { text: `${dm} ${-diffDays} days ago`, className: "text-red-500 font-medium" };
+  if (diffDays === -1) return { text: `${dm} Yesterday`, className: "text-red-500 font-medium" };
+  if (diffDays === 0) return { text: `${dm} Today`, className: "text-amber-600 font-medium" };
+  if (diffDays <= 6)
+    return {
+      text: `${dm} ${due.toLocaleDateString(undefined, { weekday: "short" })}`,
+      className: "text-gray-400",
+    };
+  return { text: dm, className: "text-gray-400" };
 }
