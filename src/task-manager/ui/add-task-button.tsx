@@ -11,15 +11,24 @@
 // Submits through the same POST /api/internal/assign route.
 
 import * as React from "react";
-import type { AssignActionResult, FlowAssignInput, FlowStaffMember } from "./types";
+import type {
+  AssignActionResult,
+  FlowAssignInput,
+  FlowStaffMember,
+  FlowTemplateControl,
+} from "./types";
 import { AssignTaskForm } from "./assign-task-form";
 
 export function AddTaskButton({
   staff,
   action,
+  templates,
 }: {
   staff: FlowStaffMember[];
   action: (input: FlowAssignInput) => Promise<AssignActionResult>;
+  /** Task Templates (2026-07-31) — saved list + load/rename/delete
+   *  actions, passed straight through to the form. */
+  templates?: FlowTemplateControl;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -53,7 +62,7 @@ export function AddTaskButton({
                 ✕
               </button>
             </div>
-            <AssignTaskForm staff={staff} action={action} bare />
+            <AssignTaskForm staff={staff} action={action} templates={templates} bare />
           </div>
         </div>
       )}

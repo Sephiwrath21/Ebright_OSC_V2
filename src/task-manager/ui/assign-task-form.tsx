@@ -20,6 +20,7 @@ import {
   type FlowAssignInput,
   type FlowGroup,
   type FlowStaffMember,
+  type FlowTemplateControl,
 } from "./types";
 import { RecipientPicker } from "./recipient-picker";
 
@@ -42,6 +43,7 @@ export function AssignTaskForm({
   staff,
   action,
   recipientGroup,
+  templates,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -53,6 +55,10 @@ export function AssignTaskForm({
    *  CEO's "+ Add Task" form) — passed straight through to RecipientPicker.
    *  Omit for the normal, fully flexible Person + any-Group picker. */
   recipientGroup?: FlowGroup;
+  /** Task Templates (2026-07-31): saved list + load/rename/delete actions
+   *  — drives "Start from a template", the Manage panel, and pairs with
+   *  the "Save as Template" checkbox below. Omit to hide all of it. */
+  templates?: FlowTemplateControl;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -77,6 +83,47 @@ export function AssignTaskForm({
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+  // Task Templates (2026-07-31)
+  const [templateId, setTemplateId] = React.useState("");
+  const [templateBusy, setTemplateBusy] = React.useState(false);
+  const [manageOpen, setManageOpen] = React.useState(false);
+  const [renamingId, setRenamingId] = React.useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = React.useState("");
+  const [saveTemplate, setSaveTemplate] = React.useState(false);
+  const [templateName, setTemplateName] = React.useState("");
+
+  /** "Start from a template": load the full template and pre-fill the
+   *  structure fields. Recipients/days/due date are untouched (they're
+   *  per-assignment); everything stays editable, and nothing here ever
+   *  writes back to the template. */
+  const applyTemplate = async (id: string) => {
+    setTemplateId(id);
+    if (!id || !templates) return;
+    setTemplateBusy(true);
+    const result = await templates.load(id);
+    setTemplateBusy(false);
+    if (!result.ok) {
+      setMessage({ ok: false, text: result.message });
+      return;
+    }
+    const t = result.template;
+    setTitle(t.title);
+    setSubtasks(t.subtasks);
+    setSubtaskDraft("");
+    setCadence(t.cadence);
+    setGuidelineUrl(t.guidelineUrl ?? "");
+    if (t.guidelineImage) {
+      setGuidelineImage({
+        mime: t.guidelineImage.mime,
+        dataBase64: t.guidelineImage.dataBase64,
+        previewUrl: `data:${t.guidelineImage.mime};base64,${t.guidelineImage.dataBase64}`,
+        name: `${t.name} (template image)`,
+      });
+    } else {
+      clearGuidelineImage();
+    }
+    setMessage(null);
+  };
 
   const GUIDELINE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
   const GUIDELINE_MAX_BYTES = 2 * 1024 * 1024;
@@ -183,9 +230,12 @@ export function AssignTaskForm({
           ? { mime: guidelineImage.mime, dataBase64: guidelineImage.dataBase64 }
           : undefined,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
+        saveAsTemplate: saveTemplate
+          ? { name: templateName.trim() || title.trim() }
+          : undefined,
       });
       if (result.ok) {
-        setMessage({ ok: true, text: "Task Assigned" });
+        setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
         setTitle("");
         setUserIds([]);
         setCadence(null);
@@ -195,6 +245,9 @@ export function AssignTaskForm({
         clearGuidelineImage();
         setSubtasks([]);
         setSubtaskDraft("");
+        setTemplateId("");
+        setSaveTemplate(false);
+        setTemplateName("");
       } else {
         setMessage({ ok: false, text: result.message });
       }
@@ -214,6 +267,116 @@ export function AssignTaskForm({
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+        {/* Task Templates (2026-07-31): pick one to pre-fill the structure
+            (title/subtasks/cadence/guideline) — recipients, days, and due
+            date always start fresh. Manage = rename/delete. Using a
+            template never modifies it. */}
+        {templates && templates.list.length > 0 && (
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-gray-600">Start from a template</p>
+              <button
+                type="button"
+                onClick={() => setManageOpen((o) => !o)}
+                className="text-xs font-medium text-blue-600 hover:underline"
+              >
+                {manageOpen ? "Done" : "Manage"}
+              </button>
+            </div>
+            <select
+              value={templateId}
+              onChange={(e) => void applyTemplate(e.target.value)}
+              disabled={templateBusy}
+              className={`mt-2 ${selectClass}`}
+            >
+              <option value="">Start from scratch</option>
+              {templates.list.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.subtaskCount} subtask{t.subtaskCount === 1 ? "" : "s"}
+                  {t.hasGuidelineUrl || t.hasGuidelineImage ? ", guideline" : ""})
+                </option>
+              ))}
+            </select>
+            {templateBusy && <p className="mt-1.5 text-xs text-gray-400">Loading template…</p>}
+            {manageOpen && (
+              <ul className="mt-2 space-y-1">
+                {templates.list.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+                  >
+                    {renamingId === t.id ? (
+                      <>
+                        <input
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          maxLength={100}
+                          className="min-w-0 flex-1 rounded-full border border-gray-300 px-3 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={!renameDraft.trim()}
+                          onClick={() => {
+                            const name = renameDraft.trim();
+                            setRenamingId(null);
+                            void templates.rename(t.id, name).then((r) => {
+                              if (!r.ok) setMessage({ ok: false, text: r.message });
+                            });
+                          }}
+                          className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenamingId(null)}
+                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 truncate">
+                          {t.name}
+                          <span className="ml-1.5 text-xs text-gray-400">
+                            {t.subtaskCount > 0 && `${t.subtaskCount} subtask${t.subtaskCount === 1 ? "" : "s"}`}
+                            {t.subtaskCount > 0 && (t.hasGuidelineUrl || t.hasGuidelineImage) && " · "}
+                            {(t.hasGuidelineUrl || t.hasGuidelineImage) && "guideline"}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenamingId(t.id);
+                            setRenameDraft(t.name);
+                          }}
+                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-blue-600"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!window.confirm(`Delete template "${t.name}"? Existing tasks are not affected.`)) return;
+                            if (templateId === t.id) setTemplateId("");
+                            void templates.remove(t.id).then((r) => {
+                              if (!r.ok) setMessage({ ok: false, text: r.message });
+                            });
+                          }}
+                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-red-600"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <label className="max-w-xl text-sm text-gray-600">
           Task title
           <input
@@ -407,6 +570,39 @@ export function AssignTaskForm({
             </div>
           )}
         </div>
+
+        {/* Save as Template (2026-07-31): also store this task's STRUCTURE
+            (title/subtasks/cadence/guideline — never recipients/days/due
+            date) for reuse. Saving under an existing template's name
+            overwrites it — that's the intended "edit template" path. */}
+        {templates && (
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-600">
+              <input
+                type="checkbox"
+                checked={saveTemplate}
+                onChange={(e) => setSaveTemplate(e.target.checked)}
+                className="size-4 rounded border-gray-300 accent-blue-600"
+              />
+              Save as Template
+            </label>
+            {saveTemplate && (
+              <>
+                <input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder={title.trim() ? `Template name (default: ${title.trim()})` : "Template name"}
+                  maxLength={100}
+                  className="mt-2 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Saves the task structure (title, subtasks, guideline) — not the recipients or dates.
+                  Using an existing name updates that template.
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sticky footer: OUTSIDE the scrollable fields region above, so the

@@ -63,6 +63,10 @@ const assignInputSchema = z.object({
   // Optional Subtasks (2026-07-30): each becomes a full task of its own
   // linked under the main task (see the pairs loop below).
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  // Optional "Save as Template" (2026-07-31): also persist this
+  // assignment's STRUCTURE as a reusable TaskTemplate owned by the actor.
+  // Same-name save overwrites (the template edit path).
+  saveAsTemplate: z.object({ name: z.string().trim().min(1).max(100) }).optional(),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -356,6 +360,35 @@ export function assignFlowTask(
         return run.id;
       }),
     );
+
+    // "Save as Template" (2026-07-31): structure only — recipients, days,
+    // and due date deliberately excluded (they reset per use). The image
+    // bytes are copied INTO the template so deleting task guidelines can
+    // never hollow it out; using the template later creates a fresh
+    // Guideline row through the normal path above.
+    if (body.saveAsTemplate) {
+      const templateData = {
+        title: body.title,
+        subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
+        cadence,
+        guidelineUrl: body.guidelineUrl ?? null,
+        guidelineMime: body.guidelineImage?.mime ?? null,
+        guidelineImage: body.guidelineImage
+          ? Buffer.from(body.guidelineImage.dataBase64, "base64")
+          : null,
+      };
+      const existing = await prisma.taskTemplate.findFirst({
+        where: { createdById: actor.id, name: body.saveAsTemplate.name },
+        select: { id: true },
+      });
+      if (existing) {
+        await prisma.taskTemplate.update({ where: { id: existing.id }, data: templateData });
+      } else {
+        await prisma.taskTemplate.create({
+          data: { createdById: actor.id, name: body.saveAsTemplate.name, ...templateData },
+        });
+      }
+    }
 
     // Subtask runs aren't counted — "created" answers "how many tasks did
     // this assignment fan out to" (recipients × days), same as before.

@@ -78,6 +78,18 @@ export type RunBlock = $Result.DefaultSelection<Prisma.$RunBlockPayload>
  */
 export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
 /**
+ * Model TaskTemplate
+ * Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
+ * assignment — task title, subtasks, cadence, guideline link/image — but
+ * deliberately NOT recipients, days, due date, or any completion state
+ * (those reset per use). Owned by its creator (createdById, TM user id);
+ * each assigner manages their own set. Saving with an existing name
+ * OVERWRITES that template (that's the "edit" path). Using a template
+ * only pre-fills the form — assignment then flows through the normal
+ * pipeline (fresh Guideline row per assignment), never mutating this row.
+ */
+export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
+/**
  * Model Proof
  * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
@@ -491,6 +503,16 @@ export class PrismaClient<
     * ```
     */
   get guideline(): Prisma.GuidelineDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.taskTemplate`: Exposes CRUD operations for the **TaskTemplate** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more TaskTemplates
+    * const taskTemplates = await prisma.taskTemplate.findMany()
+    * ```
+    */
+  get taskTemplate(): Prisma.TaskTemplateDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.proof`: Exposes CRUD operations for the **Proof** model.
@@ -1027,6 +1049,7 @@ export namespace Prisma {
     FlowRun: 'FlowRun',
     RunBlock: 'RunBlock',
     Guideline: 'Guideline',
+    TaskTemplate: 'TaskTemplate',
     Proof: 'Proof',
     RunItem: 'RunItem',
     NotificationLog: 'NotificationLog',
@@ -1051,7 +1074,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1943,6 +1966,80 @@ export namespace Prisma {
           }
         }
       }
+      TaskTemplate: {
+        payload: Prisma.$TaskTemplatePayload<ExtArgs>
+        fields: Prisma.TaskTemplateFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.TaskTemplateFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.TaskTemplateFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          findFirst: {
+            args: Prisma.TaskTemplateFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.TaskTemplateFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          findMany: {
+            args: Prisma.TaskTemplateFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>[]
+          }
+          create: {
+            args: Prisma.TaskTemplateCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          createMany: {
+            args: Prisma.TaskTemplateCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.TaskTemplateCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>[]
+          }
+          delete: {
+            args: Prisma.TaskTemplateDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          update: {
+            args: Prisma.TaskTemplateUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          deleteMany: {
+            args: Prisma.TaskTemplateDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.TaskTemplateUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.TaskTemplateUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>[]
+          }
+          upsert: {
+            args: Prisma.TaskTemplateUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplatePayload>
+          }
+          aggregate: {
+            args: Prisma.TaskTemplateAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateTaskTemplate>
+          }
+          groupBy: {
+            args: Prisma.TaskTemplateGroupByArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.TaskTemplateCountArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateCountAggregateOutputType> | number
+          }
+        }
+      }
       Proof: {
         payload: Prisma.$ProofPayload<ExtArgs>
         fields: Prisma.ProofFieldRefs
@@ -2729,6 +2826,7 @@ export namespace Prisma {
     flowRun?: FlowRunOmit
     runBlock?: RunBlockOmit
     guideline?: GuidelineOmit
+    taskTemplate?: TaskTemplateOmit
     proof?: ProofOmit
     runItem?: RunItemOmit
     notificationLog?: NotificationLogOmit
@@ -17119,6 +17217,1080 @@ export namespace Prisma {
 
 
   /**
+   * Model TaskTemplate
+   */
+
+  export type AggregateTaskTemplate = {
+    _count: TaskTemplateCountAggregateOutputType | null
+    _min: TaskTemplateMinAggregateOutputType | null
+    _max: TaskTemplateMaxAggregateOutputType | null
+  }
+
+  export type TaskTemplateMinAggregateOutputType = {
+    id: string | null
+    createdById: string | null
+    name: string | null
+    title: string | null
+    cadence: $Enums.Cadence | null
+    guidelineUrl: string | null
+    guidelineMime: string | null
+    guidelineImage: Bytes | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type TaskTemplateMaxAggregateOutputType = {
+    id: string | null
+    createdById: string | null
+    name: string | null
+    title: string | null
+    cadence: $Enums.Cadence | null
+    guidelineUrl: string | null
+    guidelineMime: string | null
+    guidelineImage: Bytes | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type TaskTemplateCountAggregateOutputType = {
+    id: number
+    createdById: number
+    name: number
+    title: number
+    subtasks: number
+    cadence: number
+    guidelineUrl: number
+    guidelineMime: number
+    guidelineImage: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type TaskTemplateMinAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    title?: true
+    cadence?: true
+    guidelineUrl?: true
+    guidelineMime?: true
+    guidelineImage?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type TaskTemplateMaxAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    title?: true
+    cadence?: true
+    guidelineUrl?: true
+    guidelineMime?: true
+    guidelineImage?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type TaskTemplateCountAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    title?: true
+    subtasks?: true
+    cadence?: true
+    guidelineUrl?: true
+    guidelineMime?: true
+    guidelineImage?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type TaskTemplateAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplate to aggregate.
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplates to fetch.
+     */
+    orderBy?: TaskTemplateOrderByWithRelationInput | TaskTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: TaskTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned TaskTemplates
+    **/
+    _count?: true | TaskTemplateCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: TaskTemplateMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: TaskTemplateMaxAggregateInputType
+  }
+
+  export type GetTaskTemplateAggregateType<T extends TaskTemplateAggregateArgs> = {
+        [P in keyof T & keyof AggregateTaskTemplate]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateTaskTemplate[P]>
+      : GetScalarType<T[P], AggregateTaskTemplate[P]>
+  }
+
+
+
+
+  export type TaskTemplateGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateWhereInput
+    orderBy?: TaskTemplateOrderByWithAggregationInput | TaskTemplateOrderByWithAggregationInput[]
+    by: TaskTemplateScalarFieldEnum[] | TaskTemplateScalarFieldEnum
+    having?: TaskTemplateScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: TaskTemplateCountAggregateInputType | true
+    _min?: TaskTemplateMinAggregateInputType
+    _max?: TaskTemplateMaxAggregateInputType
+  }
+
+  export type TaskTemplateGroupByOutputType = {
+    id: string
+    createdById: string
+    name: string
+    title: string
+    subtasks: JsonValue
+    cadence: $Enums.Cadence | null
+    guidelineUrl: string | null
+    guidelineMime: string | null
+    guidelineImage: Bytes | null
+    createdAt: Date
+    updatedAt: Date
+    _count: TaskTemplateCountAggregateOutputType | null
+    _min: TaskTemplateMinAggregateOutputType | null
+    _max: TaskTemplateMaxAggregateOutputType | null
+  }
+
+  type GetTaskTemplateGroupByPayload<T extends TaskTemplateGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<TaskTemplateGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof TaskTemplateGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], TaskTemplateGroupByOutputType[P]>
+            : GetScalarType<T[P], TaskTemplateGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type TaskTemplateSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    title?: boolean
+    subtasks?: boolean
+    cadence?: boolean
+    guidelineUrl?: boolean
+    guidelineMime?: boolean
+    guidelineImage?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["taskTemplate"]>
+
+  export type TaskTemplateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    title?: boolean
+    subtasks?: boolean
+    cadence?: boolean
+    guidelineUrl?: boolean
+    guidelineMime?: boolean
+    guidelineImage?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["taskTemplate"]>
+
+  export type TaskTemplateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    title?: boolean
+    subtasks?: boolean
+    cadence?: boolean
+    guidelineUrl?: boolean
+    guidelineMime?: boolean
+    guidelineImage?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["taskTemplate"]>
+
+  export type TaskTemplateSelectScalar = {
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    title?: boolean
+    subtasks?: boolean
+    cadence?: boolean
+    guidelineUrl?: boolean
+    guidelineMime?: boolean
+    guidelineImage?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type TaskTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "title" | "subtasks" | "cadence" | "guidelineUrl" | "guidelineMime" | "guidelineImage" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplate"]>
+
+  export type $TaskTemplatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "TaskTemplate"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      createdById: string
+      name: string
+      title: string
+      subtasks: Prisma.JsonValue
+      cadence: $Enums.Cadence | null
+      guidelineUrl: string | null
+      guidelineMime: string | null
+      guidelineImage: Prisma.Bytes | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["taskTemplate"]>
+    composites: {}
+  }
+
+  type TaskTemplateGetPayload<S extends boolean | null | undefined | TaskTemplateDefaultArgs> = $Result.GetResult<Prisma.$TaskTemplatePayload, S>
+
+  type TaskTemplateCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<TaskTemplateFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: TaskTemplateCountAggregateInputType | true
+    }
+
+  export interface TaskTemplateDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['TaskTemplate'], meta: { name: 'TaskTemplate' } }
+    /**
+     * Find zero or one TaskTemplate that matches the filter.
+     * @param {TaskTemplateFindUniqueArgs} args - Arguments to find a TaskTemplate
+     * @example
+     * // Get one TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends TaskTemplateFindUniqueArgs>(args: SelectSubset<T, TaskTemplateFindUniqueArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one TaskTemplate that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {TaskTemplateFindUniqueOrThrowArgs} args - Arguments to find a TaskTemplate
+     * @example
+     * // Get one TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends TaskTemplateFindUniqueOrThrowArgs>(args: SelectSubset<T, TaskTemplateFindUniqueOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplate that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateFindFirstArgs} args - Arguments to find a TaskTemplate
+     * @example
+     * // Get one TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends TaskTemplateFindFirstArgs>(args?: SelectSubset<T, TaskTemplateFindFirstArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplate that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateFindFirstOrThrowArgs} args - Arguments to find a TaskTemplate
+     * @example
+     * // Get one TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends TaskTemplateFindFirstOrThrowArgs>(args?: SelectSubset<T, TaskTemplateFindFirstOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more TaskTemplates that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all TaskTemplates
+     * const taskTemplates = await prisma.taskTemplate.findMany()
+     * 
+     * // Get first 10 TaskTemplates
+     * const taskTemplates = await prisma.taskTemplate.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const taskTemplateWithIdOnly = await prisma.taskTemplate.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends TaskTemplateFindManyArgs>(args?: SelectSubset<T, TaskTemplateFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a TaskTemplate.
+     * @param {TaskTemplateCreateArgs} args - Arguments to create a TaskTemplate.
+     * @example
+     * // Create one TaskTemplate
+     * const TaskTemplate = await prisma.taskTemplate.create({
+     *   data: {
+     *     // ... data to create a TaskTemplate
+     *   }
+     * })
+     * 
+     */
+    create<T extends TaskTemplateCreateArgs>(args: SelectSubset<T, TaskTemplateCreateArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many TaskTemplates.
+     * @param {TaskTemplateCreateManyArgs} args - Arguments to create many TaskTemplates.
+     * @example
+     * // Create many TaskTemplates
+     * const taskTemplate = await prisma.taskTemplate.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends TaskTemplateCreateManyArgs>(args?: SelectSubset<T, TaskTemplateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many TaskTemplates and returns the data saved in the database.
+     * @param {TaskTemplateCreateManyAndReturnArgs} args - Arguments to create many TaskTemplates.
+     * @example
+     * // Create many TaskTemplates
+     * const taskTemplate = await prisma.taskTemplate.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many TaskTemplates and only return the `id`
+     * const taskTemplateWithIdOnly = await prisma.taskTemplate.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends TaskTemplateCreateManyAndReturnArgs>(args?: SelectSubset<T, TaskTemplateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a TaskTemplate.
+     * @param {TaskTemplateDeleteArgs} args - Arguments to delete one TaskTemplate.
+     * @example
+     * // Delete one TaskTemplate
+     * const TaskTemplate = await prisma.taskTemplate.delete({
+     *   where: {
+     *     // ... filter to delete one TaskTemplate
+     *   }
+     * })
+     * 
+     */
+    delete<T extends TaskTemplateDeleteArgs>(args: SelectSubset<T, TaskTemplateDeleteArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one TaskTemplate.
+     * @param {TaskTemplateUpdateArgs} args - Arguments to update one TaskTemplate.
+     * @example
+     * // Update one TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends TaskTemplateUpdateArgs>(args: SelectSubset<T, TaskTemplateUpdateArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more TaskTemplates.
+     * @param {TaskTemplateDeleteManyArgs} args - Arguments to filter TaskTemplates to delete.
+     * @example
+     * // Delete a few TaskTemplates
+     * const { count } = await prisma.taskTemplate.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends TaskTemplateDeleteManyArgs>(args?: SelectSubset<T, TaskTemplateDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many TaskTemplates
+     * const taskTemplate = await prisma.taskTemplate.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends TaskTemplateUpdateManyArgs>(args: SelectSubset<T, TaskTemplateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplates and returns the data updated in the database.
+     * @param {TaskTemplateUpdateManyAndReturnArgs} args - Arguments to update many TaskTemplates.
+     * @example
+     * // Update many TaskTemplates
+     * const taskTemplate = await prisma.taskTemplate.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more TaskTemplates and only return the `id`
+     * const taskTemplateWithIdOnly = await prisma.taskTemplate.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends TaskTemplateUpdateManyAndReturnArgs>(args: SelectSubset<T, TaskTemplateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one TaskTemplate.
+     * @param {TaskTemplateUpsertArgs} args - Arguments to update or create a TaskTemplate.
+     * @example
+     * // Update or create a TaskTemplate
+     * const taskTemplate = await prisma.taskTemplate.upsert({
+     *   create: {
+     *     // ... data to create a TaskTemplate
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the TaskTemplate we want to update
+     *   }
+     * })
+     */
+    upsert<T extends TaskTemplateUpsertArgs>(args: SelectSubset<T, TaskTemplateUpsertArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of TaskTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateCountArgs} args - Arguments to filter TaskTemplates to count.
+     * @example
+     * // Count the number of TaskTemplates
+     * const count = await prisma.taskTemplate.count({
+     *   where: {
+     *     // ... the filter for the TaskTemplates we want to count
+     *   }
+     * })
+    **/
+    count<T extends TaskTemplateCountArgs>(
+      args?: Subset<T, TaskTemplateCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], TaskTemplateCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a TaskTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends TaskTemplateAggregateArgs>(args: Subset<T, TaskTemplateAggregateArgs>): Prisma.PrismaPromise<GetTaskTemplateAggregateType<T>>
+
+    /**
+     * Group by TaskTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends TaskTemplateGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: TaskTemplateGroupByArgs['orderBy'] }
+        : { orderBy?: TaskTemplateGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, TaskTemplateGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetTaskTemplateGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the TaskTemplate model
+   */
+  readonly fields: TaskTemplateFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for TaskTemplate.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__TaskTemplateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the TaskTemplate model
+   */
+  interface TaskTemplateFieldRefs {
+    readonly id: FieldRef<"TaskTemplate", 'String'>
+    readonly createdById: FieldRef<"TaskTemplate", 'String'>
+    readonly name: FieldRef<"TaskTemplate", 'String'>
+    readonly title: FieldRef<"TaskTemplate", 'String'>
+    readonly subtasks: FieldRef<"TaskTemplate", 'Json'>
+    readonly cadence: FieldRef<"TaskTemplate", 'Cadence'>
+    readonly guidelineUrl: FieldRef<"TaskTemplate", 'String'>
+    readonly guidelineMime: FieldRef<"TaskTemplate", 'String'>
+    readonly guidelineImage: FieldRef<"TaskTemplate", 'Bytes'>
+    readonly createdAt: FieldRef<"TaskTemplate", 'DateTime'>
+    readonly updatedAt: FieldRef<"TaskTemplate", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * TaskTemplate findUnique
+   */
+  export type TaskTemplateFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplate to fetch.
+     */
+    where: TaskTemplateWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplate findUniqueOrThrow
+   */
+  export type TaskTemplateFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplate to fetch.
+     */
+    where: TaskTemplateWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplate findFirst
+   */
+  export type TaskTemplateFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplate to fetch.
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplates to fetch.
+     */
+    orderBy?: TaskTemplateOrderByWithRelationInput | TaskTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplates.
+     */
+    cursor?: TaskTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplates.
+     */
+    distinct?: TaskTemplateScalarFieldEnum | TaskTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplate findFirstOrThrow
+   */
+  export type TaskTemplateFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplate to fetch.
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplates to fetch.
+     */
+    orderBy?: TaskTemplateOrderByWithRelationInput | TaskTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplates.
+     */
+    cursor?: TaskTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplates.
+     */
+    distinct?: TaskTemplateScalarFieldEnum | TaskTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplate findMany
+   */
+  export type TaskTemplateFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplates to fetch.
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplates to fetch.
+     */
+    orderBy?: TaskTemplateOrderByWithRelationInput | TaskTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing TaskTemplates.
+     */
+    cursor?: TaskTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplates.
+     */
+    distinct?: TaskTemplateScalarFieldEnum | TaskTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplate create
+   */
+  export type TaskTemplateCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * The data needed to create a TaskTemplate.
+     */
+    data: XOR<TaskTemplateCreateInput, TaskTemplateUncheckedCreateInput>
+  }
+
+  /**
+   * TaskTemplate createMany
+   */
+  export type TaskTemplateCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many TaskTemplates.
+     */
+    data: TaskTemplateCreateManyInput | TaskTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TaskTemplate createManyAndReturn
+   */
+  export type TaskTemplateCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to create many TaskTemplates.
+     */
+    data: TaskTemplateCreateManyInput | TaskTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TaskTemplate update
+   */
+  export type TaskTemplateUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * The data needed to update a TaskTemplate.
+     */
+    data: XOR<TaskTemplateUpdateInput, TaskTemplateUncheckedUpdateInput>
+    /**
+     * Choose, which TaskTemplate to update.
+     */
+    where: TaskTemplateWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplate updateMany
+   */
+  export type TaskTemplateUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update TaskTemplates.
+     */
+    data: XOR<TaskTemplateUpdateManyMutationInput, TaskTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplates to update
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * Limit how many TaskTemplates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplate updateManyAndReturn
+   */
+  export type TaskTemplateUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to update TaskTemplates.
+     */
+    data: XOR<TaskTemplateUpdateManyMutationInput, TaskTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplates to update
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * Limit how many TaskTemplates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplate upsert
+   */
+  export type TaskTemplateUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * The filter to search for the TaskTemplate to update in case it exists.
+     */
+    where: TaskTemplateWhereUniqueInput
+    /**
+     * In case the TaskTemplate found by the `where` argument doesn't exist, create a new TaskTemplate with this data.
+     */
+    create: XOR<TaskTemplateCreateInput, TaskTemplateUncheckedCreateInput>
+    /**
+     * In case the TaskTemplate was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<TaskTemplateUpdateInput, TaskTemplateUncheckedUpdateInput>
+  }
+
+  /**
+   * TaskTemplate delete
+   */
+  export type TaskTemplateDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Filter which TaskTemplate to delete.
+     */
+    where: TaskTemplateWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplate deleteMany
+   */
+  export type TaskTemplateDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplates to delete
+     */
+    where?: TaskTemplateWhereInput
+    /**
+     * Limit how many TaskTemplates to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplate without action
+   */
+  export type TaskTemplateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model Proof
    */
 
@@ -26864,6 +28036,23 @@ export namespace Prisma {
   export type GuidelineScalarFieldEnum = (typeof GuidelineScalarFieldEnum)[keyof typeof GuidelineScalarFieldEnum]
 
 
+  export const TaskTemplateScalarFieldEnum: {
+    id: 'id',
+    createdById: 'createdById',
+    name: 'name',
+    title: 'title',
+    subtasks: 'subtasks',
+    cadence: 'cadence',
+    guidelineUrl: 'guidelineUrl',
+    guidelineMime: 'guidelineMime',
+    guidelineImage: 'guidelineImage',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type TaskTemplateScalarFieldEnum = (typeof TaskTemplateScalarFieldEnum)[keyof typeof TaskTemplateScalarFieldEnum]
+
+
   export const ProofScalarFieldEnum: {
     id: 'id',
     runBlockId: 'runBlockId',
@@ -28171,6 +29360,88 @@ export namespace Prisma {
     imageMime?: StringNullableWithAggregatesFilter<"Guideline"> | string | null
     imageData?: BytesNullableWithAggregatesFilter<"Guideline"> | Bytes | null
     createdAt?: DateTimeWithAggregatesFilter<"Guideline"> | Date | string
+  }
+
+  export type TaskTemplateWhereInput = {
+    AND?: TaskTemplateWhereInput | TaskTemplateWhereInput[]
+    OR?: TaskTemplateWhereInput[]
+    NOT?: TaskTemplateWhereInput | TaskTemplateWhereInput[]
+    id?: StringFilter<"TaskTemplate"> | string
+    createdById?: StringFilter<"TaskTemplate"> | string
+    name?: StringFilter<"TaskTemplate"> | string
+    title?: StringFilter<"TaskTemplate"> | string
+    subtasks?: JsonFilter<"TaskTemplate">
+    cadence?: EnumCadenceNullableFilter<"TaskTemplate"> | $Enums.Cadence | null
+    guidelineUrl?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
+    createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+  }
+
+  export type TaskTemplateOrderByWithRelationInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    title?: SortOrder
+    subtasks?: SortOrder
+    cadence?: SortOrderInput | SortOrder
+    guidelineUrl?: SortOrderInput | SortOrder
+    guidelineMime?: SortOrderInput | SortOrder
+    guidelineImage?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: TaskTemplateWhereInput | TaskTemplateWhereInput[]
+    OR?: TaskTemplateWhereInput[]
+    NOT?: TaskTemplateWhereInput | TaskTemplateWhereInput[]
+    createdById?: StringFilter<"TaskTemplate"> | string
+    name?: StringFilter<"TaskTemplate"> | string
+    title?: StringFilter<"TaskTemplate"> | string
+    subtasks?: JsonFilter<"TaskTemplate">
+    cadence?: EnumCadenceNullableFilter<"TaskTemplate"> | $Enums.Cadence | null
+    guidelineUrl?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
+    createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+  }, "id">
+
+  export type TaskTemplateOrderByWithAggregationInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    title?: SortOrder
+    subtasks?: SortOrder
+    cadence?: SortOrderInput | SortOrder
+    guidelineUrl?: SortOrderInput | SortOrder
+    guidelineMime?: SortOrderInput | SortOrder
+    guidelineImage?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: TaskTemplateCountOrderByAggregateInput
+    _max?: TaskTemplateMaxOrderByAggregateInput
+    _min?: TaskTemplateMinOrderByAggregateInput
+  }
+
+  export type TaskTemplateScalarWhereWithAggregatesInput = {
+    AND?: TaskTemplateScalarWhereWithAggregatesInput | TaskTemplateScalarWhereWithAggregatesInput[]
+    OR?: TaskTemplateScalarWhereWithAggregatesInput[]
+    NOT?: TaskTemplateScalarWhereWithAggregatesInput | TaskTemplateScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"TaskTemplate"> | string
+    createdById?: StringWithAggregatesFilter<"TaskTemplate"> | string
+    name?: StringWithAggregatesFilter<"TaskTemplate"> | string
+    title?: StringWithAggregatesFilter<"TaskTemplate"> | string
+    subtasks?: JsonWithAggregatesFilter<"TaskTemplate">
+    cadence?: EnumCadenceNullableWithAggregatesFilter<"TaskTemplate"> | $Enums.Cadence | null
+    guidelineUrl?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
+    guidelineMime?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
+    guidelineImage?: BytesNullableWithAggregatesFilter<"TaskTemplate"> | Bytes | null
+    createdAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
   }
 
   export type ProofWhereInput = {
@@ -29758,6 +31029,104 @@ export namespace Prisma {
     imageMime?: NullableStringFieldUpdateOperationsInput | string | null
     imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateCreateInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateUncheckedCreateInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateCreateManyInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofCreateInput = {
@@ -31394,6 +32763,46 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedBytesNullableFilter<$PrismaModel>
     _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
+  export type TaskTemplateCountOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    title?: SortOrder
+    subtasks?: SortOrder
+    cadence?: SortOrder
+    guidelineUrl?: SortOrder
+    guidelineMime?: SortOrder
+    guidelineImage?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateMaxOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    title?: SortOrder
+    cadence?: SortOrder
+    guidelineUrl?: SortOrder
+    guidelineMime?: SortOrder
+    guidelineImage?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateMinOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    title?: SortOrder
+    cadence?: SortOrder
+    guidelineUrl?: SortOrder
+    guidelineMime?: SortOrder
+    guidelineImage?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type BytesFilter<$PrismaModel = never> = {

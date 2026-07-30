@@ -290,6 +290,10 @@ export interface FlowAssignInput {
    *  own (own status/proof/due, completion independent of the parent) for
    *  every recipient × day, linked under the main task via parentId. */
   subtasks?: string[];
+  /** Optional "Save as Template" (2026-07-31): also store this
+   *  assignment's structure as a reusable template under `name` — a
+   *  same-name save overwrites (the edit path). */
+  saveAsTemplate?: { name: string };
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -302,6 +306,43 @@ export interface FlowAssignInput {
 }
 
 export type CadenceOption = FlowPeriod | "adhoc";
+
+// ---- Task Templates (2026-07-31) ----------------------------------------
+
+export interface FlowTemplateSummary {
+  id: string;
+  name: string;
+  title: string;
+  subtaskCount: number;
+  hasGuidelineUrl: boolean;
+  hasGuidelineImage: boolean;
+  updatedAt: string; // ISO
+}
+
+/** Full template for form prefill — guidelineImage uses the SAME shape the
+ *  assign input submits, so prefill is a straight state assignment. */
+export interface FlowTemplateDetail {
+  id: string;
+  name: string;
+  title: string;
+  subtasks: string[];
+  cadence: CadenceOption | null;
+  guidelineUrl: string | null;
+  guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+
+export type TemplateLoadResult =
+  | { ok: true; template: FlowTemplateDetail }
+  | { ok: false; message: string };
+
+/** Everything the "+ Task" form needs for templates, bundled as ONE
+ *  optional prop: the saved list plus load/rename/delete server actions. */
+export interface FlowTemplateControl {
+  list: FlowTemplateSummary[];
+  load: (templateId: string) => Promise<TemplateLoadResult>;
+  rename: (templateId: string, name: string) => Promise<ActionResult>;
+  remove: (templateId: string) => Promise<ActionResult>;
+}
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the
  *  currently-selected recipient(s) — Branch Manager keeps all 3 (the one

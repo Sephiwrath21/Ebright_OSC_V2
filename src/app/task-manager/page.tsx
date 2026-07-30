@@ -38,6 +38,10 @@ import {
   recolorKanbanColumn,
   renameKanbanColumn,
   reopenFlowTask,
+  deleteTaskTemplate,
+  getTaskTemplate,
+  listTaskTemplates,
+  renameTaskTemplate,
   saveCeoDashboardConfig,
   skipFlowTask,
   uploadFlowTaskProof,
@@ -255,6 +259,46 @@ export default async function TaskManagerPage({
     }
   }
 
+  // Task Template actions (2026-07-31) — creation happens through assign's
+  // saveAsTemplate flag; these cover load-for-prefill, rename, delete.
+  async function loadTemplate(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateLoadResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const template = await getTaskTemplate(email, templateId);
+      return { ok: true, template: template as import("@/task-manager/ui/types").FlowTemplateDetail };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function renameTemplate(templateId: string, name: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await renameTaskTemplate(email, templateId, name);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function deleteTemplate(templateId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await deleteTaskTemplate(email, templateId);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   async function reassignTask(runBlockId: string, newAssigneeId: string): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
@@ -441,9 +485,23 @@ export default async function TaskManagerPage({
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
     // role per the config — layout reshuffles below the header can never
-    // move it.
+    // move it. Templates (2026-07-31) ride along: the saved list + its
+    // load/rename/delete actions feed the form's "Start from a template"
+    // picker and Manage panel.
     if (showsAddTaskHeader(viewRole)) {
-      headerAction = <AddTaskButton staff={staff} action={assign} />;
+      const templateList = await listTaskTemplates(email);
+      headerAction = (
+        <AddTaskButton
+          staff={staff}
+          action={assign}
+          templates={{
+            list: templateList,
+            load: loadTemplate,
+            rename: renameTemplate,
+            remove: deleteTemplate,
+          }}
+        />
+      );
     }
 
     if (shows(viewRole, "taskManager", "entityDropdowns")) {

@@ -341,6 +341,30 @@ model Guideline {
   blocks    RunBlock[]
 }
 
+/// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
+/// assignment — task title, subtasks, cadence, guideline link/image — but
+/// deliberately NOT recipients, days, due date, or any completion state
+/// (those reset per use). Owned by its creator (createdById, TM user id);
+/// each assigner manages their own set. Saving with an existing name
+/// OVERWRITES that template (that's the "edit" path). Using a template
+/// only pre-fills the form — assignment then flows through the normal
+/// pipeline (fresh Guideline row per assignment), never mutating this row.
+model TaskTemplate {
+  id             String   @id @default(cuid())
+  createdById    String
+  name           String
+  title          String
+  subtasks       Json     @default("[]") // string[]
+  cadence        Cadence?
+  guidelineUrl   String?
+  guidelineMime  String? // image/png | image/jpeg | image/webp
+  guidelineImage Bytes?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([createdById])
+}
+
 /// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
 /// image only, capped at 2 MB by the upload action). Optional: uploading
 /// proof never gates completion. Re-uploading replaces the row (upsert on
