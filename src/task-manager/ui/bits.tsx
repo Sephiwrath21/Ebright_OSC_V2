@@ -1047,12 +1047,12 @@ export function TaskRowLine({
             onClick={tree.onToggle}
             title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
             aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
-            className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-sm leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-base leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700"
           >
             {tree.expanded ? "▾" : "▸"}
           </button>
         ) : (
-          <span className="w-5 shrink-0" aria-hidden />
+          <span className="w-6 shrink-0" aria-hidden />
         ))}
       {isChild && <span className="w-5 shrink-0" aria-hidden />}
       {hideCompleted ? (
@@ -1375,8 +1375,11 @@ export function ResizableTaskList({
   // without resolving" completes just the parent; "Resolve all N" bulk-
   // completes the subtasks too. The warning can be switched off via the
   // modal's Warning Settings (persisted per browser in localStorage).
+  // Generalized to MULTIPLE parents (2026-07-31): "Select all" can sweep
+  // several parents with unresolved subtasks at once — one combined modal
+  // (total unresolved count) instead of a sequence of prompts.
   const [confirmTarget, setConfirmTarget] = React.useState<{
-    parent: FlowTaskRow;
+    parents: FlowTaskRow[];
     unresolved: FlowTaskRow[];
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = React.useState(false);
@@ -1469,7 +1472,7 @@ export function ResizableTaskList({
       if (unresolved.length === 0 || !warnEnabled) return onComplete!(runBlockId);
       setConfirmError(null);
       setConfirmSubsOpen(false);
-      setConfirmTarget({ parent, unresolved });
+      setConfirmTarget({ parents: [parent], unresolved });
       return { ok: true };
     };
   /** CHECKING a parent's checkbox (2026-07-31 fix — "fires consistently"):
@@ -1484,10 +1487,33 @@ export function ResizableTaskList({
     if (checking && unresolved.length > 0 && warnEnabled && onComplete) {
       setConfirmError(null);
       setConfirmSubsOpen(false);
-      setConfirmTarget({ parent, unresolved });
+      setConfirmTarget({ parents: [parent], unresolved });
       return;
     }
     toggleSelect(id);
+  };
+  /** "Select all" (2026-07-31): same guard, not bypassable — when CHECKING
+   *  would sweep in parents with unresolved subtasks, ONE combined modal
+   *  covers all of them (total unresolved count). Unchecking, warning-off,
+   *  and no-affected-parents fall through to the plain toggle. */
+  const guardedToggleSelectAll = () => {
+    if (!allOwnedSelected && warnEnabled && onComplete && hideCompleted) {
+      const parents = topLevelTasks.filter((t) =>
+        (childrenOf.get(t.runBlockId) ?? []).some(isUnresolved),
+      );
+      if (parents.length > 0) {
+        setConfirmError(null);
+        setConfirmSubsOpen(false);
+        setConfirmTarget({
+          parents,
+          unresolved: parents.flatMap((p) =>
+            (childrenOf.get(p.runBlockId) ?? []).filter(isUnresolved),
+          ),
+        });
+        return;
+      }
+    }
+    toggleSelectAll();
   };
   const closeConfirm = () => {
     setConfirmTarget(null);
@@ -1499,16 +1525,19 @@ export function ResizableTaskList({
     if (!onComplete || !confirmTarget) return;
     setConfirmBusy(true);
     setConfirmError(null);
-    const result = await onComplete(confirmTarget.parent.runBlockId);
+    const results = await Promise.allSettled(
+      confirmTarget.parents.map((p) => onComplete(p.runBlockId)),
+    );
     setConfirmBusy(false);
-    if (result.ok) closeConfirm();
-    else setConfirmError(result.message);
+    const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
+    if (failed === 0) closeConfirm();
+    else setConfirmError(`${failed} of ${confirmTarget.parents.length} tasks failed to update.`);
   };
   const resolveAll = async () => {
     if (!onComplete || !confirmTarget) return;
     setConfirmBusy(true);
     setConfirmError(null);
-    const targets = [...confirmTarget.unresolved, confirmTarget.parent];
+    const targets = [...confirmTarget.unresolved, ...confirmTarget.parents];
     const results = await Promise.allSettled(targets.map((t) => onComplete(t.runBlockId)));
     setConfirmBusy(false);
     const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
@@ -1618,7 +1647,7 @@ export function ResizableTaskList({
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
-                onChange={toggleSelectAll}
+                onChange={guardedToggleSelectAll}
                 className={`size-4 rounded border-gray-300 accent-blue-600 transition-opacity ${
                   allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                 }`}
@@ -1660,7 +1689,7 @@ export function ResizableTaskList({
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
-          {hasTree && <span className="w-5 shrink-0" aria-hidden />}
+          {hasTree && <span className="w-6 shrink-0" aria-hidden />}
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
@@ -1747,8 +1776,9 @@ export function ResizableTaskList({
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <h4 className="text-base font-semibold text-gray-900">
-                  This task has {confirmTarget.unresolved.length} unresolved item
-                  {confirmTarget.unresolved.length === 1 ? "" : "s"}
+                  {confirmTarget.parents.length === 1
+                    ? `This task has ${confirmTarget.unresolved.length} unresolved item${confirmTarget.unresolved.length === 1 ? "" : "s"}`
+                    : `These ${confirmTarget.parents.length} tasks have ${confirmTarget.unresolved.length} unresolved items`}
                 </h4>
                 <button
                   type="button"
