@@ -300,6 +300,12 @@ model RunBlock {
   guidelineId String?
   guideline   Guideline? @relation(fields: [guidelineId], references: [id])
 
+  // Optional assignee-uploaded completion evidence (2026-07-30, the My
+  // Tasks "Proof" column). Unlike guideline (shared, assigner-attached),
+  // proof is strictly per-block and NEVER inherited by recurrence
+  // successors — it's evidence for THIS occurrence only.
+  proof Proof?
+
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
@@ -319,6 +325,21 @@ model Guideline {
   imageData Bytes?
   createdAt DateTime   @default(now())
   blocks    RunBlock[]
+}
+
+/// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
+/// image only, capped at 2 MB by the upload action). Optional: uploading
+/// proof never gates completion. Re-uploading replaces the row (upsert on
+/// runBlockId); deleting the block cascades the proof away. Bytes live in
+/// the DB for the same reason as Guideline.imageData; served via
+/// /api/task-manager/proof-image/[id] (session-gated).
+model Proof {
+  id         String   @id @default(cuid())
+  runBlockId String   @unique
+  runBlock   RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
+  imageMime  String // image/png | image/jpeg | image/webp
+  imageData  Bytes
+  createdAt  DateTime @default(now())
 }
 
 enum BlockStatus {

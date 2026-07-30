@@ -65,6 +65,7 @@ export function TaskManagerView({
   completeTaskAction,
   skipTaskAction,
   reopenTaskAction,
+  uploadProofAction,
   reassign,
   manpowerScheduleHref,
   ceoDashboard,
@@ -102,6 +103,10 @@ export function TaskManagerView({
   /** Status dropdown's "Pending" option — only actionable on an already-
    *  Completed/N-A task (reopen); omit to disable reopening everywhere. */
   reopenTaskAction?: (runBlockId: string) => Promise<ActionResult>;
+  /** The Proof column's upload (2026-07-30) — assignee-only completion
+   *  evidence; optional, never gates completion. Wired to the same personal
+   *  surfaces as the status actions (see completeProps note below). */
+  uploadProofAction?: import("./types").ProofUploadHandler;
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
@@ -210,6 +215,7 @@ export function TaskManagerView({
     onComplete: completeTaskAction,
     onSkip: skipTaskAction,
     onReopen: reopenTaskAction,
+    onUploadProof: uploadProofAction,
     reassign,
   };
 

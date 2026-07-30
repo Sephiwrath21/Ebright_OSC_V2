@@ -78,6 +78,16 @@ export type RunBlock = $Result.DefaultSelection<Prisma.$RunBlockPayload>
  */
 export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
 /**
+ * Model Proof
+ * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
+ * image only, capped at 2 MB by the upload action). Optional: uploading
+ * proof never gates completion. Re-uploading replaces the row (upsert on
+ * runBlockId); deleting the block cascades the proof away. Bytes live in
+ * the DB for the same reason as Guideline.imageData; served via
+ * /api/task-manager/proof-image/[id] (session-gated).
+ */
+export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
+/**
  * Model RunItem
  * 
  */
@@ -481,6 +491,16 @@ export class PrismaClient<
     * ```
     */
   get guideline(): Prisma.GuidelineDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.proof`: Exposes CRUD operations for the **Proof** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Proofs
+    * const proofs = await prisma.proof.findMany()
+    * ```
+    */
+  get proof(): Prisma.ProofDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.runItem`: Exposes CRUD operations for the **RunItem** model.
@@ -1007,6 +1027,7 @@ export namespace Prisma {
     FlowRun: 'FlowRun',
     RunBlock: 'RunBlock',
     Guideline: 'Guideline',
+    Proof: 'Proof',
     RunItem: 'RunItem',
     NotificationLog: 'NotificationLog',
     AuditLog: 'AuditLog',
@@ -1030,7 +1051,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1922,6 +1943,80 @@ export namespace Prisma {
           }
         }
       }
+      Proof: {
+        payload: Prisma.$ProofPayload<ExtArgs>
+        fields: Prisma.ProofFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ProofFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ProofFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findFirst: {
+            args: Prisma.ProofFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ProofFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findMany: {
+            args: Prisma.ProofFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          create: {
+            args: Prisma.ProofCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          createMany: {
+            args: Prisma.ProofCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ProofCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          delete: {
+            args: Prisma.ProofDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          update: {
+            args: Prisma.ProofUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          deleteMany: {
+            args: Prisma.ProofDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ProofUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ProofUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          upsert: {
+            args: Prisma.ProofUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          aggregate: {
+            args: Prisma.ProofAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateProof>
+          }
+          groupBy: {
+            args: Prisma.ProofGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ProofGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ProofCountArgs<ExtArgs>
+            result: $Utils.Optional<ProofCountAggregateOutputType> | number
+          }
+        }
+      }
       RunItem: {
         payload: Prisma.$RunItemPayload<ExtArgs>
         fields: Prisma.RunItemFieldRefs
@@ -2634,6 +2729,7 @@ export namespace Prisma {
     flowRun?: FlowRunOmit
     runBlock?: RunBlockOmit
     guideline?: GuidelineOmit
+    proof?: ProofOmit
     runItem?: RunItemOmit
     notificationLog?: NotificationLogOmit
     auditLog?: AuditLogOmit
@@ -14786,6 +14882,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    proof?: boolean | RunBlock$proofArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["runBlock"]>
 
@@ -14862,6 +14959,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
+    proof?: boolean | RunBlock$proofArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type RunBlockIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14883,6 +14981,7 @@ export namespace Prisma {
       recurrenceOf: Prisma.$RunBlockPayload<ExtArgs> | null
       successor: Prisma.$RunBlockPayload<ExtArgs> | null
       guideline: Prisma.$GuidelinePayload<ExtArgs> | null
+      proof: Prisma.$ProofPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -15301,6 +15400,7 @@ export namespace Prisma {
     recurrenceOf<T extends RunBlock$recurrenceOfArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$recurrenceOfArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     guideline<T extends RunBlock$guidelineArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$guidelineArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    proof<T extends RunBlock$proofArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15826,6 +15926,25 @@ export namespace Prisma {
      */
     include?: GuidelineInclude<ExtArgs> | null
     where?: GuidelineWhereInput
+  }
+
+  /**
+   * RunBlock.proof
+   */
+  export type RunBlock$proofArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    where?: ProofWhereInput
   }
 
   /**
@@ -16919,6 +17038,1069 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: GuidelineInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Proof
+   */
+
+  export type AggregateProof = {
+    _count: ProofCountAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  export type ProofMinAggregateOutputType = {
+    id: string | null
+    runBlockId: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type ProofMaxAggregateOutputType = {
+    id: string | null
+    runBlockId: string | null
+    imageMime: string | null
+    imageData: Bytes | null
+    createdAt: Date | null
+  }
+
+  export type ProofCountAggregateOutputType = {
+    id: number
+    runBlockId: number
+    imageMime: number
+    imageData: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type ProofMinAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type ProofMaxAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+  }
+
+  export type ProofCountAggregateInputType = {
+    id?: true
+    runBlockId?: true
+    imageMime?: true
+    imageData?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type ProofAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proof to aggregate.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Proofs
+    **/
+    _count?: true | ProofCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ProofMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type GetProofAggregateType<T extends ProofAggregateArgs> = {
+        [P in keyof T & keyof AggregateProof]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateProof[P]>
+      : GetScalarType<T[P], AggregateProof[P]>
+  }
+
+
+
+
+  export type ProofGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
+    orderBy?: ProofOrderByWithAggregationInput | ProofOrderByWithAggregationInput[]
+    by: ProofScalarFieldEnum[] | ProofScalarFieldEnum
+    having?: ProofScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ProofCountAggregateInputType | true
+    _min?: ProofMinAggregateInputType
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type ProofGroupByOutputType = {
+    id: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt: Date
+    _count: ProofCountAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  type GetProofGroupByPayload<T extends ProofGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ProofGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ProofGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ProofGroupByOutputType[P]>
+            : GetScalarType<T[P], ProofGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ProofSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectScalar = {
+    id?: boolean
+    runBlockId?: boolean
+    imageMime?: boolean
+    imageData?: boolean
+    createdAt?: boolean
+  }
+
+  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "imageMime" | "imageData" | "createdAt", ExtArgs["result"]["proof"]>
+  export type ProofInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+  export type ProofIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+  export type ProofIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
+  }
+
+  export type $ProofPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Proof"
+    objects: {
+      runBlock: Prisma.$RunBlockPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      runBlockId: string
+      imageMime: string
+      imageData: Prisma.Bytes
+      createdAt: Date
+    }, ExtArgs["result"]["proof"]>
+    composites: {}
+  }
+
+  type ProofGetPayload<S extends boolean | null | undefined | ProofDefaultArgs> = $Result.GetResult<Prisma.$ProofPayload, S>
+
+  type ProofCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ProofFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ProofCountAggregateInputType | true
+    }
+
+  export interface ProofDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Proof'], meta: { name: 'Proof' } }
+    /**
+     * Find zero or one Proof that matches the filter.
+     * @param {ProofFindUniqueArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ProofFindUniqueArgs>(args: SelectSubset<T, ProofFindUniqueArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Proof that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ProofFindUniqueOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ProofFindUniqueOrThrowArgs>(args: SelectSubset<T, ProofFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Proof that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ProofFindFirstArgs>(args?: SelectSubset<T, ProofFindFirstArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Proof that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ProofFindFirstOrThrowArgs>(args?: SelectSubset<T, ProofFindFirstOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Proofs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Proofs
+     * const proofs = await prisma.proof.findMany()
+     * 
+     * // Get first 10 Proofs
+     * const proofs = await prisma.proof.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const proofWithIdOnly = await prisma.proof.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ProofFindManyArgs>(args?: SelectSubset<T, ProofFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Proof.
+     * @param {ProofCreateArgs} args - Arguments to create a Proof.
+     * @example
+     * // Create one Proof
+     * const Proof = await prisma.proof.create({
+     *   data: {
+     *     // ... data to create a Proof
+     *   }
+     * })
+     * 
+     */
+    create<T extends ProofCreateArgs>(args: SelectSubset<T, ProofCreateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Proofs.
+     * @param {ProofCreateManyArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ProofCreateManyArgs>(args?: SelectSubset<T, ProofCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Proofs and returns the data saved in the database.
+     * @param {ProofCreateManyAndReturnArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Proofs and only return the `id`
+     * const proofWithIdOnly = await prisma.proof.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ProofCreateManyAndReturnArgs>(args?: SelectSubset<T, ProofCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Proof.
+     * @param {ProofDeleteArgs} args - Arguments to delete one Proof.
+     * @example
+     * // Delete one Proof
+     * const Proof = await prisma.proof.delete({
+     *   where: {
+     *     // ... filter to delete one Proof
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ProofDeleteArgs>(args: SelectSubset<T, ProofDeleteArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Proof.
+     * @param {ProofUpdateArgs} args - Arguments to update one Proof.
+     * @example
+     * // Update one Proof
+     * const proof = await prisma.proof.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ProofUpdateArgs>(args: SelectSubset<T, ProofUpdateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Proofs.
+     * @param {ProofDeleteManyArgs} args - Arguments to filter Proofs to delete.
+     * @example
+     * // Delete a few Proofs
+     * const { count } = await prisma.proof.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ProofDeleteManyArgs>(args?: SelectSubset<T, ProofDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Proofs
+     * const proof = await prisma.proof.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ProofUpdateManyArgs>(args: SelectSubset<T, ProofUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Proofs and returns the data updated in the database.
+     * @param {ProofUpdateManyAndReturnArgs} args - Arguments to update many Proofs.
+     * @example
+     * // Update many Proofs
+     * const proof = await prisma.proof.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Proofs and only return the `id`
+     * const proofWithIdOnly = await prisma.proof.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ProofUpdateManyAndReturnArgs>(args: SelectSubset<T, ProofUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Proof.
+     * @param {ProofUpsertArgs} args - Arguments to update or create a Proof.
+     * @example
+     * // Update or create a Proof
+     * const proof = await prisma.proof.upsert({
+     *   create: {
+     *     // ... data to create a Proof
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Proof we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ProofUpsertArgs>(args: SelectSubset<T, ProofUpsertArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofCountArgs} args - Arguments to filter Proofs to count.
+     * @example
+     * // Count the number of Proofs
+     * const count = await prisma.proof.count({
+     *   where: {
+     *     // ... the filter for the Proofs we want to count
+     *   }
+     * })
+    **/
+    count<T extends ProofCountArgs>(
+      args?: Subset<T, ProofCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ProofCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ProofAggregateArgs>(args: Subset<T, ProofAggregateArgs>): Prisma.PrismaPromise<GetProofAggregateType<T>>
+
+    /**
+     * Group by Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ProofGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ProofGroupByArgs['orderBy'] }
+        : { orderBy?: ProofGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ProofGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetProofGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Proof model
+   */
+  readonly fields: ProofFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Proof.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ProofClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    runBlock<T extends RunBlockDefaultArgs<ExtArgs> = {}>(args?: Subset<T, RunBlockDefaultArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Proof model
+   */
+  interface ProofFieldRefs {
+    readonly id: FieldRef<"Proof", 'String'>
+    readonly runBlockId: FieldRef<"Proof", 'String'>
+    readonly imageMime: FieldRef<"Proof", 'String'>
+    readonly imageData: FieldRef<"Proof", 'Bytes'>
+    readonly createdAt: FieldRef<"Proof", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Proof findUnique
+   */
+  export type ProofFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findUniqueOrThrow
+   */
+  export type ProofFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findFirst
+   */
+  export type ProofFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findFirstOrThrow
+   */
+  export type ProofFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findMany
+   */
+  export type ProofFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proofs to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof create
+   */
+  export type ProofCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Proof.
+     */
+    data: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+  }
+
+  /**
+   * Proof createMany
+   */
+  export type ProofCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Proof createManyAndReturn
+   */
+  export type ProofCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Proof update
+   */
+  export type ProofUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Proof.
+     */
+    data: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+    /**
+     * Choose, which Proof to update.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof updateMany
+   */
+  export type ProofUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Proofs.
+     */
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyInput>
+    /**
+     * Filter which Proofs to update
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Proof updateManyAndReturn
+   */
+  export type ProofUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * The data used to update Proofs.
+     */
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyInput>
+    /**
+     * Filter which Proofs to update
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Proof upsert
+   */
+  export type ProofUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Proof to update in case it exists.
+     */
+    where: ProofWhereUniqueInput
+    /**
+     * In case the Proof found by the `where` argument doesn't exist, create a new Proof with this data.
+     */
+    create: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+    /**
+     * In case the Proof was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+  }
+
+  /**
+   * Proof delete
+   */
+  export type ProofDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter which Proof to delete.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof deleteMany
+   */
+  export type ProofDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proofs to delete
+     */
+    where?: ProofWhereInput
+    /**
+     * Limit how many Proofs to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Proof without action
+   */
+  export type ProofDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Proof
+     */
+    omit?: ProofOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
   }
 
 
@@ -25604,6 +26786,17 @@ export namespace Prisma {
   export type GuidelineScalarFieldEnum = (typeof GuidelineScalarFieldEnum)[keyof typeof GuidelineScalarFieldEnum]
 
 
+  export const ProofScalarFieldEnum: {
+    id: 'id',
+    runBlockId: 'runBlockId',
+    imageMime: 'imageMime',
+    imageData: 'imageData',
+    createdAt: 'createdAt'
+  };
+
+  export type ProofScalarFieldEnum = (typeof ProofScalarFieldEnum)[keyof typeof ProofScalarFieldEnum]
+
+
   export const RunItemScalarFieldEnum: {
     id: 'id',
     runBlockId: 'runBlockId',
@@ -26729,6 +27922,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
+    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
   }
 
   export type RunBlockOrderByWithRelationInput = {
@@ -26754,6 +27948,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockOrderByWithRelationInput
     successor?: RunBlockOrderByWithRelationInput
     guideline?: GuidelineOrderByWithRelationInput
+    proof?: ProofOrderByWithRelationInput
   }
 
   export type RunBlockWhereUniqueInput = Prisma.AtLeast<{
@@ -26783,6 +27978,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
+    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
   }, "id" | "recurrenceOfId" | "runId_nodeId">
 
   export type RunBlockOrderByWithAggregationInput = {
@@ -26886,6 +28082,61 @@ export namespace Prisma {
     imageMime?: StringNullableWithAggregatesFilter<"Guideline"> | string | null
     imageData?: BytesNullableWithAggregatesFilter<"Guideline"> | Bytes | null
     createdAt?: DateTimeWithAggregatesFilter<"Guideline"> | Date | string
+  }
+
+  export type ProofWhereInput = {
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    runBlockId?: StringFilter<"Proof"> | string
+    imageMime?: StringFilter<"Proof"> | string
+    imageData?: BytesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
+    runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
+  }
+
+  export type ProofOrderByWithRelationInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+    runBlock?: RunBlockOrderByWithRelationInput
+  }
+
+  export type ProofWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    runBlockId?: string
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    imageMime?: StringFilter<"Proof"> | string
+    imageData?: BytesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
+    runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
+  }, "id" | "runBlockId">
+
+  export type ProofOrderByWithAggregationInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+    _count?: ProofCountOrderByAggregateInput
+    _max?: ProofMaxOrderByAggregateInput
+    _min?: ProofMinOrderByAggregateInput
+  }
+
+  export type ProofScalarWhereWithAggregatesInput = {
+    AND?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    OR?: ProofScalarWhereWithAggregatesInput[]
+    NOT?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Proof"> | string
+    runBlockId?: StringWithAggregatesFilter<"Proof"> | string
+    imageMime?: StringWithAggregatesFilter<"Proof"> | string
+    imageData?: BytesWithAggregatesFilter<"Proof"> | Bytes
+    createdAt?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
   }
 
   export type RunItemWhereInput = {
@@ -28221,6 +29472,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateInput = {
@@ -28243,6 +29495,7 @@ export namespace Prisma {
     guidelineId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUpdateInput = {
@@ -28265,6 +29518,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateInput = {
@@ -28287,6 +29541,7 @@ export namespace Prisma {
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockCreateManyInput = {
@@ -28403,6 +29658,61 @@ export namespace Prisma {
     url?: NullableStringFieldUpdateOperationsInput | string | null
     imageMime?: NullableStringFieldUpdateOperationsInput | string | null
     imageData?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+    runBlock: RunBlockCreateNestedOneWithoutProofInput
+  }
+
+  export type ProofUncheckedCreateInput = {
+    id?: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
+  }
+
+  export type ProofUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runBlockId?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateManyInput = {
+    id?: string
+    runBlockId: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runBlockId?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -29841,6 +31151,11 @@ export namespace Prisma {
     isNot?: GuidelineWhereInput | null
   }
 
+  export type ProofNullableScalarRelationFilter = {
+    is?: ProofWhereInput | null
+    isNot?: ProofWhereInput | null
+  }
+
   export type RunItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -29978,6 +31293,52 @@ export namespace Prisma {
     _min?: NestedBytesNullableFilter<$PrismaModel>
     _max?: NestedBytesNullableFilter<$PrismaModel>
   }
+
+  export type BytesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  }
+
+  export type RunBlockScalarRelationFilter = {
+    is?: RunBlockWhereInput
+    isNot?: RunBlockWhereInput
+  }
+
+  export type ProofCountOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ProofMaxOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ProofMinOrderByAggregateInput = {
+    id?: SortOrder
+    runBlockId?: SortOrder
+    imageMime?: SortOrder
+    imageData?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BytesWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBytesFilter<$PrismaModel>
+    _max?: NestedBytesFilter<$PrismaModel>
+  }
   export type JsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
         Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
@@ -30000,11 +31361,6 @@ export namespace Prisma {
     gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
-
-  export type RunBlockScalarRelationFilter = {
-    is?: RunBlockWhereInput
-    isNot?: RunBlockWhereInput
   }
 
   export type RunItemCountOrderByAggregateInput = {
@@ -30951,6 +32307,12 @@ export namespace Prisma {
     connect?: GuidelineWhereUniqueInput
   }
 
+  export type ProofCreateNestedOneWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    connect?: ProofWhereUniqueInput
+  }
+
   export type RunItemUncheckedCreateNestedManyWithoutRunBlockInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -30962,6 +32324,12 @@ export namespace Prisma {
     create?: XOR<RunBlockCreateWithoutRecurrenceOfInput, RunBlockUncheckedCreateWithoutRecurrenceOfInput>
     connectOrCreate?: RunBlockCreateOrConnectWithoutRecurrenceOfInput
     connect?: RunBlockWhereUniqueInput
+  }
+
+  export type ProofUncheckedCreateNestedOneWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    connect?: ProofWhereUniqueInput
   }
 
   export type EnumBlockStatusFieldUpdateOperationsInput = {
@@ -31024,6 +32392,16 @@ export namespace Prisma {
     update?: XOR<XOR<GuidelineUpdateToOneWithWhereWithoutBlocksInput, GuidelineUpdateWithoutBlocksInput>, GuidelineUncheckedUpdateWithoutBlocksInput>
   }
 
+  export type ProofUpdateOneWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    upsert?: ProofUpsertWithoutRunBlockInput
+    disconnect?: ProofWhereInput | boolean
+    delete?: ProofWhereInput | boolean
+    connect?: ProofWhereUniqueInput
+    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
   export type RunItemUncheckedUpdateManyWithoutRunBlockNestedInput = {
     create?: XOR<RunItemCreateWithoutRunBlockInput, RunItemUncheckedCreateWithoutRunBlockInput> | RunItemCreateWithoutRunBlockInput[] | RunItemUncheckedCreateWithoutRunBlockInput[]
     connectOrCreate?: RunItemCreateOrConnectWithoutRunBlockInput | RunItemCreateOrConnectWithoutRunBlockInput[]
@@ -31046,6 +32424,16 @@ export namespace Prisma {
     delete?: RunBlockWhereInput | boolean
     connect?: RunBlockWhereUniqueInput
     update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
+  }
+
+  export type ProofUncheckedUpdateOneWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
+    upsert?: ProofUpsertWithoutRunBlockInput
+    disconnect?: ProofWhereInput | boolean
+    delete?: ProofWhereInput | boolean
+    connect?: ProofWhereUniqueInput
+    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
   }
 
   export type RunBlockCreateNestedManyWithoutGuidelineInput = {
@@ -31092,6 +32480,24 @@ export namespace Prisma {
     update?: RunBlockUpdateWithWhereUniqueWithoutGuidelineInput | RunBlockUpdateWithWhereUniqueWithoutGuidelineInput[]
     updateMany?: RunBlockUpdateManyWithWhereWithoutGuidelineInput | RunBlockUpdateManyWithWhereWithoutGuidelineInput[]
     deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
+  }
+
+  export type RunBlockCreateNestedOneWithoutProofInput = {
+    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+    connect?: RunBlockWhereUniqueInput
+  }
+
+  export type BytesFieldUpdateOperationsInput = {
+    set?: Bytes
+  }
+
+  export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
+    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+    upsert?: RunBlockUpsertWithoutProofInput
+    connect?: RunBlockWhereUniqueInput
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofInput, RunBlockUpdateWithoutProofInput>, RunBlockUncheckedUpdateWithoutProofInput>
   }
 
   export type RunBlockCreateNestedOneWithoutRunItemsInput = {
@@ -31543,6 +32949,23 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedBytesNullableFilter<$PrismaModel>
     _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
+  export type NestedBytesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  }
+
+  export type NestedBytesWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
+    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBytesFilter<$PrismaModel>
+    _max?: NestedBytesFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -32767,6 +34190,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunInput = {
@@ -32788,6 +34212,7 @@ export namespace Prisma {
     guidelineId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunInput = {
@@ -32978,6 +34403,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateWithoutSuccessorInput = {
@@ -32999,6 +34425,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutSuccessorInput = {
@@ -33025,6 +34452,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateWithoutRecurrenceOfInput = {
@@ -33046,6 +34474,7 @@ export namespace Prisma {
     guidelineId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutRecurrenceOfInput = {
@@ -33072,6 +34501,25 @@ export namespace Prisma {
   export type GuidelineCreateOrConnectWithoutBlocksInput = {
     where: GuidelineWhereUniqueInput
     create: XOR<GuidelineCreateWithoutBlocksInput, GuidelineUncheckedCreateWithoutBlocksInput>
+  }
+
+  export type ProofCreateWithoutRunBlockInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofUncheckedCreateWithoutRunBlockInput = {
+    id?: string
+    imageMime: string
+    imageData: Bytes
+    createdAt?: Date | string
+  }
+
+  export type ProofCreateOrConnectWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
+    create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
   }
 
   export type FlowRunUpsertWithoutRunBlocksInput = {
@@ -33174,6 +34622,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutSuccessorInput = {
@@ -33195,6 +34644,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUpsertWithoutRecurrenceOfInput = {
@@ -33227,6 +34677,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRecurrenceOfInput = {
@@ -33248,6 +34699,7 @@ export namespace Prisma {
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type GuidelineUpsertWithoutBlocksInput = {
@@ -33277,6 +34729,31 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ProofUpsertWithoutRunBlockInput = {
+    update: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
+    create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
+    where?: ProofWhereInput
+  }
+
+  export type ProofUpdateToOneWithWhereWithoutRunBlockInput = {
+    where?: ProofWhereInput
+    data: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
+  }
+
+  export type ProofUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    imageMime?: StringFieldUpdateOperationsInput | string
+    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type RunBlockCreateWithoutGuidelineInput = {
     id?: string
     blockId: string
@@ -33296,6 +34773,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateWithoutGuidelineInput = {
@@ -33317,6 +34795,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutGuidelineInput = {
@@ -33345,6 +34824,110 @@ export namespace Prisma {
     data: XOR<RunBlockUpdateManyMutationInput, RunBlockUncheckedUpdateManyWithoutGuidelineInput>
   }
 
+  export type RunBlockCreateWithoutProofInput = {
+    id?: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    run: FlowRunCreateNestedOneWithoutRunBlocksInput
+    runItems?: RunItemCreateNestedManyWithoutRunBlockInput
+    recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
+    successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
+    guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+  }
+
+  export type RunBlockUncheckedCreateWithoutProofInput = {
+    id?: string
+    runId: string
+    blockId: string
+    nodeId: string
+    title: string
+    assigneeId: string
+    status?: $Enums.BlockStatus
+    dueAt?: Date | string | null
+    strikeCount?: number
+    reminderJobId?: string | null
+    startedAt?: Date | string | null
+    completedAt?: Date | string | null
+    scheduleSlotId?: string | null
+    cadence?: $Enums.Cadence | null
+    repeatWeekly?: boolean
+    recurrenceOfId?: string | null
+    guidelineId?: string | null
+    runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
+    successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+  }
+
+  export type RunBlockCreateOrConnectWithoutProofInput = {
+    where: RunBlockWhereUniqueInput
+    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+  }
+
+  export type RunBlockUpsertWithoutProofInput = {
+    update: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    where?: RunBlockWhereInput
+  }
+
+  export type RunBlockUpdateToOneWithWhereWithoutProofInput = {
+    where?: RunBlockWhereInput
+    data: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+  }
+
+  export type RunBlockUpdateWithoutProofInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
+    runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
+    recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
+    successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+  }
+
+  export type RunBlockUncheckedUpdateWithoutProofInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    blockId?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    assigneeId?: StringFieldUpdateOperationsInput | string
+    status?: EnumBlockStatusFieldUpdateOperationsInput | $Enums.BlockStatus
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    strikeCount?: IntFieldUpdateOperationsInput | number
+    reminderJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
+    successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+  }
+
   export type RunBlockCreateWithoutRunItemsInput = {
     id?: string
     blockId: string
@@ -33364,6 +34947,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
+    proof?: ProofCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockUncheckedCreateWithoutRunItemsInput = {
@@ -33385,6 +34969,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
+    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutRunItemsInput = {
@@ -33422,6 +35007,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunItemsInput = {
@@ -33443,6 +35029,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type FlowCreateWithoutDocInput = {
@@ -34033,6 +35620,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutRunInput = {
@@ -34054,6 +35642,7 @@ export namespace Prisma {
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutRunInput = {
@@ -34165,6 +35754,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateWithoutGuidelineInput = {
@@ -34186,6 +35776,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
+    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
   }
 
   export type RunBlockUncheckedUpdateManyWithoutGuidelineInput = {

@@ -15,9 +15,10 @@ import {
   completeFlowTask,
   reopenFlowTask,
   skipFlowTask,
+  uploadFlowTaskProof,
   FlowBridgeError,
 } from "@/task-manager/data";
-import type { ActionResult } from "@/task-manager/ui/types";
+import type { ActionResult, ProofUploadResult } from "@/task-manager/ui/types";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
@@ -141,6 +142,21 @@ export default async function HomePage({
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
   }
+  async function uploadProof(
+    runBlockId: string,
+    image: { mime: string; dataBase64: string },
+  ): Promise<ProofUploadResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      const { proofId } = await uploadFlowTaskProof(userEmail, runBlockId, image);
+      revalidatePath("/home");
+      return { ok: true, proofId };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
 
   // One overview for every account type — the section itself resolves the
   // Task Manager role and scopes/routes accordingly (and renders nothing on
@@ -155,7 +171,7 @@ export default async function HomePage({
         adhocDate={adhocDate}
         hodDate={hodDate}
         ceoDate={ceoDate}
-        actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask }}
+        actions={{ complete: completeTask, skip: skipTask, reopen: reopenTask, uploadProof }}
       />
     </Suspense>
   );

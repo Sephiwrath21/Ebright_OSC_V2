@@ -13,6 +13,7 @@ import type {
   FlowDrillTask,
   FlowStaffMember,
   FlowTaskRow,
+  ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
 import { personSolidColor } from "./palette";
@@ -521,12 +522,168 @@ function GuidelineIndicator({
   );
 }
 
+/** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
+ *  2 MB cap, so a bad pick fails instantly instead of round-tripping. */
+const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
+const PROOF_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** The "Proof" column cell (2026-07-30): assignee-uploaded completion
+ *  evidence, always optional (never gates the status dropdown). Owner of a
+ *  proof-less row gets a ＋ upload button; once uploaded, EVERYONE sees a
+ *  📎 that opens the image in a viewer modal (served by
+ *  /api/task-manager/proof-image/[id]); the owner can replace it from
+ *  there. Rows that are neither owned nor proven show a plain dash. */
+function ProofCell({
+  task,
+  isOwned,
+  onUploadProof,
+}: {
+  task: FlowTaskRow;
+  isOwned: boolean;
+  onUploadProof?: ProofUploadHandler;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [viewerOpen, setViewerOpen] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
+  // A fresh upload shows its 📎 immediately (before the refreshed payload
+  // arrives); `version` cache-busts the image URL after a replace, since a
+  // re-upload keeps the same Proof id.
+  const [localProofId, setLocalProofId] = React.useState<string | null>(null);
+  const [version, setVersion] = React.useState(0);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const proofId = localProofId ?? task.proofId ?? null;
+  const imageSrc = proofId
+    ? `/api/task-manager/proof-image/${proofId}${version ? `?v=${version}` : ""}`
+    : null;
+  const canUpload = isOwned && Boolean(onUploadProof);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !onUploadProof) return;
+    setErrorText(null);
+    if (!PROOF_IMAGE_MIMES.includes(file.type)) {
+      setErrorText("PNG, JPEG or WebP images only");
+      return;
+    }
+    if (file.size > PROOF_IMAGE_MAX_BYTES) {
+      setErrorText("Image is too large — max 2 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const result = await onUploadProof(task.runBlockId, { mime: file.type, dataBase64 });
+      if (result.ok) {
+        setLocalProofId(result.proofId);
+        setVersion((v) => v + 1);
+      } else {
+        setErrorText(result.message);
+      }
+    } catch {
+      setErrorText("Could not read that file — please try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="relative flex shrink-0 items-center justify-center">
+      {canUpload && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onFile}
+        />
+      )}
+      {proofId ? (
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          title="View proof"
+          aria-label={`View proof for ${task.blockTitle}`}
+          className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600 hover:bg-blue-100"
+        >
+          📎
+        </button>
+      ) : canUpload ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          title="Upload proof (image, max 2 MB)"
+          aria-label={`Upload proof for ${task.blockTitle}`}
+          className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+        >
+          {busy ? "…" : "＋"}
+        </button>
+      ) : (
+        <span className="text-xs text-gray-300">—</span>
+      )}
+      {errorText && <InlineActionError text={errorText} />}
+      {viewerOpen && imageSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setViewerOpen(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-gray-900">Proof</h4>
+                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewerOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <a href={imageSrc} target="_blank" rel="noopener noreferrer" title="Open full size">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageSrc}
+                alt={`Proof for ${task.blockTitle}`}
+                className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+              />
+            </a>
+            {canUpload && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => inputRef.current?.click()}
+                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+              >
+                {busy ? "Uploading…" : "Replace image"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function TaskRowLine({
   task,
   myUserId,
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   nameWidth,
   onResizeStart,
   hideCompleted,
@@ -544,6 +701,9 @@ export function TaskRowLine({
   /** "Pending" in the status dropdown, on an already-Completed/N-A task
    *  (reopen). Omit to disable reopening (option stays but is disabled). */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** The Proof column's upload action — see ProofCell. Omit to make every
+   *  proof cell view-only (📎 still shows where proof exists). */
+  onUploadProof?: ProofUploadHandler;
   nameWidth?: number;
   onResizeStart?: (e: React.PointerEvent) => void;
   /** "My Tasks" personal-list mode — see doc comment above. */
@@ -622,8 +782,16 @@ export function TaskRowLine({
           </div>
         )}
       </div>
+      {/* "Proof" column (2026-07-30) — personal My Tasks lists only
+          (hideCompleted mode); sits between the Task column and Assigned
+          by. Width mirrors the header's w-10 spacer. */}
+      {hideCompleted && (
+        <span className="flex w-10 shrink-0 justify-center">
+          <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} />
+        </span>
+      )}
       {/* "Assigned by" column (2026-07-30) — personal My Tasks lists only
-          (hideCompleted mode); sits between the Task column and the fixed
+          (hideCompleted mode); sits between the Proof column and the fixed
           Due Date column. */}
       {hideCompleted && (
         <span className="min-w-0 flex-1 truncate text-xs text-gray-500">
@@ -808,6 +976,7 @@ export function ResizableTaskList({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   emptyLabel,
   hideCompleted,
 }: {
@@ -818,6 +987,8 @@ export function ResizableTaskList({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Pending" in the status dropdown (reopen) — see TaskRowLine. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** The Proof column's upload action — see ProofCell. */
+  onUploadProof?: ProofUploadHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
 }) {
@@ -989,6 +1160,7 @@ export function ResizableTaskList({
           <span className="shrink-0" style={{ width: nameWidth }}>
             Task
           </span>
+          <span className="w-10 shrink-0 text-center">Proof</span>
           <span className="min-w-0 flex-1">Assigned by</span>
           <span className="shrink-0">Due date</span>
         </div>
@@ -1002,6 +1174,7 @@ export function ResizableTaskList({
             onComplete={onComplete}
             onSkip={onSkip}
             onReopen={onReopen}
+            onUploadProof={onUploadProof}
             nameWidth={nameWidth}
             onResizeStart={onResizeStart}
             hideCompleted={hideCompleted}
@@ -1031,6 +1204,7 @@ export function StatusOverviewCard({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   reassign,
 }: {
   title: string;
@@ -1058,6 +1232,9 @@ export function StatusOverviewCard({
   /** "Pending" (reopen) handler, passed straight to EntityDrillModal — see
    *  TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** Proof upload handler, passed straight to EntityDrillModal — see
+   *  ProofCell. */
+  onUploadProof?: ProofUploadHandler;
   /** "Assign to Others" control, passed straight to EntityDrillModal. */
   reassign?: ReassignControl;
 }) {
@@ -1092,6 +1269,7 @@ export function StatusOverviewCard({
           onComplete={onComplete}
           onSkip={onSkip}
           onReopen={onReopen}
+          onUploadProof={onUploadProof}
           reassign={reassign}
         />
       )}
@@ -1187,6 +1365,7 @@ export function EntityDrillModal({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   reassign,
 }: {
   name: string;
@@ -1202,6 +1381,10 @@ export function EntityDrillModal({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark Pending" (reopen) handler — see TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** Proof upload — the viewer's OWN rows get the ＋/📎 cell (see
+   *  ProofCell); omitted on read-only oversight cards, where existing
+   *  proof still shows its 📎. */
+  onUploadProof?: ProofUploadHandler;
   /** "Assign to Others" (2026-07-25): when provided, every PENDING row gets
    *  a reassign control opening an inline person picker. Only passed for
    *  the 5 assign-capable identities; the server action re-checks. */
@@ -1387,6 +1570,13 @@ export function EntityDrillModal({
                         </p>
                       )}
                     </div>
+                    {/* Proof (2026-07-30): ＋ upload on the viewer's own
+                        rows, 📎 view for anyone once uploaded. Only takes
+                        space when actionable/present — the modal is too
+                        narrow for a dash placeholder column. */}
+                    {(t.proofId || (isOwned && onUploadProof)) && (
+                      <ProofCell task={t} isOwned={isOwned} onUploadProof={onUploadProof} />
+                    )}
                     {dueDisplay && (
                       <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
                     )}

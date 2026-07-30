@@ -502,6 +502,10 @@ export interface TaskRow {
    *  (getMePayload), which drive the "Assigned by" column (2026-07-30). */
   assignerId: string;
   assignerName?: string | null;
+  /** Assignee-uploaded completion evidence (2026-07-30, the "Proof"
+   *  column) — null until uploaded. The image itself is served by
+   *  /api/task-manager/proof-image/[id]. */
+  proofId: string | null;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
    *  isn't already closed and has exactly one required item, a CHECKBOX.
    *  Anything else (multiple required items, or a non-checkbox required
@@ -534,6 +538,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
       ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }
       : null,
     assignerId: b.run.startedById,
+    proofId: b.proof?.id ?? null,
     quickCompletable: isQuickCompletable(b),
   };
 }
@@ -566,6 +571,8 @@ export interface PeriodBlock {
   /** Assigner-attached SOP reference (2026-07-30) — url/mime only, the
    *  image BYTES are never selected here (served by their own route). */
   guideline: { id: string; url: string | null; imageMime: string | null } | null;
+  /** Assignee-uploaded proof — id only, bytes served by their own route. */
+  proof: { id: string } | null;
   /** Minimal shape — just enough to compute quick-complete eligibility,
    *  not the full item (label/config/value aren't needed here). */
   runItems: { required: boolean; type: ItemType }[];
@@ -647,6 +654,7 @@ export async function fetchPeriodBlocks(
       scheduleSlotId: true,
       cadence: true,
       guideline: { select: { id: true, url: true, imageMime: true } },
+      proof: { select: { id: true } },
       runItems: { select: { required: true, type: true } },
       run: {
         select: {

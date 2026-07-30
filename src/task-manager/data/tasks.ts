@@ -403,3 +403,42 @@ export function reopenFlowTask(
     };
   }, "reopenFlowTask");
 }
+
+/** The My Tasks "Proof" column (2026-07-30): assignee-only upload of ONE
+ *  completion-evidence image per task. Always optional — never gates the
+ *  status-dot completion path above. Re-uploading replaces the previous
+ *  image (upsert on runBlockId). Same mime/size rules as the Guideline
+ *  image, so the two share their constants. */
+const proofImageSchema = z.object({
+  mime: z.enum(GUIDELINE_IMAGE_MIMES),
+  dataBase64: z.string().min(1).max(GUIDELINE_IMAGE_MAX_BASE64),
+});
+
+export function uploadFlowTaskProof(
+  actorEmail: string,
+  runBlockId: string,
+  image: { mime: string; dataBase64: string },
+): Promise<{ proofId: string }> {
+  return native(async () => {
+    const id = z.string().min(1).parse(runBlockId);
+    const img = proofImageSchema.parse(image);
+    const user = await requireUserByEmail(actorEmail);
+
+    const runBlock = await prisma.runBlock.findUnique({
+      where: { id },
+      select: { assigneeId: true },
+    });
+    if (!runBlock) throw new ApiHttpError(404, "Task not found");
+    if (runBlock.assigneeId !== user.id) {
+      throw new ApiHttpError(403, "You can only upload proof for your own tasks");
+    }
+
+    const imageData = Buffer.from(img.dataBase64, "base64");
+    const proof = await prisma.proof.upsert({
+      where: { runBlockId: id },
+      create: { runBlockId: id, imageMime: img.mime, imageData },
+      update: { imageMime: img.mime, imageData },
+    });
+    return { proofId: proof.id };
+  }, "uploadFlowTaskProof");
+}

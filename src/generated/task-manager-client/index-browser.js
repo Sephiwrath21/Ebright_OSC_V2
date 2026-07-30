@@ -257,6 +257,14 @@ exports.Prisma.GuidelineScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.ProofScalarFieldEnum = {
+  id: 'id',
+  runBlockId: 'runBlockId',
+  imageMime: 'imageMime',
+  imageData: 'imageData',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.RunItemScalarFieldEnum = {
   id: 'id',
   runBlockId: 'runBlockId',
@@ -442,6 +450,7 @@ exports.Prisma.ModelName = {
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
+  Proof: 'Proof',
   RunItem: 'RunItem',
   NotificationLog: 'NotificationLog',
   AuditLog: 'AuditLog',

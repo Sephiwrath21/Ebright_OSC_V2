@@ -64,6 +64,9 @@ export async function HomeScopedOverviewSection({
     complete: (runBlockId: string) => Promise<ActionResult>;
     skip: (runBlockId: string) => Promise<ActionResult>;
     reopen: (runBlockId: string) => Promise<ActionResult>;
+    /** The Proof column's upload (2026-07-30) — same personal-only wiring
+     *  as the status actions. */
+    uploadProof?: import("@/task-manager/ui/types").ProofUploadHandler;
   };
 }) {
   try {
@@ -145,6 +148,7 @@ export async function HomeScopedOverviewSection({
       onComplete: actions.complete,
       onSkip: actions.skip,
       onReopen: actions.reopen,
+      onUploadProof: actions.uploadProof,
     };
 
     // Assigner-stream card ("HOD assigned tasks" for staff, "CEO assigned
