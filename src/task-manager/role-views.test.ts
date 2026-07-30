@@ -153,4 +153,19 @@ describe("cross-page consistency invariants", () => {
       }
     }
   });
+
+  // The My Tasks Daily table (Task | Proof | Assignee | Due Date,
+  // 2026-07-30 column spec) renders from ONE component
+  // (ResizableTaskList via task-manager-view's single myTasksDaily gate) —
+  // this pins exactly which roles get it, so adding a personal-staff role
+  // without the Daily table (or giving it to a site login by accident) is
+  // a conscious, test-breaking decision.
+  it("every personal-staff role gets the My Tasks Daily table; org/site logins don't", () => {
+    const withDailyTable = (Object.keys(ROLE_VIEWS) as ViewRole[])
+      .filter((v) => shows(v, "taskManager", "myTasksDaily"))
+      .sort();
+    expect(withDailyTable).toEqual(
+      ["BRANCH_MANAGER", "BRANCH_MEMBER", "COACH", "DEPT_MEMBER", "HOD", "OPS"].sort(),
+    );
+  });
 });
