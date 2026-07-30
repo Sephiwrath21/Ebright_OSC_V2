@@ -1047,12 +1047,12 @@ export function TaskRowLine({
             onClick={tree.onToggle}
             title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
             aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
-            className="flex w-4 shrink-0 items-center justify-center text-[10px] text-gray-400 hover:text-gray-600"
+            className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-sm leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700"
           >
             {tree.expanded ? "▾" : "▸"}
           </button>
         ) : (
-          <span className="w-4 shrink-0" aria-hidden />
+          <span className="w-5 shrink-0" aria-hidden />
         ))}
       {isChild && <span className="w-5 shrink-0" aria-hidden />}
       {hideCompleted ? (
@@ -1472,6 +1472,23 @@ export function ResizableTaskList({
       setConfirmTarget({ parent, unresolved });
       return { ok: true };
     };
+  /** CHECKING a parent's checkbox (2026-07-31 fix — "fires consistently"):
+   *  same guard as the status dropdown. While unresolved subtasks exist,
+   *  the check opens the confirmation modal instead of selecting — closing
+   *  it leaves the box unchecked (the original spec's dismiss rule).
+   *  UNchecking, warning-off, and no-unresolved-subtasks all behave as a
+   *  plain selection toggle. */
+  const guardedToggleSelect = (parent: FlowTaskRow, kids: FlowTaskRow[]) => (id: string) => {
+    const unresolved = kids.filter(isUnresolved);
+    const checking = !selectedIds.has(id);
+    if (checking && unresolved.length > 0 && warnEnabled && onComplete) {
+      setConfirmError(null);
+      setConfirmSubsOpen(false);
+      setConfirmTarget({ parent, unresolved });
+      return;
+    }
+    toggleSelect(id);
+  };
   const closeConfirm = () => {
     setConfirmTarget(null);
     setConfirmError(null);
@@ -1643,7 +1660,7 @@ export function ResizableTaskList({
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
-          {hasTree && <span className="w-4 shrink-0" aria-hidden />}
+          {hasTree && <span className="w-5 shrink-0" aria-hidden />}
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
@@ -1686,7 +1703,13 @@ export function ResizableTaskList({
                 onComplete={kids.length > 0 && onComplete ? guardedComplete(t, kids) : onComplete}
                 onResizeStart={onResizeStart}
                 selected={selectedIds.has(t.runBlockId)}
-                onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                onToggleSelect={
+                  hideCompleted
+                    ? kids.length > 0
+                      ? guardedToggleSelect(t, kids)
+                      : toggleSelect
+                    : undefined
+                }
                 tree={
                   hasTree
                     ? kids.length > 0
