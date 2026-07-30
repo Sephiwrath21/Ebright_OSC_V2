@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
+import { STAFF_ROLE_ID } from "@/lib/employeeQueries";
+import { positionGroup } from "@/lib/employeeStages";
 
 export interface ActionResult {
   ok: boolean;
@@ -24,7 +26,6 @@ async function requireSession(): Promise<ActionResult | null> {
 async function requireEmployeeInScope(userId: number): Promise<ActionResult | null> {
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
-  if (scope.fullAccess) return null;
 
   const target = await prisma.users.findUnique({
     where: { user_id: userId },
@@ -37,7 +38,17 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
       },
     },
   });
-  const emp = target?.employment[0];
+  // Guards every write action against a userId with no real portal account —
+  // e.g. an onboarding_candidate profile (see getOnboardingCandidateDetail),
+  // which uses a negative sentinel id precisely because it isn't a real
+  // users row. Without this, a save attempt would reach the underlying
+  // table's own FK constraint on user_id and throw instead of failing
+  // cleanly. Checked before the fullAccess shortcut so it applies to every
+  // account, not just scoped ones.
+  if (!target) return { ok: false, error: "This employee doesn't have a portal account yet — nothing to save." };
+  if (scope.fullAccess) return null;
+
+  const emp = target.employment[0];
   const inScope = isRowInScope(scope, {
     departmentCode: emp?.department?.department_code ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
@@ -611,6 +622,26 @@ export async function addPromotion(userId: number, input: AddPromotionInput): Pr
         attachment_file_id: attachmentFileId,
       },
     });
+
+    // A promotion's new position becomes the employee's actual current
+    // position — positionGroup() (employeeStages.ts) classifies Full Time/
+    // Part Time/Intern purely from employment.position, so updating this one
+    // field is what makes every stage/grouping view (Onboarding/Active
+    // namelist grouping, Exit's position filter, etc.) reflect the new
+    // employment type automatically. Deliberately doesn't touch anything
+    // else (payroll, benefits, leave entitlement aren't derived from this
+    // field, so nothing else needs to change).
+    if (input.newPosition) {
+      const current = await prisma.employment.findFirst({
+        where: { user_id: userId },
+        orderBy: { start_date: "desc" },
+        select: { employment_id: true },
+      });
+      if (current) {
+        await prisma.employment.update({ where: { employment_id: current.employment_id }, data: { position: input.newPosition } });
+      }
+    }
+
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Promotion." };
@@ -648,6 +679,35 @@ export async function addTransfer(userId: number, input: AddTransferInput): Prom
         attachment_file_id: attachmentFileId,
       },
     });
+
+    // A transfer's "To" becomes the employee's actual current Branch/
+    // Department — every other view that shows branch/department grouping
+    // (Employee Overview, stage namelists, Exit's branch/department filter,
+    // etc.) reads employment.branch_id/department_id directly, so updating
+    // this one field is what makes them all reflect the transfer
+    // automatically. "To" is looked up by name against both tables (whichever
+    // matches); the other FK is cleared, mirroring the department-priority
+    // rule (an employee belongs to either a branch or a department, not both).
+    if (input.toLocation) {
+      const [branch, department] = await Promise.all([
+        prisma.branch.findFirst({ where: { branch_name: input.toLocation } }),
+        prisma.department.findFirst({ where: { department_name: input.toLocation } }),
+      ]);
+      if (branch || department) {
+        const current = await prisma.employment.findFirst({
+          where: { user_id: userId },
+          orderBy: { start_date: "desc" },
+          select: { employment_id: true },
+        });
+        if (current) {
+          await prisma.employment.update({
+            where: { employment_id: current.employment_id },
+            data: { branch_id: branch?.branch_id ?? null, department_id: department?.department_id ?? null },
+          });
+        }
+      }
+    }
+
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Transfer." };
@@ -773,6 +833,7 @@ export interface UpdateResignationInput {
   resignLetterFile: File | null;
   acceptLetterFileId: string | null;
   acceptLetterFile: File | null;
+  exitType: string;
 }
 
 export async function updateResignation(userId: number, input: UpdateResignationInput): Promise<ActionResult> {
@@ -807,6 +868,7 @@ export async function updateResignation(userId: number, input: UpdateResignation
       reason: input.reason || null,
       resign_letter_file_id: resignLetterFileId,
       accept_letter_file_id: acceptLetterFileId,
+      exit_type: input.exitType || null,
     };
     await prisma.resignation.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });
     return { ok: true };
@@ -1361,5 +1423,237 @@ export async function updatePayslip(userId: number, input: UpdatePayslipInput): 
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Payslip." };
+  }
+}
+
+// ─── Add Pre-stage Employee — creates a real employee (users + user_profile +
+// employment, all tied by the same user_id) rather than the old candidate-row
+// behavior. Once created, this person is indistinguishable from any other
+// real employee: listEmployeeOverviewRows() already classifies anyone with
+// role_id 6/7/8 and a future employment.start_date as Pre stage (checked
+// before status), so no read-side change was needed — they show up as a
+// clickable row linking to the same profile template immediately. ───
+
+export interface AddPreStageEmployeeInput {
+  fullName: string;
+  position: string;
+  /** Exactly one of branchCode/departmentCode should be set — mutually
+   *  exclusive on the form, same as every other branch/dept field pair. */
+  branchCode: string;
+  departmentCode: string;
+  /** Becomes employment.start_date — must be a future date for this person
+   *  to actually land in Pre stage (the whole point of this form). */
+  startDate: string;
+}
+
+export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Promise<ActionResult & { id?: number }> {
+  const authError = await requireSession();
+  if (authError) return authError;
+
+  const fullName = input.fullName.trim();
+  if (!fullName) return { ok: false, error: "Full Name is required." };
+  if (!input.position) return { ok: false, error: "Position is required." };
+  if (input.branchCode && input.departmentCode) return { ok: false, error: "Choose either Branch or Department, not both." };
+  if (!input.branchCode && !input.departmentCode) return { ok: false, error: "Select a Branch or Department." };
+  if (!input.startDate) return { ok: false, error: "Date is required." };
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (input.startDate <= todayIso) {
+    return { ok: false, error: "Date must be in the future — otherwise this employee won't show up in Pre stage." };
+  }
+
+  // A department/branch-scoped account can only add into their own
+  // department/branch — same rule enforced for every other write here,
+  // just checked against the form's own selection instead of an existing row.
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) return { ok: false, error: "Not signed in." };
+  if (!scope.fullAccess) {
+    const inScope = isRowInScope(scope, {
+      departmentCode: input.departmentCode || null,
+      branchCode: input.branchCode || null,
+    });
+    if (!inScope) return { ok: false, error: "You can only add employees to your own department/branch." };
+  }
+
+  try {
+    const [branch, department] = await Promise.all([
+      input.branchCode ? prisma.branch.findUnique({ where: { branch_code: input.branchCode } }) : null,
+      input.departmentCode ? prisma.department.findUnique({ where: { department_code: input.departmentCode } }) : null,
+    ]);
+    if (input.branchCode && !branch) return { ok: false, error: "Unknown branch." };
+    if (input.departmentCode && !department) return { ok: false, error: "Unknown department." };
+
+    // No login is being set up here (password stays null) — just placeholder
+    // enough to satisfy users.email's UNIQUE NOT NULL constraint. HR replaces
+    // this with the employee's real email once they actually onboard.
+    const placeholderEmail = `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@placeholder.ebright.my`;
+
+    const user = await prisma.users.create({
+      data: {
+        email: placeholderEmail,
+        role_id: STAFF_ROLE_ID,
+        status: "active",
+        user_profile: { create: { full_name: fullName } },
+        employment: {
+          create: {
+            position: input.position,
+            branch_id: branch?.branch_id ?? null,
+            department_id: department?.department_id ?? null,
+            start_date: new Date(`${input.startDate}T00:00:00Z`),
+            status: "active",
+          },
+        },
+      },
+      select: { user_id: true },
+    });
+
+    return { ok: true, id: user.user_id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to add employee." };
+  }
+}
+
+// ─── Pre stage's "Proceed" button — the only stage-transition button that's
+// actually wired to a real employment update (the rest stay the pre-existing
+// "not wired up" placeholder). Full-time positions go to Probation
+// (probation=true); everything else (Part Time/Intern) goes to Onboarding
+// (status="onboarding") — same 2-way split positionGroup() already uses.
+// Also clears employment.start_date forward to today when it's still in the
+// future: Pre-stage membership is checked ahead of status/probation
+// (start_date in the future always wins), so without this the employee would
+// stay stuck in Pre no matter what status/probation gets set to here — this
+// button is an explicit "they're proceeding right now" override, not
+// something that waits for the originally-planned date to actually arrive. ───
+
+export async function proceedFromPreStage(userId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const employment = await prisma.employment.findFirst({
+      where: { user_id: userId },
+      orderBy: { start_date: "desc" },
+    });
+    if (!employment) return { ok: false, error: "No employment record found for this employee." };
+
+    const isFullTime = positionGroup(employment.position) === "Full Time";
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const startIso = employment.start_date ? employment.start_date.toISOString().slice(0, 10) : null;
+    const needsStartDateBump = !startIso || startIso > todayIso;
+
+    await prisma.employment.update({
+      where: { employment_id: employment.employment_id },
+      data: {
+        ...(needsStartDateBump ? { start_date: new Date(`${todayIso}T00:00:00Z`) } : {}),
+        status: isFullTime ? "active" : "onboarding",
+        probation: isFullTime,
+      },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
+  }
+}
+
+// ─── Probation stage's "Next" button — real employment update, gated on the
+// probation table's own Probation Status being "Confirmed" (re-checked here
+// server-side too, not just via the UI's disabled button, since a client
+// could otherwise call this action directly). Setting status="onboarding"
+// clears them out of Probation the same way it clears a non-full-time
+// employee out of Pre — nonExitStage() checks status==="onboarding" before
+// the probation flag, so probation is also reset to false here for data
+// cleanliness now that it no longer applies. ───
+
+export async function proceedFromProbation(userId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const probation = await prisma.probation.findUnique({ where: { user_id: userId } });
+    if (probation?.probation_status !== "Confirmed") {
+      return { ok: false, error: "Probation Status must be Confirmed before proceeding." };
+    }
+
+    const employment = await prisma.employment.findFirst({
+      where: { user_id: userId },
+      orderBy: { start_date: "desc" },
+    });
+    if (!employment) return { ok: false, error: "No employment record found for this employee." };
+
+    await prisma.employment.update({
+      where: { employment_id: employment.employment_id },
+      data: { status: "onboarding", probation: false },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
+  }
+}
+
+// ─── Onboarding stage's "Next" button — real employment update, no
+// prerequisite gate (unlike Probation's Confirmed-status requirement, nothing
+// was specified for Onboarding->Active, so the button stays always-enabled).
+// nonExitStage() checks status==="onboarding" before the probation flag, so
+// once status flips to "active" this employee is Active regardless of
+// probation — cleared here too for data cleanliness now that it no longer
+// applies, same as Probation's own transition. ───
+
+export async function proceedFromOnboarding(userId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const employment = await prisma.employment.findFirst({
+      where: { user_id: userId },
+      orderBy: { start_date: "desc" },
+    });
+    if (!employment) return { ok: false, error: "No employment record found for this employee." };
+
+    await prisma.employment.update({
+      where: { employment_id: employment.employment_id },
+      data: { status: "active", probation: false },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
+  }
+}
+
+// ─── Active stage's "Exit" button — real employment update, no prerequisite
+// gate (same as Onboarding->Active). Sets status="inactive" with end_date
+// left null rather than setting end_date to today: the Exit-priority rule
+// (see stageFromEmployment) only treats a set end_date as Exit once it's
+// strictly BEFORE today, so an end_date of today would actually suppress the
+// inactive shortcut and leave them classified as Active until tomorrow —
+// null end_date + status="inactive" is the one combination that moves them
+// to Exit immediately, matching "processing their exit right now" rather
+// than waiting on a date boundary. Their Exit list "Last Date" naturally
+// shows today via updated_at, since this write happens today. ───
+
+export async function proceedFromActive(userId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const employment = await prisma.employment.findFirst({
+      where: { user_id: userId },
+      orderBy: { start_date: "desc" },
+    });
+    if (!employment) return { ok: false, error: "No employment record found for this employee." };
+
+    await prisma.employment.update({
+      where: { employment_id: employment.employment_id },
+      data: { status: "inactive", end_date: null, probation: false },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
   }
 }

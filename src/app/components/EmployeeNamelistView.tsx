@@ -14,7 +14,7 @@ import {
   type EmployeeStage,
   type PositionGroup,
 } from "@/lib/employeeStages";
-import type { EmployeeOverviewRow, RealExitType } from "@/lib/employeeQueries";
+import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 
 const CARD_CAP = 6;
 
@@ -25,31 +25,18 @@ const MONTHS = [
   { value: "10", label: "October" }, { value: "11", label: "November" }, { value: "12", label: "December" },
 ];
 
-// Only resignation/eoc are ever populated (see listExitTypesByUserId) — the
-// other two are kept here since the reference defines colors for all four.
-const EXIT_TYPE_META: Record<string, { label: string; classes: string }> = {
-  resignation: { label: "Resignation", classes: "bg-[#90aeee7d] text-[#390ff2]" },
-  eoc: { label: "End of Contract", classes: "bg-[#67eab37d] text-[#307348]" },
-  "internship-completed": { label: "Internship Completed", classes: "bg-[#d8a1fa7d] text-[#621096]" },
-  termination: { label: "Termination/Dismissal", classes: "bg-[#f38e8e6b] text-[#961010]" },
-};
-
 interface Props {
   stage: EmployeeStage;
   groupBy: "branch" | "department";
   locationCode: string;
   locationName: string;
   rows: EmployeeOverviewRow[];
-  /** Real offboarding_case-derived exit type — only ever passed for stage="exit". */
-  exitTypeByUserId?: Record<number, RealExitType>;
 }
 
-export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows, exitTypeByUserId }: Props) {
-  const isExit = stage === "exit";
+export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows }: Props) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
-  const [exitTypeFilter, setExitTypeFilter] = useState("");
   const [openGroup, setOpenGroup] = useState<PositionGroup | null>(null);
 
   // Fixed link-back context for the profile breadcrumb — the URL's own
@@ -69,11 +56,10 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
     const q = search.trim().toLowerCase();
     if (q && !row.fullName.toLowerCase().includes(q) && !(row.position ?? "").toLowerCase().includes(q)) return false;
     if (typeFilter && positionGroup(row.position) !== typeFilter) return false;
-    if (isExit && exitTypeFilter && exitTypeByUserId?.[row.id] !== exitTypeFilter) return false;
     return true;
   };
 
-  const filteredRows = useMemo(() => rows.filter(matchesFilters), [rows, search, typeFilter, exitTypeFilter]);
+  const filteredRows = useMemo(() => rows.filter(matchesFilters), [rows, search, typeFilter]);
 
   const grouped = useMemo(() => {
     const out: Record<PositionGroup, EmployeeOverviewRow[]> = {
@@ -105,7 +91,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           <span className="text-slate-900 font-medium">{locationName}</span>
         </nav>
 
-        {/* search-bar: search input + type filter (+ exit type filter) + search button */}
+        {/* search-bar: search input + type filter + search button */}
         <div className="flex flex-wrap items-center gap-4 bg-white rounded-[20px] p-5 mb-3">
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
@@ -127,18 +113,6 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
               <option key={g} value={g}>{groupLabel(g)}</option>
             ))}
           </select>
-          {isExit && (
-            <select
-              value={exitTypeFilter}
-              onChange={(e) => setExitTypeFilter(e.target.value)}
-              className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px]"
-            >
-              <option value="">All exit types</option>
-              {Object.entries(EXIT_TYPE_META).map(([key, meta]) => (
-                <option key={key} value={key}>{meta.label}</option>
-              ))}
-            </select>
-          )}
           <button
             type="button"
             className="h-10 px-6 rounded-lg bg-[#8ac4f3bd] text-sm font-bold text-[#004386c9] hover:bg-[#8ac4f3]"
@@ -189,20 +163,13 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
                   rows={grouped[group]}
                   stage={stage}
                   profileQuery={profileQuery}
-                  exitTypeByUserId={exitTypeByUserId}
                   onShowMore={() => setOpenGroup(group)}
                 />
               ))
             )}
           </div>
         ) : (
-          <ListViewTable
-            stage={stage}
-            rows={filteredRows}
-            profileQuery={profileQuery}
-            thirdGroupLabel={thirdGroupLabel}
-            exitTypeByUserId={exitTypeByUserId}
-          />
+          <ListViewTable stage={stage} rows={filteredRows} profileQuery={profileQuery} thirdGroupLabel={thirdGroupLabel} />
         )}
       </div>
 
@@ -212,7 +179,6 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           rows={grouped[openGroup]}
           stage={stage}
           profileQuery={profileQuery}
-          exitTypeByUserId={exitTypeByUserId}
           onClose={() => setOpenGroup(null)}
         />
       )}
@@ -224,12 +190,10 @@ function PersonCard({
   row,
   stage,
   profileQuery,
-  exitType,
 }: {
   row: EmployeeOverviewRow;
   stage: EmployeeStage;
   profileQuery: string;
-  exitType?: RealExitType;
 }) {
   return (
     <Link
@@ -246,11 +210,6 @@ function PersonCard({
       </div>
       <div className="text-base font-medium text-black/67 w-full truncate">{row.fullName}</div>
       <div className="text-sm font-medium text-black/67 w-full truncate">{row.position ?? "—"}</div>
-      {exitType && (
-        <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium mt-0.5 ${EXIT_TYPE_META[exitType].classes}`}>
-          {EXIT_TYPE_META[exitType].label}
-        </span>
-      )}
     </Link>
   );
 }
@@ -260,14 +219,12 @@ function CategorySection({
   rows,
   stage,
   profileQuery,
-  exitTypeByUserId,
   onShowMore,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
   onShowMore: () => void;
 }) {
   const shown = rows.slice(0, CARD_CAP);
@@ -278,7 +235,7 @@ function CategorySection({
         <div className="flex flex-col items-end w-full max-w-[1000px]">
           <div className="flex flex-wrap gap-4 self-stretch">
             {shown.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} exitType={exitTypeByUserId?.[row.id]} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
             ))}
           </div>
           {rows.length > CARD_CAP && (
@@ -301,14 +258,12 @@ function ShowMoreModal({
   rows,
   stage,
   profileQuery,
-  exitTypeByUserId,
   onClose,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -394,7 +349,7 @@ function ShowMoreModal({
             <p className="col-span-full text-center text-sm text-slate-500 py-8">No matches.</p>
           ) : (
             visible.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} exitType={exitTypeByUserId?.[row.id]} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
             ))
           )}
         </div>
@@ -422,20 +377,15 @@ function ListViewTable({
   rows,
   profileQuery,
   thirdGroupLabel,
-  exitTypeByUserId,
 }: {
   stage: EmployeeStage;
   rows: EmployeeOverviewRow[];
   profileQuery: string;
   thirdGroupLabel: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const isExit = stage === "exit";
-  const gridColsClass = isExit
-    ? "grid-cols-[minmax(180px,2fr)_minmax(120px,1fr)_minmax(140px,1fr)_minmax(150px,1fr)_60px]"
-    : "grid-cols-[minmax(200px,2fr)_minmax(140px,1fr)_minmax(160px,1fr)_60px]";
+  const gridColsClass = "grid-cols-[minmax(200px,2fr)_minmax(140px,1fr)_minmax(160px,1fr)_60px]";
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const visible = rows.slice((page - 1) * pageSize, page * pageSize);
@@ -447,7 +397,6 @@ function ListViewTable({
           <span>Name</span>
           <span>Employment Type</span>
           <span>Position</span>
-          {isExit && <span>Exit Type</span>}
           <span />
         </div>
 
@@ -455,7 +404,6 @@ function ListViewTable({
           <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
         ) : (
           visible.map((row) => {
-            const exitType = exitTypeByUserId?.[row.id];
             return (
               <div
                 key={row.id}
@@ -483,17 +431,6 @@ function ListViewTable({
                   })()}
                 </span>
                 <span className="text-[15px] text-black/67 truncate">{row.position ?? "—"}</span>
-                {isExit && (
-                  <span>
-                    {exitType ? (
-                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${EXIT_TYPE_META[exitType].classes}`}>
-                        {EXIT_TYPE_META[exitType].label}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </span>
-                )}
                 <div className="flex justify-center">
                   <RowActionMenu name={row.fullName} />
                 </div>

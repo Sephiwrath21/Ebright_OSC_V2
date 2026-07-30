@@ -2,12 +2,14 @@ import { auth } from "@/auth";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import EmployeeNamelistView from "@/app/components/EmployeeNamelistView";
+import ExitListView from "@/app/components/ExitListView";
 import {
   filterStageByLocation,
   isEmployeeStage,
   listBranches,
   listEmployeeOverviewRows,
-  listExitTypesByUserId,
+  listResignationExitTypesByUserId,
+  listLastWorkingDatesByUserId,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -38,8 +40,13 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
   if (!branch) notFound();
 
   const namelistRows = filterStageByLocation(rows, stage, "branch", code);
-  const exitTypeByUserId =
-    stage === "exit" ? await listExitTypesByUserId(namelistRows.map((r) => r.id)) : undefined;
+  const [exitTypeByUserId, lastWorkingDateByUserId] =
+    stage === "exit"
+      ? await Promise.all([
+          listResignationExitTypesByUserId(namelistRows.map((r) => r.id)),
+          listLastWorkingDatesByUserId(namelistRows.map((r) => r.id)),
+        ])
+      : [undefined, undefined];
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -47,14 +54,23 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <EmployeeNamelistView
-        stage={stage}
-        groupBy="branch"
-        locationCode={code}
-        locationName={branch.name}
-        rows={namelistRows}
-        exitTypeByUserId={exitTypeByUserId}
-      />
+      {stage === "exit" ? (
+        <ExitListView
+          rows={namelistRows}
+          exitTypeByUserId={exitTypeByUserId}
+          lastWorkingDateByUserId={lastWorkingDateByUserId}
+          showLocation={false}
+          locationContext={{ groupBy: "branch", code, name: branch.name }}
+        />
+      ) : (
+        <EmployeeNamelistView
+          stage={stage}
+          groupBy="branch"
+          locationCode={code}
+          locationName={branch.name}
+          rows={namelistRows}
+        />
+      )}
     </AppShell>
   );
 }

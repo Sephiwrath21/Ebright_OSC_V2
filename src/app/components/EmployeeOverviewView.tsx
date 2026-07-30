@@ -7,6 +7,7 @@ import { EMPLOYEE_STAGES, STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage }
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
+import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 
 interface Props {
   rows: EmployeeOverviewRow[];
@@ -23,6 +24,7 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
   const [month, setMonth] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [dateSort, setDateSort] = useState<DateSortState>("default");
 
   const years = useMemo(() => {
     const set = new Set(rows.map((r) => r.date?.slice(0, 4)).filter(Boolean) as string[]);
@@ -31,14 +33,15 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    const result = rows.filter((r) => {
       if (statusFilter && r.stage !== statusFilter) return false;
       if (q && !r.fullName.toLowerCase().includes(q)) return false;
       if (year && r.date?.slice(0, 4) !== year) return false;
       if (month && r.date?.slice(5, 7) !== month) return false;
       return true;
     });
-  }, [rows, statusFilter, search, year, month]);
+    return applyDateSort(result, dateSort, (r) => r.date, Boolean(year) || Boolean(month));
+  }, [rows, statusFilter, search, year, month, dateSort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -182,7 +185,7 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
               <span>Name</span>
               <span>Branch/ Department</span>
-              <span>Date</span>
+              <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
               <span>Status</span>
               <span />
             </div>

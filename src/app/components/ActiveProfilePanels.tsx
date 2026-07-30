@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
+import { POSITION_OPTIONS } from "@/lib/employeeStages";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   updatePersonalInfo,
@@ -40,6 +41,8 @@ import {
 } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
   MedicalCheckInfo,
@@ -799,6 +802,7 @@ export function ProbationPanel({
   userId: number;
   data: ProbationInfo | null;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState(data?.probationStatus ?? "");
   const [startDate, setStartDate] = useState(data?.startDate ?? "");
   const [endDate, setEndDate] = useState(data?.endDate ?? "");
@@ -820,8 +824,8 @@ export function ProbationPanel({
 
   return (
     <EditableSection
-      onSave={() =>
-        updateProbationInfo(userId, {
+      onSave={async () => {
+        const result = await updateProbationInfo(userId, {
           probationStatus: status,
           startDate,
           endDate,
@@ -831,8 +835,16 @@ export function ProbationPanel({
           confirmationLetterFile: confirmationLetterPending,
           extensionLetterFileId,
           extensionLetterFile: extensionLetterPending,
-        })
-      }
+        });
+        // StageProfileView's own "Next" button gates on this same Probation
+        // Status (probationInfo prop, from the server) — without a refresh
+        // here, that prop stays stale after a save (it's a server-fetched
+        // prop, not something this panel's own local state feeds), so the
+        // button would keep reading the pre-save value even though this
+        // panel already shows the freshly-saved one.
+        if (!result || result.ok !== false) router.refresh();
+        return result;
+      }}
     >
       <PanelHeading>Probation</PanelHeading>
       <FieldGrid>
@@ -1163,8 +1175,18 @@ function RecordTable({
 export interface RecordField {
   key: string;
   label: string;
-  type: "text" | "date" | "textarea" | "file";
+  type: "text" | "date" | "textarea" | "file" | "select";
   full?: boolean;
+  /** Flat option list — required when type is "select" unless optionGroups is set. */
+  options?: { value: string; label: string }[];
+  /** Grouped option list (rendered as <optgroup>s) — takes priority over
+   *  `options` when both are set (e.g. Transfer's From/To: Branch group +
+   *  Department group, instead of one flattened list). */
+  optionGroups?: { label: string; options: { value: string; label: string }[] }[];
+  /** Pre-fills the field on modal open (e.g. Promotion's "Current Position"
+   *  auto-populated from the employee's position on record) — only applies
+   *  once, when the modal's own local values state is first initialized. */
+  defaultValue?: string;
 }
 
 const recordModalInputClass =
@@ -1185,7 +1207,9 @@ function RecordAddModal({
   onClose: () => void;
   onSave: (values: Record<string, string>, files: Record<string, File>) => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.filter((f) => f.defaultValue).map((f) => [f.key, f.defaultValue as string])),
+  );
   const [files, setFiles] = useState<Record<string, File>>({});
 
   function setField(key: string, value: string) {
@@ -1230,6 +1254,25 @@ function RecordAddModal({
                 />
               ) : f.type === "file" ? (
                 <FilePickerControl file={files[f.key] ?? null} onChange={(file) => setFileField(f.key, file)} editing />
+              ) : f.type === "select" ? (
+                <select value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} className={recordModalInputClass}>
+                  <option value=""></option>
+                  {f.optionGroups
+                    ? f.optionGroups.map((g) => (
+                        <optgroup key={g.label} label={g.label}>
+                          {g.options.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    : f.options?.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                </select>
               ) : (
                 <input
                   type={f.type}
@@ -1628,7 +1671,17 @@ export function SalaryRevisionPanel({ userId, data }: { userId: number; data: Sa
   );
 }
 
-export function PromotionPanel({ userId, data }: { userId: number; data: PromotionEntry[] }) {
+export function PromotionPanel({
+  userId,
+  data,
+  currentPosition,
+}: {
+  userId: number;
+  data: PromotionEntry[];
+  /** Employee's actual current position (employment.position) — pre-fills
+   *  "Current Position" so it doesn't need manual re-entry every time. */
+  currentPosition?: string | null;
+}) {
   return (
     <EditableSection>
       <RepeatableRecordSection
@@ -1637,8 +1690,14 @@ export function PromotionPanel({ userId, data }: { userId: number; data: Promoti
         fields={[
           { key: "promotionDate", label: "Promotion Date", type: "date" },
           { key: "effectiveDate", label: "Effective Date", type: "date" },
-          { key: "currentPosition", label: "Current Position", type: "text" },
-          { key: "newPosition", label: "New Position", type: "text" },
+          {
+            key: "currentPosition",
+            label: "Current Position",
+            type: "select",
+            options: POSITION_OPTIONS,
+            defaultValue: currentPosition ?? undefined,
+          },
+          { key: "newPosition", label: "New Position", type: "select", options: POSITION_OPTIONS },
           { key: "reason", label: "Reason", type: "textarea", full: true },
           { key: "approvedBy", label: "Approved By", type: "text", full: true },
           { key: "attachment", label: "Attachment", type: "file", full: true },
@@ -1675,7 +1734,32 @@ export function PromotionPanel({ userId, data }: { userId: number; data: Promoti
   );
 }
 
-export function TransferPanel({ userId, data }: { userId: number; data: TransferEntry[] }) {
+export function TransferPanel({
+  userId,
+  data,
+  branches,
+  departments,
+  currentLocation,
+}: {
+  userId: number;
+  data: TransferEntry[];
+  /** Combined Branch + Department option list — CEO is excluded from
+   *  Department per HR (an admin/management bucket, not a place staff
+   *  transfer to/from), same exclusion Exit's own Branch/Department filter
+   *  already applies. */
+  branches: BranchOpt[];
+  departments: DepartmentOpt[];
+  /** Employee's current Branch/Department (department-priority display) —
+   *  pre-fills "From" so it doesn't need manual re-entry every time. */
+  currentLocation?: string | null;
+}) {
+  const locationOptionGroups = [
+    { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) },
+    {
+      label: "Department",
+      options: departments.filter((d) => d.name.toUpperCase() !== "CEO").map((d) => ({ value: d.name, label: d.name })),
+    },
+  ];
   return (
     <EditableSection>
       <RepeatableRecordSection
@@ -1684,8 +1768,14 @@ export function TransferPanel({ userId, data }: { userId: number; data: Transfer
         fields={[
           { key: "type", label: "Type", type: "text" },
           { key: "effectiveDate", label: "Effective Date", type: "date" },
-          { key: "fromLocation", label: "From", type: "text" },
-          { key: "toLocation", label: "To", type: "text" },
+          {
+            key: "fromLocation",
+            label: "From",
+            type: "select",
+            optionGroups: locationOptionGroups,
+            defaultValue: currentLocation ?? undefined,
+          },
+          { key: "toLocation", label: "To", type: "select", optionGroups: locationOptionGroups },
           { key: "reason", label: "Reason", type: "textarea", full: true },
           { key: "attachment", label: "Attachment", type: "file", full: true },
         ]}
@@ -2098,6 +2188,13 @@ export function PipPanel({ userId, data }: { userId: number; data: PipEntry[] })
 // folder as probation's confirmation/extension letters and (per this task)
 // suspension/showcause letters. ───
 
+const EXIT_TYPE_OPTIONS = [
+  { value: "Resignation", label: "Resignation" },
+  { value: "End of Contract", label: "End of Contract" },
+  { value: "Internship Completed", label: "Internship Completed" },
+  { value: "Termination/Dismissal", label: "Termination/Dismissal" },
+];
+
 export function ResignationPanel({ userId, data }: { userId: number; data: ResignationInfo | null }) {
   const [submissionDate, setSubmissionDate] = useState(data?.submissionDate ?? "");
   const [lastWorkingDate, setLastWorkingDate] = useState(data?.lastWorkingDate ?? "");
@@ -2106,6 +2203,7 @@ export function ResignationPanel({ userId, data }: { userId: number; data: Resig
   const [pendingResignLetter, setPendingResignLetter] = useState<File | null>(null);
   const [acceptLetterFileId, setAcceptLetterFileId] = useState(data?.acceptLetterFileId ?? null);
   const [pendingAcceptLetter, setPendingAcceptLetter] = useState<File | null>(null);
+  const [exitType, setExitType] = useState(data?.exitType ?? "");
 
   function clearResignLetter() {
     if (pendingResignLetter) setPendingResignLetter(null);
@@ -2127,11 +2225,13 @@ export function ResignationPanel({ userId, data }: { userId: number; data: Resig
           resignLetterFile: pendingResignLetter,
           acceptLetterFileId,
           acceptLetterFile: pendingAcceptLetter,
+          exitType,
         })
       }
     >
       <PanelHeading>Resignation</PanelHeading>
       <FieldGrid>
+        <EditableSelectField label="Exit Type" value={exitType} onChange={setExitType} options={EXIT_TYPE_OPTIONS} />
         <EditableField label="Submission Date" value={submissionDate} onChange={setSubmissionDate} type="date" />
         <EditableField label="Last Working Date" value={lastWorkingDate} onChange={setLastWorkingDate} type="date" />
         <EditableTextArea label="Reason" value={reason} onChange={setReason} full />

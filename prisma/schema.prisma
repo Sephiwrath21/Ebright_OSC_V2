@@ -351,6 +351,9 @@ model pip {
 // (no "+Add"/history list anywhere for Resignation/Reference Letter/Exit
 // Interview Notes). ───
 
+// exit_type is constrained by a DB-level CHECK constraint
+// (chk_resignation_exit_type, alter_resignation_add_exit_type.sql) not
+// modeled here — same convention as payslip.type/nda.status.
 model resignation {
   resignation_id        Int       @id @default(autoincrement())
   user_id               Int       @unique
@@ -359,6 +362,7 @@ model resignation {
   reason                String?
   resign_letter_file_id String?   @db.VarChar(128)
   accept_letter_file_id String?   @db.VarChar(128)
+  exit_type             String?   @db.VarChar(30)
   users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resignation_user")
 }
 

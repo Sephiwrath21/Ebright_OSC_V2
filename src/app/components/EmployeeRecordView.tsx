@@ -40,6 +40,8 @@ import {
 import { updateBankDetails, updateEmergencyContact, updatePaymentInfo } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   LeaveHistoryRow,
   ResumeInfo,
   ReferenceCheckInfo,
@@ -123,6 +125,9 @@ interface Props {
   performanceReview?: PerformanceReviewInfo | null;
   /** Real payslip data — only fetched for Finance > Payroll/Payslip. */
   payslip?: PayslipInfo | null;
+  /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
 }
 
 export default function EmployeeRecordView({
@@ -156,6 +161,8 @@ export default function EmployeeRecordView({
   paymentInfo,
   performanceReview,
   payslip,
+  branches,
+  departments,
 }: Props) {
   const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
 
@@ -244,9 +251,17 @@ export default function EmployeeRecordView({
               if (category.key === "active-employment" && sectionKey === "performance-review" && performanceReview !== undefined)
                 return <PerformanceReviewPanel userId={employeeId} data={performanceReview} />;
               if (category.key === "active-employment" && sectionKey === "promotion" && promotions !== undefined)
-                return <PromotionPanel userId={employeeId} data={promotions} />;
+                return <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} />;
               if (category.key === "active-employment" && sectionKey === "transfer" && transfers !== undefined)
-                return <TransferPanel userId={employeeId} data={transfers} />;
+                return (
+                  <TransferPanel
+                    userId={employeeId}
+                    data={transfers}
+                    branches={branches ?? []}
+                    departments={departments ?? []}
+                    currentLocation={departmentName ?? branchName}
+                  />
+                );
               if (category.key === "active-employment" && sectionKey === "training" && trainings !== undefined)
                 return <TrainingPanel userId={employeeId} data={trainings} />;
               if (category.key === "disciplinary" && sectionKey === "domestic-inquiry" && domesticInquiries !== undefined)

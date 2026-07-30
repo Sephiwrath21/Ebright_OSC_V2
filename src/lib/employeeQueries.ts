@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { titleCaseName } from "@/lib/text";
 import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage } from "@/lib/employeeStages";
-import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
+import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
 
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
 export type { EmployeeStage };
@@ -14,8 +14,18 @@ export const STATUS_OPTIONS = ["active", "onboarding", "inactive", "archive"] as
 export type StatusOption = (typeof STATUS_OPTIONS)[number];
 
 // role_id values from the `role` table: 1 superadmin, 2 ceo, 3 department,
-// 4 branch, 5 regional manager, 6 staff.
+// 4 branch, 5 regional manager, 6 staff, 7 hod, 8 Branch Manager.
 export const STAFF_ROLE_ID = 6;
+
+// Employee Overview/lifecycle stages should cover every real individual
+// employee, not just plain "staff" — HOD (7) and Branch Manager (8) are also
+// real individual employees with their own position/employment record (e.g.
+// Iqbal Hakim Bin Halim, FT HOD @ Optimisation); the elevated role_id is only
+// for permission scoping, same as "staff" being the baseline. "department"/
+// "branch"/"regional manager"/superadmin/ceo are excluded on purpose — those
+// are shared/administrative scoping-only logins, not individual staff to
+// track through the lifecycle stages.
+const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 7, 8];
 
 export interface EmployeeRow {
   id: number;
@@ -163,14 +173,29 @@ export interface EmployeeOverviewRow {
   employmentType: string | null;
   date: string | null;
   stage: EmployeeStage;
+  /** True only for onboarding_candidate rows (see listUpcomingOnboardingCandidates)
+   *  — a future hire sourced from ebrightleads with no real portal account yet,
+   *  so there's no Employee Record to open. `id` is a negative sentinel
+   *  (-source_id) for these, never a real user_id. */
+  isCandidate?: boolean;
 }
 
-// employment.status only distinguishes active/onboarding/inactive/archive, so
-// "probation" and "exit" are derived from the probation flag and the
-// inactive/archive statuses respectively — there's no separate DB stage for them.
-function stageFromEmployment(status: string | null, probation: boolean): EmployeeStage {
+// Exit priority: end_date wins whenever it's set — "exit" only if it's
+// already passed (calendar-date comparison, not timestamp); a set end_date
+// that's today/in the future is NOT exit regardless of status. status is
+// only consulted as a fallback when end_date is null at all, and only
+// "inactive" qualifies (not "archive" — not named in the spec, so an
+// archive-status employee with no end_date falls through to active/
+// onboarding/probation like anyone else). "probation" is derived from the
+// probation flag — there's no separate DB stage for it.
+function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string, probation: boolean): EmployeeStage {
+  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status, probation);
+  if (status === "inactive") return "exit";
+  return nonExitStage(status, probation);
+}
+
+function nonExitStage(status: string | null, probation: boolean): EmployeeStage {
   if (status === "onboarding") return "onboarding";
-  if (status === "inactive" || status === "archive") return "exit";
   if (probation) return "probation";
   return "active";
 }
@@ -181,47 +206,51 @@ function stageFromEmployment(status: string | null, probation: boolean): Employe
 // Employee Overview/Record page, so the default (scoped) is what every one
 // of them should get; opt OUT explicitly rather than opt in, so a new
 // caller that forgets about scope still fails closed instead of open.
-export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
-  const [pending, staff] = await Promise.all([
-    prisma.users.findMany({
-      where: { status: "pending" },
-      include: {
-        user_profile: true,
-        employment: { include: { branch: true, department: true }, orderBy: { employment_id: "desc" }, take: 1 },
-      },
-      orderBy: { created_at: "desc" },
-    }),
-    prisma.users.findMany({
-      where: { role_id: STAFF_ROLE_ID, NOT: { status: "pending" } },
-      include: {
-        user_profile: true,
-        employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
-      },
-      orderBy: { created_at: "desc" },
-    }),
-  ]);
+// Pre stage = employment.start_date hasn't arrived yet. This is checked
+// FIRST and wins regardless of users.status/employment.status — a staff-role
+// employee already marked "active" with a future start_date still belongs in
+// Pre. A user still stuck at users.status "pending" with no start_date at all
+// yet (brand new registration, no employment row processed) also stays in
+// Pre. A pending user whose start_date has already arrived/passed falls out
+// of every stage (returns null, filtered below) — their account genuinely
+// hasn't been moved along by whatever workflow step does that, so there's no
+// stage that correctly represents them yet.
+function stageForRow(
+  usersStatus: string | null,
+  emp: { status: string | null; probation: boolean; start_date: Date | null; end_date: Date | null } | undefined,
+  todayIso: string,
+): EmployeeStage | null {
+  const startIso = emp?.start_date ? emp.start_date.toISOString().slice(0, 10) : null;
+  if (startIso && startIso > todayIso) return "pre";
+  if (usersStatus === "pending") {
+    return startIso ? null : "pre";
+  }
+  const endIso = emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null;
+  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false);
+}
 
-  const pendingRows: EmployeeOverviewRow[] = pending.map((u) => {
-    const emp = u.employment[0];
-    return {
-      id: u.user_id,
-      fullName: titleCaseName(u.user_profile?.full_name) || u.email,
-      position: emp?.position ?? null,
-      branchCode: emp?.branch?.branch_code ?? null,
-      branchName: emp?.branch?.branch_name ?? null,
-      departmentCode: emp?.department?.department_code ?? null,
-      departmentName: emp?.department?.department_name ?? null,
-      employmentType: emp?.employment_type ?? null,
-      date: u.created_at.toISOString().slice(0, 10),
-      stage: "pre",
-    };
+export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
+  // One combined population: every staff-role user (any status) plus every
+  // still-pending user regardless of role — status alone no longer decides
+  // Pre membership (see stageForRow), so both groups have to be considered
+  // together rather than as two disjoint queries.
+  const users = await prisma.users.findMany({
+    where: { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
+    include: {
+      user_profile: true,
+      employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
+    },
+    orderBy: { created_at: "desc" },
   });
 
-  const staffRows: EmployeeOverviewRow[] = staff.map((u) => {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const rows: EmployeeOverviewRow[] = [];
+  for (const u of users) {
     const emp = u.employment[0];
-    const stage = stageFromEmployment(emp?.status ?? u.status ?? null, emp?.probation ?? false);
+    const stage = stageForRow(u.status ?? null, emp, todayIso);
+    if (!stage) continue;
     const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
-    return {
+    rows.push({
       id: u.user_id,
       fullName: titleCaseName(u.user_profile?.full_name) || u.email,
       position: emp?.position ?? null,
@@ -232,10 +261,9 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       employmentType: emp?.employment_type ?? null,
       date: dateSource.toISOString().slice(0, 10),
       stage,
-    };
-  });
+    });
+  }
 
-  const rows = [...pendingRows, ...staffRows];
   if (options.skipScopeFilter) return rows;
 
   const scope = await getCurrentEmployeeScope();
@@ -245,6 +273,193 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // missing, so fail closed instead.
   if (!scope) return [];
   return filterRowsByScope(scope, rows);
+}
+
+// Single-employee counterpart to listEmployeeOverviewRows() above — every
+// profile/record page only ever needs ONE employee's row (to confirm they
+// exist, get their stage, and check scope), but was calling the full-list
+// version and doing `rows.find(...)` just to get it. Measured directly: the
+// full list (~220 employees, joined to employment/branch/department) takes
+// ~550ms; this single-row query takes ~18ms. Reuses the exact same stage
+// computation (stageForRow) and scope check (isRowInScope) as the full-list
+// version, so results are identical — just for one user_id instead of everyone.
+export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOverviewRow | null> {
+  const u = await prisma.users.findUnique({
+    where: { user_id: id },
+    include: {
+      user_profile: true,
+      employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
+    },
+  });
+  if (!u) return null;
+  // Same population gate as the full-list query's WHERE clause — a user
+  // outside role_id 6/7/8 and not "pending" (e.g. a department/branch shared
+  // login account) was never part of Employee Overview to begin with.
+  if (u.status !== "pending" && !EMPLOYEE_LIFECYCLE_ROLE_IDS.includes(u.role_id)) return null;
+
+  const emp = u.employment[0];
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const stage = stageForRow(u.status ?? null, emp, todayIso);
+  if (!stage) return null;
+
+  const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
+  const row: EmployeeOverviewRow = {
+    id: u.user_id,
+    fullName: titleCaseName(u.user_profile?.full_name) || u.email,
+    position: emp?.position ?? null,
+    branchCode: emp?.branch?.branch_code ?? null,
+    branchName: emp?.branch?.branch_name ?? null,
+    departmentCode: emp?.department?.department_code ?? null,
+    departmentName: emp?.department?.department_name ?? null,
+    employmentType: emp?.employment_type ?? null,
+    date: dateSource.toISOString().slice(0, 10),
+    stage,
+  };
+
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) return null;
+  if (!isRowInScope(scope, row)) return null;
+
+  return row;
+}
+
+// Normalizes name+date into a dedup key — mirrors induction/queries.ts's own
+// nameDateKey, used there for the exact same reason: ebrightleads candidates
+// and real portal employees are matched by name+date since there's no shared
+// id between the two systems.
+function nameDateKey(name: string, dateStr: string): string {
+  const norm = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return `${norm}|${dateStr}`;
+}
+
+// department_branch is free text synced from ebrightleads, not a real FK —
+// it's usually a real department/branch code or name (e.g. "MKT", "AMP",
+// "Bandar Seri Putra") but sometimes neither (e.g. "OD", "Coaching", "TSB").
+// Resolved against the real department/branch tables on a best-effort basis;
+// department wins if both match (mirrors the department-priority display
+// rule used everywhere else).
+function resolveDepartmentBranch(
+  raw: string,
+  departments: DepartmentOpt[],
+  branches: BranchOpt[],
+): { branchCode: string | null; branchName: string | null; departmentCode: string | null; departmentName: string | null } {
+  const key = raw.trim().toLowerCase();
+  const dept = departments.find((d) => d.code.toLowerCase() === key || d.name.toLowerCase() === key);
+  const branch = !dept ? branches.find((b) => b.code.toLowerCase() === key || b.name.toLowerCase() === key) : undefined;
+  return {
+    branchCode: branch?.code ?? null,
+    branchName: branch?.name ?? null,
+    departmentCode: dept?.code ?? null,
+    departmentName: dept?.name ?? (!branch ? raw : null),
+  };
+}
+
+// Pre stage's real-employee population (above) only covers people who
+// already have a portal account. Future hires still sitting in the external
+// ebrightleads pipeline — synced into onboarding_candidate, same source the
+// Induction module's own Onboarding Detail page shows as "ebrightleads" rows
+// — belong in Pre too, just with no Employee Record to open yet (isCandidate).
+//
+// Two separate de-dup layers, since neither alone is reliable:
+// - Excludes any candidate whose induction_profile_id is already set (has
+//   been formally converted to a portal account via the induction flow).
+// - Excludes any candidate whose normalized name+start_date matches an
+//   `existingRows` entry — some real employees already exist in the portal
+//   without ever going through that induction_profile linking step, so
+//   induction_profile_id alone missed real duplicates (confirmed against
+//   live data: 3 of 11 candidates were exact name+date matches of employees
+//   already in Pre via the real-account query).
+//
+// Applies the same scope filter as listEmployeeOverviewRows so a department/
+// branch-scoped account only sees candidates that resolve to their own
+// department/branch — an unresolved value has no code to match against, so
+// it fails closed (hidden from scoped accounts, still shown to full-access
+// HR/Superadmin with the raw synced text as its Branch/Department display).
+export async function listUpcomingOnboardingCandidates(existingRows: EmployeeOverviewRow[]): Promise<EmployeeOverviewRow[]> {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [candidates, departments, branches] = await Promise.all([
+    prisma.onboarding_candidate.findMany({
+      where: { induction_profile_id: null, start_date: { gt: new Date(todayIso) } },
+    }),
+    listDepartments(),
+    listBranches(),
+  ]);
+
+  const existingKeys = new Set(existingRows.filter((r) => r.date).map((r) => nameDateKey(r.fullName, r.date as string)));
+
+  const rows: EmployeeOverviewRow[] = candidates
+    .filter((c) => !existingKeys.has(nameDateKey(titleCaseName(c.name) || c.name, c.start_date.toISOString().slice(0, 10))))
+    .map((c) => {
+      const loc = resolveDepartmentBranch(c.department_branch, departments, branches);
+      return {
+        id: -c.source_id,
+        fullName: titleCaseName(c.name) || c.name,
+        position: c.position || null,
+        ...loc,
+        employmentType: null,
+        date: c.start_date.toISOString().slice(0, 10),
+        stage: "pre",
+        isCandidate: true,
+      };
+    });
+
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) return [];
+  return filterRowsByScope(scope, rows);
+}
+
+// A candidate's own profile page uses the exact same StageProfileView/
+// PersonalInfoPanel as a real employee — same template, blank fields where
+// there's genuinely nothing recorded yet (no separate simplified UI). This
+// synthesizes an EmployeeDetailFull-shaped object from the handful of fields
+// onboarding_candidate actually has (name/position/department_branch/
+// start_date); everything else (DOB, IC, phone, bank details, emergency
+// contact, ...) is null, same as a real employee who just hasn't had that
+// data entered yet. `sourceId` is the candidate's own onboarding_candidate.
+// source_id (positive) — callers pass `-row.id` since candidate rows use
+// `-source_id` as their EmployeeOverviewRow.id sentinel.
+export async function getOnboardingCandidateDetail(sourceId: number): Promise<EmployeeDetailFull | null> {
+  const [candidate, departments, branches] = await Promise.all([
+    prisma.onboarding_candidate.findUnique({ where: { source_id: sourceId } }),
+    listDepartments(),
+    listBranches(),
+  ]);
+  if (!candidate) return null;
+  const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
+  return {
+    id: -candidate.source_id,
+    email: "",
+    employeeId: null,
+    fullName: titleCaseName(candidate.name) || candidate.name,
+    nickName: null,
+    role: candidate.position || null,
+    ...loc,
+    status: null,
+    startDate: candidate.start_date.toISOString().slice(0, 10),
+    pendingOnboarding: false,
+    gender: null,
+    dob: null,
+    phone: null,
+    nationality: null,
+    nric: null,
+    homeAddress: null,
+    position: candidate.position || null,
+    endDate: candidate.end_date ? candidate.end_date.toISOString().slice(0, 10) : null,
+    employmentType: null,
+    probation: false,
+    rate: null,
+    branchId: null,
+    departmentId: null,
+    employmentId: null,
+    bankName: null,
+    bankAccount: null,
+    accountName: null,
+    emergencyName: null,
+    emergencyPhone: null,
+    emergencyRelation: null,
+    emergencyEmail: null,
+    emergencyAddress: null,
+  };
 }
 
 // Real salary_revision table — Active stage's own "Salary Revision" tab.
@@ -580,6 +795,7 @@ export interface ResignationInfo {
   reason: string | null;
   resignLetterFileId: string | null;
   acceptLetterFileId: string | null;
+  exitType: string | null;
 }
 
 export async function getResignation(userId: number): Promise<ResignationInfo | null> {
@@ -591,6 +807,7 @@ export async function getResignation(userId: number): Promise<ResignationInfo | 
     reason: row.reason,
     resignLetterFileId: row.resign_letter_file_id,
     acceptLetterFileId: row.accept_letter_file_id,
+    exitType: row.exit_type,
   };
 }
 
@@ -634,24 +851,38 @@ export async function getExitInterviewNote(userId: number): Promise<ExitIntervie
   };
 }
 
-export type RealExitType = "resignation" | "eoc";
-
-// Real offboarding_case.case_type only distinguishes Resign/ContractEnded —
-// the mock's other two exit types (Termination/Internship Completed) have no
-// real signal, so employees without a matching case simply get no badge
-// rather than a guessed one.
-export async function listExitTypesByUserId(userIds: number[]): Promise<Record<number, RealExitType>> {
+// Exit list's "Exit Type" column/filter follows the Resignation tab's own
+// Exit Type field (resignation.exit_type) — same value the user sets on that
+// profile page, stored as the exact display label ("Resignation"/"End of
+// Contract"/"Internship Completed"/"Termination/Dismissal"). An employee with
+// no value saved there yet simply gets no badge.
+export async function listResignationExitTypesByUserId(userIds: number[]): Promise<Record<number, string>> {
   if (userIds.length === 0) return {};
-  const cases = await prisma.offboarding_case.findMany({
-    where: { user_id: { in: userIds } },
-    orderBy: { created_at: "desc" },
-    distinct: ["user_id"],
-    select: { user_id: true, case_type: true },
+  const rows = await prisma.resignation.findMany({
+    where: { user_id: { in: userIds }, exit_type: { not: null } },
+    select: { user_id: true, exit_type: true },
   });
-  const map: Record<number, RealExitType> = {};
-  for (const c of cases) {
-    if (c.case_type === "Resign") map[c.user_id] = "resignation";
-    else if (c.case_type === "ContractEnded") map[c.user_id] = "eoc";
+  const map: Record<number, string> = {};
+  for (const r of rows) {
+    if (r.exit_type) map[r.user_id] = r.exit_type;
+  }
+  return map;
+}
+
+// Exit list's "Last Date" column — resignation.last_working_date is the
+// authoritative HR-recorded last day for a resignation exit; employees
+// without a resignation row (e.g. end-of-contract) have no such value here,
+// so callers fall back to the overview row's own `date` (employment.end_date)
+// for those.
+export async function listLastWorkingDatesByUserId(userIds: number[]): Promise<Record<number, string>> {
+  if (userIds.length === 0) return {};
+  const rows = await prisma.resignation.findMany({
+    where: { user_id: { in: userIds }, last_working_date: { not: null } },
+    select: { user_id: true, last_working_date: true },
+  });
+  const map: Record<number, string> = {};
+  for (const r of rows) {
+    if (r.last_working_date) map[r.user_id] = r.last_working_date.toISOString().slice(0, 10);
   }
   return map;
 }

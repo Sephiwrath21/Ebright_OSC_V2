@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
@@ -17,6 +18,8 @@ import {
 import type {
   LeaveHistoryRow,
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   ResumeInfo,
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
@@ -63,7 +66,13 @@ import {
   ExitInterviewNotesPanel,
 } from "@/app/components/ActiveProfilePanels";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
-import { updateEmergencyContact } from "@/lib/employeeRecordActions";
+import {
+  updateEmergencyContact,
+  proceedFromPreStage,
+  proceedFromProbation,
+  proceedFromOnboarding,
+  proceedFromActive,
+} from "@/lib/employeeRecordActions";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface Props {
@@ -93,6 +102,9 @@ interface Props {
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   /** Which branch/dept-scoped namelist this employee was opened from — null
    *  for Pre/Probation (no location layer) or when opened without that
    *  context. Drives the breadcrumb's dynamic branch/dept segment, mirroring
@@ -136,6 +148,8 @@ export default function StageProfileView({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  branches,
+  departments,
   locationGroup,
   locationCode,
   locationName,
@@ -164,8 +178,19 @@ export default function StageProfileView({
   const isFullTime = positionGroup(employeeDetail?.position ?? null) === "Full Time";
   const historyGroups = STAGE_HISTORY_GROUPS[stage].filter((g) => g.stage !== "probation" || isFullTime);
 
+  const router = useRouter();
   const proceedButton = STAGE_PROCEED_BUTTON[stage];
+  // Pre's own "Proceed" target depends on the employee's position (see
+  // isFullTime above) rather than the static nextStage every other stage's
+  // button uses — Full Time goes to Probation, everything else skips
+  // straight to Onboarding, same split js/pre-proceed.js already encodes.
+  const proceedTargetStage = stage === "pre" ? (isFullTime ? "probation" : "onboarding") : proceedButton?.nextStage;
+  // Probation's own "Next" only makes sense once Probation Status is
+  // actually Confirmed — In Progress/Extended/Stopped all keep the button
+  // disabled (re-checked server-side too, in proceedFromProbation).
+  const probationConfirmed = probationInfo?.probationStatus === "Confirmed";
   const [confirmingProceed, setConfirmingProceed] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
   const [proceedNotice, setProceedNotice] = useState<string | null>(null);
 
   const locationQuery = locationGroup && locationCode ? `?locGroup=${locationGroup}&locCode=${encodeURIComponent(locationCode)}` : "";
@@ -257,10 +282,12 @@ export default function StageProfileView({
                 <div className="relative mt-1 w-full">
                   <button
                     type="button"
+                    disabled={proceeding || (stage === "probation" && !probationConfirmed)}
+                    title={stage === "probation" && !probationConfirmed ? "Probation Status must be Confirmed first" : undefined}
                     onClick={() => setConfirmingProceed(true)}
-                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors"
+                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
                   >
-                    {proceedButton.label}
+                    {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
                   {proceedNotice && (
                     <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
@@ -298,6 +325,8 @@ export default function StageProfileView({
                 resignationInfo,
                 referenceLetterInfo,
                 exitInterviewNoteInfo,
+                branches,
+                departments,
                 employeeId,
               })}
             </div>
@@ -372,14 +401,38 @@ export default function StageProfileView({
         </div>
       </div>
 
-      {confirmingProceed && proceedButton && (
+      {confirmingProceed && proceedButton && proceedTargetStage && (
         <ConfirmDialog
-          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedButton.nextStage]}?`}
+          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedTargetStage]}?`}
           onCancel={() => setConfirmingProceed(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
+            // Every stage with a Proceed/Next button is now wired to a real
+            // employment update — Exit is terminal, so there's no button (and
+            // no placeholder branch) left for it.
+            setProceeding(true);
+            const result =
+              stage === "pre"
+                ? await proceedFromPreStage(employeeId)
+                : stage === "probation"
+                  ? await proceedFromProbation(employeeId)
+                  : stage === "onboarding"
+                    ? await proceedFromOnboarding(employeeId)
+                    : await proceedFromActive(employeeId);
+            setProceeding(false);
             setConfirmingProceed(false);
-            setProceedNotice("Not moved — stage transitions aren't wired to a real employment-status update yet.");
-            setTimeout(() => setProceedNotice(null), 5000);
+            if (!result.ok) {
+              setProceedNotice(result.error ?? "Failed to proceed.");
+              setTimeout(() => setProceedNotice(null), 5000);
+              return;
+            }
+            // Deliberately no router.refresh() here — this navigates to a
+            // DIFFERENT route (the employee's new stage), which already
+            // fetches fresh server data on its own. Calling refresh() right
+            // after push() races with that pending navigation: it re-runs the
+            // OLD route's own data fetch, which now 404s (the employee no
+            // longer matches the old stage) and can swallow the navigation
+            // entirely — exactly the "stuck on the old page" bug this fixes.
+            router.push(profileUrlForStage(proceedTargetStage, employeeId));
           }}
         />
       )}
@@ -395,6 +448,19 @@ function formatDisplayPhone(value: string | null | undefined): string {
   if (!value) return "--";
   const { countryCode, digits } = parsePhoneValue(value);
   return composePhoneValue(countryCode, digits) || "--";
+}
+
+// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
+// Probation) have no section segment, "separate-pages" stages (Onboarding/
+// Active/Exit) land on their first section. Used to send "Proceed" straight
+// to the employee's new profile after a real stage move, whichever URL shape
+// that target stage actually uses.
+function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
+  const config = STAGE_PROFILE_CONFIG[stage];
+  if (config.profileMode === "separate-pages") {
+    return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
+  }
+  return `/employee-folder/${stage}/employee/${employeeId}`;
 }
 
 // Shared by both the current stage's own section and every history-tab
@@ -424,6 +490,8 @@ function resolvePanel({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  branches,
+  departments,
   employeeId,
 }: {
   originStage: EmployeeStage;
@@ -448,6 +516,8 @@ function resolvePanel({
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   employeeId: number;
 }) {
   if (originStage === "active" && section.key === "mc-leave" && leaveHistory) {
@@ -508,10 +578,18 @@ function resolvePanel({
     return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} />;
   }
   if (section.key === "promotion" && promotions !== undefined) {
-    return <PromotionPanel userId={employeeId} data={promotions} />;
+    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} />;
   }
   if (section.key === "transfer" && transfers !== undefined) {
-    return <TransferPanel userId={employeeId} data={transfers} />;
+    return (
+      <TransferPanel
+        userId={employeeId}
+        data={transfers}
+        branches={branches ?? []}
+        departments={departments ?? []}
+        currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+      />
+    );
   }
   if (section.key === "training" && trainings !== undefined) {
     return <TrainingPanel userId={employeeId} data={trainings} />;
