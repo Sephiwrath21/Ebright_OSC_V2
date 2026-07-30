@@ -798,9 +798,9 @@ export function TaskRowLine({
           <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} />
         </span>
       )}
-      {/* "Assigned by" column (2026-07-30) — personal My Tasks lists only
-          (hideCompleted mode). Plain name only — the column header already
-          says "Assigned by", so no per-row prefix. */}
+      {/* "Assignee" column (2026-07-30) — personal My Tasks lists only
+          (hideCompleted mode). Plain name only — the column header gives
+          the context, so no per-row prefix. */}
       {hideCompleted && (
         <span
           className={`truncate text-xs text-gray-500 ${
@@ -811,10 +811,21 @@ export function TaskRowLine({
           {task.assignerName ?? <span className="text-gray-300">—</span>}
         </span>
       )}
-      {dueDisplay && (
-        <span className={`shrink-0 text-xs ${hideCompleted ? "ml-auto " : ""}${dueDisplay.className}`}>
-          {dueDisplay.text}
+      {/* Due Date: in table mode a FIXED column (constant width/position,
+          always rendered — dash when no due date); outside the table the
+          original content-sized badge. */}
+      {hideCompleted ? (
+        <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+          {dueDisplay ? (
+            <span className={dueDisplay.className}>{dueDisplay.text}</span>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
         </span>
+      ) : (
+        dueDisplay && (
+          <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+        )
       )}
       {!hideCompleted && <StatusChip status={task.status} />}
     </div>
@@ -830,6 +841,11 @@ const RESIZABLE_TASK_NAME_DEFAULT = 220;
  *  Proof / Assigned by / Due date keep constant size, no handles). */
 const PROOF_COL_WIDTH = 48;
 const ASSIGNER_COL_WIDTH = 180;
+/** Due Date is a true fixed column too (2026-07-30 final spec) — constant
+ *  width at a constant position right after Assignee, NOT pinned to the
+ *  container's right edge (ml-auto made its position drift with screen
+ *  width). Wide enough for the longest value ("29/7 Yesterday"). */
+const DUE_COL_WIDTH = 120;
 
 /** The Task header's drag handle — same visual as TaskRowLine's in-row
  *  handle (thin divider that thickens/blues on hover). */
@@ -1208,10 +1224,15 @@ export function ResizableTaskList({
           <span className="shrink-0 truncate text-center" style={{ width: PROOF_COL_WIDTH }}>
             Proof
           </span>
+          {/* "Assignee" per the 2026-07-30 final spec (the shown value is
+              the run's starter — assignerName — but the user explicitly
+              chose this label over "Assigned by"). */}
           <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
-            Assigned by
+            Assignee
           </span>
-          <span className="ml-auto shrink-0">Due date</span>
+          <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
+            Due Date
+          </span>
         </div>
       )}
       <div className="divide-y divide-gray-100">
