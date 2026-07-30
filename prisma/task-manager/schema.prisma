@@ -293,11 +293,32 @@ model RunBlock {
   recurrenceOf   RunBlock? @relation("BlockRecurrence", fields: [recurrenceOfId], references: [id])
   successor      RunBlock? @relation("BlockRecurrence")
 
+  // Optional SOP/reference material attached by the assigner (2026-07-30,
+  // the "+ Task" Guideline section). ONE Guideline row is shared by every
+  // block the assignment created (all recipients × days) and by weekly-
+  // recurrence successors — the image bytes are stored once.
+  guidelineId String?
+  guideline   Guideline? @relation(fields: [guidelineId], references: [id])
+
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
   @@index([repeatWeekly, dueAt])
+}
+
+/// Optional assigner-attached reference material for a task (link and/or
+/// image, both optional — but a row only exists when at least one is set).
+/// Image bytes live here in the DB (capped at 2 MB by the assign action)
+/// so dev/staging/prod share them and Docker redeploys can't lose them;
+/// served via /api/task-manager/guideline-image/[id] (session-gated).
+model Guideline {
+  id        String     @id @default(cuid())
+  url       String?
+  imageMime String? // image/png | image/jpeg | image/webp
+  imageData Bytes?
+  createdAt DateTime   @default(now())
+  blocks    RunBlock[]
 }
 
 enum BlockStatus {

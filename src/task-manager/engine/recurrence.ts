@@ -92,6 +92,9 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           dueAt: nextDueAt,
           cadence: "DAILY",
           recurrenceOfId: block.id,
+          // Successors inherit the assigner's Guideline (shared row — the
+          // image bytes are never duplicated).
+          guidelineId: block.guidelineId,
           runItems: {
             create: block.runItems.map((it) => ({
               itemId: it.itemId,

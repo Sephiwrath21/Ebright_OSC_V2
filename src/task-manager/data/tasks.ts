@@ -38,6 +38,10 @@ const DAY_INDEX: Record<(typeof DAYS)[number], number> = {
   Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0,
 };
 
+/** Guideline image cap: 2 MB binary ≈ ~2.8M base64 chars. */
+const GUIDELINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
+const GUIDELINE_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
+
 const assignInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   branches: z.array(z.string().min(1).max(100)).max(50).default([]),
@@ -47,6 +51,15 @@ const assignInputSchema = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   cadence: z.enum(CADENCE_OPTIONS),
   repeatWeekly: z.boolean().optional().default(false),
+  // Optional Guideline (2026-07-30): SOP link and/or reference image —
+  // never required, never blocks submission.
+  guidelineUrl: z.string().trim().url().max(2000).optional(),
+  guidelineImage: z
+    .object({
+      mime: z.enum(GUIDELINE_IMAGE_MIMES),
+      dataBase64: z.string().min(1).max(GUIDELINE_IMAGE_MAX_BASE64),
+    })
+    .optional(),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -208,6 +221,23 @@ export function assignFlowTask(
     }
     const cadence: Cadence = CADENCE_ENUM[body.cadence];
 
+    // ONE shared Guideline row for the whole assignment (all recipients ×
+    // occurrences reference it; recurrence successors inherit the id) —
+    // the image bytes are stored exactly once.
+    let guidelineId: string | null = null;
+    if (body.guidelineUrl || body.guidelineImage) {
+      const guideline = await prisma.guideline.create({
+        data: {
+          url: body.guidelineUrl ?? null,
+          imageMime: body.guidelineImage?.mime ?? null,
+          imageData: body.guidelineImage
+            ? Buffer.from(body.guidelineImage.dataBase64, "base64")
+            : null,
+        },
+      });
+      guidelineId = guideline.id;
+    }
+
     // Pairs touch disjoint rows — no shared transaction ties them together
     // (each create was already its own implicit transaction in the donor's
     // loop form), so they run concurrently on purpose. Do not "fix" into a
@@ -237,6 +267,7 @@ export function assignFlowTask(
             startedAt: new Date(),
             dueAt: occ.dueAt,
             cadence,
+            guidelineId,
             runItems: {
               create: block.items.map((it) => ({
                 itemId: it.id,

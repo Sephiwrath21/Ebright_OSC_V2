@@ -444,6 +444,83 @@ function CompleteButton({
     </span>
   );
 }
+/** 📎 indicator + click-to-view popup for an assigner-attached Guideline
+ *  (2026-07-30): shows the SOP link (opens in a new tab) and/or the
+ *  reference image (served by /api/task-manager/guideline-image/[id];
+ *  click = full size in a new tab). Rendered on any task row whose task
+ *  carries a guideline — the assignee's cue that reference material
+ *  exists. */
+function GuidelineIndicator({
+  guideline,
+  title,
+}: {
+  guideline: NonNullable<FlowTaskRow["guideline"]>;
+  title: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const imageSrc = `/api/task-manager/guideline-image/${guideline.id}`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="View guideline"
+        aria-label={`View guideline for ${title}`}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100"
+      >
+        📎 Guideline
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">Guideline</h4>
+                <p className="truncate text-xs text-gray-500">{title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            {guideline.url && (
+              <a
+                href={guideline.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 block truncate rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-blue-600 hover:border-blue-300 hover:underline"
+              >
+                🔗 {guideline.url}
+              </a>
+            )}
+            {guideline.hasImage && (
+              <a href={imageSrc} target="_blank" rel="noopener noreferrer" title="Open full size">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt={`Guideline for ${title}`}
+                  className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+                />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function TaskRowLine({
   task,
   myUserId,
@@ -525,6 +602,9 @@ export function TaskRowLine({
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
+          )}
+          {task.guideline && (
+            <GuidelineIndicator guideline={task.guideline} title={task.blockTitle} />
           )}
         </div>
         {!hideCompleted && (

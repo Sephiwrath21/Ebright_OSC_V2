@@ -38,6 +38,9 @@ export interface FlowTaskRow {
   /** True when this task was created by a Manpower Schedule slot sync
    *  (vs. a manual/ad hoc assignment) — drives the "Scheduled" badge. */
   fromSchedule: boolean;
+  /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
+   *  viewer; image served by /api/task-manager/guideline-image/[id]. */
+  guideline?: { id: string; url: string | null; hasImage: boolean } | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as
@@ -257,6 +260,11 @@ export interface FlowAssignInput {
    *  weekly, system-wide — nothing sends this anymore; the server accepts
    *  and ignores it for API stability. */
   repeatWeekly?: boolean;
+  /** Optional Guideline (2026-07-30): SOP link and/or reference image
+   *  (png/jpeg/webp, ≤ 2 MB, base64) — both optional, never block
+   *  submission. */
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string };
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD

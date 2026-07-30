@@ -293,6 +293,7 @@ describe("sortTaskRows", () => {
     dueAt: dueAt ? dueAt.toISOString() : null,
     status: "ACTIVE",
     fromSchedule: false,
+    guideline: null,
     quickCompletable: false,
   });
 
