@@ -203,7 +203,16 @@ export function CeoDashboardSection({
           No departments pinned yet — add one above to track it here.
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          // Stable per-instance id (this section renders twice — Daily and
+          // Monthly boards): dnd-kit otherwise numbers its aria-describedby
+          // ids with a module counter, and the server's count can differ
+          // from the client's → React hydration-mismatch error.
+          id={`ceo-dashboard-${periodLabel}`}
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
           <SortableContext items={ordered.map((d) => d.name)} strategy={rectSortingStrategy}>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {ordered.map((dept) => (
