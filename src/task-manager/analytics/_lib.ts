@@ -497,6 +497,11 @@ export interface TaskRow {
   /** Assigner-attached SOP reference (2026-07-30) — null when none. The
    *  image itself is served by /api/task-manager/guideline-image/[id]. */
   guideline: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Who assigned the task (the run's starter) — id always present;
+   *  the display NAME is resolved only by the personal payloads
+   *  (getMePayload), which drive the "Assigned by" column (2026-07-30). */
+  assignerId: string;
+  assignerName?: string | null;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
    *  isn't already closed and has exactly one required item, a CHECKBOX.
    *  Anything else (multiple required items, or a non-checkbox required
@@ -528,6 +533,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     guideline: b.guideline
       ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }
       : null,
+    assignerId: b.run.startedById,
     quickCompletable: isQuickCompletable(b),
   };
 }

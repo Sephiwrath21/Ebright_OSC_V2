@@ -41,6 +41,10 @@ export interface FlowTaskRow {
   /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
    *  viewer; image served by /api/task-manager/guideline-image/[id]. */
   guideline?: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Who assigned the task — the "Assigned by" column in the personal My
+   *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
+   *  undefined elsewhere (column shows a dash). */
+  assignerName?: string | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as

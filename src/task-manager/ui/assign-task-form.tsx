@@ -293,10 +293,7 @@ export function AssignTaskForm({
             image. Leaving both empty is fine — routine tasks need no
             guidance; nothing here ever blocks submission. */}
         <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm font-medium text-gray-600">Guideline (optional)</p>
-          <p className="mt-0.5 text-xs text-gray-400">
-            Attach a SOP link and/or a reference image to help the assignee.
-          </p>
+          <p className="text-sm font-medium text-gray-600">Guidelines</p>
           <label className="mt-2 block text-sm text-gray-600">
             Link
             <input

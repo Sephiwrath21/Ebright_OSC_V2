@@ -622,6 +622,21 @@ export function TaskRowLine({
           </div>
         )}
       </div>
+      {/* "Assigned by" column (2026-07-30) — personal My Tasks lists only
+          (hideCompleted mode); sits between the Task column and the fixed
+          Due Date column. */}
+      {hideCompleted && (
+        <span className="min-w-0 flex-1 truncate text-xs text-gray-500">
+          {task.assignerName ? (
+            <>
+              <span className="text-gray-400">Assigned by </span>
+              {task.assignerName}
+            </>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+        </span>
+      )}
       {dueDisplay && (
         <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
       )}
@@ -1339,6 +1354,15 @@ export function EntityDrillModal({
                       </p>
                       {!isOwned && (
                         <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
+                      )}
+                      {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
+                          show who assigned them (assigner cards / personal
+                          donut drills); rows about other people keep the
+                          assignee line above instead. */}
+                      {isOwned && t.assignerName && (
+                        <p className="truncate text-xs text-gray-500">
+                          Assigned by {t.assignerName}
+                        </p>
                       )}
                     </div>
                     {dueDisplay && (
