@@ -471,7 +471,7 @@ function GuidelineIndicator({
         aria-label={`View guideline for ${title}`}
         className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100"
       >
-        📎 Guideline
+        Guideline
       </button>
       {/* Portal to <body> (2026-07-30): same completed-row opacity fix as
           ProofCell's modals — see the comment there. */}
@@ -754,9 +754,9 @@ function ProofCell({
           onClick={() => setViewerOpen(true)}
           title="View proof"
           aria-label={`View proof for ${task.blockTitle}`}
-          className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600 hover:bg-blue-100"
+          className="inline-flex size-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-500 hover:bg-emerald-100"
         >
-          📎
+          ✓
         </button>
       ) : canUpload ? (
         <button
@@ -1151,8 +1151,9 @@ const RESIZABLE_TASK_NAME_DEFAULT = 220;
 
 /** Fixed widths for the non-resizable My Tasks columns (2026-07-30 final:
  *  ONLY Task is draggable — long names are the one thing worth revealing;
- *  Proof / Assigned by / Due date keep constant size, no handles). */
-const PROOF_COL_WIDTH = 48;
+ *  Proof / Assigned by / Due date keep constant size, no handles). Proof
+ *  is 96px so its two-line "Proof of Completion" header label fits. */
+const PROOF_COL_WIDTH = 96;
 const ASSIGNER_COL_WIDTH = 180;
 /** Due Date is a true fixed column too (2026-07-30 final spec) — constant
  *  width at a constant position right after Assignee, NOT pinned to the
@@ -1570,8 +1571,8 @@ export function ResizableTaskList({
             Task
             <HeaderResizeHandle onPointerDown={onResizeStart} />
           </span>
-          <span className="shrink-0 truncate text-center" style={{ width: PROOF_COL_WIDTH }}>
-            Proof
+          <span className="shrink-0 text-center leading-tight" style={{ width: PROOF_COL_WIDTH }}>
+            Proof of Completion
           </span>
           {/* "Assignee" per the 2026-07-30 final spec (the shown value is
               the run's starter — assignerName — but the user explicitly
