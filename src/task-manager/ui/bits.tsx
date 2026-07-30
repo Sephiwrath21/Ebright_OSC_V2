@@ -544,6 +544,11 @@ function ProofCell({
 }) {
   const [busy, setBusy] = React.useState(false);
   const [viewerOpen, setViewerOpen] = React.useState(false);
+  /** The "Attach proof" popover (2026-07-30): ONE surface accepting all 4
+   *  input methods — file picker, drag-and-drop, clipboard paste, and
+   *  camera capture — all funneling into the same uploadFile path. */
+  const [attachOpen, setAttachOpen] = React.useState(false);
+  const [dragOver, setDragOver] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   // A fresh upload shows its 📎 immediately (before the refreshed payload
   // arrives); `version` cache-busts the image URL after a replace, since a
@@ -551,6 +556,10 @@ function ProofCell({
   const [localProofId, setLocalProofId] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  /** capture="environment" input — phones/tablets open the native camera
+   *  app directly; desktop browsers ignore `capture` and fall back to the
+   *  ordinary file picker (browser-defined behavior, no permission code). */
+  const cameraRef = React.useRef<HTMLInputElement>(null);
 
   const proofId = localProofId ?? task.proofId ?? null;
   const imageSrc = proofId
@@ -558,10 +567,10 @@ function ProofCell({
     : null;
   const canUpload = isOwned && Boolean(onUploadProof);
 
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !onUploadProof) return;
+  /** The single upload path every input method funnels into — picker,
+   *  drop, paste, and camera all end up here with a File. */
+  const uploadFile = async (file: File) => {
+    if (!onUploadProof) return;
     setErrorText(null);
     if (!PROOF_IMAGE_MIMES.includes(file.type)) {
       setErrorText("PNG, JPEG or WebP images only");
@@ -583,6 +592,7 @@ function ProofCell({
       if (result.ok) {
         setLocalProofId(result.proofId);
         setVersion((v) => v + 1);
+        setAttachOpen(false);
       } else {
         setErrorText(result.message);
       }
@@ -593,16 +603,57 @@ function ProofCell({
     }
   };
 
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) void uploadFile(file);
+  };
+
+  // While the popover is open: Ctrl/Cmd+V anywhere attaches the clipboard
+  // image (screenshot-paste workflow), Escape closes. Document-level so
+  // the user doesn't have to focus anything first.
+  React.useEffect(() => {
+    if (!attachOpen) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        void uploadFile(file);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAttachOpen(false);
+    };
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachOpen]);
+
   return (
     <span className="relative flex shrink-0 items-center justify-center">
       {canUpload && (
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={onFile}
-        />
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={onFile}
+          />
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={onFile}
+          />
+        </>
       )}
       {proofId ? (
         <button
@@ -618,9 +669,12 @@ function ProofCell({
         <button
           type="button"
           disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          title="Upload proof (image, max 2 MB)"
-          aria-label={`Upload proof for ${task.blockTitle}`}
+          onClick={() => {
+            setErrorText(null);
+            setAttachOpen(true);
+          }}
+          title="Attach proof — drop, paste, upload, or take a photo"
+          aria-label={`Attach proof for ${task.blockTitle}`}
           className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
         >
           {busy ? "…" : "＋"}
@@ -628,7 +682,76 @@ function ProofCell({
       ) : (
         <span className="text-xs text-gray-300">—</span>
       )}
-      {errorText && <InlineActionError text={errorText} />}
+      {errorText && !attachOpen && <InlineActionError text={errorText} />}
+      {attachOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setAttachOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-gray-900">Attach proof</h4>
+                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void uploadFile(file);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
+              }`}
+            >
+              <span className="text-xl" aria-hidden>
+                🖼️
+              </span>
+              <p className="text-sm font-medium text-gray-600">Drop an image here</p>
+              <p className="text-xs text-gray-400">or paste (Ctrl+V)</p>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => inputRef.current?.click()}
+                className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+              >
+                📁 Upload file
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => cameraRef.current?.click()}
+                className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+              >
+                📷 Take Photo
+              </button>
+            </div>
+            {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
+            {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
+            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 2 MB</p>
+          </div>
+        </div>
+      )}
       {viewerOpen && imageSrc && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -664,7 +787,11 @@ function ProofCell({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => inputRef.current?.click()}
+                onClick={() => {
+                  setViewerOpen(false);
+                  setErrorText(null);
+                  setAttachOpen(true);
+                }}
                 className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
               >
                 {busy ? "Uploading…" : "Replace image"}
