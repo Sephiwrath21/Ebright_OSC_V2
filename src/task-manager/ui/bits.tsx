@@ -685,6 +685,8 @@ export function TaskRowLine({
   onReopen,
   onUploadProof,
   nameWidth,
+  proofWidth,
+  assignerWidth,
   onResizeStart,
   hideCompleted,
   selected,
@@ -705,6 +707,11 @@ export function TaskRowLine({
    *  proof cell view-only (📎 still shows where proof exists). */
   onUploadProof?: ProofUploadHandler;
   nameWidth?: number;
+  /** Shared Proof / Assigned-by column widths (2026-07-30) — set by
+   *  ResizableTaskList's header drag handles, same contract as nameWidth
+   *  (undefined = the pre-table fallback layout). */
+  proofWidth?: number;
+  assignerWidth?: number;
   onResizeStart?: (e: React.PointerEvent) => void;
   /** "My Tasks" personal-list mode — see doc comment above. */
   hideCompleted?: boolean;
@@ -784,29 +791,29 @@ export function TaskRowLine({
       </div>
       {/* "Proof" column (2026-07-30) — personal My Tasks lists only
           (hideCompleted mode); sits between the Task column and Assigned
-          by. Width mirrors the header's w-10 spacer. */}
+          by. Width tracks the header's drag handle. */}
       {hideCompleted && (
-        <span className="flex w-10 shrink-0 justify-center">
+        <span className="flex shrink-0 justify-center" style={{ width: proofWidth ?? 40 }}>
           <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} />
         </span>
       )}
       {/* "Assigned by" column (2026-07-30) — personal My Tasks lists only
-          (hideCompleted mode); sits between the Proof column and the fixed
-          Due Date column. */}
+          (hideCompleted mode). Plain name only — the column header already
+          says "Assigned by", so no per-row prefix. */}
       {hideCompleted && (
-        <span className="min-w-0 flex-1 truncate text-xs text-gray-500">
-          {task.assignerName ? (
-            <>
-              <span className="text-gray-400">Assigned by </span>
-              {task.assignerName}
-            </>
-          ) : (
-            <span className="text-gray-300">—</span>
-          )}
+        <span
+          className={`truncate text-xs text-gray-500 ${
+            assignerWidth === undefined ? "min-w-0 flex-1" : "shrink-0"
+          }`}
+          style={assignerWidth === undefined ? undefined : { width: assignerWidth }}
+        >
+          {task.assignerName ?? <span className="text-gray-300">—</span>}
         </span>
       )}
       {dueDisplay && (
-        <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+        <span className={`shrink-0 text-xs ${hideCompleted ? "ml-auto " : ""}${dueDisplay.className}`}>
+          {dueDisplay.text}
+        </span>
       )}
       {!hideCompleted && <StatusChip status={task.status} />}
     </div>
@@ -816,6 +823,30 @@ export function TaskRowLine({
 const RESIZABLE_TASK_NAME_MIN = 120;
 const RESIZABLE_TASK_NAME_MAX = 480;
 const RESIZABLE_TASK_NAME_DEFAULT = 220;
+
+/** Per-column drag bounds/defaults for the My Tasks table (2026-07-30:
+ *  every header except Due date gets a resize handle — Due date is pinned
+ *  to the right edge and takes whatever remains). */
+const RESIZABLE_COLUMNS = {
+  name: { min: RESIZABLE_TASK_NAME_MIN, max: RESIZABLE_TASK_NAME_MAX, default: RESIZABLE_TASK_NAME_DEFAULT },
+  proof: { min: 40, max: 160, default: 48 },
+  assigner: { min: 80, max: 320, default: 180 },
+} as const;
+type ResizableColumn = keyof typeof RESIZABLE_COLUMNS;
+
+/** The header-cell drag handle — same visual as TaskRowLine's in-row Task
+ *  handle (thin divider that thickens/blues on hover). */
+function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
+  return (
+    <span
+      onPointerDown={onPointerDown}
+      title="Drag to resize"
+      className="absolute -right-1.5 top-1/2 flex h-4 w-3 -translate-y-1/2 cursor-col-resize touch-none items-center justify-center"
+    >
+      <span className="h-4 w-px bg-gray-300 hover:w-0.5 hover:bg-blue-400" />
+    </span>
+  );
+}
 
 /**
  * The "My Tasks — Daily/Monthly" and roster-drill-down task lists, wrapping
@@ -992,25 +1023,28 @@ export function ResizableTaskList({
   emptyLabel: string;
   hideCompleted?: boolean;
 }) {
-  const [nameWidth, setNameWidth] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
+  const [colWidths, setColWidths] = React.useState<Record<ResizableColumn, number>>({
+    name: RESIZABLE_COLUMNS.name.default,
+    proof: RESIZABLE_COLUMNS.proof.default,
+    assigner: RESIZABLE_COLUMNS.assigner.default,
+  });
   // Defaults to ON — completed tasks are visible immediately; toggling off
   // declutters down to Pending/N-A. N/A tasks have no toggle of their own —
   // they're always shown alongside Pending, same as any other non-terminal
   // status; only DONE is ever hidden here.
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const dragRef = React.useRef<{ x: number; width: number } | null>(null);
+  const dragRef = React.useRef<{ col: ResizableColumn; x: number; width: number } | null>(null);
 
-  const onResizeStart = (e: React.PointerEvent) => {
+  const startResize = (col: ResizableColumn) => (e: React.PointerEvent) => {
     e.preventDefault();
-    dragRef.current = { x: e.clientX, width: nameWidth };
+    dragRef.current = { col, x: e.clientX, width: colWidths[col] };
     const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      const next = Math.min(
-        RESIZABLE_TASK_NAME_MAX,
-        Math.max(RESIZABLE_TASK_NAME_MIN, dragRef.current.width + (ev.clientX - dragRef.current.x)),
-      );
-      setNameWidth(next);
+      const drag = dragRef.current;
+      if (!drag) return;
+      const { min, max } = RESIZABLE_COLUMNS[drag.col];
+      const next = Math.min(max, Math.max(min, drag.width + (ev.clientX - drag.x)));
+      setColWidths((w) => ({ ...w, [drag.col]: next }));
     };
     const onUp = () => {
       dragRef.current = null;
@@ -1020,6 +1054,8 @@ export function ResizableTaskList({
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
+  const nameWidth = colWidths.name;
+  const onResizeStart = startResize("name");
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
   const visibleTasks = hideCompleted
@@ -1151,18 +1187,26 @@ export function ResizableTaskList({
       {controlBar}
       {/* Column header row (2026-07-30, ClickUp reference) — personal My
           Tasks lists only. Spacers mirror the rows' leading checkbox +
-          status circle; the Task label shares the resizable nameWidth so
-          it tracks column drags. */}
+          status circle; Task/Proof/Assigned by each carry a drag handle
+          and share their width with every row below; Due date is pinned
+          to the right edge (ml-auto) and takes whatever remains. */}
       {hideCompleted && (
         <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
           <span className="w-4 shrink-0" aria-hidden />
           <span className="w-3 shrink-0" aria-hidden />
-          <span className="shrink-0" style={{ width: nameWidth }}>
+          <span className="relative shrink-0 truncate" style={{ width: colWidths.name }}>
             Task
+            <HeaderResizeHandle onPointerDown={startResize("name")} />
           </span>
-          <span className="w-10 shrink-0 text-center">Proof</span>
-          <span className="min-w-0 flex-1">Assigned by</span>
-          <span className="shrink-0">Due date</span>
+          <span className="relative shrink-0 truncate text-center" style={{ width: colWidths.proof }}>
+            Proof
+            <HeaderResizeHandle onPointerDown={startResize("proof")} />
+          </span>
+          <span className="relative shrink-0 truncate" style={{ width: colWidths.assigner }}>
+            Assigned by
+            <HeaderResizeHandle onPointerDown={startResize("assigner")} />
+          </span>
+          <span className="ml-auto shrink-0">Due date</span>
         </div>
       )}
       <div className="divide-y divide-gray-100">
@@ -1176,6 +1220,8 @@ export function ResizableTaskList({
             onReopen={onReopen}
             onUploadProof={onUploadProof}
             nameWidth={nameWidth}
+            proofWidth={colWidths.proof}
+            assignerWidth={colWidths.assigner}
             onResizeStart={onResizeStart}
             hideCompleted={hideCompleted}
             selected={selectedIds.has(t.runBlockId)}
