@@ -8,6 +8,14 @@ export type FlowPeriod = "daily" | "monthly";
  *  Next.js masks thrown action error messages in production. */
 export type ActionResult = { ok: true } | { ok: false; message: string };
 export type AssignActionResult = { ok: true; created: number } | { ok: false; message: string };
+/** The Proof column's upload action (2026-07-30): returns the (possibly
+ *  new) Proof id so the row can show the 📎 immediately, without waiting
+ *  for the server payload to refresh. */
+export type ProofUploadResult = { ok: true; proofId: string } | { ok: false; message: string };
+export type ProofUploadHandler = (
+  runBlockId: string,
+  image: { mime: string; dataBase64: string },
+) => Promise<ProofUploadResult>;
 
 export type FlowRole =
   | "ADMIN"
@@ -38,6 +46,22 @@ export interface FlowTaskRow {
   /** True when this task was created by a Manpower Schedule slot sync
    *  (vs. a manual/ad hoc assignment) — drives the "Scheduled" badge. */
   fromSchedule: boolean;
+  /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
+   *  viewer; image served by /api/task-manager/guideline-image/[id]. */
+  guideline?: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Who assigned the task — the "Assigned by" column in the personal My
+   *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
+   *  undefined elsewhere (column shows a dash). */
+  assignerName?: string | null;
+  /** Assignee-uploaded completion evidence (2026-07-30) — drives the
+   *  "Proof" column. null until uploaded; image served by
+   *  /api/task-manager/proof-image/[id]. Optional so older payload shapes
+   *  (undefined) render the same as "no proof". */
+  proofId?: string | null;
+  /** Main Task ↔ Subtask link (2026-07-30): the parent task's runBlockId,
+   *  or null/undefined for a top-level task. ResizableTaskList groups rows
+   *  by this into the chevron/indent tree. */
+  parentId?: string | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as
@@ -257,6 +281,15 @@ export interface FlowAssignInput {
    *  weekly, system-wide — nothing sends this anymore; the server accepts
    *  and ignores it for API stability. */
   repeatWeekly?: boolean;
+  /** Optional Guideline (2026-07-30): SOP link and/or reference image
+   *  (png/jpeg/webp, ≤ 2 MB, base64) — both optional, never block
+   *  submission. */
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string };
+  /** Optional Subtasks (2026-07-30): each becomes a FULL task row of its
+   *  own (own status/proof/due, completion independent of the parent) for
+   *  every recipient × day, linked under the main task via parentId. */
+  subtasks?: string[];
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -542,20 +575,26 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Relative, human-readable due-date label (ClickUp-style): "5 days ago" /
- *  "Yesterday" (red, overdue), "Today" (amber), a short weekday name for the
- *  next 6 days (neutral gray), or a plain "Jul 30" date beyond that (also
- *  neutral gray). Calendar-day difference, not a raw ms delta — a dueAt of
- *  17:00 today still reads as "Today" regardless of the current time of day.
- *  Returns null for no due date — callers keep rendering their own "—". */
+/** Due-date label: a "D/M" date followed by a relative qualifier — "25/7
+ *  5 days ago" / "29/7 Yesterday" (red, overdue), "30/7 Today" (amber), a
+ *  short weekday for the next 6 days ("2/8 Sun", neutral gray), or the bare
+ *  "15/8" date beyond a week (also neutral gray). Calendar-day difference,
+ *  not a raw ms delta — a dueAt of 17:00 today still reads as "Today"
+ *  regardless of the current time of day. Returns null for no due date —
+ *  callers keep rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays < -1) return { text: `${-diffDays} days ago`, className: "text-red-500 font-medium" };
-  if (diffDays === -1) return { text: "Yesterday", className: "text-red-500 font-medium" };
-  if (diffDays === 0) return { text: "Today", className: "text-amber-600 font-medium" };
-  if (diffDays <= 6) return { text: due.toLocaleDateString(undefined, { weekday: "short" }), className: "text-gray-400" };
-  return { text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }), className: "text-gray-400" };
+  if (diffDays < -1) return { text: `${dm} ${-diffDays} days ago`, className: "text-red-500 font-medium" };
+  if (diffDays === -1) return { text: `${dm} Yesterday`, className: "text-red-500 font-medium" };
+  if (diffDays === 0) return { text: `${dm} Today`, className: "text-amber-600 font-medium" };
+  if (diffDays <= 6)
+    return {
+      text: `${dm} ${due.toLocaleDateString(undefined, { weekday: "short" })}`,
+      className: "text-gray-400",
+    };
+  return { text: dm, className: "text-gray-400" };
 }

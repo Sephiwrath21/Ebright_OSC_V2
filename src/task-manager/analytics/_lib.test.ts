@@ -293,6 +293,10 @@ describe("sortTaskRows", () => {
     dueAt: dueAt ? dueAt.toISOString() : null,
     status: "ACTIVE",
     fromSchedule: false,
+    guideline: null,
+    assignerId: "u-assigner",
+    proofId: null,
+    parentId: null,
     quickCompletable: false,
   });
 
@@ -484,14 +488,14 @@ describe("role scoping", () => {
   });
 
   it.each(["Operations", "Optimisation"])(
-    "canViewEntity: elevated %s DEPT_SITE sees every department but never a branch",
+    "canViewEntity: elevated %s DEPT_SITE sees every department AND every branch (2026-07-29 final spec)",
     (dept) => {
       const site = user("DEPT_SITE", dept);
       expect(canViewEntity(site, "department", dept)).toBe(true);
       expect(canViewEntity(site, "department", "Finance")).toBe(true);
       expect(canViewEntity(site, "department", "Human Resource")).toBe(true);
-      expect(canViewEntity(site, "branch", "Subang Taipan")).toBe(false);
-      expect(canViewEntity(site, "branch", "Klang")).toBe(false);
+      expect(canViewEntity(site, "branch", "Subang Taipan")).toBe(true);
+      expect(canViewEntity(site, "branch", "Klang")).toBe(true);
     },
   );
 

@@ -13,6 +13,7 @@ import type {
   FlowDrillTask,
   FlowStaffMember,
   FlowTaskRow,
+  ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
 import { personSolidColor } from "./palette";
@@ -444,17 +445,253 @@ function CompleteButton({
     </span>
   );
 }
+/** 📎 indicator + click-to-view popup for an assigner-attached Guideline
+ *  (2026-07-30): shows the SOP link (opens in a new tab) and/or the
+ *  reference image (served by /api/task-manager/guideline-image/[id];
+ *  click = full size in a new tab). Rendered on any task row whose task
+ *  carries a guideline — the assignee's cue that reference material
+ *  exists. */
+function GuidelineIndicator({
+  guideline,
+  title,
+}: {
+  guideline: NonNullable<FlowTaskRow["guideline"]>;
+  title: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const imageSrc = `/api/task-manager/guideline-image/${guideline.id}`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="View guideline"
+        aria-label={`View guideline for ${title}`}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100"
+      >
+        📎 Guideline
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">Guideline</h4>
+                <p className="truncate text-xs text-gray-500">{title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            {guideline.url && (
+              <a
+                href={guideline.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 block truncate rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-blue-600 hover:border-blue-300 hover:underline"
+              >
+                🔗 {guideline.url}
+              </a>
+            )}
+            {guideline.hasImage && (
+              <a href={imageSrc} target="_blank" rel="noopener noreferrer" title="Open full size">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt={`Guideline for ${title}`}
+                  className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+                />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
+ *  2 MB cap, so a bad pick fails instantly instead of round-tripping. */
+const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
+const PROOF_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** The "Proof" column cell (2026-07-30): assignee-uploaded completion
+ *  evidence, always optional (never gates the status dropdown). Owner of a
+ *  proof-less row gets a ＋ upload button; once uploaded, EVERYONE sees a
+ *  📎 that opens the image in a viewer modal (served by
+ *  /api/task-manager/proof-image/[id]); the owner can replace it from
+ *  there. Rows that are neither owned nor proven show a plain dash. */
+function ProofCell({
+  task,
+  isOwned,
+  onUploadProof,
+}: {
+  task: FlowTaskRow;
+  isOwned: boolean;
+  onUploadProof?: ProofUploadHandler;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [viewerOpen, setViewerOpen] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
+  // A fresh upload shows its 📎 immediately (before the refreshed payload
+  // arrives); `version` cache-busts the image URL after a replace, since a
+  // re-upload keeps the same Proof id.
+  const [localProofId, setLocalProofId] = React.useState<string | null>(null);
+  const [version, setVersion] = React.useState(0);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const proofId = localProofId ?? task.proofId ?? null;
+  const imageSrc = proofId
+    ? `/api/task-manager/proof-image/${proofId}${version ? `?v=${version}` : ""}`
+    : null;
+  const canUpload = isOwned && Boolean(onUploadProof);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !onUploadProof) return;
+    setErrorText(null);
+    if (!PROOF_IMAGE_MIMES.includes(file.type)) {
+      setErrorText("PNG, JPEG or WebP images only");
+      return;
+    }
+    if (file.size > PROOF_IMAGE_MAX_BYTES) {
+      setErrorText("Image is too large — max 2 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const result = await onUploadProof(task.runBlockId, { mime: file.type, dataBase64 });
+      if (result.ok) {
+        setLocalProofId(result.proofId);
+        setVersion((v) => v + 1);
+      } else {
+        setErrorText(result.message);
+      }
+    } catch {
+      setErrorText("Could not read that file — please try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="relative flex shrink-0 items-center justify-center">
+      {canUpload && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onFile}
+        />
+      )}
+      {proofId ? (
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          title="View proof"
+          aria-label={`View proof for ${task.blockTitle}`}
+          className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600 hover:bg-blue-100"
+        >
+          📎
+        </button>
+      ) : canUpload ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          title="Upload proof (image, max 2 MB)"
+          aria-label={`Upload proof for ${task.blockTitle}`}
+          className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+        >
+          {busy ? "…" : "＋"}
+        </button>
+      ) : (
+        <span className="text-xs text-gray-300">—</span>
+      )}
+      {errorText && <InlineActionError text={errorText} />}
+      {viewerOpen && imageSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setViewerOpen(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-gray-900">Proof</h4>
+                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewerOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <a href={imageSrc} target="_blank" rel="noopener noreferrer" title="Open full size">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageSrc}
+                alt={`Proof for ${task.blockTitle}`}
+                className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+              />
+            </a>
+            {canUpload && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => inputRef.current?.click()}
+                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+              >
+                {busy ? "Uploading…" : "Replace image"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function TaskRowLine({
   task,
   myUserId,
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   nameWidth,
+  proofWidth,
+  assignerWidth,
   onResizeStart,
   hideCompleted,
   selected,
   onToggleSelect,
+  tree,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -467,7 +704,16 @@ export function TaskRowLine({
   /** "Pending" in the status dropdown, on an already-Completed/N-A task
    *  (reopen). Omit to disable reopening (option stays but is disabled). */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
-  nameWidth?: number;
+  /** The Proof column's upload action — see ProofCell. Omit to make every
+   *  proof cell view-only (📎 still shows where proof exists). */
+  onUploadProof?: ProofUploadHandler;
+  /** Column widths (2026-07-30): a number OR a CSS length/var() string —
+   *  ResizableTaskList passes "var(--tm-col-*)" so a header drag updates
+   *  every row without re-rendering them (see its startResize).
+   *  undefined = the pre-table fallback layout (title flex-fills). */
+  nameWidth?: number | string;
+  proofWidth?: number | string;
+  assignerWidth?: number | string;
   onResizeStart?: (e: React.PointerEvent) => void;
   /** "My Tasks" personal-list mode — see doc comment above. */
   hideCompleted?: boolean;
@@ -476,11 +722,34 @@ export function TaskRowLine({
    *  provides onToggleSelect. */
   selected?: boolean;
   onToggleSelect?: (runBlockId: string) => void;
+  /** Main Task ↔ Subtask tree slot (2026-07-30, table mode only; omitted =
+   *  list has no subtasks, layout unchanged): "parent" renders the ▾/▸
+   *  chevron + count badge; "flat" reserves the chevron's width so circles
+   *  stay aligned; "child" indents the row (and shaves the indent off the
+   *  Task column so Proof/Assignee/Due Date stay aligned). */
+  tree?:
+    | { kind: "parent"; count: number; expanded: boolean; onToggle: () => void }
+    | { kind: "flat" }
+    | { kind: "child" };
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned;
+
+  // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
+  // shave that off the Task column so Proof/Assignee/Due Date columns stay
+  // exactly where the header puts them.
+  const CHILD_INDENT = 32;
+  const isChild = tree?.kind === "child";
+  const effectiveNameWidth =
+    nameWidth === undefined
+      ? undefined
+      : isChild
+        ? typeof nameWidth === "number"
+          ? nameWidth - CHILD_INDENT
+          : `calc(${nameWidth} - ${CHILD_INDENT}px)`
+        : nameWidth;
 
   return (
     <div
@@ -497,6 +766,26 @@ export function TaskRowLine({
           className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
         />
       )}
+      {/* Tree slot (see the `tree` prop): chevron on parents, matching
+          spacer on subtask-less rows, spacer + indent on subtask rows.
+          (No aria-expanded on the chevron — the row's
+          [&:has(button[aria-expanded])] z-index trick is reserved for the
+          dropdown popovers.) */}
+      {tree &&
+        (tree.kind === "parent" ? (
+          <button
+            type="button"
+            onClick={tree.onToggle}
+            title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
+            aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
+            className="flex w-4 shrink-0 items-center justify-center text-[10px] text-gray-400 hover:text-gray-600"
+          >
+            {tree.expanded ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" aria-hidden />
+        ))}
+      {isChild && <span className="w-5 shrink-0" aria-hidden />}
       {hideCompleted ? (
         <StatusDropdown task={task} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
       ) : task.status === "DONE" ? (
@@ -509,8 +798,8 @@ export function TaskRowLine({
         <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white" />
       )}
       <div
-        className={`relative min-w-0 ${nameWidth === undefined ? "flex-1" : "shrink-0"}`}
-        style={nameWidth === undefined ? undefined : { width: nameWidth }}
+        className={`relative min-w-0 ${effectiveNameWidth === undefined ? "flex-1" : "shrink-0"}`}
+        style={effectiveNameWidth === undefined ? undefined : { width: effectiveNameWidth }}
       >
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
@@ -520,11 +809,19 @@ export function TaskRowLine({
           >
             {task.blockTitle}
           </p>
+          {tree?.kind === "parent" && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+              {tree.count}
+            </span>
+          )}
           {task.fromSchedule && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600">
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
+          )}
+          {task.guideline && (
+            <GuidelineIndicator guideline={task.guideline} title={task.blockTitle} />
           )}
         </div>
         {!hideCompleted && (
@@ -542,8 +839,42 @@ export function TaskRowLine({
           </div>
         )}
       </div>
-      {dueDisplay && (
-        <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+      {/* "Proof" column (2026-07-30) — personal My Tasks lists only
+          (hideCompleted mode); sits between the Task column and Assigned
+          by. Width tracks the header's drag handle. */}
+      {hideCompleted && (
+        <span className="flex shrink-0 justify-center" style={{ width: proofWidth ?? 40 }}>
+          <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} />
+        </span>
+      )}
+      {/* "Assignee" column (2026-07-30) — personal My Tasks lists only
+          (hideCompleted mode). Plain name only — the column header gives
+          the context, so no per-row prefix. */}
+      {hideCompleted && (
+        <span
+          className={`truncate text-xs text-gray-500 ${
+            assignerWidth === undefined ? "min-w-0 flex-1" : "shrink-0"
+          }`}
+          style={assignerWidth === undefined ? undefined : { width: assignerWidth }}
+        >
+          {task.assignerName ?? <span className="text-gray-300">—</span>}
+        </span>
+      )}
+      {/* Due Date: in table mode a FIXED column (constant width/position,
+          always rendered — dash when no due date); outside the table the
+          original content-sized badge. */}
+      {hideCompleted ? (
+        <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+          {dueDisplay ? (
+            <span className={dueDisplay.className}>{dueDisplay.text}</span>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+        </span>
+      ) : (
+        dueDisplay && (
+          <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+        )
       )}
       {!hideCompleted && <StatusChip status={task.status} />}
     </div>
@@ -553,6 +884,31 @@ export function TaskRowLine({
 const RESIZABLE_TASK_NAME_MIN = 120;
 const RESIZABLE_TASK_NAME_MAX = 480;
 const RESIZABLE_TASK_NAME_DEFAULT = 220;
+
+/** Fixed widths for the non-resizable My Tasks columns (2026-07-30 final:
+ *  ONLY Task is draggable — long names are the one thing worth revealing;
+ *  Proof / Assigned by / Due date keep constant size, no handles). */
+const PROOF_COL_WIDTH = 48;
+const ASSIGNER_COL_WIDTH = 180;
+/** Due Date is a true fixed column too (2026-07-30 final spec) — constant
+ *  width at a constant position right after Assignee, NOT pinned to the
+ *  container's right edge (ml-auto made its position drift with screen
+ *  width). Wide enough for the longest value ("29/7 Yesterday"). */
+const DUE_COL_WIDTH = 120;
+
+/** The Task header's drag handle — same visual as TaskRowLine's in-row
+ *  handle (thin divider that thickens/blues on hover). */
+function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
+  return (
+    <span
+      onPointerDown={onPointerDown}
+      title="Drag to resize"
+      className="absolute -right-1.5 top-1/2 flex h-4 w-3 -translate-y-1/2 cursor-col-resize touch-none items-center justify-center"
+    >
+      <span className="h-4 w-px bg-gray-300 hover:w-0.5 hover:bg-blue-400" />
+    </span>
+  );
+}
 
 /**
  * The "My Tasks — Daily/Monthly" and roster-drill-down task lists, wrapping
@@ -713,6 +1069,7 @@ export function ResizableTaskList({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   emptyLabel,
   hideCompleted,
 }: {
@@ -723,42 +1080,93 @@ export function ResizableTaskList({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Pending" in the status dropdown (reopen) — see TaskRowLine. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** The Proof column's upload action — see ProofCell. */
+  onUploadProof?: ProofUploadHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
 }) {
-  const [nameWidth, setNameWidth] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
+  const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // Defaults to ON — completed tasks are visible immediately; toggling off
   // declutters down to Pending/N-A. N/A tasks have no toggle of their own —
   // they're always shown alongside Pending, same as any other non-terminal
   // status; only DONE is ever hidden here.
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const dragRef = React.useRef<{ x: number; width: number } | null>(null);
+  /** Parents the viewer has collapsed — everything ELSE is expanded (the
+   *  2026-07-30 confirmed default). */
+  const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
+
+  // Header and rows read the Task column's width from a CSS variable on
+  // the list container, NOT from React state directly. During a drag the
+  // pointermove handler writes the variable straight onto the DOM node —
+  // zero React re-renders per mouse move (re-rendering every TaskRowLine
+  // per move is what made dragging visibly lag) — and the width is
+  // committed to state ONCE on pointerup so later re-renders keep it.
+  const containerStyle = { "--tm-col-name": `${nameWidthPx}px` } as React.CSSProperties;
 
   const onResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
-    dragRef.current = { x: e.clientX, width: nameWidth };
+    dragRef.current = { x: e.clientX, width: nameWidthPx, latest: nameWidthPx };
     const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
+      const drag = dragRef.current;
+      if (!drag) return;
       const next = Math.min(
         RESIZABLE_TASK_NAME_MAX,
-        Math.max(RESIZABLE_TASK_NAME_MIN, dragRef.current.width + (ev.clientX - dragRef.current.x)),
+        Math.max(RESIZABLE_TASK_NAME_MIN, drag.width + (ev.clientX - drag.x)),
       );
-      setNameWidth(next);
+      drag.latest = next;
+      containerRef.current?.style.setProperty("--tm-col-name", `${next}px`);
     };
     const onUp = () => {
+      const drag = dragRef.current;
       dragRef.current = null;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      if (drag) setNameWidthPx(drag.latest);
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
+  const nameWidth = "var(--tm-col-name)";
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
   const visibleTasks = hideCompleted
     ? tasks.filter((t) => (t.status === "DONE" ? showCompleted : true))
     : tasks;
+
+  // Main Task ↔ Subtask tree (2026-07-30, table mode only): group rows
+  // under their parent, chevron-expandable (EXPANDED by default —
+  // collapsedIds tracks the exceptions). A subtask whose parent isn't in
+  // this list (different period window, or parent hidden by Show
+  // Completed) renders as a top-level row instead of vanishing.
+  const visibleIds = new Set(visibleTasks.map((t) => t.runBlockId));
+  const childrenOf = new Map<string, FlowTaskRow[]>();
+  if (hideCompleted) {
+    for (const t of visibleTasks) {
+      if (t.parentId && visibleIds.has(t.parentId)) {
+        const kids = childrenOf.get(t.parentId);
+        if (kids) kids.push(t);
+        else childrenOf.set(t.parentId, [t]);
+      }
+    }
+    // cuid ids sort in creation order = the order typed into the form.
+    for (const kids of childrenOf.values()) {
+      kids.sort((a, b) => (a.runBlockId < b.runBlockId ? -1 : 1));
+    }
+  }
+  const topLevelTasks = hideCompleted
+    ? visibleTasks.filter((t) => !t.parentId || !visibleIds.has(t.parentId))
+    : visibleTasks;
+  const hasTree = childrenOf.size > 0;
+  const toggleExpand = (id: string) =>
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Bulk-select/actions only ever apply to the viewer's OWN rows — same
   // assignee-only rule as the per-row dropdown (StatusDropdown) and
@@ -881,24 +1289,82 @@ export function ResizableTaskList({
   }
 
   return (
-    <div>
+    <div ref={containerRef} style={containerStyle}>
       {controlBar}
+      {/* Column header row (2026-07-30, ClickUp reference) — personal My
+          Tasks lists only. Spacers mirror the rows' leading checkbox +
+          status circle. ONLY the Task header carries a drag handle (its
+          width lives in the container's CSS variable); Proof and Assigned
+          by are fixed-width, and Due date is pinned to the right edge
+          (ml-auto) taking whatever remains. */}
+      {hideCompleted && (
+        <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+          <span className="w-4 shrink-0" aria-hidden />
+          {hasTree && <span className="w-4 shrink-0" aria-hidden />}
+          <span className="w-3 shrink-0" aria-hidden />
+          <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
+            Task
+            <HeaderResizeHandle onPointerDown={onResizeStart} />
+          </span>
+          <span className="shrink-0 truncate text-center" style={{ width: PROOF_COL_WIDTH }}>
+            Proof
+          </span>
+          {/* "Assignee" per the 2026-07-30 final spec (the shown value is
+              the run's starter — assignerName — but the user explicitly
+              chose this label over "Assigned by"). */}
+          <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
+            Assignee
+          </span>
+          <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
+            Due Date
+          </span>
+        </div>
+      )}
       <div className="divide-y divide-gray-100">
-        {visibleTasks.map((t) => (
-          <TaskRowLine
-            key={t.runBlockId}
-            task={t}
-            myUserId={myUserId}
-            onComplete={onComplete}
-            onSkip={onSkip}
-            onReopen={onReopen}
-            nameWidth={nameWidth}
-            onResizeStart={onResizeStart}
-            hideCompleted={hideCompleted}
-            selected={selectedIds.has(t.runBlockId)}
-            onToggleSelect={hideCompleted ? toggleSelect : undefined}
-          />
-        ))}
+        {topLevelTasks.map((t) => {
+          const kids = childrenOf.get(t.runBlockId) ?? [];
+          const expanded = !collapsedIds.has(t.runBlockId);
+          const shared = {
+            myUserId,
+            onComplete,
+            onSkip,
+            onReopen,
+            onUploadProof,
+            nameWidth,
+            proofWidth: PROOF_COL_WIDTH,
+            assignerWidth: ASSIGNER_COL_WIDTH,
+            hideCompleted,
+          };
+          return (
+            <React.Fragment key={t.runBlockId}>
+              <TaskRowLine
+                task={t}
+                {...shared}
+                onResizeStart={onResizeStart}
+                selected={selectedIds.has(t.runBlockId)}
+                onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                tree={
+                  hasTree
+                    ? kids.length > 0
+                      ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleExpand(t.runBlockId) }
+                      : { kind: "flat" }
+                    : undefined
+                }
+              />
+              {expanded &&
+                kids.map((k) => (
+                  <TaskRowLine
+                    key={k.runBlockId}
+                    task={k}
+                    {...shared}
+                    selected={selectedIds.has(k.runBlockId)}
+                    onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                    tree={{ kind: "child" }}
+                  />
+                ))}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );
@@ -921,6 +1387,7 @@ export function StatusOverviewCard({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   reassign,
 }: {
   title: string;
@@ -948,6 +1415,9 @@ export function StatusOverviewCard({
   /** "Pending" (reopen) handler, passed straight to EntityDrillModal — see
    *  TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** Proof upload handler, passed straight to EntityDrillModal — see
+   *  ProofCell. */
+  onUploadProof?: ProofUploadHandler;
   /** "Assign to Others" control, passed straight to EntityDrillModal. */
   reassign?: ReassignControl;
 }) {
@@ -982,6 +1452,7 @@ export function StatusOverviewCard({
           onComplete={onComplete}
           onSkip={onSkip}
           onReopen={onReopen}
+          onUploadProof={onUploadProof}
           reassign={reassign}
         />
       )}
@@ -1077,6 +1548,7 @@ export function EntityDrillModal({
   onComplete,
   onSkip,
   onReopen,
+  onUploadProof,
   reassign,
 }: {
   name: string;
@@ -1092,6 +1564,10 @@ export function EntityDrillModal({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark Pending" (reopen) handler — see TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  /** Proof upload — the viewer's OWN rows get the ＋/📎 cell (see
+   *  ProofCell); omitted on read-only oversight cards, where existing
+   *  proof still shows its 📎. */
+  onUploadProof?: ProofUploadHandler;
   /** "Assign to Others" (2026-07-25): when provided, every PENDING row gets
    *  a reassign control opening an inline person picker. Only passed for
    *  the 5 assign-capable identities; the server action re-checks. */
@@ -1227,7 +1703,14 @@ export function EntityDrillModal({
             No {meta.label.toLowerCase()} tasks this period.
           </p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <>
+            {/* Slim column header (2026-07-30) — the modal is too narrow
+                for the full three-column header, so just Task | Due date. */}
+            <div className="flex items-center justify-between gap-2.5 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <span>Task</span>
+              <span>Due date</span>
+            </div>
+            <div className="divide-y divide-gray-100">
             {rows.map((t) => {
               const due = t.dueAt ? new Date(t.dueAt) : null;
               const dueDisplay = formatDueDate(due);
@@ -1260,7 +1743,23 @@ export function EntityDrillModal({
                       {!isOwned && (
                         <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
                       )}
+                      {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
+                          show who assigned them (assigner cards / personal
+                          donut drills); rows about other people keep the
+                          assignee line above instead. */}
+                      {isOwned && t.assignerName && (
+                        <p className="truncate text-xs text-gray-500">
+                          Assigned by {t.assignerName}
+                        </p>
+                      )}
                     </div>
+                    {/* Proof (2026-07-30): ＋ upload on the viewer's own
+                        rows, 📎 view for anyone once uploaded. Only takes
+                        space when actionable/present — the modal is too
+                        narrow for a dash placeholder column. */}
+                    {(t.proofId || (isOwned && onUploadProof)) && (
+                      <ProofCell task={t} isOwned={isOwned} onUploadProof={onUploadProof} />
+                    )}
                     {dueDisplay && (
                       <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
                     )}
@@ -1294,7 +1793,8 @@ export function EntityDrillModal({
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </div>
     </div>

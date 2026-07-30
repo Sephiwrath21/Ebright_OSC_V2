@@ -81,11 +81,15 @@ export function getFlowDetail(
       monthDays,
     });
 
-    if (canViewOrg(user.role)) {
+    // Elevated department sites (Operations/Optimisation) get the FULL org
+    // view — departments AND branches AND ad hoc regions — per the
+    // 2026-07-29 final role spec (superadmin-equivalent visibility).
+    const elevated = isElevatedDeptSite(user);
+    if (canViewOrg(user.role) || elevated) {
       const [org, adhoc, adhocByRegion] = await Promise.all([
         getOrgPayload(q.period, q.date, monthDays),
         getAdhocPayload(null),
-        user.role === "ADMIN" || user.role === "OPS"
+        user.role === "ADMIN" || user.role === "OPS" || elevated
           ? getAdhocRegionsPayload(opts?.adhocDate)
           : Promise.resolve(undefined),
       ]);
@@ -116,9 +120,11 @@ export function getFlowDetail(
 
     if (user.role === "BRANCH" || user.role === "BRANCH_SITE") {
       const branchName = user.branch ?? UNASSIGNED;
+      // Branch SITES get the branch-wide ad hoc set too since the
+      // 2026-07-29 final role spec (was Manager-only oversight).
       const [branch, adhoc] = await Promise.all([
         getEntityPayload("branch", branchName, q.period, q.date, monthDays),
-        user.role === "BRANCH" ? getAdhocPayload(branchName) : Promise.resolve(null),
+        getAdhocPayload(branchName),
       ]);
       return {
         kind: "branch",
@@ -131,26 +137,22 @@ export function getFlowDetail(
     }
 
     if (user.role === "HOD" || user.role === "DEPT_SITE") {
+      // Elevated DEPT_SITEs never reach here (they take the org branch
+      // above since the 2026-07-29 final role spec).
       const departmentName = user.department ?? UNASSIGNED;
-      // Elevated department sites (Operations/Optimisation) see EVERY
-      // department (2026-07-28, the Home overview for all roles) — org
-      // payload with the branch halves STRIPPED: elevated visibility is
-      // org-wide DEPARTMENTS only, never branch data (see
-      // ELEVATED_DEPT_SITE_DEPARTMENTS).
-      const elevated = isElevatedDeptSite({ role: user.role, department: user.department });
-      const [department, org] = await Promise.all([
-        getEntityPayload("department", departmentName, q.period, q.date, monthDays),
-        elevated ? getOrgPayload(q.period, q.date, monthDays) : Promise.resolve(undefined),
-      ]);
+      const department = await getEntityPayload(
+        "department",
+        departmentName,
+        q.period,
+        q.date,
+        monthDays,
+      );
       return {
         kind: "department",
         period: q.period,
         date: resolvedDate(q.date),
         me,
         department: { name: departmentName, ...department },
-        ...(org
-          ? { org: { ...org, branches: [], regions: [], regionsByRole: [] } }
-          : {}),
       } as FlowDetailResponse;
     }
 
@@ -233,8 +235,11 @@ export function getMySidebarCounts(
       const m = d.getMonth() + 1;
       months[m] = (months[m] ?? 0) + 1;
       if (d.getMonth() === anchorMonth) {
-        const from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
-        const to = Math.min(from + 6, daysInAnchorMonth);
+        // FOUR chunks (2026-07-30 confirmation): 1-7 · 8-14 · 15-21 ·
+        // 22-{last day} — keys must match monthDayChunks() in the UI.
+        let from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
+        if (from > 22) from = 22;
+        const to = from === 22 ? daysInAnchorMonth : from + 6;
         const k = `${from}-${to}`;
         monthChunks[k] = (monthChunks[k] ?? 0) + 1;
       }

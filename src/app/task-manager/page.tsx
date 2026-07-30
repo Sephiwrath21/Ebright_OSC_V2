@@ -40,11 +40,18 @@ import {
   reopenFlowTask,
   saveCeoDashboardConfig,
   skipFlowTask,
+  uploadFlowTaskProof,
   FlowBridgeError,
   NoAccountError,
   SetupPendingError,
 } from "@/task-manager/data";
 import { formatLocalDate, isElevatedDeptSite, resolveWindow } from "@/task-manager/analytics/_lib";
+import {
+  resolveViewRole,
+  shows,
+  showsAddTaskHeader,
+  weekdayRangeOf,
+} from "@/task-manager/role-views";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
@@ -53,7 +60,7 @@ import {
   EntityPicker,
   MonthDropdown,
   MonthRangeDropdown,
-  MonthSidebar,
+  MonthRangeSidebar,
   WeekdaySidebar,
 } from "@/task-manager/ui/entity-picker";
 import {
@@ -157,7 +164,9 @@ export default async function TaskManagerPage({
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
-  // so changing one date never resets the others.
+  // so changing one date never resets the others. (Ad hoc is deliberately
+  // NOT date-filtered — 2026-07-29 simplification: one-off tasks, plain
+  // all-time list.)
   const rawParams = {
     date: dailyDate,
     mdate: monthlyDate,
@@ -225,6 +234,22 @@ export default async function TaskManagerPage({
       await reopenFlowTask(email, runBlockId);
       revalidatePath("/task-manager");
       return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function uploadProof(
+    runBlockId: string,
+    image: { mime: string; dataBase64: string },
+  ): Promise<import("@/task-manager/ui/types").ProofUploadResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const { proofId } = await uploadFlowTaskProof(email, runBlockId, image);
+      revalidatePath("/task-manager");
+      return { ok: true, proofId };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
@@ -405,6 +430,9 @@ export default async function TaskManagerPage({
       role,
       department: daily.me.me.department ?? null,
     });
+    // ALL role gates below read role-views.ts (the single source of truth,
+    // 2026-07-29 centralization).
+    const viewRole = resolveViewRole(daily.me.me);
     // "Assign to Others" — same 5 identities as the assign form; the data
     // layer re-checks (incl. HOD's own-department scoping) on every call.
     const canReassign =
@@ -412,23 +440,20 @@ export default async function TaskManagerPage({
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
-    // role (2026-07-29 consistency requirement) — CEO/OPS/HOD here; the
-    // superadmin + elevated-site branch below sets its own headerAction.
-    // Layout reshuffles below the header can never move it.
-    if (role === "CEO" || role === "OPS" || role === "HOD") {
+    // role per the config — layout reshuffles below the header can never
+    // move it.
+    if (showsAddTaskHeader(viewRole)) {
       headerAction = <AddTaskButton staff={staff} action={assign} />;
     }
 
-    if (role === "ADMIN" || elevatedDeptSite) {
-      // Superadmin + elevated department sites (Operation/Optimisation):
-      // dropdown-driven entity overview. ADMIN gets the Department|Branch
-      // toggle; elevated sites are department-only (no branch visibility by
-      // design — getBranchDetail would 403 them anyway). "+ Task" renders in
-      // the page header, above whatever mode is active.
-      headerAction = <AddTaskButton staff={staff} action={assign} />;
-
+    if (shows(viewRole, "taskManager", "entityDropdowns")) {
+      // Superadmin + elevated department sites (Operations/Optimisation):
+      // dropdown-driven entity overview with the Department | Branch toggle
+      // — elevated sites are superadmin-equivalent since the 2026-07-29
+      // final role spec. "+ Task" already sits in the page header via the
+      // config above.
       const view: "department" | "branch" =
-        role === "ADMIN" && sp.view === "branch" ? "branch" : "department";
+        sp.view === "branch" ? "branch" : "department";
 
       let overview: ReactNode;
       if (view === "department") {
@@ -527,7 +552,7 @@ export default async function TaskManagerPage({
 
       body = (
         <div className="flex flex-col gap-6">
-          {role === "ADMIN" && <ModeTabs active={view} date={dailyDate} />}
+          <ModeTabs active={view} date={dailyDate} />
           {overview}
         </div>
       );
@@ -614,12 +639,13 @@ export default async function TaskManagerPage({
         extraParams={monthlyCarry}
       />
     );
-    // Monthly selector (2026-07-29 redesign — calendar picker removed):
-    // compact [Month ▾][Range ▾] pair for the donut card heading; the
-    // ACCORDION month sidebar beside the "My Tasks — Monthly" list (one
-    // click selects a month AND expands its 7-day ranges inline — no
-    // separate range dropdown there). All drive the shared
-    // ?mdate=/?mrange= — changing month resets to Full month.
+    // Monthly selector (2026-07-30 layout): compact [Month ▾][Range ▾]
+    // pair for the donut card heading; on "My Tasks — Monthly" the compact
+    // [Month ▾] dropdown sits in the section heading and the range chunks
+    // (Full month · 1-7 · 8-14 · 15-21 · 22-{end}) render as a vertical
+    // sidebar with pending counts, mirroring Daily's weekday sidebar. All
+    // drive the shared ?mdate=/?mrange= — changing month resets to Full
+    // month.
     const personalMonthlyControl = (
       <div key="personal-monthly-controls" className="flex items-center gap-1.5">
         <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
@@ -631,14 +657,23 @@ export default async function TaskManagerPage({
         />
       </div>
     );
+    const personalMonthlyMonthControl = (
+      <MonthDropdown
+        key="personal-monthly-month"
+        value={monthly.date}
+        basePath="/task-manager"
+        extraParams={dailyCarry}
+      />
+    );
+    const anchorMonthNumber = Number(monthly.date.split("-")[1]);
     const personalMonthlySidebar = (
-      <MonthSidebar
-        key="personal-month-sidebar"
+      <MonthRangeSidebar
+        key="personal-month-range-sidebar"
         value={monthly.date}
         range={monthlyRangeParam}
         basePath="/task-manager"
         extraParams={dailyCarry}
-        monthCounts={sidebarCounts.months}
+        fullCount={sidebarCounts.months[anchorMonthNumber]}
         chunkCounts={sidebarCounts.monthChunks}
       />
     );
@@ -646,6 +681,8 @@ export default async function TaskManagerPage({
     // the date picker is the MASTER (any specific occurrence, past/future);
     // the sidebar switches days WITHIN the anchored week via the same
     // shared ?date= — donut, sidebar highlight, and list always agree.
+    // Weekday range (Tue–Sat / Tue–Sun / Wed–Sun) comes from the role
+    // config.
     const personalDailyDaySidebar = (
       <WeekdaySidebar
         key="daily-day-sidebar"
@@ -653,6 +690,7 @@ export default async function TaskManagerPage({
         basePath="/task-manager"
         extraParams={monthlyCarry}
         counts={sidebarCounts.weekdays}
+        range={weekdayRangeOf(viewRole)}
       />
     );
 
@@ -695,13 +733,33 @@ export default async function TaskManagerPage({
         ),
       };
     };
-    // HOD ← CEO assignments; MEMBER (Full Time / Intern / HQ Exec / Part
-    // Time / Coach / Branch Exec) ← HOD assignments — matching what each
-    // role's HOME overview shows.
-    const personalCeo =
-      daily.me.me.role === "HOD" ? dayWindowedStream("CEO", ceoDate, "cdate") : undefined;
-    const personalHod =
-      daily.me.me.role === "MEMBER" ? dayWindowedStream("HOD", hodDate, "hdate") : undefined;
+    // Dedicated assigner cards — who gets which is decided by
+    // role-views.ts (HOD ← CEO assignments; department-side staff ← HOD
+    // assignments; branch-side staff none).
+    const personalCeo = shows(viewRole, "taskManager", "ceoAssigned")
+      ? dayWindowedStream("CEO", ceoDate, "cdate")
+      : undefined;
+    const personalHod = shows(viewRole, "taskManager", "hodAssigned")
+      ? dayWindowedStream("HOD", hodDate, "hdate")
+      : undefined;
+    // Branch Manager's personal Ad hoc card + list (2026-07-29
+    // simplification: NO date filter — ad hoc tasks are one-off/irregular,
+    // so both the card and the always-rendered list show the plain ALL-TIME
+    // personal set, matching every other Ad hoc view in the app).
+    let personalAdhoc: Parameters<typeof TaskManagerView>[0]["personalAdhoc"];
+    if (shows(viewRole, "taskManager", "personalAdhoc")) {
+      const all = daily.me.adhocAll?.tasks ?? [];
+      const buckets = flowBucketize(all);
+      personalAdhoc = {
+        totals: {
+          completed: buckets.completed.length,
+          pending: buckets.pending.length,
+          na: buckets.na.length,
+        },
+        tasks: buckets,
+        flatTasks: all,
+      };
+    }
 
     body = (
       <TaskManagerView
@@ -714,6 +772,7 @@ export default async function TaskManagerPage({
         completeTaskAction={completeTask}
         skipTaskAction={skipTask}
         reopenTaskAction={reopenTask}
+        uploadProofAction={uploadProof}
         reassign={reassign}
         manpowerScheduleHref="/task-manager/manpower-schedule"
         ceoDashboard={ceoDashboard}
@@ -723,10 +782,12 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
+        personalMonthlyMonthControl={personalMonthlyMonthControl}
         personalMonthlySidebar={personalMonthlySidebar}
         personalDailyDaySidebar={personalDailyDaySidebar}
         personalCeo={personalCeo}
         personalHod={personalHod}
+        personalAdhoc={personalAdhoc}
       />
     );
   } catch (err) {

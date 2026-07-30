@@ -245,7 +245,25 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   scheduleSlotId: 'scheduleSlotId',
   cadence: 'cadence',
   repeatWeekly: 'repeatWeekly',
-  recurrenceOfId: 'recurrenceOfId'
+  recurrenceOfId: 'recurrenceOfId',
+  guidelineId: 'guidelineId',
+  parentId: 'parentId'
+};
+
+exports.Prisma.GuidelineScalarFieldEnum = {
+  id: 'id',
+  url: 'url',
+  imageMime: 'imageMime',
+  imageData: 'imageData',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ProofScalarFieldEnum = {
+  id: 'id',
+  runBlockId: 'runBlockId',
+  imageMime: 'imageMime',
+  imageData: 'imageData',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.RunItemScalarFieldEnum = {
@@ -432,6 +450,8 @@ exports.Prisma.ModelName = {
   DecisionNode: 'DecisionNode',
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
+  Guideline: 'Guideline',
+  Proof: 'Proof',
   RunItem: 'RunItem',
   NotificationLog: 'NotificationLog',
   AuditLog: 'AuditLog',

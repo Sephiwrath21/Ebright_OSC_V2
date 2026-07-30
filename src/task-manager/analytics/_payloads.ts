@@ -123,9 +123,18 @@ export async function getMePayload(
     getUsersByIds(mineAll.map((b) => b.run.startedById)),
     getAssigneeMap([...delegatedBlocks, ...delegatedAllBlocks]),
   ]);
-  // `mine`/`mineAll` are always assigned to `user` — no lookup needed.
+  // `mine`/`mineAll` are always assigned to `user` — no lookup needed for
+  // the assignee; the ASSIGNER's name (the "Assigned by" column,
+  // 2026-07-30) resolves via the starters map (built from mineAll, a
+  // superset of every windowed subset).
   const toMine = (blocks: typeof mine): DrillTaskRow[] =>
-    sortTaskRows(blocks.map(toTaskRow)).map((t) => ({ ...t, assigneeName: user.name }));
+    sortTaskRows(
+      blocks.map((b) => ({
+        ...toTaskRow(b),
+        assigneeName: user.name,
+        assignerName: starters.get(b.run.startedById)?.name ?? null,
+      })),
+    );
   const toStreams = (blocks: typeof mine) =>
     groupByAssignerRole(blocks, user.id, (id) => starters.get(id)?.role).map((s) => ({
       key: s.key,

@@ -32,7 +32,6 @@ import type {
   FlowDetailResponse,
   FlowDrillTask,
   FlowEntityDetail,
-  FlowMemberRollup,
   FlowPeriod,
   FlowTaskRow,
 } from "./types";
@@ -43,66 +42,18 @@ import {
   flowStreamLabel,
   visibleAssignerStreams,
 } from "./types";
+import { resolveViewRole, shows } from "../role-views";
 import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
 import { EntityOverviewSection } from "./department-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
-  CompletionMeter,
-  InitialAvatar,
   PageSectionHeading,
   ResizableTaskList,
   SectionCard,
   StatusOverviewCard,
   type ReassignControl,
 } from "./bits";
-
-function MemberRow({
-  member,
-  tasks,
-}: {
-  member: FlowMemberRollup;
-  tasks: FlowTaskRow[];
-}) {
-  const [open, setOpen] = React.useState(false);
-  const total = member.done + member.notDone;
-  const allDone = total > 0 && member.notDone === 0;
-
-  return (
-    <div className="border-b border-gray-100 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 py-3 text-left"
-      >
-        <InitialAvatar name={member.name} id={member.userId} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-gray-900">{member.name}</p>
-          <p className="truncate text-xs text-gray-500">{member.employmentType || "—"}</p>
-        </div>
-        <div className="hidden w-32 shrink-0 sm:block">
-          <CompletionMeter done={member.done} total={total} />
-        </div>
-        <span className="w-24 shrink-0 text-right text-xs text-gray-500">
-          {member.done} done · {member.notDone} open
-        </span>
-        <span
-          className={`inline-flex w-24 shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            allDone ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-          }`}
-        >
-          {allDone ? "Completed" : "Pending"}
-        </span>
-        <span className="shrink-0 text-gray-300">{open ? "▾" : "▸"}</span>
-      </button>
-      {open && (
-        <div className="mb-2 rounded-xl bg-gray-50 px-4 py-1">
-          <ResizableTaskList tasks={tasks} emptyLabel="No tasks this period." />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function TaskManagerView({
   daily,
@@ -114,6 +65,7 @@ export function TaskManagerView({
   completeTaskAction,
   skipTaskAction,
   reopenTaskAction,
+  uploadProofAction,
   reassign,
   manpowerScheduleHref,
   ceoDashboard,
@@ -123,10 +75,12 @@ export function TaskManagerView({
   departmentDailyControl,
   personalDailyControl,
   personalMonthlyControl,
+  personalMonthlyMonthControl,
   personalMonthlySidebar,
   personalDailyDaySidebar,
   personalCeo,
   personalHod,
+  personalAdhoc,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -149,6 +103,10 @@ export function TaskManagerView({
   /** Status dropdown's "Pending" option — only actionable on an already-
    *  Completed/N-A task (reopen); omit to disable reopening everywhere. */
   reopenTaskAction?: (runBlockId: string) => Promise<ActionResult>;
+  /** The Proof column's upload (2026-07-30) — assignee-only completion
+   *  evidence; optional, never gates completion. Wired to the same personal
+   *  surfaces as the status actions (see completeProps note below). */
+  uploadProofAction?: import("./types").ProofUploadHandler;
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
@@ -168,10 +126,12 @@ export function TaskManagerView({
    *  "My Tasks — Daily" list — switches days within the anchored week via
    *  the same shared ?date= the date picker (the master control) drives. */
   personalDailyDaySidebar?: React.ReactNode;
-  /** Monthly selector redesign (2026-07-29): the ACCORDION month sidebar
-   *  (MonthSidebar — one click selects a month and expands its 7-day
-   *  ranges inline) rendered beside the "My Tasks — Monthly" list, driving
-   *  the shared ?mdate=/?mrange=. */
+  /** Monthly selector (2026-07-30 layout): the compact [Month ▾] dropdown
+   *  for the "My Tasks — Monthly" section heading, and the vertical range
+   *  sidebar (MonthRangeSidebar — Full month + four chunks with pending
+   *  counts) rendered beside that list, driving the shared
+   *  ?mdate=/?mrange=. */
+  personalMonthlyMonthControl?: React.ReactNode;
   personalMonthlySidebar?: React.ReactNode;
   /** HOD's "CEO assigned tasks" card (2026-07-29) — same behavior as the
    *  Home version: pre-windowed to the ?cdate= day server-side, always
@@ -190,6 +150,15 @@ export function TaskManagerView({
     totals: FlowBucketTotals;
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     control?: React.ReactNode;
+  };
+  /** Branch Manager's personal "Ad hoc" card + list (2026-07-29): plain
+   *  ALL-TIME set, deliberately NO date filter — ad hoc tasks are one-off/
+   *  irregular. `flatTasks` feeds the ALWAYS-rendered "My Tasks — Ad hoc"
+   *  list; `tasks` (bucketized) feeds the donut card. */
+  personalAdhoc?: {
+    totals: FlowBucketTotals;
+    tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
+    flatTasks?: FlowTaskRow[];
   };
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
@@ -224,10 +193,10 @@ export function TaskManagerView({
 }) {
   const current = period === "daily" ? daily : monthly;
   const me = current.me;
-  // Branch-side MEMBER (Branch Exec/Coach — Manager is role BRANCH, handled
-  // separately) sees Daily only, never Monthly: no Monthly "My Status" donut,
-  // no "My Tasks — Monthly" list. Department-side MEMBER/HOD/OPS keep both.
-  const branchSideMember = me.me.role === "MEMBER" && me.me.branch !== null;
+  // ALL role gates below read role-views.ts (the single source of truth,
+  // 2026-07-29 centralization) via shows(view, "taskManager", key) — e.g.
+  // BRANCH_MEMBER (Branch Exec/Coach) = Daily only.
+  const view = resolveViewRole(me.me);
   // NOTE: elevated department sites (Operation/Optimisation) never reach
   // this view — the page routes them to the dropdown entity overview, where
   // their "+ Task" button lives in the page header.
@@ -246,6 +215,7 @@ export function TaskManagerView({
     onComplete: completeTaskAction,
     onSkip: skipTaskAction,
     onReopen: reopenTaskAction,
+    onUploadProof: uploadProofAction,
     reassign,
   };
 
@@ -285,10 +255,12 @@ export function TaskManagerView({
     />
   );
 
-  // Ad hoc tasks — all-time (Branch site + superadmin/OPS org view). No
-  // click-to-complete: this is the branch manager's oversight view across
-  // her whole branch's staff, not her own personal task list.
-  const adhocCard = current.adhoc && flowBucketTotal(current.adhoc.totals) > 0 && (
+  // Ad hoc tasks — all-time, branch-wide oversight (Branch Manager AND the
+  // view-only branch site since the 2026-07-29 final spec). Always rendered
+  // when the payload carries it (zero-filled, never a missing section). No
+  // click-to-complete: this is oversight across the whole branch's staff,
+  // not a personal task list.
+  const adhocCard = current.adhoc && (
     <StatusOverviewCard
       title="Ad hoc Tasks"
       totals={current.adhoc.totals}
@@ -297,10 +269,9 @@ export function TaskManagerView({
     />
   );
 
-  // Branch scope only since the 2026-07-24 redesign — department rosters now
-  // render inside the inline EntityOverviewSection (Details area) instead.
-  const dailyRoster = current.kind === "branch" ? daily.branch : undefined;
-  const monthlyRoster = current.kind === "branch" ? monthly.branch : undefined;
+  // Rosters render inside EntityOverviewSection for BOTH scopes since
+  // 2026-07-29 (branch adopted the Department Overview pattern) — no
+  // separately-styled roster cards remain.
 
   return (
     <div className="flex flex-col gap-5">
@@ -309,68 +280,66 @@ export function TaskManagerView({
           already worked this way; OPS/Branch/HOD/Member are now consistent
           with them too. */}
 
-      {/* ---- Overview donuts (composition per role/site) ---- */}
-      {(current.kind === "member" || (current.kind === "department" && me.me.role === "HOD")) && (
+      {/* ---- Overview donuts: personal cards row. Which cards render is
+          decided ENTIRELY by role-views.ts — site accounts list no
+          personal sections, so nothing renders for them here. ---- */}
+      {current.kind !== "org" && shows(view, "taskManager", "personalDaily") && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {/* Personal cards — MEMBER always, HOD but NOT its view-only
-              DEPT_SITE counterpart (a "Department account" has no personal
-              tasks at all — its full department detail renders below). */}
-          {(current.kind === "member" || me.me.role === "HOD") && (
-            <>
-              <StatusOverviewCard
-                title="Daily"
-                totals={daily.me.totals}
-                tasks={flowBucketize(daily.me.tasks)}
-                action={personalDailyControl}
-                actionPlacement="row"
-                {...completeProps}
-              />
-              {/* Branch-side MEMBER (Branch Exec/Coach) — Daily donut only, no
-                  Monthly. Department-side MEMBER and HOD keep both. */}
-              {!branchSideMember && (
-                <StatusOverviewCard
-                  title="Monthly"
-                  totals={monthly.me.totals}
-                  tasks={flowBucketize(monthly.me.tasks)}
-                  action={personalMonthlyControl}
-                  actionPlacement="row"
-                  {...completeProps}
-                />
-              )}
-              {/* HOD: the dedicated "CEO assigned tasks" card — same as the
-                  Home version (own ?cdate= filter, always rendered). */}
-              {me.me.role === "HOD" && personalCeo && (
-                <StatusOverviewCard
-                  title="CEO assigned tasks"
-                  totals={personalCeo.totals}
-                  tasks={personalCeo.tasks}
-                  action={personalCeo.control}
-                  actionPlacement="row"
-                  {...completeProps}
-                />
-              )}
-              {/* Staff (MEMBER — Full Time / Intern / HQ Exec / Part Time /
-                  Coach / Branch Exec): the dedicated "HOD assigned tasks"
-                  card — same as the Home version (own ?hdate= filter,
-                  always rendered). */}
-              {me.me.role === "MEMBER" && personalHod && (
-                <StatusOverviewCard
-                  title="HOD assigned tasks"
-                  totals={personalHod.totals}
-                  tasks={personalHod.tasks}
-                  action={personalHod.control}
-                  actionPlacement="row"
-                  {...completeProps}
-                />
-              )}
-              {assignedCards}
-              {/* Removed for HOD specifically — "Tasks I Assigned" stays
-                  available for MEMBER (the only other role that can reach
-                  this block) since the underlying StatusOverviewCard/
-                  delegatedCard pattern is shared, not HOD-specific. */}
-              {me.me.role !== "HOD" && delegatedCard}
-            </>
+          <StatusOverviewCard
+            title="Daily"
+            totals={daily.me.totals}
+            tasks={flowBucketize(daily.me.tasks)}
+            action={personalDailyControl}
+            actionPlacement="row"
+            {...completeProps}
+          />
+          {shows(view, "taskManager", "personalMonthly") && (
+            <StatusOverviewCard
+              title="Monthly"
+              totals={monthly.me.totals}
+              tasks={flowBucketize(monthly.me.tasks)}
+              action={personalMonthlyControl}
+              actionPlacement="row"
+              {...completeProps}
+            />
           )}
+          {/* Dedicated "CEO assigned tasks" card (HOD) — same as the Home
+              version (own ?cdate= filter, always rendered). */}
+          {shows(view, "taskManager", "ceoAssigned") && personalCeo && (
+            <StatusOverviewCard
+              title="CEO assigned tasks"
+              totals={personalCeo.totals}
+              tasks={personalCeo.tasks}
+              action={personalCeo.control}
+              actionPlacement="row"
+              {...completeProps}
+            />
+          )}
+          {/* Dedicated "HOD assigned tasks" card (department-side staff) —
+              same as the Home version (own ?hdate= filter, always
+              rendered). */}
+          {shows(view, "taskManager", "hodAssigned") && personalHod && (
+            <StatusOverviewCard
+              title="HOD assigned tasks"
+              totals={personalHod.totals}
+              tasks={personalHod.tasks}
+              action={personalHod.control}
+              actionPlacement="row"
+              {...completeProps}
+            />
+          )}
+          {/* Branch Manager's personal "Ad hoc" card — always rendered,
+              ALL-TIME, no date filter. */}
+          {shows(view, "taskManager", "personalAdhoc") && personalAdhoc && (
+            <StatusOverviewCard
+              title="Ad hoc"
+              totals={personalAdhoc.totals}
+              tasks={personalAdhoc.tasks}
+              {...completeProps}
+            />
+          )}
+          {shows(view, "taskManager", "assignerStreams") && assignedCards}
+          {shows(view, "taskManager", "delegated") && delegatedCard}
         </div>
       )}
 
@@ -378,7 +347,7 @@ export function TaskManagerView({
           branch overview blocks that used to sit here render at the BOTTOM
           of the page now — below My Tasks and My Board. */}
 
-      {current.kind === "org" && me.me.role === "CEO" && (
+      {current.kind === "org" && shows(view, "taskManager", "ceoCombinedList") && (
         <>
           {/* "+ Task" renders in the PAGE HEADER (2026-07-29 consistency
               requirement) — no in-body button here anymore. */}
@@ -448,60 +417,34 @@ export function TaskManagerView({
         </>
       )}
 
-      {current.kind === "org" && me.me.role !== "CEO" && (
-        <>
-          {/* Superadmin (ADMIN) gets NO personal cards — just the assign
-              form below (its org-wide status grids render on the OSC Home
-              page now — ui/home-overview.tsx). OPS
-              is a regular individual staff member for THIS section — her own
-              Daily/Monthly status + assigner streams (incl. "HOD assigned
-              tasks"), same pattern as any other staff member's personal
-              overview, and NOTHING else on this page: no Ad hoc card (Branch/
-              Manager context), no Department/Branch status grids (Superadmin-
-              only, on Home) — her org page is deliberately scoped down to
-              just her own tasks + the assign form. Daily/Monthly always
-              render as a pair (matching Member/HOD's own status, which is
-              never data-gated either) — an empty one just shows a 0/0/0 ring
-              instead of disappearing, so the pair doesn't silently go
-              asymmetric when only one period has tasks. */}
-          {me.me.role !== "ADMIN" && (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              <StatusOverviewCard
-                title="Daily"
-                totals={daily.me.totals}
-                tasks={flowBucketize(daily.me.tasks)}
-                {...completeProps}
-              />
-              <StatusOverviewCard
-                title="Monthly"
-                totals={monthly.me.totals}
-                tasks={flowBucketize(monthly.me.tasks)}
-                {...completeProps}
-              />
-              {assignedCards}
-            </div>
+      {/* OPS (org kind, but a regular individual staff member for THIS
+          section): her own Daily/Monthly status + assigner streams —
+          per role-views.ts. ADMIN and CEO configs list no personal cards,
+          so this renders for OPS only. The org-wide overview grids render
+          on the OSC Home page (ui/home-overview.tsx). */}
+      {current.kind === "org" && shows(view, "taskManager", "personalDaily") && (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <StatusOverviewCard
+            title="Daily"
+            totals={daily.me.totals}
+            tasks={flowBucketize(daily.me.tasks)}
+            {...completeProps}
+          />
+          {shows(view, "taskManager", "personalMonthly") && (
+            <StatusOverviewCard
+              title="Monthly"
+              totals={monthly.me.totals}
+              tasks={flowBucketize(monthly.me.tasks)}
+              {...completeProps}
+            />
           )}
-
-          {/* The org-wide overview grids (all-departments + branch-by-region
-              + ad hoc by region, Superadmin only) moved to the OSC Home page
-              — see ui/home-overview.tsx. This page keeps the assign form
-              (rendered at the bottom, after My Tasks — personal-first
-              order). */}
-        </>
+          {shows(view, "taskManager", "assignerStreams") && assignedCards}
+        </div>
       )}
 
-      {/* ---- My tasks (Daily + Monthly, always both unless branch-side
-          MEMBER; Ad hoc only when non-empty) — not for superadmin, the CEO
-          (whose dashboard is exactly the 3 sections above), or the view-only
-          DEPT_SITE/BRANCH_SITE logins (no personal tasks at all). Same role
-          gate covers every role that's supposed to have a personal "My
-          Task" view (HOD, MEMBER incl. Intern/Full Time/HQ Exec/Branch Exec/
-          Coach, OPS, and BRANCH — Farid gets these too, this block isn't
-          gated by `current.kind`). ---- */}
-      {me.me.role !== "ADMIN" &&
-        me.me.role !== "CEO" &&
-        me.me.role !== "DEPT_SITE" &&
-        me.me.role !== "BRANCH_SITE" && (
+      {/* ---- My Tasks lists — which lists render is decided ENTIRELY by
+          role-views.ts (superadmin/CEO/site logins list none). ---- */}
+      {shows(view, "taskManager", "myTasksDaily") && (
           <>
             {/* The weekday dropdown (DailyTasksByDay) was replaced by the
                 shared ?date= picker (2026-07-28): the payload is now windowed
@@ -525,10 +468,11 @@ export function TaskManagerView({
                 </div>
               </div>
             </SectionCard>
-            {!branchSideMember && (
-              <SectionCard title="My Tasks — Monthly">
-                {/* Month sidebar beside the list (2026-07-29 redesign),
-                    mirroring the Daily weekday sidebar layout. */}
+            {shows(view, "taskManager", "myTasksMonthly") && (
+              <SectionCard title="My Tasks — Monthly" action={personalMonthlyMonthControl}>
+                {/* Month dropdown in the heading; range sidebar beside the
+                    list (2026-07-30 layout), mirroring Daily's weekday
+                    sidebar. */}
                 <div className="flex flex-col gap-4 sm:flex-row">
                   {personalMonthlySidebar && (
                     <div className="shrink-0 sm:w-40">{personalMonthlySidebar}</div>
@@ -545,19 +489,34 @@ export function TaskManagerView({
               </SectionCard>
             )}
             {/* Ad hoc: routed by MY role as assignee (RunBlock.cadence),
-                never by who assigned it — hidden entirely when empty (only
-                Branch Manager assignees can ever be tagged ADHOC, per
-                assign/route.ts's allowedCadenceOptions, so this is empty for
-                almost everyone). All-time, like every other Ad hoc view. */}
-            {me.adhocAll && (
+                never by who assigned it. Branch Manager: ALWAYS rendered —
+                Daily/Monthly/Ad hoc is their confirmed 3-section My Tasks
+                set — as a plain ALL-TIME list, deliberately NO date filter
+                (2026-07-29 simplification: ad hoc tasks are one-off/
+                irregular; each row shows its due date). Other roles keep
+                the old hidden-when-empty list (only Branch Manager
+                assignees can ever be tagged ADHOC, per assign/route.ts's
+                allowedCadenceOptions, so it's empty for almost everyone). */}
+            {shows(view, "taskManager", "myTasksAdhoc") && personalAdhoc ? (
               <SectionCard title="My Tasks — Ad hoc">
                 <ResizableTaskList
-                  tasks={me.adhocAll.tasks}
+                  tasks={personalAdhoc.flatTasks ?? []}
                   {...completeProps}
                   emptyLabel="No ad hoc tasks assigned to you."
                   hideCompleted
                 />
               </SectionCard>
+            ) : (
+              me.adhocAll && (
+                <SectionCard title="My Tasks — Ad hoc">
+                  <ResizableTaskList
+                    tasks={me.adhocAll.tasks}
+                    {...completeProps}
+                    emptyLabel="No ad hoc tasks assigned to you."
+                    hideCompleted
+                  />
+                </SectionCard>
+              )
             )}
           </>
         )}
@@ -565,7 +524,7 @@ export function TaskManagerView({
       {/* ---- My Board: HOD's personal drag-and-drop Kanban — ABOVE the
           department overview, per the 2026-07-29 personal-first order.
           ("+ Task" renders in the PAGE HEADER, not here.) ---- */}
-      {current.kind === "department" && me.me.role === "HOD" && hodKanban && (
+      {shows(view, "taskManager", "myBoard") && hodKanban && (
         <>
           <PageSectionHeading>My Board</PageSectionHeading>
           <HodKanban
@@ -583,7 +542,9 @@ export function TaskManagerView({
           the 2026-07-29 personal-first reorder. Elevated department sites
           (Operations/Optimisation) never reach this view — the page routes
           them to the dropdown entity overview instead. ---- */}
-      {current.kind === "department" && daily.department && monthly.department && (
+      {shows(view, "taskManager", "departmentOverview") &&
+        daily.department &&
+        monthly.department && (
         <>
           <PageSectionHeading>Department Overview</PageSectionHeading>
           <EntityOverviewSection
@@ -603,38 +564,38 @@ export function TaskManagerView({
       )}
 
       {/* ---- Branch Overview (branch kind) — below My Tasks since the
-          2026-07-29 personal-first reorder. ---- */}
-      {current.kind === "branch" && (
+          2026-07-29 personal-first reorder. SAME component as Department
+          Overview (EntityOverviewSection, 2026-07-29 request): "{branch} —
+          Daily/Monthly" heading + date filter, stat chips, donut, and the
+          integrated click-through member roster (Manager → Branch Exec →
+          FT Coach → PT Coach sort, applied by the data layer). ---- */}
+      {shows(view, "taskManager", "branchOverview") && daily.branch && monthly.branch && (
         <>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {daily.branch && (
-              <StatusOverviewCard
-                title="Daily"
-                totals={daily.branch.totals}
-                tasks={daily.branch.tasks}
-                reassign={reassign}
-              />
-            )}
-            {monthly.branch && (
-              <StatusOverviewCard
-                title="Monthly"
-                totals={monthly.branch.totals}
-                tasks={monthly.branch.tasks}
-                reassign={reassign}
-              />
-            )}
-            {/* Ad hoc oversight — Branch Manager only, not the view-only
-                BRANCH_SITE login (spec only gives it Branch Status). */}
-            {me.me.role === "BRANCH" && adhocCard}
-            {/* CEO/HOD assigned-task cards — Branch Manager only, same as
-                every other role with a personal "My Task" view. BRANCH_SITE
-                stays view-only. */}
-            {me.me.role === "BRANCH" && assignedCards}
-          </div>
+          <PageSectionHeading>Branch Overview</PageSectionHeading>
+          <EntityOverviewSection
+            label="Daily"
+            entity={daily.branch}
+            kind="branch"
+            reassign={reassign}
+            headerControl={personalDailyControl}
+          />
+          <EntityOverviewSection
+            label="Monthly"
+            entity={monthly.branch}
+            kind="branch"
+            reassign={reassign}
+            headerControl={personalMonthlyControl}
+          />
+          {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
+              Manager only, not the view-only BRANCH_SITE login. The
+              manager's PERSONAL ad hoc card lives in the top row. */}
+          {shows(view, "taskManager", "adhocOversight") && adhocCard && (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{adhocCard}</div>
+          )}
 
           {/* ---- Details: manpower schedule (branch manager only, not
               BRANCH_SITE) ---- */}
-          {me.me.role === "BRANCH" && manpowerScheduleHref && (
+          {shows(view, "taskManager", "manpowerLink") && manpowerScheduleHref && (
             <>
               <PageSectionHeading>Details</PageSectionHeading>
               <a
@@ -659,39 +620,6 @@ export function TaskManagerView({
       {/* OPS's assign form: "+ Task" renders in the PAGE HEADER (2026-07-29
           consistency requirement) — the old bottom "Details" block is gone. */}
 
-      {/* ---- Member roster (branch scope), Daily + Monthly ---- */}
-      {[
-        { period: "Daily", roster: dailyRoster },
-        { period: "Monthly", roster: monthlyRoster },
-      ].map(
-        ({ period: label, roster }) =>
-          roster && (
-            <SectionCard
-              key={label}
-              title={`Members — ${roster.name} (${label})`}
-              action={
-                <span className="text-xs text-gray-400">
-                  {roster.members.length} members
-                </span>
-              }
-            >
-              {roster.members.length === 0 ? (
-                <p className="py-6 text-center text-sm text-gray-400">
-                  No member activity this period.
-                </p>
-              ) : (
-                roster.members.map((m) => {
-                  const memberTasks = [
-                    ...roster.tasks.completed,
-                    ...roster.tasks.pending,
-                    ...roster.tasks.na,
-                  ].filter((t) => t.assigneeId === m.userId);
-                  return <MemberRow key={m.userId} member={m} tasks={memberTasks} />;
-                })
-              )}
-            </SectionCard>
-          ),
-      )}
     </div>
   );
 }
