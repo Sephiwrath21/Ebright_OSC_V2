@@ -528,9 +528,10 @@ function GuidelineIndicator({
 }
 
 /** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
- *  2 MB cap, so a bad pick fails instantly instead of round-tripping. */
+ *  10 MB cap (raised from 2 MB, 2026-07-31), so a bad pick fails instantly
+ *  instead of round-tripping. */
 const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
-const PROOF_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** The "Proof" column cell (2026-07-30): assignee-uploaded completion
  *  evidence, always optional (never gates the status dropdown). Owner of a
@@ -582,7 +583,7 @@ function ProofCell({
       return;
     }
     if (file.size > PROOF_IMAGE_MAX_BYTES) {
-      setErrorText("Image is too large — max 2 MB");
+      setErrorText("Image is too large — max 10 MB");
       return;
     }
     setBusy(true);
@@ -675,7 +676,7 @@ function ProofCell({
       (blob) => {
         if (!blob) return;
         stopCamera();
-        // Same path as every other method — validation, 2 MB cap, upload.
+        // Same path as every other method — validation, 10 MB cap, upload.
         void uploadFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
       },
       "image/jpeg",
@@ -855,8 +856,8 @@ function ProofCell({
                   <span className="text-xl" aria-hidden>
                     🖼️
                   </span>
-                  <p className="text-sm font-medium text-gray-600">Drop an image here</p>
-                  <p className="text-xs text-gray-400">or paste (Ctrl+V)</p>
+                  <p className="text-sm font-medium text-gray-600">Drop an Image Here</p>
+                  <p className="text-xs text-gray-400">or Paste It (Ctrl+V)</p>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -865,7 +866,7 @@ function ProofCell({
                     onClick={() => inputRef.current?.click()}
                     className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
                   >
-                    📁 Upload file
+                    📁 Upload File
                   </button>
                   <button
                     type="button"
@@ -881,7 +882,7 @@ function ProofCell({
             {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
-            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 2 MB</p>
+            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 10 MB</p>
           </div>
         </div>,
         document.body,
