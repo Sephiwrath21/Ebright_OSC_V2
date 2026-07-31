@@ -41,15 +41,19 @@ function SummaryChip({
 }: {
   label: string;
   count: number;
-  tone: "neutral" | "completed" | "pending";
+  tone: "neutral" | "completed" | "pending" | "na";
 }) {
   const toneClass = {
     neutral: "border-indigo-100 bg-indigo-50 text-indigo-700",
     completed: "border-emerald-100 bg-emerald-50 text-emerald-700",
     pending: "border-rose-100 bg-rose-50 text-rose-700",
+    // Amber — matches N/A's color everywhere else (legend dot, status chip).
+    na: "border-amber-100 bg-amber-50 text-amber-700",
   }[tone];
   return (
-    <div className={`flex flex-1 flex-col items-center rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
+    <div
+      className={`flex min-w-[110px] flex-1 flex-col items-center rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}
+    >
       <span className="text-2xl font-bold">{count}</span>
       <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
     </div>
@@ -291,10 +295,15 @@ export function EntityOverviewSection({
         {headerControl}
       </div>
 
-      <div className="flex gap-3">
+      {/* flex-wrap (2026-07-31): four chips now — the N/A card wraps to a
+          second row on narrow screens instead of squeezing. N/A counts
+          TASKS from entity.totals — the same source as the status donut's
+          N/A legend segment. */}
+      <div className="flex flex-wrap gap-3">
         <SummaryChip label="Members" count={entity.members.length} tone="neutral" />
         <SummaryChip label="Completed" count={completedCount} tone="completed" />
         <SummaryChip label="Pending" count={pendingCount} tone="pending" />
+        <SummaryChip label="N/A" count={entity.totals.na} tone="na" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
