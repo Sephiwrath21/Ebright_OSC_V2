@@ -1023,7 +1023,9 @@ export function TaskRowLine({
     >
       {/* Hover-to-reveal (2026-07-30): the checkbox always OCCUPIES its
           slot (no layout shift) but is invisible until the row is hovered
-          or keyboard-focused — except a CHECKED box, which stays visible. */}
+          or keyboard-focused — except a CHECKED box, which stays visible.
+          Touch devices (2026-07-31): no hover exists, so the checkbox is
+          ALWAYS visible there ([@media(hover:none)]). */}
       {hideCompleted && isOwned && onToggleSelect && (
         <input
           type="checkbox"
@@ -1031,7 +1033,9 @@ export function TaskRowLine({
           onChange={() => onToggleSelect(task.runBlockId)}
           aria-label={`Select ${task.blockTitle}`}
           className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 transition-opacity ${
-            selected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+            selected
+              ? "opacity-100"
+              : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           }`}
         />
       )}
@@ -1674,6 +1678,13 @@ export function ResizableTaskList({
   return (
     <div ref={containerRef} style={containerStyle}>
       {controlBar}
+      {/* Phones/tablets (2026-07-31): the fixed columns total ~700px, so
+          in table mode the header+rows pan HORIZONTALLY inside this
+          container instead of cutting off or squeezing — the page itself
+          never scrolls sideways. Desktop unaffected (min-w-full keeps the
+          table filling its card). */}
+      <div className={hideCompleted ? "overflow-x-auto" : undefined}>
+        <div className={hideCompleted ? "w-max min-w-full" : undefined}>
       {/* Column header row (2026-07-30, ClickUp reference) — personal My
           Tasks lists only. Spacers mirror the rows' leading checkbox +
           status circle. ONLY the Task header carries a drag handle (its
@@ -1694,7 +1705,9 @@ export function ResizableTaskList({
               aria-label="Select all tasks"
               title="Select all"
               className={`size-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 transition-opacity ${
-                allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                allOwnedSelected
+                  ? "opacity-100"
+                  : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
               }`}
             />
           ) : (
@@ -1772,6 +1785,8 @@ export function ResizableTaskList({
             </React.Fragment>
           );
         })}
+      </div>
+        </div>
       </div>
       {/* Unresolved-subtasks confirmation modal (2026-07-30) — portal to
           <body>, same escape-the-dimmed-row rationale as ProofCell's. */}
