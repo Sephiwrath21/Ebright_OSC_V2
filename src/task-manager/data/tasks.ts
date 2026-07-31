@@ -63,6 +63,14 @@ const assignInputSchema = z.object({
   // Optional Subtasks (2026-07-30): each becomes a full task of its own
   // linked under the main task (see the pairs loop below).
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  // Optional "Save as Template" (2026-07-31): also persist this
+  // assignment's STRUCTURE as a reusable TaskTemplate owned by the actor.
+  // Same-name save overwrites (the template edit path).
+  saveAsTemplate: z.object({ name: z.string().trim().min(1).max(100) }).optional(),
+  // Set when the form was pre-filled via "Start from a template" — stamps
+  // every created block with the template's id so template deletion can
+  // find (and cancel) its pending assignments.
+  fromTemplateId: z.string().min(1).optional(),
 });
 
 /** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
@@ -241,6 +249,38 @@ export function assignFlowTask(
       guidelineId = guideline.id;
     }
 
+    // "Save as Template" (2026-07-31): runs BEFORE the fan-out so the
+    // template's id can stamp every created block (templateId) — that link
+    // is what lets deleting the template cancel its pending assignments.
+    // Structure only: recipients, days, and due date deliberately excluded
+    // (they reset per use). Image bytes are copied INTO the template so
+    // task-side changes can never hollow it out; using the template later
+    // creates a fresh Guideline row through the normal path.
+    let savedTemplateId: string | null = null;
+    if (body.saveAsTemplate) {
+      const templateData = {
+        title: body.title,
+        subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
+        cadence,
+        guidelineUrl: body.guidelineUrl ?? null,
+        guidelineMime: body.guidelineImage?.mime ?? null,
+        guidelineImage: body.guidelineImage
+          ? Buffer.from(body.guidelineImage.dataBase64, "base64")
+          : null,
+      };
+      const existing = await prisma.taskTemplate.findFirst({
+        where: { createdById: actor.id, name: body.saveAsTemplate.name },
+        select: { id: true },
+      });
+      const saved = existing
+        ? await prisma.taskTemplate.update({ where: { id: existing.id }, data: templateData })
+        : await prisma.taskTemplate.create({
+            data: { createdById: actor.id, name: body.saveAsTemplate.name, ...templateData },
+          });
+      savedTemplateId = saved.id;
+    }
+    const templateId = body.fromTemplateId ?? savedTemplateId ?? null;
+
     // Pairs touch disjoint rows — no shared transaction ties them together
     // (each create was already its own implicit transaction in the donor's
     // loop form), so they run concurrently on purpose. Do not "fix" into a
@@ -271,6 +311,7 @@ export function assignFlowTask(
             dueAt: occ.dueAt,
             cadence,
             guidelineId,
+            templateId,
             runItems: {
               create: block.items.map((it) => ({
                 itemId: it.id,
@@ -313,6 +354,7 @@ export function assignFlowTask(
               dueAt: occ.dueAt,
               cadence,
               parentId: parentBlock.id,
+              templateId,
               runItems: {
                 create: block.items.map((it) => ({
                   itemId: it.id,

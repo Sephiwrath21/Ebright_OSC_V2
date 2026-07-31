@@ -225,6 +225,7 @@ exports.Prisma.FlowRunScalarFieldEnum = {
   startedById: 'startedById',
   triggerType: 'triggerType',
   status: 'status',
+  archivedAt: 'archivedAt',
   startedAt: 'startedAt',
   completedAt: 'completedAt'
 };
@@ -247,7 +248,8 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   repeatWeekly: 'repeatWeekly',
   recurrenceOfId: 'recurrenceOfId',
   guidelineId: 'guidelineId',
-  parentId: 'parentId'
+  parentId: 'parentId',
+  templateId: 'templateId'
 };
 
 exports.Prisma.GuidelineScalarFieldEnum = {
@@ -256,6 +258,21 @@ exports.Prisma.GuidelineScalarFieldEnum = {
   imageMime: 'imageMime',
   imageData: 'imageData',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.TaskTemplateScalarFieldEnum = {
+  id: 'id',
+  createdById: 'createdById',
+  name: 'name',
+  title: 'title',
+  subtasks: 'subtasks',
+  cadence: 'cadence',
+  guidelineUrl: 'guidelineUrl',
+  guidelineMime: 'guidelineMime',
+  guidelineImage: 'guidelineImage',
+  archivedAt: 'archivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.ProofScalarFieldEnum = {
@@ -451,6 +468,7 @@ exports.Prisma.ModelName = {
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
+  TaskTemplate: 'TaskTemplate',
   Proof: 'Proof',
   RunItem: 'RunItem',
   NotificationLog: 'NotificationLog',

@@ -38,6 +38,18 @@ import {
   recolorKanbanColumn,
   renameKanbanColumn,
   reopenFlowTask,
+  archiveTemplateTasks,
+  deleteTaskTemplate,
+  editTaskTemplate,
+  getTaskTemplate,
+  getTemplateAssignees,
+  getTemplateDeletionImpact,
+  listArchivedItems,
+  listTaskTemplates,
+  reassignTemplateTasks,
+  removeTemplateAssignments,
+  renameTaskTemplate,
+  unarchiveTemplateTasks,
   saveCeoDashboardConfig,
   skipFlowTask,
   uploadFlowTaskProof,
@@ -255,6 +267,163 @@ export default async function TaskManagerPage({
     }
   }
 
+  // Task Template actions (2026-07-31) — creation happens through assign's
+  // saveAsTemplate flag; these cover load-for-prefill, rename, delete.
+  async function loadTemplate(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateLoadResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const template = await getTaskTemplate(email, templateId);
+      return { ok: true, template: template as import("@/task-manager/ui/types").FlowTemplateDetail };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function renameTemplate(templateId: string, name: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await renameTaskTemplate(email, templateId, name);
+      revalidatePath("/task-manager");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function templateImpact(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateImpactResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const impact = await getTemplateDeletionImpact(email, templateId);
+      return { ok: true, ...impact };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function deleteTemplate(templateId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await deleteTaskTemplate(email, templateId);
+      // Cancelling pending assignments changes OTHER people's lists too —
+      // refresh both task surfaces.
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  // + Task hub actions (2026-07-31): Edit / Remove-in-bulk / Reassign.
+  async function templateAssignees(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateAssigneesResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const assignees = await getTemplateAssignees(email, templateId);
+      return { ok: true, assignees };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function editTemplate(
+    templateId: string,
+    input: import("@/task-manager/ui/types").FlowTemplateEditInput,
+  ): Promise<import("@/task-manager/ui/types").TemplateEditResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await editTaskTemplate(email, templateId, input);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function removeAssignments(
+    templateId: string,
+    alsoDeleteTemplate: boolean,
+  ): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await removeTemplateAssignments(email, templateId, { deleteTemplate: alsoDeleteTemplate });
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function archiveTemplate(templateId: string, userId?: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await archiveTemplateTasks(email, templateId, userId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function unarchiveTemplate(templateId: string, userId?: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await unarchiveTemplateTasks(email, templateId, userId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function archivedItems(): Promise<import("@/task-manager/ui/types").ArchivedItemsResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const items = await listArchivedItems(email);
+      return { ok: true, ...items };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function reassignTemplate(
+    templateId: string,
+    fromUserId: string,
+    toUserId: string,
+  ): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await reassignTemplateTasks(email, templateId, fromUserId, toUserId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   async function reassignTask(runBlockId: string, newAssigneeId: string): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
@@ -441,9 +610,31 @@ export default async function TaskManagerPage({
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
     // role per the config — layout reshuffles below the header can never
-    // move it.
+    // move it. Templates (2026-07-31) ride along: the saved list + its
+    // load/rename/delete actions feed the form's "Start from a template"
+    // picker and Manage panel.
     if (showsAddTaskHeader(viewRole)) {
-      headerAction = <AddTaskButton staff={staff} action={assign} />;
+      const templateList = await listTaskTemplates(email);
+      headerAction = (
+        <AddTaskButton
+          staff={staff}
+          action={assign}
+          templates={{
+            list: templateList,
+            load: loadTemplate,
+            impact: templateImpact,
+            rename: renameTemplate,
+            remove: deleteTemplate,
+            assignees: templateAssignees,
+            edit: editTemplate,
+            removeAssignments,
+            reassignAll: reassignTemplate,
+            archive: archiveTemplate,
+            unarchive: unarchiveTemplate,
+            archived: archivedItems,
+          }}
+        />
+      );
     }
 
     if (shows(viewRole, "taskManager", "entityDropdowns")) {

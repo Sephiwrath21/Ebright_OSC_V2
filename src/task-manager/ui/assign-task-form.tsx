@@ -20,6 +20,7 @@ import {
   type FlowAssignInput,
   type FlowGroup,
   type FlowStaffMember,
+  type FlowTemplateControl,
 } from "./types";
 import { RecipientPicker } from "./recipient-picker";
 
@@ -42,6 +43,7 @@ export function AssignTaskForm({
   staff,
   action,
   recipientGroup,
+  templates,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -53,6 +55,10 @@ export function AssignTaskForm({
    *  CEO's "+ Add Task" form) — passed straight through to RecipientPicker.
    *  Omit for the normal, fully flexible Person + any-Group picker. */
   recipientGroup?: FlowGroup;
+  /** Task Templates (2026-07-31): saved list + load/rename/delete actions
+   *  — drives "Start from a template", the Manage panel, and pairs with
+   *  the "Save as Template" checkbox below. Omit to hide all of it. */
+  templates?: FlowTemplateControl;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -77,6 +83,44 @@ export function AssignTaskForm({
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+  // Task Templates (2026-07-31)
+  const [templateId, setTemplateId] = React.useState("");
+  const [templateBusy, setTemplateBusy] = React.useState(false);
+  const [saveTemplate, setSaveTemplate] = React.useState(false);
+  const [templateName, setTemplateName] = React.useState("");
+
+  /** "Start from a template": load the full template and pre-fill the
+   *  structure fields. Recipients/days/due date are untouched (they're
+   *  per-assignment); everything stays editable, and nothing here ever
+   *  writes back to the template. */
+  const applyTemplate = async (id: string) => {
+    setTemplateId(id);
+    if (!id || !templates) return;
+    setTemplateBusy(true);
+    const result = await templates.load(id);
+    setTemplateBusy(false);
+    if (!result.ok) {
+      setMessage({ ok: false, text: result.message });
+      return;
+    }
+    const t = result.template;
+    setTitle(t.title);
+    setSubtasks(t.subtasks);
+    setSubtaskDraft("");
+    setCadence(t.cadence);
+    setGuidelineUrl(t.guidelineUrl ?? "");
+    if (t.guidelineImage) {
+      setGuidelineImage({
+        mime: t.guidelineImage.mime,
+        dataBase64: t.guidelineImage.dataBase64,
+        previewUrl: `data:${t.guidelineImage.mime};base64,${t.guidelineImage.dataBase64}`,
+        name: `${t.name} (template image)`,
+      });
+    } else {
+      clearGuidelineImage();
+    }
+    setMessage(null);
+  };
 
   const GUIDELINE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
   const GUIDELINE_MAX_BYTES = 2 * 1024 * 1024;
@@ -183,9 +227,13 @@ export function AssignTaskForm({
           ? { mime: guidelineImage.mime, dataBase64: guidelineImage.dataBase64 }
           : undefined,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
+        saveAsTemplate: saveTemplate
+          ? { name: templateName.trim() || title.trim() }
+          : undefined,
+        fromTemplateId: templateId || undefined,
       });
       if (result.ok) {
-        setMessage({ ok: true, text: "Task Assigned" });
+        setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
         setTitle("");
         setUserIds([]);
         setCadence(null);
@@ -195,6 +243,9 @@ export function AssignTaskForm({
         clearGuidelineImage();
         setSubtasks([]);
         setSubtaskDraft("");
+        setTemplateId("");
+        setSaveTemplate(false);
+        setTemplateName("");
       } else {
         setMessage({ ok: false, text: result.message });
       }
@@ -214,6 +265,32 @@ export function AssignTaskForm({
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+        {/* Task Templates (2026-07-31): pick one to pre-fill the structure
+            (title/subtasks/cadence/guideline) — recipients, days, and due
+            date always start fresh. Using a template never modifies it.
+            The old Manage link is gone (2026-07-31): rename/delete/archive
+            live in the hub's Edit/Remove/Archive tabs now. */}
+        {templates && templates.list.length > 0 && (
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-600">Template</p>
+            <select
+              value={templateId}
+              onChange={(e) => void applyTemplate(e.target.value)}
+              disabled={templateBusy}
+              className={`mt-2 ${selectClass}`}
+            >
+              <option value="">Select</option>
+              {templates.list.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.subtaskCount} subtask{t.subtaskCount === 1 ? "" : "s"}
+                  {t.hasGuidelineUrl || t.hasGuidelineImage ? ", guideline" : ""})
+                </option>
+              ))}
+            </select>
+            {templateBusy && <p className="mt-1.5 text-xs text-gray-400">Loading template…</p>}
+          </div>
+        )}
+
         <label className="max-w-xl text-sm text-gray-600">
           Task title
           <input
@@ -223,6 +300,66 @@ export function AssignTaskForm({
             className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
           />
         </label>
+
+        {/* Subtasks (moved 2026-07-31): DIRECTLY under the Task title —
+            visually nested via the left guide line — mirroring how the
+            task list renders them (parent title, subtasks indented
+            below). Each entry becomes a FULL task row of its own (own
+            status/proof/due, completion independent of the main task)
+            for every recipient × day. Empty = a normal single task;
+            nothing here ever blocks submission. */}
+        <div className="ml-4 max-w-xl border-l-2 border-gray-200 pl-3">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-600">Subtasks</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={subtaskDraft}
+                onChange={(e) => setSubtaskDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addSubtask();
+                  }
+                }}
+                placeholder="Type a subtask..."
+                maxLength={200}
+                className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={addSubtask}
+                disabled={!subtaskDraft.trim() || subtasks.length >= SUBTASK_MAX}
+                className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
+              >
+                + Add
+              </button>
+            </div>
+            {subtasks.length > 0 && (
+              <ol className="mt-2 space-y-1">
+                {subtasks.map((s, i) => (
+                  <li
+                    key={`${i}-${s}`}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+                  >
+                    <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate">{s}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSubtask(i)}
+                      aria-label={`Remove subtask ${s}`}
+                      className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {subtasks.length >= SUBTASK_MAX && (
+              <p className="mt-1.5 text-xs text-gray-400">Maximum {SUBTASK_MAX} subtasks.</p>
+            )}
+          </div>
+        </div>
 
         <RecipientPicker
           staff={staff}
@@ -308,62 +445,6 @@ export function AssignTaskForm({
           />
         </label>
 
-        {/* Subtasks (optional, 2026-07-30): checklist builder — each entry
-            becomes a FULL task row of its own (own status/proof/due,
-            completion independent of the main task) for every recipient ×
-            day, indented under the main task in My Tasks. Empty = a normal
-            single task; nothing here ever blocks submission. */}
-        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm font-medium text-gray-600">Subtasks</p>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={subtaskDraft}
-              onChange={(e) => setSubtaskDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addSubtask();
-                }
-              }}
-              placeholder="Type a subtask..."
-              maxLength={200}
-              className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={addSubtask}
-              disabled={!subtaskDraft.trim() || subtasks.length >= SUBTASK_MAX}
-              className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
-            >
-              + Add
-            </button>
-          </div>
-          {subtasks.length > 0 && (
-            <ol className="mt-2 space-y-1">
-              {subtasks.map((s, i) => (
-                <li
-                  key={`${i}-${s}`}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
-                >
-                  <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
-                  <span className="min-w-0 flex-1 truncate">{s}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeSubtask(i)}
-                    aria-label={`Remove subtask ${s}`}
-                    className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-          {subtasks.length >= SUBTASK_MAX && (
-            <p className="mt-1.5 text-xs text-gray-400">Maximum {SUBTASK_MAX} subtasks.</p>
-          )}
-        </div>
-
         {/* Guideline (optional, 2026-07-30): SOP link and/or reference
             image. Leaving both empty is fine — routine tasks need no
             guidance; nothing here ever blocks submission. */}
@@ -407,6 +488,39 @@ export function AssignTaskForm({
             </div>
           )}
         </div>
+
+        {/* Save as Template (2026-07-31): also store this task's STRUCTURE
+            (title/subtasks/cadence/guideline — never recipients/days/due
+            date) for reuse. Saving under an existing template's name
+            overwrites it — that's the intended "edit template" path. */}
+        {templates && (
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-600">
+              <input
+                type="checkbox"
+                checked={saveTemplate}
+                onChange={(e) => setSaveTemplate(e.target.checked)}
+                className="size-4 rounded border-gray-300 accent-blue-600"
+              />
+              Save as Template
+            </label>
+            {saveTemplate && (
+              <>
+                <input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder={title.trim() ? `Template name (default: ${title.trim()})` : "Template name"}
+                  maxLength={100}
+                  className="mt-2 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Saves the task structure (title, subtasks, guideline) — not the recipients or dates.
+                  Using an existing name updates that template.
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sticky footer: OUTSIDE the scrollable fields region above, so the

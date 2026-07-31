@@ -233,6 +233,11 @@ model FlowRun {
   startedById      String
   triggerType      TriggerType
   status           RunStatus   @default(ACTIVE)
+  // Archive (2026-07-31): non-null = hidden from every active view
+  // (fetchPeriodBlocks filters it) but fully retrievable/restorable —
+  // unlike CANCELLED this is a first-class reversible state, cleared by
+  // Unarchive. Orthogonal to `status` so completion history survives.
+  archivedAt       DateTime?
   startedAt        DateTime    @default(now())
   completedAt      DateTime?
   runBlocks        RunBlock[]
@@ -319,12 +324,21 @@ model RunBlock {
   parent   RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   subtasks RunBlock[] @relation("BlockSubtasks")
 
+  // Which TaskTemplate this block was created from (2026-07-31): set on
+  // every block of an assignment that used "Start from a template" OR
+  // "Save as Template" (the originating assignment). Plain string, no FK —
+  // same loose coupling as user ids — so template deletion can cancel the
+  // template's PENDING assignments (see deleteTaskTemplate) while
+  // completed history keeps its (now dangling) reference untouched.
+  templateId String?
+
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
   @@index([repeatWeekly, dueAt])
   @@index([parentId])
+  @@index([templateId])
 }
 
 /// Optional assigner-attached reference material for a task (link and/or
@@ -339,6 +353,34 @@ model Guideline {
   imageData Bytes?
   createdAt DateTime   @default(now())
   blocks    RunBlock[]
+}
+
+/// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
+/// assignment — task title, subtasks, cadence, guideline link/image — but
+/// deliberately NOT recipients, days, due date, or any completion state
+/// (those reset per use). Owned by its creator (createdById, TM user id);
+/// each assigner manages their own set. Saving with an existing name
+/// OVERWRITES that template (that's the "edit" path). Using a template
+/// only pre-fills the form — assignment then flows through the normal
+/// pipeline (fresh Guideline row per assignment), never mutating this row.
+model TaskTemplate {
+  id             String    @id @default(cuid())
+  createdById    String
+  name           String
+  title          String
+  subtasks       Json      @default("[]") // string[]
+  cadence        Cadence?
+  guidelineUrl   String?
+  guidelineMime  String? // image/png | image/jpeg | image/webp
+  guidelineImage Bytes?
+  // Archive (2026-07-31): archived templates leave the assign picker and
+  // every hub tab except Archive (where Unarchive restores them + their
+  // archived instances). Reversible counterpart to deletion.
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([createdById])
 }
 
 /// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
