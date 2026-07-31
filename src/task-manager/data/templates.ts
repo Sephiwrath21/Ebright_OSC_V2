@@ -326,10 +326,15 @@ export function editTaskTemplate(
     });
     if (!template) throw new ApiHttpError(404, "Template not found");
 
-    // 1) the template itself (name unchanged — rename is its own action)
+    // 1) the template itself. The template NAME follows the title
+    // (2026-07-31 fix): after an edit, the picker label and the task
+    // title always read the same — no stale "Task (template)" name.
+    // (Manual Rename in the Manage panel still works for a deliberate
+    // divergence; the next title edit re-syncs.)
     await prisma.taskTemplate.update({
       where: { id },
       data: {
+        name: body.title,
         title: body.title,
         subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
         guidelineUrl: body.guidelineUrl ?? null,
