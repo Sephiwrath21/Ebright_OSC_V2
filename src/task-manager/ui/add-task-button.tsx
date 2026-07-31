@@ -89,7 +89,7 @@ export function AddTaskButton({
                 </button>
               </div>
               {showTabs && (
-                <div role="tablist" className="mt-3 flex gap-1.5">
+                <div role="tablist" className="mt-3 flex flex-wrap gap-1.5">
                   {HUB_TABS.map((t) => (
                     <button
                       key={t.key}

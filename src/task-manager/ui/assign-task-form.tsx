@@ -279,7 +279,7 @@ export function AssignTaskForm({
               disabled={templateBusy}
               className={`mt-2 ${selectClass}`}
             >
-              <option value="">Select</option>
+              <option value="">Scratch</option>
               {templates.list.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.subtaskCount} subtask{t.subtaskCount === 1 ? "" : "s"}
