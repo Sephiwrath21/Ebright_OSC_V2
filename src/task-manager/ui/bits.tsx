@@ -1636,38 +1636,22 @@ export function ResizableTaskList({
     });
   }
 
-  const controlBar = hideCompleted && (ownedVisibleTasks.length > 0 || completedCount > 0) && (
-    <div className="flex items-center justify-between gap-3 pb-2">
-      <div className="flex items-center gap-3">
-        {ownedVisibleTasks.length > 0 && (
-          <>
-            {/* Bare Select-all checkbox (2026-07-31: text label removed;
-                aria-label kept). Same hover-to-reveal as the row
-                checkboxes (space always reserved); stays visible while
-                checked. */}
-            <label className="group flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={allOwnedSelected}
-                onChange={guardedToggleSelectAll}
-                aria-label="Select all tasks"
-                title="Select all"
-                className={`size-4 rounded border-gray-300 accent-blue-600 transition-opacity ${
-                  allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-                }`}
-              />
-            </label>
-            {selectedIds.size > 0 && bulkActions.length > 0 && (
-              <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
-            )}
-          </>
+  // Select-all moved INTO the column header row (2026-07-31) — this slim
+  // bar now only appears when it has something to show: the bulk-actions
+  // trigger (rows selected) and/or the Show Completed toggle.
+  const controlBar = hideCompleted &&
+    ((selectedIds.size > 0 && bulkActions.length > 0) || completedCount > 0) && (
+      <div className="flex items-center justify-between gap-3 pb-2">
+        <div className="flex items-center gap-3">
+          {selectedIds.size > 0 && bulkActions.length > 0 && (
+            <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+          )}
+        </div>
+        {completedCount > 0 && (
+          <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
         )}
       </div>
-      {completedCount > 0 && (
-        <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
-      )}
-    </div>
-  );
+    );
 
   if (visibleTasks.length === 0) {
     return (
@@ -1690,8 +1674,25 @@ export function ResizableTaskList({
           by are fixed-width, and Due date is pinned to the right edge
           (ml-auto) taking whatever remains. */}
       {hideCompleted && (
-        <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-          <span className="w-4 shrink-0" aria-hidden />
+        <div className="group flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+          {/* Select-all lives IN the header row (2026-07-31), occupying
+              the checkbox column's slot so it aligns exactly above the
+              row checkboxes. Bare (no text), hover-to-reveal like them —
+              hovering anywhere on the header row shows it. */}
+          {ownedVisibleTasks.length > 0 ? (
+            <input
+              type="checkbox"
+              checked={allOwnedSelected}
+              onChange={guardedToggleSelectAll}
+              aria-label="Select all tasks"
+              title="Select all"
+              className={`size-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 transition-opacity ${
+                allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+              }`}
+            />
+          ) : (
+            <span className="w-4 shrink-0" aria-hidden />
+          )}
           {hasTree && <span className="w-6 shrink-0" aria-hidden />}
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
