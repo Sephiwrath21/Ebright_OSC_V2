@@ -1054,7 +1054,14 @@ export function TaskRowLine({
         ) : (
           <span className="w-6 shrink-0" aria-hidden />
         ))}
-      {isChild && <span className="w-5 shrink-0" aria-hidden />}
+      {/* Subtask nesting guide (2026-07-31): the indent slot draws a
+          vertical connector line under the parent, so the hierarchy reads
+          at a glance even in a long expanded group. */}
+      {isChild && (
+        <span className="flex w-5 shrink-0 justify-center self-stretch" aria-hidden>
+          <span className="w-px bg-gray-200" />
+        </span>
+      )}
       {hideCompleted ? (
         <StatusDropdown task={task} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
       ) : task.status === "DONE" ? (

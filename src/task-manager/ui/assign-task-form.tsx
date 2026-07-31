@@ -405,6 +405,66 @@ export function AssignTaskForm({
           />
         </label>
 
+        {/* Subtasks (moved 2026-07-31): DIRECTLY under the Task title —
+            visually nested via the left guide line — mirroring how the
+            task list renders them (parent title, subtasks indented
+            below). Each entry becomes a FULL task row of its own (own
+            status/proof/due, completion independent of the main task)
+            for every recipient × day. Empty = a normal single task;
+            nothing here ever blocks submission. */}
+        <div className="ml-4 max-w-xl border-l-2 border-gray-200 pl-3">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-600">Subtasks</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={subtaskDraft}
+                onChange={(e) => setSubtaskDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addSubtask();
+                  }
+                }}
+                placeholder="Type a subtask..."
+                maxLength={200}
+                className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={addSubtask}
+                disabled={!subtaskDraft.trim() || subtasks.length >= SUBTASK_MAX}
+                className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
+              >
+                + Add
+              </button>
+            </div>
+            {subtasks.length > 0 && (
+              <ol className="mt-2 space-y-1">
+                {subtasks.map((s, i) => (
+                  <li
+                    key={`${i}-${s}`}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+                  >
+                    <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate">{s}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSubtask(i)}
+                      aria-label={`Remove subtask ${s}`}
+                      className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {subtasks.length >= SUBTASK_MAX && (
+              <p className="mt-1.5 text-xs text-gray-400">Maximum {SUBTASK_MAX} subtasks.</p>
+            )}
+          </div>
+        </div>
+
         <RecipientPicker
           staff={staff}
           selected={userIds}
@@ -488,62 +548,6 @@ export function AssignTaskForm({
             className={`mt-1 ${selectClass}`}
           />
         </label>
-
-        {/* Subtasks (optional, 2026-07-30): checklist builder — each entry
-            becomes a FULL task row of its own (own status/proof/due,
-            completion independent of the main task) for every recipient ×
-            day, indented under the main task in My Tasks. Empty = a normal
-            single task; nothing here ever blocks submission. */}
-        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm font-medium text-gray-600">Subtasks</p>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={subtaskDraft}
-              onChange={(e) => setSubtaskDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addSubtask();
-                }
-              }}
-              placeholder="Type a subtask..."
-              maxLength={200}
-              className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={addSubtask}
-              disabled={!subtaskDraft.trim() || subtasks.length >= SUBTASK_MAX}
-              className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
-            >
-              + Add
-            </button>
-          </div>
-          {subtasks.length > 0 && (
-            <ol className="mt-2 space-y-1">
-              {subtasks.map((s, i) => (
-                <li
-                  key={`${i}-${s}`}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
-                >
-                  <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
-                  <span className="min-w-0 flex-1 truncate">{s}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeSubtask(i)}
-                    aria-label={`Remove subtask ${s}`}
-                    className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-          {subtasks.length >= SUBTASK_MAX && (
-            <p className="mt-1.5 text-xs text-gray-400">Maximum {SUBTASK_MAX} subtasks.</p>
-          )}
-        </div>
 
         {/* Guideline (optional, 2026-07-30): SOP link and/or reference
             image. Leaving both empty is fine — routine tasks need no
