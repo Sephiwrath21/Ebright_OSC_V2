@@ -509,6 +509,9 @@ export interface TaskRow {
   /** Main Task ↔ Subtask link (2026-07-30) — the parent RunBlock's id, or
    *  null for a top-level task. Drives the My Tasks tree display. */
   parentId: string | null;
+  /** Checklist-builder position within the parent (2026-07-31) — null on
+   *  parents and pre-column rows (UI falls back to id order). */
+  subtaskOrder: number | null;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
    *  isn't already closed and has exactly one required item, a CHECKBOX.
    *  Anything else (multiple required items, or a non-checkbox required
@@ -543,6 +546,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     assignerId: b.run.startedById,
     proofId: b.proof?.id ?? null,
     parentId: b.parentId,
+    subtaskOrder: b.subtaskOrder,
     quickCompletable: isQuickCompletable(b),
   };
 }
@@ -579,6 +583,7 @@ export interface PeriodBlock {
   proof: { id: string } | null;
   /** Parent RunBlock id for subtasks, null for top-level tasks. */
   parentId: string | null;
+  subtaskOrder: number | null;
   /** Minimal shape — just enough to compute quick-complete eligibility,
    *  not the full item (label/config/value aren't needed here). */
   runItems: { required: boolean; type: ItemType }[];
@@ -665,6 +670,7 @@ export async function fetchPeriodBlocks(
       guideline: { select: { id: true, url: true, imageMime: true } },
       proof: { select: { id: true } },
       parentId: true,
+      subtaskOrder: true,
       runItems: { select: { required: true, type: true } },
       run: {
         select: {

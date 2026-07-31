@@ -328,9 +328,9 @@ export function assignFlowTask(
         // same assignee/due/cadence, linked via parentId. Its own run keeps
         // every existing path (complete/N-A/reopen, run auto-completion,
         // proof, audit) working identically to a normal task; only the UI
-        // groups them. SEQUENTIAL inside one pair so the cuid creation
-        // order (= display order in the tree) matches the form's order.
-        for (const subtaskTitle of body.subtasks) {
+        // groups them. subtaskOrder (2026-07-31) records the checklist-
+        // builder sequence explicitly.
+        for (const [subtaskIndex, subtaskTitle] of body.subtasks.entries()) {
           const subRun = await prisma.flowRun.create({
             data: {
               flowId: flow.id,
@@ -355,6 +355,7 @@ export function assignFlowTask(
               cadence,
               parentId: parentBlock.id,
               templateId,
+              subtaskOrder: subtaskIndex,
               runItems: {
                 create: block.items.map((it) => ({
                   itemId: it.id,

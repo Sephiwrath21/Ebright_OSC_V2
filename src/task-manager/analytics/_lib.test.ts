@@ -297,6 +297,7 @@ describe("sortTaskRows", () => {
     assignerId: "u-assigner",
     proofId: null,
     parentId: null,
+    subtaskOrder: null,
     quickCompletable: false,
   });
 

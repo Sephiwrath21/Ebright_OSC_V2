@@ -1526,9 +1526,15 @@ export function ResizableTaskList({
         else childrenOf.set(t.parentId, [t]);
       }
     }
-    // cuid ids sort in creation order = the order typed into the form.
+    // Explicit checklist-builder order (subtaskOrder, 2026-07-31) first;
+    // pre-column rows (null) fall back to cuid creation order.
     for (const kids of childrenOf.values()) {
-      kids.sort((a, b) => (a.runBlockId < b.runBlockId ? -1 : 1));
+      kids.sort((a, b) => {
+        const ao = a.subtaskOrder ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.subtaskOrder ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        return a.runBlockId < b.runBlockId ? -1 : 1;
+      });
     }
   }
   const topLevelTasks = hideCompleted

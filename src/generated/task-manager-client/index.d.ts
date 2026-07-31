@@ -14717,10 +14717,12 @@ export namespace Prisma {
 
   export type RunBlockAvgAggregateOutputType = {
     strikeCount: number | null
+    subtaskOrder: number | null
   }
 
   export type RunBlockSumAggregateOutputType = {
     strikeCount: number | null
+    subtaskOrder: number | null
   }
 
   export type RunBlockMinAggregateOutputType = {
@@ -14742,6 +14744,7 @@ export namespace Prisma {
     recurrenceOfId: string | null
     guidelineId: string | null
     parentId: string | null
+    subtaskOrder: number | null
     templateId: string | null
   }
 
@@ -14764,6 +14767,7 @@ export namespace Prisma {
     recurrenceOfId: string | null
     guidelineId: string | null
     parentId: string | null
+    subtaskOrder: number | null
     templateId: string | null
   }
 
@@ -14786,6 +14790,7 @@ export namespace Prisma {
     recurrenceOfId: number
     guidelineId: number
     parentId: number
+    subtaskOrder: number
     templateId: number
     _all: number
   }
@@ -14793,10 +14798,12 @@ export namespace Prisma {
 
   export type RunBlockAvgAggregateInputType = {
     strikeCount?: true
+    subtaskOrder?: true
   }
 
   export type RunBlockSumAggregateInputType = {
     strikeCount?: true
+    subtaskOrder?: true
   }
 
   export type RunBlockMinAggregateInputType = {
@@ -14818,6 +14825,7 @@ export namespace Prisma {
     recurrenceOfId?: true
     guidelineId?: true
     parentId?: true
+    subtaskOrder?: true
     templateId?: true
   }
 
@@ -14840,6 +14848,7 @@ export namespace Prisma {
     recurrenceOfId?: true
     guidelineId?: true
     parentId?: true
+    subtaskOrder?: true
     templateId?: true
   }
 
@@ -14862,6 +14871,7 @@ export namespace Prisma {
     recurrenceOfId?: true
     guidelineId?: true
     parentId?: true
+    subtaskOrder?: true
     templateId?: true
     _all?: true
   }
@@ -14971,6 +14981,7 @@ export namespace Prisma {
     recurrenceOfId: string | null
     guidelineId: string | null
     parentId: string | null
+    subtaskOrder: number | null
     templateId: string | null
     _count: RunBlockCountAggregateOutputType | null
     _avg: RunBlockAvgAggregateOutputType | null
@@ -15012,6 +15023,7 @@ export namespace Prisma {
     recurrenceOfId?: boolean
     guidelineId?: boolean
     parentId?: boolean
+    subtaskOrder?: boolean
     templateId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
@@ -15043,6 +15055,7 @@ export namespace Prisma {
     recurrenceOfId?: boolean
     guidelineId?: boolean
     parentId?: boolean
+    subtaskOrder?: boolean
     templateId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
@@ -15069,6 +15082,7 @@ export namespace Prisma {
     recurrenceOfId?: boolean
     guidelineId?: boolean
     parentId?: boolean
+    subtaskOrder?: boolean
     templateId?: boolean
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
@@ -15095,10 +15109,11 @@ export namespace Prisma {
     recurrenceOfId?: boolean
     guidelineId?: boolean
     parentId?: boolean
+    subtaskOrder?: boolean
     templateId?: boolean
   }
 
-  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId" | "guidelineId" | "parentId" | "templateId", ExtArgs["result"]["runBlock"]>
+  export type RunBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "blockId" | "nodeId" | "title" | "assigneeId" | "status" | "dueAt" | "strikeCount" | "reminderJobId" | "startedAt" | "completedAt" | "scheduleSlotId" | "cadence" | "repeatWeekly" | "recurrenceOfId" | "guidelineId" | "parentId" | "subtaskOrder" | "templateId", ExtArgs["result"]["runBlock"]>
   export type RunBlockInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     run?: boolean | FlowRunDefaultArgs<ExtArgs>
     runItems?: boolean | RunBlock$runItemsArgs<ExtArgs>
@@ -15154,6 +15169,7 @@ export namespace Prisma {
       recurrenceOfId: string | null
       guidelineId: string | null
       parentId: string | null
+      subtaskOrder: number | null
       templateId: string | null
     }, ExtArgs["result"]["runBlock"]>
     composites: {}
@@ -15604,6 +15620,7 @@ export namespace Prisma {
     readonly recurrenceOfId: FieldRef<"RunBlock", 'String'>
     readonly guidelineId: FieldRef<"RunBlock", 'String'>
     readonly parentId: FieldRef<"RunBlock", 'String'>
+    readonly subtaskOrder: FieldRef<"RunBlock", 'Int'>
     readonly templateId: FieldRef<"RunBlock", 'String'>
   }
     
@@ -28060,6 +28077,7 @@ export namespace Prisma {
     recurrenceOfId: 'recurrenceOfId',
     guidelineId: 'guidelineId',
     parentId: 'parentId',
+    subtaskOrder: 'subtaskOrder',
     templateId: 'templateId'
   };
 
@@ -29232,6 +29250,7 @@ export namespace Prisma {
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
     parentId?: StringNullableFilter<"RunBlock"> | string | null
+    subtaskOrder?: IntNullableFilter<"RunBlock"> | number | null
     templateId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
@@ -29262,6 +29281,7 @@ export namespace Prisma {
     recurrenceOfId?: SortOrderInput | SortOrder
     guidelineId?: SortOrderInput | SortOrder
     parentId?: SortOrderInput | SortOrder
+    subtaskOrder?: SortOrderInput | SortOrder
     templateId?: SortOrderInput | SortOrder
     run?: FlowRunOrderByWithRelationInput
     runItems?: RunItemOrderByRelationAggregateInput
@@ -29296,6 +29316,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFilter<"RunBlock"> | boolean
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
     parentId?: StringNullableFilter<"RunBlock"> | string | null
+    subtaskOrder?: IntNullableFilter<"RunBlock"> | number | null
     templateId?: StringNullableFilter<"RunBlock"> | string | null
     run?: XOR<FlowRunScalarRelationFilter, FlowRunWhereInput>
     runItems?: RunItemListRelationFilter
@@ -29326,6 +29347,7 @@ export namespace Prisma {
     recurrenceOfId?: SortOrderInput | SortOrder
     guidelineId?: SortOrderInput | SortOrder
     parentId?: SortOrderInput | SortOrder
+    subtaskOrder?: SortOrderInput | SortOrder
     templateId?: SortOrderInput | SortOrder
     _count?: RunBlockCountOrderByAggregateInput
     _avg?: RunBlockAvgOrderByAggregateInput
@@ -29356,6 +29378,7 @@ export namespace Prisma {
     recurrenceOfId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
     parentId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
+    subtaskOrder?: IntNullableWithAggregatesFilter<"RunBlock"> | number | null
     templateId?: StringNullableWithAggregatesFilter<"RunBlock"> | string | null
   }
 
@@ -30891,6 +30914,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -30921,6 +30945,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -30943,6 +30968,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -30973,6 +30999,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -30999,6 +31026,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
   }
 
@@ -31017,6 +31045,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
@@ -31039,6 +31068,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
@@ -32733,11 +32763,13 @@ export namespace Prisma {
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
     parentId?: SortOrder
+    subtaskOrder?: SortOrder
     templateId?: SortOrder
   }
 
   export type RunBlockAvgOrderByAggregateInput = {
     strikeCount?: SortOrder
+    subtaskOrder?: SortOrder
   }
 
   export type RunBlockMaxOrderByAggregateInput = {
@@ -32759,6 +32791,7 @@ export namespace Prisma {
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
     parentId?: SortOrder
+    subtaskOrder?: SortOrder
     templateId?: SortOrder
   }
 
@@ -32781,11 +32814,13 @@ export namespace Prisma {
     recurrenceOfId?: SortOrder
     guidelineId?: SortOrder
     parentId?: SortOrder
+    subtaskOrder?: SortOrder
     templateId?: SortOrder
   }
 
   export type RunBlockSumOrderByAggregateInput = {
     strikeCount?: SortOrder
+    subtaskOrder?: SortOrder
   }
 
   export type EnumBlockStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -35845,6 +35880,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
@@ -35873,6 +35909,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -35981,6 +36018,7 @@ export namespace Prisma {
     recurrenceOfId?: StringNullableFilter<"RunBlock"> | string | null
     guidelineId?: StringNullableFilter<"RunBlock"> | string | null
     parentId?: StringNullableFilter<"RunBlock"> | string | null
+    subtaskOrder?: IntNullableFilter<"RunBlock"> | number | null
     templateId?: StringNullableFilter<"RunBlock"> | string | null
   }
 
@@ -36068,6 +36106,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36097,6 +36136,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
@@ -36123,6 +36163,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36151,6 +36192,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -36218,6 +36260,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36247,6 +36290,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -36273,6 +36317,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36301,6 +36346,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -36416,6 +36462,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -36445,6 +36492,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
@@ -36477,6 +36525,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -36505,6 +36554,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -36590,6 +36640,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -36619,6 +36670,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -36656,6 +36708,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36684,6 +36737,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -36732,6 +36786,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
@@ -36761,6 +36816,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
@@ -36798,6 +36854,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -36827,6 +36884,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -36848,6 +36906,7 @@ export namespace Prisma {
     scheduleSlotId?: string | null
     cadence?: $Enums.Cadence | null
     repeatWeekly?: boolean
+    subtaskOrder?: number | null
     templateId?: string | null
     run: FlowRunCreateNestedOneWithoutRunBlocksInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
@@ -36877,6 +36936,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
     proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
@@ -36914,6 +36974,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
@@ -36943,6 +37004,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
     proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
@@ -37521,6 +37583,7 @@ export namespace Prisma {
     recurrenceOfId?: string | null
     guidelineId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
   }
 
@@ -37539,6 +37602,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
@@ -37567,6 +37631,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -37592,6 +37657,7 @@ export namespace Prisma {
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
@@ -37626,6 +37692,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     guidelineId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
   }
 
@@ -37683,6 +37750,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -37711,6 +37779,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -37736,6 +37805,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
@@ -37757,6 +37827,7 @@ export namespace Prisma {
     repeatWeekly?: boolean
     recurrenceOfId?: string | null
     parentId?: string | null
+    subtaskOrder?: number | null
     templateId?: string | null
   }
 
@@ -37775,6 +37846,7 @@ export namespace Prisma {
     scheduleSlotId?: NullableStringFieldUpdateOperationsInput | string | null
     cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     run?: FlowRunUpdateOneRequiredWithoutRunBlocksNestedInput
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
@@ -37803,6 +37875,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
@@ -37828,6 +37901,7 @@ export namespace Prisma {
     repeatWeekly?: BoolFieldUpdateOperationsInput | boolean
     recurrenceOfId?: NullableStringFieldUpdateOperationsInput | string | null
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 

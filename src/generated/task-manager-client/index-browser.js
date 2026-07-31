@@ -249,6 +249,7 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   recurrenceOfId: 'recurrenceOfId',
   guidelineId: 'guidelineId',
   parentId: 'parentId',
+  subtaskOrder: 'subtaskOrder',
   templateId: 'templateId'
 };
 

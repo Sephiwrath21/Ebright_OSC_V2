@@ -62,6 +62,9 @@ export interface FlowTaskRow {
    *  or null/undefined for a top-level task. ResizableTaskList groups rows
    *  by this into the chevron/indent tree. */
   parentId?: string | null;
+  /** Checklist-builder position within the parent (2026-07-31) — the tree
+   *  sorts siblings by this, falling back to id (creation) order. */
+  subtaskOrder?: number | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as
