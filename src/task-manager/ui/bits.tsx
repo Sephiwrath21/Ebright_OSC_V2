@@ -528,9 +528,10 @@ function GuidelineIndicator({
 }
 
 /** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
- *  2 MB cap, so a bad pick fails instantly instead of round-tripping. */
+ *  10 MB cap (raised from 2 MB, 2026-07-31), so a bad pick fails instantly
+ *  instead of round-tripping. */
 const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
-const PROOF_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** The "Proof" column cell (2026-07-30): assignee-uploaded completion
  *  evidence, always optional (never gates the status dropdown). Owner of a
@@ -549,9 +550,10 @@ function ProofCell({
 }) {
   const [busy, setBusy] = React.useState(false);
   const [viewerOpen, setViewerOpen] = React.useState(false);
-  /** The "Attach proof" popover (2026-07-30): ONE surface accepting all 4
-   *  input methods — file picker, drag-and-drop, clipboard paste, and
-   *  camera capture — all funneling into the same uploadFile path. */
+  /** The "Attach Proof Of Completion" popover (2026-07-30): ONE surface
+   *  accepting all 4 input methods — file picker, drag-and-drop,
+   *  clipboard paste, and camera capture — all staging into the same
+   *  preview-then-Upload flow (stageFile/submitPending). */
   const [attachOpen, setAttachOpen] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
@@ -572,9 +574,18 @@ function ProofCell({
     : null;
   const canUpload = isOwned && Boolean(onUploadProof);
 
-  /** The single upload path every input method funnels into — picker,
-   *  drop, paste, and camera all end up here with a File. */
-  const uploadFile = async (file: File) => {
+  /** Review-before-submit (2026-07-31): picker, drop, paste, and camera
+   *  all STAGE the image here — validated + previewed in the popover —
+   *  and nothing is uploaded until the user clicks the Upload button
+   *  (submitPending below). Picking again replaces the staged image. */
+  const [pendingImage, setPendingImage] = React.useState<{
+    mime: string;
+    dataBase64: string;
+    previewUrl: string;
+    name: string;
+  } | null>(null);
+
+  const stageFile = (file: File) => {
     if (!onUploadProof) return;
     setErrorText(null);
     if (!PROOF_IMAGE_MIMES.includes(file.type)) {
@@ -582,27 +593,42 @@ function ProofCell({
       return;
     }
     if (file.size > PROOF_IMAGE_MAX_BYTES) {
-      setErrorText("Image is too large — max 2 MB");
+      setErrorText("Image is too large — max 10 MB");
       return;
     }
-    setBusy(true);
-    try {
-      const dataBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setPendingImage({
+        mime: file.type,
+        dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+        previewUrl: dataUrl,
+        name: file.name || "captured image",
       });
-      const result = await onUploadProof(task.runBlockId, { mime: file.type, dataBase64 });
+    };
+    reader.onerror = () => setErrorText("Could not read that file — please try again");
+    reader.readAsDataURL(file);
+  };
+
+  /** The ONLY place the proof actually uploads — the modal's Upload
+   *  button. Success closes the popover and flips the row to ✓. */
+  const submitPending = async () => {
+    if (!onUploadProof || !pendingImage) return;
+    setBusy(true);
+    setErrorText(null);
+    try {
+      const result = await onUploadProof(task.runBlockId, {
+        mime: pendingImage.mime,
+        dataBase64: pendingImage.dataBase64,
+      });
       if (result.ok) {
         setLocalProofId(result.proofId);
         setVersion((v) => v + 1);
+        setPendingImage(null);
         setAttachOpen(false);
       } else {
         setErrorText(result.message);
       }
-    } catch {
-      setErrorText("Could not read that file — please try again");
     } finally {
       setBusy(false);
     }
@@ -611,8 +637,17 @@ function ProofCell({
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) void uploadFile(file);
+    if (file) stageFile(file);
   };
+
+  // Closing the popover (✕ / outside / Escape) discards any un-submitted
+  // staged image and stale errors — nothing was uploaded yet.
+  React.useEffect(() => {
+    if (!attachOpen) {
+      setPendingImage(null);
+      setErrorText(null);
+    }
+  }, [attachOpen]);
 
   // ---- "Take Photo" (2026-07-30 fix) ----------------------------------
   // The capture="environment" input only opens a camera on PHONES/TABLETS
@@ -675,8 +710,9 @@ function ProofCell({
       (blob) => {
         if (!blob) return;
         stopCamera();
-        // Same path as every other method — validation, 2 MB cap, upload.
-        void uploadFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
+        // Same path as every other method — stages the frame for review;
+        // the user still confirms with the Upload button.
+        stageFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
       },
       "image/jpeg",
       0.9,
@@ -712,7 +748,7 @@ function ProofCell({
       const file = item?.getAsFile();
       if (file) {
         e.preventDefault();
-        void uploadFile(file);
+        stageFile(file);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -766,8 +802,8 @@ function ProofCell({
             setErrorText(null);
             setAttachOpen(true);
           }}
-          title="Attach proof — drop, paste, upload, or take a photo"
-          aria-label={`Attach proof for ${task.blockTitle}`}
+          title="Attach Proof Of Completion — drop, paste, upload, or take a photo"
+          aria-label={`Attach proof of completion for ${task.blockTitle}`}
           className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
         >
           {busy ? "…" : "＋"}
@@ -792,7 +828,7 @@ function ProofCell({
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900">Attach proof</h4>
+                <h4 className="text-sm font-semibold text-gray-900">Attach Proof Of Completion</h4>
                 <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
               </div>
               <button
@@ -834,6 +870,40 @@ function ProofCell({
                   </button>
                 </div>
               </>
+            ) : pendingImage ? (
+              <>
+                {/* Review step (2026-07-31): the staged image — from ANY of
+                    the 4 methods — shows here first; nothing uploads until
+                    the Upload button below is clicked. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingImage.previewUrl}
+                  alt={`Proof preview for ${task.blockTitle}`}
+                  className="max-h-64 w-full rounded-xl border border-gray-200 bg-gray-50 object-contain"
+                />
+                <p className="mt-1.5 truncate text-xs text-gray-500">{pendingImage.name}</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void submitPending()}
+                    className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {busy ? "Uploading…" : "Upload"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setPendingImage(null);
+                      setErrorText(null);
+                    }}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <div
@@ -846,7 +916,7 @@ function ProofCell({
                     e.preventDefault();
                     setDragOver(false);
                     const file = e.dataTransfer.files?.[0];
-                    if (file) void uploadFile(file);
+                    if (file) stageFile(file);
                   }}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
                     dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
@@ -855,8 +925,8 @@ function ProofCell({
                   <span className="text-xl" aria-hidden>
                     🖼️
                   </span>
-                  <p className="text-sm font-medium text-gray-600">Drop an image here</p>
-                  <p className="text-xs text-gray-400">or paste (Ctrl+V)</p>
+                  <p className="text-sm font-medium text-gray-600">Drop an Image Here</p>
+                  <p className="text-xs text-gray-400">or Paste It (Ctrl+V)</p>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -865,7 +935,7 @@ function ProofCell({
                     onClick={() => inputRef.current?.click()}
                     className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
                   >
-                    📁 Upload file
+                    📁 Upload File
                   </button>
                   <button
                     type="button"
@@ -881,7 +951,7 @@ function ProofCell({
             {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
-            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 2 MB</p>
+            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 10 MB</p>
           </div>
         </div>,
         document.body,
