@@ -1641,18 +1641,21 @@ export function ResizableTaskList({
       <div className="flex items-center gap-3">
         {ownedVisibleTasks.length > 0 && (
           <>
-            {/* Same hover-to-reveal as the row checkboxes (space always
-                reserved); stays visible while checked. */}
-            <label className="group flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600">
+            {/* Bare Select-all checkbox (2026-07-31: text label removed;
+                aria-label kept). Same hover-to-reveal as the row
+                checkboxes (space always reserved); stays visible while
+                checked. */}
+            <label className="group flex cursor-pointer items-center">
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={guardedToggleSelectAll}
+                aria-label="Select all tasks"
+                title="Select all"
                 className={`size-4 rounded border-gray-300 accent-blue-600 transition-opacity ${
                   allOwnedSelected ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                 }`}
               />
-              Select all
             </label>
             {selectedIds.size > 0 && bulkActions.length > 0 && (
               <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
