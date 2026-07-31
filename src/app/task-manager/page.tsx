@@ -39,9 +39,13 @@ import {
   renameKanbanColumn,
   reopenFlowTask,
   deleteTaskTemplate,
+  editTaskTemplate,
   getTaskTemplate,
+  getTemplateAssignees,
   getTemplateDeletionImpact,
   listTaskTemplates,
+  reassignTemplateTasks,
+  removeTemplateAssignments,
   renameTaskTemplate,
   saveCeoDashboardConfig,
   skipFlowTask,
@@ -316,6 +320,70 @@ export default async function TaskManagerPage({
     }
   }
 
+  // + Task hub actions (2026-07-31): Edit / Remove-in-bulk / Reassign.
+  async function templateAssignees(
+    templateId: string,
+  ): Promise<import("@/task-manager/ui/types").TemplateAssigneesResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const assignees = await getTemplateAssignees(email, templateId);
+      return { ok: true, assignees };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function editTemplate(
+    templateId: string,
+    input: import("@/task-manager/ui/types").FlowTemplateEditInput,
+  ): Promise<import("@/task-manager/ui/types").TemplateEditResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await editTaskTemplate(email, templateId, input);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function removeAssignments(
+    templateId: string,
+    alsoDeleteTemplate: boolean,
+  ): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await removeTemplateAssignments(email, templateId, { deleteTemplate: alsoDeleteTemplate });
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function reassignTemplate(
+    templateId: string,
+    fromUserId: string,
+    toUserId: string,
+  ): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await reassignTemplateTasks(email, templateId, fromUserId, toUserId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   async function reassignTask(runBlockId: string, newAssigneeId: string): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
@@ -517,6 +585,10 @@ export default async function TaskManagerPage({
             impact: templateImpact,
             rename: renameTemplate,
             remove: deleteTemplate,
+            assignees: templateAssignees,
+            edit: editTemplate,
+            removeAssignments,
+            reassignAll: reassignTemplate,
           }}
         />
       );

@@ -343,6 +343,27 @@ export type TemplateImpactResult =
   | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
   | { ok: false; message: string };
 
+export interface FlowTemplateAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateAssigneesResult =
+  | { ok: true; assignees: FlowTemplateAssignee[] }
+  | { ok: false; message: string };
+
+/** "Edit Task" input — the template's new structure, propagated to every
+ *  pending instance (completed records untouched). */
+export interface FlowTemplateEditInput {
+  title: string;
+  subtasks: string[];
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+export type TemplateEditResult =
+  | { ok: true; updatedTasks: number; employees: number }
+  | { ok: false; message: string };
+
 /** Everything the "+ Task" form needs for templates, bundled as ONE
  *  optional prop: the saved list plus load/impact/rename/delete server
  *  actions. `impact` feeds the pre-deletion confirmation ("removes N
@@ -354,6 +375,11 @@ export interface FlowTemplateControl {
   impact: (templateId: string) => Promise<TemplateImpactResult>;
   rename: (templateId: string, name: string) => Promise<ActionResult>;
   remove: (templateId: string) => Promise<ActionResult>;
+  // + Task hub (2026-07-31): Edit / Remove-in-bulk / Reassign
+  assignees: (templateId: string) => Promise<TemplateAssigneesResult>;
+  edit: (templateId: string, input: FlowTemplateEditInput) => Promise<TemplateEditResult>;
+  removeAssignments: (templateId: string, alsoDeleteTemplate: boolean) => Promise<ActionResult>;
+  reassignAll: (templateId: string, fromUserId: string, toUserId: string) => Promise<ActionResult>;
 }
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the

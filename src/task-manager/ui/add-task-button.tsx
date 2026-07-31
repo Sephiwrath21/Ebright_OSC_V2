@@ -18,6 +18,21 @@ import type {
   FlowTemplateControl,
 } from "./types";
 import { AssignTaskForm } from "./assign-task-form";
+import {
+  TemplateEditPanel,
+  TemplateReassignPanel,
+  TemplateRemovePanel,
+} from "./template-panels";
+
+/** + Task hub tabs (2026-07-31): Assign stays the default; the other three
+ *  are template-scoped bulk operations, shown only when templates exist. */
+const HUB_TABS = [
+  { key: "assign", label: "Assign" },
+  { key: "edit", label: "Edit" },
+  { key: "remove", label: "Remove" },
+  { key: "reassign", label: "Reassign" },
+] as const;
+type HubTab = (typeof HUB_TABS)[number]["key"];
 
 export function AddTaskButton({
   staff,
@@ -31,6 +46,10 @@ export function AddTaskButton({
   templates?: FlowTemplateControl;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [tab, setTab] = React.useState<HubTab>("assign");
+  // Edit/Remove/Reassign are template-scoped — nothing to act on until at
+  // least one template exists.
+  const showTabs = Boolean(templates && templates.list.length > 0);
 
   return (
     <>
@@ -51,18 +70,49 @@ export function AddTaskButton({
             className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3">
-              <p className="text-sm font-semibold text-gray-900">Add Task</p>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                ✕
-              </button>
+            <div className="mb-4 shrink-0 border-b border-gray-100 pb-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-900">Tasks</p>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              {showTabs && (
+                <div role="tablist" className="mt-3 flex gap-1.5">
+                  {HUB_TABS.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === t.key}
+                      onClick={() => setTab(t.key)}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${
+                        tab === t.key
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <AssignTaskForm staff={staff} action={action} templates={templates} bare />
+            {(!showTabs || tab === "assign") && (
+              <AssignTaskForm staff={staff} action={action} templates={templates} bare />
+            )}
+            {showTabs && templates && tab !== "assign" && (
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {tab === "edit" && <TemplateEditPanel templates={templates} />}
+                {tab === "remove" && <TemplateRemovePanel templates={templates} />}
+                {tab === "reassign" && <TemplateReassignPanel templates={templates} staff={staff} />}
+              </div>
+            )}
           </div>
         </div>
       )}
