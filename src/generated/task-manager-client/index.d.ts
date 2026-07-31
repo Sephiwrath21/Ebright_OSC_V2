@@ -3214,8 +3214,18 @@ export namespace Prisma {
 
   export type AggregateUser = {
     _count: UserCountAggregateOutputType | null
+    _avg: UserAvgAggregateOutputType | null
+    _sum: UserSumAggregateOutputType | null
     _min: UserMinAggregateOutputType | null
     _max: UserMaxAggregateOutputType | null
+  }
+
+  export type UserAvgAggregateOutputType = {
+    hrfsUserId: number | null
+  }
+
+  export type UserSumAggregateOutputType = {
+    hrfsUserId: number | null
   }
 
   export type UserMinAggregateOutputType = {
@@ -3226,6 +3236,7 @@ export namespace Prisma {
     department: string | null
     branch: string | null
     employmentType: string | null
+    hrfsUserId: number | null
     coachSchedule: string | null
     createdAt: Date | null
   }
@@ -3238,6 +3249,7 @@ export namespace Prisma {
     department: string | null
     branch: string | null
     employmentType: string | null
+    hrfsUserId: number | null
     coachSchedule: string | null
     createdAt: Date | null
   }
@@ -3250,11 +3262,20 @@ export namespace Prisma {
     department: number
     branch: number
     employmentType: number
+    hrfsUserId: number
     coachSchedule: number
     createdAt: number
     _all: number
   }
 
+
+  export type UserAvgAggregateInputType = {
+    hrfsUserId?: true
+  }
+
+  export type UserSumAggregateInputType = {
+    hrfsUserId?: true
+  }
 
   export type UserMinAggregateInputType = {
     id?: true
@@ -3264,6 +3285,7 @@ export namespace Prisma {
     department?: true
     branch?: true
     employmentType?: true
+    hrfsUserId?: true
     coachSchedule?: true
     createdAt?: true
   }
@@ -3276,6 +3298,7 @@ export namespace Prisma {
     department?: true
     branch?: true
     employmentType?: true
+    hrfsUserId?: true
     coachSchedule?: true
     createdAt?: true
   }
@@ -3288,6 +3311,7 @@ export namespace Prisma {
     department?: true
     branch?: true
     employmentType?: true
+    hrfsUserId?: true
     coachSchedule?: true
     createdAt?: true
     _all?: true
@@ -3331,6 +3355,18 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
+     * Select which fields to average
+    **/
+    _avg?: UserAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: UserSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
      * Select which fields to find the minimum value
     **/
     _min?: UserMinAggregateInputType
@@ -3361,6 +3397,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: UserCountAggregateInputType | true
+    _avg?: UserAvgAggregateInputType
+    _sum?: UserSumAggregateInputType
     _min?: UserMinAggregateInputType
     _max?: UserMaxAggregateInputType
   }
@@ -3373,9 +3411,12 @@ export namespace Prisma {
     department: string | null
     branch: string | null
     employmentType: string | null
+    hrfsUserId: number | null
     coachSchedule: string | null
     createdAt: Date
     _count: UserCountAggregateOutputType | null
+    _avg: UserAvgAggregateOutputType | null
+    _sum: UserSumAggregateOutputType | null
     _min: UserMinAggregateOutputType | null
     _max: UserMaxAggregateOutputType | null
   }
@@ -3402,6 +3443,7 @@ export namespace Prisma {
     department?: boolean
     branch?: boolean
     employmentType?: boolean
+    hrfsUserId?: boolean
     coachSchedule?: boolean
     createdAt?: boolean
     hodKanbanCards?: boolean | User$hodKanbanCardsArgs<ExtArgs>
@@ -3417,6 +3459,7 @@ export namespace Prisma {
     department?: boolean
     branch?: boolean
     employmentType?: boolean
+    hrfsUserId?: boolean
     coachSchedule?: boolean
     createdAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -3429,6 +3472,7 @@ export namespace Prisma {
     department?: boolean
     branch?: boolean
     employmentType?: boolean
+    hrfsUserId?: boolean
     coachSchedule?: boolean
     createdAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -3441,11 +3485,12 @@ export namespace Prisma {
     department?: boolean
     branch?: boolean
     employmentType?: boolean
+    hrfsUserId?: boolean
     coachSchedule?: boolean
     createdAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "role" | "department" | "branch" | "employmentType" | "coachSchedule" | "createdAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "role" | "department" | "branch" | "employmentType" | "hrfsUserId" | "coachSchedule" | "createdAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     hodKanbanCards?: boolean | User$hodKanbanCardsArgs<ExtArgs>
     hodKanbanColumns?: boolean | User$hodKanbanColumnsArgs<ExtArgs>
@@ -3468,6 +3513,7 @@ export namespace Prisma {
       department: string | null
       branch: string | null
       employmentType: string | null
+      hrfsUserId: number | null
       coachSchedule: string | null
       createdAt: Date
     }, ExtArgs["result"]["user"]>
@@ -3902,6 +3948,7 @@ export namespace Prisma {
     readonly department: FieldRef<"User", 'String'>
     readonly branch: FieldRef<"User", 'String'>
     readonly employmentType: FieldRef<"User", 'String'>
+    readonly hrfsUserId: FieldRef<"User", 'Int'>
     readonly coachSchedule: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
   }
@@ -27926,6 +27973,7 @@ export namespace Prisma {
     department: 'department',
     branch: 'branch',
     employmentType: 'employmentType',
+    hrfsUserId: 'hrfsUserId',
     coachSchedule: 'coachSchedule',
     createdAt: 'createdAt'
   };
@@ -28311,6 +28359,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Int'
+   */
+  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int[]'
+   */
+  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
    * Reference to a field of type 'DateTime'
    */
   export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
@@ -28335,20 +28397,6 @@ export namespace Prisma {
    * Reference to a field of type 'Float[]'
    */
   export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
-    
-
-
-  /**
-   * Reference to a field of type 'Int'
-   */
-  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-  /**
-   * Reference to a field of type 'Int[]'
-   */
-  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -28499,6 +28547,7 @@ export namespace Prisma {
     department?: StringNullableFilter<"User"> | string | null
     branch?: StringNullableFilter<"User"> | string | null
     employmentType?: StringNullableFilter<"User"> | string | null
+    hrfsUserId?: IntNullableFilter<"User"> | number | null
     coachSchedule?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     hodKanbanCards?: HodKanbanCardListRelationFilter
@@ -28513,6 +28562,7 @@ export namespace Prisma {
     department?: SortOrderInput | SortOrder
     branch?: SortOrderInput | SortOrder
     employmentType?: SortOrderInput | SortOrder
+    hrfsUserId?: SortOrderInput | SortOrder
     coachSchedule?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     hodKanbanCards?: HodKanbanCardOrderByRelationAggregateInput
@@ -28530,6 +28580,7 @@ export namespace Prisma {
     department?: StringNullableFilter<"User"> | string | null
     branch?: StringNullableFilter<"User"> | string | null
     employmentType?: StringNullableFilter<"User"> | string | null
+    hrfsUserId?: IntNullableFilter<"User"> | number | null
     coachSchedule?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     hodKanbanCards?: HodKanbanCardListRelationFilter
@@ -28544,11 +28595,14 @@ export namespace Prisma {
     department?: SortOrderInput | SortOrder
     branch?: SortOrderInput | SortOrder
     employmentType?: SortOrderInput | SortOrder
+    hrfsUserId?: SortOrderInput | SortOrder
     coachSchedule?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
+    _avg?: UserAvgOrderByAggregateInput
     _max?: UserMaxOrderByAggregateInput
     _min?: UserMinOrderByAggregateInput
+    _sum?: UserSumOrderByAggregateInput
   }
 
   export type UserScalarWhereWithAggregatesInput = {
@@ -28562,6 +28616,7 @@ export namespace Prisma {
     department?: StringNullableWithAggregatesFilter<"User"> | string | null
     branch?: StringNullableWithAggregatesFilter<"User"> | string | null
     employmentType?: StringNullableWithAggregatesFilter<"User"> | string | null
+    hrfsUserId?: IntNullableWithAggregatesFilter<"User"> | number | null
     coachSchedule?: StringNullableWithAggregatesFilter<"User"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
   }
@@ -30105,6 +30160,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanCards?: HodKanbanCardCreateNestedManyWithoutOwnerInput
@@ -30119,6 +30175,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanCards?: HodKanbanCardUncheckedCreateNestedManyWithoutOwnerInput
@@ -30133,6 +30190,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanCards?: HodKanbanCardUpdateManyWithoutOwnerNestedInput
@@ -30147,6 +30205,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanCards?: HodKanbanCardUncheckedUpdateManyWithoutOwnerNestedInput
@@ -30161,6 +30220,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
   }
@@ -30173,6 +30233,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -30185,6 +30246,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31897,6 +31959,17 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
+  export type IntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
   export type DateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -31941,8 +32014,13 @@ export namespace Prisma {
     department?: SortOrder
     branch?: SortOrder
     employmentType?: SortOrder
+    hrfsUserId?: SortOrder
     coachSchedule?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type UserAvgOrderByAggregateInput = {
+    hrfsUserId?: SortOrder
   }
 
   export type UserMaxOrderByAggregateInput = {
@@ -31953,6 +32031,7 @@ export namespace Prisma {
     department?: SortOrder
     branch?: SortOrder
     employmentType?: SortOrder
+    hrfsUserId?: SortOrder
     coachSchedule?: SortOrder
     createdAt?: SortOrder
   }
@@ -31965,8 +32044,13 @@ export namespace Prisma {
     department?: SortOrder
     branch?: SortOrder
     employmentType?: SortOrder
+    hrfsUserId?: SortOrder
     coachSchedule?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type UserSumOrderByAggregateInput = {
+    hrfsUserId?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -32013,6 +32097,22 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedStringNullableFilter<$PrismaModel>
     _max?: NestedStringNullableFilter<$PrismaModel>
+  }
+
+  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -32419,17 +32519,6 @@ export namespace Prisma {
     _max?: NestedEnumTriggerTypeFilter<$PrismaModel>
   }
 
-  export type IntNullableFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableFilter<$PrismaModel> | number | null
-  }
-
   export type BlockItemListRelationFilter = {
     every?: BlockItemWhereInput
     some?: BlockItemWhereInput
@@ -32495,22 +32584,6 @@ export namespace Prisma {
     dueInHours?: SortOrder
     reminderInterval?: SortOrder
     strikeLimit?: SortOrder
-  }
-
-  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedIntNullableFilter<$PrismaModel>
-    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type EnumItemTypeFilter<$PrismaModel = never> = {
@@ -33367,6 +33440,14 @@ export namespace Prisma {
     set?: string | null
   }
 
+  export type NullableIntFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
   export type DateTimeFieldUpdateOperationsInput = {
     set?: Date | string
   }
@@ -33767,14 +33848,6 @@ export namespace Prisma {
     connectOrCreate?: BlockItemCreateOrConnectWithoutBlockInput | BlockItemCreateOrConnectWithoutBlockInput[]
     createMany?: BlockItemCreateManyBlockInputEnvelope
     connect?: BlockItemWhereUniqueInput | BlockItemWhereUniqueInput[]
-  }
-
-  export type NullableIntFieldUpdateOperationsInput = {
-    set?: number | null
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
   }
 
   export type FlowUpdateOneRequiredWithoutBlocksNestedInput = {
@@ -34318,6 +34391,17 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
+  export type NestedIntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
   export type NestedDateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -34384,7 +34468,7 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
-  export type NestedIntNullableFilter<$PrismaModel = never> = {
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
     in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
     notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
@@ -34392,7 +34476,23 @@ export namespace Prisma {
     lte?: number | IntFieldRefInput<$PrismaModel>
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -34503,33 +34603,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumTriggerTypeFilter<$PrismaModel>
     _max?: NestedEnumTriggerTypeFilter<$PrismaModel>
-  }
-
-  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedIntNullableFilter<$PrismaModel>
-    _max?: NestedIntNullableFilter<$PrismaModel>
-  }
-
-  export type NestedFloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type NestedEnumItemTypeFilter<$PrismaModel = never> = {
@@ -34835,6 +34908,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanColumns?: HodKanbanColumnCreateNestedManyWithoutOwnerInput
@@ -34848,6 +34922,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanColumns?: HodKanbanColumnUncheckedCreateNestedManyWithoutOwnerInput
@@ -34877,6 +34952,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanColumns?: HodKanbanColumnUpdateManyWithoutOwnerNestedInput
@@ -34890,6 +34966,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanColumns?: HodKanbanColumnUncheckedUpdateManyWithoutOwnerNestedInput
@@ -34903,6 +34980,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanCards?: HodKanbanCardCreateNestedManyWithoutOwnerInput
@@ -34916,6 +34994,7 @@ export namespace Prisma {
     department?: string | null
     branch?: string | null
     employmentType?: string | null
+    hrfsUserId?: number | null
     coachSchedule?: string | null
     createdAt?: Date | string
     hodKanbanCards?: HodKanbanCardUncheckedCreateNestedManyWithoutOwnerInput
@@ -34945,6 +35024,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanCards?: HodKanbanCardUpdateManyWithoutOwnerNestedInput
@@ -34958,6 +35038,7 @@ export namespace Prisma {
     department?: NullableStringFieldUpdateOperationsInput | string | null
     branch?: NullableStringFieldUpdateOperationsInput | string | null
     employmentType?: NullableStringFieldUpdateOperationsInput | string | null
+    hrfsUserId?: NullableIntFieldUpdateOperationsInput | number | null
     coachSchedule?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     hodKanbanCards?: HodKanbanCardUncheckedUpdateManyWithoutOwnerNestedInput

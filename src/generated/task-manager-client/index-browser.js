@@ -128,6 +128,7 @@ exports.Prisma.UserScalarFieldEnum = {
   department: 'department',
   branch: 'branch',
   employmentType: 'employmentType',
+  hrfsUserId: 'hrfsUserId',
   coachSchedule: 'coachSchedule',
   createdAt: 'createdAt'
 };

@@ -38,12 +38,20 @@ model User {
   department     String?
   branch         String? // org location dimension (e.g. "Subang Taipan") — analytics
   employmentType String? // HOD | Full Time | Part Time | Intern — display label, analytics
+  // Direct link to ebright_hrfs."User"."id" (integer, 2026-07-31) — the
+  // durable cross-database key, so joins no longer depend on emails
+  // matching. Set by bootstrap from the HRFS source row; null for accounts
+  // with no ebright_hrfs row (portal-only staff, site logins, TEST
+  // accounts) or unresolved email mismatches.
+  hrfsUserId Int?
   coachSchedule  String? // Full Time | Part Time — sub-split of employmentType "Coach" only;
   // used by the assign-task recipient picker's "By Group" filter, NOT by the
   // Branch Status by Region analytics (which still matches employmentType "Coach").
   createdAt        DateTime         @default(now())
   hodKanbanCards   HodKanbanCard[]
   hodKanbanColumns HodKanbanColumn[] // DEPT_SITE/BRANCH_SITE view-only site logins for
+
+  @@index([hrfsUserId])
   // "Department accounts"/"Branch site accounts" (one department/branch's Status
   // view, no personal tasks) — see role usage below.
 }
