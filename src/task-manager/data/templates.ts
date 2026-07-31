@@ -54,7 +54,9 @@ export function listTaskTemplates(email: string): Promise<TaskTemplateSummary[]>
   return native(async () => {
     const user = await requireAssigner(email);
     const rows = await prisma.taskTemplate.findMany({
-      where: { createdById: user.id },
+      // Archived templates leave every active surface (assign picker,
+      // Edit/Remove/Reassign tabs) — the Archive tab lists them instead.
+      where: { createdById: user.id, archivedAt: null },
       orderBy: { updatedAt: "desc" },
       // Never select the image BYTES for a list — load-for-prefill only.
       select: {
@@ -152,7 +154,7 @@ export function getTemplateDeletionImpact(
     if (!template) throw new ApiHttpError(404, "Template not found");
 
     const blocks = await prisma.runBlock.findMany({
-      where: { templateId: id, run: { status: { not: "CANCELLED" } } },
+      where: { templateId: id, run: { status: { not: "CANCELLED" }, archivedAt: null } },
       select: { assigneeId: true, status: true },
     });
     const pending = blocks.filter((b) => (PENDING_STATUSES as readonly string[]).includes(b.status));
@@ -172,7 +174,7 @@ export function getTemplateDeletionImpact(
  *  and proof untouched. Nothing is hard-deleted. */
 async function cancelPendingTemplateRuns(actorId: string, templateId: string, reason: string) {
   const blocks = await prisma.runBlock.findMany({
-    where: { templateId, run: { status: { not: "CANCELLED" } } },
+    where: { templateId, run: { status: { not: "CANCELLED" }, archivedAt: null } },
     select: { runId: true, status: true },
   });
   const pendingRunIds = [
@@ -267,7 +269,7 @@ export function getTemplateAssignees(
         templateId: id,
         parentId: null,
         status: { in: [...PENDING_STATUSES] },
-        run: { status: { not: "CANCELLED" } },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
       select: { assigneeId: true },
     });
@@ -344,7 +346,7 @@ export function editTaskTemplate(
         templateId: id,
         parentId: null,
         status: { in: [...PENDING_STATUSES] },
-        run: { status: { not: "CANCELLED" } },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
       include: { run: true, runItems: true },
     });
@@ -374,7 +376,7 @@ export function editTaskTemplate(
         where: {
           parentId: parent.id,
           status: { in: [...PENDING_STATUSES] },
-          run: { status: { not: "CANCELLED" } },
+          run: { status: { not: "CANCELLED" }, archivedAt: null },
         },
         select: { runId: true },
       });
@@ -451,6 +453,198 @@ function subRunName(subtaskTitle: string, parentRunName: string): string {
   return sep >= 0 ? `${subtaskTitle}${parentRunName.slice(sep)}` : subtaskTitle;
 }
 
+// ---------------------------------------------------------------------
+// Archive / Unarchive (2026-07-31) — the REVERSIBLE counterpart to bulk
+// Remove. Archiving stamps FlowRun.archivedAt on the target's PENDING
+// instances (completed/N-A history is never touched — those runs keep
+// showing in history exactly as before, since only pending runs get
+// stamped) and, for whole-template archives, TaskTemplate.archivedAt too
+// (removing it from the assign picker). Everything is restorable.
+
+export interface ArchivedTemplateEntry {
+  id: string;
+  name: string;
+  title: string;
+  archivedTasks: number; // archived pending MAIN tasks across employees
+  archivedAt: string; // ISO
+}
+export interface ArchivedInstanceEntry {
+  templateId: string;
+  templateName: string;
+  userId: string;
+  userName: string;
+  archivedTasks: number;
+}
+export interface ArchivedItems {
+  templates: ArchivedTemplateEntry[];
+  /** Per-employee archives under templates that are themselves ACTIVE. */
+  instances: ArchivedInstanceEntry[];
+}
+
+/** Archive a whole template (userId omitted) or one employee's pending
+ *  instances of it. Returns how many runs were archived. */
+export function archiveTemplateTasks(
+  email: string,
+  templateId: string,
+  userId?: string,
+): Promise<{ archivedRuns: number; templateArchived: boolean }> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(templateId);
+    const template = await prisma.taskTemplate.findFirst({
+      where: { id, createdById: user.id },
+      select: { id: true },
+    });
+    if (!template) throw new ApiHttpError(404, "Template not found");
+
+    const blocks = await prisma.runBlock.findMany({
+      where: {
+        templateId: id,
+        ...(userId ? { assigneeId: userId } : {}),
+        status: { in: [...PENDING_STATUSES] },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
+      },
+      select: { runId: true },
+    });
+    const runIds = [...new Set(blocks.map((b) => b.runId))];
+    if (runIds.length > 0) {
+      await prisma.flowRun.updateMany({
+        where: { id: { in: runIds } },
+        data: { archivedAt: new Date() },
+      });
+    }
+    if (!userId) {
+      await prisma.taskTemplate.update({ where: { id }, data: { archivedAt: new Date() } });
+    }
+    await prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: "BLOCK_STATUS_CHANGED",
+        detail: {
+          reason: "archived",
+          templateId: id,
+          scope: userId ?? "template",
+          archivedRuns: runIds.length,
+        },
+      },
+    });
+    return { archivedRuns: runIds.length, templateArchived: !userId };
+  }, "archiveTemplateTasks");
+}
+
+/** Restore: whole template (clears TaskTemplate.archivedAt AND un-archives
+ *  every archived run of it) or one employee's instances. */
+export function unarchiveTemplateTasks(
+  email: string,
+  templateId: string,
+  userId?: string,
+): Promise<{ restoredRuns: number; templateRestored: boolean }> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(templateId);
+    const template = await prisma.taskTemplate.findFirst({
+      where: { id, createdById: user.id },
+      select: { id: true, archivedAt: true },
+    });
+    if (!template) throw new ApiHttpError(404, "Template not found");
+
+    const blocks = await prisma.runBlock.findMany({
+      where: {
+        templateId: id,
+        ...(userId ? { assigneeId: userId } : {}),
+        run: { status: { not: "CANCELLED" }, archivedAt: { not: null } },
+      },
+      select: { runId: true },
+    });
+    const runIds = [...new Set(blocks.map((b) => b.runId))];
+    if (runIds.length > 0) {
+      await prisma.flowRun.updateMany({
+        where: { id: { in: runIds } },
+        data: { archivedAt: null },
+      });
+    }
+    const restoreTemplate = !userId && template.archivedAt !== null;
+    if (restoreTemplate) {
+      await prisma.taskTemplate.update({ where: { id }, data: { archivedAt: null } });
+    }
+    await prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: "BLOCK_STATUS_CHANGED",
+        detail: {
+          reason: "unarchived",
+          templateId: id,
+          scope: userId ?? "template",
+          restoredRuns: runIds.length,
+        },
+      },
+    });
+    return { restoredRuns: runIds.length, templateRestored: restoreTemplate };
+  }, "unarchiveTemplateTasks");
+}
+
+/** Everything currently archived, for the Archive tab's "Archived" list:
+ *  the actor's archived templates + per-employee archives under their
+ *  still-active templates. */
+export function listArchivedItems(email: string): Promise<ArchivedItems> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const all = await prisma.taskTemplate.findMany({
+      where: { createdById: user.id },
+      select: { id: true, name: true, title: true, archivedAt: true },
+    });
+    const byId = new Map(all.map((t) => [t.id, t]));
+
+    // Archived PARENT blocks across this actor's templates, one query.
+    const archivedParents = await prisma.runBlock.findMany({
+      where: {
+        templateId: { in: all.map((t) => t.id) },
+        parentId: null,
+        run: { status: { not: "CANCELLED" }, archivedAt: { not: null } },
+      },
+      select: { templateId: true, assigneeId: true },
+    });
+
+    const templates: ArchivedTemplateEntry[] = all
+      .filter((t) => t.archivedAt !== null)
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        title: t.title,
+        archivedTasks: archivedParents.filter((p) => p.templateId === t.id).length,
+        archivedAt: t.archivedAt!.toISOString(),
+      }))
+      .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
+
+    // Per-employee archives under ACTIVE templates.
+    const counts = new Map<string, number>(); // `${templateId}:${userId}`
+    for (const p of archivedParents) {
+      const t = byId.get(p.templateId!);
+      if (!t || t.archivedAt !== null) continue;
+      const key = `${p.templateId}:${p.assigneeId}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const users = await getUsersByIds([...counts.keys()].map((k) => k.split(":")[1]));
+    const instances: ArchivedInstanceEntry[] = [...counts.entries()]
+      .map(([key, archivedTasks]) => {
+        const [tplId, uid] = key.split(":");
+        return {
+          templateId: tplId,
+          templateName: byId.get(tplId)?.name ?? tplId,
+          userId: uid,
+          userName: users.get(uid)?.name ?? uid,
+          archivedTasks,
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.templateName.localeCompare(b.templateName) || a.userName.localeCompare(b.userName),
+      );
+
+    return { templates, instances };
+  }, "listArchivedItems");
+}
+
 /** "Reassign Task" (2026-07-31, + Task hub): move ONE employee's pending
  *  instance(s) of this template — parent AND pending subtasks — to another
  *  employee, through reassignFlowTask so every authorization rule (incl.
@@ -471,7 +665,7 @@ export function reassignTemplateTasks(
         templateId: id,
         assigneeId: from,
         status: { in: [...PENDING_STATUSES] },
-        run: { status: { not: "CANCELLED" } },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
       orderBy: { id: "asc" },
       select: { id: true },

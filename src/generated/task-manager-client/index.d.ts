@@ -13530,6 +13530,7 @@ export namespace Prisma {
     startedById: string | null
     triggerType: $Enums.TriggerType | null
     status: $Enums.RunStatus | null
+    archivedAt: Date | null
     startedAt: Date | null
     completedAt: Date | null
   }
@@ -13542,6 +13543,7 @@ export namespace Prisma {
     startedById: string | null
     triggerType: $Enums.TriggerType | null
     status: $Enums.RunStatus | null
+    archivedAt: Date | null
     startedAt: Date | null
     completedAt: Date | null
   }
@@ -13555,6 +13557,7 @@ export namespace Prisma {
     startedById: number
     triggerType: number
     status: number
+    archivedAt: number
     startedAt: number
     completedAt: number
     _all: number
@@ -13577,6 +13580,7 @@ export namespace Prisma {
     startedById?: true
     triggerType?: true
     status?: true
+    archivedAt?: true
     startedAt?: true
     completedAt?: true
   }
@@ -13589,6 +13593,7 @@ export namespace Prisma {
     startedById?: true
     triggerType?: true
     status?: true
+    archivedAt?: true
     startedAt?: true
     completedAt?: true
   }
@@ -13602,6 +13607,7 @@ export namespace Prisma {
     startedById?: true
     triggerType?: true
     status?: true
+    archivedAt?: true
     startedAt?: true
     completedAt?: true
     _all?: true
@@ -13702,6 +13708,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status: $Enums.RunStatus
+    archivedAt: Date | null
     startedAt: Date
     completedAt: Date | null
     _count: FlowRunCountAggregateOutputType | null
@@ -13734,6 +13741,7 @@ export namespace Prisma {
     startedById?: boolean
     triggerType?: boolean
     status?: boolean
+    archivedAt?: boolean
     startedAt?: boolean
     completedAt?: boolean
     flow?: boolean | FlowDefaultArgs<ExtArgs>
@@ -13750,6 +13758,7 @@ export namespace Prisma {
     startedById?: boolean
     triggerType?: boolean
     status?: boolean
+    archivedAt?: boolean
     startedAt?: boolean
     completedAt?: boolean
     flow?: boolean | FlowDefaultArgs<ExtArgs>
@@ -13764,6 +13773,7 @@ export namespace Prisma {
     startedById?: boolean
     triggerType?: boolean
     status?: boolean
+    archivedAt?: boolean
     startedAt?: boolean
     completedAt?: boolean
     flow?: boolean | FlowDefaultArgs<ExtArgs>
@@ -13778,11 +13788,12 @@ export namespace Prisma {
     startedById?: boolean
     triggerType?: boolean
     status?: boolean
+    archivedAt?: boolean
     startedAt?: boolean
     completedAt?: boolean
   }
 
-  export type FlowRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "flowId" | "flowVersion" | "templateSnapshot" | "name" | "startedById" | "triggerType" | "status" | "startedAt" | "completedAt", ExtArgs["result"]["flowRun"]>
+  export type FlowRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "flowId" | "flowVersion" | "templateSnapshot" | "name" | "startedById" | "triggerType" | "status" | "archivedAt" | "startedAt" | "completedAt", ExtArgs["result"]["flowRun"]>
   export type FlowRunInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     flow?: boolean | FlowDefaultArgs<ExtArgs>
     runBlocks?: boolean | FlowRun$runBlocksArgs<ExtArgs>
@@ -13810,6 +13821,7 @@ export namespace Prisma {
       startedById: string
       triggerType: $Enums.TriggerType
       status: $Enums.RunStatus
+      archivedAt: Date | null
       startedAt: Date
       completedAt: Date | null
     }, ExtArgs["result"]["flowRun"]>
@@ -14245,6 +14257,7 @@ export namespace Prisma {
     readonly startedById: FieldRef<"FlowRun", 'String'>
     readonly triggerType: FieldRef<"FlowRun", 'TriggerType'>
     readonly status: FieldRef<"FlowRun", 'RunStatus'>
+    readonly archivedAt: FieldRef<"FlowRun", 'DateTime'>
     readonly startedAt: FieldRef<"FlowRun", 'DateTime'>
     readonly completedAt: FieldRef<"FlowRun", 'DateTime'>
   }
@@ -17248,6 +17261,7 @@ export namespace Prisma {
     guidelineUrl: string | null
     guidelineMime: string | null
     guidelineImage: Bytes | null
+    archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -17261,6 +17275,7 @@ export namespace Prisma {
     guidelineUrl: string | null
     guidelineMime: string | null
     guidelineImage: Bytes | null
+    archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -17275,6 +17290,7 @@ export namespace Prisma {
     guidelineUrl: number
     guidelineMime: number
     guidelineImage: number
+    archivedAt: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -17290,6 +17306,7 @@ export namespace Prisma {
     guidelineUrl?: true
     guidelineMime?: true
     guidelineImage?: true
+    archivedAt?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -17303,6 +17320,7 @@ export namespace Prisma {
     guidelineUrl?: true
     guidelineMime?: true
     guidelineImage?: true
+    archivedAt?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -17317,6 +17335,7 @@ export namespace Prisma {
     guidelineUrl?: true
     guidelineMime?: true
     guidelineImage?: true
+    archivedAt?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -17404,6 +17423,7 @@ export namespace Prisma {
     guidelineUrl: string | null
     guidelineMime: string | null
     guidelineImage: Bytes | null
+    archivedAt: Date | null
     createdAt: Date
     updatedAt: Date
     _count: TaskTemplateCountAggregateOutputType | null
@@ -17435,6 +17455,7 @@ export namespace Prisma {
     guidelineUrl?: boolean
     guidelineMime?: boolean
     guidelineImage?: boolean
+    archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["taskTemplate"]>
@@ -17449,6 +17470,7 @@ export namespace Prisma {
     guidelineUrl?: boolean
     guidelineMime?: boolean
     guidelineImage?: boolean
+    archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["taskTemplate"]>
@@ -17463,6 +17485,7 @@ export namespace Prisma {
     guidelineUrl?: boolean
     guidelineMime?: boolean
     guidelineImage?: boolean
+    archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["taskTemplate"]>
@@ -17477,11 +17500,12 @@ export namespace Prisma {
     guidelineUrl?: boolean
     guidelineMime?: boolean
     guidelineImage?: boolean
+    archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type TaskTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "title" | "subtasks" | "cadence" | "guidelineUrl" | "guidelineMime" | "guidelineImage" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplate"]>
+  export type TaskTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "title" | "subtasks" | "cadence" | "guidelineUrl" | "guidelineMime" | "guidelineImage" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplate"]>
 
   export type $TaskTemplatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "TaskTemplate"
@@ -17496,6 +17520,7 @@ export namespace Prisma {
       guidelineUrl: string | null
       guidelineMime: string | null
       guidelineImage: Prisma.Bytes | null
+      archivedAt: Date | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["taskTemplate"]>
@@ -17930,6 +17955,7 @@ export namespace Prisma {
     readonly guidelineUrl: FieldRef<"TaskTemplate", 'String'>
     readonly guidelineMime: FieldRef<"TaskTemplate", 'String'>
     readonly guidelineImage: FieldRef<"TaskTemplate", 'Bytes'>
+    readonly archivedAt: FieldRef<"TaskTemplate", 'DateTime'>
     readonly createdAt: FieldRef<"TaskTemplate", 'DateTime'>
     readonly updatedAt: FieldRef<"TaskTemplate", 'DateTime'>
   }
@@ -28007,6 +28033,7 @@ export namespace Prisma {
     startedById: 'startedById',
     triggerType: 'triggerType',
     status: 'status',
+    archivedAt: 'archivedAt',
     startedAt: 'startedAt',
     completedAt: 'completedAt'
   };
@@ -28060,6 +28087,7 @@ export namespace Prisma {
     guidelineUrl: 'guidelineUrl',
     guidelineMime: 'guidelineMime',
     guidelineImage: 'guidelineImage',
+    archivedAt: 'archivedAt',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -29104,6 +29132,7 @@ export namespace Prisma {
     startedById?: StringFilter<"FlowRun"> | string
     triggerType?: EnumTriggerTypeFilter<"FlowRun"> | $Enums.TriggerType
     status?: EnumRunStatusFilter<"FlowRun"> | $Enums.RunStatus
+    archivedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
     startedAt?: DateTimeFilter<"FlowRun"> | Date | string
     completedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
     flow?: XOR<FlowScalarRelationFilter, FlowWhereInput>
@@ -29119,6 +29148,7 @@ export namespace Prisma {
     startedById?: SortOrder
     triggerType?: SortOrder
     status?: SortOrder
+    archivedAt?: SortOrderInput | SortOrder
     startedAt?: SortOrder
     completedAt?: SortOrderInput | SortOrder
     flow?: FlowOrderByWithRelationInput
@@ -29137,6 +29167,7 @@ export namespace Prisma {
     startedById?: StringFilter<"FlowRun"> | string
     triggerType?: EnumTriggerTypeFilter<"FlowRun"> | $Enums.TriggerType
     status?: EnumRunStatusFilter<"FlowRun"> | $Enums.RunStatus
+    archivedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
     startedAt?: DateTimeFilter<"FlowRun"> | Date | string
     completedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
     flow?: XOR<FlowScalarRelationFilter, FlowWhereInput>
@@ -29152,6 +29183,7 @@ export namespace Prisma {
     startedById?: SortOrder
     triggerType?: SortOrder
     status?: SortOrder
+    archivedAt?: SortOrderInput | SortOrder
     startedAt?: SortOrder
     completedAt?: SortOrderInput | SortOrder
     _count?: FlowRunCountOrderByAggregateInput
@@ -29173,6 +29205,7 @@ export namespace Prisma {
     startedById?: StringWithAggregatesFilter<"FlowRun"> | string
     triggerType?: EnumTriggerTypeWithAggregatesFilter<"FlowRun"> | $Enums.TriggerType
     status?: EnumRunStatusWithAggregatesFilter<"FlowRun"> | $Enums.RunStatus
+    archivedAt?: DateTimeNullableWithAggregatesFilter<"FlowRun"> | Date | string | null
     startedAt?: DateTimeWithAggregatesFilter<"FlowRun"> | Date | string
     completedAt?: DateTimeNullableWithAggregatesFilter<"FlowRun"> | Date | string | null
   }
@@ -29394,6 +29427,7 @@ export namespace Prisma {
     guidelineUrl?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
+    archivedAt?: DateTimeNullableFilter<"TaskTemplate"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
   }
@@ -29408,6 +29442,7 @@ export namespace Prisma {
     guidelineUrl?: SortOrderInput | SortOrder
     guidelineMime?: SortOrderInput | SortOrder
     guidelineImage?: SortOrderInput | SortOrder
+    archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -29425,6 +29460,7 @@ export namespace Prisma {
     guidelineUrl?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
+    archivedAt?: DateTimeNullableFilter<"TaskTemplate"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
   }, "id">
@@ -29439,6 +29475,7 @@ export namespace Prisma {
     guidelineUrl?: SortOrderInput | SortOrder
     guidelineMime?: SortOrderInput | SortOrder
     guidelineImage?: SortOrderInput | SortOrder
+    archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: TaskTemplateCountOrderByAggregateInput
@@ -29459,6 +29496,7 @@ export namespace Prisma {
     guidelineUrl?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
     guidelineMime?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableWithAggregatesFilter<"TaskTemplate"> | Bytes | null
+    archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplate"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
   }
@@ -30745,6 +30783,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
     flow: FlowCreateNestedOneWithoutRunsInput
@@ -30760,6 +30799,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
     runBlocks?: RunBlockUncheckedCreateNestedManyWithoutRunInput
@@ -30773,6 +30813,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     flow?: FlowUpdateOneRequiredWithoutRunsNestedInput
@@ -30788,6 +30829,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     runBlocks?: RunBlockUncheckedUpdateManyWithoutRunNestedInput
@@ -30802,6 +30844,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
   }
@@ -30814,6 +30857,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
@@ -30827,6 +30871,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
@@ -31067,6 +31112,7 @@ export namespace Prisma {
     guidelineUrl?: string | null
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -31081,6 +31127,7 @@ export namespace Prisma {
     guidelineUrl?: string | null
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -31095,6 +31142,7 @@ export namespace Prisma {
     guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31109,6 +31157,7 @@ export namespace Prisma {
     guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31123,6 +31172,7 @@ export namespace Prisma {
     guidelineUrl?: string | null
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -31137,6 +31187,7 @@ export namespace Prisma {
     guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31151,6 +31202,7 @@ export namespace Prisma {
     guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -32550,6 +32602,7 @@ export namespace Prisma {
     startedById?: SortOrder
     triggerType?: SortOrder
     status?: SortOrder
+    archivedAt?: SortOrder
     startedAt?: SortOrder
     completedAt?: SortOrder
   }
@@ -32566,6 +32619,7 @@ export namespace Prisma {
     startedById?: SortOrder
     triggerType?: SortOrder
     status?: SortOrder
+    archivedAt?: SortOrder
     startedAt?: SortOrder
     completedAt?: SortOrder
   }
@@ -32578,6 +32632,7 @@ export namespace Prisma {
     startedById?: SortOrder
     triggerType?: SortOrder
     status?: SortOrder
+    archivedAt?: SortOrder
     startedAt?: SortOrder
     completedAt?: SortOrder
   }
@@ -32804,6 +32859,7 @@ export namespace Prisma {
     guidelineUrl?: SortOrder
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
+    archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -32817,6 +32873,7 @@ export namespace Prisma {
     guidelineUrl?: SortOrder
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
+    archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -32830,6 +32887,7 @@ export namespace Prisma {
     guidelineUrl?: SortOrder
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
+    archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -35073,6 +35131,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
     runBlocks?: RunBlockCreateNestedManyWithoutRunInput
@@ -35086,6 +35145,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
     runBlocks?: RunBlockUncheckedCreateNestedManyWithoutRunInput
@@ -35264,6 +35324,7 @@ export namespace Prisma {
     startedById?: StringFilter<"FlowRun"> | string
     triggerType?: EnumTriggerTypeFilter<"FlowRun"> | $Enums.TriggerType
     status?: EnumRunStatusFilter<"FlowRun"> | $Enums.RunStatus
+    archivedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
     startedAt?: DateTimeFilter<"FlowRun"> | Date | string
     completedAt?: DateTimeNullableFilter<"FlowRun"> | Date | string | null
   }
@@ -35931,6 +35992,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
     flow: FlowCreateNestedOneWithoutRunsInput
@@ -35945,6 +36007,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
   }
@@ -36274,6 +36337,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     flow?: FlowUpdateOneRequiredWithoutRunsNestedInput
@@ -36288,6 +36352,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
@@ -37279,6 +37344,7 @@ export namespace Prisma {
     startedById: string
     triggerType: $Enums.TriggerType
     status?: $Enums.RunStatus
+    archivedAt?: Date | string | null
     startedAt?: Date | string
     completedAt?: Date | string | null
   }
@@ -37368,6 +37434,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     runBlocks?: RunBlockUpdateManyWithoutRunNestedInput
@@ -37381,6 +37448,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     runBlocks?: RunBlockUncheckedUpdateManyWithoutRunNestedInput
@@ -37394,6 +37462,7 @@ export namespace Prisma {
     startedById?: StringFieldUpdateOperationsInput | string
     triggerType?: EnumTriggerTypeFieldUpdateOperationsInput | $Enums.TriggerType
     status?: EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }

@@ -225,6 +225,7 @@ exports.Prisma.FlowRunScalarFieldEnum = {
   startedById: 'startedById',
   triggerType: 'triggerType',
   status: 'status',
+  archivedAt: 'archivedAt',
   startedAt: 'startedAt',
   completedAt: 'completedAt'
 };
@@ -269,6 +270,7 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
   guidelineUrl: 'guidelineUrl',
   guidelineMime: 'guidelineMime',
   guidelineImage: 'guidelineImage',
+  archivedAt: 'archivedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

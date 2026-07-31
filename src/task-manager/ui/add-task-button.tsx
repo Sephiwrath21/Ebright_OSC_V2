@@ -19,18 +19,22 @@ import type {
 } from "./types";
 import { AssignTaskForm } from "./assign-task-form";
 import {
+  TemplateArchivePanel,
   TemplateEditPanel,
   TemplateReassignPanel,
   TemplateRemovePanel,
 } from "./template-panels";
 
-/** + Task hub tabs (2026-07-31): Assign stays the default; the other three
- *  are template-scoped bulk operations, shown only when templates exist. */
+/** + Task hub tabs (2026-07-31): Assign stays the default; the others are
+ *  template-scoped bulk operations, shown only when templates exist —
+ *  except Archive, which also lists/restores already-archived items (so
+ *  it must stay reachable even when every template is archived). */
 const HUB_TABS = [
   { key: "assign", label: "Assign" },
   { key: "edit", label: "Edit" },
   { key: "remove", label: "Remove" },
   { key: "reassign", label: "Reassign" },
+  { key: "archive", label: "Archive" },
 ] as const;
 type HubTab = (typeof HUB_TABS)[number]["key"];
 
@@ -47,9 +51,11 @@ export function AddTaskButton({
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<HubTab>("assign");
-  // Edit/Remove/Reassign are template-scoped — nothing to act on until at
-  // least one template exists.
-  const showTabs = Boolean(templates && templates.list.length > 0);
+  // Tabs appear once templates are in play. `templates.list` only carries
+  // ACTIVE templates, so the Archive tab (which restores archived ones)
+  // must not disappear when everything is archived — any templates prop
+  // at all keeps the tab bar once the user has used templates.
+  const showTabs = Boolean(templates);
 
   return (
     <>
@@ -111,6 +117,7 @@ export function AddTaskButton({
                 {tab === "edit" && <TemplateEditPanel templates={templates} />}
                 {tab === "remove" && <TemplateRemovePanel templates={templates} />}
                 {tab === "reassign" && <TemplateReassignPanel templates={templates} staff={staff} />}
+                {tab === "archive" && <TemplateArchivePanel templates={templates} />}
               </div>
             )}
           </div>

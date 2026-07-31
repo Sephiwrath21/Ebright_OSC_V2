@@ -233,6 +233,11 @@ model FlowRun {
   startedById      String
   triggerType      TriggerType
   status           RunStatus   @default(ACTIVE)
+  // Archive (2026-07-31): non-null = hidden from every active view
+  // (fetchPeriodBlocks filters it) but fully retrievable/restorable —
+  // unlike CANCELLED this is a first-class reversible state, cleared by
+  // Unarchive. Orthogonal to `status` so completion history survives.
+  archivedAt       DateTime?
   startedAt        DateTime    @default(now())
   completedAt      DateTime?
   runBlocks        RunBlock[]
@@ -359,17 +364,21 @@ model Guideline {
 /// only pre-fills the form — assignment then flows through the normal
 /// pipeline (fresh Guideline row per assignment), never mutating this row.
 model TaskTemplate {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   createdById    String
   name           String
   title          String
-  subtasks       Json     @default("[]") // string[]
+  subtasks       Json      @default("[]") // string[]
   cadence        Cadence?
   guidelineUrl   String?
   guidelineMime  String? // image/png | image/jpeg | image/webp
   guidelineImage Bytes?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  // Archive (2026-07-31): archived templates leave the assign picker and
+  // every hub tab except Archive (where Unarchive restores them + their
+  // archived instances). Reversible counterpart to deletion.
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([createdById])
 }

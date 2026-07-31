@@ -14,6 +14,8 @@
 
 import * as React from "react";
 import type {
+  FlowArchivedInstance,
+  FlowArchivedTemplate,
   FlowStaffMember,
   FlowTemplateAssignee,
   FlowTemplateControl,
@@ -386,6 +388,202 @@ export function TemplateRemovePanel({ templates }: { templates: FlowTemplateCont
         </>
       )}
       <Feedback message={message} />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- Archive --
+
+/** Archive = the REVERSIBLE Remove: hides pending instances (and
+ *  optionally the template) from every active view without touching any
+ *  data; the Archived list below restores either in one click. */
+export function TemplateArchivePanel({ templates }: { templates: FlowTemplateControl }) {
+  const [templateId, setTemplateId] = React.useState("");
+  const [assignees, setAssignees] = React.useState<FlowTemplateAssignee[] | null>(null);
+  const [scope, setScope] = React.useState<"template" | "employee">("template");
+  const [userId, setUserId] = React.useState("");
+  const [archived, setArchived] = React.useState<{
+    templates: FlowArchivedTemplate[];
+    instances: FlowArchivedInstance[];
+  } | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+
+  const refreshArchived = React.useCallback(() => {
+    void templates.archived().then((r) => {
+      if (r.ok) setArchived({ templates: r.templates, instances: r.instances });
+      else setMessage({ ok: false, text: r.message });
+    });
+  }, [templates]);
+  React.useEffect(() => {
+    refreshArchived();
+  }, [refreshArchived]);
+
+  const pick = async (id: string) => {
+    setTemplateId(id);
+    setAssignees(null);
+    setUserId("");
+    setMessage(null);
+    if (!id) return;
+    setBusy(true);
+    const result = await templates.assignees(id);
+    setBusy(false);
+    if (result.ok) setAssignees(result.assignees);
+    else setMessage({ ok: false, text: result.message });
+  };
+
+  const doArchive = async () => {
+    if (!templateId || !assignees) return;
+    const wholeTemplate = scope === "template";
+    if (!wholeTemplate && !userId) return;
+    const target = assignees.find((a) => a.userId === userId);
+    const employees = wholeTemplate ? assignees.length : 1;
+    const tasks = wholeTemplate
+      ? assignees.reduce((n, a) => n + a.pendingTasks, 0)
+      : (target?.pendingTasks ?? 0);
+    const warning = wholeTemplate
+      ? `This archives the task for ${employees} employee${employees === 1 ? "" : "s"} (${tasks} pending task${tasks === 1 ? "" : "s"}) AND removes the template from the assign picker. Completed records stay visible. Everything can be restored from the Archived list.`
+      : `This archives ${target?.name ?? "this employee"}'s ${tasks} pending task${tasks === 1 ? "" : "s"} (hidden from their list, restorable below). Completed records stay visible.`;
+    if (!window.confirm(`Archive?\n\n${warning}`)) return;
+    setBusy(true);
+    const result = await templates.archive(templateId, wholeTemplate ? undefined : userId);
+    setBusy(false);
+    if (result.ok) {
+      setMessage({ ok: true, text: "Archived — restore any time from the list below." });
+      setTemplateId("");
+      setAssignees(null);
+      setUserId("");
+      refreshArchived();
+    } else {
+      setMessage({ ok: false, text: result.message });
+    }
+  };
+
+  const doUnarchive = async (tplId: string, uid?: string) => {
+    setBusy(true);
+    const result = await templates.unarchive(tplId, uid);
+    setBusy(false);
+    if (result.ok) {
+      setMessage({ ok: true, text: "Restored to active." });
+      refreshArchived();
+    } else {
+      setMessage({ ok: false, text: result.message });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <TemplateSelect templates={templates} value={templateId} onChange={(id) => void pick(id)} disabled={busy} />
+      {assignees && (
+        <>
+          <div role="radiogroup" aria-label="Archive scope" className="flex gap-2">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={scope === "template"}
+              onClick={() => setScope("template")}
+              className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+                scope === "template"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+              }`}
+            >
+              Entire task (all employees)
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={scope === "employee"}
+              onClick={() => setScope("employee")}
+              className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+                scope === "employee"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+              }`}
+            >
+              One employee
+            </button>
+          </div>
+          {scope === "employee" && (
+            <label className="block text-sm text-gray-600">
+              Employee
+              <select value={userId} onChange={(e) => setUserId(e.target.value)} className={`mt-1 ${selectClass}`}>
+                <option value="">Select an employee…</option>
+                {assignees.map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    {a.name} ({a.pendingTasks} pending)
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div>
+            <button
+              type="button"
+              disabled={busy || (scope === "employee" && !userId)}
+              onClick={() => void doArchive()}
+              className="rounded-full bg-gray-700 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {busy ? "Archiving…" : "Archive"}
+            </button>
+          </div>
+        </>
+      )}
+      <Feedback message={message} />
+
+      <div className="mt-2 border-t border-gray-100 pt-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Archived</p>
+        {archived === null && <p className="mt-2 text-sm text-gray-400">Loading…</p>}
+        {archived && archived.templates.length === 0 && archived.instances.length === 0 && (
+          <p className="mt-2 text-sm text-gray-400">Nothing archived.</p>
+        )}
+        {archived && (
+          <ul className="mt-2 space-y-1">
+            {archived.templates.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {t.name}
+                  <span className="ml-1.5 text-xs text-gray-400">
+                    entire task · {t.archivedTasks} archived task{t.archivedTasks === 1 ? "" : "s"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void doUnarchive(t.id)}
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                >
+                  Unarchive
+                </button>
+              </li>
+            ))}
+            {archived.instances.map((i) => (
+              <li
+                key={`${i.templateId}:${i.userId}`}
+                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {i.templateName}
+                  <span className="ml-1.5 text-xs text-gray-400">
+                    {i.userName} · {i.archivedTasks} archived task{i.archivedTasks === 1 ? "" : "s"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void doUnarchive(i.templateId, i.userId)}
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                >
+                  Unarchive
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

@@ -63,6 +63,10 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
       dueAt: { lt: todayStart },
       successor: null,
       parentId: null,
+      // Removed (run CANCELLED) and archived tasks must NOT recur — without
+      // this, a bulk-removed/archived Daily task would resurrect as next
+      // week's occurrence (2026-07-31 fix).
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
     include: { run: true, runItems: true },
   });
@@ -97,8 +101,11 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           cadence: "DAILY",
           recurrenceOfId: block.id,
           // Successors inherit the assigner's Guideline (shared row — the
-          // image bytes are never duplicated).
+          // image bytes are never duplicated) AND the template link, so
+          // template-wide bulk ops (edit/remove/reassign/archive) keep
+          // reaching next week's occurrences.
           guidelineId: block.guidelineId,
+          templateId: block.templateId,
           runItems: {
             create: block.runItems.map((it) => ({
               itemId: it.itemId,
@@ -150,6 +157,8 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
       successor: null,
       parentId: { not: null },
       parent: { successor: { isNot: null } },
+      // Same removed/archived exclusion as the parent sweep above.
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
     include: {
       run: true,
@@ -188,6 +197,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           recurrenceOfId: sub.id,
           parentId: newParentId,
           guidelineId: sub.guidelineId,
+          templateId: sub.templateId,
           runItems: {
             create: sub.runItems.map((it) => ({
               itemId: it.itemId,

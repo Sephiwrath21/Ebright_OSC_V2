@@ -628,6 +628,9 @@ export async function fetchPeriodBlocks(
       ...(filter.excludeAssigneeId ? { assigneeId: { not: filter.excludeAssigneeId } } : {}),
       run: {
         status: { not: "CANCELLED" },
+        // Archived runs (2026-07-31) are hidden from EVERY active view —
+        // this is the one gate all lists/donuts/counts read through.
+        archivedAt: null,
         ...(filter.startedById ? { startedById: filter.startedById } : {}),
       },
       ...(window

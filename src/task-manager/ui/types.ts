@@ -364,6 +364,25 @@ export type TemplateEditResult =
   | { ok: true; updatedTasks: number; employees: number }
   | { ok: false; message: string };
 
+// Archive (2026-07-31): reversible hide — see data/templates.ts.
+export interface FlowArchivedTemplate {
+  id: string;
+  name: string;
+  title: string;
+  archivedTasks: number;
+  archivedAt: string; // ISO
+}
+export interface FlowArchivedInstance {
+  templateId: string;
+  templateName: string;
+  userId: string;
+  userName: string;
+  archivedTasks: number;
+}
+export type ArchivedItemsResult =
+  | { ok: true; templates: FlowArchivedTemplate[]; instances: FlowArchivedInstance[] }
+  | { ok: false; message: string };
+
 /** Everything the "+ Task" form needs for templates, bundled as ONE
  *  optional prop: the saved list plus load/impact/rename/delete server
  *  actions. `impact` feeds the pre-deletion confirmation ("removes N
@@ -380,6 +399,10 @@ export interface FlowTemplateControl {
   edit: (templateId: string, input: FlowTemplateEditInput) => Promise<TemplateEditResult>;
   removeAssignments: (templateId: string, alsoDeleteTemplate: boolean) => Promise<ActionResult>;
   reassignAll: (templateId: string, fromUserId: string, toUserId: string) => Promise<ActionResult>;
+  // Archive / Unarchive (2026-07-31): userId omitted = whole template.
+  archive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  unarchive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  archived: () => Promise<ArchivedItemsResult>;
 }
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the

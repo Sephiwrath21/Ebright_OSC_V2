@@ -38,15 +38,18 @@ import {
   recolorKanbanColumn,
   renameKanbanColumn,
   reopenFlowTask,
+  archiveTemplateTasks,
   deleteTaskTemplate,
   editTaskTemplate,
   getTaskTemplate,
   getTemplateAssignees,
   getTemplateDeletionImpact,
+  listArchivedItems,
   listTaskTemplates,
   reassignTemplateTasks,
   removeTemplateAssignments,
   renameTaskTemplate,
+  unarchiveTemplateTasks,
   saveCeoDashboardConfig,
   skipFlowTask,
   uploadFlowTaskProof,
@@ -366,6 +369,43 @@ export default async function TaskManagerPage({
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
   }
+  async function archiveTemplate(templateId: string, userId?: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await archiveTemplateTasks(email, templateId, userId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function unarchiveTemplate(templateId: string, userId?: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await unarchiveTemplateTasks(email, templateId, userId);
+      revalidatePath("/task-manager");
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  async function archivedItems(): Promise<import("@/task-manager/ui/types").ArchivedItemsResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const items = await listArchivedItems(email);
+      return { ok: true, ...items };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
   async function reassignTemplate(
     templateId: string,
     fromUserId: string,
@@ -589,6 +629,9 @@ export default async function TaskManagerPage({
             edit: editTemplate,
             removeAssignments,
             reassignAll: reassignTemplate,
+            archive: archiveTemplate,
+            unarchive: unarchiveTemplate,
+            archived: archivedItems,
           }}
         />
       );
