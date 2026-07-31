@@ -62,100 +62,105 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="h-10 px-5 rounded-full bg-[#63f4aea8] text-sm font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors"
+        className="min-h-11 px-5 rounded-full bg-[#63f4aea8] text-sm font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors"
       >
         + Add
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="relative w-[min(480px,calc(100vw-48px))] max-h-[calc(100vh-64px)] overflow-y-auto box-border bg-white rounded-2xl p-7 shadow-[0_12px_32px_0_#00000026]">
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Close"
-              className="absolute top-5 right-6 text-lg text-[#4b4949a3] hover:text-[#4b4949]"
-            >
-              ×
-            </button>
-            <h3 className="mb-5 text-lg font-semibold text-[#4b4949d6]">Add Pre-stage Employee</h3>
-
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-[#4b4949]">Full Name</label>
-                <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-[#4b4949]">Position</label>
-                <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputClass}>
-                  <option value=""></option>
-                  {POSITION_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-[#4b4949]">Branch</label>
-                <select
-                  value={branchCode}
-                  onChange={(e) => {
-                    setBranchCode(e.target.value);
-                    if (e.target.value) setDepartmentCode("");
-                  }}
-                  disabled={Boolean(departmentCode)}
-                  className={inputClass}
-                >
-                  <option value=""></option>
-                  {branches.map((b) => (
-                    <option key={b.code} value={b.code}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-[#4b4949]">Dept</label>
-                <select
-                  value={departmentCode}
-                  onChange={(e) => {
-                    setDepartmentCode(e.target.value);
-                    if (e.target.value) setBranchCode("");
-                  }}
-                  disabled={Boolean(branchCode)}
-                  className={inputClass}
-                >
-                  <option value=""></option>
-                  {departments.map((d) => (
-                    <option key={d.code} value={d.code}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-[#4b4949]">Date</label>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
-              </div>
-            </div>
-
-            {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
-
-            <div className="mt-6 flex justify-end gap-3">
+          <div className="relative flex w-full max-w-[480px] max-h-[calc(100vh-32px)] flex-col box-border bg-white rounded-2xl shadow-[0_12px_32px_0_#00000026] overflow-hidden">
+            <div className="flex items-start justify-between gap-4 px-5 sm:px-7 pt-6 pb-4">
+              <h3 className="text-lg font-semibold text-[#4b4949d6]">Add Pre-stage Employee</h3>
               <button
                 type="button"
                 onClick={close}
-                className="rounded-[10px] px-5 py-2.5 text-sm font-medium text-[#4b4949] hover:bg-slate-100 transition-colors"
+                aria-label="Close"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[#4b4949a3] hover:bg-[#f0f4fa] hover:text-[#4b4949]"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 sm:px-7">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Full Name</label>
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Position</label>
+                  <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputClass}>
+                    <option value=""></option>
+                    {POSITION_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Branch</label>
+                  <select
+                    value={branchCode}
+                    onChange={(e) => {
+                      setBranchCode(e.target.value);
+                      if (e.target.value) setDepartmentCode("");
+                    }}
+                    disabled={Boolean(departmentCode)}
+                    className={inputClass}
+                  >
+                    <option value=""></option>
+                    {branches.map((b) => (
+                      <option key={b.code} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Dept</label>
+                  <select
+                    value={departmentCode}
+                    onChange={(e) => {
+                      setDepartmentCode(e.target.value);
+                      if (e.target.value) setBranchCode("");
+                    }}
+                    disabled={Boolean(branchCode)}
+                    className={inputClass}
+                  >
+                    <option value=""></option>
+                    {departments.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Date</label>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+                </div>
+              </div>
+
+              {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
+            </div>
+
+            <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5">
+              <button
+                type="button"
+                onClick={close}
+                disabled={saving}
+                className="min-h-11 rounded-[10px] px-5 py-2.5 text-sm font-medium text-[#4b4949] hover:bg-slate-100 disabled:opacity-60 transition-colors"
               >
                 Cancel
               </button>
@@ -163,7 +168,7 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                 type="button"
                 disabled={saving}
                 onClick={handleSave}
-                className="rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] disabled:opacity-60 transition-colors"
+                className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] disabled:opacity-60 transition-colors"
               >
                 {saving ? "Saving…" : "Save"}
               </button>

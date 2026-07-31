@@ -24,10 +24,11 @@ import {
   listPips,
   listGuardianInfo,
   getPaymentInfo,
-  getPerformanceReview,
+  listPerformanceReviews,
   getPayslip,
   listBranches,
   listDepartments,
+  listEmployeeTasks,
 } from "@/lib/employeeQueries";
 import { findRecordCategory } from "@/lib/employeeRecordConfig";
 
@@ -95,6 +96,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     paymentInfo,
     performanceReview,
     payslip,
+    tasks,
   ] = await Promise.all([
     needsEmployeeDetail ? getEmployeeById(numId) : Promise.resolve(null),
     category === "active-employment" && section === "leave" ? listLeaveHistory(numId) : Promise.resolve(undefined),
@@ -117,8 +119,9 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     category === "disciplinary" && section === "pip" ? listPips(numId) : Promise.resolve(undefined),
     category === "personal-info" && section === "guardian-info" ? listGuardianInfo(numId) : Promise.resolve(undefined),
     category === "personal-info" && section === "payment" ? getPaymentInfo(numId) : Promise.resolve(undefined),
-    category === "active-employment" && section === "performance-review" ? getPerformanceReview(numId) : Promise.resolve(undefined),
+    category === "active-employment" && section === "performance-review" ? listPerformanceReviews(numId) : Promise.resolve(undefined),
     category === "finance" && section === "payroll" ? getPayslip(numId) : Promise.resolve(undefined),
+    category === "task" ? listEmployeeTasks(numId) : Promise.resolve(undefined),
   ]);
 
   const userEmail = session.user.email;
@@ -136,6 +139,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         branchName={employee.branchName}
         departmentName={employee.departmentName}
         stage={employee.stage}
+        employeeCode={employee.employeeId}
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
         resumeInfo={resumeInfo}
@@ -160,6 +164,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         paymentInfo={paymentInfo}
         performanceReview={performanceReview}
         payslip={payslip}
+        tasks={tasks}
       />
     </AppShell>
   );

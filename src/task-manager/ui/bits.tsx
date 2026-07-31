@@ -7,6 +7,7 @@
 // + count everywhere).
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import type {
   ActionResult,
   FlowBucketTotals,
@@ -470,9 +471,12 @@ function GuidelineIndicator({
         aria-label={`View guideline for ${title}`}
         className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100"
       >
-        📎 Guideline
+        Guideline
       </button>
-      {open && (
+      {/* Portal to <body> (2026-07-30): same completed-row opacity fix as
+          ProofCell's modals — see the comment there. */}
+      {open &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setOpen(false)}
@@ -516,16 +520,18 @@ function GuidelineIndicator({
               </a>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
 }
 
 /** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
- *  2 MB cap, so a bad pick fails instantly instead of round-tripping. */
+ *  10 MB cap (raised from 2 MB, 2026-07-31), so a bad pick fails instantly
+ *  instead of round-tripping. */
 const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
-const PROOF_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** The "Proof" column cell (2026-07-30): assignee-uploaded completion
  *  evidence, always optional (never gates the status dropdown). Owner of a
@@ -544,6 +550,12 @@ function ProofCell({
 }) {
   const [busy, setBusy] = React.useState(false);
   const [viewerOpen, setViewerOpen] = React.useState(false);
+  /** The "Attach Proof Of Completion" popover (2026-07-30): ONE surface
+   *  accepting all 4 input methods — file picker, drag-and-drop,
+   *  clipboard paste, and camera capture — all staging into the same
+   *  preview-then-Upload flow (stageFile/submitPending). */
+  const [attachOpen, setAttachOpen] = React.useState(false);
+  const [dragOver, setDragOver] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   // A fresh upload shows its 📎 immediately (before the refreshed payload
   // arrives); `version` cache-busts the image URL after a replace, since a
@@ -551,6 +563,10 @@ function ProofCell({
   const [localProofId, setLocalProofId] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  /** capture="environment" input — phones/tablets open the native camera
+   *  app directly; desktop browsers ignore `capture` and fall back to the
+   *  ordinary file picker (browser-defined behavior, no permission code). */
+  const cameraRef = React.useRef<HTMLInputElement>(null);
 
   const proofId = localProofId ?? task.proofId ?? null;
   const imageSrc = proofId
@@ -558,51 +574,215 @@ function ProofCell({
     : null;
   const canUpload = isOwned && Boolean(onUploadProof);
 
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !onUploadProof) return;
+  /** Review-before-submit (2026-07-31): picker, drop, paste, and camera
+   *  all STAGE the image here — validated + previewed in the popover —
+   *  and nothing is uploaded until the user clicks the Upload button
+   *  (submitPending below). Picking again replaces the staged image. */
+  const [pendingImage, setPendingImage] = React.useState<{
+    mime: string;
+    dataBase64: string;
+    previewUrl: string;
+    name: string;
+  } | null>(null);
+
+  const stageFile = (file: File) => {
+    if (!onUploadProof) return;
     setErrorText(null);
     if (!PROOF_IMAGE_MIMES.includes(file.type)) {
       setErrorText("PNG, JPEG or WebP images only");
       return;
     }
     if (file.size > PROOF_IMAGE_MAX_BYTES) {
-      setErrorText("Image is too large — max 2 MB");
+      setErrorText("Image is too large — max 10 MB");
       return;
     }
-    setBusy(true);
-    try {
-      const dataBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setPendingImage({
+        mime: file.type,
+        dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+        previewUrl: dataUrl,
+        name: file.name || "captured image",
       });
-      const result = await onUploadProof(task.runBlockId, { mime: file.type, dataBase64 });
+    };
+    reader.onerror = () => setErrorText("Could not read that file — please try again");
+    reader.readAsDataURL(file);
+  };
+
+  /** The ONLY place the proof actually uploads — the modal's Upload
+   *  button. Success closes the popover and flips the row to ✓. */
+  const submitPending = async () => {
+    if (!onUploadProof || !pendingImage) return;
+    setBusy(true);
+    setErrorText(null);
+    try {
+      const result = await onUploadProof(task.runBlockId, {
+        mime: pendingImage.mime,
+        dataBase64: pendingImage.dataBase64,
+      });
       if (result.ok) {
         setLocalProofId(result.proofId);
         setVersion((v) => v + 1);
+        setPendingImage(null);
+        setAttachOpen(false);
       } else {
         setErrorText(result.message);
       }
-    } catch {
-      setErrorText("Could not read that file — please try again");
     } finally {
       setBusy(false);
     }
   };
 
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) stageFile(file);
+  };
+
+  // Closing the popover (✕ / outside / Escape) discards any un-submitted
+  // staged image and stale errors — nothing was uploaded yet.
+  React.useEffect(() => {
+    if (!attachOpen) {
+      setPendingImage(null);
+      setErrorText(null);
+    }
+  }, [attachOpen]);
+
+  // ---- "Take Photo" (2026-07-30 fix) ----------------------------------
+  // The capture="environment" input only opens a camera on PHONES/TABLETS
+  // — desktop browsers ignore `capture` and show the ordinary file dialog
+  // (that was the reported bug). So: mobile keeps the native camera input,
+  // desktop gets a real in-popover webcam preview via getUserMedia, and
+  // anything without a usable camera falls back to the picker with a hint.
+  // getUserMedia needs a secure context (HTTPS or localhost).
+  const [cameraOpen, setCameraOpen] = React.useState(false);
+  const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+
+  const stopCamera = React.useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  }, []);
+
+  const openCamera = async () => {
+    setCameraError(null);
+    // Phones/tablets: the native camera app beats an in-page preview.
+    // (iPadOS reports itself as "Mac" but has >1 touch point.)
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+    if (isMobile) {
+      cameraRef.current?.click();
+      return;
+    }
+    // On failure: SHOW the reason and stay in the popover — auto-opening
+    // the file picker here made it look like Take Photo "was" the picker
+    // (the reported bug); the Upload file button is right next to it.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera needs a secure connection (HTTPS) — use Upload file instead.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+    } catch {
+      setCameraError(
+        "Webcam unavailable or permission denied (check the camera icon in the address bar) — use Upload file instead.",
+      );
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        stopCamera();
+        // Same path as every other method — stages the frame for review;
+        // the user still confirms with the Upload button.
+        stageFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      0.9,
+    );
+  };
+
+  // Wire the stream to the <video> once it's mounted; stop the webcam
+  // whenever the popover closes (Esc/click-outside included) or the row
+  // unmounts — never leave the camera light on.
+  React.useEffect(() => {
+    if (cameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      void videoRef.current.play().catch(() => {});
+    }
+  }, [cameraOpen]);
+  React.useEffect(() => {
+    if (!attachOpen && streamRef.current) stopCamera();
+  }, [attachOpen, stopCamera]);
+  React.useEffect(
+    () => () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    },
+    [],
+  );
+
+  // While the popover is open: Ctrl/Cmd+V anywhere attaches the clipboard
+  // image (screenshot-paste workflow), Escape closes. Document-level so
+  // the user doesn't have to focus anything first.
+  React.useEffect(() => {
+    if (!attachOpen) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        stageFile(file);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAttachOpen(false);
+    };
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachOpen]);
+
   return (
     <span className="relative flex shrink-0 items-center justify-center">
       {canUpload && (
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={onFile}
-        />
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={onFile}
+          />
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={onFile}
+          />
+        </>
       )}
       {proofId ? (
         <button
@@ -610,17 +790,20 @@ function ProofCell({
           onClick={() => setViewerOpen(true)}
           title="View proof"
           aria-label={`View proof for ${task.blockTitle}`}
-          className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600 hover:bg-blue-100"
+          className="inline-flex size-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-500 hover:bg-emerald-100"
         >
-          📎
+          ✓
         </button>
       ) : canUpload ? (
         <button
           type="button"
           disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          title="Upload proof (image, max 2 MB)"
-          aria-label={`Upload proof for ${task.blockTitle}`}
+          onClick={() => {
+            setErrorText(null);
+            setAttachOpen(true);
+          }}
+          title="Attach Proof Of Completion — drop, paste, upload, or take a photo"
+          aria-label={`Attach proof of completion for ${task.blockTitle}`}
           className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
         >
           {busy ? "…" : "＋"}
@@ -628,8 +811,154 @@ function ProofCell({
       ) : (
         <span className="text-xs text-gray-300">—</span>
       )}
-      {errorText && <InlineActionError text={errorText} />}
-      {viewerOpen && imageSrc && (
+      {errorText && !attachOpen && <InlineActionError text={errorText} />}
+      {/* Both modals render through a PORTAL to <body> (2026-07-30 fix):
+          completed rows carry opacity-60, and CSS opacity on an ancestor
+          dims even position:fixed descendants — rendered in place, the
+          whole modal (white card included) went see-through. */}
+      {attachOpen &&
+        createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setAttachOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-gray-900">Attach Proof Of Completion</h4>
+                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            {cameraOpen ? (
+              <>
+                {/* Live desktop webcam preview (getUserMedia) — 📸 draws
+                    the current frame to a canvas and uploads it as JPEG. */}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="aspect-video w-full rounded-xl bg-black object-cover"
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={capturePhoto}
+                    className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    📸 Capture
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : pendingImage ? (
+              <>
+                {/* Review step (2026-07-31): the staged image — from ANY of
+                    the 4 methods — shows here first; nothing uploads until
+                    the Upload button below is clicked. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingImage.previewUrl}
+                  alt={`Proof preview for ${task.blockTitle}`}
+                  className="max-h-64 w-full rounded-xl border border-gray-200 bg-gray-50 object-contain"
+                />
+                <p className="mt-1.5 truncate text-xs text-gray-500">{pendingImage.name}</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void submitPending()}
+                    className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {busy ? "Uploading…" : "Upload"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setPendingImage(null);
+                      setErrorText(null);
+                    }}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) stageFile(file);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                    dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
+                  }`}
+                >
+                  <span className="text-xl" aria-hidden>
+                    🖼️
+                  </span>
+                  <p className="text-sm font-medium text-gray-600">Drop an Image Here</p>
+                  <p className="text-xs text-gray-400">or Paste It (Ctrl+V)</p>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => inputRef.current?.click()}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    📁 Upload File
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void openCamera()}
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    📷 Take Photo
+                  </button>
+                </div>
+              </>
+            )}
+            {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
+            {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
+            {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
+            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 10 MB</p>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {viewerOpen &&
+        imageSrc &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setViewerOpen(false)}
@@ -664,14 +993,19 @@ function ProofCell({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => inputRef.current?.click()}
+                onClick={() => {
+                  setViewerOpen(false);
+                  setErrorText(null);
+                  setAttachOpen(true);
+                }}
                 className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
               >
                 {busy ? "Uploading…" : "Replace image"}
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   );
@@ -753,17 +1087,26 @@ export function TaskRowLine({
 
   return (
     <div
-      className={`flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
+      className={`group flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
         hideCompleted && (task.status === "DONE" || task.status === "SKIPPED") ? "opacity-60" : ""
       }`}
     >
+      {/* Hover-to-reveal (2026-07-30): the checkbox always OCCUPIES its
+          slot (no layout shift) but is invisible until the row is hovered
+          or keyboard-focused — except a CHECKED box, which stays visible.
+          Touch devices (2026-07-31): no hover exists, so the checkbox is
+          ALWAYS visible there ([@media(hover:none)]). */}
       {hideCompleted && isOwned && onToggleSelect && (
         <input
           type="checkbox"
           checked={selected ?? false}
           onChange={() => onToggleSelect(task.runBlockId)}
           aria-label={`Select ${task.blockTitle}`}
-          className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+          className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 transition-opacity ${
+            selected
+              ? "opacity-100"
+              : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          }`}
         />
       )}
       {/* Tree slot (see the `tree` prop): chevron on parents, matching
@@ -778,14 +1121,21 @@ export function TaskRowLine({
             onClick={tree.onToggle}
             title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
             aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
-            className="flex w-4 shrink-0 items-center justify-center text-[10px] text-gray-400 hover:text-gray-600"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-base leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700"
           >
             {tree.expanded ? "▾" : "▸"}
           </button>
         ) : (
-          <span className="w-4 shrink-0" aria-hidden />
+          <span className="w-6 shrink-0" aria-hidden />
         ))}
-      {isChild && <span className="w-5 shrink-0" aria-hidden />}
+      {/* Subtask nesting guide (2026-07-31): the indent slot draws a
+          vertical connector line under the parent, so the hierarchy reads
+          at a glance even in a long expanded group. */}
+      {isChild && (
+        <span className="flex w-5 shrink-0 justify-center self-stretch" aria-hidden>
+          <span className="w-px bg-gray-200" />
+        </span>
+      )}
       {hideCompleted ? (
         <StatusDropdown task={task} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
       ) : task.status === "DONE" ? (
@@ -887,8 +1237,13 @@ const RESIZABLE_TASK_NAME_DEFAULT = 220;
 
 /** Fixed widths for the non-resizable My Tasks columns (2026-07-30 final:
  *  ONLY Task is draggable — long names are the one thing worth revealing;
- *  Proof / Assigned by / Due date keep constant size, no handles). */
-const PROOF_COL_WIDTH = 48;
+ *  Proof / Assigned by / Due date keep constant size, no handles). Proof
+ *  is 96px so its two-line "Proof of Completion" header label fits. */
+const PROOF_COL_WIDTH = 96;
+
+/** localStorage key for the unresolved-subtasks completion warning —
+ *  "off" suppresses the modal (per browser; default on). */
+const SUBTASK_WARNING_KEY = "tm-subtask-warning";
 const ASSIGNER_COL_WIDTH = 180;
 /** Due Date is a true fixed column too (2026-07-30 final spec) — constant
  *  width at a constant position right after Assignee, NOT pinned to the
@@ -1095,6 +1450,26 @@ export function ResizableTaskList({
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
   const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
+  // ---- Unresolved-subtasks completion guard (2026-07-30) --------------
+  // Marking a PARENT Completed while it still has unresolved (non-DONE,
+  // non-SKIPPED) subtasks opens a confirmation modal instead: "Continue
+  // without resolving" completes just the parent; "Resolve all N" bulk-
+  // completes the subtasks too. The warning can be switched off via the
+  // modal's Warning Settings (persisted per browser in localStorage).
+  // Generalized to MULTIPLE parents (2026-07-31): "Select all" can sweep
+  // several parents with unresolved subtasks at once — one combined modal
+  // (total unresolved count) instead of a sequence of prompts.
+  const [confirmTarget, setConfirmTarget] = React.useState<{
+    parents: FlowTaskRow[];
+    unresolved: FlowTaskRow[];
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = React.useState(false);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
+  const [confirmSubsOpen, setConfirmSubsOpen] = React.useState(false);
+  const [warnSettingsOpen, setWarnSettingsOpen] = React.useState(false);
+  const [warnEnabled, setWarnEnabled] = React.useState(() =>
+    typeof window === "undefined" ? true : window.localStorage.getItem(SUBTASK_WARNING_KEY) !== "off",
+  );
   const containerRef = React.useRef<HTMLDivElement>(null);
   const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
 
@@ -1167,6 +1542,97 @@ export function ResizableTaskList({
       else next.add(id);
       return next;
     });
+
+  const isUnresolved = (t: FlowTaskRow) => t.status !== "DONE" && t.status !== "SKIPPED";
+  /** Wraps onComplete for a PARENT row: intercepts when unresolved
+   *  subtasks exist (and the warning is on) — the modal takes over. */
+  const guardedComplete =
+    (parent: FlowTaskRow, kids: FlowTaskRow[]) =>
+    async (runBlockId: string): Promise<ActionResult> => {
+      const unresolved = kids.filter(isUnresolved);
+      if (unresolved.length === 0 || !warnEnabled) return onComplete!(runBlockId);
+      setConfirmError(null);
+      setConfirmSubsOpen(false);
+      setConfirmTarget({ parents: [parent], unresolved });
+      return { ok: true };
+    };
+  /** CHECKING a parent's checkbox (2026-07-31 fix — "fires consistently"):
+   *  same guard as the status dropdown. While unresolved subtasks exist,
+   *  the check opens the confirmation modal instead of selecting — closing
+   *  it leaves the box unchecked (the original spec's dismiss rule).
+   *  UNchecking, warning-off, and no-unresolved-subtasks all behave as a
+   *  plain selection toggle. */
+  const guardedToggleSelect = (parent: FlowTaskRow, kids: FlowTaskRow[]) => (id: string) => {
+    const unresolved = kids.filter(isUnresolved);
+    const checking = !selectedIds.has(id);
+    if (checking && unresolved.length > 0 && warnEnabled && onComplete) {
+      setConfirmError(null);
+      setConfirmSubsOpen(false);
+      setConfirmTarget({ parents: [parent], unresolved });
+      return;
+    }
+    toggleSelect(id);
+  };
+  /** "Select all" (2026-07-31): same guard, not bypassable — when CHECKING
+   *  would sweep in parents with unresolved subtasks, ONE combined modal
+   *  covers all of them (total unresolved count). Unchecking, warning-off,
+   *  and no-affected-parents fall through to the plain toggle. */
+  const guardedToggleSelectAll = () => {
+    if (!allOwnedSelected && warnEnabled && onComplete && hideCompleted) {
+      const parents = topLevelTasks.filter((t) =>
+        (childrenOf.get(t.runBlockId) ?? []).some(isUnresolved),
+      );
+      if (parents.length > 0) {
+        setConfirmError(null);
+        setConfirmSubsOpen(false);
+        setConfirmTarget({
+          parents,
+          unresolved: parents.flatMap((p) =>
+            (childrenOf.get(p.runBlockId) ?? []).filter(isUnresolved),
+          ),
+        });
+        return;
+      }
+    }
+    toggleSelectAll();
+  };
+  const closeConfirm = () => {
+    setConfirmTarget(null);
+    setConfirmError(null);
+    setConfirmSubsOpen(false);
+    setWarnSettingsOpen(false);
+  };
+  const continueWithoutResolving = async () => {
+    if (!onComplete || !confirmTarget) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    const results = await Promise.allSettled(
+      confirmTarget.parents.map((p) => onComplete(p.runBlockId)),
+    );
+    setConfirmBusy(false);
+    const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
+    if (failed === 0) closeConfirm();
+    else setConfirmError(`${failed} of ${confirmTarget.parents.length} tasks failed to update.`);
+  };
+  const resolveAll = async () => {
+    if (!onComplete || !confirmTarget) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    const targets = [...confirmTarget.unresolved, ...confirmTarget.parents];
+    const results = await Promise.allSettled(targets.map((t) => onComplete(t.runBlockId)));
+    setConfirmBusy(false);
+    const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
+    if (failed === 0) closeConfirm();
+    else setConfirmError(`${failed} of ${targets.length} tasks failed to update — the rest were completed.`);
+  };
+  const setWarning = (on: boolean) => {
+    setWarnEnabled(on);
+    try {
+      window.localStorage.setItem(SUBTASK_WARNING_KEY, on ? "on" : "off");
+    } catch {
+      /* private mode etc. — the toggle still works for this session */
+    }
+  };
 
   // Bulk-select/actions only ever apply to the viewer's OWN rows — same
   // assignee-only rule as the per-row dropdown (StatusDropdown) and
@@ -1251,31 +1717,22 @@ export function ResizableTaskList({
     });
   }
 
-  const controlBar = hideCompleted && (ownedVisibleTasks.length > 0 || completedCount > 0) && (
-    <div className="flex items-center justify-between gap-3 pb-2">
-      <div className="flex items-center gap-3">
-        {ownedVisibleTasks.length > 0 && (
-          <>
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-              <input
-                type="checkbox"
-                checked={allOwnedSelected}
-                onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600"
-              />
-              Select all
-            </label>
-            {selectedIds.size > 0 && bulkActions.length > 0 && (
-              <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
-            )}
-          </>
+  // Select-all moved INTO the column header row (2026-07-31) — this slim
+  // bar now only appears when it has something to show: the bulk-actions
+  // trigger (rows selected) and/or the Show Completed toggle.
+  const controlBar = hideCompleted &&
+    ((selectedIds.size > 0 && bulkActions.length > 0) || completedCount > 0) && (
+      <div className="flex items-center justify-between gap-3 pb-2">
+        <div className="flex items-center gap-3">
+          {selectedIds.size > 0 && bulkActions.length > 0 && (
+            <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+          )}
+        </div>
+        {completedCount > 0 && (
+          <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
         )}
       </div>
-      {completedCount > 0 && (
-        <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
-      )}
-    </div>
-  );
+    );
 
   if (visibleTasks.length === 0) {
     return (
@@ -1291,6 +1748,13 @@ export function ResizableTaskList({
   return (
     <div ref={containerRef} style={containerStyle}>
       {controlBar}
+      {/* Phones/tablets (2026-07-31): the fixed columns total ~700px, so
+          in table mode the header+rows pan HORIZONTALLY inside this
+          container instead of cutting off or squeezing — the page itself
+          never scrolls sideways. Desktop unaffected (min-w-full keeps the
+          table filling its card). */}
+      <div className={hideCompleted ? "overflow-x-auto" : undefined}>
+        <div className={hideCompleted ? "w-max min-w-full" : undefined}>
       {/* Column header row (2026-07-30, ClickUp reference) — personal My
           Tasks lists only. Spacers mirror the rows' leading checkbox +
           status circle. ONLY the Task header carries a drag handle (its
@@ -1298,16 +1762,35 @@ export function ResizableTaskList({
           by are fixed-width, and Due date is pinned to the right edge
           (ml-auto) taking whatever remains. */}
       {hideCompleted && (
-        <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-          <span className="w-4 shrink-0" aria-hidden />
-          {hasTree && <span className="w-4 shrink-0" aria-hidden />}
+        <div className="group flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+          {/* Select-all lives IN the header row (2026-07-31), occupying
+              the checkbox column's slot so it aligns exactly above the
+              row checkboxes. Bare (no text), hover-to-reveal like them —
+              hovering anywhere on the header row shows it. */}
+          {ownedVisibleTasks.length > 0 ? (
+            <input
+              type="checkbox"
+              checked={allOwnedSelected}
+              onChange={guardedToggleSelectAll}
+              aria-label="Select all tasks"
+              title="Select all"
+              className={`size-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 transition-opacity ${
+                allOwnedSelected
+                  ? "opacity-100"
+                  : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              }`}
+            />
+          ) : (
+            <span className="w-4 shrink-0" aria-hidden />
+          )}
+          {hasTree && <span className="w-6 shrink-0" aria-hidden />}
           <span className="w-3 shrink-0" aria-hidden />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
             <HeaderResizeHandle onPointerDown={onResizeStart} />
           </span>
-          <span className="shrink-0 truncate text-center" style={{ width: PROOF_COL_WIDTH }}>
-            Proof
+          <span className="shrink-0 text-center leading-tight" style={{ width: PROOF_COL_WIDTH }}>
+            Proof of Completion
           </span>
           {/* "Assignee" per the 2026-07-30 final spec (the shown value is
               the run's starter — assignerName — but the user explicitly
@@ -1340,9 +1823,16 @@ export function ResizableTaskList({
               <TaskRowLine
                 task={t}
                 {...shared}
+                onComplete={kids.length > 0 && onComplete ? guardedComplete(t, kids) : onComplete}
                 onResizeStart={onResizeStart}
                 selected={selectedIds.has(t.runBlockId)}
-                onToggleSelect={hideCompleted ? toggleSelect : undefined}
+                onToggleSelect={
+                  hideCompleted
+                    ? kids.length > 0
+                      ? guardedToggleSelect(t, kids)
+                      : toggleSelect
+                    : undefined
+                }
                 tree={
                   hasTree
                     ? kids.length > 0
@@ -1366,6 +1856,106 @@ export function ResizableTaskList({
           );
         })}
       </div>
+        </div>
+      </div>
+      {/* Unresolved-subtasks confirmation modal (2026-07-30) — portal to
+          <body>, same escape-the-dimmed-row rationale as ProofCell's. */}
+      {confirmTarget &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={closeConfirm}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h4 className="text-base font-semibold text-gray-900">
+                  {confirmTarget.parents.length === 1
+                    ? `This task has ${confirmTarget.unresolved.length} unresolved item${confirmTarget.unresolved.length === 1 ? "" : "s"}`
+                    : `These ${confirmTarget.parents.length} tasks have ${confirmTarget.unresolved.length} unresolved items`}
+                </h4>
+                <button
+                  type="button"
+                  onClick={closeConfirm}
+                  aria-label="Close"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmSubsOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <span>
+                  {confirmTarget.unresolved.length} Subtask
+                  {confirmTarget.unresolved.length === 1 ? "" : "s"}
+                </span>
+                <span
+                  className={`text-gray-400 transition-transform ${confirmSubsOpen ? "rotate-90" : ""}`}
+                  aria-hidden
+                >
+                  ›
+                </span>
+              </button>
+              {confirmSubsOpen && (
+                <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
+                  {confirmTarget.unresolved.map((k) => (
+                    <li key={k.runBlockId} className="flex items-center gap-2 px-2 py-1 text-sm text-gray-700">
+                      <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
+                      <span className="min-w-0 flex-1 truncate">{k.blockTitle}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {confirmError && <p className="mt-3 text-xs text-red-600">{confirmError}</p>}
+              {warnSettingsOpen && (
+                <label className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={warnEnabled}
+                    onChange={(e) => setWarning(e.target.checked)}
+                    className="size-4 rounded border-gray-300 accent-blue-600"
+                  />
+                  Warn me when completing a task with unresolved subtasks
+                </label>
+              )}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWarnSettingsOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-600"
+                >
+                  <span aria-hidden>⚙️</span> Warning Settings
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => void continueWithoutResolving()}
+                    className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                  >
+                    Continue without resolving
+                  </button>
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => void resolveAll()}
+                    className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {confirmBusy
+                      ? "Updating…"
+                      : `Resolve all ${confirmTarget.unresolved.length} item${confirmTarget.unresolved.length === 1 ? "" : "s"}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

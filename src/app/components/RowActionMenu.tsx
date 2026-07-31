@@ -22,15 +22,19 @@ interface Props {
   name: string;
   /** Called only after the user confirms. Omit while deletion isn't wired to
    *  a real mutation yet — an explanatory notice shows instead of pretending
-   *  to delete a real employee record. */
-  onDelete?: () => void;
+   *  to delete a real employee record. Returning { ok: false, error } shows
+   *  that error instead of silently closing; the caller is responsible for
+   *  refreshing/removing the row from its own list on success. */
+  onDelete?: () => Promise<{ ok: boolean; error?: string } | void>;
   className?: string;
 }
 
 export default function RowActionMenu({ name, onDelete, className }: Props) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -124,12 +128,24 @@ export default function RowActionMenu({ name, onDelete, className }: Props) {
 
       {confirming && (
         <ConfirmDialog
-          message={`Are you sure you want to delete ${name || "this employee"}?`}
+          message={
+            deleting
+              ? `Deleting ${name || "this employee"}…`
+              : `Are you sure you want to delete ${name || "this employee"}?`
+          }
           onCancel={() => setConfirming(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
+            if (deleting) return;
+            if (!onDelete) {
+              setConfirming(false);
+              setNotice(true);
+              return;
+            }
+            setDeleting(true);
+            const result = await onDelete();
+            setDeleting(false);
             setConfirming(false);
-            if (onDelete) onDelete();
-            else setNotice(true);
+            if (result && result.ok === false) setError(result.error ?? "Failed to delete.");
           }}
         />
       )}
@@ -140,6 +156,15 @@ export default function RowActionMenu({ name, onDelete, className }: Props) {
           confirmLabel="OK"
           onCancel={() => setNotice(false)}
           onConfirm={() => setNotice(false)}
+        />
+      )}
+
+      {error && (
+        <ConfirmDialog
+          message={error}
+          confirmLabel="OK"
+          onCancel={() => setError(null)}
+          onConfirm={() => setError(null)}
         />
       )}
     </div>

@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
-import { STAFF_ROLE_ID } from "@/lib/employeeQueries";
+import { STAFF_ROLE_ID, getEmployeeOverviewRowById, listBranches, listDepartments, resolveDepartmentBranch } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
 
 export interface ActionResult {
@@ -57,14 +57,22 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
   return null;
 }
 
-// Matches pinfo_personalInfo.html's exact field set (Full Name/Email excluded
-// — kept non-editable here since they affect login; see EmployeeRecordView).
+// Matches pinfo_personalInfo.html's exact field set, plus Full Name/Email
+// (user_profile.full_name / users.email) — editable here too now, even
+// though they double as the login identifier, per explicit request. Signed
+// Offer Letter is a real Google Drive file now too (employment.
+// offer_letter_file_id, on the employee's current/most-recent employment
+// row) — same upload-on-save convention as Resume/CV.
 export interface PersonalInfoInput {
+  fullName: string;
+  email: string;
   dob: string; // yyyy-mm-dd, "" = unset
   phone: string;
   gender: string;
   nric: string;
   homeAddress: string;
+  offerLetterFileId: string | null;
+  offerLetterFile: File | null;
 }
 
 export async function updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ActionResult> {
@@ -72,19 +80,55 @@ export async function updatePersonalInfo(userId: number, data: PersonalInfoInput
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const fullName = data.fullName.trim();
+  const email = data.email.trim();
+  if (!fullName) return { ok: false, error: "Full Name cannot be empty." };
+  if (!email) return { ok: false, error: "Email cannot be empty." };
   try {
-    await prisma.user_profile.update({
+    const currentEmployment = await prisma.employment.findFirst({
       where: { user_id: userId },
-      data: {
-        dob: data.dob ? new Date(`${data.dob}T00:00:00Z`) : null,
-        phone: data.phone || null,
-        gender: data.gender || null,
-        nric: data.nric || null,
-        home_address: data.homeAddress || null,
-      },
+      orderBy: { start_date: "desc" },
+      select: { employment_id: true, offer_letter_file_id: true },
     });
+
+    let offerLetterFileId = data.offerLetterFileId;
+    if (data.offerLetterFile) {
+      const uploaded = await uploadToDrive(data.offerLetterFile, { prefix: "offer-letter", folderEnvVar: "GOOGLE_DRIVE_OFFER_LETTER_ID" });
+      offerLetterFileId = uploaded.id;
+    }
+    if (currentEmployment?.offer_letter_file_id && currentEmployment.offer_letter_file_id !== offerLetterFileId) {
+      await deleteFromDrive(currentEmployment.offer_letter_file_id);
+    }
+
+    await prisma.$transaction([
+      prisma.user_profile.update({
+        where: { user_id: userId },
+        data: {
+          full_name: fullName,
+          dob: data.dob ? new Date(`${data.dob}T00:00:00Z`) : null,
+          phone: data.phone || null,
+          gender: data.gender || null,
+          nric: data.nric || null,
+          home_address: data.homeAddress || null,
+        },
+      }),
+      prisma.users.update({ where: { user_id: userId }, data: { email } }),
+      ...(currentEmployment
+        ? [
+            prisma.employment.update({
+              where: { employment_id: currentEmployment.employment_id },
+              data: { offer_letter_file_id: offerLetterFileId },
+            }),
+          ]
+        : []),
+    ]);
     return { ok: true };
   } catch (e) {
+    // users.email is unique — Prisma surfaces a conflicting address as a
+    // P2002 constraint violation rather than a plain thrown message.
+    if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
+      return { ok: false, error: "This email is already in use by another account." };
+    }
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Personal Info." };
   }
 }
@@ -653,6 +697,8 @@ export interface AddTransferInput {
   effectiveDate: string;
   fromLocation: string;
   toLocation: string;
+  /** Temporary Transfer only — required when type is "Temporary Transfer", ignored otherwise. */
+  endDate: string;
   reason: string;
   attachmentFile: File | null;
 }
@@ -662,6 +708,10 @@ export async function addTransfer(userId: number, input: AddTransferInput): Prom
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const isTemporary = input.type === "Temporary Transfer";
+  if (isTemporary && !input.endDate) {
+    return { ok: false, error: "End Date is required for a Temporary Transfer." };
+  }
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -677,6 +727,7 @@ export async function addTransfer(userId: number, input: AddTransferInput): Prom
         to_location: input.toLocation || null,
         reason: input.reason || null,
         attachment_file_id: attachmentFileId,
+        end_date: isTemporary && input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
       },
     });
 
@@ -1091,6 +1142,401 @@ export async function addPip(userId: number, input: AddPipInput): Promise<Action
   }
 }
 
+// ─── Update — explicit exception to the "append only" convention above,
+// requested for all 8 repeatable tables so clicking an existing row (while
+// in edit mode) can correct it in place instead of only ever adding new
+// rows. Each checks the row's own user_id matches the caller's employeeId
+// first (same defense-in-depth as the deletes below), replaces the Drive
+// attachment (uploading the new one, deleting the old one) only when a new
+// file was actually picked — otherwise the existing attachment is left
+// untouched. Promotion's/Transfer's "becomes the employee's current
+// position/branch/department" side effect IS re-applied on edit, same as on
+// add — but always computed from whichever record is actually the most
+// recent by effective_date after the edit (re-queried fresh), not
+// necessarily the row just saved, so editing an older record only changes
+// current classification if it happens to still/now be the latest one. ───
+
+export async function updateAchievement(userId: number, id: number, input: AddAchievementInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.achievement.findUnique({ where: { achievement_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "achievement", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.achievement.update({
+      where: { achievement_id: id },
+      data: { name: input.name || null, date: input.date ? new Date(`${input.date}T00:00:00Z`) : null, attachment_file_id: attachmentFileId },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Achievement." };
+  }
+}
+
+export async function updatePromotion(userId: number, id: number, input: AddPromotionInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.promotion.findUnique({ where: { promotion_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "promotion", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.promotion.update({
+      where: { promotion_id: id },
+      data: {
+        promotion_date: input.promotionDate ? new Date(`${input.promotionDate}T00:00:00Z`) : null,
+        effective_date: input.effectiveDate ? new Date(`${input.effectiveDate}T00:00:00Z`) : null,
+        current_position: input.currentPosition || null,
+        new_position: input.newPosition || null,
+        reason: input.reason || null,
+        approved_by: input.approvedBy || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+
+    // Re-sync the employee's actual current position from whichever
+    // promotion record is now the most recent by effective_date — same
+    // ordering listPromotions uses to decide what's "latest" in the UI.
+    // Re-queried fresh rather than assuming the just-edited row is latest,
+    // since editing effective_date itself can change which row that is.
+    // nulls: "last" is required — Postgres' default DESC ordering sorts
+    // NULLs first, which would otherwise treat a record with no effective
+    // date as "most recent" ahead of every dated one.
+    const currentLatest = await prisma.promotion.findFirst({
+      where: { user_id: userId },
+      orderBy: [{ effective_date: { sort: "desc", nulls: "last" } }, { promotion_id: "desc" }],
+    });
+    if (currentLatest?.new_position) {
+      const employment = await prisma.employment.findFirst({
+        where: { user_id: userId },
+        orderBy: { start_date: "desc" },
+        select: { employment_id: true },
+      });
+      if (employment) {
+        await prisma.employment.update({ where: { employment_id: employment.employment_id }, data: { position: currentLatest.new_position } });
+      }
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Promotion." };
+  }
+}
+
+export async function updateTransfer(userId: number, id: number, input: AddTransferInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const isTemporary = input.type === "Temporary Transfer";
+  if (isTemporary && !input.endDate) {
+    return { ok: false, error: "End Date is required for a Temporary Transfer." };
+  }
+  try {
+    const existing = await prisma.transfer.findUnique({ where: { transfer_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "transfer", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.transfer.update({
+      where: { transfer_id: id },
+      data: {
+        type: input.type || null,
+        effective_date: input.effectiveDate ? new Date(`${input.effectiveDate}T00:00:00Z`) : null,
+        from_location: input.fromLocation || null,
+        to_location: input.toLocation || null,
+        reason: input.reason || null,
+        attachment_file_id: attachmentFileId,
+        end_date: isTemporary && input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+      },
+    });
+
+    // Re-sync the employee's actual current Branch/Department from
+    // whichever transfer record is now the most recent by effective_date —
+    // same ordering listTransfers uses to decide what's "latest" in the UI.
+    // Re-queried fresh rather than assuming the just-edited row is latest,
+    // since editing effective_date itself can change which row that is.
+    // nulls: "last" is required — Postgres' default DESC ordering sorts
+    // NULLs first, which would otherwise treat a record with no effective
+    // date as "most recent" ahead of every dated one.
+    const currentLatest = await prisma.transfer.findFirst({
+      where: { user_id: userId },
+      orderBy: [{ effective_date: { sort: "desc", nulls: "last" } }, { transfer_id: "desc" }],
+    });
+    if (currentLatest?.to_location) {
+      const [branch, department] = await Promise.all([
+        prisma.branch.findFirst({ where: { branch_name: currentLatest.to_location } }),
+        prisma.department.findFirst({ where: { department_name: currentLatest.to_location } }),
+      ]);
+      if (branch || department) {
+        const employment = await prisma.employment.findFirst({
+          where: { user_id: userId },
+          orderBy: { start_date: "desc" },
+          select: { employment_id: true },
+        });
+        if (employment) {
+          await prisma.employment.update({
+            where: { employment_id: employment.employment_id },
+            data: { branch_id: branch?.branch_id ?? null, department_id: department?.department_id ?? null },
+          });
+        }
+      }
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Transfer." };
+  }
+}
+
+export async function updateTraining(userId: number, id: number, input: AddTrainingInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.training.findUnique({ where: { training_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    await prisma.training.update({
+      where: { training_id: id },
+      data: { name: input.name || null, date: input.date ? new Date(`${input.date}T00:00:00Z`) : null, status: input.status || null },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Training." };
+  }
+}
+
+export async function updateDomesticInquiry(userId: number, id: number, input: AddDomesticInquiryInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.domestic_inquiry.findUnique({ where: { domestic_inquiry_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "domestic-inquiry", folderEnvVar: "GOOGLE_DRIVE_DISCIPLINARY_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.domestic_inquiry.update({
+      where: { domestic_inquiry_id: id },
+      data: {
+        date: input.date ? new Date(`${input.date}T00:00:00Z`) : null,
+        panel: input.panel || null,
+        case_summary: input.caseSummary || null,
+        decision: input.decision || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Domestic Inquiry." };
+  }
+}
+
+export async function updateSuspensionLetter(userId: number, id: number, input: AddSuspensionLetterInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.suspension_letter.findUnique({ where: { suspension_letter_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "suspension-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.suspension_letter.update({
+      where: { suspension_letter_id: id },
+      data: {
+        start_date: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
+        end_date: input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+        type: input.type || null,
+        reason: input.reason || null,
+        issued_by: input.issuedBy || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Suspension Letter." };
+  }
+}
+
+export async function updateShowcauseWarningLetter(
+  userId: number,
+  id: number,
+  input: AddShowcauseWarningLetterInput,
+): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.showcause_warning_letter.findUnique({ where: { showcause_warning_letter_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "showcause-warning-letter",
+        folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID",
+      });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.showcause_warning_letter.update({
+      where: { showcause_warning_letter_id: id },
+      data: {
+        type: input.type || null,
+        date: input.date ? new Date(`${input.date}T00:00:00Z`) : null,
+        issued_by: input.issuedBy || null,
+        status: input.status || null,
+        reason: input.reason || null,
+        emp_response: input.empResponse || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Showcause/ Warning Letter." };
+  }
+}
+
+export async function updatePip(userId: number, id: number, input: AddPipInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.pip.findUnique({ where: { pip_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    await prisma.pip.update({
+      where: { pip_id: id },
+      data: {
+        start_date: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
+        end_date: input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+        supervisor: input.supervisor || null,
+        review_result: input.reviewResult || null,
+        improvement_goal: input.improvementGoal || null,
+        remark: input.remark || null,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update PIP." };
+  }
+}
+
+// Salary Revision and Performance Review aren't RepeatableRecordSection
+// tables (they're the bespoke "form defaults to latest + history table
+// below" pattern), but the same requested behavior — click a history row
+// while in edit mode to load it into the form and save as a correction
+// rather than a new append — applies to them too, so these two follow the
+// exact same update-in-place shape as the 8 above.
+export async function updateSalaryRevision(userId: number, id: number, input: AddSalaryRevisionInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.salary_revision.findUnique({ where: { salary_revision_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "salary-revision", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.salary_revision.update({
+      where: { salary_revision_id: id },
+      data: {
+        issued_date: input.issuedDate ? new Date(`${input.issuedDate}T00:00:00Z`) : null,
+        effective_date: input.effectiveDate ? new Date(`${input.effectiveDate}T00:00:00Z`) : null,
+        current_salary: input.currentSalary ? Number.parseFloat(input.currentSalary) : null,
+        new_salary: input.newSalary ? Number.parseFloat(input.newSalary) : null,
+        reason: input.reason || null,
+        salary_adjustment: input.salaryAdjustment ? Number.parseFloat(input.salaryAdjustment) : null,
+        approved_by: input.approvedBy || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Salary Revision." };
+  }
+}
+
+export async function updatePerformanceReview(userId: number, id: number, input: AddPerformanceReviewInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const existing = await prisma.performance_review.findUnique({ where: { performance_review_id: id } });
+    if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
+    let attachmentFileId = existing.attachment_file_id;
+    if (input.attachmentFile) {
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "performance-review",
+        folderEnvVar: "GOOGLE_DRIVE_PERFORMANCE_REVIEW_ID",
+      });
+      attachmentFileId = uploaded.id;
+      if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
+        await deleteFromDrive(existing.attachment_file_id);
+      }
+    }
+    await prisma.performance_review.update({
+      where: { performance_review_id: id },
+      data: {
+        period: input.period || null,
+        review_date: input.reviewDate ? new Date(`${input.reviewDate}T00:00:00Z`) : null,
+        reviewer: input.reviewer || null,
+        overall_rating: input.overallRating || null,
+        comment: input.comment || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update Performance Review." };
+  }
+}
+
 // ─── Delete — explicit exception to the "append only" convention above,
 // requested for all 8 repeatable tables (not just Salary Revision) to keep
 // the UX consistent. Each checks the row's own user_id matches the caller's
@@ -1345,25 +1791,22 @@ export async function updatePaymentInfo(userId: number, input: UpdatePaymentInfo
   }
 }
 
-export interface UpdatePerformanceReviewInput {
+export interface AddPerformanceReviewInput {
   period: string;
   reviewDate: string;
   reviewer: string;
   overallRating: string;
   comment: string;
-  attachmentFileId: string | null;
   attachmentFile: File | null;
 }
 
-export async function updatePerformanceReview(userId: number, input: UpdatePerformanceReviewInput): Promise<ActionResult> {
+export async function addPerformanceReview(userId: number, input: AddPerformanceReviewInput): Promise<ActionResult> {
   const authError = await requireSession();
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
   try {
-    const existing = await prisma.performance_review.findUnique({ where: { user_id: userId } });
-
-    let attachmentFileId = input.attachmentFileId;
+    let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
       const uploaded = await uploadToDrive(input.attachmentFile, {
         prefix: "performance-review",
@@ -1371,22 +1814,36 @@ export async function updatePerformanceReview(userId: number, input: UpdatePerfo
       });
       attachmentFileId = uploaded.id;
     }
-    if (existing?.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
-      await deleteFromDrive(existing.attachment_file_id);
-    }
-
-    const fields = {
-      period: input.period || null,
-      review_date: input.reviewDate ? new Date(`${input.reviewDate}T00:00:00Z`) : null,
-      reviewer: input.reviewer || null,
-      overall_rating: input.overallRating || null,
-      comment: input.comment || null,
-      attachment_file_id: attachmentFileId,
-    };
-    await prisma.performance_review.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });
+    await prisma.performance_review.create({
+      data: {
+        user_id: userId,
+        period: input.period || null,
+        review_date: input.reviewDate ? new Date(`${input.reviewDate}T00:00:00Z`) : null,
+        reviewer: input.reviewer || null,
+        overall_rating: input.overallRating || null,
+        comment: input.comment || null,
+        attachment_file_id: attachmentFileId,
+      },
+    });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Performance Review." };
+  }
+}
+
+export async function deletePerformanceReview(userId: number, id: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const row = await prisma.performance_review.findUnique({ where: { performance_review_id: id } });
+    if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
+    if (row.attachment_file_id) await deleteFromDrive(row.attachment_file_id);
+    await prisma.performance_review.delete({ where: { performance_review_id: id } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete Performance Review." };
   }
 }
 
@@ -1553,6 +2010,61 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
+  }
+}
+
+// ─── Pre stage list's row-menu Delete — one action covering both row kinds
+// (see StageFlatListView/RowActionMenu), since they map to two different
+// tables with no shared id space:
+// - Real employee (positive id, a genuine users row): deletes the users row
+//   outright. Every one of its relations (employment, user_profile, ...) is
+//   declared onDelete: Cascade in schema.prisma, so this is a clean single
+//   delete, not a manual multi-table teardown — and safe specifically because
+//   Pre-stage employees haven't accrued any real history yet (no leave,
+//   achievements, promotions, ...) worth preserving.
+// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail):
+//   deletes the onboarding_candidate row directly; there's no users row to
+//   remove.
+// Restricted to employees still actually in Pre — this only exists to back
+// the Pre-stage list's own Delete button, not as a general "delete any
+// employee" action, so a client can't repurpose it against someone who has
+// already moved on and has real history attached. ───
+export async function deletePreStageEmployee(id: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scope = await getCurrentEmployeeScope();
+  if (!scope) return { ok: false, error: "Not signed in." };
+
+  if (id < 0) {
+    const sourceId = -id;
+    const candidate = await prisma.onboarding_candidate.findUnique({ where: { source_id: sourceId } });
+    if (!candidate) return { ok: false, error: "This candidate no longer exists." };
+    if (!scope.fullAccess) {
+      const [departments, branches] = await Promise.all([listDepartments(), listBranches()]);
+      const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
+      if (!isRowInScope(scope, { departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
+        return { ok: false, error: "You do not have access to this candidate." };
+      }
+    }
+    try {
+      await prisma.onboarding_candidate.delete({ where: { source_id: sourceId } });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Failed to delete candidate." };
+    }
+  }
+
+  const row = await getEmployeeOverviewRowById(id);
+  if (!row) return { ok: false, error: "This employee doesn't exist or you don't have access to them." };
+  if (row.stage !== "pre") return { ok: false, error: "Only Pre-stage employees can be deleted this way." };
+
+  const scopeError = await requireEmployeeInScope(id);
+  if (scopeError) return scopeError;
+  try {
+    await prisma.users.delete({ where: { user_id: id } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete employee." };
   }
 }
 

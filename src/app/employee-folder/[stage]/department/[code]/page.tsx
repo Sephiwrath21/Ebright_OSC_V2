@@ -10,6 +10,7 @@ import {
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
+  getOverdueTaskCounts,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -44,6 +45,7 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
           listLastWorkingDatesByUserId(namelistRows.map((r) => r.id)),
         ])
       : [undefined, undefined];
+  const overdueTaskCounts = await getOverdueTaskCounts(namelistRows.map((r) => r.id));
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -58,6 +60,7 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
           lastWorkingDateByUserId={lastWorkingDateByUserId}
           showLocation={false}
           locationContext={{ groupBy: "department", code, name: department.name }}
+          overdueTaskCounts={overdueTaskCounts}
         />
       ) : (
         <EmployeeNamelistView
@@ -66,6 +69,7 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
           locationCode={code}
           locationName={department.name}
           rows={namelistRows}
+          overdueTaskCounts={overdueTaskCounts}
         />
       )}
     </AppShell>

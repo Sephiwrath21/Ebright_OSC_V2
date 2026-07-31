@@ -5,5 +5,6 @@ export { FlowBridgeError, NoAccountError, SetupPendingError } from "./data/core"
 export * from "./data/queries";
 export * from "./data/ceo";
 export * from "./data/tasks";
+export * from "./data/templates";
 export * from "./data/manpower";
 export * from "./data/kanban";

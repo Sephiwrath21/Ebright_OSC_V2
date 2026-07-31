@@ -290,6 +290,14 @@ export interface FlowAssignInput {
    *  own (own status/proof/due, completion independent of the parent) for
    *  every recipient × day, linked under the main task via parentId. */
   subtasks?: string[];
+  /** Optional "Save as Template" (2026-07-31): also store this
+   *  assignment's structure as a reusable template under `name` — a
+   *  same-name save overwrites (the edit path). */
+  saveAsTemplate?: { name: string };
+  /** Set when the form was pre-filled via "Start from a template" — links
+   *  the created tasks to that template (template deletion cancels its
+   *  still-pending assignments). */
+  fromTemplateId?: string;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -302,6 +310,100 @@ export interface FlowAssignInput {
 }
 
 export type CadenceOption = FlowPeriod | "adhoc";
+
+// ---- Task Templates (2026-07-31) ----------------------------------------
+
+export interface FlowTemplateSummary {
+  id: string;
+  name: string;
+  title: string;
+  subtaskCount: number;
+  hasGuidelineUrl: boolean;
+  hasGuidelineImage: boolean;
+  updatedAt: string; // ISO
+}
+
+/** Full template for form prefill — guidelineImage uses the SAME shape the
+ *  assign input submits, so prefill is a straight state assignment. */
+export interface FlowTemplateDetail {
+  id: string;
+  name: string;
+  title: string;
+  subtasks: string[];
+  cadence: CadenceOption | null;
+  guidelineUrl: string | null;
+  guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+
+export type TemplateLoadResult =
+  | { ok: true; template: FlowTemplateDetail }
+  | { ok: false; message: string };
+
+export type TemplateImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
+export interface FlowTemplateAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateAssigneesResult =
+  | { ok: true; assignees: FlowTemplateAssignee[] }
+  | { ok: false; message: string };
+
+/** "Edit Task" input — the template's new structure, propagated to every
+ *  pending instance (completed records untouched). */
+export interface FlowTemplateEditInput {
+  title: string;
+  subtasks: string[];
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+export type TemplateEditResult =
+  | { ok: true; updatedTasks: number; employees: number }
+  | { ok: false; message: string };
+
+// Archive (2026-07-31): reversible hide — see data/templates.ts.
+export interface FlowArchivedTemplate {
+  id: string;
+  name: string;
+  title: string;
+  archivedTasks: number;
+  archivedAt: string; // ISO
+}
+export interface FlowArchivedInstance {
+  templateId: string;
+  templateName: string;
+  userId: string;
+  userName: string;
+  archivedTasks: number;
+}
+export type ArchivedItemsResult =
+  | { ok: true; templates: FlowArchivedTemplate[]; instances: FlowArchivedInstance[] }
+  | { ok: false; message: string };
+
+/** Everything the "+ Task" form needs for templates, bundled as ONE
+ *  optional prop: the saved list plus load/impact/rename/delete server
+ *  actions. `impact` feeds the pre-deletion confirmation ("removes N
+ *  pending tasks from M employees; completed records kept"); `remove`
+ *  then cancels those pending assignments and deletes the template. */
+export interface FlowTemplateControl {
+  list: FlowTemplateSummary[];
+  load: (templateId: string) => Promise<TemplateLoadResult>;
+  impact: (templateId: string) => Promise<TemplateImpactResult>;
+  rename: (templateId: string, name: string) => Promise<ActionResult>;
+  remove: (templateId: string) => Promise<ActionResult>;
+  // + Task hub (2026-07-31): Edit / Remove-in-bulk / Reassign
+  assignees: (templateId: string) => Promise<TemplateAssigneesResult>;
+  edit: (templateId: string, input: FlowTemplateEditInput) => Promise<TemplateEditResult>;
+  removeAssignments: (templateId: string, alsoDeleteTemplate: boolean) => Promise<ActionResult>;
+  reassignAll: (templateId: string, fromUserId: string, toUserId: string) => Promise<ActionResult>;
+  // Archive / Unarchive (2026-07-31): userId omitted = whole template.
+  archive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  unarchive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  archived: () => Promise<ArchivedItemsResult>;
+}
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the
  *  currently-selected recipient(s) — Branch Manager keeps all 3 (the one

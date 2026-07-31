@@ -204,9 +204,95 @@ export default function StageProfileView({
     setInPageActive(key);
   }
 
+  // The section pills for the right-hand nav rail — pulled out to its own
+  // variable mainly so the rail's wrapping <nav> (further below) stays
+  // readable next to its width/style logic.
+  const navSections = (
+    <>
+      {topLevel.map((section) => {
+        const isActive = !history && section.key === currentKey;
+        const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+          isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+        }`;
+        if (config.profileMode === "in-page-tabs") {
+          return (
+            <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={className}>
+              {section.label}
+            </button>
+          );
+        }
+        return (
+          <Link key={section.key} href={sectionHref(section.key)} className={className}>
+            {section.label}
+          </Link>
+        );
+      })}
+
+      {groups.map((group) => {
+        const groupSections = config.sections.filter((s) => s.group === group);
+        const isGroupActive = !history && groupSections.some((s) => s.key === currentKey);
+        const isOpen = openGroup === group || isGroupActive;
+        return (
+          <div key={group} className="flex flex-col" style={{ gap: config.navRail.gapPx }}>
+            <button
+              type="button"
+              onClick={() => setOpenGroup((g) => (g === group ? null : group))}
+              aria-expanded={isOpen}
+              className={`w-full flex items-center justify-between box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+                isGroupActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+              }`}
+            >
+              {group}
+              <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+            </button>
+            {isOpen && (
+              <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
+                {groupSections.map((s) => {
+                  const isCurrent = !history && s.key === currentKey;
+                  return (
+                    <Link
+                      key={s.key}
+                      href={sectionHref(s.key)}
+                      className={`w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+                        isCurrent
+                          ? config.navRail.clearanceCurrent ?? config.navRail.current
+                          : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
+                      }`}
+                    >
+                      {s.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div className="min-h-full bg-[#f9fbff]">
-      <div className="max-w-[1440px] mx-auto px-8 pt-4 pb-16">
+      {/* --rail-width (fluid, below lg) and --rail-width-lg (the exact
+          original per-stage pixel value, pinned at lg+ via the className's
+          own lg:w-[var(--rail-width-lg)]) are both declared once here so the
+          history strip, the rail, and the aside all size consistently.
+          Two separate properties — not one clamp() meant to "converge" to
+          the desktop value on its own — because relying on a single fluid
+          formula to land on exactly the right pixel width at arbitrary
+          desktop viewport sizes is exactly what produced the truncated rail
+          labels this fixes: at lg+ these should be governed by a literal,
+          unconditional value, not a calc() that merely happens to usually
+          work out. */}
+      <div
+        className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16"
+        style={
+          {
+            "--rail-width": `clamp(100px, 26vw, ${config.navRail.widthPx}px)`,
+            "--rail-width-lg": `${config.navRail.widthPx}px`,
+          } as React.CSSProperties
+        }
+      >
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -234,39 +320,67 @@ export default function StageProfileView({
 
         <h1 className="text-2xl font-semibold text-[#4b4949d6] mb-4">{STAGE_LABELS[stage]}</h1>
 
-        {historyGroups.length > 0 &&
-          (stage === "exit" ? (
-            <ExitHistoryTiles
-              stage={stage}
-              groups={historyGroups}
-              selected={history}
-              currentStyle={config.navRail.current}
-              onSelect={(sel) => setHistory(sel)}
-              className="mb-0"
-            />
-          ) : (
-            <HistoryTabStrip
-              variant={stage === "probation" ? "bookmark" : "top"}
-              groups={historyGroups}
-              selected={history}
-              currentStyle={config.navRail.current}
-              onSelect={(sel) => setHistory(sel)}
-              className="mb-0"
-            />
-          ))}
+        {/* Width-capped to match the white content card below (100% minus
+            the rail and its gap — the same split the card/rail flex row
+            computes for itself), not the full device width. Each strip
+            itself is nowrap + overflow-x-auto (see their own definitions) so
+            tabs that don't fit stay reachable by swipe instead of wrapping
+            to a second row. lg:w-auto removes that cap entirely at desktop —
+            original, unconstrained flex-wrap flow, exactly as before any of
+            this responsive work. */}
+        {historyGroups.length > 0 && (
+          <div className="w-[calc(100%-var(--rail-width)-16px)] lg:w-auto">
+            {stage === "exit" ? (
+              <ExitHistoryTiles
+                stage={stage}
+                groups={historyGroups}
+                selected={history}
+                currentStyle={config.navRail.current}
+                onSelect={(sel) => setHistory(sel)}
+                className="mb-0"
+              />
+            ) : (
+              <HistoryTabStrip
+                variant={stage === "probation" ? "bookmark" : "top"}
+                groups={historyGroups}
+                selected={history}
+                currentStyle={config.navRail.current}
+                onSelect={(sel) => setHistory(sel)}
+                className="mb-0"
+              />
+            )}
+          </div>
+        )}
 
-        {/* Card + vertical nav-pill rail as flex siblings — the reference docks
-            this rail to the right of the content card on every stage. */}
-        <div className="flex items-start gap-4">
-          <div className="relative flex-1 min-w-0 bg-white rounded-[35px] p-10 flex gap-10">
+        {/* Card + vertical nav-pill rail as flex siblings — same side-by-side
+            structure as desktop at every breakpoint (never stacks below).
+            Below lg, the aside and rail fluidly narrow on small viewports
+            (see their own width styles) instead of wrapping under the
+            content, and content keeps a real minimum width so its fields
+            never get crushed illegibly; if those floors add up to more than
+            a given phone's width, overflow-x-auto lets this row scroll
+            horizontally as a unit. lg:overflow-visible turns that scroll
+            escape hatch off entirely at desktop — the aside/rail are pinned
+            to their exact original pixel widths there (see their own
+            lg:w-[...] overrides), so there is nothing left for it to ever
+            need to catch. */}
+        <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto lg:overflow-visible">
+          <div className="relative flex-1 min-w-0 bg-white rounded-[24px] lg:rounded-[35px] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10">
             {/* Left column: avatar/name/status/Branch-Dept/Position/Phone/Email + proceed button */}
-            <aside aria-label="Employee profile summary" className="flex-none w-[220px] flex flex-col items-start gap-2.5">
+            <aside
+              aria-label="Employee profile summary"
+              className="flex-none w-[var(--aside-width)] lg:w-[220px] flex flex-col items-start gap-2.5"
+              style={{ "--aside-width": "clamp(108px, 30vw, 220px)" } as React.CSSProperties}
+            >
               <div
-                className={`w-[122px] h-[118px] rounded-full flex items-center justify-center text-3xl font-semibold shrink-0 ${STAGE_PILL_CLASSES[stage]}`}
+                className={`w-[min(122px,100%)] aspect-square rounded-full flex items-center justify-center text-3xl font-semibold shrink-0 ${STAGE_PILL_CLASSES[stage]}`}
               >
                 {initialsFromName(employeeName)}
               </div>
               <h2 className="mt-1 w-full break-words text-2xl text-black">{employeeName}</h2>
+              {stage !== "pre" && employeeDetail?.employeeId && (
+                <span className="text-xs text-slate-500">ID: {employeeDetail.employeeId}</span>
+              )}
               <span className={`inline-block px-3.5 py-0.5 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
                 {STAGE_LABELS[stage]}
               </span>
@@ -285,7 +399,7 @@ export default function StageProfileView({
                     disabled={proceeding || (stage === "probation" && !probationConfirmed)}
                     title={stage === "probation" && !probationConfirmed ? "Probation Status must be Confirmed first" : undefined}
                     onClick={() => setConfirmingProceed(true)}
-                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
+                    className="w-full min-h-11 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
                   >
                     {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
@@ -301,7 +415,7 @@ export default function StageProfileView({
             <div className="w-0.5 self-stretch bg-[#d9d9d9] shrink-0" aria-hidden="true" />
 
             {/* Middle column: tab content */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-[130px]">
               {resolvePanel({
                 originStage: displayStage,
                 section: displaySection,
@@ -332,71 +446,20 @@ export default function StageProfileView({
             </div>
           </div>
 
-          {/* Right column: vertical stage/action nav rail */}
+          {/* Right column: vertical stage/action nav rail — always docked
+              beside the card, matching desktop at every breakpoint. Below
+              lg, width fluidly narrows on small viewports (min 96px, via
+              --rail-width). At lg+, lg:w-[var(--rail-width-lg)] pins it to
+              the exact original per-stage pixel width unconditionally — not
+              relying on the clamp() to land there on its own, which is what
+              let "Salary Revision"/"Non-Compete" truncate at ordinary
+              desktop widths. */}
           <nav
             aria-label={`${STAGE_LABELS[stage]} sections`}
-            className="flex-none flex flex-col"
-            style={{ width: config.navRail.widthPx, gap: config.navRail.gapPx }}
+            className="flex-none flex flex-col w-[var(--rail-width)] lg:w-[var(--rail-width-lg)]"
+            style={{ gap: config.navRail.gapPx }}
           >
-            {topLevel.map((section) => {
-              const isActive = !history && section.key === currentKey;
-              const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
-              }`;
-              if (config.profileMode === "in-page-tabs") {
-                return (
-                  <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={className}>
-                    {section.label}
-                  </button>
-                );
-              }
-              return (
-                <Link key={section.key} href={sectionHref(section.key)} className={className}>
-                  {section.label}
-                </Link>
-              );
-            })}
-
-            {groups.map((group) => {
-              const groupSections = config.sections.filter((s) => s.group === group);
-              const isGroupActive = !history && groupSections.some((s) => s.key === currentKey);
-              const isOpen = openGroup === group || isGroupActive;
-              return (
-                <div key={group} className="flex flex-col" style={{ gap: config.navRail.gapPx }}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup((g) => (g === group ? null : group))}
-                    aria-expanded={isOpen}
-                    className={`w-full flex items-center justify-between box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                      isGroupActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
-                    }`}
-                  >
-                    {group}
-                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-                  </button>
-                  {isOpen && (
-                    <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
-                      {groupSections.map((s) => {
-                        const isCurrent = !history && s.key === currentKey;
-                        return (
-                          <Link
-                            key={s.key}
-                            href={sectionHref(s.key)}
-                            className={`w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                              isCurrent
-                                ? config.navRail.clearanceCurrent ?? config.navRail.current
-                                : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
-                            }`}
-                          >
-                            {s.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {navSections}
           </nav>
         </div>
       </div>
@@ -660,7 +723,7 @@ function HistoryTabStrip({
   const shape = variant === "bookmark" ? "rounded-t-[10px] rounded-b-none border-b-0" : "rounded-t-[10px] rounded-b-none border-b-0";
 
   return (
-    <nav aria-label="Previous stage sections" className={`flex flex-wrap gap-1 ${className}`}>
+    <nav aria-label="Previous stage sections" className={`flex flex-nowrap overflow-x-auto gap-1 ${className}`}>
       {groups.flatMap((group) =>
         group.sections.map((section) => {
           const isActive = selected?.stage === group.stage && selected.section.key === section.key;
@@ -670,7 +733,7 @@ function HistoryTabStrip({
               key={`${group.stage}-${section.key}`}
               type="button"
               onClick={() => onSelect({ stage: group.stage, section })}
-              className={`px-3.5 py-2 border-2 text-[13px] font-medium whitespace-nowrap transition-colors ${shape} ${
+              className={`shrink-0 px-3.5 py-2 border-2 text-[13px] font-medium whitespace-nowrap transition-colors ${shape} ${
                 isActive ? currentStyle : `${style.base} text-black hover:brightness-95`
               }`}
             >
@@ -722,12 +785,12 @@ function ExitHistoryTiles({
   );
 
   return (
-    <div aria-label="Previous stages" className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+    <div aria-label="Previous stages" className={`flex flex-nowrap overflow-x-auto items-center gap-1.5 ${className}`}>
       {groups.map((group) => {
         const isOpen = expanded === group.stage;
         const style = STAGE_HISTORY_TAB_STYLE[group.stage] ?? STAGE_HISTORY_TAB_STYLE.pre!;
         return (
-          <div key={group.stage} className="flex items-center gap-1">
+          <div key={group.stage} className="flex items-center gap-1 shrink-0">
             {!isOpen && (
               <button
                 type="button"
@@ -747,7 +810,7 @@ function ExitHistoryTiles({
               </button>
             )}
             {isOpen && (
-              <div className="flex flex-wrap items-center gap-1">
+              <div className="flex flex-nowrap items-center gap-1">
                 {group.sections.map((section) => {
                   const isActive = selected?.stage === group.stage && selected.section.key === section.key;
                   return (
@@ -755,7 +818,7 @@ function ExitHistoryTiles({
                       key={section.key}
                       type="button"
                       onClick={() => onSelect({ stage: group.stage, section })}
-                      className={`px-3.5 py-2 rounded-t-[10px] border-2 border-b-0 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                      className={`shrink-0 px-3.5 py-2 rounded-t-[10px] border-2 border-b-0 text-[13px] font-medium whitespace-nowrap transition-colors ${
                         isActive ? currentStyle : `${style.base} text-black hover:brightness-95`
                       }`}
                     >

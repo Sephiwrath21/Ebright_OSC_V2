@@ -1,5 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+// Task Manager lives in a separate database (ebright_task_manager, via
+// TASK_MANAGER_DATABASE_URL) with its own generated Prisma client — aliased
+// here to avoid colliding with this file's own `prisma` (the main hrfs db).
+import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
 import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
@@ -69,6 +73,7 @@ export interface EmployeeDetailFull extends EmployeeRow {
   emergencyRelation: string | null;
   emergencyEmail: string | null;
   emergencyAddress: string | null;
+  offerLetterFileId: string | null;
 }
 
 export interface BranchOpt { id: number; code: string; name: string }
@@ -164,6 +169,9 @@ export async function listEmployees(filters: ListFilters = {}): Promise<Employee
 
 export interface EmployeeOverviewRow {
   id: number;
+  /** employment.employee_id — the assigned staff code. Only ever set once an
+   *  employee reaches Probation/Onboarding (Pre stage never has one). */
+  employeeId: string | null;
   fullName: string;
   position: string | null;
   branchCode: string | null;
@@ -252,6 +260,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
     const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
     rows.push({
       id: u.user_id,
+      employeeId: emp?.employee_id ?? null,
       fullName: titleCaseName(u.user_profile?.full_name) || u.email,
       position: emp?.position ?? null,
       branchCode: emp?.branch?.branch_code ?? null,
@@ -305,6 +314,7 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
   const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
   const row: EmployeeOverviewRow = {
     id: u.user_id,
+    employeeId: emp?.employee_id ?? null,
     fullName: titleCaseName(u.user_profile?.full_name) || u.email,
     position: emp?.position ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
@@ -338,7 +348,7 @@ function nameDateKey(name: string, dateStr: string): string {
 // Resolved against the real department/branch tables on a best-effort basis;
 // department wins if both match (mirrors the department-priority display
 // rule used everywhere else).
-function resolveDepartmentBranch(
+export function resolveDepartmentBranch(
   raw: string,
   departments: DepartmentOpt[],
   branches: BranchOpt[],
@@ -393,6 +403,7 @@ export async function listUpcomingOnboardingCandidates(existingRows: EmployeeOve
       const loc = resolveDepartmentBranch(c.department_branch, departments, branches);
       return {
         id: -c.source_id,
+        employeeId: null,
         fullName: titleCaseName(c.name) || c.name,
         position: c.position || null,
         ...loc,
@@ -459,6 +470,7 @@ export async function getOnboardingCandidateDetail(sourceId: number): Promise<Em
     emergencyRelation: null,
     emergencyEmail: null,
     emergencyAddress: null,
+    offerLetterFileId: null,
   };
 }
 
@@ -588,6 +600,8 @@ export interface TransferEntry {
   toLocation: string | null;
   reason: string | null;
   attachmentFileId: string | null;
+  /** Temporary Transfer only — the date this reverts back to fromLocation. */
+  endDate: string | null;
 }
 
 export async function listTransfers(userId: number): Promise<TransferEntry[]> {
@@ -600,6 +614,7 @@ export async function listTransfers(userId: number): Promise<TransferEntry[]> {
     toLocation: r.to_location,
     reason: r.reason,
     attachmentFileId: r.attachment_file_id,
+    endDate: r.end_date ? r.end_date.toISOString().slice(0, 10) : null,
   }));
 }
 
@@ -924,10 +939,18 @@ export function summarizeStageByBranch(
   branches: BranchOpt[],
 ): StageLocationSummary[] {
   const stageRows = rows.filter((r) => r.stage === stage);
-  return branches.map((b) => {
-    const inBranch = stageRows.filter((r) => r.branchCode === b.code);
-    return { code: b.code, name: b.name, count: inBranch.length };
-  });
+  // HQ isn't a real standalone branch location for this drill-down — every
+  // Department already sits under it, so listing it as a peer of actual
+  // branches (Ampang, Klang, ...) duplicates the "By Department" view and
+  // confuses the two groupings. Excluded here only (not from listBranches()
+  // itself, which other callers — Transfer's dropdown, the Add-employee
+  // form — still need HQ in).
+  return branches
+    .filter((b) => b.code !== "HQ")
+    .map((b) => {
+      const inBranch = stageRows.filter((r) => r.branchCode === b.code);
+      return { code: b.code, name: b.name, count: inBranch.length };
+    });
 }
 
 export function summarizeStageByDepartment(
@@ -1260,6 +1283,7 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     emergencyRelation: em?.relation ?? null,
     emergencyEmail: em?.email ?? null,
     emergencyAddress: em?.address ?? null,
+    offerLetterFileId: emp?.offer_letter_file_id ?? null,
   };
 }
 
@@ -1311,9 +1335,11 @@ export async function getPaymentInfo(userId: number): Promise<PaymentInfoData | 
   };
 }
 
-// Singleton — confirmed via the mock's own single-form-only rendering
-// (activeEmp_performanceRev.html), no history list/"+Add" button.
-export interface PerformanceReviewInfo {
+// Repeatable — same shape/convention as salary_revision (own serial PK,
+// user_id not unique, newest first): the form shows entries[0] ("latest"),
+// the full array backs the "Performance Review History" table below it.
+export interface PerformanceReviewEntry {
+  id: number;
   period: string | null;
   reviewDate: string | null;
   reviewer: string | null;
@@ -1322,17 +1348,20 @@ export interface PerformanceReviewInfo {
   attachmentFileId: string | null;
 }
 
-export async function getPerformanceReview(userId: number): Promise<PerformanceReviewInfo | null> {
-  const row = await prisma.performance_review.findUnique({ where: { user_id: userId } });
-  if (!row) return null;
-  return {
+export async function listPerformanceReviews(userId: number): Promise<PerformanceReviewEntry[]> {
+  const rows = await prisma.performance_review.findMany({
+    where: { user_id: userId },
+    orderBy: { review_date: "desc" },
+  });
+  return rows.map((row) => ({
+    id: row.performance_review_id,
     period: row.period,
     reviewDate: row.review_date ? row.review_date.toISOString().slice(0, 10) : null,
     reviewer: row.reviewer,
     overallRating: row.overall_rating,
     comment: row.comment,
     attachmentFileId: row.attachment_file_id,
-  };
+  }));
 }
 
 // Singleton — Finance > Payroll/Payslip's "Basic Pay" + "Payslip"
@@ -1352,4 +1381,150 @@ export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
     type: row.type,
     attachmentFileId: row.attachment_file_id,
   };
+}
+
+// ─── Employee Record > Task (Pending/Overdue) ───
+//
+// There is no daily/monthly/ceo_assigned_task/hod_assigned_task/adhoc_task
+// table anywhere, in either database — Task Manager's real execution-instance
+// model is a single `RunBlock` row per task, with a nullable `cadence` field
+// (DAILY/MONTHLY/ADHOC) only ever set by its own "+ Add Task" quick-assign
+// form. "Who assigned it" (CEO/HOD/ad hoc) isn't a table either — it's
+// derived from the run's own starter role. None of that distinction matters
+// here: every RunBlock a given employee is the assignee of counts, regardless
+// of cadence or who assigned it.
+//
+// Task Manager's own User table lives in ITS OWN database
+// (ebright_task_manager, via TASK_MANAGER_DATABASE_URL) — bootstrap-IMPORTED
+// from hrfs (see prisma/task-manager/hrfs-map.ts), not a live join. The only
+// way to find "this employee's Task Manager account" at request time is by
+// matching email (unique on both sides) — an employee who was never
+// bootstrapped into Task Manager (or has no account yet) simply has no tasks
+// to show, not an error.
+export interface EmployeeTaskRow {
+  id: string;
+  name: string;
+  dueDate: string | null;
+  /** due_date < today (strictly before, not <=) and not completed — same
+   *  rule as the overdue query itself, also exposed per-row so the Pending
+   *  tab can highlight the subset of pending tasks that are also overdue. */
+  isOverdue: boolean;
+}
+
+export interface EmployeeTasksSummary {
+  pending: EmployeeTaskRow[];
+  overdue: EmployeeTaskRow[];
+}
+
+// Overdue means due_date < today, NOT due_date < this exact instant — a task
+// due today (stored as today's date at UTC midnight, same convention as
+// every other date-only field in this codebase) must NOT count as overdue
+// just because "now" is later in the day than midnight. Shared by every
+// overdue check below so they can't drift out of sync with each other.
+function startOfTodayUtc(): Date {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+function toEmployeeTaskRow(row: { id: string; title: string; dueAt: Date | null }, startOfToday: Date): EmployeeTaskRow {
+  return {
+    id: row.id,
+    name: row.title,
+    dueDate: row.dueAt ? row.dueAt.toISOString().slice(0, 10) : null,
+    isOverdue: row.dueAt !== null && row.dueAt < startOfToday,
+  };
+}
+
+export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSummary> {
+  const user = await prisma.users.findUnique({ where: { user_id: userId }, select: { email: true } });
+  if (!user?.email) return { pending: [], overdue: [] };
+
+  // Task Manager's bootstrap normalizes every imported email to lowercase
+  // (see hrfs-map.ts's mapHrfsUser) — match the same way here.
+  const tmUser = await taskManagerPrisma.user.findUnique({
+    where: { email: user.email.trim().toLowerCase() },
+    select: { id: true },
+  });
+  if (!tmUser) return { pending: [], overdue: [] };
+
+  const startOfToday = startOfTodayUtc();
+
+  const [pendingRows, overdueRows] = await Promise.all([
+    // "Pending" here matches Task Manager's own bucketOf() convention
+    // (analytics/_lib.ts) — PENDING/ACTIVE/OVERDUE/ESCALATED all bucket to
+    // "pending" there (only DONE and SKIPPED don't), not the literal
+    // BlockStatus.PENDING value alone. That's not just for consistency: live
+    // data confirms every currently-open task in the DB has status ACTIVE,
+    // none are literally "PENDING" (the initial state before anyone opens
+    // it), so filtering on the literal enum value alone would show an empty
+    // tab for every employee despite real open tasks existing.
+    taskManagerPrisma.runBlock.findMany({
+      where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] } },
+      orderBy: { dueAt: "asc" },
+      select: { id: true, title: true, dueAt: true },
+    }),
+    // Due date strictly before today and not completed — independent of the
+    // current `status` label (Task Manager's own OVERDUE status is only set
+    // when a periodic reminder sweep gets to it, so a still-"PENDING" row
+    // past its due date belongs here too; a row can appear in both lists at
+    // once).
+    taskManagerPrisma.runBlock.findMany({
+      where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] }, dueAt: { lt: startOfToday } },
+      orderBy: { dueAt: "asc" },
+      select: { id: true, title: true, dueAt: true },
+    }),
+  ]);
+
+  return {
+    pending: pendingRows.map((r) => toEmployeeTaskRow(r, startOfToday)),
+    overdue: overdueRows.map((r) => toEmployeeTaskRow(r, startOfToday)),
+  };
+}
+
+// ─── Employee Folder stage namelists — red overdue-task dot ───
+//
+// Batched (one email lookup + one Task Manager user lookup + one grouped
+// count, regardless of how many employees are on the page) rather than
+// calling listEmployeeTasks per row — a namelist page can show 100+ rows at
+// once, and per-row queries would mean 100+ round trips to a SEPARATE
+// database. Returns a plain object (not a Map) since this is passed straight
+// through from a Server Component page to a "use client" list view as a prop.
+export async function getOverdueTaskCounts(userIds: number[]): Promise<Record<number, number>> {
+  if (userIds.length === 0) return {};
+
+  const users = await prisma.users.findMany({ where: { user_id: { in: userIds } }, select: { user_id: true, email: true } });
+  if (users.length === 0) return {};
+
+  const emailToUserId = new Map<string, number>();
+  for (const u of users) emailToUserId.set(u.email.trim().toLowerCase(), u.user_id);
+
+  const tmUsers = await taskManagerPrisma.user.findMany({
+    where: { email: { in: [...emailToUserId.keys()] } },
+    select: { id: true, email: true },
+  });
+  if (tmUsers.length === 0) return {};
+
+  const tmIdToUserId = new Map<string, number>();
+  for (const u of tmUsers) {
+    const employeeId = emailToUserId.get(u.email);
+    if (employeeId !== undefined) tmIdToUserId.set(u.id, employeeId);
+  }
+
+  const grouped = await taskManagerPrisma.runBlock.groupBy({
+    by: ["assigneeId"],
+    where: {
+      assigneeId: { in: [...tmIdToUserId.keys()] },
+      status: { notIn: ["DONE", "SKIPPED"] },
+      dueAt: { lt: startOfTodayUtc() },
+    },
+    _count: { _all: true },
+  });
+
+  const counts: Record<number, number> = {};
+  for (const g of grouped) {
+    const employeeId = tmIdToUserId.get(g.assigneeId);
+    if (employeeId !== undefined) counts[employeeId] = g._count._all;
+  }
+  return counts;
 }

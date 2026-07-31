@@ -56,7 +56,7 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -103,122 +103,139 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
             Employee Records
           </h2>
 
-          <div className="flex flex-wrap items-center gap-4 bg-white rounded-2xl p-5 mb-6">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
-              <input
-                type="search"
-                placeholder="Search"
-                value={search}
+          {/* Below sm: exactly 2 rows — search+status on row 1, year+month+
+              Search+Reset on row 2 (each row its own flex-nowrap group, sized
+              so neither needs to wrap or scroll down to 375px). sm:contents
+              on each row wrapper removes it from the layout at sm+ (a wrapper
+              with no padding/background of its own to lose), so every child
+              rejoins the single flex-wrap row that was already here —
+              desktop is byte-for-byte unchanged. */}
+          <div className="flex flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 bg-white rounded-2xl p-4 sm:p-5 mb-6">
+            <div className="flex flex-nowrap items-center gap-2 sm:contents">
+              <div className="relative flex-1 min-w-0 sm:flex-1 sm:min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder="Search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <select
+                value={statusFilter}
                 onChange={(e) => {
-                  setSearch(e.target.value);
+                  setStatusFilter(e.target.value as EmployeeStage | "");
                   setPage(1);
                 }}
-                className="w-full h-10 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="shrink-0 w-[100px] sm:w-auto h-11 px-2 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[120px]"
+              >
+                <option value="">status</option>
+                {EMPLOYEE_STAGES.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {STAGE_LABELS[stage]}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as EmployeeStage | "");
-                setPage(1);
-              }}
-              className="h-10 px-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 min-w-[120px]"
-            >
-              <option value="">status</option>
-              {EMPLOYEE_STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {STAGE_LABELS[stage]}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-nowrap items-center gap-2 sm:contents">
+              <select
+                value={year}
+                onChange={(e) => {
+                  setYear(e.target.value);
+                  setPage(1);
+                }}
+                className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[110px]"
+              >
+                <option value="">year</option>
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={year}
-              onChange={(e) => {
-                setYear(e.target.value);
-                setPage(1);
-              }}
-              className="h-10 px-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 min-w-[110px]"
-            >
-              <option value="">year</option>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              <select
+                value={month}
+                onChange={(e) => {
+                  setMonth(e.target.value);
+                  setPage(1);
+                }}
+                className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[130px]"
+              >
+                <option value="">month</option>
+                {MONTHS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={month}
-              onChange={(e) => {
-                setMonth(e.target.value);
-                setPage(1);
-              }}
-              className="h-10 px-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 min-w-[130px]"
-            >
-              <option value="">month</option>
-              {MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              className="h-10 px-6 rounded-lg bg-blue-100 text-blue-800 font-semibold text-sm hover:bg-blue-200 transition-colors"
-            >
-              Search
-            </button>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="h-10 px-4 rounded-lg border-2 border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-colors"
-            >
-              Reset
-            </button>
+              <button
+                type="button"
+                className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 text-blue-800 font-semibold text-xs sm:text-sm hover:bg-blue-200 transition-colors"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="shrink-0 h-11 px-3 sm:px-4 rounded-lg border-2 border-slate-200 text-slate-600 font-medium text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
-          <div className="bg-white rounded-[27px] overflow-hidden">
-            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
-              <span>Name</span>
-              <span>Branch/ Department</span>
-              <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
-              <span>Status</span>
-              <span />
-            </div>
+          {/* Horizontal scroll below the min-width preserves the full column
+              structure on mobile instead of squishing it — the whole table,
+              including Name, swipes left/right together as one unit
+              (deliberately no sticky column). */}
+          <div className="bg-white rounded-[27px] overflow-x-auto">
+            <div className="min-w-[680px]">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
+                <span>Name</span>
+                <span>Branch/ Department</span>
+                <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
+                <span>Status</span>
+                <span />
+              </div>
 
-            {pageRows.length === 0 ? (
-              <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
-            ) : (
-              pageRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0"
-                >
-                  <Link
-                    href={`/employee-record/${row.id}`}
-                    className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate"
+              {pageRows.length === 0 ? (
+                <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
+              ) : (
+                pageRows.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0"
                   >
-                    {row.fullName}
-                  </Link>
-                  <span className="text-sm font-medium text-slate-600 truncate">
-                    {row.departmentName ?? row.branchName ?? "—"}
-                  </span>
-                  <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                  <span>
-                    <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
-                      {STAGE_LABELS[row.stage]}
+                    <Link
+                      href={`/employee-record/${row.id}`}
+                      className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate"
+                    >
+                      {row.fullName}
+                    </Link>
+                    <span className="text-sm font-medium text-slate-600 truncate">
+                      {row.departmentName ?? row.branchName ?? "—"}
                     </span>
-                  </span>
-                  <div className="flex justify-center">
-                    <RowActionMenu name={row.fullName} />
+                    <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
+                    <span>
+                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
+                        {STAGE_LABELS[row.stage]}
+                      </span>
+                    </span>
+                    <div className="flex justify-center">
+                      <RowActionMenu name={row.fullName} />
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
 
           {filtered.length > 0 && (

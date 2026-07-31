@@ -8,6 +8,7 @@ import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employeeQueries";
+import OverdueDot from "@/app/components/OverdueDot";
 
 // Keyed by resignation.exit_type's exact stored value (same 4 options the
 // Resignation tab's own Exit Type dropdown offers) — the badge shown here is
@@ -55,6 +56,8 @@ interface Props {
    *  EmployeeNamelistView. Omitted entirely for the combined, all-locations
    *  view (no single location to attribute the visit to). */
   locationContext?: LocationContext;
+  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
+  overdueTaskCounts?: Record<number, number>;
 }
 
 // List-only Exit namelist — Exit has no Block/Grid view (unlike Active/
@@ -69,6 +72,7 @@ export default function ExitListView({
   branches = [],
   departments = [],
   locationContext,
+  overdueTaskCounts,
 }: Props) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
@@ -93,11 +97,11 @@ export default function ExitListView({
 
   // Full canonical lists, not just what's present among today's exit rows —
   // every real branch/department should be selectable even with zero current
-  // exits there. CEO is excluded from the Department filter per HR — it's an
-  // admin/management bucket, not a place staff meaningfully "exit" from.
+  // exits there. CEO is included in Department (explicit reversal of an
+  // earlier HR-driven exclusion).
   const branchOptions = useMemo(() => branches.map((b) => b.name).sort((a, b) => a.localeCompare(b)), [branches]);
   const departmentOptions = useMemo(
-    () => departments.filter((d) => d.name.toUpperCase() !== "CEO").map((d) => d.name).sort((a, b) => a.localeCompare(b)),
+    () => departments.map((d) => d.name).sort((a, b) => a.localeCompare(b)),
     [departments],
   );
   const years = useMemo(
@@ -164,7 +168,7 @@ export default function ExitListView({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 pt-4 pb-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -194,9 +198,14 @@ export default function ExitListView({
           {/* Main row — always visible: Name search, Position, and (only for
               the combined cross-location view) separate Branch/Department
               dropdowns, since a scoped account's own list has just one of
-              each already. */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[180px]">
+              each already. Single row down to 375px: search shrinks
+              proportionally (flex-1, min-w-0), the selects are shrink-0 with
+              narrow fixed widths/padding on mobile, and overflow-x-auto is
+              the fallback if the combined (up to 4-select) view still
+              doesn't fit. sm+ reverts to the original flex-wrap layout and
+              desktop sizing unchanged. */}
+          <div className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-4 overflow-x-auto sm:overflow-visible">
+            <div className="relative flex-1 min-w-[90px] sm:min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
               <input
                 type="search"
@@ -206,7 +215,7 @@ export default function ExitListView({
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="w-full h-10 pl-9 pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <select
@@ -215,7 +224,7 @@ export default function ExitListView({
                 setTypeFilter(e.target.value as PositionGroup | "");
                 setPage(1);
               }}
-              className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px]"
+              className="shrink-0 w-[92px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[130px]"
             >
               <option value="">All positions</option>
               {POSITION_GROUPS.map((g) => (
@@ -230,7 +239,7 @@ export default function ExitListView({
                     setBranchFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[140px]"
+                  className="shrink-0 w-[96px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[140px]"
                 >
                   <option value="">All branches</option>
                   {branchOptions.map((b) => (
@@ -243,7 +252,7 @@ export default function ExitListView({
                     setDepartmentFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[160px]"
+                  className="shrink-0 w-[104px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[160px]"
                 >
                   <option value="">All departments</option>
                   {departmentOptions.map((d) => (
@@ -264,7 +273,7 @@ export default function ExitListView({
                   setExitTypeFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px]"
               >
                 <option value="">All exit types</option>
                 {Object.entries(EXIT_TYPE_META).map(([key, meta]) => (
@@ -277,7 +286,7 @@ export default function ExitListView({
                   setMonthFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px]"
               >
                 <option value="">month</option>
                 {MONTHS.map((m) => (
@@ -290,7 +299,7 @@ export default function ExitListView({
                   setYearFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[110px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[110px]"
               >
                 <option value="">year</option>
                 {years.map((y) => (
@@ -300,27 +309,27 @@ export default function ExitListView({
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setAdvancedOpen((v) => !v)}
               aria-expanded={advancedOpen}
-              className="inline-flex items-center gap-1 text-sm font-medium text-[#004386c9] hover:underline"
+              className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#004386c9] hover:underline"
             >
               {advancedOpen ? "hide advanced filters" : "advanced filters"}
               <ChevronDown className={`w-4 h-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
             </button>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={resetFilters}
-                className="h-10 px-4 rounded-lg border-2 border-[#8ac4f3bd] text-sm font-medium text-[#004386c9] hover:bg-[#8ac4f320]"
+                className="h-11 px-4 rounded-lg border-2 border-[#8ac4f3bd] text-sm font-medium text-[#004386c9] hover:bg-[#8ac4f320]"
               >
                 Reset
               </button>
               <button
                 type="button"
-                className="h-10 px-6 rounded-lg bg-[#8ac4f3bd] text-sm font-bold text-[#004386c9] hover:bg-[#8ac4f3]"
+                className="h-11 px-6 rounded-lg bg-[#8ac4f3bd] text-sm font-bold text-[#004386c9] hover:bg-[#8ac4f3]"
               >
                 search
               </button>
@@ -330,7 +339,11 @@ export default function ExitListView({
 
         <h1 className="text-xl font-medium text-black mb-4">Exit</h1>
 
-        <div className="bg-white rounded-[20px] overflow-hidden">
+        {/* Widest table in Employee Folder (up to 6 columns) — horizontal
+            scroll below each column's own minmax() floor keeps every column
+            reachable by swipe on mobile. The whole table (including Name)
+            scrolls together as one unit — deliberately no sticky column. */}
+        <div className="bg-white rounded-[20px] overflow-x-auto">
           <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#a4e2f480] text-[15px] font-medium text-black`}>
             <span>Name</span>
             <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} label="Last Date" />
@@ -352,9 +365,10 @@ export default function ExitListView({
                 >
                   <Link
                     href={`/employee-folder/exit/employee/${row.id}${profileQuery}`}
-                    className="text-base font-medium text-black hover:underline truncate min-w-0"
+                    className="flex items-center gap-1.5 min-w-0"
                   >
-                    {row.fullName}
+                    <span className="text-base font-medium text-black hover:underline truncate min-w-0">{row.fullName}</span>
+                    <OverdueDot count={overdueTaskCounts?.[row.id]} />
                   </Link>
                   <span className="text-[15px] text-black/67 truncate">
                     {lastWorkingDateByUserId?.[row.id] ?? row.date ?? "—"}
