@@ -16,7 +16,7 @@ export default function StageLocationsView({ stage, groupBy, locations }: Props)
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-3xl mx-auto px-6 pt-4 pb-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -34,7 +34,7 @@ export default function StageLocationsView({ stage, groupBy, locations }: Props)
           <div className="flex gap-2 mb-6">
             <Link
               href={`/employee-folder/${stage}?by=branch`}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              className={`min-h-11 flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 groupBy === "branch" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
@@ -42,7 +42,7 @@ export default function StageLocationsView({ stage, groupBy, locations }: Props)
             </Link>
             <Link
               href={`/employee-folder/${stage}?by=department`}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              className={`min-h-11 flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 groupBy === "department" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
               }`}
             >

@@ -14,8 +14,12 @@ import {
   SalaryRevisionFields,
   EditableField,
   EditableSelectField,
+  SelectWithOtherField,
   EditableTextArea,
   RealFileField,
+  RecordTable,
+  RealAttachmentLink,
+  FilePickerControl,
   PhoneField,
   EmailField,
   type SalaryRevisionHandle,
@@ -26,10 +30,18 @@ import {
   addGuardianInfo,
   updateGuardianInfo,
   deleteGuardianInfo,
+  addPerformanceReview,
   updatePerformanceReview,
+  deletePerformanceReview,
   updatePayslip,
 } from "@/lib/employeeRecordActions";
-import type { SalaryRevisionEntry, GuardianInfoEntry, PerformanceReviewInfo, PayslipInfo } from "@/lib/employeeQueries";
+import type {
+  SalaryRevisionEntry,
+  GuardianInfoEntry,
+  PerformanceReviewEntry,
+  PayslipInfo,
+  EmployeeTaskRow,
+} from "@/lib/employeeQueries";
 import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
 
 // category_shared.css's field-grid/field-control/upload-field/record-table
@@ -45,6 +57,8 @@ interface GuardianDraft {
   id: number | null; // null = not yet saved (added via "Add Another" this session)
   name: string;
   relationship: string;
+  /** Free text draft, only meaningful while relationship === "OTHER". */
+  relationshipOther: string;
   gender: string;
   email: string;
   phone: string;
@@ -52,20 +66,28 @@ interface GuardianDraft {
 }
 
 function blankGuardianDraft(): GuardianDraft {
-  return { id: null, name: "", relationship: "", gender: "", email: "", phone: "", address: "" };
+  return { id: null, name: "", relationship: "", relationshipOther: "", gender: "", email: "", phone: "", address: "" };
 }
 
 function toDrafts(data: GuardianInfoEntry[]): GuardianDraft[] {
   if (data.length === 0) return [blankGuardianDraft()];
-  return data.map((r) => ({
-    id: r.id,
-    name: r.name ?? "",
-    relationship: r.relationship ?? "",
-    gender: r.gender ?? "",
-    email: r.email ?? "",
-    phone: r.phone ?? "",
-    address: r.address ?? "",
-  }));
+  return data.map((r) => {
+    // Older rows may hold a relationship string that isn't one of the fixed
+    // options — treat those the same as a fresh "OTHER" pick so the existing
+    // free text still shows up (same convention as Training's Status
+    // dropdown/ActiveProfilePanels' EmergencyContactPanel).
+    const isKnownRelationship = GUARDIAN_RELATIONSHIP_OPTIONS.some((o) => o.value === r.relationship);
+    return {
+      id: r.id,
+      name: r.name ?? "",
+      relationship: r.relationship ? (isKnownRelationship ? r.relationship : "OTHER") : "",
+      relationshipOther: r.relationship && !isKnownRelationship ? r.relationship : "",
+      gender: r.gender ?? "",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      address: r.address ?? "",
+    };
+  });
 }
 
 // "Add Another" — visible/clickable only in edit mode, matching every other
@@ -103,6 +125,31 @@ function RemoveGuardianButton({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
+
+// Values match the existing real data's own casing (e.g. the one real
+// guardian_info row currently stores gender "MALE", relationship "FATHER" —
+// plain uppercase of the label), so converting from free text to a dropdown
+// doesn't blank out what's already saved.
+const GUARDIAN_GENDER_OPTIONS = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "NON-BINARY", label: "Non-binary" },
+  { value: "PREFER NOT TO SAY", label: "Prefer not to say" },
+];
+
+const GUARDIAN_RELATIONSHIP_OPTIONS = [
+  { value: "FATHER", label: "Father" },
+  { value: "MOTHER", label: "Mother" },
+  { value: "SPOUSE", label: "Spouse" },
+  { value: "BROTHER", label: "Brother" },
+  { value: "SISTER", label: "Sister" },
+  { value: "SON", label: "Son" },
+  { value: "DAUGHTER", label: "Daughter" },
+  { value: "GUARDIAN", label: "Guardian" },
+  { value: "RELATIVE", label: "Relative" },
+  { value: "FRIEND", label: "Friend" },
+  { value: "OTHER", label: "Other" },
+];
 
 // Personal Info > Guardian Info is real now — repeatable (confirmed via the
 // mock's own real "Add Another" button, pinfo_guardianInfo.html), but shown
@@ -188,7 +235,7 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
 
       const input = {
         name: g.name,
-        relationship: g.relationship,
+        relationship: g.relationship === "OTHER" ? g.relationshipOther : g.relationship,
         gender: g.gender,
         email: g.email,
         phone: g.phone,
@@ -212,8 +259,21 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
           </div>
           <FieldGrid>
             <EditableField label="Full Name" value={g.name} onChange={(v) => updateGuardianField(i, "name", v)} />
-            <EditableField label="Relationship" value={g.relationship} onChange={(v) => updateGuardianField(i, "relationship", v)} />
-            <EditableField label="Gender" value={g.gender} onChange={(v) => updateGuardianField(i, "gender", v)} />
+            <SelectWithOtherField
+              label="Relationship"
+              value={g.relationship}
+              otherText={g.relationshipOther}
+              onValueChange={(v) => updateGuardianField(i, "relationship", v)}
+              onOtherTextChange={(v) => updateGuardianField(i, "relationshipOther", v)}
+              options={GUARDIAN_RELATIONSHIP_OPTIONS}
+              otherSentinel="OTHER"
+            />
+            <EditableSelectField
+              label="Gender"
+              value={g.gender}
+              onChange={(v) => updateGuardianField(i, "gender", v)}
+              options={GUARDIAN_GENDER_OPTIONS}
+            />
             <EmailField label="Email" value={g.email} onChange={(v) => updateGuardianField(i, "email", v)} />
             <PhoneField label="Phone Number" value={g.phone} onChange={(v) => updateGuardianField(i, "phone", v)} />
             <EditableField label="Address" value={g.address} onChange={(v) => updateGuardianField(i, "address", v)} />
@@ -351,49 +411,207 @@ const PERFORMANCE_RATING_OPTIONS = [
   { value: "Below Expectations", label: "Below Expectations" },
 ];
 
-// Performance Review is real now — singleton, confirmed via the mock's own
-// single-form-only rendering (activeEmp_performanceRev.html has no history
-// list/"+Add" button, unlike Guardian Info/Achievement), special-cased in
-// EmployeeRecordView's resolvePanel instead of living in the static-panel
-// lookup below since it needs real userId/data props. Attachment routes to
-// its own dedicated GOOGLE_DRIVE_PERFORMANCE_REVIEW_ID folder.
-export function PerformanceReviewPanel({ userId, data }: { userId: number; data: PerformanceReviewInfo | null }) {
-  const [period, setPeriod] = useState(data?.period ?? "");
-  const [reviewDate, setReviewDate] = useState(data?.reviewDate ?? "");
-  const [reviewer, setReviewer] = useState(data?.reviewer ?? "");
-  const [overallRating, setOverallRating] = useState(data?.overallRating ?? "");
-  const [comment, setComment] = useState(data?.comment ?? "");
-  const [fileId, setFileId] = useState(data?.attachmentFileId ?? null);
+// Mirrors ActiveProfilePanels' own (private) SalaryRevisionAttachmentField —
+// picking a file stages it for the NEW review row Save is about to create,
+// it never edits the latest row's own attachment in place, so there's no
+// "existing value being edited" the way RealFileField models it.
+function PerformanceReviewAttachmentField({
+  existingFileId,
+  pendingFile,
+  onPick,
+  editingExistingRecord,
+}: {
+  existingFileId: string | null;
+  pendingFile: File | null;
+  onPick: (file: File | null) => void;
+  /** True only when the form is loaded with a specific history row (clicked
+   *  for in-place editing) rather than defaulting to latest for a new
+   *  review — gates showing the row's own existing attachment + Replace. */
+  editingExistingRecord: boolean;
+}) {
+  const editing = useEditMode();
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-xs font-medium text-slate-500">Attachment</span>
+      {editing ? (
+        editingExistingRecord && existingFileId && !pendingFile ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <RealAttachmentLink fileId={existingFileId} />
+            <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+              <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+              Replace
+            </label>
+          </div>
+        ) : (
+          <FilePickerControl file={pendingFile} onChange={onPick} editing />
+        )
+      ) : existingFileId ? (
+        <RealAttachmentLink fileId={existingFileId} />
+      ) : (
+        <span className="text-sm italic text-slate-400">Not provided</span>
+      )}
+    </div>
+  );
+}
+
+// Small child of the EditableSection below so its useEditMode() reads that
+// section's own context — a read in PerformanceReviewPanel's own body would
+// read the ambient context from OUTSIDE the section it's about to render
+// instead (same caveat SalaryRevisionAttachmentField's comment documents).
+function CancelEditLink({ show, onClick }: { show: boolean; onClick: () => void }) {
+  const editing = useEditMode();
+  if (!editing || !show) return null;
+  return (
+    <button type="button" onClick={onClick} className="text-xs text-[#4a90e2] hover:underline shrink-0">
+      Cancel edit — add new review instead
+    </button>
+  );
+}
+
+// Performance Review is real now — repeatable, same shape/convention as
+// Salary Revision (see ActiveProfilePanels.SalaryRevisionFields): the form
+// shows data[0] ("latest", listPerformanceReviews orders by review_date
+// desc) by default, and a "Performance Review History" table lists every
+// entry underneath. Saving the form appends a NEW row — same
+// unchanged-vs-latest guard as Salary Revision, so toggling Edit on/off
+// without actually changing anything (e.g. just to delete a history row)
+// doesn't create a spurious duplicate. Clicking a history row while in edit
+// mode instead loads that row into the form and Save corrects it in place
+// (updatePerformanceReview) rather than appending.
+export function PerformanceReviewPanel({ userId, data }: { userId: number; data: PerformanceReviewEntry[] }) {
+  const router = useRouter();
+  const latest = data[0] ?? null;
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const loaded = editingId !== null ? data.find((r) => r.id === editingId) ?? null : latest;
+
+  const [period, setPeriod] = useState(loaded?.period ?? "");
+  const [reviewDate, setReviewDate] = useState(loaded?.reviewDate ?? "");
+  const [reviewer, setReviewer] = useState(loaded?.reviewer ?? "");
+  const [overallRating, setOverallRating] = useState(loaded?.overallRating ?? "");
+  const [comment, setComment] = useState(loaded?.comment ?? "");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  function clearFile() {
-    if (pendingFile) setPendingFile(null);
-    else setFileId(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Re-sync the form whenever the *identity* of the loaded record changes —
+  // a save created a new latest, a delete promoted the next-newest record,
+  // or the user clicked a different history row to edit.
+  const [syncedLoadedId, setSyncedLoadedId] = useState(loaded?.id ?? null);
+  if (syncedLoadedId !== (loaded?.id ?? null)) {
+    setSyncedLoadedId(loaded?.id ?? null);
+    setPeriod(loaded?.period ?? "");
+    setReviewDate(loaded?.reviewDate ?? "");
+    setReviewer(loaded?.reviewer ?? "");
+    setOverallRating(loaded?.overallRating ?? "");
+    setComment(loaded?.comment ?? "");
+    setPendingFile(null);
+  }
+
+  async function handleSave(): Promise<SaveResult> {
+    if (!reviewDate && !period) return { ok: true };
+    if (editingId !== null) {
+      const result = await updatePerformanceReview(userId, editingId, {
+        period,
+        reviewDate,
+        reviewer,
+        overallRating,
+        comment,
+        attachmentFile: pendingFile,
+      });
+      if (!result || result.ok !== false) {
+        setEditingId(null);
+        router.refresh();
+      }
+      return result;
+    }
+    if (latest && latest.reviewDate === reviewDate && latest.period === period && latest.overallRating === overallRating) {
+      return { ok: true };
+    }
+    const result = await addPerformanceReview(userId, { period, reviewDate, reviewer, overallRating, comment, attachmentFile: pendingFile });
+    if (!result || result.ok !== false) router.refresh();
+    return result;
+  }
+
+  async function handleConfirmDelete() {
+    if (pendingDeleteId === null) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deletePerformanceReview(userId, pendingDeleteId);
+      if (result && result.ok === false) {
+        setDeleteError(result.error ?? "Delete failed.");
+        setDeleting(false);
+        return;
+      }
+      setDeleting(false);
+      setPendingDeleteId(null);
+      if (editingId === pendingDeleteId) setEditingId(null);
+      router.refresh();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Delete failed.");
+      setDeleting(false);
+    }
   }
 
   return (
-    <EditableSection
-      onSave={() =>
-        updatePerformanceReview(userId, {
-          period,
-          reviewDate,
-          reviewer,
-          overallRating,
-          comment,
-          attachmentFileId: fileId,
-          attachmentFile: pendingFile,
-        })
-      }
-    >
-      <PanelHeading>Performance Review</PanelHeading>
+    <EditableSection onSave={handleSave}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
+        <CancelEditLink show={editingId !== null} onClick={() => setEditingId(null)} />
+      </div>
       <FieldGrid>
         <EditableField label="Review Period" value={period} onChange={setPeriod} />
         <EditableField label="Review Date" value={reviewDate} onChange={setReviewDate} type="date" />
         <EditableField label="Reviewer" value={reviewer} onChange={setReviewer} />
         <EditableSelectField label="Overall Rating" value={overallRating} onChange={setOverallRating} options={PERFORMANCE_RATING_OPTIONS} />
         <EditableTextArea label="Comment" value={comment} onChange={setComment} full />
-        <RealFileField label="Attachment" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} />
+        <PerformanceReviewAttachmentField
+          existingFileId={loaded?.attachmentFileId ?? null}
+          pendingFile={pendingFile}
+          onPick={setPendingFile}
+          editingExistingRecord={editingId !== null}
+        />
       </FieldGrid>
+
+      <div className="mt-7">
+        <PanelHeading>Performance Review History</PanelHeading>
+        <RecordTable
+          columns={[
+            { key: "period", label: "Review Period" },
+            { key: "date", label: "Review Date" },
+            { key: "reviewer", label: "Reviewer" },
+            { key: "rating", label: "Overall Rating" },
+            { key: "comment", label: "Comment" },
+            { key: "attachment", label: "Attachment" },
+          ]}
+          rows={data.map((r) => ({
+            period: r.period ?? "—",
+            date: r.reviewDate ?? "—",
+            reviewer: r.reviewer ?? "—",
+            rating: r.overallRating ?? "—",
+            comment: r.comment ?? "—",
+            attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
+          }))}
+          rowIds={data.map((r) => r.id)}
+          onDeleteRow={(id) => setPendingDeleteId(id)}
+          onRowClick={(i) => setEditingId(data[i].id)}
+        />
+      </div>
+
+      {pendingDeleteId !== null && (
+        <ConfirmDialog
+          message={deleteError ?? "Delete this performance review record? This cannot be undone."}
+          confirmLabel={deleting ? "Deleting…" : "Delete"}
+          onCancel={() => {
+            setPendingDeleteId(null);
+            setDeleteError(null);
+          }}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </EditableSection>
   );
 }
@@ -414,37 +632,55 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
 // PipPanel, each special-cased in EmployeeRecordView's resolvePanel.
 
 
-function TaskList() {
+// Real now — backed by Task Manager's own RunBlock rows (a separate database,
+// ebright_task_manager; see employeeQueries.listEmployeeTasks for how an
+// employee's row here is matched to their Task Manager account and how
+// Pending/Overdue are each queried). Read-only: no add/edit/delete affordance
+// exists for these (they're managed entirely from within Task Manager
+// itself), so this is a plain RecordTable with no EditableSection around it.
+// Overdue rows (isOverdue — due date passed, not completed) render in red so
+// they stand out from tasks still within their due date; every row on the
+// Overdue tab is overdue by definition, so it renders entirely red there too.
+function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
   return (
-    <ul className="divide-y divide-black/5">
-      <li className="py-6 text-center text-sm text-slate-400">No tasks this month.</li>
-    </ul>
+    <RecordTable
+      columns={[
+        { key: "name", label: "Task Name" },
+        { key: "date", label: "Date" },
+      ]}
+      rows={tasks.map((t) => ({
+        name: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.name}</span>,
+        date: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
+      }))}
+    />
   );
 }
 
-export function TaskPendingPanel() {
+export function TaskPendingPanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
   return (
     <div>
       <PanelHeading>Pending</PanelHeading>
-      <TaskList />
+      <TaskTable tasks={tasks} />
     </div>
   );
 }
 
-export function TaskOverduePanel() {
+export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
   return (
     <div>
       <PanelHeading>Overdue</PanelHeading>
-      <TaskList />
+      <TaskTable tasks={tasks} />
     </div>
   );
 }
 
 // ─── Lookup: "category/section" -> panel component ───
-
+//
+// Task/Pending and Task/Overdue are NOT here — they need real userId/tasks
+// props the rest of this dictionary doesn't take, so they're special-cased
+// in EmployeeRecordView's resolvePanel instead (same convention as Training/
+// Promotion/Transfer/Cert.-Achievement/the 4 Disciplinary sub-tabs).
 export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, () => ReactNode> = {
   "hr-info/offer-letter": OfferLetterPanel,
   "hr-info/hiring-notes": HiringNotesPanel,
-  "task/pending": TaskPendingPanel,
-  "task/overdue": TaskOverduePanel,
 };

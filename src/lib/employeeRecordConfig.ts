@@ -32,7 +32,7 @@ export const EMPLOYEE_RECORD_CATEGORIES: RecordCategory[] = [
       { key: "hiring-notes", label: "Hiring Notes" },
       { key: "reference", label: "Reference" },
       { key: "medical-check", label: "Medical Check" },
-      { key: "nda-nc", label: "NDA/ NC" },
+      { key: "nda-nc", label: "NDA / NC" },
       { key: "handbook", label: "Employee Handbook" },
     ],
   },
@@ -62,7 +62,7 @@ export const EMPLOYEE_RECORD_CATEGORIES: RecordCategory[] = [
     sections: [
       { key: "domestic-inquiry", label: "Domestic Inquiry" },
       { key: "suspension", label: "Suspension Letter" },
-      { key: "showcause", label: "Showcause/ Warning Letter" },
+      { key: "showcause", label: "Showcause / Warning Letter" },
       { key: "pip", label: "Performance Improvement Plan" },
     ],
   },

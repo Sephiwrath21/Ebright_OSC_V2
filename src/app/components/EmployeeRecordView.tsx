@@ -36,6 +36,8 @@ import {
   PayrollPanel,
   GuardianInfoPanel,
   PerformanceReviewPanel,
+  TaskPendingPanel,
+  TaskOverduePanel,
 } from "@/app/components/EmployeeRecordPanels";
 import { updateBankDetails, updateEmergencyContact, updatePaymentInfo } from "@/lib/employeeRecordActions";
 import type {
@@ -61,14 +63,17 @@ import type {
   PipEntry,
   GuardianInfoEntry,
   PaymentInfoData,
-  PerformanceReviewInfo,
+  PerformanceReviewEntry,
   PayslipInfo,
+  EmployeeTasksSummary,
 } from "@/lib/employeeQueries";
 
 // Vertical sub-nav rail — green, from category_shared.css (shared by every
 // Employee Record category, e.g. Personal Info / Guardian Info / Payment &
-// Bank Info / Emergency Contact under "Personal Info").
-const RAIL_WIDTH_PX = 210;
+// Bank Info / Emergency Contact under "Personal Info"). Width is a literal
+// 210px Tailwind class (lg:w-[210px] below) rather than this constant now
+// that it only applies from lg up — kept as a plain number wasn't usable
+// responsively the way the inline style was.
 const RAIL_GAP_PX = 10;
 const RAIL_BASE = "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
@@ -85,6 +90,9 @@ interface Props {
   branchName?: string | null;
   departmentName?: string | null;
   stage?: EmployeeStage;
+  /** employment.employee_id — only assigned from Probation/Onboarding onward, so this is
+   *  null (and hidden) for anyone still in Pre. */
+  employeeCode?: string | null;
   /** Real user_profile/bank_details/emergency_contact data — only fetched for Personal Info's 3 data sections. */
   employeeDetail?: EmployeeDetailFull | null;
   /** Real leave_request rows — only fetched for Active Employment > Leave. */
@@ -122,12 +130,14 @@ interface Props {
   /** Real payment_info data — only fetched for Personal Info > Payment. */
   paymentInfo?: PaymentInfoData | null;
   /** Real performance_review data — only fetched for Active Employment > Performance Review. */
-  performanceReview?: PerformanceReviewInfo | null;
+  performanceReview?: PerformanceReviewEntry[];
   /** Real payslip data — only fetched for Finance > Payroll/Payslip. */
   payslip?: PayslipInfo | null;
   /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
+  /** Real Task Manager data (separate database) — only fetched for the Task category. */
+  tasks?: EmployeeTasksSummary;
 }
 
 export default function EmployeeRecordView({
@@ -139,6 +149,7 @@ export default function EmployeeRecordView({
   branchName,
   departmentName,
   stage,
+  employeeCode,
   employeeDetail,
   leaveHistory,
   resumeInfo,
@@ -163,12 +174,21 @@ export default function EmployeeRecordView({
   payslip,
   branches,
   departments,
+  tasks,
 }: Props) {
   const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
+      {/* --rail-width is declared once here so both the cat-tabs bar (via
+          calc()) and the sub-nav rail itself (directly) size against the
+          exact same value — that's what keeps the tabs bar's width matched
+          to the white content card's width instead of the full page/device
+          width, since the card is everything left over after the rail. */}
+      <div
+        className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10"
+        style={{ "--rail-width": "clamp(96px, 28vw, 210px)" } as React.CSSProperties}
+      >
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -188,6 +208,9 @@ export default function EmployeeRecordView({
           </div>
           <div className="flex flex-col gap-1.5">
             <h1 className="text-xl font-semibold text-slate-900">{employeeName}</h1>
+            {stage && stage !== "pre" && employeeCode && (
+              <span className="block text-xs text-slate-500">ID: {employeeCode}</span>
+            )}
             <span className="block text-xs text-slate-500">
               {departmentName ?? branchName ?? "--"} · {position || "--"}
             </span>
@@ -195,15 +218,26 @@ export default function EmployeeRecordView({
           </div>
         </div>
 
-        {/* cat-tabs — horizontal, one entry per record category, independent of any stage */}
-        <nav aria-label="Employee record categories" className="flex flex-wrap gap-1 mb-0">
+        {/* cat-tabs — horizontal, one entry per record category, independent
+            of any stage. Desktop tab sizing is untouched at every breakpoint
+            (no shrinking) — width is explicitly capped to match the white
+            content card's width below (100% minus the rail and its gap, the
+            same split the card/rail flex row computes for itself), not the
+            full device width. Tabs that don't fit within that width are
+            simply not visible until scrolled to (nowrap + overflow-x-auto),
+            never wrapped to a second row. lg:w-auto removes that cap
+            entirely at desktop, back to the original unconstrained flow. */}
+        <nav
+          aria-label="Employee record categories"
+          className="flex flex-nowrap gap-1 mb-0 overflow-x-auto w-[calc(100%-var(--rail-width)-16px)] lg:w-auto"
+        >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
             return (
               <Link
                 key={cat.key}
                 href={`/employee-record/${employeeId}/${cat.key}`}
-                className={`px-4 py-2 rounded-t-[10px] border-2 border-b-0 text-sm font-medium transition-colors ${
+                className={`shrink-0 flex items-center px-4 py-2 rounded-t-[10px] border-2 border-b-0 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-[#22b8d1] border-[#0e6577] text-white"
                     : "bg-[#68d4ffa8] border-[#49a2c6] text-black hover:bg-[#68d4ff]"
@@ -215,9 +249,14 @@ export default function EmployeeRecordView({
           })}
         </nav>
 
-        {/* Card + vertical sub-nav rail as flex siblings, docked under the cat-tabs bar */}
-        <div className="flex items-start gap-4">
-          <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-6">
+        {/* Card + vertical sub-nav rail as flex siblings, docked under the
+            cat-tabs bar — same side-by-side structure as desktop at every
+            breakpoint (never stacks). The rail's own width fluidly shrinks
+            on narrow viewports (see its own style below) so both columns
+            keep fitting side by side instead of the rail getting pushed
+            below the content. */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
@@ -272,6 +311,10 @@ export default function EmployeeRecordView({
                 return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} />;
               if (category.key === "disciplinary" && sectionKey === "pip" && pips !== undefined)
                 return <PipPanel userId={employeeId} data={pips} />;
+              if (category.key === "task" && sectionKey === "pending" && tasks !== undefined)
+                return <TaskPendingPanel tasks={tasks.pending} />;
+              if (category.key === "task" && sectionKey === "overdue" && tasks !== undefined)
+                return <TaskOverduePanel tasks={tasks.overdue} />;
               if (StaticPanel) return <StaticPanel />;
               return (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
@@ -287,10 +330,15 @@ export default function EmployeeRecordView({
             })()}
           </div>
 
+          {/* Below lg, width fluidly narrows on small viewports (min 96px,
+              via --rail-width, declared once on the page's outer wrapper and
+              shared with the cat-tabs bar above). At lg+, lg:w-[210px] pins
+              it to the exact original pixel width unconditionally — not
+              relying on the clamp() to land there on its own. */}
           <nav
             aria-label={`${category.label} sections`}
-            className="flex-none flex flex-col"
-            style={{ width: RAIL_WIDTH_PX, gap: RAIL_GAP_PX }}
+            className="flex-none w-[var(--rail-width)] lg:w-[210px] flex flex-col"
+            style={{ gap: RAIL_GAP_PX }}
           >
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
@@ -298,7 +346,7 @@ export default function EmployeeRecordView({
                 <Link
                   key={section.key}
                   href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
-                  className={`w-full box-border rounded-r-[20px] border-2 py-[11px] px-4 text-sm font-semibold leading-tight transition-colors ${
+                  className={`w-full min-h-11 flex items-center box-border rounded-r-[20px] border-2 py-[11px] px-2.5 sm:px-4 text-xs sm:text-sm font-semibold leading-tight transition-colors ${
                     isActive ? RAIL_CURRENT : `${RAIL_BASE} hover:brightness-95`
                   }`}
                 >

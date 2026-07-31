@@ -12,6 +12,8 @@ const SCANNER_SYNC_INTERVAL_MS = 10_000; // 10 seconds — matches the old app's
 
 const TASK_RECURRENCE_SWEEP_MS = 60 * 60 * 1000; // hourly
 
+const TRANSFER_REVERT_SWEEP_MS = 60 * 60 * 1000; // hourly — end_date is a calendar date, not a time, so hourly is more than enough resolution
+
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
@@ -56,4 +58,28 @@ export async function register(): Promise<void> {
       void sweep();
     }, TASK_RECURRENCE_SWEEP_MS);
   }
+
+  // Transfer's "Temporary Transfer" type — auto-reverts the employee's
+  // Branch/Department back to "From" once end_date has passed. Same
+  // idempotent/self-healing shape as the task-recurrence sweep above: fires
+  // once at boot (catches anything due while the server was down), then
+  // hourly.
+  const { revertExpiredTemporaryTransfers } = await import("@/lib/transferAutomation");
+  const revertSweep = async () => {
+    try {
+      const reverted = await revertExpiredTemporaryTransfers();
+      if (reverted > 0) {
+        console.log(`[transfer-revert] reverted ${reverted} expired temporary transfer(s)`);
+      }
+    } catch (err) {
+      console.warn(
+        `[transfer-revert] sweep failed (will retry next interval): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  };
+  console.log("[transfer-revert] hourly sweep starting");
+  void revertSweep();
+  setInterval(() => {
+    void revertSweep();
+  }, TRANSFER_REVERT_SWEEP_MS);
 }

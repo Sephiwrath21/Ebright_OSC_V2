@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronRight, Home, Search } from "lucide-react";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employeeQueries";
+import { deletePreStageEmployee } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import AddPreStageEmployeeModal from "@/app/components/AddPreStageEmployeeModal";
+import OverdueDot from "@/app/components/OverdueDot";
 
 const MONTHS = [
   { value: "01", label: "January" }, { value: "02", label: "February" }, { value: "03", label: "March" },
@@ -23,11 +26,14 @@ interface Props {
    *  button that creates a real employee (users/user_profile/employment). */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
+  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
+  overdueTaskCounts?: Record<number, number>;
 }
 
 // Reference (pre.html / probation.html): a flat table, no Branch/Department
 // drill-down — each row links straight into that stage's profile.
-export default function StageFlatListView({ stage, rows, branches, departments }: Props) {
+export default function StageFlatListView({ stage, rows, branches, departments, overdueTaskCounts }: Props) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
@@ -51,7 +57,7 @@ export default function StageFlatListView({ stage, rows, branches, departments }
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -65,21 +71,26 @@ export default function StageFlatListView({ stage, rows, branches, departments }
           <span className="text-slate-900 font-medium">{STAGE_LABELS[stage]}</span>
         </nav>
 
-        <div className="flex flex-wrap items-center gap-4 bg-white rounded-2xl p-5 mb-6">
-          <div className="relative flex-1 min-w-[180px]">
+        {/* Single row down to 375px — search takes the remaining space
+            (flex-1, min-w-0), year/month are shrink-0 with narrow fixed
+            widths/padding on mobile, and overflow-x-auto is the fallback if
+            it still doesn't fit (e.g. Pre's extra "+ Add" button). sm+
+            reverts to the original flex-wrap layout and desktop sizing. */}
+        <div className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-4 overflow-x-auto sm:overflow-visible bg-white rounded-2xl p-4 sm:p-5 mb-6">
+          <div className="relative flex-1 min-w-[90px] sm:min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
               type="search"
               placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
             value={year}
             onChange={(e) => setYear(e.target.value)}
-            className="h-10 px-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 min-w-[110px]"
+            className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[110px]"
           >
             <option value="">year</option>
             {years.map((y) => (
@@ -89,49 +100,70 @@ export default function StageFlatListView({ stage, rows, branches, departments }
           <select
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="h-10 px-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 min-w-[130px]"
+            className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[130px]"
           >
             <option value="">month</option>
             {MONTHS.map((m) => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>
-          {stage === "pre" && <AddPreStageEmployeeModal branches={branches ?? []} departments={departments ?? []} />}
+          {stage === "pre" && (
+            <div className="shrink-0">
+              <AddPreStageEmployeeModal branches={branches ?? []} departments={departments ?? []} />
+            </div>
+          )}
         </div>
 
-        <div className="bg-white rounded-[27px] overflow-hidden">
-          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
-            <span>Name</span>
-            <span>Branch/ Department</span>
-            <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
-            <span>Status</span>
-            <span />
-          </div>
+        {/* Table scrolls horizontally as a unit below the min-width — the grid
+            template can't be squeezed narrower than that, so on mobile the
+            whole table (every column, including Name) swipes left/right
+            together as one block instead of squishing into illegible
+            slivers. Deliberately no sticky column — the whole row scrolls as
+            a unit, per explicit request. */}
+        <div className="bg-white rounded-[27px] overflow-x-auto">
+          <div className="min-w-[680px]">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
+              <span>Name</span>
+              <span>Branch/ Department</span>
+              <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
+              <span>Status</span>
+              <span />
+            </div>
 
-          {filtered.length === 0 ? (
-            <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
-          ) : (
-            filtered.map((row) => (
-              <Link
-                key={row.id}
-                href={`/employee-folder/${stage}/employee/${row.id}`}
-                className="relative grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0 hover:bg-slate-50 transition-colors"
-              >
-                <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
-                <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
-                <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                <span>
-                  <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                    {STAGE_LABELS[stage]}
+            {filtered.length === 0 ? (
+              <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
+            ) : (
+              filtered.map((row) => (
+                <Link
+                  key={row.id}
+                  href={`/employee-folder/${stage}/employee/${row.id}`}
+                  className="relative grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0 hover:bg-slate-50 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
+                    <OverdueDot count={overdueTaskCounts?.[row.id]} />
                   </span>
-                </span>
-                {/* Candidates have no portal account to act on — no message/
-                    remove actions make sense yet, so the menu is skipped
-                    (the row itself still opens the same profile template). */}
-                <div className="flex justify-center">{!row.isCandidate && <RowActionMenu name={row.fullName} />}</div>
-              </Link>
-            ))
-          )}
+                  <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
+                  <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
+                  <span>
+                    <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                      {STAGE_LABELS[stage]}
+                    </span>
+                  </span>
+                  <div className="flex justify-center">
+                    <RowActionMenu
+                      name={row.fullName}
+                      onDelete={async () => {
+                        const result = await deletePreStageEmployee(row.id);
+                        if (result.ok) router.refresh();
+                        return result;
+                      }}
+                    />
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
