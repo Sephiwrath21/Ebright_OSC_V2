@@ -20,6 +20,7 @@ import type {
   FlowTemplateAssignee,
   FlowTemplateControl,
 } from "./types";
+import { personRowLabel, SinglePersonPickList } from "./recipient-picker";
 
 const selectClass =
   "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
@@ -601,6 +602,8 @@ export function TemplateReassignPanel({
   const [assignees, setAssignees] = React.useState<FlowTemplateAssignee[] | null>(null);
   const [fromUserId, setFromUserId] = React.useState("");
   const [toUserId, setToUserId] = React.useState("");
+  /** Type-ahead filter for the "To" combobox (2026-07-31). */
+  const [toSearch, setToSearch] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
 
@@ -609,6 +612,7 @@ export function TemplateReassignPanel({
     setAssignees(null);
     setFromUserId("");
     setToUserId("");
+    setToSearch("");
     setMessage(null);
     if (!id) return;
     setBusy(true);
@@ -662,25 +666,59 @@ export function TemplateReassignPanel({
               ))}
             </select>
           </label>
-          <label className="block text-sm text-gray-600">
+          {/* Searchable combobox (2026-07-31): type to filter instead of
+              scrolling a giant select. Same search-input + one-click-pick
+              pieces as the drill modal's "Assign to Others" picker, so the
+              two person-pickers can't drift apart visually. */}
+          <div className="text-sm text-gray-600">
             To (new assignee)
-            <select
-              value={toUserId}
-              onChange={(e) => setToUserId(e.target.value)}
-              className={`mt-1 ${selectClass}`}
-            >
-              <option value="">Select an employee…</option>
-              {staff
-                .filter((s) => s.id !== fromUserId)
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-            </select>
-          </label>
+            {toUserId ? (
+              <div className="mt-1 flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+                <span className="min-w-0 flex-1 truncate">
+                  {(() => {
+                    const s = staff.find((m) => m.id === toUserId);
+                    return s ? personRowLabel(s) : toUserId;
+                  })()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToUserId("");
+                    setToSearch("");
+                  }}
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
+                >
+                  change
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  value={toSearch}
+                  onChange={(e) => setToSearch(e.target.value)}
+                  placeholder="Select an employee…"
+                  className={`mt-1 ${selectClass}`}
+                />
+                <div className="mt-1.5">
+                  <SinglePersonPickList
+                    members={staff
+                      .filter((s) => s.id !== fromUserId)
+                      .filter((s) =>
+                        s.name.toLowerCase().includes(toSearch.trim().toLowerCase()),
+                      )
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name))}
+                    onPick={(id) => {
+                      setToUserId(id);
+                      setToSearch("");
+                    }}
+                    disabled={busy}
+                    emptyLabel="No staff match that search."
+                  />
+                </div>
+              </>
+            )}
+          </div>
           <div>
             <button
               type="button"
