@@ -767,8 +767,8 @@ function ProofCell({
             setErrorText(null);
             setAttachOpen(true);
           }}
-          title="Attach proof — drop, paste, upload, or take a photo"
-          aria-label={`Attach proof for ${task.blockTitle}`}
+          title="Attach Proof Of Completion — drop, paste, upload, or take a photo"
+          aria-label={`Attach proof of completion for ${task.blockTitle}`}
           className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
         >
           {busy ? "…" : "＋"}
@@ -793,7 +793,7 @@ function ProofCell({
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900">Attach proof</h4>
+                <h4 className="text-sm font-semibold text-gray-900">Attach Proof Of Completion</h4>
                 <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
               </div>
               <button
