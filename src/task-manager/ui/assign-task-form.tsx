@@ -86,9 +86,6 @@ export function AssignTaskForm({
   // Task Templates (2026-07-31)
   const [templateId, setTemplateId] = React.useState("");
   const [templateBusy, setTemplateBusy] = React.useState(false);
-  const [manageOpen, setManageOpen] = React.useState(false);
-  const [renamingId, setRenamingId] = React.useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = React.useState("");
   const [saveTemplate, setSaveTemplate] = React.useState(false);
   const [templateName, setTemplateName] = React.useState("");
 
@@ -270,27 +267,19 @@ export function AssignTaskForm({
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {/* Task Templates (2026-07-31): pick one to pre-fill the structure
             (title/subtasks/cadence/guideline) — recipients, days, and due
-            date always start fresh. Manage = rename/delete. Using a
-            template never modifies it. */}
+            date always start fresh. Using a template never modifies it.
+            The old Manage link is gone (2026-07-31): rename/delete/archive
+            live in the hub's Edit/Remove/Archive tabs now. */}
         {templates && templates.list.length > 0 && (
           <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-gray-600">Start from a template</p>
-              <button
-                type="button"
-                onClick={() => setManageOpen((o) => !o)}
-                className="text-xs font-medium text-blue-600 hover:underline"
-              >
-                {manageOpen ? "Done" : "Manage"}
-              </button>
-            </div>
+            <p className="text-sm font-medium text-gray-600">Template</p>
             <select
               value={templateId}
               onChange={(e) => void applyTemplate(e.target.value)}
               disabled={templateBusy}
               className={`mt-2 ${selectClass}`}
             >
-              <option value="">Start from scratch</option>
+              <option value="">Select</option>
               {templates.list.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.subtaskCount} subtask{t.subtaskCount === 1 ? "" : "s"}
@@ -299,99 +288,6 @@ export function AssignTaskForm({
               ))}
             </select>
             {templateBusy && <p className="mt-1.5 text-xs text-gray-400">Loading template…</p>}
-            {manageOpen && (
-              <ul className="mt-2 space-y-1">
-                {templates.list.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
-                  >
-                    {renamingId === t.id ? (
-                      <>
-                        <input
-                          value={renameDraft}
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          maxLength={100}
-                          className="min-w-0 flex-1 rounded-full border border-gray-300 px-3 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          disabled={!renameDraft.trim()}
-                          onClick={() => {
-                            const name = renameDraft.trim();
-                            setRenamingId(null);
-                            void templates.rename(t.id, name).then((r) => {
-                              if (!r.ok) setMessage({ ok: false, text: r.message });
-                            });
-                          }}
-                          className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRenamingId(null)}
-                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-gray-600"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="min-w-0 flex-1 truncate">
-                          {t.name}
-                          <span className="ml-1.5 text-xs text-gray-400">
-                            {t.subtaskCount > 0 && `${t.subtaskCount} subtask${t.subtaskCount === 1 ? "" : "s"}`}
-                            {t.subtaskCount > 0 && (t.hasGuidelineUrl || t.hasGuidelineImage) && " · "}
-                            {(t.hasGuidelineUrl || t.hasGuidelineImage) && "guideline"}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRenamingId(t.id);
-                            setRenameDraft(t.name);
-                          }}
-                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-blue-600"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          disabled={templateBusy}
-                          onClick={() => {
-                            // Impact-first confirmation (2026-07-31):
-                            // deleting a template also CANCELS its still-
-                            // pending assignments (completed records are
-                            // kept) — say exactly how many before acting.
-                            setTemplateBusy(true);
-                            void templates.impact(t.id).then((impact) => {
-                              setTemplateBusy(false);
-                              if (!impact.ok) {
-                                setMessage({ ok: false, text: impact.message });
-                                return;
-                              }
-                              const warning =
-                                impact.pendingTasks > 0
-                                  ? `This will remove this task from ${impact.pendingEmployees} employee${impact.pendingEmployees === 1 ? "" : "s"} who ${impact.pendingEmployees === 1 ? "hasn't" : "haven't"} completed it yet (${impact.pendingTasks} pending task${impact.pendingTasks === 1 ? "" : "s"}). ${impact.completedKept} completed record${impact.completedKept === 1 ? "" : "s"} will be kept.`
-                                  : `No pending assignments — ${impact.completedKept} completed record${impact.completedKept === 1 ? "" : "s"} will be kept.`;
-                              if (!window.confirm(`Delete template "${t.name}"?\n\n${warning}`)) return;
-                              if (templateId === t.id) setTemplateId("");
-                              void templates.remove(t.id).then((r) => {
-                                if (!r.ok) setMessage({ ok: false, text: r.message });
-                              });
-                            });
-                          }}
-                          className="shrink-0 text-xs font-medium text-gray-400 hover:text-red-600 disabled:opacity-40"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         )}
 
