@@ -773,9 +773,6 @@ export default async function TaskManagerPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold">Task Manager</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Your tasks, team status, and assignments — daily and monthly.
-                </p>
               </div>
               {headerAction}
             </div>
@@ -1039,9 +1036,6 @@ export default async function TaskManagerPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">Task Manager</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Your tasks, team status, and assignments — daily and monthly.
-            </p>
           </div>
           {headerAction}
         </div>
