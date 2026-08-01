@@ -38,6 +38,7 @@ import {
 } from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
+import { RegionDonutGrids } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import {
   flowBucketize,
@@ -125,6 +126,17 @@ export async function HomeScopedOverviewSection({
           extraParams={carry("mdate", "mrange")}
         />
       </div>
+    );
+    // CEO's branchRegionOverview Ad hoc section (2026-08-01) — same single-
+    // day picker as HomeTaskOverview's org-wide version.
+    const adhocPicker = (
+      <DailyDatePicker
+        key="ceo-adhoc-picker"
+        value={adhocAnchor}
+        basePath="/home"
+        param="adate"
+        extraParams={carry("adate")}
+      />
     );
 
     // ALL role gates below read role-views.ts (the single source of truth,
@@ -450,6 +462,39 @@ export async function HomeScopedOverviewSection({
       );
     }
 
+    // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
+    // Monthly (Manager)/Ad hoc (Manager), the SAME RegionDonutGrids sections
+    // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
+    // draggable department dashboards. daily.org/monthly.org/adhocByRegion
+    // are already fetched for the CEO (canViewOrg includes CEO) — this only
+    // decides whether they render here.
+    let branchRegionOverview: ReactNode = null;
+    if (shows(view, "home", "branchRegionOverview") && daily.org) {
+      branchRegionOverview = (
+        <>
+          <RegionDonutGrids
+            title="Branch Status by Region — Daily"
+            regions={daily.org.regions}
+            action={dailyPicker}
+          />
+          {monthly.org && (
+            <RegionDonutGrids
+              title="Branch Status by Region — Monthly (Manager)"
+              regions={monthly.org.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []}
+              action={monthlyPicker}
+            />
+          )}
+          {daily.adhocByRegion && (
+            <RegionDonutGrids
+              title="Ad hoc Tasks by Region (Manager)"
+              regions={daily.adhocByRegion.regions}
+              action={adhocPicker}
+            />
+          )}
+        </>
+      );
+    }
+
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
     // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
     // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
@@ -504,6 +549,7 @@ export async function HomeScopedOverviewSection({
           </>,
         )}
         {ceoDashboards}
+        {branchRegionOverview}
       </div>
     );
   } catch {

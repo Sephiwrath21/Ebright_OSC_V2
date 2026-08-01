@@ -92,7 +92,9 @@ export function getFlowDetail(
       const [org, adhoc, adhocByRegion] = await Promise.all([
         getOrgPayload(q.period, q.date, monthDays),
         getAdhocPayload(null),
-        user.role === "ADMIN" || user.role === "OPS" || elevated
+        // CEO joined 2026-08-01 (Home's branchRegionOverview section needs
+        // the Ad hoc-by-region rollup alongside ADMIN/OPS/elevated).
+        user.role === "ADMIN" || user.role === "OPS" || user.role === "CEO" || elevated
           ? getAdhocRegionsPayload(opts?.adhocDate)
           : Promise.resolve(undefined),
       ]);

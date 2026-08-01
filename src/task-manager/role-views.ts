@@ -52,7 +52,8 @@ export type SectionKey =
   // CEO-specific sections
   | "ceoCombinedList"
   | "ceoTaskTable"
-  | "ceoKanban";
+  | "ceoKanban"
+  | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc
 
 /** Daily weekday sidebar range — per the 2026-07-29 final spec (+ CEO,
  *  2026-08-01): department-side Tue–Sat; Branch Manager + Branch Exec
@@ -87,8 +88,13 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // sidebar Daily table view every other role uses (myTasksDaily — the
   // old un-windowed combined list is gone); Home keeps the ONE combined
   // "My Tasks" card (ceoCombinedList) with its date filter.
+  // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
+  // Monthly/Ad hoc, the same RegionDonutGrids sections ADMIN/OPS see via
+  // orgGrids — appended below the draggable department dashboards. Home
+  // only; the CEO's Task Manager page keeps entityDropdowns for branch
+  // drill-down instead.
   CEO: {
-    home: ["ceoCombinedList", "ceoKanban"],
+    home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
     taskManager: ["myTasksDaily", "ceoTaskTable", "entityDropdowns"],
     weekdayRange: "mon-sun",
     addTaskHeader: true,
