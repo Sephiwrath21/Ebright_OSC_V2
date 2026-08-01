@@ -470,6 +470,18 @@ export async function HomeScopedOverviewSection({
       <div className="flex flex-col gap-5">
         {grid(
           <>
+            {/* CEO (2026-08-01): ONE combined "My Tasks" card — no
+                Daily/Monthly split; totals cover their whole un-windowed
+                task set, matching the Task Manager combined list. */}
+            {shows(view, "home", "ceoCombinedList") && (
+              <StatusOverviewCard
+                key="ceo-own-tasks"
+                title="My Tasks"
+                totals={daily.me.totals}
+                tasks={flowBucketize(daily.me.tasks)}
+                {...completeProps}
+              />
+            )}
             {personalPair}
             {shows(view, "home", "hodAssigned") && streamCard("HOD", hodDate, "hdate", "From HOD")}
             {shows(view, "home", "assignerStreams") && otherStreamCards}

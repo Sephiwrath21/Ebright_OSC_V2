@@ -83,15 +83,12 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // dashboards live on HOME ONLY (relocated off /task-manager, same-day
   // follow-up); Task Manager = own tasks + the superadmin-style
   // Department|Branch dropdown overview (entityDropdowns) below them.
+  // No Daily/Monthly split for the CEO anywhere (2026-08-01 follow-up):
+  // their own tasks are ONE combined set (ceoCombinedList — a single
+  // "My Tasks" card on Home, the combined list on Task Manager).
   CEO: {
-    home: ["personalDaily", "personalMonthly", "ceoKanban"],
-    taskManager: [
-      "personalDaily",
-      "personalMonthly",
-      "ceoCombinedList",
-      "ceoTaskTable",
-      "entityDropdowns",
-    ],
+    home: ["ceoCombinedList", "ceoKanban"],
+    taskManager: ["ceoCombinedList", "ceoTaskTable", "entityDropdowns"],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
