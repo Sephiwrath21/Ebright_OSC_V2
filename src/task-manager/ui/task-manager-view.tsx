@@ -81,7 +81,6 @@ export function TaskManagerView({
   personalCeo,
   personalHod,
   personalAdhoc,
-  ceoDayWindow,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -161,10 +160,6 @@ export function TaskManagerView({
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     flatTasks?: FlowTaskRow[];
   };
-  /** CEO only (2026-08-01): the selected ?date= day's window (epoch ms) —
-   *  filters the combined My Tasks list by due date; undated tasks always
-   *  show. Omitted for every other role. */
-  ceoDayWindow?: { start: number; end: number };
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -352,49 +347,16 @@ export function TaskManagerView({
           branch overview blocks that used to sit here render at the BOTTOM
           of the page now — below My Tasks and My Board. */}
 
-      {current.kind === "org" && shows(view, "taskManager", "ceoCombinedList") && (
+      {current.kind === "org" && shows(view, "taskManager", "ceoTaskTable") && (
         <>
-          {/* "+ Task" renders in the PAGE HEADER (2026-07-29 consistency
-              requirement) — no in-body button here anymore. */}
+          {/* CEO's OWN tasks render through the standard myTasksDaily
+              block below (2026-08-01: the old un-windowed combined list
+              was replaced by the same weekday-sidebar Daily view every
+              role uses). */}
 
-          {/* ---- Section 1: My Tasks — tasks assigned TO the CEO by any of
-              the 5 assign-capable roles (Superadmin, Operation, Ops, HOD —
-              the CEO can't assign to themself). Unlike every other role,
-              this is ONE combined list, not separate Daily/Monthly/Ad hoc
-              cards — cadence is just a per-row tag here, not a way to split
-              the view. Ad hoc-tagged blocks never appear in daily/monthly
-              (fetchPeriodBlocks excludes them there), but an UNTAGGED block
-              due "today" is inside both the daily window and the current
-              month's, so daily.me.tasks and monthly.me.tasks can share a row
-              — flowDedupeTasks collapses that before render. Same
-              ResizableTaskList as every other "My Tasks" list — single-line
-              rows, fixed due date, status-dropdown circle, checkbox/select-
-              all/bulk actions, Show Completed toggle, assignee-only
-              completion. DATE FILTER (2026-08-01, user request): the shared
-              ?date= picker windows the combined list to the selected day
-              by DUE date — undated tasks always stay visible so nothing
-              becomes unreachable. */}
-          <SectionCard title="My Tasks" action={personalDailyControl}>
-            <ResizableTaskList
-              tasks={flowDedupeTasks([
-                ...daily.me.tasks,
-                ...monthly.me.tasks,
-                ...(me.adhocAll?.tasks ?? []),
-              ]).filter((t) => {
-                if (!ceoDayWindow || !t.dueAt) return true;
-                const ms = new Date(t.dueAt).getTime();
-                return ms >= ceoDayWindow.start && ms < ceoDayWindow.end;
-              })}
-              {...completeProps}
-              emptyLabel="No tasks assigned to you this day."
-              hideCompleted
-            />
-          </SectionCard>
-
-          {/* ---- Section 2: CEO Task Overview — grouped table, not a donut
-              (status groups, Task/PIC/Due date columns).
-              Tasks the CEO delegated OUT to others — the opposite direction
-              from Section 1 above. ---- */}
+          {/* ---- CEO Task Overview — grouped table, not a donut (status
+              groups, Task/PIC/Due date columns). Tasks the CEO delegated
+              OUT to others — the opposite direction from My Tasks. ---- */}
           {me.delegatedAll && <CeoTaskTable tasks={flowBucketize(me.delegatedAll.tasks)} />}
 
           {/* ---- Section 3: Department Daily Overview — Kanban (own

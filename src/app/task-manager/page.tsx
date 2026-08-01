@@ -990,14 +990,6 @@ export default async function TaskManagerPage({
         personalCeo={personalCeo}
         personalHod={personalHod}
         personalAdhoc={personalAdhoc}
-        ceoDayWindow={
-          viewRole === "CEO"
-            ? (() => {
-                const win = resolveWindow("daily", dailyDate ?? formatLocalDate(new Date()));
-                return { start: win.start.getTime(), end: win.end.getTime() };
-              })()
-            : undefined
-        }
       />
     );
 

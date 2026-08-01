@@ -76,8 +76,11 @@ export function getFlowDetail(
     // Monthly-only day-range clamp (the range dropdown) — guard here so a
     // stray mrange param can never affect the daily fetch.
     const monthDays = q.period === "monthly" ? opts?.monthDays : undefined;
+    // strictWindow for EVERYONE now (2026-08-01): the CEO's old exception
+    // fed the un-windowed combined list, which was replaced by the same
+    // day-windowed "My Tasks — Daily" view every other role uses.
     const me = await getMePayload(user, q.period, q.date, {
-      strictWindow: user.role !== "CEO",
+      strictWindow: true,
       monthDays,
     });
 

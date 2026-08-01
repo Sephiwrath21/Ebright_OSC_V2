@@ -146,10 +146,10 @@ describe("cross-page consistency invariants", () => {
 
   it("a My Tasks list implies its personal card (and vice versa for Daily)", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
-      // The CEO's own list is the single COMBINED list (mixed cadences),
-      // not the per-cadence "My Tasks — Daily" table — their personal
-      // Daily card pairs with that instead (2026-08-01 CEO redesign).
-      if (shows(v, "taskManager", "ceoCombinedList")) continue;
+      // CEO exception (2026-08-01 redesign): Home shows the ONE combined
+      // "My Tasks" card (ceoCombinedList) while Task Manager shows the
+      // standard Daily table WITHOUT a separate personal donut card.
+      if (shows(v, "home", "ceoCombinedList") || shows(v, "taskManager", "ceoCombinedList")) continue;
       expect(shows(v, "taskManager", "myTasksDaily")).toBe(shows(v, "taskManager", "personalDaily"));
       // Monthly list implies the Monthly card (not necessarily the reverse).
       if (shows(v, "taskManager", "myTasksMonthly")) {
@@ -168,8 +168,10 @@ describe("cross-page consistency invariants", () => {
     const withDailyTable = (Object.keys(ROLE_VIEWS) as ViewRole[])
       .filter((v) => shows(v, "taskManager", "myTasksDaily"))
       .sort();
+    // CEO joined 2026-08-01: their Task Manager "My Tasks" is the same
+    // weekday-sidebar Daily table now (the combined list is Home-only).
     expect(withDailyTable).toEqual(
-      ["BRANCH_MANAGER", "BRANCH_MEMBER", "COACH", "DEPT_MEMBER", "HOD", "OPS"].sort(),
+      ["BRANCH_MANAGER", "BRANCH_MEMBER", "CEO", "COACH", "DEPT_MEMBER", "HOD", "OPS"].sort(),
     );
   });
 });
