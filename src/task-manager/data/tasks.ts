@@ -188,6 +188,11 @@ export function assignFlowTask(
     if (targets.length === 0) {
       throw new ApiHttpError(400, "No staff match that selection");
     }
+    // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the form's
+    // recipient picker already restricts; this is the bypass-proof check.
+    if (actor.role === "CEO" && targets.some((t) => t.role !== "HOD")) {
+      throw new ApiHttpError(400, "The CEO can only assign tasks to HODs");
+    }
     const allowedCadences = allowedCadenceOptions(targets);
     if (!allowedCadences.includes(body.cadence)) {
       throw new ApiHttpError(

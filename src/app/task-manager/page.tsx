@@ -620,6 +620,9 @@ export default async function TaskManagerPage({
         <AddTaskButton
           staff={staff}
           action={assign}
+          // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the
+          // picker restricts, and assignFlowTask re-enforces server-side.
+          recipientGroup={role === "CEO" ? "HOD" : undefined}
           templates={{
             list: templateList,
             load: loadTemplate,
@@ -987,6 +990,14 @@ export default async function TaskManagerPage({
         personalCeo={personalCeo}
         personalHod={personalHod}
         personalAdhoc={personalAdhoc}
+        ceoDayWindow={
+          viewRole === "CEO"
+            ? (() => {
+                const win = resolveWindow("daily", dailyDate ?? formatLocalDate(new Date()));
+                return { start: win.start.getTime(), end: win.end.getTime() };
+              })()
+            : undefined
+        }
       />
     );
 

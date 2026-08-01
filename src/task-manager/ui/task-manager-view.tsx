@@ -81,6 +81,7 @@ export function TaskManagerView({
   personalCeo,
   personalHod,
   personalAdhoc,
+  ceoDayWindow,
 }: {
   daily: FlowDetailResponse;
   monthly: FlowDetailResponse;
@@ -160,6 +161,10 @@ export function TaskManagerView({
     tasks: Record<"completed" | "pending" | "na", FlowDrillTask[]>;
     flatTasks?: FlowTaskRow[];
   };
+  /** CEO only (2026-08-01): the selected ?date= day's window (epoch ms) —
+   *  filters the combined My Tasks list by due date; undated tasks always
+   *  show. Omitted for every other role. */
+  ceoDayWindow?: { start: number; end: number };
   /** Assignable staff directory — enables the department assign form (superadmin). */
   staff?: import("./types").FlowStaffMember[];
   /** Link to the Manpower Schedule page (branch manager only) — the host app
@@ -365,18 +370,23 @@ export function TaskManagerView({
               ResizableTaskList as every other "My Tasks" list — single-line
               rows, fixed due date, status-dropdown circle, checkbox/select-
               all/bulk actions, Show Completed toggle, assignee-only
-              completion. No date filter here either — the CEO's me-payload
-              deliberately stays un-windowed (see getFlowDetail), since this
-              single list mixes cadences and shows everything at once. */}
-          <SectionCard title="My Tasks">
+              completion. DATE FILTER (2026-08-01, user request): the shared
+              ?date= picker windows the combined list to the selected day
+              by DUE date — undated tasks always stay visible so nothing
+              becomes unreachable. */}
+          <SectionCard title="My Tasks" action={personalDailyControl}>
             <ResizableTaskList
               tasks={flowDedupeTasks([
                 ...daily.me.tasks,
                 ...monthly.me.tasks,
                 ...(me.adhocAll?.tasks ?? []),
-              ])}
+              ]).filter((t) => {
+                if (!ceoDayWindow || !t.dueAt) return true;
+                const ms = new Date(t.dueAt).getTime();
+                return ms >= ceoDayWindow.start && ms < ceoDayWindow.end;
+              })}
               {...completeProps}
-              emptyLabel="No tasks assigned to you."
+              emptyLabel="No tasks assigned to you this day."
               hideCompleted
             />
           </SectionCard>

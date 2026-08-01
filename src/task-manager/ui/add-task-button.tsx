@@ -14,6 +14,7 @@ import * as React from "react";
 import type {
   AssignActionResult,
   FlowAssignInput,
+  FlowGroup,
   FlowStaffMember,
   FlowTemplateControl,
 } from "./types";
@@ -42,12 +43,17 @@ export function AddTaskButton({
   staff,
   action,
   templates,
+  recipientGroup,
 }: {
   staff: FlowStaffMember[];
   action: (input: FlowAssignInput) => Promise<AssignActionResult>;
   /** Task Templates (2026-07-31) — saved list + load/rename/delete
    *  actions, passed straight through to the form. */
   templates?: FlowTemplateControl;
+  /** Restrict the recipient picker to one group (2026-08-01: the CEO
+   *  assigns to HODs only) — passed straight through to AssignTaskForm;
+   *  the server re-enforces regardless. */
+  recipientGroup?: FlowGroup;
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<HubTab>("assign");
@@ -110,7 +116,13 @@ export function AddTaskButton({
               )}
             </div>
             {(!showTabs || tab === "assign") && (
-              <AssignTaskForm staff={staff} action={action} templates={templates} bare />
+              <AssignTaskForm
+                staff={staff}
+                action={action}
+                templates={templates}
+                recipientGroup={recipientGroup}
+                bare
+              />
             )}
             {showTabs && templates && tab !== "assign" && (
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
