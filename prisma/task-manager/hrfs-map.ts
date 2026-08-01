@@ -493,6 +493,15 @@ export const EXTRA_USERS: MappedUser[] = [
   // created directly (role hod/staff/Branch Manager, temp password).
   // Remove this block (and the hrfs rows) when role testing is done.
   {
+    email: "test-ceo@ebright.my",
+    name: "TEST CEO",
+    role: "CEO",
+    department: null,
+    branch: null,
+    employmentType: "CEO",
+    coachSchedule: null,
+  },
+  {
     email: "test-hod-optimisation@ebright.my",
     name: "TEST HOD Optimisation",
     role: "HOD",
