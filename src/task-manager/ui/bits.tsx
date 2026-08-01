@@ -1104,6 +1104,13 @@ export function TaskRowLine({
           }`}
         />
       )}
+      {/* No checkbox (read-only viewer, e.g. the member detail drill)?
+          Reserve its slot anyway (2026-08-01) — the header always reserves
+          it, so skipping it here shifted every column ~28px left and made
+          the Task resize divider look broken/crooked. */}
+      {hideCompleted && !(isOwned && onToggleSelect) && (
+        <span className="w-4 shrink-0" aria-hidden />
+      )}
       {/* Tree slot (see the `tree` prop): chevron on parents, matching
           spacer on subtask-less rows, spacer + indent on subtask rows.
           (No aria-expanded on the chevron — the row's
