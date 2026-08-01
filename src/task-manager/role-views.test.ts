@@ -146,6 +146,10 @@ describe("cross-page consistency invariants", () => {
 
   it("a My Tasks list implies its personal card (and vice versa for Daily)", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
+      // The CEO's own list is the single COMBINED list (mixed cadences),
+      // not the per-cadence "My Tasks — Daily" table — their personal
+      // Daily card pairs with that instead (2026-08-01 CEO redesign).
+      if (shows(v, "taskManager", "ceoCombinedList")) continue;
       expect(shows(v, "taskManager", "myTasksDaily")).toBe(shows(v, "taskManager", "personalDaily"));
       // Monthly list implies the Monthly card (not necessarily the reverse).
       if (shows(v, "taskManager", "myTasksMonthly")) {

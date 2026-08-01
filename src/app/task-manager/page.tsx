@@ -66,6 +66,7 @@ import {
 } from "@/task-manager/role-views";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
+import { PageSectionHeading } from "@/task-manager/ui/bits";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
 import {
   DailyDatePicker,
@@ -637,15 +638,13 @@ export default async function TaskManagerPage({
       );
     }
 
-    if (shows(viewRole, "taskManager", "entityDropdowns")) {
-      // Superadmin + elevated department sites (Operations/Optimisation):
-      // dropdown-driven entity overview with the Department | Branch toggle
-      // — elevated sites are superadmin-equivalent since the 2026-07-29
-      // final role spec. "+ Task" already sits in the page header via the
-      // config above.
-      const view: "department" | "branch" =
-        sp.view === "branch" ? "branch" : "department";
-
+    // Dropdown-driven entity overview (Department | Branch toggle) —
+    // superadmin/elevated sites' WHOLE page, and since 2026-08-01 also
+    // appended BELOW the CEO's own sections (config: entityDropdowns).
+    // Extracted into a builder so both render paths share one definition.
+    const entityView: "department" | "branch" = sp.view === "branch" ? "branch" : "department";
+    async function buildEntityOverview(): Promise<ReactNode> {
+      const view = entityView;
       let overview: ReactNode;
       if (view === "department") {
         // Default to the ACCOUNT'S OWN department when it has one — the
@@ -740,11 +739,18 @@ export default async function TaskManagerPage({
           </>
         );
       }
+      return overview;
+    }
 
+    if (shows(viewRole, "taskManager", "entityDropdowns") && viewRole !== "CEO") {
+      // Superadmin + elevated department sites (Operations/Optimisation):
+      // the dropdown overview IS the whole page. The CEO (also configured
+      // with entityDropdowns) instead gets it appended below their own
+      // sections — see the CEO block after the TaskManagerView body.
       body = (
         <div className="flex flex-col gap-6">
-          <ModeTabs active={view} date={dailyDate} />
-          {overview}
+          <ModeTabs active={entityView} date={dailyDate} />
+          {await buildEntityOverview()}
         </div>
       );
 
@@ -981,6 +987,23 @@ export default async function TaskManagerPage({
         personalAdhoc={personalAdhoc}
       />
     );
+
+    // CEO (2026-08-01): the superadmin-style Department | Branch dropdown
+    // overview appended BELOW their own sections — same builder, same
+    // components, full cross-department/branch visibility (canViewOrg
+    // already authorizes CEO in the data layer). Only the CEO reaches
+    // here with entityDropdowns configured — ADMIN/elevated early-return
+    // above.
+    if (shows(viewRole, "taskManager", "entityDropdowns")) {
+      body = (
+        <div className="flex flex-col gap-6">
+          {body}
+          <PageSectionHeading>Department / Branch Overview</PageSectionHeading>
+          <ModeTabs active={entityView} date={dailyDate} />
+          {await buildEntityOverview()}
+        </div>
+      );
+    }
   } catch (err) {
     if (err instanceof SetupPendingError) {
       body = <SetupPendingCard />;

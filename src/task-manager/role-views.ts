@@ -76,9 +76,22 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
+  // CEO redesign (2026-08-01, user spec): Home = OWN tasks first (the same
+  // personal donut pair every staff role uses), then the DRAGGABLE pinned-
+  // department dashboards (ceoKanban — add/reorder/remove, persisted
+  // per-CEO in CeoDashboardConfig) replacing the fixed org grids. Task
+  // Manager additionally gets the superadmin-style Department|Branch
+  // dropdown overview (entityDropdowns) BELOW the CEO's own sections.
   CEO: {
-    home: ["orgGrids"],
-    taskManager: ["ceoCombinedList", "ceoTaskTable", "ceoKanban"],
+    home: ["personalDaily", "personalMonthly", "ceoKanban"],
+    taskManager: [
+      "personalDaily",
+      "personalMonthly",
+      "ceoCombinedList",
+      "ceoTaskTable",
+      "ceoKanban",
+      "entityDropdowns",
+    ],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
