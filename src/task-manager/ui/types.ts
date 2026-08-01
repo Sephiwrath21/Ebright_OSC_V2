@@ -680,22 +680,22 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Due-date label: a "D/M" date followed by a relative qualifier — "25/7
- *  5 days ago" / "29/7 Yesterday" (red, overdue), "30/7 Today" (amber), a
- *  short weekday for the next 6 days ("2/8 Sun", neutral gray), or the bare
- *  "15/8" date beyond a week (also neutral gray). Calendar-day difference,
- *  not a raw ms delta — a dueAt of 17:00 today still reads as "Today"
- *  regardless of the current time of day. Returns null for no due date —
- *  callers keep rendering their own "—". */
+/** Due-date label (2026-08-01 status rules): a "D/M" date followed by a
+ *  status qualifier — "1/8 Overdue" (red) for TODAY and anything earlier,
+ *  "2/8 Due Soon" (amber) for TOMORROW, a short weekday for 2–6 days out
+ *  ("3/8 Mon", neutral gray, no status label), or the bare "15/8" date
+ *  beyond a week (also neutral gray). Calendar-day difference, not a raw
+ *  ms delta — a dueAt of 17:00 today still counts as today regardless of
+ *  the current time. Returns null for no due date — callers keep
+ *  rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays < -1) return { text: `${dm} ${-diffDays} days ago`, className: "text-red-500 font-medium" };
-  if (diffDays === -1) return { text: `${dm} Yesterday`, className: "text-red-500 font-medium" };
-  if (diffDays === 0) return { text: `${dm} Today`, className: "text-amber-600 font-medium" };
+  if (diffDays <= 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
+  if (diffDays === 1) return { text: `${dm} Due Soon`, className: "text-amber-600 font-medium" };
   if (diffDays <= 6)
     return {
       text: `${dm} ${due.toLocaleDateString(undefined, { weekday: "short" })}`,
