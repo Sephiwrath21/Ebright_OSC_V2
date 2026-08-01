@@ -54,10 +54,10 @@ export type SectionKey =
   | "ceoTaskTable"
   | "ceoKanban";
 
-/** Daily weekday sidebar range — three distinct ranges per the 2026-07-29
- *  final spec: department-side Tue–Sat; Branch Manager + Branch Exec
- *  Tue–Sun; Coaches Wed–Sun. */
-export type WeekdayRange = "tue-sat" | "tue-sun" | "wed-sun";
+/** Daily weekday sidebar range — per the 2026-07-29 final spec (+ CEO,
+ *  2026-08-01): department-side Tue–Sat; Branch Manager + Branch Exec
+ *  Tue–Sun; Coaches Wed–Sun; CEO the full Mon–Sun week. */
+export type WeekdayRange = "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun";
 
 export interface RoleViewConfig {
   /** Sections on the HOME page overview, in render order. */
@@ -90,7 +90,7 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   CEO: {
     home: ["ceoCombinedList", "ceoKanban"],
     taskManager: ["myTasksDaily", "ceoTaskTable", "entityDropdowns"],
-    weekdayRange: "tue-sat",
+    weekdayRange: "mon-sun",
     addTaskHeader: true,
   },
   OPS: {
