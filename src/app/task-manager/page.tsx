@@ -603,10 +603,12 @@ export default async function TaskManagerPage({
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization).
     const viewRole = resolveViewRole(daily.me.me);
-    // "Assign to Others" — same 5 identities as the assign form; the data
-    // layer re-checks (incl. HOD's own-department scoping) on every call.
-    const canReassign =
-      role === "ADMIN" || role === "CEO" || role === "OPS" || role === "HOD" || elevatedDeptSite;
+    // "Assign to Others" — same identities as the assign form MINUS the CEO
+    // (2026-08-01: the CEO is view-only on the org-wide/department/branch
+    // drill-downs — reassigning other people's existing tasks isn't part of
+    // that role here, only creating new ones via "+ Task"). The data layer
+    // re-checks (incl. HOD's own-department scoping) on every call.
+    const canReassign = role === "ADMIN" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable

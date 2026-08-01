@@ -84,16 +84,18 @@ export function reassignFlowTask(
 ): Promise<void> {
   return native(async () => {
     const actor = await requireUserByEmail(actorEmail);
+    // The CEO is excluded here (2026-08-01) — view-only on the org-wide/
+    // department/branch drill-downs, bypass-proof alongside the UI gate in
+    // app/task-manager/page.tsx's canReassign.
     const allowed =
       actor.role === "ADMIN" ||
       actor.role === "OPS" ||
-      actor.role === "CEO" ||
       actor.role === "HOD" ||
       isElevatedDeptSite(actor);
     if (!allowed) {
       throw new ApiHttpError(
         403,
-        "Only superadmin, operations, HOD, the CEO, or the Operation/Optimisation department accounts can reassign tasks",
+        "Only superadmin, operations, HOD, or the Operation/Optimisation department accounts can reassign tasks",
       );
     }
 
