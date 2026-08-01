@@ -44,6 +44,7 @@ export function AssignTaskForm({
   staff,
   action,
   recipientGroup,
+  quickSelfId,
   templates,
   bare = false,
 }: {
@@ -56,6 +57,9 @@ export function AssignTaskForm({
    *  CEO's "+ Add Task" form) — passed straight through to RecipientPicker.
    *  Omit for the normal, fully flexible Person + any-Group picker. */
   recipientGroup?: FlowGroup;
+  /** CEO quick-pick (2026-08-01): the caller's own user id — passed straight
+   *  through to RecipientPicker's "Myself" chip. Omit outside the CEO form. */
+  quickSelfId?: string;
   /** Task Templates (2026-07-31): saved list + load/rename/delete actions
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
@@ -358,6 +362,7 @@ export function AssignTaskForm({
           selected={userIds}
           onChange={setUserIds}
           restrictToGroup={recipientGroup}
+          quickSelfId={quickSelfId}
         />
 
         <div className="text-sm text-gray-600">

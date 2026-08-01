@@ -622,7 +622,10 @@ export default async function TaskManagerPage({
           action={assign}
           // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the
           // picker restricts, and assignFlowTask re-enforces server-side.
+          // quickSelfId adds the CEO's own "Myself" chip, since the CEO
+          // isn't a HOD and would otherwise never appear in this list.
           recipientGroup={role === "CEO" ? "HOD" : undefined}
+          quickSelfId={role === "CEO" ? daily.me.me.userId : undefined}
           templates={{
             list: templateList,
             load: loadTemplate,

@@ -44,6 +44,7 @@ export function AddTaskButton({
   action,
   templates,
   recipientGroup,
+  quickSelfId,
 }: {
   staff: FlowStaffMember[];
   action: (input: FlowAssignInput) => Promise<AssignActionResult>;
@@ -54,6 +55,9 @@ export function AddTaskButton({
    *  assigns to HODs only) — passed straight through to AssignTaskForm;
    *  the server re-enforces regardless. */
   recipientGroup?: FlowGroup;
+  /** CEO quick-pick (2026-08-01): the caller's own user id — passed
+   *  straight through to AssignTaskForm's "Myself" chip. */
+  quickSelfId?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<HubTab>("assign");
@@ -121,6 +125,7 @@ export function AddTaskButton({
                 action={action}
                 templates={templates}
                 recipientGroup={recipientGroup}
+                quickSelfId={quickSelfId}
                 bare
               />
             )}

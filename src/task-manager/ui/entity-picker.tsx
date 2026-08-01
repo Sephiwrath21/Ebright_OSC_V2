@@ -133,7 +133,7 @@ export function WeekdaySidebar({
    *  YYYY-MM-DD — getMySidebarCounts().weekdays. Zero/absent = no badge. */
   counts?: Record<string, number>;
   /** Which days to list — from role-views.ts weekdayRangeOf(). */
-  range?: "tue-sat" | "tue-sun" | "wed-sun";
+  range?: "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun";
 }) {
   const router = useRouter();
   // Optimistic selection: highlight instantly on click; cleared when the
