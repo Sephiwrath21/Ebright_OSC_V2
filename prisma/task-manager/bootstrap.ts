@@ -68,10 +68,11 @@ async function fetchHrfsRows(): Promise<HrfsUserRow[]> {
     connectionTimeoutMillis: 10_000,
   });
   try {
-    const result = await pool.query<{ email: string; name: string | null; role: string; branchName: string | null; status: string }>(
-      `select email, name, role, "branchName", status from "User" where status = 'ACTIVE'`,
+    const result = await pool.query<{ id: number; email: string; name: string | null; role: string; branchName: string | null; status: string }>(
+      `select id, email, name, role, "branchName", status from "User" where status = 'ACTIVE'`,
     );
     return result.rows.map((r) => ({
+      id: r.id,
       email: r.email,
       name: r.name,
       role: r.role,
@@ -300,6 +301,10 @@ async function upsertUsers(users: MappedUser[]): Promise<{ created: number; upda
       branch: user.branch,
       employmentType: user.employmentType,
       coachSchedule: user.coachSchedule,
+      // Direct HRFS link (2026-07-31): written when this run's source row
+      // supplied it; NEVER cleared when absent (portal-source updates and
+      // manually-resolved mismatches must not be clobbered back to null).
+      ...(user.hrfsUserId != null ? { hrfsUserId: user.hrfsUserId } : {}),
     };
     const existing = await prisma.user.findUnique({ where: { email: user.email } });
     if (existing) {

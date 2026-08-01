@@ -84,16 +84,18 @@ export function reassignFlowTask(
 ): Promise<void> {
   return native(async () => {
     const actor = await requireUserByEmail(actorEmail);
+    // The CEO is excluded here (2026-08-01) — view-only on the org-wide/
+    // department/branch drill-downs, bypass-proof alongside the UI gate in
+    // app/task-manager/page.tsx's canReassign.
     const allowed =
       actor.role === "ADMIN" ||
       actor.role === "OPS" ||
-      actor.role === "CEO" ||
       actor.role === "HOD" ||
       isElevatedDeptSite(actor);
     if (!allowed) {
       throw new ApiHttpError(
         403,
-        "Only superadmin, operations, HOD, the CEO, or the Operation/Optimisation department accounts can reassign tasks",
+        "Only superadmin, operations, HOD, or the Operation/Optimisation department accounts can reassign tasks",
       );
     }
 
@@ -187,6 +189,15 @@ export function assignFlowTask(
     });
     if (targets.length === 0) {
       throw new ApiHttpError(400, "No staff match that selection");
+    }
+    // The CEO assigns to HODs ONLY, plus themselves via the "Myself" quick
+    // pick (2026-08-01) — the form's recipient picker already restricts;
+    // this is the bypass-proof check.
+    if (
+      actor.role === "CEO" &&
+      targets.some((t) => t.role !== "HOD" && t.id !== actor.id)
+    ) {
+      throw new ApiHttpError(400, "The CEO can only assign tasks to HODs or themselves");
     }
     const allowedCadences = allowedCadenceOptions(targets);
     if (!allowedCadences.includes(body.cadence)) {
@@ -328,9 +339,9 @@ export function assignFlowTask(
         // same assignee/due/cadence, linked via parentId. Its own run keeps
         // every existing path (complete/N-A/reopen, run auto-completion,
         // proof, audit) working identically to a normal task; only the UI
-        // groups them. SEQUENTIAL inside one pair so the cuid creation
-        // order (= display order in the tree) matches the form's order.
-        for (const subtaskTitle of body.subtasks) {
+        // groups them. subtaskOrder (2026-07-31) records the checklist-
+        // builder sequence explicitly.
+        for (const [subtaskIndex, subtaskTitle] of body.subtasks.entries()) {
           const subRun = await prisma.flowRun.create({
             data: {
               flowId: flow.id,
@@ -355,6 +366,7 @@ export function assignFlowTask(
               cadence,
               parentId: parentBlock.id,
               templateId,
+              subtaskOrder: subtaskIndex,
               runItems: {
                 create: block.items.map((it) => ({
                   itemId: it.id,
@@ -511,11 +523,11 @@ export function reopenFlowTask(
 /** The My Tasks "Proof" column (2026-07-30): assignee-only upload of ONE
  *  completion-evidence image per task. Always optional — never gates the
  *  status-dot completion path above. Re-uploading replaces the previous
- *  image (upsert on runBlockId). Same mimes as the Guideline image, but
- *  its own 10 MB cap (raised from 2 MB, 2026-07-31 — phone photos easily
- *  exceed 2 MB; Guideline stays at 2 MB). Well inside the 55 MB server-
- *  action body limit (next.config bodySizeLimit). */
-const PROOF_IMAGE_MAX_BASE64 = 10 * 1024 * 1024 * 1.37;
+ *  image (upsert on runBlockId). 2 MB cap (2026-08-01 storage decision:
+ *  images are compressed CLIENT-side to ≤1280px JPEG before upload — see
+ *  ui/image-compress.ts — so this server cap is the bypass-proof
+ *  enforcement of the same limit, not the primary size control). */
+const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
   dataBase64: z.string().min(1).max(PROOF_IMAGE_MAX_BASE64),

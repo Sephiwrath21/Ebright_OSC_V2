@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 // OSC integration package — shared presentational primitives. Pure SVG +
 // standard Tailwind utility classes, no chart library, so the folder drops
@@ -17,6 +17,7 @@ import type {
   ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate } from "./types";
+import { compressImageFile, IMAGE_JPEG_QUALITY, IMAGE_MAX_DIMENSION } from "./image-compress";
 import { personSolidColor } from "./palette";
 import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
 
@@ -53,10 +54,19 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
 
 /** Page-level divider between major page areas (e.g. the read-only Overview
  *  grids vs. the action-oriented Details/assign area). */
-export function PageSectionHeading({ children }: { children: React.ReactNode }) {
+export function PageSectionHeading({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  /** Right-aligned control (e.g. a date filter) — optional, most headings
+   *  have none. */
+  action?: React.ReactNode;
+}) {
   return (
-    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
-      {children}
+    <h2 className="mt-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+      <span>{children}</span>
+      {action}
     </h2>
   );
 }
@@ -527,11 +537,9 @@ function GuidelineIndicator({
   );
 }
 
-/** Client-side mirror of uploadFlowTaskProof's validation — same mimes and
- *  10 MB cap (raised from 2 MB, 2026-07-31), so a bad pick fails instantly
- *  instead of round-tripping. */
-const PROOF_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
-const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+// Proof images are COMPRESSED client-side before staging (2026-08-01
+// storage decision — see image-compress.ts: 1280px max, JPEG 75%, 2 MB
+// post-compression cap mirrored by the server).
 
 /** The "Proof" column cell (2026-07-30): assignee-uploaded completion
  *  evidence, always optional (never gates the status dropdown). Owner of a
@@ -585,29 +593,22 @@ function ProofCell({
     name: string;
   } | null>(null);
 
-  const stageFile = (file: File) => {
+  const stageFile = async (file: File) => {
     if (!onUploadProof) return;
     setErrorText(null);
-    if (!PROOF_IMAGE_MIMES.includes(file.type)) {
-      setErrorText("PNG, JPEG or WebP images only");
+    // Compress BEFORE staging — the full-res original never leaves the
+    // browser; what the user previews is exactly what gets stored.
+    const result = await compressImageFile(file);
+    if (!result.ok) {
+      setErrorText(result.message);
       return;
     }
-    if (file.size > PROOF_IMAGE_MAX_BYTES) {
-      setErrorText("Image is too large — max 10 MB");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      setPendingImage({
-        mime: file.type,
-        dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
-        previewUrl: dataUrl,
-        name: file.name || "captured image",
-      });
-    };
-    reader.onerror = () => setErrorText("Could not read that file — please try again");
-    reader.readAsDataURL(file);
+    setPendingImage({
+      mime: result.image.mime,
+      dataBase64: result.image.dataBase64,
+      previewUrl: result.image.previewUrl,
+      name: file.name || "captured image",
+    });
   };
 
   /** The ONLY place the proof actually uploads — the modal's Upload
@@ -637,7 +638,7 @@ function ProofCell({
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) stageFile(file);
+    if (file) void stageFile(file);
   };
 
   // Closing the popover (✕ / outside / Escape) discards any un-submitted
@@ -702,21 +703,22 @@ function ProofCell({
   const capturePhoto = () => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) return;
+    // Captured DIRECTLY at the compressed profile (2026-08-01): scaled to
+    // the shared max dimension and encoded once at the shared JPEG
+    // quality — no full-res intermediate, no double re-encode.
+    const scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        stopCamera();
-        // Same path as every other method — stages the frame for review;
-        // the user still confirms with the Upload button.
-        stageFile(new File([blob], "camera-photo.jpg", { type: "image/jpeg" }));
-      },
-      "image/jpeg",
-      0.9,
-    );
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stopCamera();
+    const previewUrl = canvas.toDataURL("image/jpeg", IMAGE_JPEG_QUALITY);
+    setPendingImage({
+      mime: "image/jpeg",
+      dataBase64: previewUrl.slice(previewUrl.indexOf(",") + 1),
+      previewUrl,
+      name: "camera-photo.jpg",
+    });
   };
 
   // Wire the stream to the <video> once it's mounted; stop the webcam
@@ -748,7 +750,7 @@ function ProofCell({
       const file = item?.getAsFile();
       if (file) {
         e.preventDefault();
-        stageFile(file);
+        void stageFile(file);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -916,7 +918,7 @@ function ProofCell({
                     e.preventDefault();
                     setDragOver(false);
                     const file = e.dataTransfer.files?.[0];
-                    if (file) stageFile(file);
+                    if (file) void stageFile(file);
                   }}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
                     dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
@@ -951,7 +953,9 @@ function ProofCell({
             {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
-            <p className="mt-2 text-[11px] text-gray-400">PNG / JPEG / WebP · max 10 MB</p>
+            <p className="mt-2 text-[11px] text-gray-400">
+              PNG / JPEG / WebP · photos are auto-compressed (max 1280px)
+            </p>
           </div>
         </div>,
         document.body,
@@ -1108,6 +1112,13 @@ export function TaskRowLine({
               : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           }`}
         />
+      )}
+      {/* No checkbox (read-only viewer, e.g. the member detail drill)?
+          Reserve its slot anyway (2026-08-01) — the header always reserves
+          it, so skipping it here shifted every column ~28px left and made
+          the Task resize divider look broken/crooked. */}
+      {hideCompleted && !(isOwned && onToggleSelect) && (
+        <span className="w-4 shrink-0" aria-hidden />
       )}
       {/* Tree slot (see the `tree` prop): chevron on parents, matching
           spacer on subtask-less rows, spacer + indent on subtask rows.
@@ -1526,9 +1537,15 @@ export function ResizableTaskList({
         else childrenOf.set(t.parentId, [t]);
       }
     }
-    // cuid ids sort in creation order = the order typed into the form.
+    // Explicit checklist-builder order (subtaskOrder, 2026-07-31) first;
+    // pre-column rows (null) fall back to cuid creation order.
     for (const kids of childrenOf.values()) {
-      kids.sort((a, b) => (a.runBlockId < b.runBlockId ? -1 : 1));
+      kids.sort((a, b) => {
+        const ao = a.subtaskOrder ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.subtaskOrder ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        return a.runBlockId < b.runBlockId ? -1 : 1;
+      });
     }
   }
   const topLevelTasks = hideCompleted

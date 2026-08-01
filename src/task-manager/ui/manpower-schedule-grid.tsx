@@ -27,12 +27,14 @@ function rowKey(cell: { startTime: string; endTime: string }): string {
 // guidance (Next.js masks thrown server-action error messages in production).
 export interface ManpowerScheduleActions {
   createSchedule: () => Promise<ActionResult>;
-  addRow: (startTime: string, endTime: string) => Promise<ActionResult>;
+  addRow: (startTime: string, endTime: string, label?: string) => Promise<ActionResult>;
   renameRow: (
     oldStartTime: string,
     oldEndTime: string,
     newStartTime: string,
     newEndTime: string,
+    /** New row label; "" clears (auto-format takes over). */
+    newLabel?: string,
   ) => Promise<ActionResult>;
   deleteRow: (startTime: string, endTime: string) => Promise<ActionResult>;
   addColumn: (kind: "Coach" | "Exec") => Promise<ActionResult>;
@@ -103,10 +105,15 @@ function StaticCell({ cell }: { cell: FlowScheduleCell }) {
   );
 }
 
-function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => Promise<ActionResult> }) {
+function AddRowForm({
+  onAdd,
+}: {
+  onAdd: (startTime: string, endTime: string, label?: string) => Promise<ActionResult>;
+}) {
   const [open, setOpen] = React.useState(false);
   const [start, setStart] = React.useState("");
   const [end, setEnd] = React.useState("");
+  const [label, setLabel] = React.useState("");
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
@@ -137,6 +144,13 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
         onChange={(e) => setEnd(e.target.value)}
         className="rounded-full border border-gray-300 px-3 py-1 text-xs"
       />
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="Label (e.g. Opening) — optional"
+        maxLength={60}
+        className="w-52 rounded-full border border-gray-300 px-3 py-1 text-xs placeholder:text-gray-400"
+      />
       <button
         type="button"
         disabled={pending}
@@ -146,11 +160,12 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
               setError("Pick a valid start/end time.");
               return;
             }
-            const result = await onAdd(start, end);
+            const result = await onAdd(start, end, label.trim() || undefined);
             if (result.ok) {
               setOpen(false);
               setStart("");
               setEnd("");
+              setLabel("");
             } else {
               setError(result.message);
             }
@@ -177,13 +192,14 @@ function RowTimeLabel({
   onRename,
   onDelete,
 }: {
-  row: { startTime: string; endTime: string };
-  onRename: (newStart: string, newEnd: string) => Promise<ActionResult>;
+  row: { startTime: string; endTime: string; rowLabel: string | null };
+  onRename: (newStart: string, newEnd: string, newLabel: string) => Promise<ActionResult>;
   onDelete: () => Promise<ActionResult>;
 }) {
   const [editing, setEditing] = React.useState(false);
   const [start, setStart] = React.useState(row.startTime);
   const [end, setEnd] = React.useState(row.endTime);
+  const [label, setLabel] = React.useState(row.rowLabel ?? "");
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
@@ -198,13 +214,22 @@ function RowTimeLabel({
   if (!editing) {
     return (
       <div>
-        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-700">
+        {/* Row label (2026-08-01, ClickUp-style slot naming) shown above
+            the time range — this is the exact title the synced task gets. */}
+        {row.rowLabel && (
+          <p className="whitespace-nowrap text-sm font-semibold text-gray-800">{row.rowLabel}</p>
+        )}
+        <div
+          className={`flex items-center gap-1.5 whitespace-nowrap ${
+            row.rowLabel ? "text-xs text-gray-500" : "text-sm font-medium text-gray-700"
+          }`}
+        >
           {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
           <button
             type="button"
             onClick={() => setEditing(true)}
             className="text-xs text-gray-400 hover:text-blue-600"
-            title="Edit time"
+            title="Edit time / label"
           >
             ✎
           </button>
@@ -225,6 +250,13 @@ function RowTimeLabel({
 
   return (
     <div className="flex flex-col gap-1">
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="Label (e.g. Opening) — optional"
+        maxLength={60}
+        className="w-full rounded-full border border-gray-300 px-2 py-0.5 text-xs placeholder:text-gray-400"
+      />
       <div className="flex items-center gap-1">
         <input
           type="time"
@@ -249,7 +281,7 @@ function RowTimeLabel({
                 setError("Invalid time range.");
                 return;
               }
-              const result = await onRename(start, end);
+              const result = await onRename(start, end, label.trim());
               if (result.ok) {
                 setEditing(false);
               } else {
@@ -316,7 +348,7 @@ export function ManpowerScheduleGrid({
     );
   }
 
-  const rows: { startTime: string; endTime: string }[] = [];
+  const rows: { startTime: string; endTime: string; rowLabel: string | null }[] = [];
   const seenRows = new Set<string>();
   const columns: string[] = [];
   const seenColumns = new Set<string>();
@@ -324,7 +356,7 @@ export function ManpowerScheduleGrid({
     const rk = rowKey(cell);
     if (!seenRows.has(rk)) {
       seenRows.add(rk);
-      rows.push({ startTime: cell.startTime, endTime: cell.endTime });
+      rows.push({ startTime: cell.startTime, endTime: cell.endTime, rowLabel: cell.rowLabel });
     }
     if (!seenColumns.has(cell.roleColumn)) {
       seenColumns.add(cell.roleColumn);
@@ -406,13 +438,24 @@ export function ManpowerScheduleGrid({
                   {canEdit ? (
                     <RowTimeLabel
                       row={row}
-                      onRename={(s, e) => actions.renameRow(row.startTime, row.endTime, s, e)}
+                      onRename={(s, e, l) => actions.renameRow(row.startTime, row.endTime, s, e, l)}
                       onDelete={() => actions.deleteRow(row.startTime, row.endTime)}
                     />
                   ) : (
-                    <span className="whitespace-nowrap text-sm font-medium text-gray-700">
-                      {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
-                    </span>
+                    <div>
+                      {row.rowLabel && (
+                        <p className="whitespace-nowrap text-sm font-semibold text-gray-800">
+                          {row.rowLabel}
+                        </p>
+                      )}
+                      <span
+                        className={`whitespace-nowrap ${
+                          row.rowLabel ? "text-xs text-gray-500" : "text-sm font-medium text-gray-700"
+                        }`}
+                      >
+                        {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
+                      </span>
+                    </div>
                   )}
                 </td>
                 {columns.map((col) => {

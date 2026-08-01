@@ -52,12 +52,13 @@ export type SectionKey =
   // CEO-specific sections
   | "ceoCombinedList"
   | "ceoTaskTable"
-  | "ceoKanban";
+  | "ceoKanban"
+  | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc
 
-/** Daily weekday sidebar range — three distinct ranges per the 2026-07-29
- *  final spec: department-side Tue–Sat; Branch Manager + Branch Exec
- *  Tue–Sun; Coaches Wed–Sun. */
-export type WeekdayRange = "tue-sat" | "tue-sun" | "wed-sun";
+/** Daily weekday sidebar range — per the 2026-07-29 final spec (+ CEO,
+ *  2026-08-01): department-side Tue–Sat; Branch Manager + Branch Exec
+ *  Tue–Sun; Coaches Wed–Sun; CEO the full Mon–Sun week. */
+export type WeekdayRange = "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun";
 
 export interface RoleViewConfig {
   /** Sections on the HOME page overview, in render order. */
@@ -76,10 +77,26 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
+  // CEO redesign (2026-08-01, user spec): Home = OWN tasks first (the same
+  // personal donut pair every staff role uses), then the DRAGGABLE pinned-
+  // department dashboards (ceoKanban — add/reorder/remove, persisted
+  // per-CEO in CeoDashboardConfig) replacing the fixed org grids. The
+  // dashboards live on HOME ONLY (relocated off /task-manager, same-day
+  // follow-up); Task Manager = own tasks + the superadmin-style
+  // Department|Branch dropdown overview (entityDropdowns) below them.
+  // CEO (2026-08-01, latest): Task Manager "My Tasks" = the SAME weekday-
+  // sidebar Daily table view every other role uses (myTasksDaily — the
+  // old un-windowed combined list is gone); Home keeps the ONE combined
+  // "My Tasks" card (ceoCombinedList) with its date filter.
+  // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
+  // Monthly/Ad hoc, the same RegionDonutGrids sections ADMIN/OPS see via
+  // orgGrids — appended below the draggable department dashboards. Home
+  // only; the CEO's Task Manager page keeps entityDropdowns for branch
+  // drill-down instead.
   CEO: {
-    home: ["orgGrids"],
-    taskManager: ["ceoCombinedList", "ceoTaskTable", "ceoKanban"],
-    weekdayRange: "tue-sat",
+    home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
+    taskManager: ["myTasksDaily", "ceoTaskTable", "entityDropdowns"],
+    weekdayRange: "mon-sun",
     addTaskHeader: true,
   },
   OPS: {

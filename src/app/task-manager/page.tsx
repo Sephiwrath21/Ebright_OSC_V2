@@ -66,6 +66,7 @@ import {
 } from "@/task-manager/role-views";
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
+import { PageSectionHeading } from "@/task-manager/ui/bits";
 import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
 import {
   DailyDatePicker,
@@ -602,10 +603,12 @@ export default async function TaskManagerPage({
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization).
     const viewRole = resolveViewRole(daily.me.me);
-    // "Assign to Others" — same 5 identities as the assign form; the data
-    // layer re-checks (incl. HOD's own-department scoping) on every call.
-    const canReassign =
-      role === "ADMIN" || role === "CEO" || role === "OPS" || role === "HOD" || elevatedDeptSite;
+    // "Assign to Others" — same identities as the assign form MINUS the CEO
+    // (2026-08-01: the CEO is view-only on the org-wide/department/branch
+    // drill-downs — reassigning other people's existing tasks isn't part of
+    // that role here, only creating new ones via "+ Task"). The data layer
+    // re-checks (incl. HOD's own-department scoping) on every call.
+    const canReassign = role === "ADMIN" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
@@ -619,6 +622,17 @@ export default async function TaskManagerPage({
         <AddTaskButton
           staff={staff}
           action={assign}
+          // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the
+          // picker restricts, and assignFlowTask re-enforces server-side.
+          // quickSelfId adds the CEO's own "Myself" chip, since the CEO
+          // isn't a HOD and would otherwise never appear in this list.
+          recipientGroup={role === "CEO" ? "HOD" : undefined}
+          quickSelfId={role === "CEO" ? daily.me.me.userId : undefined}
+          // Cadence is meaningless for CEO-assigned tasks (2026-08-01):
+          // they're categorized by WHO assigned them (the recipient's "CEO
+          // Assigned" stream, or the CEO's own list for "Myself"), never by
+          // a Daily/Monthly tag — so the field is hidden for the CEO only.
+          hideCadence={role === "CEO"}
           templates={{
             list: templateList,
             load: loadTemplate,
@@ -637,15 +651,13 @@ export default async function TaskManagerPage({
       );
     }
 
-    if (shows(viewRole, "taskManager", "entityDropdowns")) {
-      // Superadmin + elevated department sites (Operations/Optimisation):
-      // dropdown-driven entity overview with the Department | Branch toggle
-      // — elevated sites are superadmin-equivalent since the 2026-07-29
-      // final role spec. "+ Task" already sits in the page header via the
-      // config above.
-      const view: "department" | "branch" =
-        sp.view === "branch" ? "branch" : "department";
-
+    // Dropdown-driven entity overview (Department | Branch toggle) —
+    // superadmin/elevated sites' WHOLE page, and since 2026-08-01 also
+    // appended BELOW the CEO's own sections (config: entityDropdowns).
+    // Extracted into a builder so both render paths share one definition.
+    const entityView: "department" | "branch" = sp.view === "branch" ? "branch" : "department";
+    async function buildEntityOverview(): Promise<ReactNode> {
+      const view = entityView;
       let overview: ReactNode;
       if (view === "department") {
         // Default to the ACCOUNT'S OWN department when it has one — the
@@ -740,11 +752,18 @@ export default async function TaskManagerPage({
           </>
         );
       }
+      return overview;
+    }
 
+    if (shows(viewRole, "taskManager", "entityDropdowns") && viewRole !== "CEO") {
+      // Superadmin + elevated department sites (Operations/Optimisation):
+      // the dropdown overview IS the whole page. The CEO (also configured
+      // with entityDropdowns) instead gets it appended below their own
+      // sections — see the CEO block after the TaskManagerView body.
       body = (
         <div className="flex flex-col gap-6">
-          <ModeTabs active={view} date={dailyDate} />
-          {overview}
+          <ModeTabs active={entityView} date={dailyDate} />
+          {await buildEntityOverview()}
         </div>
       );
 
@@ -754,9 +773,6 @@ export default async function TaskManagerPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold">Task Manager</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Your tasks, team status, and assignments — daily and monthly.
-                </p>
               </div>
               {headerAction}
             </div>
@@ -766,9 +782,11 @@ export default async function TaskManagerPage({
       );
     }
 
-    // CEO only: each cadence's own pinned list + donut data, independently.
+    // CEO pinned-department dashboards — config-gated (2026-08-01: the
+    // ceoKanban key moved to the CEO's HOME config, so this stays unbuilt
+    // and the view's kanban sections never render on /task-manager).
     let ceoDashboard: Parameters<typeof TaskManagerView>[0]["ceoDashboard"];
-    if (daily.me.me.role === "CEO") {
+    if (shows(viewRole, "taskManager", "ceoKanban")) {
       const [dailyConfig, monthlyConfig] = await Promise.all([
         getCeoDashboardConfig(email, "daily"),
         getCeoDashboardConfig(email, "monthly"),
@@ -981,6 +999,23 @@ export default async function TaskManagerPage({
         personalAdhoc={personalAdhoc}
       />
     );
+
+    // CEO (2026-08-01): the superadmin-style Department | Branch dropdown
+    // overview appended BELOW their own sections — same builder, same
+    // components, full cross-department/branch visibility (canViewOrg
+    // already authorizes CEO in the data layer). Only the CEO reaches
+    // here with entityDropdowns configured — ADMIN/elevated early-return
+    // above.
+    if (shows(viewRole, "taskManager", "entityDropdowns")) {
+      body = (
+        <div className="flex flex-col gap-6">
+          {body}
+          <PageSectionHeading>Department / Branch Overview</PageSectionHeading>
+          <ModeTabs active={entityView} date={dailyDate} />
+          {await buildEntityOverview()}
+        </div>
+      );
+    }
   } catch (err) {
     if (err instanceof SetupPendingError) {
       body = <SetupPendingCard />;
@@ -1001,9 +1036,6 @@ export default async function TaskManagerPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">Task Manager</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Your tasks, team status, and assignments — daily and monthly.
-            </p>
           </div>
           {headerAction}
         </div>

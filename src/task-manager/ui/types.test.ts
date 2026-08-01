@@ -35,37 +35,37 @@ describe("formatDueDate", () => {
     expect(formatDueDate(null)).toBeNull();
   });
 
-  it("is time-of-day independent — due later today is still 'D/M Today'", () => {
+  it("TODAY is 'Overdue' (red), time-of-day independent (2026-08-01 rules)", () => {
     expect(formatDueDate(daysFromToday(0, 23))).toEqual({
-      text: "15/1 Today",
-      className: "text-amber-600 font-medium",
+      text: "15/1 Overdue",
+      className: "text-red-500 font-medium",
     });
     expect(formatDueDate(daysFromToday(0, 0))).toEqual({
-      text: "15/1 Today",
-      className: "text-amber-600 font-medium",
-    });
-  });
-
-  it("labels yesterday distinctly from older overdue dates", () => {
-    expect(formatDueDate(daysFromToday(-1))).toEqual({
-      text: "14/1 Yesterday",
+      text: "15/1 Overdue",
       className: "text-red-500 font-medium",
     });
   });
 
-  it("shows 'D/M N days ago' for anything more than 1 day overdue", () => {
-    expect(formatDueDate(daysFromToday(-2))).toEqual({
-      text: "13/1 2 days ago",
+  it("every past date is 'Overdue' (red)", () => {
+    expect(formatDueDate(daysFromToday(-1))).toEqual({
+      text: "14/1 Overdue",
       className: "text-red-500 font-medium",
     });
     expect(formatDueDate(daysFromToday(-10))).toEqual({
-      text: "5/1 10 days ago",
+      text: "5/1 Overdue",
       className: "text-red-500 font-medium",
     });
   });
 
-  it("uses 'D/M + short weekday' for the next 6 days, staying neutral gray", () => {
-    for (const offset of [1, 6]) {
+  it("TOMORROW is 'Due Soon' (amber)", () => {
+    expect(formatDueDate(daysFromToday(1))).toEqual({
+      text: "16/1 Due Soon",
+      className: "text-amber-600 font-medium",
+    });
+  });
+
+  it("uses 'D/M + short weekday' for 2-6 days out, neutral gray, no status label", () => {
+    for (const offset of [2, 6]) {
       const result = formatDueDate(daysFromToday(offset));
       expect(result?.className).toBe("text-gray-400");
       expect(result?.text).toMatch(/^\d{1,2}\/\d{1,2} [A-Za-z]{2,3}$/);

@@ -320,6 +320,10 @@ export interface MappedUser {
   branch: string | null;
   employmentType: string | null;
   coachSchedule: string | null;
+  /** ebright_hrfs."User"."id" (2026-07-31) — the direct cross-database
+   *  link. Only the HRFS primary source can supply it; portal-only
+   *  employees and EXTRA_USERS have none (optional, treated as null). */
+  hrfsUserId?: number | null;
 }
 
 /** Keyed by LOWERCASED email. Empty by default — fill these in before
@@ -489,6 +493,15 @@ export const EXTRA_USERS: MappedUser[] = [
   // created directly (role hod/staff/Branch Manager, temp password).
   // Remove this block (and the hrfs rows) when role testing is done.
   {
+    email: "test-ceo@ebright.my",
+    name: "TEST CEO",
+    role: "CEO",
+    department: null,
+    branch: null,
+    employmentType: "CEO",
+    coachSchedule: null,
+  },
+  {
     email: "test-hod-optimisation@ebright.my",
     name: "TEST HOD Optimisation",
     role: "HOD",
@@ -599,6 +612,9 @@ validateHandEditedConfig(OVERRIDES, EXTRA_USERS);
 // ---------------------------------------------------------------------------
 
 export interface HrfsUserRow {
+  /** ebright_hrfs."User"."id" — optional so older tests/fixtures without
+   *  it keep compiling; when absent, hrfsUserId simply stays null. */
+  id?: number | null;
   email: string;
   name: string | null;
   role: string;
@@ -655,6 +671,7 @@ export function mapHrfsUser(row: HrfsUserRow): MapResult {
     branch,
     employmentType: entry.employmentType,
     coachSchedule: entry.coachSchedule,
+    hrfsUserId: row.id ?? null,
   };
 
   // ---- overrides: merged LAST, can rewrite anything (including role) ----

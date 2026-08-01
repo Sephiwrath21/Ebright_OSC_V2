@@ -83,7 +83,12 @@ const TUE_SAT = [
   { label: "Friday", offset: 4 },
   { label: "Saturday", offset: 5 },
 ];
-const SIDEBAR_RANGES: Record<"tue-sat" | "tue-sun" | "wed-sun", { label: string; offset: number }[]> = {
+const SIDEBAR_RANGES: Record<
+  "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun",
+  { label: string; offset: number }[]
+> = {
+  // Full week (2026-08-01): the CEO's range.
+  "mon-sun": [{ label: "Monday", offset: 0 }, ...TUE_SAT, { label: "Sunday", offset: 6 }],
   "tue-sat": TUE_SAT,
   "tue-sun": [...TUE_SAT, { label: "Sunday", offset: 6 }],
   "wed-sun": [...TUE_SAT.slice(1), { label: "Sunday", offset: 6 }],
@@ -128,7 +133,7 @@ export function WeekdaySidebar({
    *  YYYY-MM-DD — getMySidebarCounts().weekdays. Zero/absent = no badge. */
   counts?: Record<string, number>;
   /** Which days to list — from role-views.ts weekdayRangeOf(). */
-  range?: "tue-sat" | "tue-sun" | "wed-sun";
+  range?: "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun";
 }) {
   const router = useRouter();
   // Optimistic selection: highlight instantly on click; cleared when the

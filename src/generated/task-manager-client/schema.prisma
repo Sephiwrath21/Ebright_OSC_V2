@@ -38,6 +38,12 @@ model User {
   department       String?
   branch           String? // org location dimension (e.g. "Subang Taipan") — analytics
   employmentType   String? // HOD | Full Time | Part Time | Intern — display label, analytics
+  // Direct link to ebright_hrfs."User"."id" (integer, 2026-07-31) — the
+  // durable cross-database key, so joins no longer depend on emails
+  // matching. Set by bootstrap from the HRFS source row; null for accounts
+  // with no ebright_hrfs row (portal-only staff, site logins, TEST
+  // accounts) or unresolved email mismatches.
+  hrfsUserId       Int?
   coachSchedule    String? // Full Time | Part Time — sub-split of employmentType "Coach" only;
   // used by the assign-task recipient picker's "By Group" filter, NOT by the
   // Branch Status by Region analytics (which still matches employmentType "Coach").
@@ -46,6 +52,8 @@ model User {
   hodKanbanColumns HodKanbanColumn[] // DEPT_SITE/BRANCH_SITE view-only site logins for
   // "Department accounts"/"Branch site accounts" (one department/branch's Status
   // view, no personal tasks) — see role usage below.
+
+  @@index([hrfsUserId])
 }
 
 enum Role {
@@ -320,9 +328,14 @@ model RunBlock {
   // PARENTS only (engine/recurrence.ts skips parentId ≠ null) and clones
   // subtasks under the new parent. SET NULL on parent delete — an orphaned
   // subtask degrades to a normal top-level task.
-  parentId String?
-  parent   RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  subtasks RunBlock[] @relation("BlockSubtasks")
+  parentId     String?
+  parent       RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  subtasks     RunBlock[] @relation("BlockSubtasks")
+  // Explicit checklist-builder sequence for SUBTASKS (2026-07-31, spec
+  // delta B): 0-based position within the parent; copied by edit
+  // propagation and weekly recurrence. Null on parents and on pre-column
+  // subtasks — the UI falls back to creation (id) order for those.
+  subtaskOrder Int?
 
   // Which TaskTemplate this block was created from (2026-07-31): set on
   // every block of an assignment that used "Start from a template" OR
@@ -527,6 +540,12 @@ model ScheduleSlot {
   schedule        ManpowerSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   startTime       String // HH:mm
   endTime         String // HH:mm
+  // Optional row label (2026-08-01, ClickUp-style slot naming): "Opening",
+  // "6:00 PM Class", "Closing" — typed by the Branch Manager per TIME ROW
+  // (stored on every cell of that row, kept uniform by the row actions).
+  // Synced task titles use it; rows without one fall back to
+  // "{h:mm AM/PM} Class" auto-formatted from startTime (slotTaskTitle).
+  rowLabel        String?
   roleColumn      String // "Manager" | "Coach 1" | "Exec 1" | ...
   assignedStaffId String?
   runBlockId      String?

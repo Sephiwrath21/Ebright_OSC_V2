@@ -101,6 +101,24 @@ export async function loadAdhocFlow() {
 
 type AdhocFlow = Awaited<ReturnType<typeof loadAdhocFlow>>;
 
+/** "6:00 PM" from "18:00" — server-side twin of the UI's flowFormatTime12h
+ *  (ui/types.ts is a client module; this file must stay server-safe). */
+function format12h(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Synced task title (2026-08-01, ClickUp-style slot naming): the grid
+ *  row's LABEL when the Branch Manager typed one ("Opening", "Closing",
+ *  "6:00 PM Class"), else "{start time} Class" auto-formatted — never the
+ *  old "Coach 1 shift (18:00–19:15)" form. */
+export function slotTaskTitle(rowLabel: string | null | undefined, startTime: string): string {
+  const label = rowLabel?.trim();
+  return label || `${format12h(startTime)} Class`;
+}
+
 /** Creates the ad hoc FlowRun/RunBlock for one slot assignment, tagged with
  *  scheduleSlotId so it shows the "Scheduled" badge and counts as synced. */
 export async function createSlotRun(
@@ -108,6 +126,7 @@ export async function createSlotRun(
   opts: {
     slotId: string;
     roleColumn: string;
+    rowLabel: string | null;
     startTime: string;
     endTime: string;
     date: string;
@@ -116,7 +135,7 @@ export async function createSlotRun(
     actorId: string;
   },
 ): Promise<string> {
-  const blockTitle = `${opts.roleColumn} shift (${opts.startTime}–${opts.endTime})`;
+  const blockTitle = slotTaskTitle(opts.rowLabel, opts.startTime);
   const d = parseLocalDate(opts.date);
   const [endHour, endMinute] = opts.endTime.split(":").map(Number);
   const dueAt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), endHour, endMinute);
