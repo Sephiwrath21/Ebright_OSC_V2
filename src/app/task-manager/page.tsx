@@ -772,9 +772,11 @@ export default async function TaskManagerPage({
       );
     }
 
-    // CEO only: each cadence's own pinned list + donut data, independently.
+    // CEO pinned-department dashboards — config-gated (2026-08-01: the
+    // ceoKanban key moved to the CEO's HOME config, so this stays unbuilt
+    // and the view's kanban sections never render on /task-manager).
     let ceoDashboard: Parameters<typeof TaskManagerView>[0]["ceoDashboard"];
-    if (daily.me.me.role === "CEO") {
+    if (shows(viewRole, "taskManager", "ceoKanban")) {
       const [dailyConfig, monthlyConfig] = await Promise.all([
         getCeoDashboardConfig(email, "daily"),
         getCeoDashboardConfig(email, "monthly"),
