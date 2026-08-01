@@ -440,18 +440,18 @@ export async function HomeScopedOverviewSection({
       ]);
       const [dailyDetails, monthlyDetails] = await Promise.all([
         Promise.all(dailyConfig.departments.map((n) => getDepartmentDetail(email, n, "daily", dailyDate))),
-        Promise.all(monthlyConfig.departments.map((n) => getDepartmentDetail(email, n, "monthly"))),
+        Promise.all(monthlyConfig.departments.map((n) => getDepartmentDetail(email, n, "monthly", monthlyDate))),
       ]);
       ceoDashboards = (
         <>
-          <PageSectionHeading>Department Daily Overview</PageSectionHeading>
+          <PageSectionHeading action={dailyPicker}>Department Daily Overview</PageSectionHeading>
           <CeoDashboardSection
             periodLabel="Daily"
             departments={dailyDetails.map((r) => r.department)}
             availableToAdd={FLOW_DEPARTMENTS.filter((d) => !dailyConfig.departments.includes(d))}
             actions={makeCeoActions("daily")}
           />
-          <PageSectionHeading>Department Monthly Overview</PageSectionHeading>
+          <PageSectionHeading action={monthlyPicker}>Department Monthly Overview</PageSectionHeading>
           <CeoDashboardSection
             periodLabel="Monthly"
             departments={monthlyDetails.map((r) => r.department)}

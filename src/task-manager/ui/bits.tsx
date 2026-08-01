@@ -54,10 +54,19 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
 
 /** Page-level divider between major page areas (e.g. the read-only Overview
  *  grids vs. the action-oriented Details/assign area). */
-export function PageSectionHeading({ children }: { children: React.ReactNode }) {
+export function PageSectionHeading({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  /** Right-aligned control (e.g. a date filter) — optional, most headings
+   *  have none. */
+  action?: React.ReactNode;
+}) {
   return (
-    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
-      {children}
+    <h2 className="mt-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+      <span>{children}</span>
+      {action}
     </h2>
   );
 }
