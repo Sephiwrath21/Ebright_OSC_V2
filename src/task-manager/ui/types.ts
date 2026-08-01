@@ -447,6 +447,9 @@ export interface FlowScheduleCell {
   slotId: string;
   startTime: string; // HH:mm
   endTime: string; // HH:mm
+  /** Optional row label ("Opening", "6:00 PM Class") — drives synced task
+   *  titles; null = auto-format from startTime (2026-08-01). */
+  rowLabel: string | null;
   roleColumn: string; // "Manager" | "Coach 1" | "Exec 1" | ...
   assignedStaffId: string | null;
   assignedStaffName: string | null;

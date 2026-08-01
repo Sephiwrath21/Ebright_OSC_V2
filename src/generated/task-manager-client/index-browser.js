@@ -352,6 +352,7 @@ exports.Prisma.ScheduleSlotScalarFieldEnum = {
   scheduleId: 'scheduleId',
   startTime: 'startTime',
   endTime: 'endTime',
+  rowLabel: 'rowLabel',
   roleColumn: 'roleColumn',
   assignedStaffId: 'assignedStaffId',
   runBlockId: 'runBlockId',

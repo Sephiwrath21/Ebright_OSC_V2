@@ -538,6 +538,12 @@ model ScheduleSlot {
   schedule        ManpowerSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   startTime       String // HH:mm
   endTime         String // HH:mm
+  // Optional row label (2026-08-01, ClickUp-style slot naming): "Opening",
+  // "6:00 PM Class", "Closing" — typed by the Branch Manager per TIME ROW
+  // (stored on every cell of that row, kept uniform by the row actions).
+  // Synced task titles use it; rows without one fall back to
+  // "{h:mm AM/PM} Class" auto-formatted from startTime (slotTaskTitle).
+  rowLabel        String?
   roleColumn      String // "Manager" | "Coach 1" | "Exec 1" | ...
   assignedStaffId String?
   runBlockId      String?

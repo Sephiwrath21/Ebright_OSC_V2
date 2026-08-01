@@ -25868,6 +25868,7 @@ export namespace Prisma {
     scheduleId: string | null
     startTime: string | null
     endTime: string | null
+    rowLabel: string | null
     roleColumn: string | null
     assignedStaffId: string | null
     runBlockId: string | null
@@ -25879,6 +25880,7 @@ export namespace Prisma {
     scheduleId: string | null
     startTime: string | null
     endTime: string | null
+    rowLabel: string | null
     roleColumn: string | null
     assignedStaffId: string | null
     runBlockId: string | null
@@ -25890,6 +25892,7 @@ export namespace Prisma {
     scheduleId: number
     startTime: number
     endTime: number
+    rowLabel: number
     roleColumn: number
     assignedStaffId: number
     runBlockId: number
@@ -25903,6 +25906,7 @@ export namespace Prisma {
     scheduleId?: true
     startTime?: true
     endTime?: true
+    rowLabel?: true
     roleColumn?: true
     assignedStaffId?: true
     runBlockId?: true
@@ -25914,6 +25918,7 @@ export namespace Prisma {
     scheduleId?: true
     startTime?: true
     endTime?: true
+    rowLabel?: true
     roleColumn?: true
     assignedStaffId?: true
     runBlockId?: true
@@ -25925,6 +25930,7 @@ export namespace Prisma {
     scheduleId?: true
     startTime?: true
     endTime?: true
+    rowLabel?: true
     roleColumn?: true
     assignedStaffId?: true
     runBlockId?: true
@@ -26009,6 +26015,7 @@ export namespace Prisma {
     scheduleId: string
     startTime: string
     endTime: string
+    rowLabel: string | null
     roleColumn: string
     assignedStaffId: string | null
     runBlockId: string | null
@@ -26037,6 +26044,7 @@ export namespace Prisma {
     scheduleId?: boolean
     startTime?: boolean
     endTime?: boolean
+    rowLabel?: boolean
     roleColumn?: boolean
     assignedStaffId?: boolean
     runBlockId?: boolean
@@ -26049,6 +26057,7 @@ export namespace Prisma {
     scheduleId?: boolean
     startTime?: boolean
     endTime?: boolean
+    rowLabel?: boolean
     roleColumn?: boolean
     assignedStaffId?: boolean
     runBlockId?: boolean
@@ -26061,6 +26070,7 @@ export namespace Prisma {
     scheduleId?: boolean
     startTime?: boolean
     endTime?: boolean
+    rowLabel?: boolean
     roleColumn?: boolean
     assignedStaffId?: boolean
     runBlockId?: boolean
@@ -26073,13 +26083,14 @@ export namespace Prisma {
     scheduleId?: boolean
     startTime?: boolean
     endTime?: boolean
+    rowLabel?: boolean
     roleColumn?: boolean
     assignedStaffId?: boolean
     runBlockId?: boolean
     updatedAt?: boolean
   }
 
-  export type ScheduleSlotOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "scheduleId" | "startTime" | "endTime" | "roleColumn" | "assignedStaffId" | "runBlockId" | "updatedAt", ExtArgs["result"]["scheduleSlot"]>
+  export type ScheduleSlotOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "scheduleId" | "startTime" | "endTime" | "rowLabel" | "roleColumn" | "assignedStaffId" | "runBlockId" | "updatedAt", ExtArgs["result"]["scheduleSlot"]>
   export type ScheduleSlotInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     schedule?: boolean | ManpowerScheduleDefaultArgs<ExtArgs>
   }
@@ -26100,6 +26111,7 @@ export namespace Prisma {
       scheduleId: string
       startTime: string
       endTime: string
+      rowLabel: string | null
       roleColumn: string
       assignedStaffId: string | null
       runBlockId: string | null
@@ -26532,6 +26544,7 @@ export namespace Prisma {
     readonly scheduleId: FieldRef<"ScheduleSlot", 'String'>
     readonly startTime: FieldRef<"ScheduleSlot", 'String'>
     readonly endTime: FieldRef<"ScheduleSlot", 'String'>
+    readonly rowLabel: FieldRef<"ScheduleSlot", 'String'>
     readonly roleColumn: FieldRef<"ScheduleSlot", 'String'>
     readonly assignedStaffId: FieldRef<"ScheduleSlot", 'String'>
     readonly runBlockId: FieldRef<"ScheduleSlot", 'String'>
@@ -28257,6 +28270,7 @@ export namespace Prisma {
     scheduleId: 'scheduleId',
     startTime: 'startTime',
     endTime: 'endTime',
+    rowLabel: 'rowLabel',
     roleColumn: 'roleColumn',
     assignedStaffId: 'assignedStaffId',
     runBlockId: 'runBlockId',
@@ -30036,6 +30050,7 @@ export namespace Prisma {
     scheduleId?: StringFilter<"ScheduleSlot"> | string
     startTime?: StringFilter<"ScheduleSlot"> | string
     endTime?: StringFilter<"ScheduleSlot"> | string
+    rowLabel?: StringNullableFilter<"ScheduleSlot"> | string | null
     roleColumn?: StringFilter<"ScheduleSlot"> | string
     assignedStaffId?: StringNullableFilter<"ScheduleSlot"> | string | null
     runBlockId?: StringNullableFilter<"ScheduleSlot"> | string | null
@@ -30048,6 +30063,7 @@ export namespace Prisma {
     scheduleId?: SortOrder
     startTime?: SortOrder
     endTime?: SortOrder
+    rowLabel?: SortOrderInput | SortOrder
     roleColumn?: SortOrder
     assignedStaffId?: SortOrderInput | SortOrder
     runBlockId?: SortOrderInput | SortOrder
@@ -30064,6 +30080,7 @@ export namespace Prisma {
     scheduleId?: StringFilter<"ScheduleSlot"> | string
     startTime?: StringFilter<"ScheduleSlot"> | string
     endTime?: StringFilter<"ScheduleSlot"> | string
+    rowLabel?: StringNullableFilter<"ScheduleSlot"> | string | null
     roleColumn?: StringFilter<"ScheduleSlot"> | string
     assignedStaffId?: StringNullableFilter<"ScheduleSlot"> | string | null
     runBlockId?: StringNullableFilter<"ScheduleSlot"> | string | null
@@ -30076,6 +30093,7 @@ export namespace Prisma {
     scheduleId?: SortOrder
     startTime?: SortOrder
     endTime?: SortOrder
+    rowLabel?: SortOrderInput | SortOrder
     roleColumn?: SortOrder
     assignedStaffId?: SortOrderInput | SortOrder
     runBlockId?: SortOrderInput | SortOrder
@@ -30093,6 +30111,7 @@ export namespace Prisma {
     scheduleId?: StringWithAggregatesFilter<"ScheduleSlot"> | string
     startTime?: StringWithAggregatesFilter<"ScheduleSlot"> | string
     endTime?: StringWithAggregatesFilter<"ScheduleSlot"> | string
+    rowLabel?: StringNullableWithAggregatesFilter<"ScheduleSlot"> | string | null
     roleColumn?: StringWithAggregatesFilter<"ScheduleSlot"> | string
     assignedStaffId?: StringNullableWithAggregatesFilter<"ScheduleSlot"> | string | null
     runBlockId?: StringNullableWithAggregatesFilter<"ScheduleSlot"> | string | null
@@ -31794,6 +31813,7 @@ export namespace Prisma {
     id?: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -31806,6 +31826,7 @@ export namespace Prisma {
     scheduleId: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -31816,6 +31837,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31828,6 +31850,7 @@ export namespace Prisma {
     scheduleId?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31839,6 +31862,7 @@ export namespace Prisma {
     scheduleId: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -31849,6 +31873,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31860,6 +31885,7 @@ export namespace Prisma {
     scheduleId?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -33345,6 +33371,7 @@ export namespace Prisma {
     scheduleId?: SortOrder
     startTime?: SortOrder
     endTime?: SortOrder
+    rowLabel?: SortOrder
     roleColumn?: SortOrder
     assignedStaffId?: SortOrder
     runBlockId?: SortOrder
@@ -33356,6 +33383,7 @@ export namespace Prisma {
     scheduleId?: SortOrder
     startTime?: SortOrder
     endTime?: SortOrder
+    rowLabel?: SortOrder
     roleColumn?: SortOrder
     assignedStaffId?: SortOrder
     runBlockId?: SortOrder
@@ -33367,6 +33395,7 @@ export namespace Prisma {
     scheduleId?: SortOrder
     startTime?: SortOrder
     endTime?: SortOrder
+    rowLabel?: SortOrder
     roleColumn?: SortOrder
     assignedStaffId?: SortOrder
     runBlockId?: SortOrder
@@ -37196,6 +37225,7 @@ export namespace Prisma {
     id?: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -37206,6 +37236,7 @@ export namespace Prisma {
     id?: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -37246,6 +37277,7 @@ export namespace Prisma {
     scheduleId?: StringFilter<"ScheduleSlot"> | string
     startTime?: StringFilter<"ScheduleSlot"> | string
     endTime?: StringFilter<"ScheduleSlot"> | string
+    rowLabel?: StringNullableFilter<"ScheduleSlot"> | string | null
     roleColumn?: StringFilter<"ScheduleSlot"> | string
     assignedStaffId?: StringNullableFilter<"ScheduleSlot"> | string | null
     runBlockId?: StringNullableFilter<"ScheduleSlot"> | string | null
@@ -37990,6 +38022,7 @@ export namespace Prisma {
     id?: string
     startTime: string
     endTime: string
+    rowLabel?: string | null
     roleColumn: string
     assignedStaffId?: string | null
     runBlockId?: string | null
@@ -38000,6 +38033,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -38010,6 +38044,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -38020,6 +38055,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     startTime?: StringFieldUpdateOperationsInput | string
     endTime?: StringFieldUpdateOperationsInput | string
+    rowLabel?: NullableStringFieldUpdateOperationsInput | string | null
     roleColumn?: StringFieldUpdateOperationsInput | string
     assignedStaffId?: NullableStringFieldUpdateOperationsInput | string | null
     runBlockId?: NullableStringFieldUpdateOperationsInput | string | null
