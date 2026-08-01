@@ -8,14 +8,17 @@ import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
+import OverdueDot from "@/app/components/OverdueDot";
 
 interface Props {
   rows: EmployeeOverviewRow[];
   counts: Record<EmployeeStage, number>;
   userName?: string | null;
+  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
+  overdueTaskCounts?: Record<number, number>;
 }
 
-export default function EmployeeOverviewView({ rows, counts, userName }: Props) {
+export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts }: Props) {
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
@@ -214,11 +217,9 @@ export default function EmployeeOverviewView({ rows, counts, userName }: Props) 
                     key={row.id}
                     className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0"
                   >
-                    <Link
-                      href={`/employee-record/${row.id}`}
-                      className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate"
-                    >
-                      {row.fullName}
+                    <Link href={`/employee-record/${row.id}`} className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
+                      <OverdueDot count={overdueTaskCounts?.[row.id]} />
                     </Link>
                     <span className="text-sm font-medium text-slate-600 truncate">
                       {row.departmentName ?? row.branchName ?? "—"}

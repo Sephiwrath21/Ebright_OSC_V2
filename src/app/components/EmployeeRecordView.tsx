@@ -70,10 +70,10 @@ import type {
 
 // Vertical sub-nav rail — green, from category_shared.css (shared by every
 // Employee Record category, e.g. Personal Info / Guardian Info / Payment &
-// Bank Info / Emergency Contact under "Personal Info"). Width is a literal
-// 210px Tailwind class (lg:w-[210px] below) rather than this constant now
-// that it only applies from lg up — kept as a plain number wasn't usable
-// responsively the way the inline style was.
+// Bank Info / Emergency Contact under "Personal Info"). Hidden entirely on
+// touch devices ([@media(hover:none)]:hidden below) — width is a literal
+// w-[210px] Tailwind class since it now only ever renders at its one fixed
+// desktop size.
 const RAIL_GAP_PX = 10;
 const RAIL_BASE = "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
@@ -180,15 +180,12 @@ export default function EmployeeRecordView({
 
   return (
     <div className="min-h-full bg-slate-50">
-      {/* --rail-width is declared once here so both the cat-tabs bar (via
-          calc()) and the sub-nav rail itself (directly) size against the
-          exact same value — that's what keeps the tabs bar's width matched
-          to the white content card's width instead of the full page/device
-          width, since the card is everything left over after the rail. */}
-      <div
-        className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10"
-        style={{ "--rail-width": "clamp(96px, 28vw, 210px)" } as React.CSSProperties}
-      >
+      {/* No longer needs a --rail-width custom property: the vertical rail
+          is either hidden outright (touch devices, replaced by the mobile
+          sub-tab row) or rendered at its one fixed w-[210px] (mouse/
+          trackpad-driven browsers) — neither consumer needs a shared fluid
+          value anymore. */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -219,17 +216,34 @@ export default function EmployeeRecordView({
         </div>
 
         {/* cat-tabs — horizontal, one entry per record category, independent
-            of any stage. Desktop tab sizing is untouched at every breakpoint
-            (no shrinking) — width is explicitly capped to match the white
-            content card's width below (100% minus the rail and its gap, the
-            same split the card/rail flex row computes for itself), not the
-            full device width. Tabs that don't fit within that width are
-            simply not visible until scrolled to (nowrap + overflow-x-auto),
-            never wrapped to a second row. lg:w-auto removes that cap
-            entirely at desktop, back to the original unconstrained flow. */}
+            of any stage. Switched from a width breakpoint (lg:) to the
+            [@media(hover:none)] arbitrary variant — same technique already
+            used in src/task-manager/ui/bits.tsx for the identical "real
+            touch device, not just a narrow window" distinction. A width
+            breakpoint can't tell an iPad Pro in landscape (1366px CSS width,
+            wider than a resized desktop browser would ever need to trigger
+            "mobile" at) from an actual small desktop window — hover:none
+            only matches when the PRIMARY input has no hover capability
+            (touch), true for phones/tablets of any size/orientation and
+            false for anything mouse/trackpad-driven, which is the actual
+            "not a desktop browser" distinction requested. (Caveat: iPadOS
+            reports hover:hover if an external trackpad/mouse is actively
+            paired — an intentional platform behavior, not a bug in this
+            query — so that specific combination would still get the
+            desktop layout below.) Base classes are now the desktop
+            (folder-tab) look; [@media(hover:none)]: overrides restore the
+            pill-capsule look for touch devices — same bg-[#eef3fb] rounded
+            capsule + bg-[#a9d3f7bd] text-[#004386c9] active state as
+            EmployeeNamelistView's List/Grid toggle and the Task panel's
+            Source filter pills, for visual consistency across the module.
+            w-full on touch (not the old calc(100% - rail width) cap, which
+            was truncating labels like "Finance" by reserving space for a
+            sidebar that's hidden on touch anyway). Tabs that still don't
+            fit are simply not visible until scrolled to (nowrap +
+            overflow-x-auto), never wrapped to a second row, either way. */}
         <nav
           aria-label="Employee record categories"
-          className="flex flex-nowrap gap-1 mb-0 overflow-x-auto w-[calc(100%-var(--rail-width)-16px)] lg:w-auto"
+          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
         >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
@@ -237,10 +251,10 @@ export default function EmployeeRecordView({
               <Link
                 key={cat.key}
                 href={`/employee-record/${employeeId}/${cat.key}`}
-                className={`shrink-0 flex items-center px-4 py-2 rounded-t-[10px] border-2 border-b-0 text-sm font-medium transition-colors ${
+                className={`shrink-0 flex items-center px-4 py-2 text-sm font-medium transition-colors rounded-t-[10px] border-2 border-b-0 [@media(hover:none)]:rounded-full [@media(hover:none)]:border-0 ${
                   isActive
-                    ? "bg-[#22b8d1] border-[#0e6577] text-white"
-                    : "bg-[#68d4ffa8] border-[#49a2c6] text-black hover:bg-[#68d4ff]"
+                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] [@media(hover:none)]:text-[#004386c9]"
+                    : "bg-[#68d4ffa8] border-[#49a2c6] text-black hover:bg-[#68d4ff] [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 [@media(hover:none)]:hover:bg-[#dde8f7]"
                 }`}
               >
                 {cat.label}
@@ -248,6 +262,44 @@ export default function EmployeeRecordView({
             );
           })}
         </nav>
+
+        {/* Touch-only sub-tab row ([@media(hover:none)] — see the cat-tabs
+            bar's own comment above for why hover:none rather than a lg:
+            width breakpoint; desktop, and any mouse/trackpad-driven browser
+            regardless of window width, keeps the vertical rail below
+            instead, unchanged). hidden by default (desktop doesn't need
+            this row at all — display:none, so every other class here is
+            inert until the media query matches); [@media(hover:none)]:flex
+            shows it on touch. Same pill vocabulary as the cat-tabs bar
+            above; scrolls horizontally rather than wrapping when a category
+            has more sections than fit (HR Info's 7, in particular). Own
+            mt-2/mb-3 for spacing rather than touching the cat-tabs bar's own
+            margin, so desktop's mb-0 (folder tabs flush against the card)
+            stays untouched. Guarded on sections.length > 1 per spec ("shown
+            only when the selected main tab has sub-sections") — always true
+            today (every category has 2+), kept as a real check rather than
+            assumed. */}
+        {category.sections.length > 1 && (
+          <nav
+            aria-label={`${category.label} sections`}
+            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] rounded-full p-1"
+          >
+            {category.sections.map((section) => {
+              const isActive = section.key === currentSection.key;
+              return (
+                <Link
+                  key={section.key}
+                  href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
+                  className={`shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                    isActive ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+                  }`}
+                >
+                  {section.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Card + vertical sub-nav rail as flex siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
@@ -330,14 +382,19 @@ export default function EmployeeRecordView({
             })()}
           </div>
 
-          {/* Below lg, width fluidly narrows on small viewports (min 96px,
-              via --rail-width, declared once on the page's outer wrapper and
-              shared with the cat-tabs bar above). At lg+, lg:w-[210px] pins
-              it to the exact original pixel width unconditionally — not
-              relying on the clamp() to land there on its own. */}
+          {/* Desktop/mouse-driven-browser-only — [@media(hover:none)]:hidden
+              (see the cat-tabs bar's own comment for why hover:none rather
+              than a lg: width breakpoint). On any real touch device
+              (phone/tablet, any size/orientation, including iPad Pro
+              landscape) the mobile sub-tab row above replaces this
+              entirely, per explicit request — the vertical rail shouldn't
+              exist in that position there at all, not just visually adapt.
+              w-[210px] is unconditional now (was lg:w-[210px] against a
+              fluid mobile width) since this element is either fully hidden
+              or rendered at its one fixed desktop size, nothing in between. */}
           <nav
             aria-label={`${category.label} sections`}
-            className="flex-none w-[var(--rail-width)] lg:w-[210px] flex flex-col"
+            className="flex flex-none w-[210px] flex-col [@media(hover:none)]:hidden"
             style={{ gap: RAIL_GAP_PX }}
           >
             {category.sections.map((section) => {

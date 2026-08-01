@@ -15,7 +15,6 @@ import {
   type PositionGroup,
 } from "@/lib/employeeStages";
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
-import OverdueDot from "@/app/components/OverdueDot";
 
 const CARD_CAP = 6;
 
@@ -32,11 +31,9 @@ interface Props {
   locationCode: string;
   locationName: string;
   rows: EmployeeOverviewRow[];
-  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
-  overdueTaskCounts?: Record<number, number>;
 }
 
-export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows, overdueTaskCounts }: Props) {
+export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows }: Props) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
@@ -172,19 +169,12 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
                   stage={stage}
                   profileQuery={profileQuery}
                   onShowMore={() => setOpenGroup(group)}
-                  overdueTaskCounts={overdueTaskCounts}
                 />
               ))
             )}
           </div>
         ) : (
-          <ListViewTable
-            stage={stage}
-            rows={filteredRows}
-            profileQuery={profileQuery}
-            thirdGroupLabel={thirdGroupLabel}
-            overdueTaskCounts={overdueTaskCounts}
-          />
+          <ListViewTable stage={stage} rows={filteredRows} profileQuery={profileQuery} thirdGroupLabel={thirdGroupLabel} />
         )}
       </div>
 
@@ -195,7 +185,6 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           stage={stage}
           profileQuery={profileQuery}
           onClose={() => setOpenGroup(null)}
-          overdueTaskCounts={overdueTaskCounts}
         />
       )}
     </div>
@@ -206,12 +195,10 @@ function PersonCard({
   row,
   stage,
   profileQuery,
-  overdueCount,
 }: {
   row: EmployeeOverviewRow;
   stage: EmployeeStage;
   profileQuery: string;
-  overdueCount?: number;
 }) {
   return (
     <Link
@@ -226,10 +213,7 @@ function PersonCard({
       >
         {initialsFromName(row.fullName)}
       </div>
-      <div className="flex items-center justify-center gap-1.5 w-full min-w-0">
-        <div className="text-base font-medium text-black/67 min-w-0 truncate">{row.fullName}</div>
-        <OverdueDot count={overdueCount} />
-      </div>
+      <div className="text-base font-medium text-black/67 w-full truncate">{row.fullName}</div>
       <div className="text-sm font-medium text-black/67 w-full truncate">{row.position ?? "—"}</div>
     </Link>
   );
@@ -241,14 +225,12 @@ function CategorySection({
   stage,
   profileQuery,
   onShowMore,
-  overdueTaskCounts,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
   onShowMore: () => void;
-  overdueTaskCounts?: Record<number, number>;
 }) {
   const shown = rows.slice(0, CARD_CAP);
   return (
@@ -258,13 +240,7 @@ function CategorySection({
         <div className="flex flex-col items-end w-full max-w-[1000px]">
           <div className="flex flex-wrap gap-4 self-stretch">
             {shown.map((row) => (
-              <PersonCard
-                key={row.id}
-                row={row}
-                stage={stage}
-                profileQuery={profileQuery}
-                overdueCount={overdueTaskCounts?.[row.id]}
-              />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
             ))}
           </div>
           {rows.length > CARD_CAP && (
@@ -288,14 +264,12 @@ function ShowMoreModal({
   stage,
   profileQuery,
   onClose,
-  overdueTaskCounts,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
   onClose: () => void;
-  overdueTaskCounts?: Record<number, number>;
 }) {
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
@@ -385,13 +359,7 @@ function ShowMoreModal({
             <p className="col-span-full text-center text-sm text-slate-500 py-8">No matches.</p>
           ) : (
             visible.map((row) => (
-              <PersonCard
-                key={row.id}
-                row={row}
-                stage={stage}
-                profileQuery={profileQuery}
-                overdueCount={overdueTaskCounts?.[row.id]}
-              />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
             ))
           )}
         </div>
@@ -419,13 +387,11 @@ function ListViewTable({
   rows,
   profileQuery,
   thirdGroupLabel,
-  overdueTaskCounts,
 }: {
   stage: EmployeeStage;
   rows: EmployeeOverviewRow[];
   profileQuery: string;
   thirdGroupLabel: string;
-  overdueTaskCounts?: Record<number, number>;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -468,10 +434,9 @@ function ListViewTable({
               >
                 <Link
                   href={`/employee-folder/${stage}/employee/${row.id}${profileQuery}`}
-                  className="flex items-center gap-1.5 min-w-0"
+                  className="text-base font-medium text-black hover:underline truncate min-w-0"
                 >
-                  <span className="text-base font-medium text-black hover:underline truncate min-w-0">{row.fullName}</span>
-                  <OverdueDot count={overdueTaskCounts?.[row.id]} />
+                  {row.fullName}
                 </Link>
                 {/* Derived from position, not the raw employment_type column —
                     confirmed via direct query that employment_type is null on

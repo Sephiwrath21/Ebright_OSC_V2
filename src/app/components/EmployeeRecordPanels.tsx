@@ -41,6 +41,7 @@ import type {
   PerformanceReviewEntry,
   PayslipInfo,
   EmployeeTaskRow,
+  TaskCadence,
 } from "@/lib/employeeQueries";
 import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
 
@@ -647,31 +648,75 @@ function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
       columns={[
         { key: "name", label: "Task Name" },
         { key: "date", label: "Date" },
+        { key: "source", label: "Source" },
       ]}
       rows={tasks.map((t) => ({
         name: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.name}</span>,
         date: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
+        source: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.source}</span>,
       }))}
     />
   );
 }
 
-export function TaskPendingPanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
+type TaskCadenceFilter = "all" | TaskCadence;
+
+const TASK_CADENCE_FILTER_OPTIONS: { value: TaskCadenceFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "DAILY", label: "Daily" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "ADHOC", label: "Ad-hoc" },
+];
+
+// Same segmented-pill visual vocabulary as EmployeeNamelistView's List/Grid
+// view toggle (outer "bg-[#eef3fb] rounded-full p-1", active pill
+// "bg-[#a9d3f7bd] text-[#004386c9]") — text-label pills here instead of
+// fixed-size icon squares, otherwise identical, for visual consistency
+// with the rest of the Employee Folder module.
+function TaskCadenceFilterPills({ value, onChange }: { value: TaskCadenceFilter; onChange: (v: TaskCadenceFilter) => void }) {
   return (
-    <div>
-      <PanelHeading>Pending</PanelHeading>
-      <TaskTable tasks={tasks} />
+    <div className="inline-flex gap-1 bg-[#eef3fb] rounded-full p-1 shrink-0">
+      {TASK_CADENCE_FILTER_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          aria-pressed={value === opt.value}
+          className={`h-8 px-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            value === opt.value ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
+// Client-side only (no refetch) — the full task list is already loaded, and
+// the Source filter is purely a display concern (which of the already-
+// fetched rows to show), same rationale as every other in-page search/filter
+// input elsewhere in this app.
+function TaskPanel({ heading, tasks }: { heading: string; tasks: EmployeeTaskRow[] }) {
+  const [cadenceFilter, setCadenceFilter] = useState<TaskCadenceFilter>("all");
+  const filtered = cadenceFilter === "all" ? tasks : tasks.filter((t) => t.cadence === cadenceFilter);
   return (
     <div>
-      <PanelHeading>Overdue</PanelHeading>
-      <TaskTable tasks={tasks} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <PanelHeading>{heading}</PanelHeading>
+        <TaskCadenceFilterPills value={cadenceFilter} onChange={setCadenceFilter} />
+      </div>
+      <TaskTable tasks={filtered} />
     </div>
   );
+}
+
+export function TaskPendingPanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
+  return <TaskPanel heading="Pending" tasks={tasks} />;
+}
+
+export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
+  return <TaskPanel heading="Overdue" tasks={tasks} />;
 }
 
 // ─── Lookup: "category/section" -> panel component ───

@@ -10,7 +10,6 @@ import { deletePreStageEmployee } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import AddPreStageEmployeeModal from "@/app/components/AddPreStageEmployeeModal";
-import OverdueDot from "@/app/components/OverdueDot";
 
 const MONTHS = [
   { value: "01", label: "January" }, { value: "02", label: "February" }, { value: "03", label: "March" },
@@ -26,13 +25,11 @@ interface Props {
    *  button that creates a real employee (users/user_profile/employment). */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
-  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
-  overdueTaskCounts?: Record<number, number>;
 }
 
 // Reference (pre.html / probation.html): a flat table, no Branch/Department
 // drill-down — each row links straight into that stage's profile.
-export default function StageFlatListView({ stage, rows, branches, departments, overdueTaskCounts }: Props) {
+export default function StageFlatListView({ stage, rows, branches, departments }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
@@ -139,10 +136,7 @@ export default function StageFlatListView({ stage, rows, branches, departments, 
                   href={`/employee-folder/${stage}/employee/${row.id}`}
                   className="relative grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0 hover:bg-slate-50 transition-colors"
                 >
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
-                    <OverdueDot count={overdueTaskCounts?.[row.id]} />
-                  </span>
+                  <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
                   <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
                   <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
                   <span>

@@ -10,7 +10,6 @@ import {
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
-  getOverdueTaskCounts,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -48,7 +47,6 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
           listLastWorkingDatesByUserId(namelistRows.map((r) => r.id)),
         ])
       : [undefined, undefined];
-  const overdueTaskCounts = await getOverdueTaskCounts(namelistRows.map((r) => r.id));
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -63,7 +61,6 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
           lastWorkingDateByUserId={lastWorkingDateByUserId}
           showLocation={false}
           locationContext={{ groupBy: "branch", code, name: branch.name }}
-          overdueTaskCounts={overdueTaskCounts}
         />
       ) : (
         <EmployeeNamelistView
@@ -72,7 +69,6 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
           locationCode={code}
           locationName={branch.name}
           rows={namelistRows}
-          overdueTaskCounts={overdueTaskCounts}
         />
       )}
     </AppShell>
