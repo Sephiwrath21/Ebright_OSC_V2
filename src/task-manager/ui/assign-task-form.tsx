@@ -45,6 +45,7 @@ export function AssignTaskForm({
   action,
   recipientGroup,
   quickSelfId,
+  hideCadence = false,
   templates,
   bare = false,
 }: {
@@ -60,6 +61,14 @@ export function AssignTaskForm({
   /** CEO quick-pick (2026-08-01): the caller's own user id — passed straight
    *  through to RecipientPicker's "Myself" chip. Omit outside the CEO form. */
   quickSelfId?: string;
+  /** CEO-only (2026-08-01): hides the Cadence picker entirely — CEO-assigned
+   *  tasks are categorized downstream by WHO assigned them (the "CEO
+   *  Assigned" stream on the recipient's page, or the CEO's own task list
+   *  for "Myself"), not by a Daily/Monthly tag, so there's nothing for the
+   *  CEO to pick. The form silently submits "daily" underneath — functionally
+   *  identical to leaving it untagged for how these tasks get windowed, and
+   *  it keeps the task recurring/visible like any normal Daily task. */
+  hideCadence?: boolean;
   /** Task Templates (2026-07-31): saved list + load/rename/delete actions
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
@@ -71,7 +80,7 @@ export function AssignTaskForm({
 }) {
   const [title, setTitle] = React.useState("");
   const [userIds, setUserIds] = React.useState<string[]>([]);
-  const [cadence, setCadence] = React.useState<CadenceOption | null>(null);
+  const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
   const [days, setDays] = React.useState<NonNullable<FlowAssignInput["days"]>>([]);
   const [dueDate, setDueDate] = React.useState("");
   // Guideline (optional, 2026-07-30): SOP link and/or reference image —
@@ -112,7 +121,7 @@ export function AssignTaskForm({
     setTitle(t.title);
     setSubtasks(t.subtasks);
     setSubtaskDraft("");
-    setCadence(t.cadence);
+    setCadence(hideCadence ? "daily" : t.cadence);
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
       setGuidelineImage({
@@ -162,7 +171,11 @@ export function AssignTaskForm({
   // Clear a previously-picked cadence if it's no longer valid once the
   // recipient selection changes (e.g. switching from a Branch Manager to an
   // HQ Exec drops a stale "adhoc" pick instead of silently keeping it).
+  // Skipped when hideCadence — the CEO's forced "daily" is never a user
+  // pick to revalidate (and CEO recipients are always HOD/self, always
+  // Daily-eligible, so it would never need clearing anyway).
   React.useEffect(() => {
+    if (hideCadence) return;
     setCadence((prev) => (prev && visibleCadences.includes(prev) ? prev : null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleCadences.join(",")]);
@@ -232,7 +245,7 @@ export function AssignTaskForm({
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
         setTitle("");
         setUserIds([]);
-        setCadence(null);
+        setCadence(hideCadence ? "daily" : null);
         setDays([]);
         setDueDate("");
         setGuidelineUrl("");
@@ -365,30 +378,32 @@ export function AssignTaskForm({
           quickSelfId={quickSelfId}
         />
 
-        <div className="text-sm text-gray-600">
-          Cadence
-          <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
-            {visibleCadences.map((value) => {
-              const active = cadence === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  onClick={() => setCadence(value)}
-                  aria-checked={active}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-                    active
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                  }`}
-                >
-                  {CADENCE_LABELS[value]}
-                </button>
-              );
-            })}
+        {!hideCadence && (
+          <div className="text-sm text-gray-600">
+            Cadence
+            <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
+              {visibleCadences.map((value) => {
+                const active = cadence === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    onClick={() => setCadence(value)}
+                    aria-checked={active}
+                    className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+                      active
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                    }`}
+                  >
+                    {CADENCE_LABELS[value]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* No recurrence control here: since 2026-07-25 (final decision)
             EVERY Daily task auto-recurs weekly, system-wide — see

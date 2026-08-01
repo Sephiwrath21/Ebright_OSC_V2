@@ -45,6 +45,7 @@ export function AddTaskButton({
   templates,
   recipientGroup,
   quickSelfId,
+  hideCadence,
 }: {
   staff: FlowStaffMember[];
   action: (input: FlowAssignInput) => Promise<AssignActionResult>;
@@ -58,6 +59,9 @@ export function AddTaskButton({
   /** CEO quick-pick (2026-08-01): the caller's own user id — passed
    *  straight through to AssignTaskForm's "Myself" chip. */
   quickSelfId?: string;
+  /** CEO-only (2026-08-01): hides the Cadence picker — passed straight
+   *  through to AssignTaskForm. */
+  hideCadence?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<HubTab>("assign");
@@ -126,6 +130,7 @@ export function AddTaskButton({
                 templates={templates}
                 recipientGroup={recipientGroup}
                 quickSelfId={quickSelfId}
+                hideCadence={hideCadence}
                 bare
               />
             )}

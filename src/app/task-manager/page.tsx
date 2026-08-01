@@ -626,6 +626,11 @@ export default async function TaskManagerPage({
           // isn't a HOD and would otherwise never appear in this list.
           recipientGroup={role === "CEO" ? "HOD" : undefined}
           quickSelfId={role === "CEO" ? daily.me.me.userId : undefined}
+          // Cadence is meaningless for CEO-assigned tasks (2026-08-01):
+          // they're categorized by WHO assigned them (the recipient's "CEO
+          // Assigned" stream, or the CEO's own list for "Myself"), never by
+          // a Daily/Monthly tag — so the field is hidden for the CEO only.
+          hideCadence={role === "CEO"}
           templates={{
             list: templateList,
             load: loadTemplate,
