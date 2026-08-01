@@ -512,11 +512,11 @@ export function reopenFlowTask(
 /** The My Tasks "Proof" column (2026-07-30): assignee-only upload of ONE
  *  completion-evidence image per task. Always optional — never gates the
  *  status-dot completion path above. Re-uploading replaces the previous
- *  image (upsert on runBlockId). Same mimes as the Guideline image, but
- *  its own 10 MB cap (raised from 2 MB, 2026-07-31 — phone photos easily
- *  exceed 2 MB; Guideline stays at 2 MB). Well inside the 55 MB server-
- *  action body limit (next.config bodySizeLimit). */
-const PROOF_IMAGE_MAX_BASE64 = 10 * 1024 * 1024 * 1.37;
+ *  image (upsert on runBlockId). 2 MB cap (2026-08-01 storage decision:
+ *  images are compressed CLIENT-side to ≤1280px JPEG before upload — see
+ *  ui/image-compress.ts — so this server cap is the bypass-proof
+ *  enforcement of the same limit, not the primary size control). */
+const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
   dataBase64: z.string().min(1).max(PROOF_IMAGE_MAX_BASE64),

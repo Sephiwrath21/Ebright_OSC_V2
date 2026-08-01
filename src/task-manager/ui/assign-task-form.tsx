@@ -23,6 +23,7 @@ import {
   type FlowTemplateControl,
 } from "./types";
 import { RecipientPicker } from "./recipient-picker";
+import { compressImageFile } from "./image-compress";
 
 const CADENCE_LABELS: Record<CadenceOption, string> = {
   daily: "Daily",
@@ -122,37 +123,28 @@ export function AssignTaskForm({
     setMessage(null);
   };
 
-  const GUIDELINE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
-  const GUIDELINE_MAX_BYTES = 2 * 1024 * 1024;
   const clearGuidelineImage = () => {
     setGuidelineImage(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
+  // Compressed client-side before staging (2026-08-01 storage decision) —
+  // same ≤1280px JPEG pipeline as proof uploads (ui/image-compress.ts).
   const onGuidelineImagePick = (file: File | undefined) => {
     if (!file) return;
-    if (!(GUIDELINE_MIMES as readonly string[]).includes(file.type)) {
-      setMessage({ ok: false, text: "Guideline image must be PNG, JPG, or WebP." });
-      clearGuidelineImage();
-      return;
-    }
-    if (file.size > GUIDELINE_MAX_BYTES) {
-      setMessage({ ok: false, text: "Guideline image must be 2 MB or smaller." });
-      clearGuidelineImage();
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string; // data:<mime>;base64,<data>
-      const dataBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    void compressImageFile(file).then((result) => {
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        clearGuidelineImage();
+        return;
+      }
       setGuidelineImage({
-        mime: file.type as (typeof GUIDELINE_MIMES)[number],
-        dataBase64,
-        previewUrl: dataUrl,
+        mime: result.image.mime,
+        dataBase64: result.image.dataBase64,
+        previewUrl: result.image.previewUrl,
         name: file.name,
       });
       setMessage(null);
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   // Which Cadence pills to even offer depends on who's selected — Branch
