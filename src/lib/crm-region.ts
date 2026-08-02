@@ -116,6 +116,8 @@ async function resolveTenantId(): Promise<string | null> {
 
 export async function getRegionDayDistribution(opts: {
   preset?: string; from?: string; to?: string; region?: string; branchId?: string;
+  /** Access-enforced crm_branch allow-list. null = no restriction. */
+  allowedBranchIds?: string[] | null;
 }): Promise<RegionResult | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
@@ -125,11 +127,12 @@ export async function getRegionDayDistribution(opts: {
   const regionParam = (opts.region ?? "all").toUpperCase();
   const branchIdParam = opts.branchId ?? "all";
 
-  // ─── Visible branches (superadmin = whole tenant), region/branch filtered ───
+  // ─── Visible branches (region/branch filtered, then clamped to access) ───
   const bParams: unknown[] = [tenantId];
   const bFilters = [`"tenantId" = $1`];
   if (regionParam !== "ALL") { bParams.push(regionParam); bFilters.push(`region = $${bParams.length}`); }
   if (branchIdParam !== "all") { bParams.push(branchIdParam); bFilters.push(`id = $${bParams.length}`); }
+  if (opts.allowedBranchIds != null) { bParams.push(opts.allowedBranchIds); bFilters.push(`id = ANY($${bParams.length}::text[])`); }
 
   const branchRes = await queryCrmDb<{ id: string; name: string; region: string | null }>(
     `SELECT id, name, region FROM crm.crm_branch WHERE ${bFilters.join(" AND ")} ORDER BY name ASC`,

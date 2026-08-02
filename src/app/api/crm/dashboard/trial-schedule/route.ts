@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { isCrmAvailable } from "@/lib/crm-db";
 import { getTrialSchedule, type SchedulePreset } from "@/lib/crm-trial-schedule";
+import { buildAccess } from "@/lib/access/engine";
+import { resolveCrmBranchIds } from "@/lib/crm-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -10,21 +11,20 @@ const PRESETS: SchedulePreset[] = [
   "today", "yesterday", "this_week", "last_week", "next_week", "this_month", "custom",
 ];
 
-// GET /api/crm/dashboard/trial-schedule — superadmin trial-class grid (read-only,
-// sourced from ebright_crm). Mirrors v1's endpoint; branch mapping is by branchId.
+// GET /api/crm/dashboard/trial-schedule — trial-class grid (read-only, sourced
+// from ebright_crm). Branch mapping is by branchId; scoped to the caller's
+// `cns_dashboard` grant.
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
-  });
-  if (me?.role?.role_type !== "superadmin") {
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("cns_dashboard", "view")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const branchScope = await resolveCrmBranchIds(access, "cns_dashboard");
 
   if (!isCrmAvailable()) {
     return NextResponse.json(
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       preset,
       from: sp.get("from") ?? undefined,
       to: sp.get("to") ?? undefined,
+      allowedBranchIds: branchScope.all ? null : branchScope.ids,
     });
     if (!data) {
       return NextResponse.json({ error: "CRM data unavailable" }, { status: 503 });

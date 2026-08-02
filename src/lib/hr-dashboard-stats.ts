@@ -211,7 +211,7 @@ export async function getMia(
     ),
     queryEbrightHrfsSource<{ emp_no: string | null }>(
       `SELECT DISTINCT emp_no FROM public.attendance_justification
-         WHERE just_date = $1::date`,
+         WHERE just_date = $1::date AND status = 'approved'`,
       [todayMyt],
     ),
   ]);

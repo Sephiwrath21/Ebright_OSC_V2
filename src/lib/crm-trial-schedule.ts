@@ -139,6 +139,8 @@ export async function getTrialSchedule(opts: {
   preset: SchedulePreset;
   from?: string;
   to?: string;
+  /** Access-enforced crm_branch allow-list. null = no restriction. */
+  allowedBranchIds?: string[] | null;
 }): Promise<TrialScheduleResult | null> {
   const tenantRes = await queryCrmDb<{ id: string }>(
     `SELECT id FROM crm.crm_tenant WHERE slug IN ('ebright','ebright-demo') ORDER BY "createdAt" ASC LIMIT 1`,
@@ -157,7 +159,11 @@ export async function getTrialSchedule(opts: {
     `SELECT id, name, region FROM crm.crm_branch WHERE "tenantId" = $1 AND region IN ('A','B','C') ORDER BY name ASC`,
     [tenantId],
   );
-  const allBranches = branchesRes?.rows ?? [];
+  // Clamp the branch universe to what the caller may see (access boundary).
+  const allowed = opts.allowedBranchIds ?? null;
+  const allBranches = (branchesRes?.rows ?? []).filter(
+    (b) => allowed === null || allowed.includes(b.id),
+  );
   const branchOptions = allBranches.map((b) => ({ id: b.id, name: b.name }));
 
   const requested = opts.branchId;

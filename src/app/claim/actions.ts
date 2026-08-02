@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { canReviewClaims } from "@/app/claim/roles";
+import { buildAccess } from "@/lib/access/engine";
 import { uploadToDrive } from "@/lib/drive";
 import {
   type ClaimType,
@@ -229,24 +229,9 @@ export async function reviewClaim(
   const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
 
-  const reviewer = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (
-    !reviewer ||
-    !canReviewClaims({
-      role_id: reviewer.role_id,
-      email: reviewer.email,
-      role_type: reviewer.role?.role_type ?? null,
-    })
-  ) {
-    return { ok: false, error: "Only finance or superadmin can review claims." };
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("claim", "update")) {
+    return { ok: false, error: "You don't have permission to review claims." };
   }
 
   const claimId = parseInt(s(formData, "claim_id"), 10);
@@ -304,16 +289,8 @@ export async function advanceClaim(
   const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (!me) return { ok: false, error: "User record not found." };
+  const access = await buildAccess(session.user.email);
+  if (!access) return { ok: false, error: "User record not found." };
 
   const claimId = parseInt(s(formData, "claim_id"), 10);
   if (Number.isNaN(claimId)) return { ok: false, error: "Invalid claim id." };
@@ -329,20 +306,14 @@ export async function advanceClaim(
   });
   if (!existing) return { ok: false, error: "Claim not found." };
 
-  // Disbursement is a finance action; confirming receipt belongs to the
+  // Disbursement is a review action; confirming receipt belongs to the
   // employee who requested the claim.
   if (action === "disburse") {
-    if (
-      !canReviewClaims({
-        role_id: me.role_id,
-        email: me.email,
-        role_type: me.role?.role_type ?? null,
-      })
-    ) {
-      return { ok: false, error: "Only finance or superadmin can disburse claims." };
+    if (!access.can("claim", "update")) {
+      return { ok: false, error: "You don't have permission to disburse claims." };
     }
   } else {
-    if (existing.user_id !== me.user_id) {
+    if (existing.user_id !== access.actor.userId) {
       return { ok: false, error: "Only the claim requester can confirm receipt." };
     }
   }

@@ -1,95 +1,20 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mytDateOnly, mytHour } from "@/lib/myt";
-import { getMalaysiaHoliday, isMalaysiaHoliday } from "@/lib/malaysiaHolidays";
+import { mytDateOnly } from "@/lib/myt";
+import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
+import {
+  getSelfAttendance,
+  classifySelfDay,
+  hoursForDay,
+  overtimeForDay,
+} from "@/lib/self-attendance";
 
 export const dynamic = "force-dynamic";
 
 const STAFF_ROLE_ID = 4;
-const LATE_HOUR_MYT = 9; // strictly after 09:00 MYT counts as late
-
-// Schedule definitions per branch. Keyed by branch_code.
-// HQ:    Tue–Sat, 09:00 → 18:00 (Sat → 19:00).
-// Other: Mon–Sat, 09:00 → 18:00 (default for branches we haven't tuned).
-type DaySchedule = { startHour: number; endHour: number };
-type Schedule    = { workingDows: number[]; perDow: Record<number, DaySchedule> };
-
-// JS getUTCDay(): 0=Sun, 1=Mon, 2=Tue, ..., 6=Sat
-const HQ_SCHEDULE: Schedule = {
-  workingDows: [2, 3, 4, 5, 6],
-  perDow: {
-    2: { startHour: 9, endHour: 18 },
-    3: { startHour: 9, endHour: 18 },
-    4: { startHour: 9, endHour: 18 },
-    5: { startHour: 9, endHour: 18 },
-    6: { startHour: 9, endHour: 19 },
-  },
-};
-
-const DEFAULT_SCHEDULE: Schedule = {
-  workingDows: [1, 2, 3, 4, 5, 6],
-  perDow: {
-    1: { startHour: 9, endHour: 18 },
-    2: { startHour: 9, endHour: 18 },
-    3: { startHour: 9, endHour: 18 },
-    4: { startHour: 9, endHour: 18 },
-    5: { startHour: 9, endHour: 18 },
-    6: { startHour: 9, endHour: 18 },
-  },
-};
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Count working days in [start, end] inclusive: days in the schedule's
-// `workingDows` that are NOT a Malaysian public holiday.
-function workingDaysBetween(start: Date, end: Date, sch: Schedule): number {
-  let count = 0;
-  const d = new Date(start.getTime());
-  while (d.getTime() <= end.getTime()) {
-    const iso = d.toISOString().slice(0, 10);
-    if (sch.workingDows.includes(d.getUTCDay()) && !isMalaysiaHoliday(iso)) {
-      count++;
-    }
-    d.setUTCDate(d.getUTCDate() + 1);
-  }
-  return count;
-}
-
-// Hours worked for an attendance row. Prefers `total_hours`; falls back to
-// (check_out − check_in) when the column is null but both stamps exist.
-function hoursFromRow(row: { check_in: Date | null; check_out: Date | null; total_hours: unknown }): number {
-  const th = row.total_hours;
-  if (th !== null && th !== undefined) {
-    const n = Number(th);
-    if (!isNaN(n) && n > 0) return n;
-  }
-  if (row.check_in && row.check_out) {
-    const ms = row.check_out.getTime() - row.check_in.getTime();
-    if (ms > 0) return ms / 3_600_000;
-  }
-  return 0;
-}
-
-// Format an MYT-anchored Date as the wall-clock time, e.g. "9:14 AM".
-function fmtMytClock(d: Date): string {
-  const mytMs = d.getTime() + 8 * 60 * 60_000;
-  const m = new Date(mytMs);
-  let h = m.getUTCHours();
-  const mm = m.getUTCMinutes();
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12; if (h === 0) h = 12;
-  return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
-}
-
-// Minutes a check_in is after the scheduled startHour (negative → early).
-function minutesLate(checkIn: Date, startHour: number): number {
-  const mytMs = checkIn.getTime() + 8 * 60 * 60_000;
-  const m = new Date(mytMs);
-  const totalMin   = m.getUTCHours() * 60 + m.getUTCMinutes();
-  const startMin   = startHour * 60;
-  return totalMin - startMin;
-}
 
 export async function GET() {
   const session = await auth();
@@ -125,10 +50,10 @@ export async function GET() {
 
   const employment = me.employment[0];
   const branchCode = employment?.branch?.branch_code ?? null;
-  const sch = branchCode === "HQ" ? HQ_SCHEDULE : DEFAULT_SCHEDULE;
 
   // Calendar bounds (MYT @db.Date space).
   const today      = mytDateOnly();
+  const todayIso   = today.toISOString().slice(0, 10);
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(),     1));
   const lastMStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
   const lastMEnd   = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(),     0));
@@ -139,50 +64,60 @@ export async function GET() {
   const weekStart   = new Date(today.getTime()); weekStart.setUTCDate(today.getUTCDate() - daysFromMon);
   const weekEnd     = new Date(weekStart.getTime()); weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
 
-  const [attMonth, attLast, attWeek, pendingLeaveAgg] = await Promise.all([
-    prisma.attendance.findMany({
-      where: { user_id: me.user_id, date: { gte: monthStart, lte: today } },
-      select: { date: true, check_in: true, check_out: true, total_hours: true },
-    }),
-    prisma.attendance.findMany({
-      where: { user_id: me.user_id, date: { gte: lastMStart, lte: lastMEnd } },
-      select: { check_in: true },
-    }),
-    prisma.attendance.findMany({
-      where: { user_id: me.user_id, date: { gte: weekStart, lte: weekEnd } },
-      select: { date: true, check_in: true, check_out: true, total_hours: true },
-    }),
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  // One scan-sourced pass over the widest range we need (last month → end of
+  // this week), plus the portal-side pending-leave total.
+  const rangeStart = lastMStart.getTime() < weekStart.getTime() ? lastMStart : weekStart;
+  const rangeEnd   = weekEnd.getTime()   > today.getTime()      ? weekEnd    : today;
+  const [selfAtt, pendingLeaveAgg] = await Promise.all([
+    getSelfAttendance(me.user_id, iso(rangeStart), iso(rangeEnd)),
     prisma.leave_request.aggregate({
       where: { user_id: me.user_id, status: "pending" },
       _sum:  { total_days: true },
     }),
   ]);
+  const attDays = selfAtt.days;
 
-  // ── Monthly KPIs ────────────────────────────────────────────────────────────
-  const elapsedWorking   = workingDaysBetween(monthStart, today,    sch);
-  const lastMonthWorking = workingDaysBetween(lastMStart, lastMEnd, sch);
+  // ── Monthly KPIs (present / elapsed working days, from scans) ──────────────
+  const monthlyStats = (from: Date, to: Date) => {
+    let present = 0;
+    let elapsed = 0;
+    let late = 0;
+    let overtime = 0;
+    for (const d = new Date(from.getTime()); d.getTime() <= to.getTime(); d.setUTCDate(d.getUTCDate() + 1)) {
+      const key = iso(d);
+      const info = attDays.get(key);
+      if (!info) continue;
+      const { state } = classifySelfDay(info, key, todayIso);
+      // Only real, elapsed working days count toward the ratio.
+      if (state === "offday" || state === "holiday" || state === "upcoming") continue;
+      elapsed++;
+      if (info.checkIn) {
+        present++;
+        if (state === "late") late++;
+      }
+      overtime += overtimeForDay(info);
+    }
+    return { present, elapsed, late, overtime };
+  };
 
-  const presentThis = attMonth.filter(a => a.check_in).length;
-  const presentLast = attLast.filter(a => a.check_in).length;
+  const thisMonth = monthlyStats(monthStart, today);
+  const lastMonth = monthlyStats(lastMStart, lastMEnd);
 
-  const thisMonthPercent = elapsedWorking   > 0 ? Math.min(100, Math.round((presentThis / elapsedWorking)   * 100)) : 0;
-  const lastMonthPercent = lastMonthWorking > 0 ? Math.min(100, Math.round((presentLast / lastMonthWorking) * 100)) : 0;
+  const thisMonthPercent = thisMonth.elapsed > 0 ? Math.min(100, Math.round((thisMonth.present / thisMonth.elapsed) * 100)) : 0;
+  const lastMonthPercent = lastMonth.elapsed > 0 ? Math.min(100, Math.round((lastMonth.present / lastMonth.elapsed) * 100)) : 0;
+  const lateThisMonth = thisMonth.late;
+  const overtimeHrs = Math.round(thisMonth.overtime * 10) / 10;
 
-  const lateThisMonth = attMonth.filter(a => a.check_in && mytHour(a.check_in) >= LATE_HOUR_MYT).length;
-
-  let overtimeHrs = 0;
-  for (const a of attMonth) {
-    const hrs = hoursFromRow(a);
-    if (hrs > 8) overtimeHrs += hrs - 8;
-  }
-  overtimeHrs = Math.round(overtimeHrs * 10) / 10;
-
-  // ── This-week breakdown (only working days for the user's schedule) ────────
-  const weekAttMap = new Map<string, { check_in: Date | null; check_out: Date | null; total_hours: unknown }>();
-  for (const a of attWeek) {
-    const key = a.date.toISOString().slice(0, 10);
-    weekAttMap.set(key, { check_in: a.check_in, check_out: a.check_out, total_hours: a.total_hours });
-  }
+  // ── This-week breakdown (the user's own scheduled days) ────────────────────
+  const fmtClock = (d: Date) => {
+    const h24 = d.getUTCHours();
+    const mm = d.getUTCMinutes();
+    const ampm = h24 >= 12 ? "PM" : "AM";
+    let h = h24 % 12; if (h === 0) h = 12;
+    return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
+  };
 
   type WeekDay = {
     day:      string;
@@ -190,6 +125,7 @@ export async function GET() {
     state:    "ontime" | "late" | "today" | "absent" | "upcoming" | "holiday";
     label:    string;
     minutesLate?: number;
+    justification?: { reason: string | null; status: string };
   };
 
   const weekDays: WeekDay[] = [];
@@ -198,62 +134,63 @@ export async function GET() {
   let lateWeek    = 0;
   let absentWeek  = 0;
   let holidayWeek = 0;
+  let elapsedWeekDays = 0;
 
-  const cur = new Date(weekStart.getTime());
-  while (cur.getTime() <= weekEnd.getTime()) {
+  for (const cur = new Date(weekStart.getTime()); cur.getTime() <= weekEnd.getTime(); cur.setUTCDate(cur.getUTCDate() + 1)) {
+    const key = iso(cur);
+    const info = attDays.get(key);
+    if (!info || !info.slot) continue; // off day / no schedule → not shown
+
     const cDow = cur.getUTCDay();
-    if (sch.workingDows.includes(cDow)) {
-      const iso         = cur.toISOString().slice(0, 10);
-      const holidayName = getMalaysiaHoliday(iso);
-      const cmpToday    = cur.getTime() === today.getTime();
-      const future      = cur.getTime() >  today.getTime();
-      const att         = weekAttMap.get(iso);
+    const { state: rawState, minutesLate: mins } = classifySelfDay(info, key, todayIso);
+    if (cur.getTime() <= today.getTime() && !info.holidayName) elapsedWeekDays++;
+    totalWeekHours += hoursForDay(info);
 
-      const startHour = sch.perDow[cDow]?.startHour ?? 9;
-
-      let state: WeekDay["state"];
-      let label: string;
-      let minsLate: number | undefined;
-
-      if (holidayName) {
-        // Public holiday — keep any check-in hours but never count as absent/late.
-        state = "holiday";
-        label = holidayName;
-        holidayWeek++;
-        if (att) totalWeekHours += hoursFromRow(att);
-      } else if (att?.check_in) {
-        const mins  = minutesLate(att.check_in, startHour);
-        const clock = fmtMytClock(att.check_in);
-        if (mins > 0) {
-          state = "late";
-          minsLate = mins;
-          label = `Late ${mins}m · ${clock}`;
-          lateWeek++;
-        } else {
-          state = "ontime";
-          label = `On time · ${clock}`;
-          onTimeWeek++;
-        }
-        totalWeekHours += hoursFromRow(att);
-      } else if (cmpToday) {
-        state = "today";
-        label = "Today";
-      } else if (future) {
-        state = "upcoming";
-        label = DAY_NAMES[cDow];
-      } else {
-        state = "absent";
-        label = "Absent";
-        absentWeek++;
-      }
-
-      weekDays.push({ day: DAY_NAMES[cDow], dateIso: iso, state, label, minutesLate: minsLate });
+    let state: WeekDay["state"];
+    let label: string;
+    if (info.holidayName) {
+      state = "holiday"; label = info.holidayName; holidayWeek++;
+    } else if (rawState === "late" && info.checkIn) {
+      state = "late"; label = `Late ${mins}m · ${fmtClock(info.checkIn)}`; lateWeek++;
+    } else if (rawState === "ontime" && info.checkIn) {
+      state = "ontime"; label = `On time · ${fmtClock(info.checkIn)}`; onTimeWeek++;
+    } else if (rawState === "today") {
+      state = "today"; label = "Today";
+    } else if (rawState === "upcoming") {
+      state = "upcoming"; label = DAY_NAMES[cDow];
+    } else {
+      state = "absent"; label = "Absent"; absentWeek++;
     }
-    cur.setUTCDate(cur.getUTCDate() + 1);
+
+    weekDays.push({ day: DAY_NAMES[cDow], dateIso: key, state, label, minutesLate: mins });
   }
 
-  // Working days elapsed this week up to & including today.
-  const elapsedWeekDays = workingDaysBetween(weekStart, today, sch);
+  // Annotate absent/late days with any justification the employee has on HRFS
+  // (their own pending submissions, or an HR-approved/rejected decision). Best
+  // effort — an HRFS outage must not break the dashboard.
+  const empNo = selfAtt.empNo ?? "";
+  if (empNo) {
+    try {
+      const jres = await queryEbrightHrfs<{
+        just_date: string;
+        reason: string | null;
+        status: string | null;
+      }>(
+        `SELECT to_char(just_date, 'YYYY-MM-DD') AS just_date, reason, status
+           FROM public.attendance_justification
+          WHERE emp_no = $1 AND just_date >= $2::date AND just_date <= $3::date`,
+        [empNo, iso(weekStart), iso(weekEnd)],
+      );
+      const byDate = new Map(jres.rows.map((r) => [r.just_date, r]));
+      for (const wd of weekDays) {
+        const j = byDate.get(wd.dateIso);
+        if (j) wd.justification = { reason: j.reason, status: j.status ?? "pending" };
+      }
+    } catch {
+      // Leave justifications unset; the dashboard still renders.
+    }
+  }
+
   const weekOnTimePercent = elapsedWeekDays > 0
     ? Math.round((onTimeWeek / elapsedWeekDays) * 100)
     : 0;

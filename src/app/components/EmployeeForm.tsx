@@ -18,7 +18,7 @@ const WORKFLOW_TEMPLATE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "FullTimer", label: "Full-timer · HQ or Branch" },
 ];
 
-const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "INTERN"];
+const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "PROTEGE INTERN", "HQ INTERN"];
 
 // Employee ID structure: RR-DD-NNNN (8 digits total). The role select drives
 // the first two digits; the department code drives the next two; the user keys
@@ -31,6 +31,9 @@ const ROLE_CODES: Record<string, string> = {
   "BM": "55",
   "FT COACH": "66",
   "PT COACH": "77",
+  // All intern types share the intern role code 44.
+  "PROTEGE INTERN": "44",
+  "HQ INTERN": "44",
 };
 const DEPT_CODES: Array<{ code: string; name: string }> = [
   { code: "01", name: "CEO" },
@@ -42,13 +45,35 @@ const DEPT_CODES: Array<{ code: string; name: string }> = [
   { code: "07", name: "Marketing" },
   { code: "08", name: "Optimisation" },
 ];
+
+// Map a picked department's name to its 2-digit Employee-ID DD code, so the ID
+// composer stays in sync with the Department dropdown. Alias a few name spellings.
+const DEPT_NAME_ALIASES: Record<string, string> = {
+  operations: "02",
+  "human resource": "04",
+  "human resources": "04",
+  optimization: "08",
+};
+function ddCodeForDeptName(name: string | null | undefined): string {
+  const key = (name ?? "").trim().toLowerCase();
+  if (!key) return "";
+  const direct = DEPT_CODES.find((d) => d.name.toLowerCase() === key);
+  return direct ? direct.code : DEPT_NAME_ALIASES[key] ?? "";
+}
 // Roles where the department code is fixed and not user-selectable.
 const FIXED_DEPT_BY_ROLE: Record<string, string> = {
   "FT CEO": "01",
   "BM": "02",
   "FT COACH": "02",
   "PT COACH": "02",
+  // Protégé interns are branch-based like coaches (Operation); HQ interns sit
+  // in an HQ department, so their department stays user-selectable.
+  "PROTEGE INTERN": "02",
 };
+// Which org field a role gets: HQ/department-based roles pick a DEPARTMENT;
+// everyone else picks a BRANCH; FT CEO is org-less (neither dropdown).
+const DEPT_ROLES = new Set(["FT HOD", "FT EXEC", "HQ INTERN"]);
+const NO_ORG_ROLES = new Set(["FT CEO"]);
 const GENDER_OPTIONS = ["Male", "Female", "Other"];
 const EMPLOYMENT_TYPE_OPTIONS = [
   "Full time - Permanent",
@@ -150,9 +175,12 @@ export default function EmployeeForm({
   const [departmentId, setDepartmentId] = useState<string>(
     employee?.departmentId ? String(employee.departmentId) : "",
   );
-  // Department select is only relevant under HQ — derived from the chosen branch's code.
-  const isHqSelected =
-    branches.find((b) => String(b.id) === branchId)?.code === "HQ";
+  // The org field follows the selected role: department for HQ/dept roles,
+  // branch for everyone else. FT CEO is auto-assigned to the CEO department.
+  const showDept = DEPT_ROLES.has(currentRole);
+  const isNoOrgRole = NO_ORG_ROLES.has(currentRole);
+  const showBranch = !showDept && !isNoOrgRole;
+  const ceoDept = departments.find((d) => d.code === "01");
 
   // Employee ID parts. Existing rows that already follow the RR-DD-NNNNNN
   // convention pre-fill cleanly; legacy values stay in the serial slot.
@@ -168,6 +196,9 @@ export default function EmployeeForm({
   const empRoleCode = ROLE_CODES[currentRole] ?? "";
   const fixedDeptForRole = FIXED_DEPT_BY_ROLE[currentRole] ?? null;
   const effectiveDeptCode = fixedDeptForRole ?? empDeptCode;
+  // For dept-driven roles the DD is auto-set from the Department dropdown, so
+  // lock it (and the role-fixed case) rather than let it drift out of sync.
+  const ddLocked = fixedDeptForRole !== null || (showDept && effectiveDeptCode !== "");
   // Final value submitted as `employeeId` — only complete when all three parts are filled.
   const composedEmployeeId =
     empRoleCode && effectiveDeptCode && empSerial.length === 4
@@ -236,7 +267,7 @@ export default function EmployeeForm({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-5xl mx-auto px-6 pt-4 pb-32">
+      <div className="max-w-5xl mx-auto px-6 pt-4 pb-8">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -293,10 +324,10 @@ export default function EmployeeForm({
             actions={<TabNav active={activeTab} onChange={setActiveTab} />}
           >
             <Field label="Full Name" required>
-              <input name="fullName" type="text" placeholder="e.g. NIK NUR ATHIRAH NIK" className={inputCls} defaultValue={employee?.fullName ?? ""} required />
+              <input name="fullName" type="text" placeholder="e.g. ERNIE SUHAILA BINTI RAMLAN" className={inputCls} defaultValue={employee?.fullName ?? ""} required />
             </Field>
             <Field label="Nick Name">
-              <input name="nickName" type="text" placeholder="e.g. ATHIRAH" className={inputCls} defaultValue={employee?.nickName ?? ""} />
+              <input name="nickName" type="text" placeholder="e.g. ERNIE" className={inputCls} defaultValue={employee?.nickName ?? ""} />
             </Field>
             <Field label="Email" required hint={isSelfEdit ? "Change your email via Profile → Edit." : undefined}>
               <input
@@ -372,14 +403,16 @@ export default function EmployeeForm({
                     <select
                       value={effectiveDeptCode}
                       onChange={(e) => setEmpDeptCode(e.target.value)}
-                      disabled={fixedDeptForRole !== null}
+                      disabled={ddLocked}
                       title={
                         fixedDeptForRole
                           ? `Locked to ${fixedDeptForRole} for this role`
-                          : "Department code"
+                          : showDept
+                            ? "Auto-set from the selected department"
+                            : "Department code"
                       }
                       className={`${inputCls} pr-8 appearance-none cursor-pointer font-mono ${
-                        fixedDeptForRole !== null ? "bg-slate-50 text-slate-600 cursor-not-allowed" : ""
+                        ddLocked ? "bg-slate-50 text-slate-600 cursor-not-allowed" : ""
                       }`}
                     >
                       <option value="" disabled>
@@ -411,7 +444,14 @@ export default function EmployeeForm({
                 <select
                   name="role"
                   defaultValue={employee?.role ?? ""}
-                  onChange={(e) => setCurrentRole(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCurrentRole(v);
+                    // Keep only the org value that matches the new role.
+                    if (DEPT_ROLES.has(v)) setBranchId("");
+                    else if (NO_ORG_ROLES.has(v)) { setBranchId(""); setDepartmentId(""); }
+                    else setDepartmentId("");
+                  }}
                   required
                   className={`${inputCls} pr-8 appearance-none cursor-pointer`}
                 >
@@ -423,35 +463,40 @@ export default function EmployeeForm({
                 <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
               </div>
             </Field>
-            <Field label="Branch" required>
-              <div className="relative">
-                <select
-                  name="branchId"
-                  value={branchId}
-                  onChange={(e) => {
-                    setBranchId(e.target.value);
-                    // Picking a non-HQ branch clears any previously selected department.
-                    const code = branches.find((b) => String(b.id) === e.target.value)?.code;
-                    if (code !== "HQ") setDepartmentId("");
-                  }}
-                  required
-                  className={`${inputCls} pr-8 appearance-none cursor-pointer`}
-                >
-                  <option value="" disabled>Select branch</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.code} — {b.name}</option>
-                  ))}
-                </select>
-                <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
-              </div>
-            </Field>
-            {isHqSelected && (
+            {showBranch && (
+              <Field label="Branch" required>
+                <div className="relative">
+                  <select
+                    name="branchId"
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    required
+                    className={`${inputCls} pr-8 appearance-none cursor-pointer`}
+                  >
+                    <option value="" disabled>Select branch</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.code} — {b.name}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
+                </div>
+              </Field>
+            )}
+            {showDept && (
               <Field label="Department" required>
                 <div className="relative">
                   <select
                     name="departmentId"
                     value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setDepartmentId(id);
+                      // Sync the Employee-ID DD code to the chosen department.
+                      const dd = ddCodeForDeptName(
+                        departments.find((d) => String(d.id) === id)?.name,
+                      );
+                      if (dd) setEmpDeptCode(dd);
+                    }}
                     required
                     className={`${inputCls} pr-8 appearance-none cursor-pointer`}
                   >
@@ -462,6 +507,14 @@ export default function EmployeeForm({
                   </select>
                   <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
                 </div>
+              </Field>
+            )}
+            {isNoOrgRole && (
+              <Field label="Department">
+                <div className={`${inputCls} flex items-center bg-slate-50 text-slate-500`}>
+                  {ceoDept ? `${ceoDept.code} — ${ceoDept.name} · auto-assigned` : "CEO department not found"}
+                </div>
+                <input type="hidden" name="departmentId" value={ceoDept ? String(ceoDept.id) : ""} />
               </Field>
             )}
             <Field label="Employment Type">
@@ -646,7 +699,7 @@ export default function EmployeeForm({
               <Select name="bankName" placeholder="Select bank" options={BANK_OPTIONS} defaultValue={employee?.bankName ?? ""} />
             </Field>
             <Field label="Account Holder Name" hint="Name as registered with the bank.">
-              <input name="accountName" type="text" placeholder="e.g. NIK NUR ATHIRAH BINTI NIK" className={inputCls} defaultValue={employee?.accountName ?? ""} />
+              <input name="accountName" type="text" placeholder="e.g. ERNIE SUHAILA BINTI RAMLAN" className={inputCls} defaultValue={employee?.accountName ?? ""} />
             </Field>
             <Field label="Account Number" span={2}>
               <input name="bankAccount" type="text" inputMode="numeric" placeholder="e.g. 1642-3344-9902" className={inputCls} defaultValue={employee?.bankAccount ?? ""} />
@@ -676,7 +729,7 @@ export default function EmployeeForm({
           </Section>
           </div>
 
-          <div className="sticky bottom-0 -mx-6 px-6 py-4 bg-slate-50/85 backdrop-blur border-t border-slate-200 flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => router.push(isSelfEdit ? "/profile" : isEdit && employee ? `/dashboard-employee-management/${employee.id}` : "/dashboard-employee-management")}

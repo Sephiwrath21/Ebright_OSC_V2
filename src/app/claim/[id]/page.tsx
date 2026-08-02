@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
 import ClaimDetailView from "@/app/components/ClaimDetailView";
-import { canReviewClaims } from "@/app/claim/roles";
+import { buildAccess } from "@/lib/access/engine";
+import { canViewClaimRecord } from "@/lib/access/claimScope";
 import { getDriveMeta, looksLikeDriveId } from "@/lib/drive";
 
 interface ResolvedAttachment {
@@ -41,22 +42,11 @@ export default async function ClaimDetailPage({
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (!me) redirect("/login");
+  const access = await buildAccess(session.user.email);
+  if (!access) redirect("/login");
 
-  const isFinance = canReviewClaims({
-    role_id: me.role_id,
-    email: me.email,
-    role_type: me.role?.role_type ?? null,
-  });
+  // Whether this actor can review (approve/reject/disburse) claims.
+  const canReview = access.can("claim", "update");
 
   const { id } = await params;
   const claimId = parseInt(id, 10);
@@ -76,6 +66,7 @@ export default async function ClaimDetailPage({
               employee_id: true,
               position: true,
               branch_id: true,
+              department_id: true,
               branch: { select: { branch_name: true, branch_code: true } },
               department: { select: { department_name: true, department_code: true } },
             },
@@ -87,11 +78,20 @@ export default async function ClaimDetailPage({
 
   if (!claim) notFound();
 
-  // Employees can only view their own claims
-  if (!isFinance && claim.user_id !== me.user_id) notFound();
+  // Scope-gated read: own always, plus team/global per the actor's claim view.
+  const ownerEmp = claim.users.employment[0];
+  if (
+    !canViewClaimRecord(access, {
+      userId: claim.user_id,
+      branchId: ownerEmp?.branch_id ?? null,
+      departmentId: ownerEmp?.department_id ?? null,
+    })
+  ) {
+    notFound();
+  }
 
   // Only the requester can confirm receipt of their own claim.
-  const isOwner = claim.user_id === me.user_id;
+  const isOwner = claim.user_id === access.actor.userId;
 
   const profile = claim.users.user_profile;
   const employment = claim.users.employment[0];
@@ -110,7 +110,7 @@ export default async function ClaimDetailPage({
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <ClaimDetailView
-        isFinance={isFinance}
+        isFinance={canReview}
         isOwner={isOwner}
         claim={{
           claimId: claim.claim_id,
