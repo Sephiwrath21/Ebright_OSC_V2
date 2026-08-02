@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import { BreadcrumbProvider } from "./BreadcrumbContext";
+import { getNavAccess } from "./navAccess.actions";
+import type { NavAccess } from "./navAccess.types";
 
 interface AppShellProps {
   children: ReactNode;
@@ -17,6 +19,10 @@ interface AppShellProps {
 let globalCollapsed = typeof window !== "undefined" ? localStorage.getItem("sidebar-collapsed") === "true" : false;
 let isFirstLoad = true;
 
+// Session-lived cache of the user's nav access so it's fetched once, not on
+// every client navigation (each route re-renders AppShell).
+let cachedNavAccess: NavAccess | null = null;
+
 export default function AppShell({ children, email, role, name }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(() => {
     return isFirstLoad ? false : globalCollapsed;
@@ -24,7 +30,25 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
   // Off-canvas drawer state for small screens (< lg), independent of the
   // desktop collapse state above.
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [navAccess, setNavAccess] = useState<NavAccess | null>(cachedNavAccess);
   const pathname = usePathname();
+
+  // Fetch the viewable-module set once per session; reuse the cache thereafter.
+  useEffect(() => {
+    if (cachedNavAccess) return;
+    let cancelled = false;
+    getNavAccess()
+      .then((a) => {
+        cachedNavAccess = a;
+        if (!cancelled) setNavAccess(a);
+      })
+      .catch(() => {
+        /* leave the menu unfiltered if access can't be resolved */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     isFirstLoad = false;
@@ -69,7 +93,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
       <div className="flex h-screen bg-slate-50 overflow-hidden">
         {/* Desktop sidebar rail (inline, collapsible). */}
         <div className="hidden lg:flex">
-          <Sidebar collapsed={collapsed} />
+          <Sidebar collapsed={collapsed} navAccess={navAccess} />
         </div>
 
         {/* Mobile off-canvas drawer + backdrop. */}
@@ -88,7 +112,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
               mobileOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
-            <Sidebar collapsed={false} />
+            <Sidebar collapsed={false} navAccess={navAccess} />
           </div>
         </div>
 

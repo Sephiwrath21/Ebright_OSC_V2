@@ -105,6 +105,8 @@ export default function ClaimsView({
   counts,
   isFinance = false,
   isSuperadmin = false,
+  showOwnerColumns,
+  teamToggle = null,
   orgOptions = [],
   initialStatus = "",
 }: {
@@ -112,9 +114,14 @@ export default function ClaimsView({
   counts?: StatusCounts;
   isFinance?: boolean;
   isSuperadmin?: boolean;
+  /** Show employee/branch columns (seeing others' claims). Defaults to isFinance. */
+  showOwnerColumns?: boolean;
+  /** own↔team switch for HOD / branch manager; null hides it. */
+  teamToggle?: { active: boolean } | null;
   orgOptions?: OrgOption[];
   initialStatus?: string;
 }) {
+  const showOwners = showOwnerColumns ?? isFinance;
   // Only honour a status that maps to a real filter option (deep-link safety).
   const validInitialStatus = STATUS_OPTIONS.some((s) => s.value === initialStatus)
     ? initialStatus
@@ -273,15 +280,42 @@ export default function ClaimsView({
                 : "Submit and track your expense claims."}
             </p>
           </div>
-          {(!isFinance || isSuperadmin) && (
-            <Link
-              href="/claim/new"
-              className="shrink-0 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              Add New Claim
-            </Link>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Add is hidden on the "My team" view (you can't add a claim for others). */}
+            {(!isFinance || isSuperadmin) && !teamToggle?.active && (
+              <Link
+                href="/claim/new"
+                className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Add New Claim
+              </Link>
+            )}
+            {teamToggle && (
+              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <Link
+                  href="/claim?view=own"
+                  className={`inline-flex items-center h-10 px-4 text-sm font-semibold transition-colors ${
+                    !teamToggle.active
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  My claims
+                </Link>
+                <Link
+                  href="/claim?view=team"
+                  className={`inline-flex items-center h-10 px-4 text-sm font-semibold transition-colors ${
+                    teamToggle.active
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  My team
+                </Link>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Monthly Claim Cycle */}
@@ -701,8 +735,8 @@ export default function ClaimsView({
               <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase">
                 <tr>
                   <th className="text-left px-6 py-3">Claim ID</th>
-                  {isFinance && <th className="text-left px-6 py-3">Employee</th>}
-                  {isFinance && <th className="text-left px-6 py-3">Branch</th>}
+                  {showOwners && <th className="text-left px-6 py-3">Employee</th>}
+                  {showOwners && <th className="text-left px-6 py-3">Branch</th>}
                   <th className="text-left px-6 py-3">Type</th>
                   <th className="text-left px-6 py-3">Amount</th>
                   <th className="text-left px-6 py-3">Date Submitted</th>
@@ -713,7 +747,7 @@ export default function ClaimsView({
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={isFinance ? 8 : 6} className="px-6 py-20">
+                    <td colSpan={showOwners ? 8 : 6} className="px-6 py-20">
                       <div className="flex flex-col items-center gap-3 text-center">
                         <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
                           <Inbox className="w-6 h-6 text-slate-400" aria-hidden="true" />
@@ -749,10 +783,10 @@ export default function ClaimsView({
                         <td className="px-6 py-4 font-semibold text-blue-600">
                           {c.displayId}
                         </td>
-                        {isFinance && (
+                        {showOwners && (
                           <td className="px-6 py-4 text-slate-800">{c.employeeName}</td>
                         )}
-                        {isFinance && (
+                        {showOwners && (
                           <td className="px-6 py-4 text-slate-600">{c.branch}</td>
                         )}
                         <td className="px-6 py-4 text-slate-700">

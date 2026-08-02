@@ -556,9 +556,28 @@ model leave_types {
 }
 
 model role {
-  role_id   Int     @id @default(autoincrement())
-  role_type String  @unique @db.VarChar(50)
-  users     users[]
+  role_id         Int               @id @default(autoincrement())
+  role_type       String            @unique @db.VarChar(50)
+  users           users[]
+  role_permission role_permission[]
+}
+
+/// DB-editable RBAC matrix: capability + scope per (role, subtype, feature, action).
+/// subtype = "" applies to the whole role; else a department_code (department role)
+/// or a position (staff role). Seeded by scripts/access-rbac-phase1.sql.
+model role_permission {
+  id          Int      @id @default(autoincrement())
+  role_id     Int
+  subtype     String   @default("") @db.VarChar(30)
+  feature_key String   @db.VarChar(40)
+  action      String   @db.VarChar(10)
+  allowed     Boolean  @default(false)
+  scope       String   @default("own") @db.VarChar(10)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  role        role     @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_role_permission_role")
+
+  @@unique([role_id, subtype, feature_key, action], map: "uq_role_permission")
+  @@index([role_id, subtype], map: "idx_role_permission_lookup")
 }
 
 model user_profile {

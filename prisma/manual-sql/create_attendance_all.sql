@@ -20,9 +20,15 @@ CREATE TABLE IF NOT EXISTS attendance_all (
   clock_in_time   TIME,                           -- first scan of the day
   clock_out_time  TIME,                           -- last scan of the day
   status          VARCHAR(20)  NOT NULL DEFAULT 'no record',  -- 'present' | 'no record'
+  scan_count      INTEGER      NOT NULL DEFAULT 0,-- number of scans that day
+  device_name     TEXT,                           -- device of the earliest scan (branch/visitor detection)
   synced_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
   CONSTRAINT uq_attendance_all_emp_date UNIQUE (employee_id, date)
 );
 
 CREATE INDEX IF NOT EXISTS idx_attendance_all_date   ON attendance_all (date);
 CREATE INDEX IF NOT EXISTS idx_attendance_all_branch ON attendance_all (branch_id);
+
+-- Added after first ship — safe to re-run.
+ALTER TABLE attendance_all ADD COLUMN IF NOT EXISTS scan_count  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE attendance_all ADD COLUMN IF NOT EXISTS device_name TEXT;

@@ -11,7 +11,7 @@ import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
 export type { EmployeeStage };
 
-export const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "INTERN"] as const;
+export const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "INTERN", "PROTEGE INTERN", "HQ INTERN"] as const;
 export type RoleOption = (typeof ROLE_OPTIONS)[number];
 
 export const STATUS_OPTIONS = ["active", "onboarding", "inactive", "archive"] as const;

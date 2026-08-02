@@ -62,6 +62,8 @@ const POSITION_OPTIONS = [
   "FT COACH",
   "PT COACH",
   "INTERN",
+  "PROTEGE INTERN",
+  "HQ INTERN",
 ];
 
 const MODULE_LABEL: Record<ModuleKey, string> = {

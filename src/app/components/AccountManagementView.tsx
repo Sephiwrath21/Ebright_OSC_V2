@@ -19,6 +19,7 @@ import {
   Check,
   AlertCircle,
   User,
+  UserPlus,
 } from "lucide-react";
 import {
   updateAccountRole,
@@ -28,6 +29,7 @@ import {
   updateAccountOrgUnit,
 } from "@/app/account-management/actions";
 import AccessTabs from "@/app/components/AccessTabs";
+import AddAccountModal from "@/app/components/AddAccountModal";
 
 export type AccountUser = {
   user_id: number;
@@ -47,7 +49,7 @@ export type AccountUser = {
 
 export type AccountData = {
   users: AccountUser[];
-  branches: { branch_id: number; branch_name: string }[];
+  branches: { branch_id: number; branch_name: string; region: string | null }[];
   departments: { department_id: number; department_name: string }[];
   roles: { role_id: number; role_type: string }[];
 };
@@ -171,10 +173,16 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
   const [position, setPosition] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<AccountUser | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     setUsers(data.users);
   }, [data.users]);
+
+  const handleCreated = (u: AccountUser) => {
+    setUsers((prev) => [u, ...prev.filter((x) => x.user_id !== u.user_id)]);
+    setAdding(false);
+  };
 
   const patchUser = (userId: number, patch: Partial<AccountUser>) => {
     setUsers((prev) =>
@@ -265,9 +273,19 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
           <div className="border-b border-slate-200 px-4 sm:px-6 py-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-slate-800">User Accounts</h2>
-              <p className="text-xs font-medium text-slate-500">
-                {filtered.length} of {users.length} accounts shown
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs font-medium text-slate-500">
+                  {filtered.length} of {users.length} accounts shown
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all duration-200"
+                >
+                  <UserPlus className="w-4 h-4" aria-hidden="true" />
+                  Add User
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -392,6 +410,16 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
           departments={data.departments}
           onClose={() => setEditing(null)}
           onPatch={patchUser}
+        />
+      )}
+
+      {adding && (
+        <AddAccountModal
+          roles={data.roles}
+          branches={data.branches}
+          departments={data.departments}
+          onClose={() => setAdding(false)}
+          onCreated={handleCreated}
         />
       )}
     </div>
