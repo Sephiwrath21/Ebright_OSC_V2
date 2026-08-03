@@ -1,26 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { isCrmAvailable } from "@/lib/crm-db";
 import { getContacts } from "@/lib/crm-contacts";
+import { buildAccess } from "@/lib/access/engine";
+import { resolveCrmBranchIds } from "@/lib/crm-scope";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/crm/contacts — superadmin contacts list (read-only, sourced from
-// ebright_crm). Mirrors v1's getContactsByTenant; tallies with the live list.
+// GET /api/crm/contacts — CNS contacts list (read-only, sourced from
+// ebright_crm). Scope follows the caller's `cns_contacts` grant: branch/region
+// callers see only contacts with an opportunity in their branch(es).
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
-  });
-  if (me?.role?.role_type !== "superadmin") {
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("cns_contacts", "view")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const branchScope = await resolveCrmBranchIds(access, "cns_contacts");
 
   if (!isCrmAvailable()) {
     return NextResponse.json({ error: "CRM database not configured (CRM_DATABASE_URL unset)" }, { status: 503 });
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
       pageSize: sp.get("pageSize") ? Number(sp.get("pageSize")) : undefined,
       sortBy,
       sortDir,
+      allowedBranchIds: branchScope.all ? null : branchScope.ids,
     });
     if (!data) return NextResponse.json({ error: "CRM data unavailable" }, { status: 503 });
     return NextResponse.json(data);

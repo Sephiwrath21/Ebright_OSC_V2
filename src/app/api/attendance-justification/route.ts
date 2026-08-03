@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Only HR-approved justifications count as "justified" for the Summary/Report
+  // (staff-submitted pending/rejected ones live in the HR approvals queue).
   const res = await queryEbrightHrfs<JustRow>(
     `SELECT id::text, emp_no, branch, emp_name,
             to_char(just_date, 'YYYY-MM-DD') AS just_date,
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest) {
             created_at::text, updated_at::text
        FROM public.attendance_justification
       WHERE just_date >= $1::date AND just_date <= $2::date
+        AND status = 'approved'
       ORDER BY just_date ASC, emp_no ASC`,
     [from, to],
   );

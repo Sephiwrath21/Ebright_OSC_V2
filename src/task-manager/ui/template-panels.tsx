@@ -21,6 +21,7 @@ import type {
   FlowTemplateControl,
 } from "./types";
 import { personRowLabel, SinglePersonPickList } from "./recipient-picker";
+import { compressImageFile } from "./image-compress";
 
 const selectClass =
   "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
@@ -110,27 +111,22 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
     setLoaded(true);
   };
 
+  // Compressed client-side before staging (2026-08-01) — same ≤1280px
+  // JPEG pipeline as proof uploads (ui/image-compress.ts).
   const onImagePick = (file: File | undefined) => {
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setMessage({ ok: false, text: "Guideline image must be PNG, JPG, or WebP." });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ ok: false, text: "Guideline image must be 2 MB or smaller." });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    void compressImageFile(file).then((result) => {
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        return;
+      }
       setGuidelineImage({
-        mime: file.type as "image/png" | "image/jpeg" | "image/webp",
-        dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
-        previewUrl: dataUrl,
+        mime: result.image.mime,
+        dataBase64: result.image.dataBase64,
+        previewUrl: result.image.previewUrl,
       });
       setMessage(null);
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   const save = async () => {

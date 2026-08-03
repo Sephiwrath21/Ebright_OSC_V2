@@ -22,6 +22,7 @@ import {
   Award,
   ClipboardList,
 } from "lucide-react";
+import type { NavAccess } from "./navAccess.types";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -35,6 +36,11 @@ interface NavItem {
   external?: boolean;
   /** Match the active route exactly instead of by prefix (for "Overview" links whose siblings share the prefix). */
   exact?: boolean;
+  /** Access-management feature key that gates this item (and its subtree).
+   *  Hidden unless the signed-in user can `view` it. Unset = always shown. */
+  feature?: string;
+  /** Superadmin / CEO only (e.g. Account Management). */
+  privileged?: boolean;
   children?: NavItem[];
 }
 
@@ -47,28 +53,30 @@ const primaryNav: NavItem[] = [
     Icon: Users,
     children: [
       { name: "Overview", href: "/dashboards/hrms" },
-      { name: "Employee Dashboard", href: "/dashboard-employee-management" },
-      { name: "Manpower Planning", href: "/manpower-schedule" },
-      { name: "Claims", href: "/claim" },
+      { name: "Employee Dashboard", href: "/dashboard-employee-management", feature: "employee_dashboard" },
+      { name: "Manpower Planning", href: "/manpower-schedule", feature: "manpower_plan" },
+      { name: "Claims", href: "/claim", feature: "claim" },
       {
         name: "Attendance",
         children: [
-          { name: "Overview", href: "/attendance", exact: true },
-          { name: "Leave", href: "/attendance/leave" },
-          { name: "Report", href: "/attendance/report" },
-          { name: "Summary", href: "/attendance/summary" },
+          { name: "Overview", href: "/attendance", exact: true, feature: "attendance_overview" },
+          { name: "Leave", href: "/attendance/leave", feature: "leave" },
+          { name: "Report", href: "/attendance/report", feature: "attendance_report" },
+          { name: "Summary", href: "/attendance/summary", feature: "attendance_summary" },
+          { name: "Justifications", href: "/attendance/justifications", feature: "attendance_justifications" },
         ],
       },
-      { name: "HR Dashboard", href: "/induction/hr-dashboard" },
-      { name: "Manpower Cost Report", href: "/manpower-cost-report" },
-      { name: "Staff Directory", href: "/staff-directory" },
-      { name: "Employee Folder", href: "/employee-folder" },
+      { name: "HR Dashboard", href: "/induction/hr-dashboard", feature: "hr_dashboard" },
+      { name: "Manpower Cost Report", href: "/manpower-cost-report", feature: "manpower_cost" },
+      { name: "Staff Directory", href: "/staff-directory", feature: "staff_directory" },
+      { name: "Employee Folder", href: "/employee-folder", feature: "employee_folder" },
     ],
   },
   {
     name: "CNS",
     href: "/dashboards/crm",
     Icon: Newspaper,
+    feature: "cns_dashboard",
     children: [
       {
         name: "Lead",
@@ -101,9 +109,9 @@ const primaryNav: NavItem[] = [
     href: "/dashboards/sms",
     Icon: BookUser,
     children: [
-      { name: "Student", href: "/dashboards/sms/student" },
-      { name: "Package", href: "/dashboards/sms/package" },
-      { name: "Age Group", href: "/dashboards/sms/age-group" },
+      { name: "Student", href: "/dashboards/sms/student", feature: "sms_student" },
+      { name: "Package", href: "/dashboards/sms/package", feature: "sms_package" },
+      { name: "Age Group", href: "/dashboards/sms/age-group", feature: "sms_age_group" },
     ],
   },
   {
@@ -117,6 +125,7 @@ const primaryNav: NavItem[] = [
     name: "FA System",
     href: "/dashboards/fa",
     Icon: Award,
+    feature: "fa_dashboard",
     children: [
       { name: "Events", href: "/dashboards/fa/events" },
       { name: "Inventory", href: "/dashboards/fa/inventory" },
@@ -130,6 +139,7 @@ const primaryNav: NavItem[] = [
     name: "PCM System",
     href: "/dashboards/pcm",
     Icon: ClipboardList,
+    feature: "pcm_dashboard",
     children: [
       { name: "Events", href: "/dashboards/pcm/events" },
       { name: "Student List", href: "/dashboards/pcm/student-list" },
@@ -143,8 +153,8 @@ const primaryNav: NavItem[] = [
 ];
 
 const secondaryNav: NavItem[] = [
-  { name: "Attendance", href: "/attendance", Icon: CalendarCheck },
-  { name: "Account Management", href: "/account-management", Icon: ShieldCheck },
+  { name: "Attendance", href: "/attendance", Icon: CalendarCheck, feature: "attendance_overview" },
+  { name: "Account Management", href: "/account-management", Icon: ShieldCheck, privileged: true },
   {
     name: "Internal Dashboard",
     href: "https://dashboard.ebright.my",
@@ -160,6 +170,29 @@ const secondaryNav: NavItem[] = [
     external: true,
   },
 ];
+
+/**
+ * Drop nav items the signed-in user can't reach: feature-gated items whose key
+ * isn't granted, and privileged-only items for non-privileged users. A parent
+ * whose children all get filtered out disappears too. `null` access (still
+ * loading) leaves the menu untouched so nothing flickers for privileged users.
+ */
+function filterNav(items: NavItem[], access: NavAccess | null): NavItem[] {
+  if (!access) return items;
+  const out: NavItem[] = [];
+  for (const item of items) {
+    if (item.privileged && !access.privileged) continue;
+    if (item.feature && !access.features.includes(item.feature)) continue;
+    if (item.children?.length) {
+      const kids = filterNav(item.children, access);
+      if (kids.length === 0) continue;
+      out.push({ ...item, children: kids });
+    } else {
+      out.push(item);
+    }
+  }
+  return out;
+}
 
 function isItemActive(item: NavItem, pathname: string | null): boolean {
   if (!item.href || item.external || !pathname) return false;
@@ -192,8 +225,16 @@ function firstHref(item: NavItem): string {
   return "#";
 }
 
-export default function Sidebar({ collapsed }: { collapsed: boolean }) {
+export default function Sidebar({
+  collapsed,
+  navAccess = null,
+}: {
+  collapsed: boolean;
+  navAccess?: NavAccess | null;
+}) {
   const pathname = usePathname();
+  const primaryItems = filterNav(primaryNav, navAccess);
+  const secondaryItems = filterNav(secondaryNav, navAccess);
 
   return (
     <aside
@@ -224,9 +265,13 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
       </Link>
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
-        <NavSection label="Workspace" items={primaryNav} pathname={pathname} collapsed={collapsed} />
-        <div className="my-3 mx-3 border-t border-slate-100" />
-        <NavSection label="Quick Access" items={secondaryNav} pathname={pathname} collapsed={collapsed} />
+        <NavSection label="Workspace" items={primaryItems} pathname={pathname} collapsed={collapsed} />
+        {secondaryItems.length > 0 && (
+          <>
+            <div className="my-3 mx-3 border-t border-slate-100" />
+            <NavSection label="Quick Access" items={secondaryItems} pathname={pathname} collapsed={collapsed} />
+          </>
+        )}
       </nav>
     </aside>
   );

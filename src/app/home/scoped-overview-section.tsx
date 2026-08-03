@@ -20,7 +20,15 @@
 // no account, bridge failure) renders nothing — Home must never break
 // because of Task Manager state.
 import type { ReactNode } from "react";
-import { getFlowDetail } from "@/task-manager/data";
+import { revalidatePath } from "next/cache";
+import { requireLiveSession } from "@/task-manager/action-session";
+import {
+  getCeoDashboardConfig,
+  getDepartmentDetail,
+  getFlowDetail,
+  saveCeoDashboardConfig,
+  FlowBridgeError,
+} from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
 import { resolveViewRole, shows } from "@/task-manager/role-views";
 import {
@@ -29,8 +37,15 @@ import {
   MonthRangeDropdown,
 } from "@/task-manager/ui/entity-picker";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
+import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
+import { RegionDonutGrids } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
-import { flowBucketize, flowStreamLabel, visibleAssignerStreams } from "@/task-manager/ui/types";
+import {
+  flowBucketize,
+  flowStreamLabel,
+  visibleAssignerStreams,
+  FLOW_DEPARTMENTS,
+} from "@/task-manager/ui/types";
 import type { ActionResult } from "@/task-manager/ui/types";
 
 export async function HomeScopedOverviewSection({
@@ -111,6 +126,17 @@ export async function HomeScopedOverviewSection({
           extraParams={carry("mdate", "mrange")}
         />
       </div>
+    );
+    // CEO's branchRegionOverview Ad hoc section (2026-08-01) — same single-
+    // day picker as HomeTaskOverview's org-wide version.
+    const adhocPicker = (
+      <DailyDatePicker
+        key="ceo-adhoc-picker"
+        value={adhocAnchor}
+        basePath="/home"
+        param="adate"
+        extraParams={carry("adate")}
+      />
     );
 
     // ALL role gates below read role-views.ts (the single source of truth,
@@ -356,6 +382,119 @@ export async function HomeScopedOverviewSection({
       );
     }
 
+    // CEO (2026-08-01 redesign): below the personal pair, the DRAGGABLE
+    // pinned-department dashboards — the SAME CeoDashboardSection the Task
+    // Manager page uses (add / drag-reorder / ✕-remove, per-CEO persisted
+    // in CeoDashboardConfig; removing a card only hides it from this
+    // dashboard, never touches the department). Actions revalidate /home.
+    let ceoDashboards: ReactNode = null;
+    if (shows(view, "home", "ceoKanban")) {
+      const FALLBACK = "Something went wrong — please try again";
+      const makeCeoActions = (cadence: "daily" | "monthly") => {
+        async function add(department: string): Promise<ActionResult> {
+          "use server";
+          const stale = await requireLiveSession(email);
+          if (stale) return stale;
+          try {
+            const { departments } = await getCeoDashboardConfig(email, cadence);
+            if (!departments.includes(department)) {
+              await saveCeoDashboardConfig(email, cadence, [...departments, department]);
+            }
+            revalidatePath("/home");
+            return { ok: true };
+          } catch (err) {
+            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
+          }
+        }
+        async function remove(department: string): Promise<ActionResult> {
+          "use server";
+          const stale = await requireLiveSession(email);
+          if (stale) return stale;
+          try {
+            const { departments } = await getCeoDashboardConfig(email, cadence);
+            await saveCeoDashboardConfig(email, cadence, departments.filter((d) => d !== department));
+            revalidatePath("/home");
+            return { ok: true };
+          } catch (err) {
+            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
+          }
+        }
+        async function reorder(orderedNames: string[]): Promise<ActionResult> {
+          "use server";
+          const stale = await requireLiveSession(email);
+          if (stale) return stale;
+          try {
+            await saveCeoDashboardConfig(email, cadence, orderedNames);
+            revalidatePath("/home");
+            return { ok: true };
+          } catch (err) {
+            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
+          }
+        }
+        return { add, remove, reorder };
+      };
+
+      const [dailyConfig, monthlyConfig] = await Promise.all([
+        getCeoDashboardConfig(email, "daily"),
+        getCeoDashboardConfig(email, "monthly"),
+      ]);
+      const [dailyDetails, monthlyDetails] = await Promise.all([
+        Promise.all(dailyConfig.departments.map((n) => getDepartmentDetail(email, n, "daily", dailyDate))),
+        Promise.all(monthlyConfig.departments.map((n) => getDepartmentDetail(email, n, "monthly", monthlyDate))),
+      ]);
+      ceoDashboards = (
+        <>
+          <PageSectionHeading action={dailyPicker}>Department Daily Overview</PageSectionHeading>
+          <CeoDashboardSection
+            periodLabel="Daily"
+            departments={dailyDetails.map((r) => r.department)}
+            availableToAdd={FLOW_DEPARTMENTS.filter((d) => !dailyConfig.departments.includes(d))}
+            actions={makeCeoActions("daily")}
+          />
+          <PageSectionHeading action={monthlyPicker}>Department Monthly Overview</PageSectionHeading>
+          <CeoDashboardSection
+            periodLabel="Monthly"
+            departments={monthlyDetails.map((r) => r.department)}
+            availableToAdd={FLOW_DEPARTMENTS.filter((d) => !monthlyConfig.departments.includes(d))}
+            actions={makeCeoActions("monthly")}
+          />
+        </>
+      );
+    }
+
+    // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
+    // Monthly (Manager)/Ad hoc (Manager), the SAME RegionDonutGrids sections
+    // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
+    // draggable department dashboards. daily.org/monthly.org/adhocByRegion
+    // are already fetched for the CEO (canViewOrg includes CEO) — this only
+    // decides whether they render here.
+    let branchRegionOverview: ReactNode = null;
+    if (shows(view, "home", "branchRegionOverview") && daily.org) {
+      branchRegionOverview = (
+        <>
+          <RegionDonutGrids
+            title="Branch Status by Region — Daily"
+            regions={daily.org.regions}
+            action={dailyPicker}
+          />
+          {monthly.org && (
+            <RegionDonutGrids
+              title="Branch Status by Region — Monthly (Manager)"
+              regions={monthly.org.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []}
+              action={monthlyPicker}
+            />
+          )}
+          {daily.adhocByRegion && (
+            <RegionDonutGrids
+              title="Ad hoc Tasks by Region (Manager)"
+              regions={daily.adhocByRegion.regions}
+              action={adhocPicker}
+            />
+          )}
+        </>
+      );
+    }
+
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
     // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
     // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
@@ -372,12 +511,46 @@ export async function HomeScopedOverviewSection({
           {...completeProps}
         />
       ));
-    return grid(
-      <>
-        {personalPair}
-        {shows(view, "home", "hodAssigned") && streamCard("HOD", hodDate, "hdate", "From HOD")}
-        {shows(view, "home", "assignerStreams") && otherStreamCards}
-      </>,
+    return (
+      <div className="flex flex-col gap-5">
+        {grid(
+          <>
+            {/* CEO (2026-08-01): ONE combined "My Tasks" card — no
+                Daily/Monthly split — with the shared ?date= filter
+                windowing it by DUE date (undated tasks always show). */}
+            {shows(view, "home", "ceoCombinedList") &&
+              (() => {
+                const win = resolveWindow("daily", dailyDate ?? formatLocalDate(new Date()));
+                const windowed = daily.me.tasks.filter((t) => {
+                  if (!t.dueAt) return true;
+                  const due = new Date(t.dueAt);
+                  return due >= win.start && due < win.end;
+                });
+                const buckets = flowBucketize(windowed);
+                return (
+                  <StatusOverviewCard
+                    key="ceo-own-tasks"
+                    title="My Tasks"
+                    totals={{
+                      completed: buckets.completed.length,
+                      pending: buckets.pending.length,
+                      na: buckets.na.length,
+                    }}
+                    tasks={buckets}
+                    action={dailyPicker}
+                    actionPlacement="row"
+                    {...completeProps}
+                  />
+                );
+              })()}
+            {personalPair}
+            {shows(view, "home", "hodAssigned") && streamCard("HOD", hodDate, "hdate", "From HOD")}
+            {shows(view, "home", "assignerStreams") && otherStreamCards}
+          </>,
+        )}
+        {ceoDashboards}
+        {branchRegionOverview}
+      </div>
     );
   } catch {
     return null;

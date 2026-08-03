@@ -1,25 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { isCrmAvailable } from "@/lib/crm-db";
 import { getTicketKanban, type TicketKanbanRange } from "@/lib/crm-tickets";
+import { buildAccess } from "@/lib/access/engine";
+import { resolveTktBranchIds } from "@/lib/crm-scope";
 
 export const dynamic = "force-dynamic";
 
 const VALID_RANGES: TicketKanbanRange[] = ["today", "yesterday", "last7", "month", "custom", "all"];
 
-// GET /api/crm/tickets/kanban — superadmin ticket status board (read-only).
-// Optional query params: range=today|yesterday|last7|month|custom|all,
-// and for custom: from=YYYY-MM-DD & to=YYYY-MM-DD.
+// GET /api/crm/tickets/kanban — ticket status board (read-only), scoped to the
+// caller's `cns_ticket_opportunities` grant. Optional query params:
+// range=today|yesterday|last7|month|custom|all, and for custom: from & to.
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
-  });
-  if (me?.role?.role_type !== "superadmin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("cns_ticket_opportunities", "view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const branchScope = await resolveTktBranchIds(access, "cns_ticket_opportunities");
   if (!isCrmAvailable()) return NextResponse.json({ error: "CRM database not configured" }, { status: 503 });
 
   const sp = req.nextUrl.searchParams;
@@ -32,7 +33,10 @@ export async function GET(req: NextRequest) {
   const to = isDate(sp.get("to")) ? sp.get("to") : null;
 
   try {
-    const data = await getTicketKanban({ range, from, to });
+    const data = await getTicketKanban({
+      range, from, to,
+      allowedBranchIds: branchScope.all ? null : branchScope.ids,
+    });
     if (!data) return NextResponse.json({ error: "CRM data unavailable" }, { status: 503 });
     return NextResponse.json(data);
   } catch (e) {

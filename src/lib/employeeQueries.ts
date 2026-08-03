@@ -11,7 +11,7 @@ import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
 export type { EmployeeStage };
 
-export const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "INTERN"] as const;
+export const ROLE_OPTIONS = ["FT CEO", "FT HOD", "FT EXEC", "BM", "FT COACH", "PT COACH", "INTERN", "PROTEGE INTERN", "HQ INTERN"] as const;
 export type RoleOption = (typeof ROLE_OPTIONS)[number];
 
 export const STATUS_OPTIONS = ["active", "onboarding", "inactive", "archive"] as const;
@@ -1401,6 +1401,9 @@ export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
 // matching email (unique on both sides) — an employee who was never
 // bootstrapped into Task Manager (or has no account yet) simply has no tasks
 // to show, not an error.
+/** Mirrors RunBlock.cadence's Cadence enum (prisma/task-manager/schema.prisma). */
+export type TaskCadence = "DAILY" | "MONTHLY" | "ADHOC";
+
 export interface EmployeeTaskRow {
   id: string;
   name: string;
@@ -1409,6 +1412,18 @@ export interface EmployeeTaskRow {
    *  rule as the overdue query itself, also exposed per-row so the Pending
    *  tab can highlight the subset of pending tasks that are also overdue. */
   isOverdue: boolean;
+  /** "{Role} Assigned · {Cadence}" (e.g. "HOD Assigned · Daily"), cadence
+   *  omitted when untagged (e.g. "HOD Assigned"). Role is the RunBlock's
+   *  own FlowRun.startedById's Task Manager role — "Self-assigned" when
+   *  startedById is this same employee's own Task Manager account — same
+   *  resolution groupByAssignerRole (task-manager/analytics/_lib.ts) uses,
+   *  just formatted as one string instead of a bucket key. */
+  source: string;
+  /** Raw cadence, separate from the formatted `source` string — the Source
+   *  filter pills filter on this structured value (Daily/Monthly/Ad-hoc),
+   *  not by string-matching `source`, since a task's cadence and its "who
+   *  assigned it" role are two independent dimensions. */
+  cadence: TaskCadence | null;
 }
 
 export interface EmployeeTasksSummary {
@@ -1427,12 +1442,57 @@ function startOfTodayUtc(): Date {
   return d;
 }
 
-function toEmployeeTaskRow(row: { id: string; title: string; dueAt: Date | null }, startOfToday: Date): EmployeeTaskRow {
+// Mirrors groupByAssignerRole's own bucket keys (task-manager/analytics/
+// _lib.ts) — CEO/OPS/ADMIN/DEPT_SITE/BRANCH/HOD/MEMBER, plus BRANCH_SITE
+// (a real Role enum value that function's own order[] omits, handled here
+// defensively) — as the "{Role} Assigned" half of the Source column.
+const ASSIGNER_ROLE_LABELS: Record<string, string> = {
+  CEO: "CEO Assigned",
+  OPS: "OPS Assigned",
+  ADMIN: "Admin Assigned",
+  DEPT_SITE: "Dept Site Assigned",
+  BRANCH: "Branch Assigned",
+  HOD: "HOD Assigned",
+  MEMBER: "Member Assigned",
+  BRANCH_SITE: "Branch Site Assigned",
+};
+
+// Mirrors RunBlock.cadence's Cadence enum (prisma/task-manager/schema.prisma)
+// as the "· {Cadence}" half of the Source column — omitted entirely when
+// cadence is null (untagged; see the field's own schema comment).
+const TASK_CADENCE_LABELS: Record<string, string> = {
+  DAILY: "Daily",
+  MONTHLY: "Monthly",
+  ADHOC: "Ad-hoc",
+};
+
+function taskSourceLabel(
+  startedById: string,
+  selfTmUserId: string,
+  starterRoles: Map<string, string>,
+  cadence: string | null,
+): string {
+  const roleLabel =
+    startedById === selfTmUserId
+      ? "Self-assigned"
+      : ASSIGNER_ROLE_LABELS[starterRoles.get(startedById) ?? "MEMBER"] ?? ASSIGNER_ROLE_LABELS.MEMBER;
+  const cadenceLabel = cadence ? TASK_CADENCE_LABELS[cadence] : null;
+  return cadenceLabel ? `${roleLabel} · ${cadenceLabel}` : roleLabel;
+}
+
+function toEmployeeTaskRow(
+  row: { id: string; title: string; dueAt: Date | null; cadence: string | null; run: { startedById: string } },
+  startOfToday: Date,
+  selfTmUserId: string,
+  starterRoles: Map<string, string>,
+): EmployeeTaskRow {
   return {
     id: row.id,
     name: row.title,
     dueDate: row.dueAt ? row.dueAt.toISOString().slice(0, 10) : null,
     isOverdue: row.dueAt !== null && row.dueAt < startOfToday,
+    source: taskSourceLabel(row.run.startedById, selfTmUserId, starterRoles, row.cadence),
+    cadence: (row.cadence as TaskCadence | null) ?? null,
   };
 }
 
@@ -1462,7 +1522,7 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
     taskManagerPrisma.runBlock.findMany({
       where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] } },
       orderBy: { dueAt: "asc" },
-      select: { id: true, title: true, dueAt: true },
+      select: { id: true, title: true, dueAt: true, cadence: true, run: { select: { startedById: true } } },
     }),
     // Due date strictly before today and not completed — independent of the
     // current `status` label (Task Manager's own OVERDUE status is only set
@@ -1472,13 +1532,24 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
     taskManagerPrisma.runBlock.findMany({
       where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] }, dueAt: { lt: startOfToday } },
       orderBy: { dueAt: "asc" },
-      select: { id: true, title: true, dueAt: true },
+      select: { id: true, title: true, dueAt: true, cadence: true, run: { select: { startedById: true } } },
     }),
   ]);
 
+  // One batched role lookup for every distinct starter across both lists
+  // (they overlap heavily — overdue is a subset of pending) rather than a
+  // lookup per row, same batching rationale as getOverdueTaskCounts below.
+  const starterIds = new Set<string>();
+  for (const r of [...pendingRows, ...overdueRows]) starterIds.add(r.run.startedById);
+  const starters = await taskManagerPrisma.user.findMany({
+    where: { id: { in: [...starterIds] } },
+    select: { id: true, role: true },
+  });
+  const starterRoles = new Map(starters.map((s) => [s.id, s.role as string]));
+
   return {
-    pending: pendingRows.map((r) => toEmployeeTaskRow(r, startOfToday)),
-    overdue: overdueRows.map((r) => toEmployeeTaskRow(r, startOfToday)),
+    pending: pendingRows.map((r) => toEmployeeTaskRow(r, startOfToday, tmUser.id, starterRoles)),
+    overdue: overdueRows.map((r) => toEmployeeTaskRow(r, startOfToday, tmUser.id, starterRoles)),
   };
 }
 

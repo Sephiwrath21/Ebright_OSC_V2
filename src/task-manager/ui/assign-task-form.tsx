@@ -23,6 +23,7 @@ import {
   type FlowTemplateControl,
 } from "./types";
 import { RecipientPicker } from "./recipient-picker";
+import { compressImageFile } from "./image-compress";
 
 const CADENCE_LABELS: Record<CadenceOption, string> = {
   daily: "Daily",
@@ -43,6 +44,8 @@ export function AssignTaskForm({
   staff,
   action,
   recipientGroup,
+  quickSelfId,
+  hideCadence = false,
   templates,
   bare = false,
 }: {
@@ -55,6 +58,17 @@ export function AssignTaskForm({
    *  CEO's "+ Add Task" form) — passed straight through to RecipientPicker.
    *  Omit for the normal, fully flexible Person + any-Group picker. */
   recipientGroup?: FlowGroup;
+  /** CEO quick-pick (2026-08-01): the caller's own user id — passed straight
+   *  through to RecipientPicker's "Myself" chip. Omit outside the CEO form. */
+  quickSelfId?: string;
+  /** CEO-only (2026-08-01): hides the Cadence picker entirely — CEO-assigned
+   *  tasks are categorized downstream by WHO assigned them (the "CEO
+   *  Assigned" stream on the recipient's page, or the CEO's own task list
+   *  for "Myself"), not by a Daily/Monthly tag, so there's nothing for the
+   *  CEO to pick. The form silently submits "daily" underneath — functionally
+   *  identical to leaving it untagged for how these tasks get windowed, and
+   *  it keeps the task recurring/visible like any normal Daily task. */
+  hideCadence?: boolean;
   /** Task Templates (2026-07-31): saved list + load/rename/delete actions
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
@@ -66,7 +80,7 @@ export function AssignTaskForm({
 }) {
   const [title, setTitle] = React.useState("");
   const [userIds, setUserIds] = React.useState<string[]>([]);
-  const [cadence, setCadence] = React.useState<CadenceOption | null>(null);
+  const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
   const [days, setDays] = React.useState<NonNullable<FlowAssignInput["days"]>>([]);
   const [dueDate, setDueDate] = React.useState("");
   // Guideline (optional, 2026-07-30): SOP link and/or reference image —
@@ -107,7 +121,7 @@ export function AssignTaskForm({
     setTitle(t.title);
     setSubtasks(t.subtasks);
     setSubtaskDraft("");
-    setCadence(t.cadence);
+    setCadence(hideCadence ? "daily" : t.cadence);
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
       setGuidelineImage({
@@ -122,37 +136,28 @@ export function AssignTaskForm({
     setMessage(null);
   };
 
-  const GUIDELINE_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
-  const GUIDELINE_MAX_BYTES = 2 * 1024 * 1024;
   const clearGuidelineImage = () => {
     setGuidelineImage(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
+  // Compressed client-side before staging (2026-08-01 storage decision) —
+  // same ≤1280px JPEG pipeline as proof uploads (ui/image-compress.ts).
   const onGuidelineImagePick = (file: File | undefined) => {
     if (!file) return;
-    if (!(GUIDELINE_MIMES as readonly string[]).includes(file.type)) {
-      setMessage({ ok: false, text: "Guideline image must be PNG, JPG, or WebP." });
-      clearGuidelineImage();
-      return;
-    }
-    if (file.size > GUIDELINE_MAX_BYTES) {
-      setMessage({ ok: false, text: "Guideline image must be 2 MB or smaller." });
-      clearGuidelineImage();
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string; // data:<mime>;base64,<data>
-      const dataBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    void compressImageFile(file).then((result) => {
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        clearGuidelineImage();
+        return;
+      }
       setGuidelineImage({
-        mime: file.type as (typeof GUIDELINE_MIMES)[number],
-        dataBase64,
-        previewUrl: dataUrl,
+        mime: result.image.mime,
+        dataBase64: result.image.dataBase64,
+        previewUrl: result.image.previewUrl,
         name: file.name,
       });
       setMessage(null);
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   // Which Cadence pills to even offer depends on who's selected — Branch
@@ -166,7 +171,11 @@ export function AssignTaskForm({
   // Clear a previously-picked cadence if it's no longer valid once the
   // recipient selection changes (e.g. switching from a Branch Manager to an
   // HQ Exec drops a stale "adhoc" pick instead of silently keeping it).
+  // Skipped when hideCadence — the CEO's forced "daily" is never a user
+  // pick to revalidate (and CEO recipients are always HOD/self, always
+  // Daily-eligible, so it would never need clearing anyway).
   React.useEffect(() => {
+    if (hideCadence) return;
     setCadence((prev) => (prev && visibleCadences.includes(prev) ? prev : null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleCadences.join(",")]);
@@ -236,7 +245,7 @@ export function AssignTaskForm({
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
         setTitle("");
         setUserIds([]);
-        setCadence(null);
+        setCadence(hideCadence ? "daily" : null);
         setDays([]);
         setDueDate("");
         setGuidelineUrl("");
@@ -366,32 +375,35 @@ export function AssignTaskForm({
           selected={userIds}
           onChange={setUserIds}
           restrictToGroup={recipientGroup}
+          quickSelfId={quickSelfId}
         />
 
-        <div className="text-sm text-gray-600">
-          Cadence
-          <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
-            {visibleCadences.map((value) => {
-              const active = cadence === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  onClick={() => setCadence(value)}
-                  aria-checked={active}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-                    active
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                  }`}
-                >
-                  {CADENCE_LABELS[value]}
-                </button>
-              );
-            })}
+        {!hideCadence && (
+          <div className="text-sm text-gray-600">
+            Cadence
+            <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
+              {visibleCadences.map((value) => {
+                const active = cadence === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    onClick={() => setCadence(value)}
+                    aria-checked={active}
+                    className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+                      active
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                    }`}
+                  >
+                    {CADENCE_LABELS[value]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* No recurrence control here: since 2026-07-25 (final decision)
             EVERY Daily task auto-recurs weekly, system-wide — see

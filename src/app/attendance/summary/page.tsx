@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
+import { refreshAndReadAttendance } from "@/lib/attendance-all";
 import AppShell from "@/app/components/AppShell";
 import AttendanceSummaryView, {
   type SummaryData,
@@ -11,7 +12,6 @@ import AttendanceSummaryView, {
   type AbsenceKind,
 } from "@/app/components/AttendanceSummaryView";
 import { ShieldAlert } from "lucide-react";
-import { mytDayUtcBounds } from "@/lib/myt";
 import { type WeeklySchedule } from "@/lib/schedule-history";
 import { assignedBranchOnDay, rotationFor } from "@/lib/staff-rotation";
 
@@ -72,7 +72,6 @@ function dayKeyForMytDate(d: Date): DayKey {
   return DAY_KEYS[myt.getUTCDay()];
 }
 
-// `mytDayUtcBounds` lives in @/lib/myt and is imported above.
 
 // Convert a UTC Date to "HH:MM" in MYT.
 function utcToMytHm(d: Date): string {
@@ -176,7 +175,6 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
   const refDate = parseMytDate(sp.date);
   const selectedDate = formatMytIsoDate(refDate);
   const dayKey = dayKeyForMytDate(refDate);
-  const { start: dayStart, end: dayEnd } = mytDayUtcBounds(refDate);
 
   // Branch dropdown reads from local `branch` table; its branch_code matches
   // BranchStaff.branch on HRFS.
@@ -308,74 +306,42 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
       .filter((id): id is string => !!id),
   );
 
-  // ── HRFS: aggregate today's Hikvision events ─────────────────────────────
-  // - LEFT JOIN hikvision_id_map to translate "wrong" person_ids to true ids.
-  // - Group by translated empNo so the same person across both scanners
-  //   (HQ + ST) appears once with min/max times.
-  const aggResult = await queryEbrightHrfsSource<{
-    emp_no: string;
-    first_event: Date;
-    last_event: Date;
-    scan_count: string;
-    sample_device_name: string | null;
-  }>(
-    // `event_time` is `timestamp WITHOUT time zone` holding the MYT wall clock.
-    // Reinterpret it as Asia/Kuala_Lumpur -> `timestamptz` so node-pg parses the
-    // true instant (not the wall clock read as UTC, which shifts reads +8h).
-    // The $1/$2 bounds are UTC ISO strings, so compare against the converted ts.
-    `WITH events AS (
-       SELECT
-         COALESCE(m.true_id, h.person_id) AS emp_no,
-         (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') AS event_ts,
-         h.device_name
-       FROM public.hikvision_attendance_all h
-       LEFT JOIN public.hikvision_id_map m ON m.wrong_id = h.person_id
-       WHERE (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') >= $1
-         AND (h.event_time AT TIME ZONE 'Asia/Kuala_Lumpur') < $2
-     )
-     SELECT
-       emp_no,
-       MIN(event_ts) AS first_event,
-       MAX(event_ts) AS last_event,
-       COUNT(*)::text AS scan_count,
-       (array_agg(device_name ORDER BY event_ts))[1] AS sample_device_name
-     FROM events
-     WHERE emp_no IS NOT NULL
-     GROUP BY emp_no`,
-    [dayStart.toISOString(), dayEnd.toISOString()],
-  );
-  const aggregated: AggregatedScan[] = aggResult.rows.map((r) => ({
-    emp_no: r.emp_no,
-    first_event: r.first_event instanceof Date ? r.first_event : new Date(r.first_event),
-    last_event: r.last_event instanceof Date ? r.last_event : new Date(r.last_event),
-    scan_count: Number(r.scan_count) || 0,
-    sample_device_name: r.sample_device_name,
-  }));
+  // ── attendance_all: normalized daily scans (single v2 source) ────────────
+  // Sync-on-view pulls the selected day from the Hikvision log into
+  // attendance_all first, then we read it back. clock_in/out are MYT wall-clock
+  // "HH:MM:SS"; rebuild the check-in/out as true instants (…+08:00) so the
+  // existing utcToMytHm() classification downstream is unchanged.
+  const attRows = await refreshAndReadAttendance(selectedDate, selectedDate);
+  const aggregated: AggregatedScan[] = attRows
+    .filter((r) => r.clock_in)
+    .map((r) => ({
+      emp_no: r.emp_no,
+      first_event: new Date(`${r.day}T${r.clock_in}+08:00`),
+      last_event: new Date(`${r.day}T${r.clock_out ?? r.clock_in}+08:00`),
+      scan_count: r.scan_count,
+      sample_device_name: r.device_name,
+    }));
   const scanByEmpNo = new Map<string, AggregatedScan>();
   for (const s of aggregated) scanByEmpNo.set(s.emp_no, s);
 
-  // Most-recent scan timestamp + total event count today — for "scanner online"
-  // and "Records today" indicators on the summary view.
-  const liveResult = await queryEbrightHrfsSource<{
-    last_event: Date | null;
-    total: string;
-  }>(
-    // Same MYT-wall-clock reinterpretation as the aggregate query above.
-    `SELECT MAX(event_time AT TIME ZONE 'Asia/Kuala_Lumpur') AS last_event,
-            COUNT(*)::text AS total
-       FROM public.hikvision_attendance_all
-      WHERE (event_time AT TIME ZONE 'Asia/Kuala_Lumpur') >= $1
-        AND (event_time AT TIME ZONE 'Asia/Kuala_Lumpur') < $2`,
-    [dayStart.toISOString(), dayEnd.toISOString()],
-  );
-  const lastEventRaw = liveResult.rows[0]?.last_event ?? null;
-  const lastScanTs = lastEventRaw
-    ? lastEventRaw instanceof Date ? lastEventRaw : new Date(lastEventRaw)
-    : null;
-  const recordsToday = Number(liveResult.rows[0]?.total ?? 0);
+  // "Scanner online" + "Records today" from the same materialized rows.
+  let lastScanTs: Date | null = null;
+  let recordsToday = 0;
+  for (const a of aggregated) {
+    recordsToday += a.scan_count;
+    if (!lastScanTs || a.last_event.getTime() > lastScanTs.getTime()) lastScanTs = a.last_event;
+  }
   const scannerOnline = lastScanTs
     ? Date.now() - lastScanTs.getTime() < SCANNER_ONLINE_WINDOW_MIN * 60_000
     : false;
+
+  // When attendance_all was last refreshed for this date — drives "Synced … ago".
+  let lastSyncedAt: Date | null = null;
+  for (const r of attRows) {
+    if (!r.synced_at) continue;
+    const d = new Date(r.synced_at);
+    if (!lastSyncedAt || d.getTime() > lastSyncedAt.getTime()) lastSyncedAt = d;
+  }
 
   // ── HRFS: leave records covering selectedDate ────────────────────────────
   // Match by EmployeeCode (= BranchStaff.employeeId), with a name fallback for
@@ -609,7 +575,7 @@ export default async function AttendanceSummaryPage({ searchParams }: PageProps)
       totalEmployees,
     },
     scannerOnline,
-    lastSyncedIso: lastScanTs?.toISOString() ?? null,
+    lastSyncedIso: lastSyncedAt?.toISOString() ?? null,
     recordsToday,
     rows,
     canJustify: ALLOWED_ROLE_TYPES.has(roleType),

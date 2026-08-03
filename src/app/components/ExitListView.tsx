@@ -8,7 +8,6 @@ import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employeeQueries";
-import OverdueDot from "@/app/components/OverdueDot";
 
 // Keyed by resignation.exit_type's exact stored value (same 4 options the
 // Resignation tab's own Exit Type dropdown offers) — the badge shown here is
@@ -56,8 +55,6 @@ interface Props {
    *  EmployeeNamelistView. Omitted entirely for the combined, all-locations
    *  view (no single location to attribute the visit to). */
   locationContext?: LocationContext;
-  /** userId -> overdue Task Manager task count, for the red dot next to Name. */
-  overdueTaskCounts?: Record<number, number>;
 }
 
 // List-only Exit namelist — Exit has no Block/Grid view (unlike Active/
@@ -72,7 +69,6 @@ export default function ExitListView({
   branches = [],
   departments = [],
   locationContext,
-  overdueTaskCounts,
 }: Props) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
@@ -365,10 +361,9 @@ export default function ExitListView({
                 >
                   <Link
                     href={`/employee-folder/exit/employee/${row.id}${profileQuery}`}
-                    className="flex items-center gap-1.5 min-w-0"
+                    className="text-base font-medium text-black hover:underline truncate min-w-0"
                   >
-                    <span className="text-base font-medium text-black hover:underline truncate min-w-0">{row.fullName}</span>
-                    <OverdueDot count={overdueTaskCounts?.[row.id]} />
+                    {row.fullName}
                   </Link>
                   <span className="text-[15px] text-black/67 truncate">
                     {lastWorkingDateByUserId?.[row.id] ?? row.date ?? "—"}

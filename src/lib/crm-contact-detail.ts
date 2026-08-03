@@ -74,9 +74,26 @@ async function resolveTenantId(): Promise<string | null> {
 
 const TS = `'YYYY-MM-DD"T"HH24:MI:SS'`;
 
-export async function getContactDetail(contactId: string): Promise<ContactDetail | null> {
+export async function getContactDetail(
+  contactId: string,
+  allowedBranchIds: string[] | null = null,
+): Promise<ContactDetail | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
+
+  // Branch access boundary: the contact must own an opportunity in an allowed
+  // branch, otherwise it's out of scope (treated as not found).
+  if (allowedBranchIds != null) {
+    const inScope = await queryCrmDb<{ ok: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM crm.crm_opportunity o
+          WHERE o."contactId" = $1 AND o."deletedAt" IS NULL
+            AND o."branchId" = ANY($2::text[])
+       ) AS ok`,
+      [contactId, allowedBranchIds],
+    );
+    if (!inScope?.rows[0]?.ok) return null;
+  }
 
   // Base contact (+ lead source + assigned user + tags).
   const cRes = await queryCrmDb<{

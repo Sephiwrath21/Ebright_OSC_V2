@@ -41,6 +41,9 @@ export interface ContactsFilter {
   pageSize?: number;
   sortBy?: "name" | "createdAt";
   sortDir?: "asc" | "desc";
+  /** Access-enforced branch allow-list: keep only contacts with a non-deleted
+   *  opportunity in one of these crm_branch ids. null = no restriction. */
+  allowedBranchIds?: string[] | null;
 }
 
 async function resolveTenantId(): Promise<string | null> {
@@ -92,6 +95,16 @@ function buildWhere(tenantId: string, f: ContactsFilter): { clause: string; para
     parts.push(
       `EXISTS (SELECT 1 FROM crm.crm_opportunity o2 JOIN crm.crm_stage s2 ON s2.id = o2."stageId"
                WHERE o2."contactId" = c.id AND o2."deletedAt" IS NULL AND s2.name = $${params.length})`,
+    );
+  }
+
+  // Branch access boundary: contact must own an opportunity in an allowed branch.
+  if (f.allowedBranchIds != null) {
+    params.push(f.allowedBranchIds);
+    parts.push(
+      `EXISTS (SELECT 1 FROM crm.crm_opportunity ob
+               WHERE ob."contactId" = c.id AND ob."deletedAt" IS NULL
+                 AND ob."branchId" = ANY($${params.length}::text[]))`,
     );
   }
 

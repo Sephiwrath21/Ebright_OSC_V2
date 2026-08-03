@@ -14,7 +14,6 @@ import {
   listUpcomingOnboardingCandidates,
   summarizeStageByBranch,
   summarizeStageByDepartment,
-  getOverdueTaskCounts,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
@@ -57,20 +56,9 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
       branches = branchList;
       departments = departmentList;
     }
-    // Candidates (isCandidate) have a negative sentinel id, not a real
-    // user_id — no Task Manager/hrfs account exists for them to look up.
-    const overdueTaskCounts = await getOverdueTaskCounts(
-      stageRows.filter((r) => !r.isCandidate).map((r) => r.id),
-    );
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
-        <StageFlatListView
-          stage={stage}
-          rows={stageRows}
-          branches={branches}
-          departments={departments}
-          overdueTaskCounts={overdueTaskCounts}
-        />
+        <StageFlatListView stage={stage} rows={stageRows} branches={branches} departments={departments} />
       </AppShell>
     );
   }
@@ -96,10 +84,9 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
     const [rows, branches, departments] = await Promise.all([listEmployeeOverviewRows(), listBranches(), listDepartments()]);
     const exitRows = rows.filter((r) => r.stage === "exit");
     const exitUserIds = exitRows.map((r) => r.id);
-    const [exitTypeByUserId, lastWorkingDateByUserId, overdueTaskCounts] = await Promise.all([
+    const [exitTypeByUserId, lastWorkingDateByUserId] = await Promise.all([
       listResignationExitTypesByUserId(exitUserIds),
       listLastWorkingDatesByUserId(exitUserIds),
-      getOverdueTaskCounts(exitUserIds),
     ]);
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
@@ -110,7 +97,6 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
           showLocation
           branches={branches}
           departments={departments}
-          overdueTaskCounts={overdueTaskCounts}
         />
       </AppShell>
     );

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfsSource } from "@/lib/ebright-hrfs-source";
+import { refreshAndReadAttendance } from "@/lib/attendance-all";
 import AppShell from "@/app/components/AppShell";
 import AttendanceReportView, {
   type EmployeeOption,
@@ -248,10 +249,9 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   const startDay = dateStr ? Number(dateStr.slice(8, 10)) : 1;
   const endDay   = dateStr ? Number(dateStr.slice(8, 10)) : lastDayOfMonth;
 
-  // UTC bounds covering [startDay 00:00 MYT, endDay+1 00:00 MYT).
-  // Midnight MYT = previous-day 16:00 UTC.
-  const windowStart = new Date(Date.UTC(year, month - 1, startDay, -8, 0, 0));
-  const windowEnd   = new Date(Date.UTC(year, month - 1, endDay + 1, -8, 0, 0));
+  // MYT date bounds of the window.
+  const fromIso = `${year}-${String(month).padStart(2, "0")}-${String(startDay).padStart(2, "0")}`;
+  const toIso   = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
 
   // Schedule history for the selected staff — sourced from the PORTAL
   // (employment.working_hours_json + employment_schedule_version), resolved on
@@ -259,43 +259,19 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   const cachedWorkingHours: WeeklySchedule | null = selected?.workingHours ?? null;
   const versions = selected?.versions ?? [];
 
-  // ── HRFS: scans for this employee in the window ──────────────────────────
-  // Aggregate per MYT date so a single day shows one row even when scans came
-  // from multiple devices/scanners. Uses the same source/aggregation as the
-  // Summary view so the two pages always agree on times.
-  type ScanRow = {
-    date_myt: string;
-    first_event: Date;
-    last_event: Date;
-    scan_count: string;
-  };
+  // ── attendance_all: this employee's daily scans (single v2 source) ───────
+  // Sync-on-view then read from attendance_all. clock_in/out are MYT wall-clock
+  // "HH:MM:SS"; rebuild as true instants (…+08:00) so mytHm() classification
+  // downstream is unchanged.
   const scansByDate = new Map<string, { firstEvent: Date; lastEvent: Date }>();
   if (selectedEmployeeCode) {
-    const scanRes = await queryEbrightHrfsSource<ScanRow>(
-      `WITH events AS (
-         SELECT
-           COALESCE(m.true_id, h.person_id) AS emp_no,
-           h.event_time
-         FROM public.hikvision_attendance_all h
-         LEFT JOIN public.hikvision_id_map m ON m.wrong_id = h.person_id
-         WHERE h.event_time >= $1
-           AND h.event_time <  $2
-           AND COALESCE(m.true_id, h.person_id) = $3
-       )
-       SELECT
-         to_char(event_time AT TIME ZONE 'Asia/Kuala_Lumpur', 'YYYY-MM-DD') AS date_myt,
-         MIN(event_time) AS first_event,
-         MAX(event_time) AS last_event,
-         COUNT(*)::text AS scan_count
-       FROM events
-       GROUP BY date_myt
-       ORDER BY date_myt`,
-      [windowStart.toISOString(), windowEnd.toISOString(), selectedEmployeeCode],
-    );
-    for (const r of scanRes.rows) {
-      const first = r.first_event instanceof Date ? r.first_event : new Date(r.first_event);
-      const last  = r.last_event  instanceof Date ? r.last_event  : new Date(r.last_event);
-      scansByDate.set(r.date_myt, { firstEvent: first, lastEvent: last });
+    const rows = await refreshAndReadAttendance(fromIso, toIso, selectedEmployeeCode);
+    for (const r of rows) {
+      if (!r.clock_in) continue;
+      scansByDate.set(r.day, {
+        firstEvent: new Date(`${r.day}T${r.clock_in}+08:00`),
+        lastEvent: new Date(`${r.day}T${r.clock_out ?? r.clock_in}+08:00`),
+      });
     }
   }
 

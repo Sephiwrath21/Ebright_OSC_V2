@@ -103,6 +103,7 @@ function MemberDropdown({
   onToggleAll,
   emptyLabel,
   showRole = true,
+  selectAllLabel,
 }: {
   members: FlowStaffMember[];
   selected: Set<string>;
@@ -110,6 +111,8 @@ function MemberDropdown({
   onToggleAll: (ids: string[]) => void;
   emptyLabel: string;
   showRole?: boolean;
+  /** Overrides the default "Select all (N)" text (e.g. "All HODs (N)"). */
+  selectAllLabel?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -159,7 +162,7 @@ function MemberDropdown({
             onClick={() => onToggleAll(members.map((m) => m.id))}
             className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50"
           >
-            {allSelected ? "Deselect all" : `Select all (${members.length})`}
+            {allSelected ? "Deselect all" : (selectAllLabel ?? `Select all (${members.length})`)}
           </button>
           {members.map((m) => {
             const isSelected = selected.has(m.id);
@@ -241,6 +244,7 @@ export function RecipientPicker({
   selected,
   onChange,
   restrictToGroup,
+  quickSelfId,
 }: {
   staff: FlowStaffMember[];
   selected: string[];
@@ -251,6 +255,12 @@ export function RecipientPicker({
    *  CEO's "+ Add Task" form (HODs only). Omit for the normal, fully
    *  flexible Person + any-Group picker. */
   restrictToGroup?: FlowGroup;
+  /** CEO quick-picks (2026-08-01): the caller's OWN user id — renders a
+   *  "Myself" toggle chip next to "All {group}s" in the restricted picker,
+   *  letting the CEO self-assign even though they aren't in the restricted
+   *  group's member list. Both chips merge into the same selection as
+   *  individually-picked people. */
+  quickSelfId?: string;
 }) {
   const [view, setView] = React.useState<PickerView>("menu");
   const [search, setSearch] = React.useState("");
@@ -321,6 +331,15 @@ export function RecipientPicker({
     return (
       <div className="flex flex-col gap-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-3">
+          {quickSelfId && (
+            <button
+              type="button"
+              onClick={() => toggle(quickSelfId)}
+              className={`mb-2 ${chipClass(selectedSet.has(quickSelfId))}`}
+            >
+              {selectedSet.has(quickSelfId) ? "✓ Myself" : "+ Myself"}
+            </button>
+          )}
           {(needsSub || optionalDeptSub) && (
             <select
               value={groupSub}
@@ -345,6 +364,7 @@ export function RecipientPicker({
               onToggle={toggle}
               onToggleAll={toggleAll}
               emptyLabel={`No ${restrictToGroup.toLowerCase()} staff found.`}
+              selectAllLabel={`All ${restrictToGroup}s (${groupResults.length})`}
             />
           )}
         </div>
