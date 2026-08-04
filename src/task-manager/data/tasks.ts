@@ -536,11 +536,10 @@ export function reopenFlowTask(
  *  the shared GOOGLE_DRIVE_FOLDER_ID root every other module defaults to,
  *  since this is a high-volume feature that deserves its own space).
  *  Only the returned Drive file id is stored (Proof.driveFileId); a
- *  replace deletes the previous file from Drive. Pre-2026-08-04 rows keep
- *  their bytes in imageMime/imageData (now nullable, read-only legacy
- *  fallback — see proof-image/[id]/route.ts) since a live backfill needs
- *  working Drive credentials this environment didn't have at migration
- *  time; nothing currently uploaded is at risk.
+ *  replace deletes the previous file from Drive. The original in-DB-bytes
+ *  columns (imageMime/imageData) were dropped 2026-08-04 once their only 7
+ *  rows — all test data pre-dating this cutover — were deleted; every row
+ *  now goes through Drive, no fallback branch needed anymore.
  *
  *  Folder structure (2026-08-04, mirrors the Inventory repo's dated-
  *  hierarchy convention for the same reason — easing QA/QC of a high-
@@ -617,7 +616,7 @@ export function uploadFlowTaskProof(
     const proof = await prisma.proof.upsert({
       where: { runBlockId: id },
       create: { runBlockId: id, driveFileId: uploaded.id },
-      update: { driveFileId: uploaded.id, imageMime: null, imageData: null },
+      update: { driveFileId: uploaded.id },
     });
 
     if (existing?.driveFileId && existing.driveFileId !== uploaded.id) {

@@ -3,13 +3,12 @@
 // precisely so assigners/overseers can check it — but nothing is served to
 // anonymous requests.
 //
-// Storage (2026-08-04): every upload since goes to Google Drive
-// (Proof.driveFileId) — this route proxies the bytes via src/lib/drive.ts's
-// streamFromDrive, same pattern as api/attachment/[id]. The handful of rows
-// uploaded before the cutover still have their bytes in Postgres
-// (imageMime/imageData, now nullable/legacy) — served straight from the DB
-// as before so nothing already uploaded breaks. New uploads never write to
-// those columns, so this fallback branch only ever serves pre-cutover rows.
+// Storage (2026-08-04): every upload goes to Google Drive (Proof.driveFileId)
+// — this route proxies the bytes via src/lib/drive.ts's streamFromDrive,
+// same pattern as api/attachment/[id]. The original in-DB-bytes fallback
+// (imageMime/imageData) was removed once its only 7 rows — all test data
+// pre-dating the Drive cutover — were deleted; every row now has a
+// driveFileId.
 import { NextResponse } from "next/server";
 import { Readable } from "node:stream";
 import { auth } from "@/auth";
@@ -29,37 +28,25 @@ export async function GET(
   const { id } = await params;
   const proof = await prisma.proof.findUnique({
     where: { id },
-    select: { driveFileId: true, imageMime: true, imageData: true },
+    select: { driveFileId: true },
   });
-  if (!proof) {
+  if (!proof?.driveFileId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // A re-upload REPLACES the file under the same Proof id — unlike
-  // guideline images this URL is not immutable, so keep the cache window
-  // short either way.
-  const cacheControl = "private, max-age=300";
-
-  if (proof.driveFileId) {
-    try {
-      const { body, meta } = await streamFromDrive(proof.driveFileId);
-      const webStream = Readable.toWeb(body) as unknown as ReadableStream<Uint8Array>;
-      return new NextResponse(webStream, {
-        headers: {
-          "Content-Type": meta.mimeType || "application/octet-stream",
-          "Cache-Control": cacheControl,
-        },
-      });
-    } catch {
-      return NextResponse.json({ error: "File unavailable" }, { status: 404 });
-    }
-  }
-
-  if (proof.imageData && proof.imageMime) {
-    return new NextResponse(new Uint8Array(proof.imageData), {
-      headers: { "Content-Type": proof.imageMime, "Cache-Control": cacheControl },
+  try {
+    const { body, meta } = await streamFromDrive(proof.driveFileId);
+    const webStream = Readable.toWeb(body) as unknown as ReadableStream<Uint8Array>;
+    return new NextResponse(webStream, {
+      headers: {
+        "Content-Type": meta.mimeType || "application/octet-stream",
+        // A re-upload REPLACES the file under the same Proof id — unlike
+        // guideline images this URL is not immutable, so keep the cache
+        // window short.
+        "Cache-Control": "private, max-age=300",
+      },
     });
+  } catch {
+    return NextResponse.json({ error: "File unavailable" }, { status: 404 });
   }
-
-  return NextResponse.json({ error: "Not found" }, { status: 404 });
 }

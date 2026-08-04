@@ -400,18 +400,16 @@ model TaskTemplate {
 /// runBlockId); deleting the block cascades the proof away. Images live in
 /// Google Drive (2026-08-04 storage decision — high upload volume made
 /// in-DB bytes impractical) — driveFileId is the sole reference for every
-/// new upload; served via /api/task-manager/proof-image/[id] (session-
-/// gated), which proxies from Drive. imageMime/imageData are the RETIRED
-/// in-DB-bytes storage (pre-2026-08-04) — kept nullable, read-only, as a
-/// fallback for the handful of pre-existing rows so nothing already
-/// uploaded breaks; never written to by new uploads.
+/// upload; served via /api/task-manager/proof-image/[id] (session-gated),
+/// which proxies from Drive. The original in-DB-bytes columns
+/// (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
+/// (pre-dating the Drive cutover, all test data) were deleted — every
+/// surviving/future row goes through Drive.
 model Proof {
   id          String   @id @default(cuid())
   runBlockId  String   @unique
   runBlock    RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
-  driveFileId String? // Google Drive file id — set by every upload since 2026-08-04
-  imageMime   String? // image/png | image/jpeg | image/webp — legacy in-DB-bytes rows only
-  imageData   Bytes? // legacy in-DB-bytes rows only
+  driveFileId String? // Google Drive file id — set by every upload
   createdAt   DateTime @default(now())
 }
 
