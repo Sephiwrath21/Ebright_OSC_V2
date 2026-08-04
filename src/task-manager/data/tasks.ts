@@ -531,15 +531,27 @@ export function reopenFlowTask(
  *
  *  Storage (2026-08-04): the compressed image is uploaded to Google Drive
  *  (src/lib/drive.ts — the SAME shared helper the HR module's resume/
- *  payslip/etc. uploads use, called here as-is, never modified) under
- *  "Task Manager Proofs" beneath the shared GOOGLE_DRIVE_FOLDER_ID root —
- *  no dedicated env var needed, the subfolder is auto-created on first use.
+ *  payslip/etc. uploads use, called here as-is, never modified) under its
+ *  OWN dedicated folder (GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID — separate from
+ *  the shared GOOGLE_DRIVE_FOLDER_ID root every other module defaults to,
+ *  since this is a high-volume feature that deserves its own space).
  *  Only the returned Drive file id is stored (Proof.driveFileId); a
  *  replace deletes the previous file from Drive. Pre-2026-08-04 rows keep
  *  their bytes in imageMime/imageData (now nullable, read-only legacy
  *  fallback — see proof-image/[id]/route.ts) since a live backfill needs
  *  working Drive credentials this environment didn't have at migration
- *  time; nothing currently uploaded is at risk. */
+ *  time; nothing currently uploaded is at risk.
+ *
+ *  Folder structure (2026-08-04, mirrors the Inventory repo's dated-
+ *  hierarchy convention for the same reason — easing QA/QC of a high-
+ *  volume photo stream): {root}/{YYYY}/{MM}/{DD}/{Department-or-Branch}/
+ *  — Department for HOD/department-side staff, Branch for Branch Manager/
+ *  branch-side staff (the exact split role-views.ts uses everywhere else);
+ *  "Unassigned" when a staff record has neither (the ~61 unplaced real
+ *  staff role-views.ts already documents elsewhere). The filename is built
+ *  from the assignee + task title as uploadToDrive's `prefix` — its own
+ *  `${prefix}-${Date.now()}-${fileName}` naming already bakes in a
+ *  timestamp, so nothing here duplicates one. */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
@@ -550,6 +562,12 @@ const PROOF_IMAGE_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/webp": ".webp",
 };
+/** Drive folder/file names tolerate most characters, but keep it to a safe
+ *  ASCII-ish set so a stray "/" in a task title (or similar) can never be
+ *  misread as a path separator by anyone browsing the Drive tree by hand. */
+function sanitizeDriveNamePart(value: string): string {
+  return value.replace(/[^a-z0-9.\-_ ]/gi, "_").trim();
+}
 
 export function uploadFlowTaskProof(
   actorEmail: string,
@@ -563,7 +581,7 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true },
+      select: { assigneeId: true, title: true },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
@@ -575,11 +593,25 @@ export function uploadFlowTaskProof(
       select: { driveFileId: true },
     });
 
+    // Department for dept-side staff, Branch for branch-side staff — same
+    // split as role-views.ts. "Unassigned" is the documented fallback for
+    // staff with neither (rare, but real — see User.department's comment).
+    const orgUnit = user.department ?? user.branch ?? "Unassigned";
+    const now = new Date();
+    const folderPath = [
+      String(now.getFullYear()),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+      orgUnit,
+    ];
+    const prefix = sanitizeDriveNamePart(`${user.name}-${runBlock.title}`).slice(0, 150);
+
     const buffer = Buffer.from(img.dataBase64, "base64");
     const file = new File([buffer], `proof${PROOF_IMAGE_EXT[img.mime] ?? ""}`, { type: img.mime });
     const uploaded = await uploadToDrive(file, {
-      prefix: "proof",
-      folderPath: ["Task Manager Proofs"],
+      prefix,
+      folderPath,
+      folderEnvVar: "GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID",
     });
 
     const proof = await prisma.proof.upsert({
