@@ -13,6 +13,7 @@ import { buildTemplateSnapshot } from "../engine/snapshot";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
 import { BRANCH_STAFF_ROLES, isElevatedDeptSite, parseLocalDate } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
+import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 
 const CADENCE_OPTIONS = ["daily", "monthly", "adhoc"] as const;
 type CadenceOption = (typeof CADENCE_OPTIONS)[number];
@@ -526,12 +527,46 @@ export function reopenFlowTask(
  *  image (upsert on runBlockId). 2 MB cap (2026-08-01 storage decision:
  *  images are compressed CLIENT-side to ≤1280px JPEG before upload — see
  *  ui/image-compress.ts — so this server cap is the bypass-proof
- *  enforcement of the same limit, not the primary size control). */
+ *  enforcement of the same limit, not the primary size control).
+ *
+ *  Storage (2026-08-04): the compressed image is uploaded to Google Drive
+ *  (src/lib/drive.ts — the SAME shared helper the HR module's resume/
+ *  payslip/etc. uploads use, called here as-is, never modified) under its
+ *  OWN dedicated folder (GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID — separate from
+ *  the shared GOOGLE_DRIVE_FOLDER_ID root every other module defaults to,
+ *  since this is a high-volume feature that deserves its own space).
+ *  Only the returned Drive file id is stored (Proof.driveFileId); a
+ *  replace deletes the previous file from Drive. The original in-DB-bytes
+ *  columns (imageMime/imageData) were dropped 2026-08-04 once their only 7
+ *  rows — all test data pre-dating this cutover — were deleted; every row
+ *  now goes through Drive, no fallback branch needed anymore.
+ *
+ *  Folder structure (2026-08-04, mirrors the Inventory repo's dated-
+ *  hierarchy convention for the same reason — easing QA/QC of a high-
+ *  volume photo stream): {root}/{YYYY}/{MM}/{DD}/{Department-or-Branch}/
+ *  — Department for HOD/department-side staff, Branch for Branch Manager/
+ *  branch-side staff (the exact split role-views.ts uses everywhere else);
+ *  "Unassigned" when a staff record has neither (the ~61 unplaced real
+ *  staff role-views.ts already documents elsewhere). The filename is built
+ *  from the assignee + task title as uploadToDrive's `prefix` — its own
+ *  `${prefix}-${Date.now()}-${fileName}` naming already bakes in a
+ *  timestamp, so nothing here duplicates one. */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
   dataBase64: z.string().min(1).max(PROOF_IMAGE_MAX_BASE64),
 });
+const PROOF_IMAGE_EXT: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+};
+/** Drive folder/file names tolerate most characters, but keep it to a safe
+ *  ASCII-ish set so a stray "/" in a task title (or similar) can never be
+ *  misread as a path separator by anyone browsing the Drive tree by hand. */
+function sanitizeDriveNamePart(value: string): string {
+  return value.replace(/[^a-z0-9.\-_ ]/gi, "_").trim();
+}
 
 export function uploadFlowTaskProof(
   actorEmail: string,
@@ -545,19 +580,49 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true },
+      select: { assigneeId: true, title: true },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
     }
 
-    const imageData = Buffer.from(img.dataBase64, "base64");
+    const existing = await prisma.proof.findUnique({
+      where: { runBlockId: id },
+      select: { driveFileId: true },
+    });
+
+    // Department for dept-side staff, Branch for branch-side staff — same
+    // split as role-views.ts. "Unassigned" is the documented fallback for
+    // staff with neither (rare, but real — see User.department's comment).
+    const orgUnit = user.department ?? user.branch ?? "Unassigned";
+    const now = new Date();
+    const folderPath = [
+      String(now.getFullYear()),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+      orgUnit,
+    ];
+    const prefix = sanitizeDriveNamePart(`${user.name}-${runBlock.title}`).slice(0, 150);
+
+    const buffer = Buffer.from(img.dataBase64, "base64");
+    const file = new File([buffer], `proof${PROOF_IMAGE_EXT[img.mime] ?? ""}`, { type: img.mime });
+    const uploaded = await uploadToDrive(file, {
+      prefix,
+      folderPath,
+      folderEnvVar: "GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID",
+    });
+
     const proof = await prisma.proof.upsert({
       where: { runBlockId: id },
-      create: { runBlockId: id, imageMime: img.mime, imageData },
-      update: { imageMime: img.mime, imageData },
+      create: { runBlockId: id, driveFileId: uploaded.id },
+      update: { driveFileId: uploaded.id },
     });
+
+    if (existing?.driveFileId && existing.driveFileId !== uploaded.id) {
+      await deleteFromDrive(existing.driveFileId);
+    }
+
     return { proofId: proof.id };
   }, "uploadFlowTaskProof");
 }
