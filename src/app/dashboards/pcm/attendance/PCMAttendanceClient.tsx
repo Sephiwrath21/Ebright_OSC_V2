@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
-  ClipboardCheck, CalendarDays, Users, MapPin, Search, Download, ChevronRight,
+  ClipboardCheck, CalendarDays, Users, MapPin, Search, Download, ChevronRight, Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  BRANCHES as PCM_BRANCHES, gradeLabel,
+  type FAEvent as RawEvent, type Session as RawSession, type Invitation as RawInvitation,
+} from "@/lib/pcm/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BranchCode = "PJ" | "KL" | "SJ" | "PG" | "JB";
+type BranchCode = string;
 type AttStatus = "invited" | "confirmed" | "attended" | "rescheduled" | "declined" | "no_show";
 type AttStatusFilter = "all" | AttStatus;
 type InviteType = "progress" | "renewal";
@@ -45,55 +49,6 @@ interface AttRecord {
   coachName: string;
 }
 
-// ─── Mock Events ──────────────────────────────────────────────────────────────
-
-const MOCK_EVENTS: PCMEvent[] = [
-  { id: "pcm-001", name: "PCM Jul 2026", venue: "Ebright PJ HQ",      startDate: "2026-07-14", status: "open",      numberOfDays: 7 },
-  { id: "pcm-a3",  name: "PCM May 2026", venue: "Ebright PJ HQ",      startDate: "2026-05-19", status: "completed", numberOfDays: 7 },
-  { id: "pcm-a2",  name: "PCM Mar 2026", venue: "Ebright KL Branch",   startDate: "2026-03-10", status: "completed", numberOfDays: 7 },
-  { id: "pcm-a1",  name: "PCM Jan 2025", venue: "Ebright PJ HQ",      startDate: "2025-01-06", status: "completed", numberOfDays: 7 },
-];
-
-// ─── Sessions (auto-generated) ────────────────────────────────────────────────
-
-const SESSION_TIMES = [
-  { n: 1, start: "09:00", end: "10:00" },
-  { n: 2, start: "10:00", end: "11:00" },
-  { n: 3, start: "11:00", end: "12:00" },
-  { n: 4, start: "14:00", end: "15:00" },
-  { n: 5, start: "15:00", end: "16:00" },
-  { n: 6, start: "16:00", end: "17:00" },
-] as const;
-
-const MOCK_SESSIONS: PCMSession[] = [];
-const SESSIONS_BY_ID = new Map<string, PCMSession>();
-for (const ev of MOCK_EVENTS) {
-  for (let d = 1; d <= ev.numberOfDays; d++) {
-    for (const t of SESSION_TIMES) {
-      const s: PCMSession = {
-        id: `${ev.id}-d${d}-s${t.n}`,
-        eventId: ev.id,
-        dayNumber: d,
-        sessionNumber: t.n,
-        startTime: t.start,
-        endTime: t.end,
-      };
-      MOCK_SESSIONS.push(s);
-      SESSIONS_BY_ID.set(s.id, s);
-    }
-  }
-}
-
-// ─── Day Labels ───────────────────────────────────────────────────────────────
-
-const EVENT_DAY_LABELS: Record<string, Record<number, string>> = {
-  "pcm-001": { 1:"Tue 14 Jul", 2:"Wed 15 Jul", 3:"Thu 16 Jul", 4:"Fri 17 Jul", 5:"Sat 18 Jul", 6:"Sun 19 Jul", 7:"Mon 20 Jul" },
-  "pcm-a3":  { 1:"Tue 19 May", 2:"Wed 20 May", 3:"Thu 21 May", 4:"Fri 22 May", 5:"Sat 23 May", 6:"Sun 24 May", 7:"Mon 25 May" },
-  "pcm-a2":  { 1:"Tue 10 Mar", 2:"Wed 11 Mar", 3:"Thu 12 Mar", 4:"Fri 13 Mar", 5:"Sat 14 Mar", 6:"Sun 15 Mar", 7:"Mon 16 Mar" },
-  "pcm-a1":  { 1:"Mon 6 Jan",  2:"Tue 7 Jan",  3:"Wed 8 Jan",  4:"Thu 9 Jan",  5:"Fri 10 Jan", 6:"Sat 11 Jan", 7:"Sun 12 Jan" },
-};
-
-// ─── Status Display ───────────────────────────────────────────────────────────
 
 const STATUS_BADGE: Record<AttStatus, string> = {
   invited:     "bg-slate-100 text-slate-600",
@@ -125,60 +80,41 @@ const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
   draft: "Draft", open: "Open", ongoing: "Ongoing", closed: "Closed", completed: "Completed",
 };
 
-// ─── Mock Attendance Records ──────────────────────────────────────────────────
-
-const MOCK_RECORDS: AttRecord[] = [
-  // pcm-a1 — Day 1
-  { id:"ar-001", sessionId:"pcm-a1-d1-s1", eventId:"pcm-a1", studentId:"STU-1042", studentName:"Ahmad Razif bin Musa",     branch:"KL", grade:8,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-002", sessionId:"pcm-a1-d1-s1", eventId:"pcm-a1", studentId:"STU-2185", studentName:"Nur Farhana binti Rosli",  branch:"PJ", grade:12, inviteType:"renewal",  status:"attended",  coachName:"Mr Ali"   },
-  { id:"ar-003", sessionId:"pcm-a1-d1-s1", eventId:"pcm-a1", studentId:"STU-3371", studentName:"Siti Aminah Mohd Noh",     branch:"SJ", grade:5,  inviteType:"progress", status:"no_show",   coachName:"Ms Jana"  },
-  { id:"ar-004", sessionId:"pcm-a1-d1-s2", eventId:"pcm-a1", studentId:"STU-1198", studentName:"Mohd Farid Azlan",         branch:"PJ", grade:10, inviteType:"renewal",  status:"attended",  coachName:"Mr Ali"   },
-  { id:"ar-005", sessionId:"pcm-a1-d1-s2", eventId:"pcm-a1", studentId:"STU-2047", studentName:"Tan Wei Ling",             branch:"KL", grade:7,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-006", sessionId:"pcm-a1-d1-s2", eventId:"pcm-a1", studentId:"STU-4203", studentName:"Rajan Kumar",              branch:"PG", grade:11, inviteType:"renewal",  status:"attended",  coachName:"Ms Siti"  },
-  { id:"ar-007", sessionId:"pcm-a1-d1-s3", eventId:"pcm-a1", studentId:"STU-3108", studentName:"Lim Mei Yi",               branch:"SJ", grade:9,  inviteType:"progress", status:"attended",  coachName:"Ms Siti"  },
-  { id:"ar-008", sessionId:"pcm-a1-d1-s3", eventId:"pcm-a1", studentId:"STU-5012", studentName:"Azizul Hakim Ramli",       branch:"JB", grade:6,  inviteType:"progress", status:"no_show",   coachName:"Mr Hafiz" },
-  { id:"ar-009", sessionId:"pcm-a1-d1-s4", eventId:"pcm-a1", studentId:"STU-2290", studentName:"Faezah binti Hamid",       branch:"KL", grade:13, inviteType:"renewal",  status:"attended",  coachName:"Ms Rania" },
-  { id:"ar-010", sessionId:"pcm-a1-d1-s4", eventId:"pcm-a1", studentId:"STU-1334", studentName:"Chen Yi Xuan",             branch:"PJ", grade:8,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-011", sessionId:"pcm-a1-d1-s4", eventId:"pcm-a1", studentId:"STU-4455", studentName:"Muthu Krishnan",           branch:"PG", grade:12, inviteType:"renewal",  status:"attended",  coachName:"Ms Siti"  },
-  { id:"ar-012", sessionId:"pcm-a1-d1-s5", eventId:"pcm-a1", studentId:"STU-3214", studentName:"Nurul Izzah Zainudin",     branch:"SJ", grade:7,  inviteType:"progress", status:"attended",  coachName:"Ms Rania" },
-  { id:"ar-013", sessionId:"pcm-a1-d1-s5", eventId:"pcm-a1", studentId:"STU-2381", studentName:"Hafizuddin Nor",           branch:"KL", grade:10, inviteType:"renewal",  status:"no_show",   coachName:"Mr Ali"   },
-  { id:"ar-014", sessionId:"pcm-a1-d1-s6", eventId:"pcm-a1", studentId:"STU-1507", studentName:"Rashidah binti Omar",      branch:"PJ", grade:9,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-015", sessionId:"pcm-a1-d1-s6", eventId:"pcm-a1", studentId:"STU-5129", studentName:"Vinod Anand",              branch:"JB", grade:11, inviteType:"renewal",  status:"attended",  coachName:"Mr Hafiz" },
-  // pcm-a1 — Day 2
-  { id:"ar-016", sessionId:"pcm-a1-d2-s1", eventId:"pcm-a1", studentId:"STU-2445", studentName:"Afiq Zafran Azman",        branch:"KL", grade:9,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-017", sessionId:"pcm-a1-d2-s1", eventId:"pcm-a1", studentId:"STU-1612", studentName:"Hana Yasmin Ahmad",        branch:"PJ", grade:11, inviteType:"renewal",  status:"no_show",   coachName:"Mr Ali"   },
-  { id:"ar-018", sessionId:"pcm-a1-d2-s4", eventId:"pcm-a1", studentId:"STU-3320", studentName:"Izwan Nizam",              branch:"SJ", grade:8,  inviteType:"progress", status:"attended",  coachName:"Ms Siti"  },
-  { id:"ar-019", sessionId:"pcm-a1-d2-s4", eventId:"pcm-a1", studentId:"STU-4567", studentName:"Salmah binti Daud",        branch:"PG", grade:13, inviteType:"renewal",  status:"attended",  coachName:"Ms Rania" },
-  // pcm-a3 — Day 1
-  { id:"ar-020", sessionId:"pcm-a3-d1-s1", eventId:"pcm-a3", studentId:"STU-1890", studentName:"Adib Haiqal Zaki",         branch:"PJ", grade:8,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  { id:"ar-021", sessionId:"pcm-a3-d1-s1", eventId:"pcm-a3", studentId:"STU-2501", studentName:"Umi Kalsom binti Razak",   branch:"KL", grade:13, inviteType:"renewal",  status:"attended",  coachName:"Mr Ali"   },
-  { id:"ar-022", sessionId:"pcm-a3-d1-s2", eventId:"pcm-a3", studentId:"STU-3678", studentName:"Fitri Akmal Hassan",       branch:"SJ", grade:10, inviteType:"progress", status:"attended",  coachName:"Ms Siti"  },
-  { id:"ar-023", sessionId:"pcm-a3-d1-s2", eventId:"pcm-a3", studentId:"STU-4789", studentName:"Zubaidah Mohd Yusof",      branch:"PG", grade:6,  inviteType:"renewal",  status:"no_show",   coachName:"Ms Rania" },
-  { id:"ar-024", sessionId:"pcm-a3-d1-s3", eventId:"pcm-a3", studentId:"STU-5234", studentName:"Hazwan bin Kamaruddin",    branch:"JB", grade:11, inviteType:"renewal",  status:"attended",  coachName:"Mr Hafiz" },
-  { id:"ar-025", sessionId:"pcm-a3-d1-s3", eventId:"pcm-a3", studentId:"STU-2112", studentName:"Syakirah Nadia Ahmad",     branch:"KL", grade:7,  inviteType:"progress", status:"attended",  coachName:"Ms Jana"  },
-  // pcm-001 — Day 1 (upcoming — confirmed / invited)
-  { id:"ar-026", sessionId:"pcm-001-d1-s1", eventId:"pcm-001", studentId:"STU-1756", studentName:"Aidil Fitri Azman",      branch:"PJ", grade:9,  inviteType:"progress", status:"confirmed", coachName:"Ms Jana"  },
-  { id:"ar-027", sessionId:"pcm-001-d1-s1", eventId:"pcm-001", studentId:"STU-2834", studentName:"Norhanim binti Ramli",   branch:"KL", grade:12, inviteType:"renewal",  status:"invited",   coachName:"Mr Ali"   },
-  { id:"ar-028", sessionId:"pcm-001-d1-s1", eventId:"pcm-001", studentId:"STU-3445", studentName:"Iskandar Arif",          branch:"SJ", grade:10, inviteType:"progress", status:"confirmed", coachName:"Ms Siti"  },
-  { id:"ar-029", sessionId:"pcm-001-d1-s1", eventId:"pcm-001", studentId:"STU-5001", studentName:"Rokiah binti Sulaiman",  branch:"JB", grade:8,  inviteType:"renewal",  status:"invited",   coachName:"Mr Hafiz" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function gradeLabel(g: number): string {
-  return g <= 12 ? `G${g}` : `GB${g - 12}`;
+const BRANCHES: { code: string; name: string }[] = PCM_BRANCHES.map(b => ({ code: b.code, name: b.name }));
+
+interface PCMDataBundle {
+  events: RawEvent[];
+  sessions: RawSession[];
+  invitations: RawInvitation[];
 }
 
-function buildCsv(records: AttRecord[]): string {
-  const evById = new Map(MOCK_EVENTS.map(e => [e.id, e]));
+const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/** Label for the Nth day of an event: startDate + (dayNumber-1), UTC-anchored. */
+function dayLabel(startIso: string | undefined, dayNumber: number): string {
+  if (!startIso) return `Day ${dayNumber}`;
+  const [y, m, d] = startIso.split("-").map(Number);
+  if (!y || !m || !d) return `Day ${dayNumber}`;
+  const dt = new Date(Date.UTC(y, m - 1, d + (dayNumber - 1)));
+  return `${WEEKDAYS[dt.getUTCDay()]} ${dt.getUTCDate()} ${MONTHS_SHORT[dt.getUTCMonth()]}`;
+}
+
+function buildCsv(
+  records: AttRecord[],
+  events: PCMEvent[],
+  sessById: Map<string, PCMSession>,
+): string {
+  const evById = new Map(events.map(e => [e.id, e]));
   const header = "Event,Day,Session,Start,End,StudentID,Name,Branch,Grade,Type,Status,Coach";
   const rows = records.map(r => {
-    const sess = SESSIONS_BY_ID.get(r.sessionId);
+    const sess = sessById.get(r.sessionId);
     const ev   = evById.get(r.eventId);
-    const dayLabel = EVENT_DAY_LABELS[r.eventId]?.[sess?.dayNumber ?? 1] ?? `Day ${sess?.dayNumber}`;
     return [
       ev?.name ?? r.eventId,
-      dayLabel,
+      dayLabel(ev?.startDate, sess?.dayNumber ?? 1),
       `S${sess?.sessionNumber ?? ""}`,
       sess?.startTime ?? "",
       sess?.endTime ?? "",
@@ -197,23 +133,71 @@ function buildCsv(records: AttRecord[]): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PCMAttendanceClient() {
-  const [eventId, setEventId]             = useState(MOCK_EVENTS[0].id);
+  const [eventId, setEventId]             = useState<string>("");
   const [dayFilter, setDayFilter]         = useState<number | "all">("all");
   const [sessionIdFilter, setSessionIdFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter]   = useState<BranchCode | "all">("all");
   const [statusFilter, setStatusFilter]   = useState<AttStatusFilter>("all");
   const [search, setSearch]               = useState("");
 
+  const [events, setEvents]         = useState<PCMEvent[]>([]);
+  const [sessions, setSessions]     = useState<PCMSession[]>([]);
+  const [records, setRecords]       = useState<AttRecord[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/pcm/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load attendance (${res.status})`);
+        const data = (await res.json()) as PCMDataBundle;
+        if (!alive) return;
+        const evs: PCMEvent[] = (data.events ?? [])
+          .map(e => ({ id: e.id, name: e.name, venue: e.venue, startDate: e.startDate, status: e.status as EventStatus, numberOfDays: e.numberOfDays }))
+          .sort((a, b) => b.startDate.localeCompare(a.startDate));
+        setEvents(evs);
+        setSessions((data.sessions ?? []).map(s => ({
+          id: s.id, eventId: s.eventId, dayNumber: s.dayNumber,
+          sessionNumber: s.sessionNumber, startTime: s.startTime, endTime: s.endTime,
+        })));
+        setRecords((data.invitations ?? []).map(i => ({
+          id: i.id, sessionId: i.sessionId, eventId: i.eventId,
+          studentId: i.studentId,
+          studentName: i.studentName || `#${i.studentId}`,
+          branch: i.branch, grade: i.targetGrade,
+          inviteType: (i.inviteType === "renewal" ? "renewal" : "progress"),
+          status: i.status as AttStatus,
+          coachName: i.coachName ?? "",
+        })));
+        // Default to the most recent event that has attendance records.
+        const withRec = evs.find(e => (data.invitations ?? []).some(i => i.eventId === e.id));
+        setEventId(withRec?.id ?? evs[0]?.id ?? "");
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load attendance");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const SESSIONS_BY_ID = useMemo(
+    () => new Map<string, PCMSession>(sessions.map(s => [s.id, s])),
+    [sessions],
+  );
+
   const selectedEvent = useMemo(
-    () => MOCK_EVENTS.find(e => e.id === eventId) ?? MOCK_EVENTS[0],
-    [eventId],
+    () => events.find(e => e.id === eventId) ?? null,
+    [events, eventId],
   );
 
   const eventSessions = useMemo(
-    () => MOCK_SESSIONS
+    () => sessions
       .filter(s => s.eventId === eventId)
       .sort((a, b) => a.dayNumber - b.dayNumber || a.sessionNumber - b.sessionNumber),
-    [eventId],
+    [sessions, eventId],
   );
 
   const filteredSessions = useMemo(
@@ -223,7 +207,7 @@ export default function PCMAttendanceClient() {
 
   const allFilteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_RECORDS.filter(r => {
+    return records.filter(r => {
       if (r.eventId !== eventId) return false;
       if (r.status === "declined") return false;
       if (branchFilter !== "all" && r.branch !== branchFilter) return false;
@@ -231,7 +215,7 @@ export default function PCMAttendanceClient() {
       if (q && !r.studentName.toLowerCase().includes(q) && !r.studentId.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [eventId, branchFilter, statusFilter, search]);
+  }, [records, eventId, branchFilter, statusFilter, search]);
 
   // Sessions that have at least one record after filters
   const sessionsWithData = useMemo(
@@ -264,18 +248,18 @@ export default function PCMAttendanceClient() {
   }), [allFilteredRecords]);
 
   function handleDownload() {
-    const csv  = buildCsv(allFilteredRecords);
+    const csv  = buildCsv(allFilteredRecords, events, SESSIONS_BY_ID);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
-    a.download = `attendance-${selectedEvent.name.replace(/\s+/g, "-").toLowerCase()}.csv`;
+    a.download = `attendance-${(selectedEvent?.name ?? "pcm").replace(/\s+/g, "-").toLowerCase()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   return (
-    <div className="px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-6">
+    <div className="px-4 py-6 md:px-8 w-full mx-auto space-y-6">
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-slate-400">
@@ -314,7 +298,7 @@ export default function PCMAttendanceClient() {
               setSessionIdFilter("all");
             }}
           >
-            {MOCK_EVENTS.map(ev => (
+            {events.map(ev => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
             ))}
           </select>
@@ -329,9 +313,9 @@ export default function PCMAttendanceClient() {
             }}
           >
             <option value="all">All days</option>
-            {Array.from({ length: selectedEvent.numberOfDays }, (_, i) => i + 1).map(d => (
+            {Array.from({ length: selectedEvent?.numberOfDays ?? 0 }, (_, i) => i + 1).map(d => (
               <option key={d} value={d}>
-                {EVENT_DAY_LABELS[eventId]?.[d] ?? `Day ${d}`}
+                {dayLabel(selectedEvent?.startDate, d)}
               </option>
             ))}
           </select>
@@ -344,7 +328,7 @@ export default function PCMAttendanceClient() {
             <option value="all">All sessions</option>
             {filteredSessions.map(s => (
               <option key={s.id} value={s.id}>
-                {EVENT_DAY_LABELS[eventId]?.[s.dayNumber] ?? `Day ${s.dayNumber}`} · S{s.sessionNumber} · {s.startTime}–{s.endTime}
+                {dayLabel(selectedEvent?.startDate, s.dayNumber)} · S{s.sessionNumber} · {s.startTime}–{s.endTime}
               </option>
             ))}
           </select>
@@ -355,11 +339,11 @@ export default function PCMAttendanceClient() {
           <select
             className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm min-w-[160px]"
             value={branchFilter}
-            onChange={e => setBranchFilter(e.target.value as BranchCode | "all")}
+            onChange={e => setBranchFilter(e.target.value)}
           >
             <option value="all">All branches</option>
-            {(["PJ", "KL", "SJ", "PG", "JB"] as BranchCode[]).map(b => (
-              <option key={b} value={b}>{b}</option>
+            {BRANCHES.map(b => (
+              <option key={b.code} value={b.code}>{b.code} — {b.name}</option>
             ))}
           </select>
 
@@ -389,11 +373,13 @@ export default function PCMAttendanceClient() {
 
         {/* Stats strip */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 border-t border-slate-100 text-xs">
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${EVENT_STATUS_BADGE[selectedEvent.status]}`}>
-            {EVENT_STATUS_LABELS[selectedEvent.status]}
-          </span>
+          {selectedEvent && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${EVENT_STATUS_BADGE[selectedEvent.status]}`}>
+              {EVENT_STATUS_LABELS[selectedEvent.status]}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1 text-slate-500">
-            <MapPin className="w-3 h-3 text-slate-400" /> {selectedEvent.venue}
+            <MapPin className="w-3 h-3 text-slate-400" /> {selectedEvent?.venue ?? "—"}
           </span>
           <span><strong className="text-slate-900">{counts.rows}</strong> <span className="text-slate-400">rows</span></span>
           <span className="text-emerald-700"><strong>{counts.attended}</strong> attended</span>
@@ -416,7 +402,16 @@ export default function PCMAttendanceClient() {
       )}
 
       {/* Roster cards */}
-      {sessionsToRender.length === 0 ? (
+      {loading ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+          <Loader2 className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">Loading attendance…</p>
+        </div>
+      ) : error ? (
+        <div className="bg-white border border-red-200 rounded-2xl p-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-red-600">{error}</p>
+        </div>
+      ) : sessionsToRender.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
           <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
             <Users className="w-6 h-6 text-slate-400" />
@@ -427,11 +422,11 @@ export default function PCMAttendanceClient() {
       ) : (
         <div className="space-y-4">
           {sessionsToRender.map(session => {
-            const records    = recordsBySession.get(session.id) ?? [];
-            const sessAtt    = records.filter(r => r.status === "attended").length;
-            const sessAbs    = records.filter(r => r.status === "no_show").length;
-            const sessAwait  = records.filter(r => r.status === "confirmed" || r.status === "invited").length;
-            const dayLabel   = EVENT_DAY_LABELS[eventId]?.[session.dayNumber] ?? `Day ${session.dayNumber}`;
+            const sessionRecords = recordsBySession.get(session.id) ?? [];
+            const sessAtt    = sessionRecords.filter(r => r.status === "attended").length;
+            const sessAbs    = sessionRecords.filter(r => r.status === "no_show").length;
+            const sessAwait  = sessionRecords.filter(r => r.status === "confirmed" || r.status === "invited").length;
+            const dayLabelStr = dayLabel(selectedEvent?.startDate, session.dayNumber);
 
             return (
               <div key={session.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -439,7 +434,7 @@ export default function PCMAttendanceClient() {
                 <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-semibold text-slate-900">
-                      {dayLabel} · Session {session.sessionNumber} · {session.startTime}–{session.endTime}
+                      {dayLabelStr} · Session {session.sessionNumber} · {session.startTime}–{session.endTime}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 text-xs">
                       {sessAtt > 0   && <span className="text-emerald-700 font-medium">{sessAtt} attended</span>}
@@ -447,11 +442,11 @@ export default function PCMAttendanceClient() {
                       {sessAwait > 0 && <span className="text-amber-600 font-medium">{sessAwait} awaiting</span>}
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400">{records.length} student{records.length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-slate-400">{sessionRecords.length} student{sessionRecords.length !== 1 ? "s" : ""}</span>
                 </div>
 
                 {/* Student table */}
-                {records.length === 0 ? (
+                {sessionRecords.length === 0 ? (
                   <div className="p-6 text-center text-sm text-slate-400">No students in this session.</div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -468,7 +463,7 @@ export default function PCMAttendanceClient() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {records.map((r, i) => (
+                        {sessionRecords.map((r, i) => (
                           <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
                             <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                             <td className="px-4 py-3">

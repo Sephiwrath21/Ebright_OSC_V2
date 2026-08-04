@@ -40,7 +40,7 @@ const modules: CrmModule[] = [
 export default function CrmDashboard() {
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link
             href="/home"
@@ -50,12 +50,12 @@ export default function CrmDashboard() {
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">CRM</span>
+          <span className="text-slate-900 font-medium">CNS</span>
         </nav>
 
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-            Customer Relationship Management
+            Client Nexus System
           </h1>
         </header>
 

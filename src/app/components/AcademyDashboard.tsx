@@ -139,7 +139,7 @@ export default function AcademyDashboard({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-12 space-y-6">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12 space-y-6">
         
         {/* Header */}
         <div className="mb-6 w-full space-y-2">

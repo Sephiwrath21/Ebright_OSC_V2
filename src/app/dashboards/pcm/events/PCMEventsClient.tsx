@@ -5,8 +5,12 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, MapPin, CalendarDays, Plus, ChevronRight, Home,
+  Search, MapPin, CalendarDays, Plus, ChevronRight, Home, Loader2,
 } from "lucide-react";
+import {
+  type FAEvent as RawEvent, type Session as RawSession,
+  type Invitation as RawInvitation, type InvitationStatus,
+} from "@/lib/pcm/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,64 +34,78 @@ interface PCMEvent {
   archiveDate?: string;
   invitationOpen?: string;
   invitationClose?: string;
+  /** ISO start date kept for chronological sorting (display startDate is a
+   *  human string that doesn't sort by date). */
+  isoStart: string;
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
+interface PCMDataBundle {
+  events: RawEvent[];
+  sessions: RawSession[];
+  quotas: unknown[];
+  invitations: RawInvitation[];
+  overrides: unknown[];
+}
 
-const mockActiveEvents: PCMEvent[] = [
-  {
-    id: "pcm-001",
-    name: "PCM Jul 2026 Weekly Showcase",
-    startDate: "14 Jul 2026", endDate: "20 Jul 2026",
-    days: 7, venue: "Mid Valley Megamall", status: "open",
-    sessions: 42, invited: 214, confirmed: 176,
-    month: "JUL", day: 14, year: 2026,
-    invitationOpen: "Jun 1, 2026", invitationClose: "Jul 7, 2026",
-  },
-  {
-    id: "pcm-002",
-    name: "PCM Aug 2026 Weekly Showcase",
-    startDate: "11 Aug 2026", endDate: "17 Aug 2026",
-    days: 7, venue: "KL Gateway", status: "draft",
-    sessions: 0, invited: 0, confirmed: 0,
-    month: "AUG", day: 11, year: 2026,
-  },
-  {
-    id: "pcm-003",
-    name: "PCM Sep 2026 Weekly Showcase",
-    startDate: "8 Sep 2026", endDate: "14 Sep 2026",
-    days: 7, venue: "Sunway Pyramid", status: "draft",
-    sessions: 0, invited: 0, confirmed: 0,
-    month: "SEP", day: 8, year: 2026,
-  },
-];
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-const mockArchiveEvents: PCMEvent[] = [
-  {
-    id: "pcm-a1",
-    name: "PCM Jan 2025 Weekly Showcase",
-    startDate: "6 Jan 2025", endDate: "12 Jan 2025",
-    days: 7, venue: "KLCC Convention Centre", status: "completed",
-    sessions: 42, invited: 387, confirmed: 330, attended: 311,
-    month: "JAN", day: 6, year: 2025, archiveDate: "Jan 15, 2025",
-  },
-  {
-    id: "pcm-a2",
-    name: "PCM Mar 2026 Weekly Showcase",
-    startDate: "9 Mar 2026", endDate: "15 Mar 2026",
-    days: 7, venue: "Pavilion Damansara Heights", status: "completed",
-    sessions: 42, invited: 344, confirmed: 290, attended: 276,
-    month: "MAR", day: 9, year: 2026, archiveDate: "Mar 20, 2026",
-  },
-  {
-    id: "pcm-a3",
-    name: "PCM May 2026 Weekly Showcase",
-    startDate: "11 May 2026", endDate: "17 May 2026",
-    days: 7, venue: "Pavilion KL", status: "completed",
-    sessions: 42, invited: 361, confirmed: 298, attended: 285,
-    month: "MAY", day: 11, year: 2026, archiveDate: "May 22, 2026",
-  },
-];
+// PCM has no countsAsConfirmed/countsAsAttended helpers — v1 inlines these.
+const isConfirmed = (s: InvitationStatus) => s === "confirmed" || s === "attended";
+const isAttended  = (s: InvitationStatus) => s === "attended";
+
+function fmtDayMonYear(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const mon = MONTHS[m - 1] ?? "";
+  return `${d} ${mon.charAt(0) + mon.slice(1).toLowerCase()} ${y}`;
+}
+function fmtLongDate(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const mon = MONTHS[m - 1] ?? "";
+  return `${mon.charAt(0) + mon.slice(1).toLowerCase()} ${d}, ${y}`;
+}
+
+/** Fold the raw PCM bundle into the display rows this page renders. Counts use
+ *  v1's rules: invited = all invitations, confirmed = confirmed|attended,
+ *  attended = attended. */
+function toDisplayEvents(data: PCMDataBundle): PCMEvent[] {
+  const sessionCountByEvent = new Map<string, number>();
+  for (const s of data.sessions) {
+    sessionCountByEvent.set(s.eventId, (sessionCountByEvent.get(s.eventId) ?? 0) + 1);
+  }
+  const invByEvent = new Map<string, RawInvitation[]>();
+  for (const inv of data.invitations) {
+    const arr = invByEvent.get(inv.eventId) ?? [];
+    arr.push(inv);
+    invByEvent.set(inv.eventId, arr);
+  }
+  return data.events.map((e) => {
+    const invs = invByEvent.get(e.id) ?? [];
+    const [sy, sm, sd] = e.startDate.split("-").map(Number);
+    return {
+      id: e.id,
+      name: e.name,
+      startDate: fmtDayMonYear(e.startDate),
+      endDate: fmtDayMonYear(e.endDate),
+      days: e.numberOfDays,
+      venue: e.venue,
+      status: e.status,
+      sessions: sessionCountByEvent.get(e.id) ?? 0,
+      invited: invs.length,
+      confirmed: invs.filter((i) => isConfirmed(i.status)).length,
+      attended: invs.filter((i) => isAttended(i.status)).length,
+      isoStart: e.startDate,
+      month: MONTHS[(sm ?? e.month) - 1] ?? "",
+      day: sd || 1,
+      year: sy || e.year,
+      archiveDate: e.status === "completed" ? fmtLongDate(e.endDate) : undefined,
+      invitationOpen: fmtLongDate(e.invitationOpenDate),
+      invitationClose: fmtLongDate(e.invitationCloseDate),
+    };
+  });
+}
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
@@ -427,11 +445,41 @@ export default function PCMEventsClient() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatus | "all">("all");
 
+  const [allEvents, setAllEvents] = useState<PCMEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/pcm/data", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load events (${res.status})`);
+        const data = (await res.json()) as PCMDataBundle;
+        if (alive) setAllEvents(toDisplayEvents(data));
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load events");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   const q = search.toLowerCase();
   const matchesSearch = (e: PCMEvent) =>
     !search || e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q);
 
-  const filteredActive = mockActiveEvents.filter((e) => {
+  // Match v1 (academy/page.tsx): upcoming (non-completed) sorted ASCENDING so
+  // the soonest event is the hero; archive (completed) sorted DESCENDING.
+  const activeEvents = allEvents
+    .filter((e) => e.status !== "completed")
+    .sort((a, b) => a.isoStart.localeCompare(b.isoStart));
+  const archiveEvents = allEvents
+    .filter((e) => e.status === "completed")
+    .sort((a, b) => b.isoStart.localeCompare(a.isoStart));
+
+  const filteredActive = activeEvents.filter((e) => {
     if (!matchesSearch(e)) return false;
     if (statusFilter === "completed") return false;
     if (statusFilter === "all") return true;
@@ -439,13 +487,13 @@ export default function PCMEventsClient() {
   });
 
   const showArchive = statusFilter === "all" || statusFilter === "completed";
-  const filteredArchive = showArchive ? mockArchiveEvents.filter(matchesSearch) : [];
+  const filteredArchive = showArchive ? archiveEvents.filter(matchesSearch) : [];
 
   const [nextEvent, ...upcoming] = filteredActive;
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-0">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -478,7 +526,7 @@ export default function PCMEventsClient() {
 
       {/* Sticky search + filter bar */}
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3 flex-wrap">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
@@ -508,10 +556,22 @@ export default function PCMEventsClient() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
+
+        {loading && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center mb-6">
+            <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
+            <p className="text-sm text-slate-500">Loading events…</p>
+          </div>
+        )}
+        {error && !loading && (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center mb-6">
+            <p className="text-sm font-medium text-red-600">{error}</p>
+          </div>
+        )}
 
         {/* Active events */}
-        {statusFilter !== "completed" && (
+        {!loading && !error && statusFilter !== "completed" && (
           <>
             {filteredActive.length === 0 && statusFilter !== "all" ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
@@ -560,7 +620,7 @@ export default function PCMEventsClient() {
         )}
 
         {/* Empty when filtering completed + no archive match */}
-        {statusFilter === "completed" && filteredArchive.length === 0 && (
+        {!loading && !error && statusFilter === "completed" && filteredArchive.length === 0 && (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
             <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />
             <p className="text-sm font-medium text-slate-500">No completed events match your search.</p>

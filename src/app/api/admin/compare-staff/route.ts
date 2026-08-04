@@ -32,10 +32,11 @@ export async function GET() {
   const hrfs = await queryEbrightHrfs<{
     employee_id: string | null;
     name: string | null;
+    nickname: string | null;
     branch: string | null;
     status: string | null;
   }>(
-    `SELECT "employeeId" AS employee_id, name, branch, status
+    `SELECT "employeeId" AS employee_id, name, nickname, branch, status
        FROM public."BranchStaff"
       WHERE "employeeId" IS NOT NULL`,
   );
@@ -51,7 +52,7 @@ export async function GET() {
         select: {
           user_id: true,
           status: true,
-          user_profile: { select: { full_name: true } },
+          user_profile: { select: { full_name: true, nick_name: true } },
         },
       },
     },
@@ -66,6 +67,7 @@ export async function GET() {
   const inHrfsOnly: Array<{ employee_id: string; name: string | null; branch: string | null; status: string | null }> = [];
   const inLocalOnly: Array<{ employee_id: string; name: string | null; branch: string | null; status: string | null }> = [];
   const nameMismatch: Array<{ employee_id: string; hrfs_name: string | null; local_name: string | null }> = [];
+  const nicknameMismatch: Array<{ employee_id: string; hrfs_nickname: string | null; local_nickname: string | null }> = [];
   const branchMismatch: Array<{ employee_id: string; hrfs_branch: string | null; local_branch: string | null }> = [];
 
   for (const [code, h] of hrfsByCode) {
@@ -85,6 +87,14 @@ export async function GET() {
         employee_id: code,
         hrfs_name: h.name,
         local_name: localName,
+      });
+    }
+    const localNickname = l.users.user_profile?.nick_name ?? null;
+    if ((h.nickname ?? "").trim() !== (localNickname ?? "").trim()) {
+      nicknameMismatch.push({
+        employee_id: code,
+        hrfs_nickname: h.nickname,
+        local_nickname: localNickname,
       });
     }
     const localBranch = l.branch?.branch_code ?? null;
@@ -114,11 +124,13 @@ export async function GET() {
       inHrfsOnly: inHrfsOnly.length,
       inLocalOnly: inLocalOnly.length,
       nameMismatch: nameMismatch.length,
+      nicknameMismatch: nicknameMismatch.length,
       branchMismatch: branchMismatch.length,
     },
     inHrfsOnly,
     inLocalOnly,
     nameMismatch,
+    nicknameMismatch,
     branchMismatch,
   });
 }

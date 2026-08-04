@@ -8,6 +8,7 @@ import { createEmployee } from "@/app/dashboard-employee-management/actions";
 
 export default async function AddEmployeePage() {
   const session = await auth();
+  
   if (!session) redirect("/login");
 
   const [branches, departments, buddyOptions] = await Promise.all([

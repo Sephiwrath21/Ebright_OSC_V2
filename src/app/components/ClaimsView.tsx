@@ -243,7 +243,7 @@ export default function ClaimsView({
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-10 space-y-6">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10 space-y-6">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
           <Link
@@ -317,39 +317,38 @@ export default function ClaimsView({
           <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
             {cycleSteps.map((step, i) => {
               const isPast = currentDay > step.day;
-              const isActive = step.day === activeStep;
-
-              let stepClass = "bg-slate-50 border-slate-200 text-slate-600";
-              let dotClass = "bg-slate-400";
-              let textClass = "text-slate-600";
-
-              if (isActive) {
-                if (step.day === 2) {
-                  stepClass = "bg-red-50 border-red-300 ring-2 ring-red-200";
-                  dotClass = "bg-red-500";
-                  textClass = "text-red-700 font-semibold";
-                } else {
-                  stepClass = "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200";
-                  dotClass = "bg-emerald-500";
-                  textClass = "text-emerald-700 font-semibold";
-                }
-              } else if (isPast) {
-                stepClass = "bg-slate-50 border-slate-200 opacity-50";
-                dotClass = "bg-slate-300";
-                textClass = "text-slate-400";
-              }
-
+              const isSubmissionStep = step.day === 2;
               return (
                 <Fragment key={step.label}>
                   <div
                     style={{ flexShrink: 0 }}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border whitespace-nowrap transition-all ${stepClass}`}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border whitespace-nowrap transition-all ${
+                      isSubmissionStep
+                        ? "bg-red-50 border-red-300 ring-2 ring-red-200"
+                        : isPast
+                        ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
                   >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${dotClass}`}
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isSubmissionStep
+                          ? "bg-red-500"
+                          : isPast
+                          ? "bg-emerald-500"
+                          : "bg-slate-400"
+                      }`}
                       aria-hidden="true"
                     />
-                    <p className={`text-sm ${textClass}`}>
+                    <p
+                      className={`text-sm ${
+                        isSubmissionStep
+                          ? "text-red-700 font-semibold"
+                          : isPast
+                          ? "text-emerald-700 font-semibold"
+                          : "text-slate-600"
+                      }`}
+                    >
                       <span className="font-semibold">{step.date}</span>
                       <span className="mx-1 text-slate-400">-</span>
                       {step.label}
@@ -362,7 +361,7 @@ export default function ClaimsView({
                         flex: "1 1 0%",
                         height: "2px",
                         margin: "0 8px",
-                        backgroundColor: isPast ? "#cbd5e1" : "#bfdbfe",
+                        backgroundColor: isPast ? "#60a5fa" : "#bfdbfe",
                       }}
                     />
                   )}

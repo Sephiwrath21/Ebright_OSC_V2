@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   TrendingUp, Users, CheckCircle2, XCircle, CalendarClock, Calendar,
-  CalendarRange, BadgeCheck, Receipt, ChevronRight, X,
+  CalendarRange, BadgeCheck, Receipt, ChevronRight, X, Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  BRANCHES as PCM_BRANCHES,
+  type FAEvent as RawEvent, type Invitation as RawInvitation, type Student as RawStudent,
+} from "@/lib/pcm/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BranchCode = "PJ" | "KL" | "SJ" | "PG" | "JB";
+type BranchCode = string;
 type InviteType = "progress" | "renewal";
 type DashStatus = "invited" | "confirmed" | "attended" | "no_show" | "rescheduled" | "declined";
 type RangePreset = "thisWeek" | "thisMonth" | "thisYear" | "custom" | "all";
@@ -23,7 +27,7 @@ interface DashRecord {
   paid: boolean;
 }
 
-interface MockEvent {
+interface DashEvent {
   id: string;
   name: string;
   startDate: string;
@@ -39,115 +43,7 @@ interface RenewalRow {
   date: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_EVENTS: MockEvent[] = [
-  { id: "pcm-001", name: "PCM Jul 2026", startDate: "2026-07-14" },
-  { id: "pcm-a3",  name: "PCM May 2026", startDate: "2026-05-19" },
-  { id: "pcm-a2",  name: "PCM Mar 2026", startDate: "2026-03-10" },
-  { id: "pcm-a1",  name: "PCM Jan 2025", startDate: "2025-01-06" },
-];
-
-// [eventId, branch, inviteType, status, paid]
-const RAW: [string, BranchCode, InviteType, DashStatus, boolean][] = [
-  // pcm-a1 (Jan 2025)
-  ["pcm-a1","PJ","progress","attended",  false],
-  ["pcm-a1","PJ","renewal", "attended",  true ],
-  ["pcm-a1","PJ","renewal", "attended",  true ],
-  ["pcm-a1","PJ","progress","no_show",   false],
-  ["pcm-a1","PJ","renewal", "confirmed", false],
-  ["pcm-a1","KL","progress","attended",  false],
-  ["pcm-a1","KL","progress","attended",  false],
-  ["pcm-a1","KL","renewal", "attended",  true ],
-  ["pcm-a1","KL","renewal", "no_show",   false],
-  ["pcm-a1","SJ","renewal", "attended",  true ],
-  ["pcm-a1","SJ","renewal", "attended",  true ],
-  ["pcm-a1","SJ","progress","no_show",   false],
-  ["pcm-a1","SJ","progress","no_show",   false],
-  ["pcm-a1","PG","renewal", "attended",  true ],
-  ["pcm-a1","PG","renewal", "attended",  true ],
-  ["pcm-a1","PG","renewal", "attended",  true ],
-  ["pcm-a1","PG","renewal", "invited",   false],
-  ["pcm-a1","JB","progress","attended",  false],
-  ["pcm-a1","JB","renewal", "attended",  true ],
-  ["pcm-a1","JB","renewal", "no_show",   false],
-  // pcm-a2 (Mar 2026)
-  ["pcm-a2","PJ","progress","attended",    false],
-  ["pcm-a2","PJ","renewal", "attended",    true ],
-  ["pcm-a2","PJ","renewal", "attended",    true ],
-  ["pcm-a2","PJ","renewal", "no_show",     false],
-  ["pcm-a2","PJ","progress","rescheduled", false],
-  ["pcm-a2","KL","progress","attended",    false],
-  ["pcm-a2","KL","renewal", "attended",    true ],
-  ["pcm-a2","KL","progress","no_show",     false],
-  ["pcm-a2","KL","renewal", "confirmed",   false],
-  ["pcm-a2","SJ","progress","attended",    false],
-  ["pcm-a2","SJ","renewal", "attended",    true ],
-  ["pcm-a2","SJ","renewal", "attended",    true ],
-  ["pcm-a2","SJ","progress","no_show",     false],
-  ["pcm-a2","PG","renewal", "attended",    true ],
-  ["pcm-a2","PG","renewal", "attended",    false],
-  ["pcm-a2","PG","progress","confirmed",   false],
-  ["pcm-a2","JB","progress","attended",    false],
-  ["pcm-a2","JB","renewal", "invited",     false],
-  // pcm-a3 (May 2026)
-  ["pcm-a3","PJ","progress","attended",    false],
-  ["pcm-a3","PJ","renewal", "attended",    true ],
-  ["pcm-a3","PJ","renewal", "no_show",     false],
-  ["pcm-a3","PJ","progress","rescheduled", false],
-  ["pcm-a3","KL","progress","attended",    false],
-  ["pcm-a3","KL","renewal", "attended",    true ],
-  ["pcm-a3","KL","renewal", "attended",    true ],
-  ["pcm-a3","KL","progress","no_show",     false],
-  ["pcm-a3","SJ","renewal", "attended",    true ],
-  ["pcm-a3","SJ","progress","attended",    false],
-  ["pcm-a3","SJ","progress","confirmed",   false],
-  ["pcm-a3","PG","renewal", "attended",    true ],
-  ["pcm-a3","PG","progress","no_show",     false],
-  ["pcm-a3","PG","renewal", "no_show",     false],
-  ["pcm-a3","JB","progress","attended",    false],
-  ["pcm-a3","JB","renewal", "attended",    true ],
-  // pcm-001 (Jul 2026 — upcoming)
-  ["pcm-001","PJ","progress","confirmed",false],
-  ["pcm-001","PJ","renewal", "invited",  false],
-  ["pcm-001","PJ","progress","confirmed",false],
-  ["pcm-001","KL","renewal", "confirmed",false],
-  ["pcm-001","KL","progress","invited",  false],
-  ["pcm-001","KL","renewal", "confirmed",false],
-  ["pcm-001","SJ","progress","invited",  false],
-  ["pcm-001","SJ","progress","confirmed",false],
-  ["pcm-001","PG","renewal", "invited",  false],
-  ["pcm-001","PG","renewal", "confirmed",false],
-  ["pcm-001","JB","progress","invited",  false],
-  ["pcm-001","JB","progress","confirmed",false],
-];
-
-const MOCK_RECORDS: DashRecord[] = RAW.map(([eventId, branch, inviteType, status, paid]) => ({
-  eventId, branch, inviteType, status, paid,
-}));
-
-const BRANCH_STUDENT_COUNTS: Record<BranchCode, number> = {
-  PJ: 84, KL: 72, SJ: 60, PG: 48, JB: 36,
-};
-
-const BRANCHES: { code: BranchCode; name: string }[] = [
-  { code: "PJ", name: "Petaling Jaya"  },
-  { code: "KL", name: "Kuala Lumpur"   },
-  { code: "SJ", name: "Subang Jaya"    },
-  { code: "PG", name: "Penang"         },
-  { code: "JB", name: "Johor Bahru"    },
-];
-
-const MOCK_RENEWAL_ROWS: RenewalRow[] = [
-  { studentName:"Nur Farhana binti Rosli",   studentId:"STU-2185", branch:"PJ", grade:"G12",  coachName:"Mr Ali",   amount:1800, date:"2025-01-08" },
-  { studentName:"Rajan Kumar",               studentId:"STU-4203", branch:"PG", grade:"G11",  coachName:"Ms Siti",  amount:1600, date:"2025-01-08" },
-  { studentName:"Faezah binti Hamid",        studentId:"STU-2290", branch:"KL", grade:"GB1",  coachName:"Ms Rania", amount:2000, date:"2025-01-09" },
-  { studentName:"Muthu Krishnan",            studentId:"STU-4455", branch:"PG", grade:"G12",  coachName:"Ms Siti",  amount:1800, date:"2025-01-09" },
-  { studentName:"Vinod Anand",               studentId:"STU-5129", branch:"JB", grade:"G11",  coachName:"Mr Hafiz", amount:1600, date:"2025-01-10" },
-  { studentName:"Salmah binti Daud",         studentId:"STU-4567", branch:"PG", grade:"GB1",  coachName:"Ms Rania", amount:2000, date:"2025-01-10" },
-  { studentName:"Umi Kalsom binti Razak",    studentId:"STU-2501", branch:"KL", grade:"GB1",  coachName:"Mr Ali",   amount:2000, date:"2026-05-21" },
-  { studentName:"Hazwan bin Kamaruddin",     studentId:"STU-5234", branch:"JB", grade:"G11",  coachName:"Mr Hafiz", amount:1600, date:"2026-05-21" },
-];
+const BRANCHES: { code: BranchCode; name: string }[] = PCM_BRANCHES.map(b => ({ code: b.code, name: b.name }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -276,18 +172,62 @@ export default function PCMDashboardClient() {
   const [outcomeScope, setOutcomeScope] = useState<"overall" | "renewal">("overall");
   const [renewalOpen, setRenewalOpen]   = useState(false);
 
+  // Live PCM data (events + invitations) and per-branch student counts.
+  const [events, setEvents]       = useState<DashEvent[]>([]);
+  const [records, setRecords]     = useState<DashRecord[]>([]);
+  const [branchStudentCounts, setBranchStudentCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [dataRes, studentsRes] = await Promise.all([
+          fetch("/api/pcm/data", { cache: "no-store" }),
+          fetch("/api/pcm/students", { cache: "no-store" }),
+        ]);
+        if (!dataRes.ok) throw new Error(`Failed to load PCM data (${dataRes.status})`);
+        const data = (await dataRes.json()) as { events: RawEvent[]; invitations: RawInvitation[] };
+        if (!alive) return;
+        setEvents((data.events ?? []).map(e => ({ id: e.id, name: e.name, startDate: e.startDate })));
+        setRecords((data.invitations ?? []).map(i => ({
+          eventId: i.eventId,
+          branch: i.branch,
+          inviteType: (i.inviteType === "renewal" ? "renewal" : "progress") as InviteType,
+          status: i.status as DashStatus,
+          paid: !!i.paid,
+        })));
+        // Per-branch active student counts drive the participation cards.
+        if (studentsRes.ok) {
+          const sj = (await studentsRes.json()) as { students: RawStudent[] };
+          const counts: Record<string, number> = {};
+          for (const s of sj.students ?? []) {
+            if (!s.archived) counts[s.branch] = (counts[s.branch] ?? 0) + 1;
+          }
+          if (alive) setBranchStudentCounts(counts);
+        }
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Failed to load PCM data");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   const range = useMemo(
     () => getDateRange(rangePreset, customStart, customEnd),
     [rangePreset, customStart, customEnd],
   );
 
   const eventsInRange = useMemo(() => {
-    if (!range) return MOCK_EVENTS;
-    return MOCK_EVENTS.filter(e => {
+    if (!range) return events;
+    return events.filter(e => {
       const d = new Date(e.startDate);
       return d >= range.start && d <= range.end;
     });
-  }, [range]);
+  }, [events, range]);
 
   const eventIdsInRange = useMemo(
     () => new Set(eventsInRange.map(e => e.id)),
@@ -295,7 +235,7 @@ export default function PCMDashboardClient() {
   );
 
   const filteredRecords = useMemo(() => {
-    return MOCK_RECORDS.filter(r => {
+    return records.filter(r => {
       if (!eventIdsInRange.has(r.eventId)) return false;
       if (branchFilter !== "all" && r.branch !== branchFilter) return false;
       return true;
@@ -349,18 +289,60 @@ export default function PCMDashboardClient() {
     return BRANCHES
       .filter(b => branchFilter === "all" || b.code === branchFilter)
       .map(b => {
-        const totalStudents = BRANCH_STUDENT_COUNTS[b.code];
+        const totalStudents = branchStudentCounts[b.code] ?? 0;
         const shouldInvite  = Math.round(totalStudents / 12);
         const invited       = filteredRecords.filter(r => r.branch === b.code).length;
         const pct           = shouldInvite > 0 ? Math.round((invited / shouldInvite) * 100) : 0;
         return { code: b.code, name: b.name, totalStudents, shouldInvite, invited, pct };
-      });
-  }, [filteredRecords, branchFilter]);
+      })
+      .filter(b => b.totalStudents > 0 || b.invited > 0);
+  }, [filteredRecords, branchFilter, branchStudentCounts]);
+
+  // Renewal drill-down (public.finance_renewals via /api/pcm/renewal-details),
+  // fetched when the modal opens and re-fetched on branch/range change.
+  const [renewalRows, setRenewalRows] = useState<RenewalRow[]>([]);
+  const [renewalLoading, setRenewalLoading] = useState(false);
+
+  useEffect(() => {
+    if (!renewalOpen) return;
+    let alive = true;
+    setRenewalLoading(true);
+    const params = new URLSearchParams();
+    if (branchFilter !== "all") params.set("branch", branchFilter);
+    if (range) {
+      params.set("start", range.start.toISOString().slice(0, 10));
+      params.set("end", range.end.toISOString().slice(0, 10));
+    }
+    (async () => {
+      try {
+        const res = await fetch(`/api/pcm/renewal-details?${params.toString()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("failed");
+        const data = (await res.json()) as {
+          rows: { studentName: string; studentId: string | null; branch: string; gradeChapter: string | null; coachName: string | null; amount: number; docDate: string | null }[];
+        };
+        if (!alive) return;
+        setRenewalRows((data.rows ?? []).map(r => ({
+          studentName: r.studentName,
+          studentId: r.studentId ?? "—",
+          branch: r.branch,
+          grade: r.gradeChapter ?? "—",
+          coachName: r.coachName ?? "—",
+          amount: r.amount,
+          date: r.docDate ?? "—",
+        })));
+      } catch {
+        if (alive) setRenewalRows([]);
+      } finally {
+        if (alive) setRenewalLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [renewalOpen, branchFilter, range]);
 
   const rangeLabel = getRangeLabel(rangePreset, customStart, customEnd);
 
   return (
-    <div className="px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-5">
+    <div className="px-4 py-6 md:px-8 w-full mx-auto space-y-5">
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-slate-400">
@@ -433,6 +415,15 @@ export default function PCMDashboardClient() {
         </div>
       </div>
 
+      {loading && (
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-10 flex items-center justify-center gap-2 text-sm text-slate-500">
+          <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> Loading PCM data…
+        </div>
+      )}
+      {error && !loading && (
+        <div className="rounded-2xl bg-white border border-red-200 shadow-sm p-6 text-center text-sm font-medium text-red-600">{error}</div>
+      )}
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Invited"     value={stats.invited}     icon={Users}         accent="violet"  />
@@ -481,9 +472,9 @@ export default function PCMDashboardClient() {
 
             <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
               <span className="text-slate-500">Total renewals: <strong className="text-slate-900">
-                RM {MOCK_RENEWAL_ROWS.reduce((s, r) => s + r.amount, 0).toLocaleString("en-MY", { minimumFractionDigits:2 })}
+                RM {renewalRows.reduce((s, r) => s + r.amount, 0).toLocaleString("en-MY", { minimumFractionDigits:2 })}
               </strong></span>
-              <span className="text-slate-400 text-xs">{MOCK_RENEWAL_ROWS.length} student rows</span>
+              <span className="text-slate-400 text-xs">{renewalRows.length} student rows</span>
             </div>
 
             <div className="overflow-y-auto flex-1">
@@ -498,7 +489,13 @@ export default function PCMDashboardClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {MOCK_RENEWAL_ROWS.map((r, i) => (
+                  {renewalLoading && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">Loading renewals…</td></tr>
+                  )}
+                  {!renewalLoading && renewalRows.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">No renewals on record for this filter.</td></tr>
+                  )}
+                  {!renewalLoading && renewalRows.map((r, i) => (
                     <tr key={i} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{r.studentName}</div>

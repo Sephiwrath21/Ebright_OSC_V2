@@ -663,8 +663,8 @@ export default function BranchDashboard({
             alignItems: "stretch",
           }}
         >
-          {/* 4) Monthly ClickUp pie */}
-          <Panel title="Monthly ClickUp">
+          {/* 4) Monthly tasks pie (mock data — label updated with the ClickUp feature's removal) */}
+          <Panel title="Monthly Tasks">
             <Donut data={clickupData} />
           </Panel>
 

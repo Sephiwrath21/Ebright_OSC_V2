@@ -381,7 +381,7 @@ export async function getUpcomingHires(
         startDate: startDate.toISOString().slice(0, 10),
         daysUntilStart: days,
         isWithin7Days: days <= 7,
-        hasPendingRequest: r.users.induction_request_user.length > 0,
+        hasPendingRequest: !!r.users.induction_request_user,
         inductionProfileStatus: r.users.induction_profile?.status ?? null,
       };
     });
@@ -430,7 +430,7 @@ export async function getUpcomingExits(
         endDate: endDate.toISOString().slice(0, 10),
         daysUntilEnd: days,
         isWithin7Days: days <= 7,
-        hasPendingRequest: r.users.induction_request_user.length > 0,
+        hasPendingRequest: !!r.users.induction_request_user,
         inductionProfileStatus: r.users.induction_profile?.status ?? null,
       };
     });

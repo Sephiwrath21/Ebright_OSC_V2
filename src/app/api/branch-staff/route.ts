@@ -11,6 +11,7 @@ interface StaffPayload {
   name: string;
   branch: string;
   role: string | null;
+  endDate: string | null;
 }
 
 const MANAGER_POSITIONS = new Set(["BM", "BRANCH MANAGER", "MANAGER"]);
@@ -74,6 +75,7 @@ export async function GET(req: Request) {
           select: {
             position: true,
             branch: { select: { branch_name: true } },
+            end_date: true,
           },
         },
       },
@@ -100,6 +102,7 @@ export async function GET(req: Request) {
           name: displayName,
           branch: branchName,
           role,
+          endDate: emp.end_date ? emp.end_date.toISOString() : null,
         },
       ];
     });

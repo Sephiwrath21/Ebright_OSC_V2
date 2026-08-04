@@ -115,7 +115,7 @@ function UpdateScheduleContent() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
@@ -141,21 +141,9 @@ function UpdateScheduleContent() {
         </nav>
 
         {/* Page heading */}
-        <header className="mb-8 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
-            <RefreshCw className="w-6 h-6 text-amber-600" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-amber-600 mb-1">
-              Manpower
-            </p>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
-              Update Manpower Schedule
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-xl">
-              Adjust shifts and assignments for active weeks after the fact.
-            </p>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">Update Manpower Schedule</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Adjust shifts and assignments for active weeks after the fact.</p>
         </header>
 
         {/* Branch filter */}

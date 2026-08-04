@@ -73,7 +73,7 @@ export default function FAInventoryClient() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 pt-4 pb-0">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
@@ -95,7 +95,7 @@ export default function FAInventoryClient() {
 
       {/* Sticky search + filters bar */}
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -132,7 +132,7 @@ export default function FAInventoryClient() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
         {filtered.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
             <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />

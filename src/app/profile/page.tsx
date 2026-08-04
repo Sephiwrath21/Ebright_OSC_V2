@@ -73,7 +73,7 @@ export default async function ProfilePage({
   const userRole = roleType;
   const userName = session.user.name ?? null;
 
-  const canEditOrgUnit = roleType === "admin" || roleType === "ceo" || roleType === "staff";
+  const canEditOrgUnit = roleType === "admin" || roleType === "ceo" || roleType === "staff" || roleType === "branch";
   const [branches, departments, team] = await Promise.all([
     canEditOrgUnit ? listBranches() : Promise.resolve([]),
     canEditOrgUnit ? listDepartments() : Promise.resolve([]),
@@ -249,6 +249,7 @@ export default async function ProfilePage({
                 branches={branches}
                 departments={departments}
                 defaultOrgUnit={defaultOrgUnit}
+                onlyBranches={roleType === "branch"}
               />
             )}
 

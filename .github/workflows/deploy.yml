@@ -28,11 +28,19 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Generate Task Manager Prisma client
+        run: npx prisma generate --config prisma.task-manager.config.ts
+
       # - name: TypeScript check
       #   run: npx tsc --noEmit
 
   deploy:
     needs: validate
+    # Never let a fork's copy of this workflow SSH into our servers.
+    # A fork can delete this line, so it is a safety net, NOT the real
+    # lock — rotating SSH_DEPLOY_KEY (so forks lack the key) is what
+    # actually prevents fork deploys.
+    if: github.repository == 'EbrightOD/Ebright_OSC_V2'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve deploy target
@@ -54,6 +62,12 @@ jobs:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # The Docker build on the small deploy host takes ~11 min, which
+          # exceeds appleboy/ssh-action's 10-minute default command_timeout —
+          # causing the SSH session to be killed and the job to report a FALSE
+          # failure even though the build finished and the container came up.
+          # Give it generous headroom so a slow-but-successful deploy is green.
+          command_timeout: 20m
           script_stop: true
           script: |
             set -euo pipefail
@@ -65,10 +79,14 @@ jobs:
             # Stash any local drift so git checkout/pull never blocks
             git stash push -u -m "auto-stash-$(date -u +%FT%TZ)" >> ~/deploy.log 2>&1 || true
 
-            # Refresh refs and hard-sync local branch to remote
-            git remote set-url origin https://github.com/Sephiwrath21/Ebright_OSC_V2.git || true
+            # Refresh refs and hard-sync local branch to remote, exactly like
+            # v1's prod-/staging-deploy.yml (fetch + reset --hard). Do NOT force
+            # the remote to an HTTPS URL: the deploy boxes authenticate to the
+            # private repo over SSH (git@github.com). Forcing HTTPS overwrote the
+            # working SSH remote and broke the fetch with "could not read
+            # Username for https://github.com" → exit 128.
             git fetch origin >> ~/deploy.log 2>&1
-            git checkout -B "${{ github.ref_name }}" "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
+            git reset --hard "origin/${{ github.ref_name }}" >> ~/deploy.log 2>&1
 
             # Diagnostic: confirm we actually have the latest commit on disk
             echo "--- HEAD commit on server: ---" >> ~/deploy.log 2>&1
@@ -79,14 +97,8 @@ jobs:
             echo "--- Tip of source (templates.ts first 25 lines): ---" >> ~/deploy.log 2>&1
             head -25 src/app/induction/templates.ts >> ~/deploy.log 2>&1 || true
 
-            # Ensure remote .env has ClickUp configuration
-            touch .env
-            sed -i '/^CLICKUP_API_TOKEN=/d' .env || true
-            sed -i '/^CLICKUP_TEAM_ID=/d' .env || true
-            printf '%s\n' "CLICKUP_API_TOKEN=pk_3667618_5NI4BGVS2CJIWLEZ33AHOL4LBPC417FX" >> .env
-            printf '%s\n' "CLICKUP_TEAM_ID=3631897" >> .env
- 
             # Ensure remote .env has Google Drive configuration
+            touch .env
             sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
             sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
@@ -102,7 +114,16 @@ jobs:
             # `docker compose up -d --force-recreate`.
             echo "--- Starting Docker Build ---" >> ~/deploy.log 2>&1
             docker build --build-arg BUILD_DATE=$(date +%s) -t ebright-osc-v2:latest . >> ~/deploy.log 2>&1
-            docker compose up -d --force-recreate >> ~/deploy.log 2>&1 || echo "Docker compose up failed" >> ~/deploy.log 2>&1
+
+            # Remove any container squatting on our container_name (e.g. a
+            # manually-started container from before this compose setup
+            # existed) so `up --force-recreate` can never silently no-op
+            # with a "name already in use" conflict again.
+            docker rm -f ebright-osc-v2 >> ~/deploy.log 2>&1 || true
+
+            # No `|| echo ...` fallback here on purpose — if this fails the
+            # job must go red, not report success while serving stale code.
+            docker compose up -d --force-recreate >> ~/deploy.log 2>&1
 
             echo "=== DOCKER PS ===" >> ~/deploy.log
             docker ps -a >> ~/deploy.log 2>&1
