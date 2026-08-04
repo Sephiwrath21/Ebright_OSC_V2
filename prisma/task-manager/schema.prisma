@@ -397,16 +397,20 @@ model TaskTemplate {
 /// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
 /// image only, capped at 2 MB by the upload action). Optional: uploading
 /// proof never gates completion. Re-uploading replaces the row (upsert on
-/// runBlockId); deleting the block cascades the proof away. Bytes live in
-/// the DB for the same reason as Guideline.imageData; served via
-/// /api/task-manager/proof-image/[id] (session-gated).
+/// runBlockId); deleting the block cascades the proof away. Images live in
+/// Google Drive (2026-08-04 storage decision — high upload volume made
+/// in-DB bytes impractical) — driveFileId is the sole reference for every
+/// upload; served via /api/task-manager/proof-image/[id] (session-gated),
+/// which proxies from Drive. The original in-DB-bytes columns
+/// (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
+/// (pre-dating the Drive cutover, all test data) were deleted — every
+/// surviving/future row goes through Drive.
 model Proof {
-  id         String   @id @default(cuid())
-  runBlockId String   @unique
-  runBlock   RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
-  imageMime  String // image/png | image/jpeg | image/webp
-  imageData  Bytes
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  runBlockId  String   @unique
+  runBlock    RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
+  driveFileId String? // Google Drive file id — set by every upload
+  createdAt   DateTime @default(now())
 }
 
 enum BlockStatus {
