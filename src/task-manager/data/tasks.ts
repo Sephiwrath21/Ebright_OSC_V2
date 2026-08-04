@@ -13,6 +13,7 @@ import { buildTemplateSnapshot } from "../engine/snapshot";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
 import { BRANCH_STAFF_ROLES, isElevatedDeptSite, parseLocalDate } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
+import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 
 const CADENCE_OPTIONS = ["daily", "monthly", "adhoc"] as const;
 type CadenceOption = (typeof CADENCE_OPTIONS)[number];
@@ -526,12 +527,29 @@ export function reopenFlowTask(
  *  image (upsert on runBlockId). 2 MB cap (2026-08-01 storage decision:
  *  images are compressed CLIENT-side to ≤1280px JPEG before upload — see
  *  ui/image-compress.ts — so this server cap is the bypass-proof
- *  enforcement of the same limit, not the primary size control). */
+ *  enforcement of the same limit, not the primary size control).
+ *
+ *  Storage (2026-08-04): the compressed image is uploaded to Google Drive
+ *  (src/lib/drive.ts — the SAME shared helper the HR module's resume/
+ *  payslip/etc. uploads use, called here as-is, never modified) under
+ *  "Task Manager Proofs" beneath the shared GOOGLE_DRIVE_FOLDER_ID root —
+ *  no dedicated env var needed, the subfolder is auto-created on first use.
+ *  Only the returned Drive file id is stored (Proof.driveFileId); a
+ *  replace deletes the previous file from Drive. Pre-2026-08-04 rows keep
+ *  their bytes in imageMime/imageData (now nullable, read-only legacy
+ *  fallback — see proof-image/[id]/route.ts) since a live backfill needs
+ *  working Drive credentials this environment didn't have at migration
+ *  time; nothing currently uploaded is at risk. */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
   dataBase64: z.string().min(1).max(PROOF_IMAGE_MAX_BASE64),
 });
+const PROOF_IMAGE_EXT: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+};
 
 export function uploadFlowTaskProof(
   actorEmail: string,
@@ -552,12 +570,28 @@ export function uploadFlowTaskProof(
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
     }
 
-    const imageData = Buffer.from(img.dataBase64, "base64");
+    const existing = await prisma.proof.findUnique({
+      where: { runBlockId: id },
+      select: { driveFileId: true },
+    });
+
+    const buffer = Buffer.from(img.dataBase64, "base64");
+    const file = new File([buffer], `proof${PROOF_IMAGE_EXT[img.mime] ?? ""}`, { type: img.mime });
+    const uploaded = await uploadToDrive(file, {
+      prefix: "proof",
+      folderPath: ["Task Manager Proofs"],
+    });
+
     const proof = await prisma.proof.upsert({
       where: { runBlockId: id },
-      create: { runBlockId: id, imageMime: img.mime, imageData },
-      update: { imageMime: img.mime, imageData },
+      create: { runBlockId: id, driveFileId: uploaded.id },
+      update: { driveFileId: uploaded.id, imageMime: null, imageData: null },
     });
+
+    if (existing?.driveFileId && existing.driveFileId !== uploaded.id) {
+      await deleteFromDrive(existing.driveFileId);
+    }
+
     return { proofId: proof.id };
   }, "uploadFlowTaskProof");
 }
