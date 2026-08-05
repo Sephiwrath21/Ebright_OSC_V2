@@ -329,11 +329,15 @@ function StatusDropdown({
     }
   };
 
+  // Past-day lock (2026-08-05): once locked, the WHOLE control is inert —
+  // the trigger itself is disabled (can't even open the menu), regardless
+  // of the task's current status. Not just canMarkDone/canMarkNA
+  // individually gated — a locked task offers no status action at all.
+  const locked = isLockedPastDay(task);
   const isResolved = task.status === "DONE" || task.status === "SKIPPED";
   const canReopen = Boolean(onReopen) && isResolved;
-  const canMarkDone =
-    Boolean(onComplete) && task.quickCompletable && task.status !== "DONE" && !isLockedPastDay(task);
-  const canMarkNA = Boolean(onSkip) && task.status !== "SKIPPED";
+  const canMarkDone = Boolean(onComplete) && task.quickCompletable && task.status !== "DONE" && !locked;
+  const canMarkNA = Boolean(onSkip) && task.status !== "SKIPPED" && !locked;
 
   return (
     <div ref={containerRef} className="relative shrink-0">
@@ -343,7 +347,7 @@ function StatusDropdown({
         aria-label="Change status"
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={busy}
+        disabled={busy || locked}
         onClick={() => {
           setErrorText(null);
           setOpen((o) => !o);
@@ -1349,9 +1353,14 @@ function ToggleSwitch({
 function BulkActionsButton({
   count,
   actions,
+  disabled = false,
 }: {
   count: number;
   actions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[];
+  /** True when every currently-selected task is past-day locked (2026-08-05)
+   *  — the whole control goes inert, not just individual actions inside it,
+   *  matching StatusDropdown's own trigger-level lock. */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -1392,7 +1401,7 @@ function BulkActionsButton({
       <div className="relative inline-block">
         <button
           type="button"
-          disabled={busy || !only}
+          disabled={busy || disabled || !only}
           onClick={() => only && run(only.onRun)}
           className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
@@ -1408,7 +1417,7 @@ function BulkActionsButton({
       <button
         type="button"
         aria-label="Bulk actions"
-        disabled={busy}
+        disabled={busy || disabled}
         onClick={() => {
           setErrorText(null);
           setOpen((o) => !o);
@@ -1734,7 +1743,11 @@ export function ResizableTaskList({
           ✓
         </span>
       ),
-      onRun: () => runBulk(onComplete, (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId),
+      onRun: () =>
+        runBulk(
+          onComplete,
+          (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId && !isLockedPastDay(t),
+        ),
     });
   }
   if (onSkip) {
@@ -1742,9 +1755,18 @@ export function ResizableTaskList({
       key: "na",
       label: "Mark N/A",
       icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
-      onRun: () => runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId),
+      onRun: () =>
+        runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId && !isLockedPastDay(t)),
     });
   }
+  // Past-day lock (2026-08-05): the WHOLE bulk-actions control goes inert
+  // when every currently-selected task is locked — mirrors StatusDropdown's
+  // own trigger-level lock rather than relying on per-action eligibility
+  // alone. A mixed selection (some locked, some not) leaves the button
+  // enabled; the eligible() filters above silently skip the locked ones
+  // when it runs, same as any other ineligible row already does.
+  const selectedBulkTasks = visibleTasks.filter((t) => selectedIds.has(t.runBlockId));
+  const allSelectedLocked = selectedBulkTasks.length > 0 && selectedBulkTasks.every(isLockedPastDay);
 
   // Select-all moved INTO the column header row (2026-07-31) — this slim
   // bar now only appears when it has something to show: the bulk-actions
@@ -1754,7 +1776,7 @@ export function ResizableTaskList({
       <div className="flex items-center justify-between gap-3 pb-2">
         <div className="flex items-center gap-3">
           {selectedIds.size > 0 && bulkActions.length > 0 && (
-            <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+            <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
           )}
         </div>
         {completedCount > 0 && (
@@ -2257,7 +2279,8 @@ export function EntityDrillModal({
             ✓
           </span>
         ),
-        onRun: () => runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId),
+        onRun: () =>
+          runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId && !isLockedPastDay(t)),
       });
     }
     if (onSkip) {
@@ -2265,7 +2288,7 @@ export function EntityDrillModal({
         key: "na",
         label: "Mark N/A",
         icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
-        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId),
+        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
       });
     }
   } else if (onReopen) {
@@ -2273,9 +2296,13 @@ export function EntityDrillModal({
       key: "reopen",
       label: "Mark Pending",
       icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
-      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId),
+      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
     });
   }
+  // Past-day lock (2026-08-05) — same trigger-level lock as ResizableTaskList's
+  // bulk button; see its comment for the mixed-selection rationale.
+  const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
+  const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedPastDay);
 
   return (
     <div
@@ -2313,7 +2340,7 @@ export function EntityDrillModal({
               Select all
             </label>
             {selectedIds.size > 0 && bulkActions.length > 0 && (
-              <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+              <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
             )}
           </div>
         )}
