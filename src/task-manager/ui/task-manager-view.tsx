@@ -508,17 +508,19 @@ export function TaskManagerView({
       )}
 
       {/* ---- Tasks I Assigned (2026-08-05): HOD's delegated-OUT work —
-          the SAME shared My Tasks table (Task / Proof of Completion /
-          Assignee / Due Date), reused read-only exactly like department-
+          the SAME shared My Tasks table (Task / Assigned To / Proof of
+          Completion / Due Date), reused read-only exactly like department-
           overview.tsx's member drill-down (no myUserId/actions, so status
           circles are static and Proof is view-only). The table's
-          "Assignee" column actually renders `assignerName` under the
-          hood (it's "who assigned this to me" in the normal My Tasks
-          context) — here every row's assigner is always "me", so it's
-          remapped to the row's real assignee instead, the useful
-          direction for a delegated-OUT list. CEO's equivalent stays the
-          separate, unchanged CeoTaskTable (grouped sections) below —
-          this list is HOD-only by design. ---- */}
+          Assignee column actually renders `assignerName` under the hood
+          (it's "who assigned this to me" in the normal My Tasks context)
+          — here every row's assigner is always "me", so it's remapped to
+          the row's real assignee instead, the useful direction for a
+          delegated-OUT list — labeled "Assigned To" here (via
+          assigneeColumnLabel) rather than "Assignee" for clarity, since
+          it means the opposite thing in this context. CEO's equivalent
+          stays the separate, unchanged CeoTaskTable (grouped sections)
+          below — this list is HOD-only by design. ---- */}
       {shows(view, "taskManager", "assignedByMeList") && me.delegatedAll && (
         // Card wrapper (2026-08-05) — matches My Board's own card styling
         // (hod-kanban.tsx's root div) so this section reads as one
@@ -530,7 +532,7 @@ export function TaskManagerView({
             tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
             emptyLabel="You haven't assigned any tasks yet."
             hideCompleted
-            sentenceAssigner={me.me.name}
+            assigneeColumnLabel="Assigned To"
           />
         </div>
       )}
