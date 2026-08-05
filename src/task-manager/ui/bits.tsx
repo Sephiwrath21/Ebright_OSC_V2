@@ -1085,6 +1085,7 @@ export function TaskRowLine({
   selected,
   onToggleSelect,
   tree,
+  sentenceAssigner,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -1124,6 +1125,17 @@ export function TaskRowLine({
     | { kind: "parent"; count: number; expanded: boolean; onToggle: () => void }
     | { kind: "flat" }
     | { kind: "child" };
+  /** Sentence format (2026-08-05, "Tasks I Assigned"): the assigner's own
+   *  name — when set, the Task cell reads "{sentenceAssigner} assigned
+   *  {title} to {assignee}" instead of splitting Task/Assignee into two
+   *  columns, and the separate Assignee column is omitted entirely (its
+   *  info is now inside the sentence). Only top-level/flat rows get the
+   *  full sentence — subtask rows under one parent always share the exact
+   *  same assignee (the assignment fan-out creates them together), so
+   *  repeating "assigned {X} to {same person}" per child would be
+   *  redundant; children just show their own bare title, relying on the
+   *  existing indent + connector line to read as "part of the row above". */
+  sentenceAssigner?: string;
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
@@ -1218,13 +1230,27 @@ export function TaskRowLine({
         style={effectiveNameWidth === undefined ? undefined : { width: effectiveNameWidth }}
       >
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
-          <p
-            className={`min-w-0 truncate text-sm font-semibold ${
-              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
-            }`}
-          >
-            {task.blockTitle}
-          </p>
+          {sentenceAssigner && tree?.kind !== "child" ? (
+            <p
+              className={`min-w-0 truncate text-sm ${
+                task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-700"
+              }`}
+            >
+              {sentenceAssigner} assigned{" "}
+              <span className={`font-semibold ${task.status === "DONE" ? "" : "text-gray-900"}`}>
+                {task.blockTitle}
+              </span>{" "}
+              to {task.assignerName ?? "—"}
+            </p>
+          ) : (
+            <p
+              className={`min-w-0 truncate text-sm font-semibold ${
+                task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+              }`}
+            >
+              {task.blockTitle}
+            </p>
+          )}
           {tree?.kind === "parent" && (
             <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
               {tree.count}
@@ -1265,8 +1291,11 @@ export function TaskRowLine({
       )}
       {/* "Assignee" column (2026-07-30) — personal My Tasks lists only
           (hideCompleted mode). Plain name only — the column header gives
-          the context, so no per-row prefix. */}
-      {hideCompleted && (
+          the context, so no per-row prefix. Omitted entirely (2026-08-05)
+          when sentenceAssigner is set — that same assignerName value is
+          already folded into the Task cell's sentence above, so a
+          separate column would just repeat it. */}
+      {hideCompleted && !sentenceAssigner && (
         <span
           className={`truncate text-xs text-gray-500 ${
             assignerWidth === undefined ? "min-w-0 flex-1" : "shrink-0"
@@ -1498,6 +1527,7 @@ export function ResizableTaskList({
   onUploadProof,
   emptyLabel,
   hideCompleted,
+  sentenceAssigner,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1510,6 +1540,10 @@ export function ResizableTaskList({
   onUploadProof?: ProofUploadHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
+  /** Sentence format (2026-08-05) — see TaskRowLine. Set to the viewer's
+   *  own name for a "tasks I assigned" list; omit everywhere else (the
+   *  default two-column Task/Assignee layout). */
+  sentenceAssigner?: string;
 }) {
   const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // Defaults to ON — completed tasks are visible immediately; toggling off
@@ -1884,10 +1918,14 @@ export function ResizableTaskList({
           </span>
           {/* "Assignee" per the 2026-07-30 final spec (the shown value is
               the run's starter — assignerName — but the user explicitly
-              chose this label over "Assigned by"). */}
-          <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
-            Assignee
-          </span>
+              chose this label over "Assigned by"). Omitted (2026-08-05)
+              when sentenceAssigner folds this into the Task column instead
+              — see TaskRowLine. */}
+          {!sentenceAssigner && (
+            <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
+              Assignee
+            </span>
+          )}
           <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
             Due Date
           </span>
@@ -1907,6 +1945,7 @@ export function ResizableTaskList({
             proofWidth: PROOF_COL_WIDTH,
             assignerWidth: ASSIGNER_COL_WIDTH,
             hideCompleted,
+            sentenceAssigner,
           };
           return (
             <React.Fragment key={t.runBlockId}>

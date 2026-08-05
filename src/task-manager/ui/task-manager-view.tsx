@@ -530,6 +530,7 @@ export function TaskManagerView({
             tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
             emptyLabel="You haven't assigned any tasks yet."
             hideCompleted
+            sentenceAssigner={me.me.name}
           />
         </div>
       )}
