@@ -104,7 +104,7 @@ export interface FlowPersonal {
   streams: FlowTaskStream[];
   /** Delegated rows carry the assignee's name (unlike `tasks`/`streams`,
    *  where the assignee is always `me`) — the CEO's task table's "PIC"
-   *  column, and HOD's "Tasks I Assigned" card, both need to show who. */
+   *  column, and HOD's "Task Assignment" card, both need to show who. */
   delegated: { totals: FlowBucketTotals; tasks: FlowDrillTask[] } | null;
   /** ALL-TIME variants — the un-periodized overview cards ("CEO Tasks",
    *  "HOD assigned tasks": not daily or monthly). */

@@ -240,7 +240,7 @@ export function TaskManagerView({
       />
     ));
 
-  // "Tasks I Assigned" (HOD's own delegated-work card) — all-time, no period
+  // "Task Assignment" (HOD's own delegated-work card) — all-time, no period
   // split. The CEO's equivalent is a table now (CeoTaskTable, below), not
   // this donut — current.kind is always "org" for CEO, so this card (only
   // rendered under the member/department overview block) never reaches them.
@@ -248,7 +248,7 @@ export function TaskManagerView({
   // the viewer is never the assignee — not a personal task list.
   const delegatedCard = me.delegatedAll && (
     <StatusOverviewCard
-      title="Tasks I Assigned"
+      title="Task Assignment"
       totals={me.delegatedAll.totals}
       tasks={flowBucketize(me.delegatedAll.tasks)}
       reassign={reassign}
@@ -507,7 +507,7 @@ export function TaskManagerView({
         </>
       )}
 
-      {/* ---- Tasks I Assigned (2026-08-05): HOD's delegated-OUT work —
+      {/* ---- Task Assignment (2026-08-05): HOD's delegated-OUT work —
           the SAME shared My Tasks table (Task / Assigned To / Proof of
           Completion / Due Date), reused read-only exactly like department-
           overview.tsx's member drill-down (no myUserId/actions, so status
@@ -527,7 +527,7 @@ export function TaskManagerView({
         // distinct card like every other bordered section on this page,
         // instead of floating on the bare page background.
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <PageSectionHeading hideBorder>Tasks I Assigned</PageSectionHeading>
+          <PageSectionHeading hideBorder>Task Assignment</PageSectionHeading>
           <ResizableTaskList
             tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
             emptyLabel="You haven't assigned any tasks yet."

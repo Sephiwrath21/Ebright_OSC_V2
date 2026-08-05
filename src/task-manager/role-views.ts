@@ -43,13 +43,13 @@ export type SectionKey =
   | "ceoAssigned" // dedicated "CEO assigned tasks" card (?cdate=)
   | "hodAssigned" // dedicated "HOD assigned tasks" card (?hdate=)
   | "assignerStreams" // generic non-dedicated assigner-stream cards
-  | "delegated" // "Tasks I Assigned" card
+  | "delegated" // "Task Assignment" card
   // personal lists / boards
   | "myTasksDaily"
   | "myTasksMonthly"
   | "myTasksAdhoc" // Branch Manager's always-rendered ad hoc list
   | "myBoard" // HOD's personal Kanban
-  | "assignedByMeList" // 2026-08-05: HOD's "Tasks I Assigned" inline list
+  | "assignedByMeList" // 2026-08-05: HOD's "Task Assignment" inline list
   // (Task/Proof of Completion/Assignee/Due Date, the shared My Tasks table
   // reused read-only) — distinct from "delegated" above, which drives an
   // unused donut card; CEO's equivalent is the separate ceoTaskTable below.
