@@ -11,10 +11,11 @@ import {
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
-  listUpcomingOnboardingCandidates,
   summarizeStageByBranch,
   summarizeStageByDepartment,
 } from "@/lib/employeeQueries";
+import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
+import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -41,20 +42,49 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   if (!STAGE_PROFILE_CONFIG[stage].hasLocationLayer) {
     const rows = await listEmployeeOverviewRows();
     const stageRows = rows.filter((r) => r.stage === stage);
-    // Pre also includes future hires with no portal account yet, sourced
-    // from the ebrightleads-synced onboarding_candidate table, plus the
-    // Branch/Department option lists for the "+ Add" form.
+    // ebrightleads (onboarding_candidate) is no longer merged into Pre —
+    // disabled per decision; Pre now only reflects real employment rows
+    // (status="pre") plus, going forward, ebright_hrfs/career_applications
+    // syncs. Still fetch Branch/Department for the "+ Add" form.
     let branches: Awaited<ReturnType<typeof listBranches>> | undefined;
     let departments: Awaited<ReturnType<typeof listDepartments>> | undefined;
     if (stage === "pre") {
-      const [candidates, branchList, departmentList] = await Promise.all([
-        listUpcomingOnboardingCandidates(stageRows),
+      const [branchList, departmentList, careerApplications] = await Promise.all([
         listBranches(),
         listDepartments(),
+        lookupCareerApplicationsByName(),
       ]);
-      stageRows.push(...candidates);
       branches = branchList;
       departments = departmentList;
+      // Status column shows the matching career_applications row's current
+      // board_stage — live, not a snapshot from sync time. Rows with no
+      // match (e.g. manually added via addPreStageEmployee) keep boardStage
+      // undefined, so the list falls back to the plain "Pre" pill.
+      for (const row of stageRows) {
+        row.boardStage = careerApplications.get(normalizeName(row.fullName))?.boardStage ?? null;
+      }
+    } else if (stage === "probation") {
+      // Dual-listing, display-only — per explicit decision (see
+      // conversation): someone whose career_applications board_stage is
+      // "Probation" keeps their real, stored stage of Onboarding (the sync's
+      // mapping deliberately folds board_stage=Probation into Onboarding,
+      // not a separate stage) — but the Probation list ALSO shows them,
+      // alongside genuinely-Probation-stage rows. No change to what's
+      // stored; row.profileStage points their link at their real
+      // (Onboarding) profile, since that's where it actually lives. Driven
+      // by board_stage directly, NOT rec_recruit/rec_stage — the two
+      // disagree often enough (see conversation) that rec_stage was dropped
+      // entirely from this logic.
+      const onboardingRows = rows.filter((r) => r.stage === "onboarding");
+      if (onboardingRows.length > 0) {
+        const careerApplications = await lookupCareerApplicationsByName();
+        for (const row of onboardingRows) {
+          const match = careerApplications.get(normalizeName(row.fullName));
+          if (match?.boardStage && BOARD_STAGE_TO_OUR_STAGE[match.boardStage]?.alsoShowOnProbationList) {
+            stageRows.push({ ...row, profileStage: "onboarding" });
+          }
+        }
+      }
     }
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   PanelHeading,
@@ -41,7 +41,6 @@ import type {
   PerformanceReviewEntry,
   PayslipInfo,
   EmployeeTaskRow,
-  TaskCadence,
 } from "@/lib/employeeQueries";
 import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
 
@@ -659,52 +658,91 @@ function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
   );
 }
 
-type TaskCadenceFilter = "all" | TaskCadence;
-
-const TASK_CADENCE_FILTER_OPTIONS: { value: TaskCadenceFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "DAILY", label: "Daily" },
-  { value: "MONTHLY", label: "Monthly" },
-  { value: "ADHOC", label: "Ad-hoc" },
+// Same 2-digit zero-padded value convention as every other month <select>
+// in this app (e.g. EmployeeOverviewView's own MONTHS) — matches dueDate's
+// own ISO "yyyy-mm-dd" month segment directly, no reformatting needed.
+const TASK_MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
 ];
 
-// Same segmented-pill visual vocabulary as EmployeeNamelistView's List/Grid
-// view toggle (outer "bg-[#eef3fb] rounded-full p-1", active pill
-// "bg-[#a9d3f7bd] text-[#004386c9]") — text-label pills here instead of
-// fixed-size icon squares, otherwise identical, for visual consistency
-// with the rest of the Employee Folder module.
-function TaskCadenceFilterPills({ value, onChange }: { value: TaskCadenceFilter; onChange: (v: TaskCadenceFilter) => void }) {
+const taskFilterSelectClass =
+  "h-8 px-2.5 rounded-lg border border-black/15 bg-white text-sm text-black/70 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+function TaskDateFilters({
+  month,
+  year,
+  years,
+  onMonthChange,
+  onYearChange,
+}: {
+  month: string;
+  year: string;
+  years: string[];
+  onMonthChange: (v: string) => void;
+  onYearChange: (v: string) => void;
+}) {
   return (
-    <div className="inline-flex gap-1 bg-[#eef3fb] rounded-full p-1 shrink-0">
-      {TASK_CADENCE_FILTER_OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          aria-pressed={value === opt.value}
-          className={`h-8 px-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-            value === opt.value ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className="flex items-center gap-2 shrink-0">
+      <select aria-label="Filter by month" value={month} onChange={(e) => onMonthChange(e.target.value)} className={taskFilterSelectClass}>
+        <option value="all">All months</option>
+        {TASK_MONTH_OPTIONS.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <select aria-label="Filter by year" value={year} onChange={(e) => onYearChange(e.target.value)} className={taskFilterSelectClass}>
+        <option value="all">All years</option>
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
 
 // Client-side only (no refetch) — the full task list is already loaded, and
-// the Source filter is purely a display concern (which of the already-
+// this date filter is purely a display concern (which of the already-
 // fetched rows to show), same rationale as every other in-page search/filter
-// input elsewhere in this app.
+// input elsewhere in this app. Year options are derived from the tasks'
+// OWN dueDate values (never hardcoded), same distinct-years-from-data
+// pattern EmployeeOverviewView's own year filter already uses — so a new
+// year automatically gets an option the moment a task with that due date
+// exists, no code change required.
 function TaskPanel({ heading, tasks }: { heading: string; tasks: EmployeeTaskRow[] }) {
-  const [cadenceFilter, setCadenceFilter] = useState<TaskCadenceFilter>("all");
-  const filtered = cadenceFilter === "all" ? tasks : tasks.filter((t) => t.cadence === cadenceFilter);
+  const years = useMemo(() => {
+    const set = new Set(tasks.map((t) => t.dueDate?.slice(0, 4)).filter(Boolean) as string[]);
+    return Array.from(set).sort((a, b) => b.localeCompare(a)); // most recent first
+  }, [tasks]);
+
+  const [month, setMonth] = useState("all");
+  const [year, setYear] = useState("all");
+
+  const filtered = tasks.filter((t) => {
+    if (!t.dueDate) return false;
+    if (year !== "all" && t.dueDate.slice(0, 4) !== year) return false;
+    if (month !== "all" && t.dueDate.slice(5, 7) !== month) return false;
+    return true;
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <PanelHeading>{heading}</PanelHeading>
-        <TaskCadenceFilterPills value={cadenceFilter} onChange={setCadenceFilter} />
+        <TaskDateFilters month={month} year={year} years={years} onMonthChange={setMonth} onYearChange={setYear} />
       </div>
       <TaskTable tasks={filtered} />
     </div>

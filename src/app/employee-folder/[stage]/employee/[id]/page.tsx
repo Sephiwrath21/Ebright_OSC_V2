@@ -69,7 +69,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // so there's no branch/dept-scoped namelist to have arrived from.
   const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, { locGroup, locCode }] = await Promise.all([
     getResumeInfo(numId),
-    getInterviewAssessment(numId),
+    getInterviewAssessment(numId, employee.fullName),
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),

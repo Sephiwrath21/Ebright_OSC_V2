@@ -162,6 +162,25 @@ export async function requestPasswordReset(
   const baseUrl = await resolveBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
+  // Plain-text alternative. Not optional: a transactional message sent as
+  // HTML-only with a single prominent link is a classic spam-filter signature,
+  // and Gmail will quietly bin it. Every transport below sends multipart.
+  const emailText = [
+    "Hi,",
+    "",
+    "You requested a password reset for your Ebright account.",
+    "",
+    "Open this link to set a new password:",
+    resetUrl,
+    "",
+    "This link is valid for 1 hour and can only be used once.",
+    "",
+    "If you didn't request a password reset, you can safely ignore this email —",
+    "your password stays unchanged.",
+    "",
+    "Ebright HR Team",
+  ].join("\n");
+
   const emailHtml = `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px;color:#111827;">
       <div style="background:#1d4ed8;border-radius:8px;padding:16px 24px;margin-bottom:24px;">
@@ -208,6 +227,7 @@ export async function requestPasswordReset(
         from: `"Ebright Security" <${process.env.SMTP_USER}>`,
         to: email,
         subject: "Reset Your Password",
+        text: emailText,
         html: emailHtml,
       });
       sent = true;
@@ -230,6 +250,7 @@ export async function requestPasswordReset(
         from: process.env.CRM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || "noreply@ebright.my",
         to: email,
         subject: "Reset Your Password",
+        text: emailText,
         html: emailHtml,
       });
       sent = true;

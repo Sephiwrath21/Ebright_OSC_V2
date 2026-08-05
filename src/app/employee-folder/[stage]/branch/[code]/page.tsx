@@ -10,6 +10,7 @@ import {
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
+  UNASSIGNED_LOCATION_CODE,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -36,7 +37,10 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
   if (!scope.fullAccess && scope.branchCode !== code) notFound();
 
   const [rows, branches] = await Promise.all([listEmployeeOverviewRows(), listBranches()]);
-  const branch = branches.find((b) => b.code === code);
+  const branch =
+    code === UNASSIGNED_LOCATION_CODE
+      ? { code: UNASSIGNED_LOCATION_CODE, name: "Unassigned" }
+      : branches.find((b) => b.code === code);
   if (!branch) notFound();
 
   const namelistRows = filterStageByLocation(rows, stage, "branch", code);
