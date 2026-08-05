@@ -7,6 +7,7 @@
 import { z } from "zod";
 import type { Cadence, Prisma } from "@/generated/task-manager-client";
 import type { FlowAssignInput } from "../ui/types";
+import { isPastDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { buildTemplateSnapshot } from "../engine/snapshot";
@@ -580,11 +581,17 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true, title: true },
+      select: { assigneeId: true, title: true, cadence: true, dueAt: true },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
+    }
+    // Past-day lock (2026-08-05): same rule as completeBlock's — a Daily
+    // task's day has passed once its dueAt is strictly before today, so
+    // proof can no longer be attached OR replaced for it either.
+    if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
     }
 
     const existing = await prisma.proof.findUnique({

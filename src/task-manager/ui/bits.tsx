@@ -16,7 +16,7 @@ import type {
   FlowTaskRow,
   ProofUploadHandler,
 } from "./types";
-import { flowBucketTotal, formatDueDate } from "./types";
+import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
 import { compressImageFile, IMAGE_JPEG_QUALITY, IMAGE_MAX_DIMENSION } from "./image-compress";
 import { personSolidColor } from "./palette";
 import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
@@ -252,6 +252,17 @@ function statusCircleClasses(status: FlowTaskRow["status"]): string {
   return "border-2 border-red-400 bg-white";
 }
 
+/** Past-day lock (2026-08-05): a Daily task's day has passed, so it can no
+ *  longer be marked complete or have proof attached/replaced — mirrors the
+ *  server-authoritative checks in engine/run.ts's completeBlock and
+ *  data/tasks.ts's uploadFlowTaskProof (this is the disabled-UI half, not
+ *  the enforcement; a request that somehow reached the server anyway would
+ *  still be rejected there). Applies to every role — there's no exception
+ *  for elevated viewers completing on someone else's behalf. */
+function isLockedPastDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
+  return task.cadence === "DAILY" && isPastDueDay(task.dueAt);
+}
+
 /**
  * "My Tasks" mode's status circle — click opens a small dropdown (Pending /
  * Completed / N/A, each with the matching status dot/check) instead of
@@ -320,7 +331,8 @@ function StatusDropdown({
 
   const isResolved = task.status === "DONE" || task.status === "SKIPPED";
   const canReopen = Boolean(onReopen) && isResolved;
-  const canMarkDone = Boolean(onComplete) && task.quickCompletable && task.status !== "DONE";
+  const canMarkDone =
+    Boolean(onComplete) && task.quickCompletable && task.status !== "DONE" && !isLockedPastDay(task);
   const canMarkNA = Boolean(onSkip) && task.status !== "SKIPPED";
 
   return (
@@ -580,7 +592,7 @@ function ProofCell({
   const imageSrc = proofId
     ? `/api/task-manager/proof-image/${proofId}${version ? `?v=${version}` : ""}`
     : null;
-  const canUpload = isOwned && Boolean(onUploadProof);
+  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task);
 
   /** Review-before-submit (2026-07-31): picker, drop, paste, and camera
    *  all STAGE the image here — validated + previewed in the popover —
@@ -1073,7 +1085,7 @@ export function TaskRowLine({
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
-  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned;
+  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedPastDay(task);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay

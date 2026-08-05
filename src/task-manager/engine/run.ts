@@ -15,6 +15,7 @@ import { prisma } from "../prisma";
 import { getReminderQueue, reminderJobId } from "../lib/queues";
 import type { RunItemValue, SnapshotBlock, TemplateSnapshot } from "../lib/types";
 import { getUsersByIds } from "../lib/users";
+import { isPastDueDay } from "../ui/types";
 import { evaluateConditions } from "./conditions";
 import { buildTemplateSnapshot } from "./snapshot";
 
@@ -439,6 +440,13 @@ export async function completeBlock(input: CompleteBlockInput): Promise<Complete
   if (run.status !== "ACTIVE") throw new ApiHttpError(400, "Run is not active");
   if (runBlock.status === "DONE") throw new ApiHttpError(400, "This step is already completed");
   if (runBlock.status === "SKIPPED") throw new ApiHttpError(400, "This step was skipped");
+  // Past-day lock (2026-08-05): a Daily task's day has passed once its
+  // dueAt is strictly before today — completion closes for good at that
+  // point (server-authoritative; bits.tsx mirrors this for the disabled
+  // UI, but this is the check that actually can't be bypassed).
+  if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+    throw new ApiHttpError(400, "This task's day has passed and can no longer be marked complete");
+  }
 
   const actor = await getActor(actorId);
   if (runBlock.assigneeId !== actorId && !isElevated(actor)) {
