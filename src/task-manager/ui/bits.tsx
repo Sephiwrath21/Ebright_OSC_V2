@@ -72,7 +72,7 @@ export function PageSectionHeading({
 }) {
   return (
     <h2
-      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500 ${
+      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-lg font-semibold text-gray-900 ${
         hideBorder ? "" : "border-b border-gray-200"
       }`}
     >
