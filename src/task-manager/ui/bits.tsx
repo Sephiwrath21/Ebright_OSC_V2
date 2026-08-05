@@ -1499,6 +1499,7 @@ export function ResizableTaskList({
   emptyLabel,
   hideCompleted,
   assigneeColumnLabel,
+  hideRowResizeDivider,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1517,6 +1518,14 @@ export function ResizableTaskList({
    *  meaning elsewhere). Defaults to "Assignee". Cosmetic only — the
    *  column's row content (task.assignerName) is unchanged either way. */
   assigneeColumnLabel?: string;
+  /** Hide the per-row Task-column resize handle (2026-08-05) — that thin
+   *  vertical line between Task and the next column on every row is
+   *  TaskRowLine's own drag handle (each row can resize the column, not
+   *  just the header). Setting this only stops passing it to ROWS; the
+   *  header's own resize handle (HeaderResizeHandle, below) is untouched,
+   *  so the column stays resizable from there. Defaults to shown
+   *  (unchanged) everywhere this isn't explicitly set. */
+  hideRowResizeDivider?: boolean;
 }) {
   const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // Defaults to ON — completed tasks are visible immediately; toggling off
@@ -1923,7 +1932,7 @@ export function ResizableTaskList({
                 task={t}
                 {...shared}
                 onComplete={kids.length > 0 && onComplete ? guardedComplete(t, kids) : onComplete}
-                onResizeStart={onResizeStart}
+                onResizeStart={hideRowResizeDivider ? undefined : onResizeStart}
                 selected={selectedIds.has(t.runBlockId)}
                 onToggleSelect={
                   hideCompleted

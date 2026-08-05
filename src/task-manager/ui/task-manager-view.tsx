@@ -533,6 +533,7 @@ export function TaskManagerView({
             emptyLabel="You haven't assigned any tasks yet."
             hideCompleted
             assigneeColumnLabel="Assigned To"
+            hideRowResizeDivider
           />
         </div>
       )}
