@@ -520,14 +520,18 @@ export function TaskManagerView({
           separate, unchanged CeoTaskTable (grouped sections) below —
           this list is HOD-only by design. ---- */}
       {shows(view, "taskManager", "assignedByMeList") && me.delegatedAll && (
-        <>
+        // Card wrapper (2026-08-05) — matches My Board's own card styling
+        // (hod-kanban.tsx's root div) so this section reads as one
+        // distinct card like every other bordered section on this page,
+        // instead of floating on the bare page background.
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <PageSectionHeading>Tasks I Assigned</PageSectionHeading>
           <ResizableTaskList
             tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
             emptyLabel="You haven't assigned any tasks yet."
             hideCompleted
           />
-        </>
+        </div>
       )}
 
       {/* ---- Department Overview: the full department view (chips + donut
