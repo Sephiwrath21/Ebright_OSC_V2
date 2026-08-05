@@ -687,9 +687,9 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Due-date label (2026-08-05: split TODAY off from Overdue): bare "Due"
+/** Due-date label (2026-08-05: split TODAY off from Overdue): "D/M Due"
  *  (blue — this app's existing today/current convention, e.g. the weekday
- *  sidebar's active-day highlight) for TODAY specifically, a "D/M Overdue"
+ *  sidebar's active-day highlight) for TODAY specifically, "D/M Overdue"
  *  (red) for anything STRICTLY earlier, "2/8 Due Soon" (amber) for
  *  TOMORROW, a short weekday for 2–6 days out ("3/8 Mon", neutral gray, no
  *  status label), or the bare "15/8" date beyond a week (also neutral
@@ -702,7 +702,7 @@ export function formatDueDate(due: Date | null): DueDateDisplay | null {
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays === 0) return { text: "Due", className: "text-blue-600 font-medium" };
+  if (diffDays === 0) return { text: `${dm} Due`, className: "text-blue-600 font-medium" };
   if (diffDays < 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
   if (diffDays === 1) return { text: `${dm} Due Soon`, className: "text-amber-600 font-medium" };
   if (diffDays <= 6)
