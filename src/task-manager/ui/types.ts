@@ -687,21 +687,23 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Due-date label (2026-08-01 status rules): a "D/M" date followed by a
- *  status qualifier — "1/8 Overdue" (red) for TODAY and anything earlier,
- *  "2/8 Due Soon" (amber) for TOMORROW, a short weekday for 2–6 days out
- *  ("3/8 Mon", neutral gray, no status label), or the bare "15/8" date
- *  beyond a week (also neutral gray). Calendar-day difference, not a raw
- *  ms delta — a dueAt of 17:00 today still counts as today regardless of
- *  the current time. Returns null for no due date — callers keep
- *  rendering their own "—". */
+/** Due-date label (2026-08-05: split TODAY off from Overdue): bare "Due"
+ *  (blue — this app's existing today/current convention, e.g. the weekday
+ *  sidebar's active-day highlight) for TODAY specifically, a "D/M Overdue"
+ *  (red) for anything STRICTLY earlier, "2/8 Due Soon" (amber) for
+ *  TOMORROW, a short weekday for 2–6 days out ("3/8 Mon", neutral gray, no
+ *  status label), or the bare "15/8" date beyond a week (also neutral
+ *  gray). Calendar-day difference, not a raw ms delta — a dueAt of 17:00
+ *  today still counts as today regardless of the current time. Returns
+ *  null for no due date — callers keep rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays <= 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
+  if (diffDays === 0) return { text: "Due", className: "text-blue-600 font-medium" };
+  if (diffDays < 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
   if (diffDays === 1) return { text: `${dm} Due Soon`, className: "text-amber-600 font-medium" };
   if (diffDays <= 6)
     return {
@@ -713,17 +715,17 @@ export function formatDueDate(due: Date | null): DueDateDisplay | null {
 
 /** Locked-past-day check (2026-08-05: Daily tasks can no longer be marked
  *  complete, or have proof attached/replaced, once their day has passed) —
- *  STRICTLY before today, unlike formatDueDate's "Overdue" label above
- *  (which flags TODAY too, since an undone task due today is already
- *  urgent). Today must stay completable per the product spec's own
- *  example ("if today is 5 Aug, tasks dated 4 Aug... should be locked" —
- *  5 Aug itself is not locked). Same calendar-day (not raw ms delta) rule
- *  as formatDueDate, so the two never disagree about which day a dueAt
- *  falls on. Accepts an ISO string (the client-facing FlowTaskRow.dueAt
- *  shape) or a Date (server-side RunBlock.dueAt) so both layers — the
- *  server-authoritative guard in engine/run.ts's completeBlock and
- *  data/tasks.ts's uploadFlowTaskProof, and the client UX guard in
- *  bits.tsx — share the exact same definition of "past". */
+ *  STRICTLY before today (diffDays < 0). Today must stay completable per
+ *  the product spec's own example ("if today is 5 Aug, tasks dated 4
+ *  Aug... should be locked" — 5 Aug itself is not locked). Same
+ *  calendar-day (not raw ms delta) boundary as formatDueDate's own
+ *  diffDays === 0 "Due" / diffDays < 0 "Overdue" split above, so the two
+ *  never disagree about which day a dueAt falls on. Accepts an ISO string
+ *  (the client-facing FlowTaskRow.dueAt shape) or a Date (server-side
+ *  RunBlock.dueAt) so both layers — the server-authoritative guard in
+ *  engine/run.ts's completeBlock/skipBlock/reopenBlock and data/tasks.ts's
+ *  uploadFlowTaskProof, and the client UX guard in bits.tsx — share the
+ *  exact same definition of "past". */
 export function isPastDueDay(due: string | Date | null): boolean {
   if (!due) return false;
   const d = typeof due === "string" ? new Date(due) : due;
