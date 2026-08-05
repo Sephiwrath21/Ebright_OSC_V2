@@ -448,7 +448,10 @@ export function MonthDropdown({
  *  is labeled with the month's ACTUAL last day (29–31 / 29–30 / bare 29 for
  *  leap February; absent entirely for 28-day February). Navigates
  *  ?mrange=from-to, omitted for Full month; pins ?mdate= so the anchor
- *  month always survives (callers pass extraParams WITHOUT mdate/mrange). */
+ *  month always survives (callers pass extraParams WITHOUT mdate/mrange).
+ *  Uses CompactDropdown (2026-08-05, was a native <select>) so its arrow
+ *  icon and selected/hover styling match Year/Month exactly instead of
+ *  falling back to the browser's own default chevron. */
 export function MonthRangeDropdown({
   value,
   range,
@@ -473,20 +476,13 @@ export function MonthRangeDropdown({
     router.push(`${basePath}?${qs.toString()}`);
   };
 
+  const options = [
+    { value: "", label: "Full month" },
+    ...monthDayChunks(y, m).map((c) => ({ value: `${c.from}-${c.to}`, label: chunkLabel(c) })),
+  ];
+
   return (
-    <select
-      value={range ?? ""}
-      onChange={(e) => navigate(e.target.value)}
-      aria-label="Day range"
-      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
-    >
-      <option value="">Full month</option>
-      {monthDayChunks(y, m).map((c) => (
-        <option key={`${c.from}-${c.to}`} value={`${c.from}-${c.to}`}>
-          {chunkLabel(c)}
-        </option>
-      ))}
-    </select>
+    <CompactDropdown value={range ?? ""} options={options} onSelect={navigate} ariaLabel="Day range" />
   );
 }
 
