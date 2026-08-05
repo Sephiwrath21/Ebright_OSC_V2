@@ -392,7 +392,7 @@ export function editTaskTemplate(
         });
       }
       // ...and recreate from the NEW list, same pattern as assignment.
-      for (const subtaskTitle of body.subtasks) {
+      for (const [subtaskIndex, subtaskTitle] of body.subtasks.entries()) {
         const subRun = await prisma.flowRun.create({
           data: {
             flowId: parent.run.flowId,
@@ -417,6 +417,7 @@ export function editTaskTemplate(
             cadence: parent.cadence,
             parentId: parent.id,
             templateId: id,
+            subtaskOrder: subtaskIndex,
             runItems: {
               create: parent.runItems.map((it) => ({
                 itemId: it.itemId,

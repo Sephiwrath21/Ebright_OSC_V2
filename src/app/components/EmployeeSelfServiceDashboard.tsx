@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
+import SelfJustificationModal, {
+  type SelfJustificationTarget,
+} from "./SelfJustificationModal";
 import {
   Check,
   ChevronRight,
@@ -40,6 +43,7 @@ interface WeekDay {
   state:   "ontime" | "late" | "today" | "absent" | "upcoming" | "holiday";
   label:   string;
   minutesLate?: number;
+  justification?: { reason: string | null; status: string };
 }
 
 interface DashboardData {
@@ -128,23 +132,37 @@ function formatWeekRange(startIso: string, endIso: string): string {
 export default function EmployeeSelfServiceDashboard({ userName, userEmail, taskOverview }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [justifyTarget, setJustifyTarget] = useState<SelfJustificationTarget | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employee-dashboard", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.success) setData(json);
+    } catch {
+      // leave data null; UI shows fallback values
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      try {
-        const res = await fetch("/api/employee-dashboard");
-        const json = await res.json();
-        if (!cancelled && res.ok && json.success) setData(json);
-      } catch {
-        // leave data null; UI shows fallback values
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await load();
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [load]);
+
+  const openJustify = (w: WeekDay) => {
+    if (w.state !== "absent" && w.state !== "late") return;
+    setJustifyTarget({
+      date: w.dateIso,
+      state: w.state,
+      existingReason: w.justification?.reason ?? null,
+      existingStatus: w.justification?.status ?? null,
+    });
+  };
 
   const v = data?.viewer;
   const greetName = v?.nickName || v?.fullName?.split(" ")[0] || userName?.split(" ")[0] || "";
@@ -240,7 +258,18 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
                   </p>
                 )}
                 {weekDays.map(w => (
-                  <WeekRow key={w.dateIso} day={w.day} state={w.state} label={w.label} />
+                  <WeekRow
+                    key={w.dateIso}
+                    day={w.day}
+                    state={w.state}
+                    label={w.label}
+                    justification={w.justification}
+                    onJustify={
+                      w.state === "absent" || w.state === "late"
+                        ? () => openJustify(w)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -360,6 +389,12 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
             (2026-07-28 placement decision). */}
         {taskOverview && <div className="mt-6">{taskOverview}</div>}
       </div>
+
+      <SelfJustificationModal
+        target={justifyTarget}
+        onClose={() => setJustifyTarget(null)}
+        onSaved={load}
+      />
     </div>
   );
 }
@@ -436,10 +471,12 @@ function Donut({ percent }: { percent: number }) {
   );
 }
 
-function WeekRow({ day, state, label }: {
+function WeekRow({ day, state, label, justification, onJustify }: {
   day: string;
   state: "ontime" | "late" | "today" | "absent" | "upcoming" | "holiday";
   label: string;
+  justification?: { reason: string | null; status: string };
+  onJustify?: () => void;
 }) {
   const tone =
     state === "ontime"    ? { bg: "#E8F7F0", fg: C.green,   w: "85%"  }
@@ -451,8 +488,19 @@ function WeekRow({ day, state, label }: {
   const labelColor =
     state === "today" || state === "upcoming" ? "#94A3B8" : tone.fg;
 
-  return (
-    <div className="flex items-center gap-3">
+  // Small pill on the right of the bar reflecting justification status, or a
+  // "Justify" affordance when the day is absent/late and not yet handled.
+  const badge = (() => {
+    const s = justification?.status;
+    if (s === "approved") return { text: "Justified", bg: "#E8F7F0", fg: C.green };
+    if (s === "pending")  return { text: "Pending",   bg: "#FFF8EC", fg: C.amber };
+    if (s === "rejected") return { text: "Rejected",  bg: "#FEE7E7", fg: C.red };
+    if (onJustify)        return { text: "Justify",   bg: "#E8F0FB", fg: C.blue };
+    return null;
+  })();
+
+  const rowInner = (
+    <>
       <span className="w-8 text-[11px] font-bold text-slate-500 shrink-0">{day}</span>
       <div className="flex-1 h-7 rounded-lg bg-slate-100 overflow-hidden relative">
         <div className="h-full rounded-lg transition-all" style={{ width: tone.w, background: tone.bg }} />
@@ -463,8 +511,31 @@ function WeekRow({ day, state, label }: {
           {label}
         </span>
       </div>
-    </div>
+      {badge && (
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+          style={{ background: badge.bg, color: badge.fg }}
+        >
+          {badge.text}
+        </span>
+      )}
+    </>
   );
+
+  if (onJustify) {
+    return (
+      <button
+        type="button"
+        onClick={onJustify}
+        className="w-full flex items-center gap-3 text-left rounded-lg hover:bg-slate-50 transition-colors"
+        title="Justify this day"
+      >
+        {rowInner}
+      </button>
+    );
+  }
+
+  return <div className="flex items-center gap-3">{rowInner}</div>;
 }
 
 function WeekStat({ label, value, tone }: {

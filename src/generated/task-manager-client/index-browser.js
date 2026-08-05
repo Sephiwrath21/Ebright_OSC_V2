@@ -128,6 +128,7 @@ exports.Prisma.UserScalarFieldEnum = {
   department: 'department',
   branch: 'branch',
   employmentType: 'employmentType',
+  hrfsUserId: 'hrfsUserId',
   coachSchedule: 'coachSchedule',
   createdAt: 'createdAt'
 };
@@ -249,6 +250,7 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   recurrenceOfId: 'recurrenceOfId',
   guidelineId: 'guidelineId',
   parentId: 'parentId',
+  subtaskOrder: 'subtaskOrder',
   templateId: 'templateId'
 };
 
@@ -350,6 +352,7 @@ exports.Prisma.ScheduleSlotScalarFieldEnum = {
   scheduleId: 'scheduleId',
   startTime: 'startTime',
   endTime: 'endTime',
+  rowLabel: 'rowLabel',
   roleColumn: 'roleColumn',
   assignedStaffId: 'assignedStaffId',
   runBlockId: 'runBlockId',

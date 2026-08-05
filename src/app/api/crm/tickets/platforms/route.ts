@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { isCrmAvailable } from "@/lib/crm-db";
 import { getPlatforms } from "@/lib/crm-tickets";
+import { buildAccess } from "@/lib/access/engine";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/crm/tickets/platforms — superadmin ticket platforms with counts.
+// GET /api/crm/tickets/platforms — ticket platforms with counts. Requires
+// `cns_ticket_platforms` view. NOTE: the per-platform counts are tenant-wide
+// (not branch-filtered) — platforms are a shared config surface.
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
-  });
-  if (me?.role?.role_type !== "superadmin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("cns_ticket_platforms", "view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (!isCrmAvailable()) return NextResponse.json({ error: "CRM database not configured" }, { status: 503 });
 
   try {

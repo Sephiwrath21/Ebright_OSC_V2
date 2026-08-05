@@ -94,6 +94,10 @@ export default async function HomePage({
 
   // role_type "staff" corresponds to role_id = 4 in the DB.
   const isStaff = userRole.toLowerCase() === "staff";
+  // HOD and Branch Manager get the same self-service (own-data) home as staff.
+  const isHod = userRole.toLowerCase() === "hod";
+  const isBranchManager = userRole.toLowerCase() === "branch manager";
+  const isSelfService = isStaff || isHod || isBranchManager;
   const isFinance = userEmail.toLowerCase() === FINANCE_EMAIL;
   const isOD = userEmail.toLowerCase() === "od@ebright.my";
   const isOperations = userEmail.toLowerCase() === "operations@ebright.my";
@@ -196,7 +200,7 @@ export default async function HomePage({
         />
       ) : isFinance ? (
         <FinanceDashboard userName={userName} userEmail={userEmail} taskOverview={taskOverview} />
-      ) : isStaff ? (
+      ) : isSelfService ? (
         <EmployeeSelfServiceDashboard
           userName={userName}
           userEmail={userEmail}

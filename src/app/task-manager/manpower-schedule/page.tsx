@@ -115,7 +115,7 @@ export default async function ManpowerSchedulePage({
     // these controls once a schedule exists.
     const scheduleId = schedule?.id;
 
-    async function addRow(startTime: string, endTime: string): Promise<ActionResult> {
+    async function addRow(startTime: string, endTime: string, label?: string): Promise<ActionResult> {
       "use server";
       const stale = await requireLiveSession(email);
       if (stale) return stale;
@@ -123,7 +123,7 @@ export default async function ManpowerSchedulePage({
         if (!scheduleId) {
           return { ok: false, message: "No schedule exists for this date yet — create it first" };
         }
-        await addScheduleRow(email, scheduleId, startTime, endTime);
+        await addScheduleRow(email, scheduleId, startTime, endTime, label);
         revalidatePath("/task-manager/manpower-schedule");
         return { ok: true };
       } catch (err) {
@@ -139,6 +139,7 @@ export default async function ManpowerSchedulePage({
       oldEndTime: string,
       newStartTime: string,
       newEndTime: string,
+      newLabel?: string,
     ): Promise<ActionResult> {
       "use server";
       const stale = await requireLiveSession(email);
@@ -154,6 +155,7 @@ export default async function ManpowerSchedulePage({
           oldEndTime,
           newStartTime,
           newEndTime,
+          newLabel,
         );
         revalidatePath("/task-manager/manpower-schedule");
         return { ok: true };

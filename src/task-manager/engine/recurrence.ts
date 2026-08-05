@@ -42,13 +42,28 @@ export function resetRecurrenceThrottle(): void {
   lastCatchupAt = 0;
 }
 
+/** Global reset hour (2026-07-31, TM_RESET_HOUR in .env, 0–23; default 0 =
+ *  midnight, the original behavior): next week's occurrence only appears
+ *  once the clock passes this hour on the day AFTER the due day. Read at
+ *  call time so tests/scripts can override per run. One GLOBAL setting by
+ *  design (user decision) — not per-series. */
+function resetHour(): number {
+  const parsed = Number.parseInt(process.env.TM_RESET_HOUR ?? "0", 10);
+  return Number.isFinite(parsed) ? Math.min(23, Math.max(0, parsed)) : 0;
+}
+
 /** Advance every eligible recurring block. Returns how many successors were
  *  created (0 when throttled or nothing is due). Never throws on races. */
 export async function advanceRecurringBlocks(now: Date = new Date()): Promise<number> {
   if (now.getTime() - lastCatchupAt < CATCHUP_INTERVAL_MS) return 0;
   lastCatchupAt = now.getTime();
 
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Shift the day boundary by the configured reset hour: before TM_RESET_HOUR
+  // o'clock, "today" still counts as yesterday, so due blocks don't advance
+  // until the reset time arrives. The lazy on-read trigger makes the flip
+  // near-instant at that hour; the hourly sweep is the backstop.
+  const shifted = new Date(now.getTime() - resetHour() * 3_600_000);
+  const todayStart = new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
   // UNIVERSAL: every DAILY task with a due day recurs — no flag (the
   // repeatWeekly column is retired; see its schema comment). Manpower
   // Schedule slot tasks are excluded by scheduleSlotId (and are ADHOC
@@ -198,6 +213,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           parentId: newParentId,
           guidelineId: sub.guidelineId,
           templateId: sub.templateId,
+          subtaskOrder: sub.subtaskOrder,
           runItems: {
             create: sub.runItems.map((it) => ({
               itemId: it.itemId,

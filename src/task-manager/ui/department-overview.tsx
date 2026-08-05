@@ -11,28 +11,14 @@
 
 import * as React from "react";
 import type { FlowEntityDetail, FlowMemberRollup, FlowTaskRow } from "./types";
-import { flowCompletionPct, formatDueDate } from "./types";
+import { flowCompletionPct } from "./types";
 import {
-  CalendarIcon,
   InitialAvatar,
+  ResizableTaskList,
   StatusDonut,
   StatusOverviewCard,
   type ReassignControl,
 } from "./bits";
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" className="size-3">
-      <path
-        d="M3 8.5L6.5 12L13 4"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function SummaryChip({
   label,
@@ -131,36 +117,6 @@ function MemberListRow({
   );
 }
 
-function TaskChecklistRow({ task }: { task: FlowTaskRow }) {
-  const done = task.status === "DONE";
-  const due = task.dueAt ? new Date(task.dueAt) : null;
-  const dueDisplay = formatDueDate(due);
-  return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span
-        className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 text-transparent"
-        }`}
-      >
-        <CheckIcon />
-      </span>
-      <span
-        className={`min-w-0 flex-1 truncate text-sm font-semibold ${
-          done ? "text-gray-400 line-through" : "text-gray-900"
-        }`}
-      >
-        {task.blockTitle}
-      </span>
-      {dueDisplay && (
-        <span className={`flex shrink-0 items-center gap-1 text-xs ${dueDisplay.className}`}>
-          <CalendarIcon className="size-3.5" />
-          {dueDisplay.text}
-        </span>
-      )}
-    </div>
-  );
-}
-
 /** One member's own detail: big donut + done/not-done stats + task checklist. */
 function MemberDetailView({
   label,
@@ -225,15 +181,19 @@ function MemberDetailView({
         <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-gray-500">
           {label}
         </p>
-        {sorted.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">No tasks this period.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {sorted.map((t) => (
-              <TaskChecklistRow key={t.runBlockId} task={t} />
-            ))}
-          </div>
-        )}
+        {/* The SAME shared My Tasks table (2026-08-01): Task ‖ Proof of
+            Completion | Assignee | Due Date, subtask tree included.
+            Read-only for the viewer by design — no myUserId/actions are
+            passed, so status circles are static, no checkboxes render,
+            and the Proof cell is view-only (✓ opens the image; upload
+            stays assignee-only per the standing server rule). Assignee
+            shows the member's own name on every row (their list, their
+            tasks) per the confirmed spec. */}
+        <ResizableTaskList
+          tasks={sorted.map((t) => ({ ...t, assignerName: member.name }))}
+          emptyLabel="No tasks this period."
+          hideCompleted
+        />
       </div>
     </div>
   );
