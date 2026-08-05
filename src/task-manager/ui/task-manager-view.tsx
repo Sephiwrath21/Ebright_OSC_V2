@@ -527,7 +527,7 @@ export function TaskManagerView({
         // distinct card like every other bordered section on this page,
         // instead of floating on the bare page background.
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <PageSectionHeading>Tasks I Assigned</PageSectionHeading>
+          <PageSectionHeading hideBorder>Tasks I Assigned</PageSectionHeading>
           <ResizableTaskList
             tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
             emptyLabel="You haven't assigned any tasks yet."

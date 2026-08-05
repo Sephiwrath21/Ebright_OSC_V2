@@ -57,14 +57,25 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
 export function PageSectionHeading({
   children,
   action,
+  hideBorder,
 }: {
   children: React.ReactNode;
   /** Right-aligned control (e.g. a date filter) — optional, most headings
    *  have none. */
   action?: React.ReactNode;
+  /** Drop the bottom border (2026-08-05) — e.g. when a table with its own
+   *  header row (ResizableTaskList) sits directly beneath, which already
+   *  draws a border-b under ITS OWN column labels; the default border here
+   *  would otherwise sit as a second, redundant-looking line above it.
+   *  Bottom padding is kept either way, so spacing doesn't collapse. */
+  hideBorder?: boolean;
 }) {
   return (
-    <h2 className="mt-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+    <h2
+      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500 ${
+        hideBorder ? "" : "border-b border-gray-200"
+      }`}
+    >
       <span>{children}</span>
       {action}
     </h2>
