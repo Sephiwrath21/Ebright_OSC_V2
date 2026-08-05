@@ -294,21 +294,47 @@ function StatusDropdown({
   const [busy, setBusy] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  // Portal position (2026-08-05 fix): "My Tasks" rows sit inside the
+  // horizontal-scroll wrapper added for the mobile table pan (bits.tsx's
+  // `overflow-x-auto` on the hideCompleted table) — setting overflow-x
+  // without overflow-y computes overflow-y to "auto" too per the CSS spec,
+  // so this menu (previously position:absolute, a DOM child of that
+  // wrapper) was getting clipped/hidden instead of floating over the row.
+  // Portaling to <body> with position:fixed at the trigger's actual screen
+  // coordinates escapes that ancestor's overflow entirely, same rationale
+  // as this file's existing modal createPortal calls.
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
   const isOwner = task.assigneeId === myUserId;
 
   React.useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !(menuRef.current && menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    // The menu's position:fixed coordinates are computed once on open —
+    // close on scroll (capture: true catches the table's own horizontal
+    // scroll container, not just window/document scroll) rather than
+    // leaving a stale, visually-detached menu floating over the wrong row.
+    const onScroll = () => setOpen(false);
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -342,6 +368,7 @@ function StatusDropdown({
   return (
     <div ref={containerRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         title="Change status"
         aria-label="Change status"
@@ -350,18 +377,29 @@ function StatusDropdown({
         disabled={busy || locked}
         onClick={() => {
           setErrorText(null);
-          setOpen((o) => !o);
+          setOpen((o) => {
+            const next = !o;
+            if (next && triggerRef.current) {
+              const rect = triggerRef.current.getBoundingClientRect();
+              setMenuPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            return next;
+          });
         }}
         className="flex size-3 shrink-0 items-center justify-center disabled:opacity-50"
       >
         {circle}
       </button>
       {errorText && <InlineActionError text={errorText} />}
-      {open && (
-        <div
-          role="menu"
-          className="absolute left-0 top-5 z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
-        >
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          >
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Statuses</p>
           <button
             type="button"
@@ -402,8 +440,9 @@ function StatusDropdown({
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
           </button>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
