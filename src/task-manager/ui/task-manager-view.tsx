@@ -356,8 +356,19 @@ export function TaskManagerView({
 
           {/* ---- CEO Task Overview — grouped table, not a donut (status
               groups, Task/PIC/Due date columns). Tasks the CEO delegated
-              OUT to others — the opposite direction from My Tasks. ---- */}
-          {me.delegatedAll && <CeoTaskTable tasks={flowBucketize(me.delegatedAll.tasks)} />}
+              OUT to others — the opposite direction from My Tasks. Given
+              the same "Task Assignment" heading as HOD's equivalent list
+              (2026-08-05) — CeoTaskTable itself is untouched (unlike
+              HOD's, it renders its own fully-bordered card, so the
+              heading sits as a plain sibling above it, same pattern as
+              "Department Daily Overview" above CeoDashboardSection below,
+              not wrapped together into one shared card). ---- */}
+          {me.delegatedAll && (
+            <>
+              <PageSectionHeading>Task Assignment</PageSectionHeading>
+              <CeoTaskTable tasks={flowBucketize(me.delegatedAll.tasks)} />
+            </>
+          )}
 
           {/* ---- Section 3: Department Daily Overview — Kanban (own
               independent department list/order, never shared with Monthly) ---- */}
