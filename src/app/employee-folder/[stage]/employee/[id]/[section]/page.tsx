@@ -114,7 +114,7 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     activeOrAfter ? listLeaveHistory(numId) : Promise.resolve(undefined),
     getEmployeeById(numId),
     getResumeInfo(numId),
-    getInterviewAssessment(numId),
+    getInterviewAssessment(numId, employee.fullName),
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),

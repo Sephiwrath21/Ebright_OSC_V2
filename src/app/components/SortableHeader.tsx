@@ -73,18 +73,20 @@ function compareDates(a: string | null | undefined, b: string | null | undefined
 // order in that case.
 // `defaultBehavior` picks what the unclicked "default" state actually shows:
 // "month-grouped" (current month onward, then past, both ascending — the
-// original behavior) or "nearest-first" (just the most-recent date on top,
-// same order as the explicit nearest-first state) — Exit's own Last Date
-// column uses "nearest-first" as its default, since Exit dates are
-// overwhelmingly in the past and the month-grouping split isn't meaningful
-// there; clicking once from that default still lands on furthest-first
-// ("desc" — oldest first), same as everywhere else.
+// original behavior), "nearest-first" (most-recent date on top, same order
+// as the explicit nearest-first state — Exit's Last Date column, since Exit
+// dates are overwhelmingly in the past and month-grouping isn't meaningful
+// there), or "ascending" (soonest date on top, no-date rows always last, no
+// month grouping — Pre stage's default: start_date is either upcoming or
+// unknown, never in the past, so "soonest first" is the only ordering that
+// makes sense and month-grouping would just be noise). Clicking the header
+// from any default still cycles the same 3 explicit states.
 export function applyDateSort<T>(
   rows: T[],
   state: DateSortState,
   getDate: (row: T) => string | null | undefined,
   suppressDefaultGrouping: boolean,
-  defaultBehavior: "month-grouped" | "nearest-first" = "month-grouped",
+  defaultBehavior: "month-grouped" | "nearest-first" | "ascending" = "month-grouped",
 ): T[] {
   if (state === "furthest-first") {
     return [...rows].sort((a, b) => compareDates(getDate(a), getDate(b), false));
@@ -92,7 +94,7 @@ export function applyDateSort<T>(
   if (state === "nearest-first" || (state === "default" && defaultBehavior === "nearest-first")) {
     return [...rows].sort((a, b) => compareDates(getDate(a), getDate(b), true));
   }
-  if (suppressDefaultGrouping) {
+  if (suppressDefaultGrouping || (state === "default" && defaultBehavior === "ascending")) {
     return [...rows].sort((a, b) => compareDates(getDate(a), getDate(b), false));
   }
   const now = new Date();

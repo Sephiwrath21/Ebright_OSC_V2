@@ -2,7 +2,13 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import EmployeeOverviewView from "@/app/components/EmployeeOverviewView";
-import { listEmployeeOverviewRows, countEmployeeStages, getOverdueTaskCounts } from "@/lib/employeeQueries";
+import {
+  listEmployeeOverviewRows,
+  countEmployeeStages,
+  getOverdueTaskCounts,
+} from "@/lib/employeeQueries";
+import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
+import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +22,29 @@ export default async function EmployeeFolderPage() {
 
   const rows = await listEmployeeOverviewRows();
   const counts = countEmployeeStages(rows);
-  // Candidates (isCandidate) have a negative sentinel id, not a real
-  // user_id — no Task Manager/hrfs account exists for them to look up.
-  const overdueTaskCounts = await getOverdueTaskCounts(rows.filter((r) => !r.isCandidate).map((r) => r.id));
+  // ebrightleads (onboarding_candidate) is no longer merged into Pre —
+  // disabled per decision; Pre now only reflects real employment rows
+  // (status="pre") plus, going forward, ebright_hrfs/career_applications
+  // syncs. See listUpcomingOnboardingCandidates in employeeQueries.ts,
+  // still defined but no longer called from here.
+  //
+  // Probation's card count must match what its own list page shows — that
+  // page additionally dual-lists Onboarding-stage employees whose
+  // career_applications board_stage is "Probation" (display-only, their
+  // stored status stays Onboarding — see [stage]/page.tsx). Same lookup,
+  // same rule, applied here just for the count. Driven by board_stage
+  // directly, not rec_recruit/rec_stage (dropped — see conversation).
+  const onboardingRows = rows.filter((r) => r.stage === "onboarding");
+  if (onboardingRows.length > 0) {
+    const careerApplications = await lookupCareerApplicationsByName();
+    for (const row of onboardingRows) {
+      const match = careerApplications.get(normalizeName(row.fullName));
+      if (match?.boardStage && BOARD_STAGE_TO_OUR_STAGE[match.boardStage]?.alsoShowOnProbationList) {
+        counts.probation += 1;
+      }
+    }
+  }
+  const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";

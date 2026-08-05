@@ -1956,7 +1956,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
             branch_id: branch?.branch_id ?? null,
             department_id: department?.department_id ?? null,
             start_date: new Date(`${input.startDate}T00:00:00Z`),
-            status: "active",
+            // "pre" (not "active") — a distinct, literal marker so the
+            // automatic Pre -> Onboarding/Probation sweep (stageTransition
+            // Automation.ts) can find these rows by status alone once
+            // start_date arrives, without a new column. stageForRow's own
+            // Pre-branch never reads this field (start_date > today wins
+            // unconditionally), so this has no effect on display until then.
+            status: "pre",
           },
         },
       },
