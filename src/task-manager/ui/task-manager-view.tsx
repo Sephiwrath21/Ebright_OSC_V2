@@ -507,6 +507,29 @@ export function TaskManagerView({
         </>
       )}
 
+      {/* ---- Tasks I Assigned (2026-08-05): HOD's delegated-OUT work —
+          the SAME shared My Tasks table (Task / Proof of Completion /
+          Assignee / Due Date), reused read-only exactly like department-
+          overview.tsx's member drill-down (no myUserId/actions, so status
+          circles are static and Proof is view-only). The table's
+          "Assignee" column actually renders `assignerName` under the
+          hood (it's "who assigned this to me" in the normal My Tasks
+          context) — here every row's assigner is always "me", so it's
+          remapped to the row's real assignee instead, the useful
+          direction for a delegated-OUT list. CEO's equivalent stays the
+          separate, unchanged CeoTaskTable (grouped sections) below —
+          this list is HOD-only by design. ---- */}
+      {shows(view, "taskManager", "assignedByMeList") && me.delegatedAll && (
+        <>
+          <PageSectionHeading>Tasks I Assigned</PageSectionHeading>
+          <ResizableTaskList
+            tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
+            emptyLabel="You haven't assigned any tasks yet."
+            hideCompleted
+          />
+        </>
+      )}
+
       {/* ---- Department Overview: the full department view (chips + donut
           + click-through member roster) rendered INLINE for HOD and
           DEPT_SITE — the standalone Department Overview page was folded in

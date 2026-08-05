@@ -49,6 +49,10 @@ export type SectionKey =
   | "myTasksMonthly"
   | "myTasksAdhoc" // Branch Manager's always-rendered ad hoc list
   | "myBoard" // HOD's personal Kanban
+  | "assignedByMeList" // 2026-08-05: HOD's "Tasks I Assigned" inline list
+  // (Task/Proof of Completion/Assignee/Due Date, the shared My Tasks table
+  // reused read-only) — distinct from "delegated" above, which drives an
+  // unused donut card; CEO's equivalent is the separate ceoTaskTable below.
   // CEO-specific sections
   | "ceoCombinedList"
   | "ceoTaskTable"
@@ -107,6 +111,11 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   },
   HOD: {
     home: ["personalDaily", "personalMonthly", "ceoAssigned", "departmentOverview"],
+    // assignedByMeList (2026-08-05): mirrors CEO's own tasks-→-ceoTaskTable
+    // ordering — own tasks/board first, then what HOD delegated OUT to
+    // their department, then the broader department overview. Task
+    // Manager only (Home stays summary-card territory, matching every
+    // other detailed list in this app).
     taskManager: [
       "personalDaily",
       "personalMonthly",
@@ -114,6 +123,7 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
       "myTasksDaily",
       "myTasksMonthly",
       "myBoard",
+      "assignedByMeList",
       "departmentOverview",
     ],
     weekdayRange: "tue-sat",
