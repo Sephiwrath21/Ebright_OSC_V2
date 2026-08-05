@@ -280,10 +280,26 @@ export function MonthRangeSidebar({
   );
 }
 
-/** Compact month + year selector ("Jul 2026 ▾") — the Monthly section
- *  heading and card/grid headings. One dropdown spanning the anchor's
- *  previous, current, and next year; navigates ?mdate=YYYY-MM-01 and drops
- *  ?mrange= (a new month resets to Full month). */
+/** How far the Year dropdown spans around the REAL current year (2026-08-05
+ *  redesign — was a single combined "Jul 2026 ▾" select spanning only the
+ *  anchor's ±1 year, which couldn't reach further back/forward without
+ *  first navigating there some other way). Recomputed from `new Date()` on
+ *  every render, so the window shifts automatically each year — never
+ *  hardcoded. */
+const YEAR_DROPDOWN_PAST = 5;
+const YEAR_DROPDOWN_FUTURE = 10;
+
+const selectClass =
+  "rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none";
+
+/** Year + Month selector (2026-08-05: split from the old single "Jul 2026 ▾"
+ *  combined dropdown into two, per the product decision) — the Monthly
+ *  section heading and card/grid headings. Year spans [thisYear - 5,
+ *  thisYear + 10] (dynamic — see YEAR_DROPDOWN_PAST/FUTURE), Month is the
+ *  standard 12. Either select alone navigates ?mdate=YYYY-MM-01 (combining
+ *  its own new value with the OTHER select's current value) and drops
+ *  ?mrange= (a new month resets to Full month) — same external contract as
+ *  the old single dropdown, so no caller/data-fetching change was needed. */
 export function MonthDropdown({
   value,
   basePath,
@@ -296,31 +312,51 @@ export function MonthDropdown({
 }) {
   const router = useRouter();
   const [y, m] = value.split("-").map(Number);
-  const current = `${y}-${pad2(m)}`;
-  const options = [y - 1, y, y + 1].flatMap((year) =>
-    MONTH_LABELS.map((label, i) => ({
-      value: `${year}-${pad2(i + 1)}`,
-      label: `${label} ${year}`,
-    })),
-  );
-  const navigate = (v: string) => {
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let year = thisYear - YEAR_DROPDOWN_PAST; year <= thisYear + YEAR_DROPDOWN_FUTURE; year++) {
+    years.push(year);
+  }
+  // Defensive: if the currently-anchored year somehow falls outside the
+  // computed window (e.g. straddling a year boundary at the exact moment
+  // "now" ticks over), keep it selectable rather than silently losing the
+  // selection.
+  if (!years.includes(y)) years.push(y);
+  years.sort((a, b) => a - b);
+
+  const navigate = (nextYear: number, nextMonth: number) => {
+    const v = `${nextYear}-${pad2(nextMonth)}`;
     const qs = new URLSearchParams({ ...extraParams, mdate: `${v}-01` });
     router.push(`${basePath}?${qs.toString()}`);
   };
 
   return (
-    <select
-      value={current}
-      onChange={(e) => navigate(e.target.value)}
-      aria-label="Month"
-      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className="flex items-center gap-1.5">
+      <select
+        value={y}
+        onChange={(e) => navigate(Number(e.target.value), m)}
+        aria-label="Year"
+        className={selectClass}
+      >
+        {years.map((year) => (
+          <option key={year} value={year}>
+            {year}
+          </option>
+        ))}
+      </select>
+      <select
+        value={m}
+        onChange={(e) => navigate(y, Number(e.target.value))}
+        aria-label="Month"
+        className={selectClass}
+      >
+        {MONTH_LABELS.map((label, i) => (
+          <option key={label} value={i + 1}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
