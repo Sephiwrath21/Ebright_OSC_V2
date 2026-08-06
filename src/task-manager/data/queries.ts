@@ -277,6 +277,19 @@ export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
   }, "getFlowStaff");
 }
 
+/** Just the caller's own Task Manager domain role (User.role) — a light
+ *  alternative to getFlowDetail/getFlowOverview for callers that only need
+ *  the role, e.g. deciding whether to hide the Cadence picker for a CEO
+ *  (mirrors /task-manager/page.tsx's `role === "CEO"` check, without
+ *  fetching that page's full daily payload). Deliberately NOT the OSC
+ *  portal session's own role field — a different identity system. */
+export function getMyRole(email: string): Promise<{ role: string }> {
+  return native(async () => {
+    const user = await requireUserByEmail(email);
+    return { role: user.role };
+  }, "getMyRole");
+}
+
 const departmentQuerySchema = analyticsQuerySchema.extend({
   department: z.string().min(1).max(200),
 });

@@ -4,9 +4,15 @@
 // /task-manager's own page: server component fetches data + defines
 // "use server" action closures, passes both to a client dashboard
 // component. Gated by the same assign-capable allow-list as the rest of
-// Task Manager — the first fetch (listTemplateGroups) IS the gate: a
-// FlowBridgeError there means the account isn't assign-capable, so we
-// bounce to /task-manager instead of rendering an empty/broken page.
+// Task Manager — the first fetch (listTemplateGroups, via requireAssigner)
+// IS the gate. Mirrors /task-manager/page.tsx's own three-way error
+// handling for its first fetch: SetupPendingError -> SetupPendingCard,
+// NoAccountError -> NoAccountCard, any other unexpected failure ->
+// TaskManagerErrorCard with the real message. Only a genuine 403 (account
+// exists but isn't assign-capable — requireAssigner's own ApiHttpError(403,
+// ...), which native() re-throws as a FlowBridgeError carrying that same
+// status) redirects to /task-manager instead of rendering an empty/broken
+// page here.
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
@@ -19,11 +25,19 @@ import {
   editTemplateGroup,
   getGroupDeletionImpact,
   getFlowStaff,
+  getMyRole,
   getTemplateGroup,
   listTemplateGroups,
   FlowBridgeError,
+  NoAccountError,
+  SetupPendingError,
 } from "@/task-manager/data";
 import { TemplateGroupDashboard } from "@/task-manager/ui/template-group-dashboard";
+import {
+  NoAccountCard,
+  SetupPendingCard,
+  TaskManagerErrorCard,
+} from "@/task-manager/ui/status-cards";
 import type {
   FlowTemplateGroupApplyInput,
   FlowTemplateGroupTaskInput,
@@ -46,13 +60,37 @@ export default async function TaskManagerTemplatePage() {
   const email = su.email;
 
   let groups;
+  let staff;
+  let role;
   try {
-    groups = await listTemplateGroups(email);
+    const [groupsResult, staffResult, roleResult] = await Promise.all([
+      listTemplateGroups(email),
+      getFlowStaff(),
+      getMyRole(email),
+    ]);
+    groups = groupsResult;
+    staff = staffResult.staff;
+    role = roleResult.role;
   } catch (err) {
-    if (err instanceof FlowBridgeError) redirect("/task-manager");
-    throw err;
+    // Genuine "not assign-capable" (403) is the only case that bounces
+    // elsewhere — everything else renders in place, same as /task-manager.
+    if (err instanceof FlowBridgeError && err.status === 403) redirect("/task-manager");
+    let card;
+    if (err instanceof SetupPendingError) {
+      card = <SetupPendingCard />;
+    } else if (err instanceof NoAccountError) {
+      card = <NoAccountCard email={email} />;
+    } else {
+      card = (
+        <TaskManagerErrorCard message={err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE} />
+      );
+    }
+    return (
+      <AppShell email={su.email} role={su.role} name={su.name}>
+        <div className="mx-auto max-w-[1400px] p-6">{card}</div>
+      </AppShell>
+    );
   }
-  const { staff } = await getFlowStaff();
 
   async function loadGroup(groupId: string): Promise<TemplateGroupLoadResult> {
     "use server";
@@ -149,6 +187,7 @@ export default async function TaskManagerTemplatePage() {
         <div className="mt-6">
           <TemplateGroupDashboard
             staff={staff}
+            hideCadence={role === "CEO"}
             control={{
               list: groups,
               load: loadGroup,
