@@ -349,10 +349,11 @@ export async function removeTemplateAssigneeCore(
   assigneeId: string,
 ): Promise<{ removedTasks: number; keptRecords: number }> {
   const id = z.string().min(1).parse(templateId);
+  const targetAssigneeId = z.string().min(1).parse(assigneeId);
   const template = await prisma.taskTemplate.findFirst({
     where: { id, createdById: user.id },
     select: { id: true },
   });
   if (!template) throw new ApiHttpError(404, "Template not found");
-  return cancelPendingTemplateRuns(user.id, id, "template-assignee-removed", assigneeId);
+  return cancelPendingTemplateRuns(user.id, id, "template-assignee-removed", targetAssigneeId);
 }
