@@ -17,6 +17,16 @@ const TRANSFER_REVERT_SWEEP_MS = 60 * 60 * 1000; // hourly — end_date is a cal
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Local CRM development: the HR background pollers (scanner-sync every 10s,
+  // hourly sweeps) open extra connections to the portal DB and can exhaust a
+  // connection-limited remote Postgres — which then starves the CRM's own
+  // queries. Set DISABLE_BG_POLLERS=1 in .env to skip them while working on
+  // the CRM. Never set this in production.
+  if (process.env.DISABLE_BG_POLLERS === "1") {
+    console.log("[instrumentation] background pollers disabled via DISABLE_BG_POLLERS");
+    return;
+  }
+
   const { syncScannerToDb } = await import("@/lib/scanner-sync");
 
   console.log(

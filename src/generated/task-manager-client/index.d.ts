@@ -94,9 +94,14 @@ export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
  * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
  * proof never gates completion. Re-uploading replaces the row (upsert on
- * runBlockId); deleting the block cascades the proof away. Bytes live in
- * the DB for the same reason as Guideline.imageData; served via
- * /api/task-manager/proof-image/[id] (session-gated).
+ * runBlockId); deleting the block cascades the proof away. Images live in
+ * Google Drive (2026-08-04 storage decision — high upload volume made
+ * in-DB bytes impractical) — driveFileId is the sole reference for every
+ * upload; served via /api/task-manager/proof-image/[id] (session-gated),
+ * which proxies from Drive. The original in-DB-bytes columns
+ * (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
+ * (pre-dating the Drive cutover, all test data) were deleted — every
+ * surviving/future row goes through Drive.
  */
 export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
 /**
@@ -303,7 +308,7 @@ export class PrismaClient<
    * Read more in our [docs](https://pris.ly/d/client).
    */
 
-  constructor(optionsArg ?: Prisma.Subset<ClientOptions, Prisma.PrismaClientOptions>);
+  constructor(optionsArg ?: Prisma.PrismaClientConstructorArgs<ClientOptions>);
   $on<V extends U>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
 
   /**
@@ -376,7 +381,7 @@ export class PrismaClient<
    * 
    * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
    */
-  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
+  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
 
   $transaction<R>(fn: (prisma: Omit<PrismaClient, runtime.ITXClientDenyList>) => $Utils.JsPromise<R>, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<R>
 
@@ -653,8 +658,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 7.7.0
-   * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+   * Prisma Client JS version: 7.9.1
+   * Query Engine version: e922089b7d7502aff4249d5da3420f6fa55fc6ad
    */
   export type PrismaVersion = {
     client: string
@@ -789,6 +794,19 @@ export namespace Prisma {
   };
 
   /**
+   * Resolved type of the argument passed to the `PrismaClient` constructor.
+   *
+   * When called without a narrower options type (the common case), this resolves
+   * to `PrismaClientOptions` directly, which produces a clear TypeScript error
+   * message (`not assignable to parameter of type 'PrismaClientOptions'`) when
+   * the argument is missing or incomplete. When the user supplies a narrower
+   * options type (e.g. via a literal), it falls back to `Subset` to keep
+   * filtering out unknown properties.
+   */
+  export type PrismaClientConstructorArgs<Options extends PrismaClientOptions> =
+    [PrismaClientOptions] extends [Options] ? PrismaClientOptions : Subset<Options, PrismaClientOptions>;
+
+  /**
    * SelectSubset
    * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
    * Additionally, it validates, if both select and include are present. If the case, it errors.
@@ -820,7 +838,7 @@ export namespace Prisma {
   type XOR<T, U> =
     T extends object ?
     U extends object ?
-      (Without<T, U> & U) | (Without<U, T> & T)
+      ((Without<T, U> & U) | (Without<U, T> & T)) & object
     : U : T
 
 
@@ -2774,11 +2792,26 @@ export namespace Prisma {
       isolationLevel?: Prisma.TransactionIsolationLevel
     }
     /**
-     * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-planetscale`
+     * A driver adapter that PrismaClient uses to connect to your database, such as the ones provided by `@prisma/adapter-pg`, `@prisma/adapter-libsql`, `@prisma/adapter-planetscale`, etc.
+     * 
+     * A driver adapter is **required** unless you connect to your database through Prisma Accelerate (in which case use `accelerateUrl` instead).
+     * 
+     * Learn more: https://pris.ly/d/driver-adapters
+     * 
+     * @example
+     * ```ts
+     * import { PrismaPg } from '@prisma/adapter-pg'
+     * import { PrismaClient } from './generated/prisma/client'
+     * 
+     * const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+     * const prisma = new PrismaClient({ adapter })
+     * ```
      */
     adapter?: runtime.SqlDriverAdapterFactory
     /**
-     * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
+     * The Prisma Accelerate connection URL. Use this option to connect to your database through Prisma Accelerate instead of using a driver adapter to connect directly.
+     * 
+     * Learn more: https://pris.ly/d/accelerate
      */
     accelerateUrl?: string
     /**
@@ -18406,24 +18439,21 @@ export namespace Prisma {
   export type ProofMinAggregateOutputType = {
     id: string | null
     runBlockId: string | null
-    imageMime: string | null
-    imageData: Bytes | null
+    driveFileId: string | null
     createdAt: Date | null
   }
 
   export type ProofMaxAggregateOutputType = {
     id: string | null
     runBlockId: string | null
-    imageMime: string | null
-    imageData: Bytes | null
+    driveFileId: string | null
     createdAt: Date | null
   }
 
   export type ProofCountAggregateOutputType = {
     id: number
     runBlockId: number
-    imageMime: number
-    imageData: number
+    driveFileId: number
     createdAt: number
     _all: number
   }
@@ -18432,24 +18462,21 @@ export namespace Prisma {
   export type ProofMinAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
   }
 
   export type ProofMaxAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
   }
 
   export type ProofCountAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
     _all?: true
   }
@@ -18529,8 +18556,7 @@ export namespace Prisma {
   export type ProofGroupByOutputType = {
     id: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId: string | null
     createdAt: Date
     _count: ProofCountAggregateOutputType | null
     _min: ProofMinAggregateOutputType | null
@@ -18554,8 +18580,7 @@ export namespace Prisma {
   export type ProofSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18563,8 +18588,7 @@ export namespace Prisma {
   export type ProofSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18572,8 +18596,7 @@ export namespace Prisma {
   export type ProofSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18581,12 +18604,11 @@ export namespace Prisma {
   export type ProofSelectScalar = {
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
   }
 
-  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "imageMime" | "imageData" | "createdAt", ExtArgs["result"]["proof"]>
+  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "driveFileId" | "createdAt", ExtArgs["result"]["proof"]>
   export type ProofInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }
@@ -18605,8 +18627,7 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       runBlockId: string
-      imageMime: string
-      imageData: Prisma.Bytes
+      driveFileId: string | null
       createdAt: Date
     }, ExtArgs["result"]["proof"]>
     composites: {}
@@ -19034,8 +19055,7 @@ export namespace Prisma {
   interface ProofFieldRefs {
     readonly id: FieldRef<"Proof", 'String'>
     readonly runBlockId: FieldRef<"Proof", 'String'>
-    readonly imageMime: FieldRef<"Proof", 'String'>
-    readonly imageData: FieldRef<"Proof", 'Bytes'>
+    readonly driveFileId: FieldRef<"Proof", 'String'>
     readonly createdAt: FieldRef<"Proof", 'DateTime'>
   }
     
@@ -28177,8 +28197,7 @@ export namespace Prisma {
   export const ProofScalarFieldEnum: {
     id: 'id',
     runBlockId: 'runBlockId',
-    imageMime: 'imageMime',
-    imageData: 'imageData',
+    driveFileId: 'driveFileId',
     createdAt: 'createdAt'
   };
 
@@ -29599,8 +29618,7 @@ export namespace Prisma {
     NOT?: ProofWhereInput | ProofWhereInput[]
     id?: StringFilter<"Proof"> | string
     runBlockId?: StringFilter<"Proof"> | string
-    imageMime?: StringFilter<"Proof"> | string
-    imageData?: BytesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
   }
@@ -29608,8 +29626,7 @@ export namespace Prisma {
   export type ProofOrderByWithRelationInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     runBlock?: RunBlockOrderByWithRelationInput
   }
@@ -29620,8 +29637,7 @@ export namespace Prisma {
     AND?: ProofWhereInput | ProofWhereInput[]
     OR?: ProofWhereInput[]
     NOT?: ProofWhereInput | ProofWhereInput[]
-    imageMime?: StringFilter<"Proof"> | string
-    imageData?: BytesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
   }, "id" | "runBlockId">
@@ -29629,8 +29645,7 @@ export namespace Prisma {
   export type ProofOrderByWithAggregationInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: ProofCountOrderByAggregateInput
     _max?: ProofMaxOrderByAggregateInput
@@ -29643,8 +29658,7 @@ export namespace Prisma {
     NOT?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Proof"> | string
     runBlockId?: StringWithAggregatesFilter<"Proof"> | string
-    imageMime?: StringWithAggregatesFilter<"Proof"> | string
-    imageData?: BytesWithAggregatesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableWithAggregatesFilter<"Proof"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
   }
 
@@ -31320,8 +31334,7 @@ export namespace Prisma {
 
   export type ProofCreateInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
     runBlock: RunBlockCreateNestedOneWithoutProofInput
   }
@@ -31329,15 +31342,13 @@ export namespace Prisma {
   export type ProofUncheckedCreateInput = {
     id?: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
   }
@@ -31345,31 +31356,27 @@ export namespace Prisma {
   export type ProofUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     runBlockId?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofCreateManyInput = {
     id?: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     runBlockId?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -33026,13 +33033,6 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
-  export type BytesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesFilter<$PrismaModel> | Bytes
-  }
-
   export type RunBlockScalarRelationFilter = {
     is?: RunBlockWhereInput
     isNot?: RunBlockWhereInput
@@ -33041,35 +33041,22 @@ export namespace Prisma {
   export type ProofCountOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
   }
 
   export type ProofMaxOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
   }
 
   export type ProofMinOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
-  }
-
-  export type BytesWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBytesFilter<$PrismaModel>
-    _max?: NestedBytesFilter<$PrismaModel>
   }
   export type JsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -34281,10 +34268,6 @@ export namespace Prisma {
     connect?: RunBlockWhereUniqueInput
   }
 
-  export type BytesFieldUpdateOperationsInput = {
-    set?: Bytes
-  }
-
   export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
     create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
     connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
@@ -34742,23 +34725,6 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedBytesNullableFilter<$PrismaModel>
     _max?: NestedBytesNullableFilter<$PrismaModel>
-  }
-
-  export type NestedBytesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesFilter<$PrismaModel> | Bytes
-  }
-
-  export type NestedBytesWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBytesFilter<$PrismaModel>
-    _max?: NestedBytesFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -36338,15 +36304,13 @@ export namespace Prisma {
 
   export type ProofCreateWithoutRunBlockInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUncheckedCreateWithoutRunBlockInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
@@ -36712,15 +36676,13 @@ export namespace Prisma {
 
   export type ProofUpdateWithoutRunBlockInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofUncheckedUpdateWithoutRunBlockInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
