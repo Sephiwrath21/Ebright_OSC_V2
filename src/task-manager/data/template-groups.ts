@@ -157,7 +157,13 @@ export interface EditTemplateGroupResult {
  *  instances); new members (id absent) are created fresh. `employees` sums
  *  per-task counts and may double-count someone with pending tasks from
  *  more than one member of this group — an acceptable approximation for a
- *  summary count, same caveat the single-task Edit panel already has. */
+ *  summary count, same caveat the single-task Edit panel already has.
+ *  Not wrapped in a transaction across members — if one member's edit/
+ *  delete throws partway through (e.g. concurrently deleted by another
+ *  admin), earlier iterations' changes are already committed and the
+ *  group is left partially reconciled. Accepted trade-off, matching
+ *  templates.ts's own non-transactional multi-step writes; callers should
+ *  treat a thrown error as "re-fetch and re-check," not "nothing happened." */
 export function editTemplateGroup(
   email: string,
   groupId: string,
@@ -251,7 +257,9 @@ export function getGroupDeletionImpact(
 }
 
 /** Deletes every member task (cascade-safe — see deleteTaskTemplate) then
- *  the group row itself. */
+ *  the group row itself. Not wrapped in a transaction across members — see
+ *  editTemplateGroup's equivalent note for the accepted partial-failure
+ *  trade-off. */
 export function deleteTemplateGroup(
   email: string,
   groupId: string,
