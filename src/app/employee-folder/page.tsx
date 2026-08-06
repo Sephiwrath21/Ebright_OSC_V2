@@ -7,8 +7,12 @@ import {
   countEmployeeStages,
   getOverdueTaskCounts,
 } from "@/lib/employeeQueries";
-import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
-import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
+import {
+  lookupCareerApplicationsByName,
+  matchIsProbationPipeline,
+  matchIsProbationOverrideExcluded,
+  normalizeName,
+} from "@/lib/careerApplicationSync";
 
 export const dynamic = "force-dynamic";
 
@@ -29,21 +33,23 @@ export default async function EmployeeFolderPage() {
   // still defined but no longer called from here.
   //
   // Probation's card count must match what its own list page shows — that
-  // page additionally dual-lists Onboarding-stage employees whose
-  // career_applications board_stage is "Probation" (display-only, their
-  // stored status stays Onboarding — see [stage]/page.tsx). Same lookup,
-  // same rule, applied here just for the count. Driven by board_stage
-  // directly, not rec_recruit/rec_stage (dropped — see conversation).
-  const onboardingRows = rows.filter((r) => r.stage === "onboarding");
-  if (onboardingRows.length > 0) {
-    const careerApplications = await lookupCareerApplicationsByName();
-    for (const row of onboardingRows) {
-      const match = careerApplications.get(normalizeName(row.fullName));
-      if (match?.boardStage && BOARD_STAGE_TO_OUR_STAGE[match.boardStage]?.alsoShowOnProbationList) {
-        counts.probation += 1;
-      }
+  // page's membership rule is an OR across career_applications.board_stage
+  // and rec_recruit/rec_stage.name (see matchIsProbationPipeline), which can
+  // both ADD non-Probation-stage rows and REMOVE real-Probation-stage rows
+  // whose manual flag neither pipeline field corroborates anymore
+  // (matchIsProbationOverrideExcluded) — see [stage]/page.tsx for the full
+  // rationale. Same lookup, same rule, applied here just for the count.
+  const careerApplications = await lookupCareerApplicationsByName();
+  let probationCount = 0;
+  for (const row of rows) {
+    const match = careerApplications.get(normalizeName(row.fullName));
+    if (row.stage === "probation") {
+      if (!matchIsProbationOverrideExcluded(match)) probationCount += 1;
+    } else if (matchIsProbationPipeline(match)) {
+      probationCount += 1;
     }
   }
+  counts.probation = probationCount;
   const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));
 
   const userEmail = session.user.email;

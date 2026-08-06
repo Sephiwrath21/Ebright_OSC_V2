@@ -1,14 +1,17 @@
-// career_applications.board_stage -> our stage, per explicit decision (see
-// conversation — this REPLACES an earlier version keyed off rec_recruit/
-// rec_stage, reverted because board_stage and rec_stage are two genuinely
-// separate columns in two separate tables that can disagree for the same
-// application; board_stage is the field of record now).
+// career_applications.board_stage -> our stage, for the real sync-time
+// employment write (see careerApplicationSync.ts's decideSyncAction) — per
+// explicit decision, this REPLACES an earlier version keyed off
+// rec_recruit/rec_stage, reverted because board_stage and rec_stage are two
+// genuinely separate columns in two separate tables that can disagree for
+// the same application; board_stage is the field of record for THIS
+// (write) purpose.
 //
-// alsoShowOnProbationList: true only for "Probation" — those people's
-// stored employment.status still becomes "onboarding" (same field values as
-// every other entry here), but the Probation list ADDITIONALLY displays
-// them (see [stage]/page.tsx and employee-folder/page.tsx) — display-only,
-// not a second stored status.
+// The Probation list's DISPLAY-time membership rule is separate and wider —
+// board_stage OR rec_stage, since either field alone has been caught
+// disagreeing with reality (see isDualListedOnProbation/
+// isProbationOverrideExcluded in careerApplicationSync.ts) — but that's a
+// display-only dual-listing decision, never a second stored status, so it
+// doesn't belong in this write-time table.
 //
 // No entry currently maps to "active" — board_stage has no equivalent to
 // rec_stage's old "Access To Payroll"/"IOP Sessions" values (checked: the
@@ -23,13 +26,10 @@
 // same key names to exclude Onboarding-bound values from its filter
 // options — can import it without pulling server-only code into the client
 // bundle.
-export const BOARD_STAGE_TO_OUR_STAGE: Record<
-  string,
-  { status: "onboarding"; probation: false; alsoShowOnProbationList: boolean }
-> = {
-  "Trial": { status: "onboarding", probation: false, alsoShowOnProbationList: false },
-  "1st Training Day": { status: "onboarding", probation: false, alsoShowOnProbationList: false },
-  "2nd Training Day": { status: "onboarding", probation: false, alsoShowOnProbationList: false },
-  "3rd Training Day": { status: "onboarding", probation: false, alsoShowOnProbationList: false },
-  "Probation": { status: "onboarding", probation: false, alsoShowOnProbationList: true },
+export const BOARD_STAGE_TO_OUR_STAGE: Record<string, { status: "onboarding"; probation: false }> = {
+  "Trial": { status: "onboarding", probation: false },
+  "1st Training Day": { status: "onboarding", probation: false },
+  "2nd Training Day": { status: "onboarding", probation: false },
+  "3rd Training Day": { status: "onboarding", probation: false },
+  "Probation": { status: "onboarding", probation: false },
 };

@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
-import { STAFF_ROLE_ID } from "@/lib/employeeQueries";
+import { STAFF_ROLE_ID, resolveDepartmentBranch, type BranchOpt, type DepartmentOpt } from "@/lib/employeeQueries";
 import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 
 export { BOARD_STAGE_TO_OUR_STAGE };
@@ -146,37 +146,146 @@ export function normalizeEmail(email: string): string {
 }
 
 export interface CareerApplicationLookupEntry {
-  applicationId: number;
+  applicationId: number | null;
   boardStage: string | null;
   hiringNote: string | null;
+  // rec_recruit -> rec_stage.name, name-matched the same way as board_stage
+  // below — a SEPARATE, granular pipeline field that often disagrees with
+  // board_stage (see conversation: Chan Ten Kiat's board_stage said
+  // "Rejected" while rec_stage said "Trial"). Kept alongside board_stage,
+  // not instead of it — per explicit decision, Probation-list membership is
+  // now an OR across both fields (see isDualListedOnProbation /
+  // isProbationOverrideExcluded below), since each field alone has been
+  // caught disagreeing with reality in different, unpredictable directions.
+  recStage: string | null;
 }
 
-// Live name-matched lookup into career_applications — used wherever a
-// synced Pre/Probation record's page needs to reflect that source row's
-// CURRENT data (board_stage for the list Status column and the Probation
-// list's dual-listing; feedback1/feedback2 as the Hiring Notes fallback),
-// not just what was true at sync time. Same normalizeName matching the sync
-// itself uses, same "approximate, name-based" caveat. Cheap in practice —
-// career_applications is ~230 rows total — so always fetches the full table
-// rather than trying to filter server-side by a list of names.
+// Live name-matched lookup into career_applications AND rec_recruit/
+// rec_stage — used wherever a synced Pre/Probation record's page needs to
+// reflect that source data's CURRENT state (board_stage for the Pre list's
+// Status column; board_stage OR rec_stage for the Probation list's
+// dual-listing; feedback1/feedback2 as the Hiring Notes fallback), not just
+// what was true at sync time. Same normalizeName matching the sync itself
+// uses, same "approximate, name-based" caveat. Cheap in practice — both
+// tables are a few hundred rows total — so always fetches everything rather
+// than trying to filter server-side by a list of names.
 export async function lookupCareerApplicationsByName(): Promise<Map<string, CareerApplicationLookupEntry>> {
-  const { rows } = await queryEbrightHrfs<{
-    id: number;
-    name: string;
-    board_stage: string | null;
-    feedback1: string | null;
-    feedback2: string | null;
-  }>(`select id, name, board_stage, feedback1, feedback2 from public.career_applications`);
+  const [{ rows: apps }, { rows: recs }, { rows: stages }] = await Promise.all([
+    queryEbrightHrfs<{
+      id: number;
+      name: string;
+      board_stage: string | null;
+      feedback1: string | null;
+      feedback2: string | null;
+    }>(`select id, name, board_stage, feedback1, feedback2 from public.career_applications`),
+    queryEbrightHrfs<{ name: string; stageId: string | null }>(`select name, "stageId" from public.rec_recruit`),
+    queryEbrightHrfs<{ id: string; name: string }>(`select id, name from public.rec_stage`),
+  ]);
+
+  const stageNameById = new Map(stages.map((s) => [s.id, s.name]));
+  const recStageByName = new Map<string, string | null>();
+  for (const r of recs) {
+    const key = normalizeName(r.name);
+    if (!key) continue;
+    recStageByName.set(key, r.stageId ? (stageNameById.get(r.stageId) ?? null) : null);
+  }
 
   const map = new Map<string, CareerApplicationLookupEntry>();
-  for (const r of rows) {
+  for (const r of apps) {
     const key = normalizeName(r.name);
     if (!key) continue;
     map.set(key, {
       applicationId: r.id,
       boardStage: r.board_stage,
       hiringNote: (r.feedback1?.trim() || r.feedback2?.trim()) || null,
+      recStage: recStageByName.get(key) ?? null,
     });
+  }
+  // A rec_recruit row with no matching career_applications row (e.g.
+  // someone whose recruitment record predates career_applications, or was
+  // entered straight into the pipeline board) still needs to be checkable —
+  // otherwise a real employee who only ever exists in rec_recruit could
+  // never be OR-matched into the Probation list at all.
+  for (const [key, recStage] of recStageByName) {
+    if (!map.has(key)) map.set(key, { applicationId: null, boardStage: null, hiringNote: null, recStage });
+  }
+  return map;
+}
+
+// Probation-list membership per explicit decision: a person belongs on the
+// Probation list if EITHER career_applications.board_stage OR
+// rec_recruit/rec_stage.name reads "Probation" — neither field alone is
+// trusted enough on its own (both have been caught disagreeing with the
+// other and with reality; see the recStage doc comment above). Pure,
+// map-lookup version — takes an already-fetched lookup entry so a caller
+// iterating many rows (the list page) can fetch lookupCareerApplicationsByName()
+// ONCE instead of once per row; matchIsProbationOverrideExcluded below is
+// its mirror. The single-name async wrappers further below wrap both for
+// one-off callers (the profile page, checking just the row it's rendering).
+export function matchIsProbationPipeline(match: CareerApplicationLookupEntry | undefined): boolean {
+  return Boolean(match && (match.boardStage === "Probation" || match.recStage === "Probation"));
+}
+
+// The flip side of the same rule: a person whose OWN employment record has
+// probation=true (set by someone manually clicking "Proceed") should NOT
+// show on the Probation list if BOTH pipeline fields are known and NEITHER
+// says "Probation" — the manual flag doesn't get to override when the
+// pipeline data actively contradicts it. Deliberately returns false (i.e.
+// trust the manual flag) when there's no pipeline match at all, or the
+// match has no data in either field — this only excludes on a genuine,
+// positive contradiction, not on an absence of data.
+export function matchIsProbationOverrideExcluded(match: CareerApplicationLookupEntry | undefined): boolean {
+  if (!match) return false;
+  if (match.boardStage === "Probation" || match.recStage === "Probation") return false;
+  return Boolean(match.boardStage || match.recStage);
+}
+
+// Used both to decide whether to dual-list a not-really-Probation-stage row
+// onto the Probation list, and by the profile page to decide whether to
+// relax its stage guard for that same row — the two can never disagree
+// since both ultimately call matchIsProbationPipeline.
+export async function isDualListedOnProbation(fullName: string): Promise<boolean> {
+  const map = await lookupCareerApplicationsByName();
+  return matchIsProbationPipeline(map.get(normalizeName(fullName)));
+}
+
+export async function isProbationOverrideExcluded(fullName: string): Promise<boolean> {
+  const map = await lookupCareerApplicationsByName();
+  return matchIsProbationOverrideExcluded(map.get(normalizeName(fullName)));
+}
+
+// ebright_hrfs's real operational HR roster (confirmed table/columns by
+// direct schema inspection — not the auth `hrfs` Prisma database, a
+// same-named but unrelated thing; see ebright-hrfs.ts's own note on this).
+// Used as a live Branch/Department fallback for Probation-list rows whose
+// own employment record has neither set — most commonly a dual-listed row
+// still mid-recruitment-pipeline (career_applications/rec_recruit have no
+// branch/department column of their own), but BranchStaff already has real,
+// current values for them since HR enters new hires there as soon as
+// they're signed, generally before this system's own employment row is
+// fully filled in. department wins over branch when both resolve, matching
+// resolveDepartmentBranch's existing rule everywhere else; a compound value
+// like "HR/IOP" (seen on real data) is retried by its first "/"-segment
+// since the compound itself never matches a real department code/name.
+export async function lookupBranchStaffLocationByName(
+  branches: BranchOpt[],
+  departments: DepartmentOpt[],
+): Promise<Map<string, ReturnType<typeof resolveDepartmentBranch>>> {
+  const { rows } = await queryEbrightHrfs<{ name: string; branch: string | null; department: string | null }>(
+    `select name, branch, department from public."BranchStaff"`,
+  );
+  const map = new Map<string, ReturnType<typeof resolveDepartmentBranch>>();
+  for (const r of rows) {
+    const key = normalizeName(r.name);
+    if (!key) continue;
+    let resolved = r.department ? resolveDepartmentBranch(r.department, departments, branches) : null;
+    if (resolved && !resolved.departmentCode && !resolved.branchCode && r.department!.includes("/")) {
+      resolved = resolveDepartmentBranch(r.department!.split("/")[0].trim(), departments, branches);
+    }
+    if (!resolved || (!resolved.departmentCode && !resolved.branchCode)) {
+      resolved = r.branch ? resolveDepartmentBranch(r.branch, departments, branches) : null;
+    }
+    if (resolved && (resolved.departmentCode || resolved.branchCode)) map.set(key, resolved);
   }
   return map;
 }

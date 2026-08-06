@@ -192,13 +192,6 @@ export interface EmployeeOverviewRow {
    *  no career_applications match (e.g. manually added via
    *  addPreStageEmployee). */
   boardStage?: string | null;
-  /** Set only for rows dual-listed onto a stage list they don't actually
-   *  belong to (currently: Onboarding employees whose linked rec_stage is
-   *  "Probation", also shown on the Probation list — see [stage]/page.tsx).
-   *  The row's real, stored stage — used as the profile link target instead
-   *  of the current page's own stage, since that's where their profile
-   *  genuinely lives. Undefined for every normal (non-dual-listed) row. */
-  profileStage?: EmployeeStage;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's

@@ -217,7 +217,7 @@ export default function StageFlatListView({ stage, rows, branches, departments }
               visible.map((row) => (
                 <Link
                   key={row.id}
-                  href={`/employee-folder/${row.profileStage ?? stage}/employee/${row.id}`}
+                  href={`/employee-folder/${stage}/employee/${row.id}`}
                   className={`relative grid ${stage === "pre" ? "grid-cols-[2fr_1fr_1fr_60px]" : "grid-cols-[2fr_1fr_1fr_1fr_60px]"} gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0 hover:bg-slate-50 transition-colors`}
                 >
                   <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
@@ -233,8 +233,14 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                         <span className="text-sm text-slate-500">—</span>
                       )
                     ) : (
-                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                        {STAGE_LABELS[stage]}
+                      // row.stage (not the page's own `stage`) — a dual-listed
+                      // row's REAL stage can differ from this page's stage
+                      // (e.g. an Onboarding/Active person whose recruitment
+                      // pipeline also flags them Probation, shown here too);
+                      // the badge must say what they actually are, not a flat
+                      // label matching whichever list happens to show them.
+                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
+                        {STAGE_LABELS[row.stage]}
                       </span>
                     )}
                   </span>
