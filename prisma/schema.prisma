@@ -234,6 +234,12 @@ model transfer {
   to_location        String?   @db.VarChar(100)
   reason             String?
   attachment_file_id String?   @db.VarChar(128)
+  // Temporary Transfer only — the date this transfer should auto-revert the
+  // employee's Branch/Department back to from_location, and when the
+  // scheduled sweep (src/lib/transferAutomation.ts) actually did so. NULL
+  // for every other transfer type.
+  end_date           DateTime? @db.Date
+  reverted_at        DateTime? @db.Timestamptz(6)
   users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_transfer_user")
 
   @@index([user_id], map: "idx_transfer_user")
@@ -351,6 +357,9 @@ model pip {
 // (no "+Add"/history list anywhere for Resignation/Reference Letter/Exit
 // Interview Notes). ───
 
+// exit_type is constrained by a DB-level CHECK constraint
+// (chk_resignation_exit_type, alter_resignation_add_exit_type.sql) not
+// modeled here — same convention as payslip.type/nda.status.
 model resignation {
   resignation_id        Int       @id @default(autoincrement())
   user_id               Int       @unique
@@ -359,6 +368,7 @@ model resignation {
   reason                String?
   resign_letter_file_id String?   @db.VarChar(128)
   accept_letter_file_id String?   @db.VarChar(128)
+  exit_type             String?   @db.VarChar(30)
   users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resignation_user")
 }
 
@@ -430,9 +440,13 @@ model payment_info {
 // overall_rating is constrained by a DB-level CHECK constraint
 // (chk_performance_review_rating, add_performance_review.sql) not modeled
 // here — same convention as nda.status.
+// Repeatable — one row per review (newest first), same shape as
+// salary_revision — Active Employment's "Performance Review" form shows the
+// latest row, with all rows listed in the "Performance Review History"
+// table below.
 model performance_review {
   performance_review_id Int       @id @default(autoincrement())
-  user_id               Int       @unique
+  user_id               Int
   period                String?   @db.VarChar(50)
   review_date           DateTime? @db.Date
   reviewer              String?   @db.VarChar(100)
@@ -440,6 +454,8 @@ model performance_review {
   comment               String?
   attachment_file_id    String?   @db.VarChar(128)
   users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_performance_review_user")
+
+  @@index([user_id], map: "idx_performance_review_user")
 }
 
 // Deliberately separate from the existing payroll model (EPF/SOCSO/EIS/Tax/
@@ -472,6 +488,9 @@ model employment {
   rate               String?                       @db.VarChar(100)
   working_hours      String?                       @db.VarChar(50)
   working_hours_json Json?
+  // Pre stage's Personal Info "Signed Offer Letter" upload — real Google
+  // Drive file id, same convention as resume.resume_file_id.
+  offer_letter_file_id String?                     @db.VarChar(128)
   branch             branch?                       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
   department         department?                   @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
   users              users                         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employment_user")
@@ -536,10 +555,45 @@ model leave_types {
   leave_request   leave_request[]
 }
 
+/// Applied via prisma/manual-sql/create_password_reset_token.sql (no migrations folder).
+model password_reset_token {
+  token_id     Int       @id @default(autoincrement())
+  user_id      Int
+  /// SHA-256 of the token that went out in the email — never the token itself.
+  token_hash   String    @unique(map: "uq_password_reset_token_hash") @db.VarChar(64)
+  expires_at   DateTime  @db.Timestamptz(6)
+  used_at      DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  requested_ip String?   @db.VarChar(64)
+  users        users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_password_reset_user")
+
+  @@index([user_id], map: "idx_password_reset_user")
+  @@index([expires_at], map: "idx_password_reset_expires")
+}
+
 model role {
-  role_id   Int     @id @default(autoincrement())
-  role_type String  @unique @db.VarChar(50)
-  users     users[]
+  role_id         Int               @id @default(autoincrement())
+  role_type       String            @unique @db.VarChar(50)
+  users           users[]
+  role_permission role_permission[]
+}
+
+/// DB-editable RBAC matrix: capability + scope per (role, subtype, feature, action).
+/// subtype = "" applies to the whole role; else a department_code (department role)
+/// or a position (staff role). Seeded by scripts/access-rbac-phase1.sql.
+model role_permission {
+  id          Int      @id @default(autoincrement())
+  role_id     Int
+  subtype     String   @default("") @db.VarChar(30)
+  feature_key String   @db.VarChar(40)
+  action      String   @db.VarChar(10)
+  allowed     Boolean  @default(false)
+  scope       String   @default("own") @db.VarChar(10)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  role        role     @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_role_permission_role")
+
+  @@unique([role_id, subtype, feature_key, action], map: "uq_role_permission")
+  @@index([role_id, subtype], map: "idx_role_permission_lookup")
 }
 
 model user_profile {
@@ -609,6 +663,7 @@ model users {
   offboarding_case_supervisor                    offboarding_case[]           @relation("OffboardingCaseSupervisor")
   offboarding_case_user                          offboarding_case[]           @relation("OffboardingCaseUser")
   offboarding_checklist_completed                offboarding_checklist_item[]
+  password_reset_token                           password_reset_token[]
   payroll                                        payroll?
   pip                                            pip[]
   probation_record                               probation?
@@ -632,7 +687,7 @@ model users {
   exit_interview_note                            exit_interview_note?
   guardian_info                                  guardian_info[]
   payment_info                                   payment_info?
-  performance_review                             performance_review?
+  performance_review                             performance_review[]
   payslip                                        payslip?
 }
 

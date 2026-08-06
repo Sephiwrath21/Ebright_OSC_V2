@@ -1,38 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Home,
   ChevronRight,
-  ChevronDown,
   Check,
-  Minus,
   Lock,
   Save,
-  MoreHorizontal,
-  RotateCcw,
-  Copy,
   CircleUser,
-  ShieldAlert,
+  Tags,
+  ChevronDown,
+  Loader2,
+  AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 import AccessTabs from "@/app/components/AccessTabs";
 import {
-  MODULES,
-  ACTION_COLUMNS,
+  FEATURES,
+  ACTIONS,
+  SCOPES,
+  SCOPE_LABEL,
+  featureApplies,
   isCeilingLocked,
   type PermAction,
-  type FeatureDef,
-} from "@/lib/accessMatrix";
+  type Scope,
+} from "@/lib/access/types";
+import {
+  loadMatrix,
+  saveMatrix,
+  type MatrixGrant,
+} from "@/app/access-management/actions";
 
 type Role = { role_id: number; role_type: string };
+type Department = {
+  department_id: number;
+  department_code: string;
+  department_name: string;
+};
 
-// featureKey -> action -> true (absence = not allowed). Only stores grants.
-type Grants = Record<string, Partial<Record<PermAction, boolean>>>;
+// featureKey -> action -> scope (presence = allowed).
+type Grants = Record<string, Partial<Record<PermAction, Scope>>>;
 
-type CellKind = "allowed" | "denied" | "partial" | "na" | "locked";
-
-const EXPAND_STORAGE_KEY = "access-matrix-expanded-v1";
+const ACTION_LABEL: Record<PermAction, string> = {
+  view: "View",
+  add: "Add",
+  update: "Update",
+  delete: "Delete",
+  export: "Export",
+};
 
 function prettyRole(roleType: string): string {
   return roleType
@@ -41,296 +57,628 @@ function prettyRole(roleType: string): string {
     .join(" ");
 }
 
-/** Strip falsy entries so baseline/current compare cleanly for dirty-tracking. */
-function normalize(grants: Grants): string {
+/** Sensible starting scope when a cell is first switched on. */
+function defaultScopeFor(roleType: string): Scope {
+  switch (roleType.toLowerCase()) {
+    case "department":
+      return "global";
+    case "regional manager":
+      return "region";
+    case "branch":
+    case "branch manager":
+      return "branch";
+    case "hod":
+      return "team";
+    default:
+      return "own";
+  }
+}
+
+function normalize(g: Grants): string {
   const out: Grants = {};
-  for (const fk of Object.keys(grants).sort()) {
-    const actions = grants[fk];
-    const kept: Partial<Record<PermAction, boolean>> = {};
+  for (const fk of Object.keys(g).sort()) {
+    const actions = g[fk];
+    const kept: Partial<Record<PermAction, Scope>> = {};
     for (const a of Object.keys(actions).sort() as PermAction[]) {
-      if (actions[a]) kept[a] = true;
+      const s = actions[a];
+      if (s) kept[a] = s;
     }
     if (Object.keys(kept).length) out[fk] = kept;
   }
   return JSON.stringify(out);
 }
 
-function featureCellKind(
-  feature: FeatureDef,
-  action: PermAction,
-  grants: Grants,
-): CellKind {
-  if (!feature.applies.includes(action)) return "na";
-  if (isCeilingLocked(feature.key, action)) return "locked";
-  return grants[feature.key]?.[action] ? "allowed" : "denied";
-}
+const GROUP_ORDER = [
+  "HRMS",
+  "Attendance",
+  "Manpower",
+  "CNS",
+  "FA System",
+  "PCM System",
+  "SMS",
+  "Self-service",
+];
 
-/** Roll a module's children up to a single parent state for one column. */
-function parentCellKind(
-  features: FeatureDef[],
-  action: PermAction,
-  grants: Grants,
-): CellKind {
-  const applicable = features.filter((f) => f.applies.includes(action));
-  if (applicable.length === 0) return "na";
+export default function AccessManagementView({
+  roles,
+  departments,
+  positions,
+  canEdit,
+}: {
+  roles: Role[];
+  departments: Department[];
+  positions: string[];
+  canEdit: boolean;
+}) {
+  const [roleId, setRoleId] = useState<number>(roles[0]?.role_id ?? 0);
+  const role = roles.find((r) => r.role_id === roleId);
+  const roleType = role?.role_type.toLowerCase() ?? "";
+  const isImplicit = roleType === "superadmin" || roleType === "ceo";
 
-  const hasLocked = applicable.some((f) => isCeilingLocked(f.key, action));
-  // Any locked child makes the whole feature superadmin-only for this column.
-  if (hasLocked) return "locked";
-
-  const allowedCount = applicable.filter(
-    (f) => grants[f.key]?.[action],
-  ).length;
-  if (allowedCount === 0) return "denied";
-  if (allowedCount === applicable.length) return "allowed";
-  return "partial";
-}
-
-export default function AccessManagementView({ roles }: { roles: Role[] }) {
-  const editableRoles = useMemo(
-    () => roles.filter((r) => r.role_type.toLowerCase() !== "superadmin"),
-    [roles],
+  const subtypeOptions = useMemo(
+    () => subtypeOptionsFor(roleType, departments, positions),
+    [roleType, departments, positions],
   );
+  // Multiple sub-types can be selected to bulk-apply the same matrix. The FIRST
+  // selected is the "primary" whose stored matrix is loaded for editing; Save
+  // writes the edited matrix to every selected sub-type.
+  const [subtypes, setSubtypes] = useState<string[]>([]);
+  const primary = subtypes[0] ?? "";
 
-  const [roleId, setRoleId] = useState<number | null>(
-    editableRoles[0]?.role_id ?? null,
-  );
+  const [grants, setGrants] = useState<Grants>({});
+  const [baseline, setBaseline] = useState<Grants>({});
+  const [loading, startLoad] = useTransition();
+  const [saving, startSave] = useTransition();
+  const [flash, setFlash] = useState<
+    { kind: "ok" | "error"; msg: string } | null
+  >(null);
 
-  // Per-role working state + baseline (baseline = last "saved"). Stubbed: both
-  // start empty (all not-allowed) until a real role_permissions source exists.
-  const [grantsByRole, setGrantsByRole] = useState<Record<number, Grants>>({});
-  const [baselineByRole, setBaselineByRole] = useState<Record<number, Grants>>(
-    {},
-  );
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  // Restore expand state per session.
+  // Reset sub-type selection when the role changes (start with the first option).
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(EXPAND_STORAGE_KEY);
-      if (raw) setExpanded(JSON.parse(raw));
-      else setExpanded(Object.fromEntries(MODULES.map((m) => [m.key, true])));
-    } catch {
-      setExpanded(Object.fromEntries(MODULES.map((m) => [m.key, true])));
-    }
-  }, []);
+    setSubtypes(subtypeOptions?.[0] ? [subtypeOptions[0].value] : []);
+  }, [subtypeOptions]);
 
-  const persistExpanded = (next: Record<string, boolean>) => {
-    setExpanded(next);
-    try {
-      window.localStorage.setItem(EXPAND_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore */
+  // Load the stored matrix of the PRIMARY (first-selected) sub-type.
+  useEffect(() => {
+    if (isImplicit || roleId === 0) {
+      setGrants({});
+      setBaseline({});
+      return;
     }
-  };
+    setFlash(null);
+    startLoad(async () => {
+      const res = await loadMatrix(roleId, primary);
+      if (res.ok) {
+        const g: Grants = {};
+        for (const row of res.grants) {
+          (g[row.feature_key] ??= {})[row.action] = row.scope;
+        }
+        setGrants(g);
+        setBaseline(structuredClone(g));
+      } else {
+        setFlash({ kind: "error", msg: res.error });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleId, primary, isImplicit]);
 
-  const grants: Grants = roleId != null ? grantsByRole[roleId] ?? {} : {};
-  const baseline: Grants = roleId != null ? baselineByRole[roleId] ?? {} : {};
   const dirty = normalize(grants) !== normalize(baseline);
 
-  const setGrant = (featureKey: string, action: PermAction, value: boolean) => {
-    if (roleId == null) return;
-    setSavedFlash(false);
-    setGrantsByRole((prev) => {
-      const roleGrants: Grants = { ...(prev[roleId] ?? {}) };
-      const fg = { ...(roleGrants[featureKey] ?? {}) };
-      if (value) fg[action] = true;
-      else delete fg[action];
-      if (Object.keys(fg).length) roleGrants[featureKey] = fg;
-      else delete roleGrants[featureKey];
-      return { ...prev, [roleId]: roleGrants };
+  const cellScope = (feature: string, action: PermAction): Scope | null =>
+    grants[feature]?.[action] ?? null;
+
+  const toggleCell = (feature: string, action: PermAction) => {
+    if (!canEdit) return;
+    setFlash(null);
+    setGrants((prev) => {
+      const fk = { ...(prev[feature] ?? {}) };
+      if (fk[action]) delete fk[action];
+      else fk[action] = defaultScopeFor(roleType);
+      const next = { ...prev };
+      if (Object.keys(fk).length) next[feature] = fk;
+      else delete next[feature];
+      return next;
     });
   };
 
-  const toggleFeatureCell = (feature: FeatureDef, action: PermAction) => {
-    const kind = featureCellKind(feature, action, grants);
-    if (kind === "na" || kind === "locked") return;
-    setGrant(feature.key, action, kind !== "allowed");
-  };
-
-  const toggleParentCell = (features: FeatureDef[], action: PermAction) => {
-    if (roleId == null) return;
-    const kind = parentCellKind(features, action, grants);
-    if (kind === "na" || kind === "locked") return;
-    // allowed -> clear all; denied/partial -> set all (non-locked, applicable)
-    const target = kind !== "allowed";
-    setSavedFlash(false);
-    setGrantsByRole((prev) => {
-      const roleGrants: Grants = { ...(prev[roleId] ?? {}) };
-      for (const f of features) {
-        if (!f.applies.includes(action)) continue;
-        if (isCeilingLocked(f.key, action)) continue;
-        const fg = { ...(roleGrants[f.key] ?? {}) };
-        if (target) fg[action] = true;
-        else delete fg[action];
-        if (Object.keys(fg).length) roleGrants[f.key] = fg;
-        else delete roleGrants[f.key];
-      }
-      return { ...prev, [roleId]: roleGrants };
-    });
+  const setCellScope = (feature: string, action: PermAction, scope: Scope) => {
+    if (!canEdit) return;
+    setFlash(null);
+    setGrants((prev) => ({
+      ...prev,
+      [feature]: { ...(prev[feature] ?? {}), [action]: scope },
+    }));
   };
 
   const handleSave = () => {
-    if (roleId == null || !dirty) return;
-    // STUB: no persistence yet — promote current state to baseline so the UI
-    // reflects a successful save. Real server action + role_permissions TBD.
-    setBaselineByRole((prev) => ({
-      ...prev,
-      [roleId]: JSON.parse(JSON.stringify(grants)),
-    }));
-    setSavedFlash(true);
+    if (!canEdit || !dirty) return;
+    const payload: MatrixGrant[] = [];
+    for (const [feature, actions] of Object.entries(grants)) {
+      for (const [action, scope] of Object.entries(actions)) {
+        if (scope)
+          payload.push({
+            feature_key: feature,
+            action: action as PermAction,
+            scope,
+          });
+      }
+    }
+    const targets = subtypes.length ? subtypes : [""];
+    setFlash(null);
+    startSave(async () => {
+      const results = await Promise.all(
+        targets.map((st) => saveMatrix(roleId, st, payload)),
+      );
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        setFlash({ kind: "error", msg: failed.error ?? "Could not save." });
+      } else {
+        setBaseline(structuredClone(grants));
+        setFlash({
+          kind: "ok",
+          msg:
+            targets.length > 1
+              ? `Permissions saved to ${targets.length} ${
+                  roleType === "department" ? "departments" : "positions"
+                }`
+              : "Permissions saved",
+        });
+      }
+    });
   };
-
-  const handleResetToDefault = () => {
-    if (roleId == null) return;
-    // STUB action — clears all grants for the current role back to none.
-    setGrantsByRole((prev) => ({ ...prev, [roleId]: {} }));
-    setSavedFlash(false);
-  };
-
-  if (editableRoles.length === 0) {
-    return (
-      <Shell>
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-10 text-center">
-          <ShieldAlert className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">
-            No editable roles found. (Superadmin is always full-access and is not
-            listed here.)
-          </p>
-        </div>
-      </Shell>
-    );
-  }
 
   return (
     <Shell>
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200">
-          <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200">
-            <CircleUser className="w-4 h-4 text-slate-500" aria-hidden="true" />
-            <span className="text-slate-500">Role</span>
-            <select
-              value={roleId ?? ""}
-              onChange={(e) => {
-                setRoleId(Number(e.target.value));
-                setSavedFlash(false);
-              }}
-              className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1"
-            >
-              {editableRoles.map((r) => (
-                <option key={r.role_id} value={r.role_id}>
-                  {prettyRole(r.role_type)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Picker
+              icon={<CircleUser className="w-4 h-4 text-slate-500" />}
+              label="Role"
+              value={String(roleId)}
+              onChange={(v) => setRoleId(Number(v))}
+              options={roles.map((r) => ({
+                value: String(r.role_id),
+                label: prettyRole(r.role_type),
+              }))}
+            />
+            {subtypeOptions && (
+              <MultiPicker
+                icon={<Tags className="w-4 h-4 text-indigo-500" />}
+                label={roleType === "staff" ? "Position" : "Department"}
+                selected={subtypes}
+                onChange={setSubtypes}
+                options={subtypeOptions}
+                primary={primary}
+              />
+            )}
+            {subtypeOptions && subtypes.length > 1 && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600">
+                <Tags className="w-3.5 h-3.5" />
+                Editing {subtypeOptions.find((o) => o.value === primary)?.label ?? "base"};
+                Save applies to all {subtypes.length} selected
+              </span>
+            )}
+            {roleType === "regional manager" && (
+              <span className="text-xs text-slate-500">
+                Same rules for regions A / B / C
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
-            {dirty ? (
+            {flash && (
+              <span
+                className={`inline-flex items-center gap-1 text-xs font-semibold ${
+                  flash.kind === "ok" ? "text-emerald-600" : "text-rose-600"
+                }`}
+              >
+                {flash.kind === "ok" ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5" />
+                )}
+                {flash.msg}
+              </span>
+            )}
+            {dirty && !flash && (
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Unsaved changes
               </span>
-            ) : savedFlash ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-                <Check className="w-3.5 h-3.5" aria-hidden="true" />
-                Saved
-              </span>
-            ) : null}
-
-            <OverflowMenu onResetToDefault={handleResetToDefault} />
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!dirty}
-              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              <Save className="w-4 h-4" aria-hidden="true" />
-              Save permissions
-            </button>
+            )}
+            {loading && (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            )}
+            {canEdit && !isImplicit && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!dirty || saving}
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save permissions
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Matrix */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700">
-                <th className="text-left px-6 py-3 font-semibold sticky left-0 bg-slate-100 z-10 min-w-[260px]">
-                  Module / Feature
-                </th>
-                {ACTION_COLUMNS.map((c) => (
-                  <th
-                    key={c.key}
-                    className="px-4 py-3 font-semibold text-center w-[92px]"
-                  >
-                    {c.label}
+        {isImplicit ? (
+          <ImplicitBanner roleType={roleType} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700">
+                  <th className="text-left px-6 py-3 font-semibold sticky left-0 bg-slate-100 z-10 min-w-[240px]">
+                    Module / Feature
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MODULES.map((mod) => {
-                const isOpen = expanded[mod.key] ?? true;
-                return (
-                  <ModuleRows
-                    key={mod.key}
-                    moduleKey={mod.key}
-                    label={mod.label}
-                    features={mod.features}
-                    grants={grants}
-                    open={isOpen}
-                    onToggleOpen={() =>
-                      persistExpanded({ ...expanded, [mod.key]: !isOpen })
-                    }
-                    onToggleParent={(action) =>
-                      toggleParentCell(mod.features, action)
-                    }
-                    onToggleChild={(feature, action) =>
-                      toggleFeatureCell(feature, action)
-                    }
-                  />
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  {ACTIONS.map((a) => (
+                    <th
+                      key={a}
+                      className="px-3 py-3 font-semibold text-center min-w-[104px]"
+                    >
+                      {ACTION_LABEL[a]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {GROUP_ORDER.map((group) => {
+                  const feats = FEATURES.filter((f) => f.group === group);
+                  if (!feats.length) return null;
+                  return (
+                    <FeatureGroup
+                      key={group}
+                      group={group}
+                      features={feats}
+                      cellScope={cellScope}
+                      canEdit={canEdit}
+                      onToggle={toggleCell}
+                      onScope={setCellScope}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600">
-          <LegendItem>
-            <CellBox kind="allowed" />
-            <span>Allowed</span>
-          </LegendItem>
-          <LegendItem>
-            <CellBox kind="denied" />
-            <span>Not allowed</span>
-          </LegendItem>
-          <LegendItem>
-            <CellBox kind="partial" />
-            <span>Partially allowed</span>
-          </LegendItem>
-          <LegendItem>
-            <span className="w-6 text-center text-slate-400 font-semibold">—</span>
-            <span>Not applicable to this feature</span>
-          </LegendItem>
-          <LegendItem>
-            <CellBox kind="locked" />
-            <span>Superadmin only — no role can grant this</span>
-          </LegendItem>
-        </div>
+        <Legend />
       </section>
     </Shell>
   );
 }
 
 // ──────────────────────────────────────────────────────────
-// Layout shell (breadcrumb + header + tabs)
-// ──────────────────────────────────────────────────────────
+
+function subtypeOptionsFor(
+  roleType: string,
+  departments: Department[],
+  positions: string[],
+): { value: string; label: string }[] | null {
+  if (roleType === "superadmin" || roleType === "ceo") return null;
+  if (roleType === "department") {
+    return departments.map((d) => ({
+      value: d.department_code,
+      label: `${d.department_name} (${d.department_code})`,
+    }));
+  }
+  if (roleType === "staff") {
+    return [
+      { value: "", label: "Base — all positions" },
+      ...positions.map((p) => ({ value: p, label: p })),
+    ];
+  }
+  return null; // single implicit subtype ""
+}
+
+function FeatureGroup({
+  group,
+  features,
+  cellScope,
+  canEdit,
+  onToggle,
+  onScope,
+}: {
+  group: string;
+  features: typeof FEATURES;
+  cellScope: (f: string, a: PermAction) => Scope | null;
+  canEdit: boolean;
+  onToggle: (f: string, a: PermAction) => void;
+  onScope: (f: string, a: PermAction, s: Scope) => void;
+}) {
+  return (
+    <>
+      <tr className="bg-slate-50 border-b border-slate-200">
+        <td
+          colSpan={1 + ACTIONS.length}
+          className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 sticky left-0 bg-slate-50"
+        >
+          {group}
+        </td>
+      </tr>
+      {features.map((f) => (
+        <tr
+          key={f.key}
+          className="bg-white border-b border-slate-100 hover:bg-slate-50/60 transition-colors duration-150"
+        >
+          <td className="px-6 py-2.5 sticky left-0 bg-inherit z-10">
+            <span className="text-sm font-medium text-slate-700">{f.label}</span>
+          </td>
+          {ACTIONS.map((a) => (
+            <td key={a} className="px-3 py-2.5 text-center">
+              <Cell
+                applies={featureApplies(f.key, a)}
+                locked={isCeilingLocked(f.key, a)}
+                scope={cellScope(f.key, a)}
+                canEdit={canEdit}
+                onToggle={() => onToggle(f.key, a)}
+                onScope={(s) => onScope(f.key, a, s)}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function Cell({
+  applies,
+  locked,
+  scope,
+  canEdit,
+  onToggle,
+  onScope,
+}: {
+  applies: boolean;
+  locked: boolean;
+  scope: Scope | null;
+  canEdit: boolean;
+  onToggle: () => void;
+  onScope: (s: Scope) => void;
+}) {
+  if (!applies)
+    return (
+      <span className="inline-block w-6 text-center text-slate-300 select-none">
+        —
+      </span>
+    );
+  if (locked)
+    return (
+      <span title="Superadmin only" className="inline-flex justify-center">
+        <Lock className="w-4 h-4 text-slate-300" />
+      </span>
+    );
+
+  const allowed = scope !== null;
+  return (
+    <div className="inline-flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!canEdit}
+        aria-pressed={allowed}
+        className={`inline-flex items-center justify-center w-5 h-5 rounded-md transition-colors duration-150 ${
+          allowed
+            ? "bg-emerald-500 text-white shadow-sm"
+            : "border border-slate-300 bg-white hover:border-slate-400"
+        } ${canEdit ? "cursor-pointer" : "cursor-default opacity-90"}`}
+      >
+        {allowed && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+      </button>
+      {allowed && (
+        <select
+          value={scope}
+          disabled={!canEdit}
+          onChange={(e) => onScope(e.target.value as Scope)}
+          className="text-[10px] font-semibold text-slate-600 bg-transparent border border-slate-200 rounded px-1 py-0.5 focus:outline-none focus:border-indigo-400 disabled:opacity-70"
+        >
+          {SCOPES.map((s) => (
+            <option key={s} value={s}>
+              {SCOPE_LABEL[s]}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function ImplicitBanner({ roleType }: { roleType: string }) {
+  return (
+    <div className="px-6 py-12 text-center">
+      <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+        <ShieldCheck className="w-6 h-6 text-slate-400" />
+      </div>
+      <p className="text-sm font-medium text-slate-700">
+        {roleType === "superadmin"
+          ? "Superadmin has full access to everything."
+          : "CEO can view everything (read-only)."}
+      </p>
+      <p className="mt-1 text-xs text-slate-500">
+        This is fixed in code and can&apos;t be edited here.
+      </p>
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500 text-white">
+          <Check className="w-3.5 h-3.5" strokeWidth={3} />
+        </span>
+        Allowed (pick a scope)
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block w-5 h-5 rounded-md border border-slate-300 bg-white" />
+        Not allowed
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="w-6 text-center text-slate-400 font-semibold">—</span>
+        Not applicable
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Lock className="w-4 h-4 text-slate-300" />
+        Superadmin only
+      </span>
+      <span className="text-slate-400">
+        Scope: Global · Region · Branch · Team · Own
+      </span>
+    </div>
+  );
+}
+
+function Picker({
+  icon,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200">
+      {icon}
+      <span className="text-slate-500">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Checkbox multi-select for sub-types — tick several to bulk-apply the matrix. */
+function MultiPicker({
+  icon,
+  label,
+  options,
+  selected,
+  onChange,
+  primary,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  primary: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const toggle = (value: string) => {
+    onChange(
+      selected.includes(value)
+        ? selected.filter((v) => v !== value)
+        : [...selected, value],
+    );
+  };
+
+  const summary =
+    selected.length === 0
+      ? "None selected"
+      : selected.length === 1
+        ? options.find((o) => o.value === selected[0])?.label ?? selected[0]
+        : `${selected.length} selected`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`inline-flex items-center h-10 rounded-xl border bg-white px-3 gap-2 text-sm transition-all duration-200 ${
+          open ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200 hover:border-slate-300"
+        }`}
+      >
+        {icon}
+        <span className="text-slate-500">{label}</span>
+        <span className="font-semibold text-slate-800 max-w-[160px] truncate">{summary}</span>
+        <ChevronDown className="w-4 h-4 text-slate-400" aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-lg py-1.5">
+          <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Tick to apply together
+          </p>
+          <div className="max-h-72 overflow-y-auto">
+            {options.map((o) => {
+              const checked = selected.includes(o.value);
+              const isPrimary = checked && o.value === primary;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => toggle(o.value)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50"
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[5px] border flex items-center justify-center shrink-0 ${
+                      checked ? "bg-indigo-600 border-indigo-600" : "border-slate-300"
+                    }`}
+                  >
+                    {checked && (
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} aria-hidden="true" />
+                    )}
+                  </span>
+                  <span className={`flex-1 ${checked ? "text-slate-900 font-medium" : "text-slate-700"}`}>
+                    {o.label}
+                  </span>
+                  {isPrimary && (
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 shrink-0">
+                      editing
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -344,10 +692,10 @@ function Shell({ children }: { children: React.ReactNode }) {
             href="/home"
             className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200"
           >
-            <Home className="w-4 h-4" aria-hidden="true" />
+            <Home className="w-4 h-4" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
+          <ChevronRight className="w-4 h-4 text-slate-400" />
           <span className="text-slate-900 font-medium">Access Management</span>
         </nav>
 
@@ -358,243 +706,6 @@ function Shell({ children }: { children: React.ReactNode }) {
 
         {children}
       </div>
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────
-// Rows
-// ──────────────────────────────────────────────────────────
-
-function ModuleRows({
-  moduleKey,
-  label,
-  features,
-  grants,
-  open,
-  onToggleOpen,
-  onToggleParent,
-  onToggleChild,
-}: {
-  moduleKey: string;
-  label: string;
-  features: FeatureDef[];
-  grants: Grants;
-  open: boolean;
-  onToggleOpen: () => void;
-  onToggleParent: (action: PermAction) => void;
-  onToggleChild: (feature: FeatureDef, action: PermAction) => void;
-}) {
-  return (
-    <>
-      <tr className="bg-white border-b border-slate-200">
-        <td className="px-6 py-3 sticky left-0 bg-white z-10">
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            aria-expanded={open}
-            className="inline-flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-indigo-700 transition-colors duration-200"
-          >
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                open ? "" : "-rotate-90"
-              }`}
-              aria-hidden="true"
-            />
-            {label}
-          </button>
-        </td>
-        {ACTION_COLUMNS.map((c) => {
-          const kind = parentCellKind(features, c.key, grants);
-          return (
-            <td key={c.key} className="px-4 py-3 text-center">
-              <MatrixCell
-                kind={kind}
-                onToggle={() => onToggleParent(c.key)}
-                label={`${label} — ${c.label}`}
-              />
-            </td>
-          );
-        })}
-      </tr>
-
-      {open &&
-        features.map((f) => (
-          <tr
-            key={f.key}
-            className="bg-slate-50/40 border-b border-slate-100 hover:bg-slate-100/60 transition-colors duration-150"
-          >
-            <td className="px-6 py-2.5 sticky left-0 bg-inherit z-10">
-              <span className="pl-6 text-sm font-medium text-slate-600">
-                {f.label}
-              </span>
-            </td>
-            {ACTION_COLUMNS.map((c) => {
-              const kind = featureCellKind(f, c.key, grants);
-              return (
-                <td key={c.key} className="px-4 py-2.5 text-center">
-                  <MatrixCell
-                    kind={kind}
-                    onToggle={() => onToggleChild(f, c.key)}
-                    label={`${f.label} — ${c.label}`}
-                  />
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-    </>
-  );
-}
-
-// ──────────────────────────────────────────────────────────
-// Cell
-// ──────────────────────────────────────────────────────────
-
-function MatrixCell({
-  kind,
-  onToggle,
-  label,
-}: {
-  kind: CellKind;
-  onToggle: () => void;
-  label: string;
-}) {
-  if (kind === "na") {
-    return (
-      <span
-        className="inline-block w-6 text-center text-slate-300 font-semibold select-none"
-        title="Not applicable to this feature"
-        aria-label={`${label}: not applicable`}
-      >
-        —
-      </span>
-    );
-  }
-  if (kind === "locked") {
-    return (
-      <span
-        className="inline-flex items-center justify-center w-6 h-6"
-        title="Superadmin only — no role can grant this"
-        aria-label={`${label}: superadmin only`}
-      >
-        <Lock className="w-4 h-4 text-slate-300" aria-hidden="true" />
-      </span>
-    );
-  }
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={kind === "allowed"}
-      aria-label={`${label}: ${
-        kind === "allowed"
-          ? "allowed"
-          : kind === "partial"
-            ? "partially allowed"
-            : "not allowed"
-      }`}
-      className="inline-flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 rounded-md"
-    >
-      <CellBox kind={kind} />
-    </button>
-  );
-}
-
-function CellBox({ kind }: { kind: CellKind }) {
-  if (kind === "allowed") {
-    return (
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500 text-white shadow-sm">
-        <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden="true" />
-      </span>
-    );
-  }
-  if (kind === "partial") {
-    return (
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100 border border-indigo-300 text-indigo-600">
-        <Minus className="w-3.5 h-3.5" strokeWidth={3} aria-hidden="true" />
-      </span>
-    );
-  }
-  if (kind === "locked") {
-    return (
-      <span className="inline-flex items-center justify-center w-5 h-5">
-        <Lock className="w-4 h-4 text-slate-300" aria-hidden="true" />
-      </span>
-    );
-  }
-  // denied
-  return (
-    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md border border-slate-300 bg-white hover:border-slate-400 transition-colors duration-150" />
-  );
-}
-
-function LegendItem({ children }: { children: React.ReactNode }) {
-  return <span className="inline-flex items-center gap-1.5">{children}</span>;
-}
-
-// ──────────────────────────────────────────────────────────
-// Overflow menu (secondary actions — stubbed)
-// ──────────────────────────────────────────────────────────
-
-function OverflowMenu({
-  onResetToDefault,
-}: {
-  onResetToDefault: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More actions"
-        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200"
-      >
-        <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 mt-1 w-56 rounded-xl border border-slate-200 bg-white shadow-lg py-1 z-20"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onResetToDefault();
-              setOpen(false);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors duration-150"
-          >
-            <RotateCcw className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            Reset to default
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled
-            title="Coming soon"
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-400 cursor-not-allowed"
-          >
-            <Copy className="w-4 h-4" aria-hidden="true" />
-            Copy from another role
-          </button>
-        </div>
-      )}
     </div>
   );
 }

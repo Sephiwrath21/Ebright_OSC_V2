@@ -51,6 +51,21 @@ export interface LeadsMetricsResult {
   trend?: MonthPoint[]; // 6-month rolling series (only when opts.trend)
 }
 
+// Which branches the caller is allowed to see. Resolved from the access engine
+// (user → employment → branch/region) so every consumer reads from this one
+// centralized metrics source instead of a parallel query.
+export type MetricsScope =
+  | { kind: "global" } // superadmin/ceo — every regioned branch
+  | { kind: "region"; region: string | null } // regional — their A/B/C
+  | { kind: "branch"; branchCodes: string[] }; // branch/team — matched by code
+
+// Normalize a branch code for portal↔CRM matching: numeric codes compare by
+// value ("02" == "2"), everything else by upper-cased text.
+function normCode(s: string | null | undefined): string {
+  const t = (s ?? "").trim().toUpperCase();
+  return /^\d+$/.test(t) ? String(Number(t)) : t;
+}
+
 // KL has no DST — a fixed +8h offset is safe. All presets are KL wall-clock.
 const KL_OFFSET_MS = 8 * 3600 * 1000;
 // Display floor: leads created before this are historical noise (matches v1's
@@ -187,6 +202,8 @@ export async function getLeadsMetrics(opts: {
   from?: string;
   to?: string;
   trend?: boolean;
+  /** Defaults to the elevated all-branches view when omitted. */
+  scope?: MetricsScope;
 }): Promise<LeadsMetricsResult | null> {
   // Resolve tenant (single-tenant 'ebright' in practice; fall back to earliest).
   const tenantRes = await queryCrmDb<{ id: string }>(
@@ -231,7 +248,22 @@ export async function getLeadsMetrics(opts: {
       WHERE "tenantId" = $1 AND region IN ('A','B','C')`,
     [tenantId],
   );
-  const branches = branchesRes?.rows ?? [];
+  const allBranches = branchesRes?.rows ?? [];
+
+  // Narrow to the caller's scope. Global (or omitted) sees every regioned
+  // branch; region keeps its A/B/C; branch keeps only code-matched branches.
+  const scope = opts.scope ?? { kind: "global" as const };
+  const branches =
+    scope.kind === "global"
+      ? allBranches
+      : scope.kind === "region"
+        ? allBranches.filter((b) => b.region === scope.region)
+        : allBranches.filter((b) => {
+            const codes = scope.branchCodes.map(normCode);
+            const disp = displayBranch(b.name, b.code);
+            return codes.includes(normCode(disp.code)) || codes.includes(normCode(b.code));
+          });
+
   const branchIds = branches.map((b) => b.id);
   if (branchIds.length === 0) {
     const empty: RegionTotals = { NL: 0, CT: 0, SU: 0, ENR: 0 };

@@ -4,7 +4,7 @@ import AppShell from "@/app/components/AppShell";
 import StageProfileView from "@/app/components/StageProfileView";
 import {
   isEmployeeStage,
-  listEmployeeOverviewRows,
+  getEmployeeOverviewRowById,
   listSalaryRevisions,
   listLeaveHistory,
   getEmployeeById,
@@ -26,7 +26,10 @@ import {
   getReferenceLetter,
   getExitInterviewNote,
   resolveLocationName,
+  listBranches,
+  listDepartments,
 } from "@/lib/employeeQueries";
+import { isEligibleForOnboardingDualListing } from "@/lib/careerApplicationSync";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +52,23 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   const numId = Number(id);
   if (Number.isNaN(numId)) notFound();
 
-  const rows = await listEmployeeOverviewRows();
-  const employee = rows.find((r) => r.id === numId && r.stage === stage);
+  const employee = await getEmployeeOverviewRowById(numId);
   if (!employee) notFound();
+  if (employee.stage !== stage) {
+    // The one allowed mismatch here: a real Probation-stage Full-Time
+    // person, or a real Active-stage Full-Time person whose recruitment
+    // pipeline still reads "Probation", is also dual-listed on the
+    // Onboarding list (see [stage]/page.tsx and
+    // computeOnboardingDualListedRows) and must be reachable at
+    // /onboarding/employee/[id]/... there, rendered with the Onboarding
+    // profile template below — not a 404. Visiting them at their real
+    // stage's own URL (e.g. /probation/employee/[id]) still shows that
+    // stage's content, unaffected by this (Probation's profileMode is
+    // "in-page-tabs", handled entirely by [id]/page.tsx, which never
+    // reaches this file).
+    const isDualListedOnboardingView = stage === "onboarding" && (await isEligibleForOnboardingDualListing(employee));
+    if (!isDualListedOnboardingView) notFound();
+  }
 
   const { locGroup, locCode } = await searchParams;
   const locationGroup = locGroup === "branch" || locGroup === "department" ? locGroup : null;
@@ -77,31 +94,61 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   const stageOrder = ["pre", "probation", "onboarding", "active", "exit"] as const;
   const isAtOrAfter = (owner: (typeof stageOrder)[number]) => stageOrder.indexOf(stage) >= stageOrder.indexOf(owner);
   const activeOrAfter = isAtOrAfter("active");
-
-  const leaveHistory = activeOrAfter ? await listLeaveHistory(numId) : undefined;
-  const employeeDetail = await getEmployeeById(numId);
-  const resumeInfo = await getResumeInfo(numId);
-  const interviewAssessment = await getInterviewAssessment(numId);
-  const referenceCheck = await getReferenceCheck(numId);
-  const medicalCheck = await getMedicalCheck(numId);
-  const probationInfo = await getProbationInfo(numId);
-  const documentsInfo = await getDocuments(numId);
-  const payrollInfo = await getPayrollInfo(numId);
-  const achievements = activeOrAfter ? await listAchievements(numId) : undefined;
-  const salaryRevisions = activeOrAfter ? await listSalaryRevisions(numId) : undefined;
-  const promotions = activeOrAfter ? await listPromotions(numId) : undefined;
-  const transfers = activeOrAfter ? await listTransfers(numId) : undefined;
-  const trainings = activeOrAfter ? await listTrainings(numId) : undefined;
-  const ndaInfo = activeOrAfter ? await getNda(numId) : undefined;
-  const nonCompeteInfo = activeOrAfter ? await getNonCompete(numId) : undefined;
-  const disciplinarySummary = activeOrAfter ? await listDisciplinarySummary(numId) : undefined;
   // Resignation/Reference Letter/Exit Interview Notes are Exit's own tabs
   // only — Exit is terminal (nothing comes after it), so unlike Active's
   // tabs above these never need to be fetched for an earlier stage's history.
   const isExit = stage === "exit";
-  const resignationInfo = isExit ? await getResignation(numId) : undefined;
-  const referenceLetterInfo = isExit ? await getReferenceLetter(numId) : undefined;
-  const exitInterviewNoteInfo = isExit ? await getExitInterviewNote(numId) : undefined;
+
+  // All of these are independent (keyed only by numId, none depends on
+  // another's result) but were previously awaited one at a time — up to 18
+  // sequential round trips on every single Active/Onboarding/Exit profile
+  // load, regardless of which section was actually being viewed. Batched
+  // into one Promise.all so they run concurrently instead.
+  const [
+    leaveHistory,
+    employeeDetail,
+    resumeInfo,
+    interviewAssessment,
+    referenceCheck,
+    medicalCheck,
+    probationInfo,
+    documentsInfo,
+    payrollInfo,
+    achievements,
+    salaryRevisions,
+    promotions,
+    transfers,
+    [branches, departments],
+    trainings,
+    ndaInfo,
+    nonCompeteInfo,
+    disciplinarySummary,
+    resignationInfo,
+    referenceLetterInfo,
+    exitInterviewNoteInfo,
+  ] = await Promise.all([
+    activeOrAfter ? listLeaveHistory(numId) : Promise.resolve(undefined),
+    getEmployeeById(numId),
+    getResumeInfo(numId),
+    getInterviewAssessment(numId, employee.fullName),
+    getReferenceCheck(numId),
+    getMedicalCheck(numId),
+    getProbationInfo(numId),
+    getDocuments(numId),
+    getPayrollInfo(numId),
+    activeOrAfter ? listAchievements(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listSalaryRevisions(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listPromotions(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listTransfers(numId) : Promise.resolve(undefined),
+    activeOrAfter ? Promise.all([listBranches(), listDepartments()]) : Promise.resolve([undefined, undefined] as const),
+    activeOrAfter ? listTrainings(numId) : Promise.resolve(undefined),
+    activeOrAfter ? getNda(numId) : Promise.resolve(undefined),
+    activeOrAfter ? getNonCompete(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listDisciplinarySummary(numId) : Promise.resolve(undefined),
+    isExit ? getResignation(numId) : Promise.resolve(undefined),
+    isExit ? getReferenceLetter(numId) : Promise.resolve(undefined),
+    isExit ? getExitInterviewNote(numId) : Promise.resolve(undefined),
+  ]);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -127,6 +174,8 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         salaryRevisions={salaryRevisions}
         promotions={promotions}
         transfers={transfers}
+        branches={branches}
+        departments={departments}
         trainings={trainings}
         ndaInfo={ndaInfo}
         nonCompeteInfo={nonCompeteInfo}

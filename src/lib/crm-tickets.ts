@@ -133,6 +133,8 @@ const FROM_JOINS = `
 export async function getTickets(opts: {
   status?: string; platformId?: string; branchId?: string; search?: string;
   page?: number; pageSize?: number;
+  /** Access-enforced tkt_branch allow-list. null = no restriction. */
+  allowedBranchIds?: string[] | null;
 }): Promise<TicketListResult | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
@@ -143,8 +145,14 @@ export async function getTickets(opts: {
   // Base filter (platform/branch/search) — NO status. Reused for the tab counts.
   const baseParams: unknown[] = [tenantId];
   const baseFilters = [`tk.tenant_id = $1`];
+  if (opts.allowedBranchIds != null) {
+    baseParams.push(opts.allowedBranchIds);
+    baseFilters.push(`tk.branch_id = ANY($${baseParams.length}::text[])`);
+  }
   if (opts.platformId) { baseParams.push(opts.platformId); baseFilters.push(`tk.platform_id = $${baseParams.length}`); }
-  if (opts.branchId) { baseParams.push(opts.branchId); baseFilters.push(`tk.branch_id = $${baseParams.length}`); }
+  if (opts.branchId && (opts.allowedBranchIds == null || opts.allowedBranchIds.includes(opts.branchId))) {
+    baseParams.push(opts.branchId); baseFilters.push(`tk.branch_id = $${baseParams.length}`);
+  }
   if (opts.search?.trim()) {
     baseParams.push(`%${opts.search.trim()}%`);
     const like = `$${baseParams.length}`;
@@ -204,35 +212,44 @@ export interface TicketDashboard {
   recent: TicketRow[];
 }
 
-export async function getTicketDashboard(): Promise<TicketDashboard | null> {
+export async function getTicketDashboard(
+  opts: { allowedBranchIds?: string[] | null } = {},
+): Promise<TicketDashboard | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
 
+  // Branch access boundary ($2 = allow-list when present). `bare` targets the
+  // unaliased tkt_ticket queries; `tkf` the tk-aliased ones.
+  const allowed = opts.allowedBranchIds ?? null;
+  const params: unknown[] = allowed ? [tenantId, allowed] : [tenantId];
+  const bare = allowed ? ` AND branch_id = ANY($2::text[])` : "";
+  const tkf = allowed ? ` AND tk.branch_id = ANY($2::text[])` : "";
+
   const [statusRes, catRes, platRes, avgRes, recentRes] = await Promise.all([
     queryCrmDb<{ status: string; n: string }>(
-      `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1 GROUP BY status`,
-      [tenantId],
+      `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1${bare} GROUP BY status`,
+      params,
     ),
     queryCrmDb<{ sub_type: string | null; n: string }>(
-      `SELECT sub_type, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1 GROUP BY sub_type ORDER BY n DESC LIMIT 6`,
-      [tenantId],
+      `SELECT sub_type, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1${bare} GROUP BY sub_type ORDER BY n DESC LIMIT 6`,
+      params,
     ),
     queryCrmDb<{ id: string; name: string; slug: string | null; accent_color: string | null; n: string }>(
       `SELECT p.id, p.name, p.slug, p.accent_color, COUNT(tk.id)::int AS n
          FROM crm.tkt_platform p
-         LEFT JOIN crm.tkt_ticket tk ON tk.platform_id = p.id AND tk.tenant_id = $1
+         LEFT JOIN crm.tkt_ticket tk ON tk.platform_id = p.id AND tk.tenant_id = $1${tkf}
         WHERE p.tenant_id = $1
         GROUP BY p.id ORDER BY n DESC`,
-      [tenantId],
+      params,
     ),
     queryCrmDb<{ hours: string | null }>(
       `SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600.0) AS hours
-         FROM crm.tkt_ticket WHERE tenant_id = $1 AND status = 'complete' AND completed_at IS NOT NULL`,
-      [tenantId],
+         FROM crm.tkt_ticket WHERE tenant_id = $1 AND status = 'complete' AND completed_at IS NOT NULL${bare}`,
+      params,
     ),
     queryCrmDb<RawTicket>(
-      `SELECT ${SELECT_COLS} ${FROM_JOINS} WHERE tk.tenant_id = $1 ORDER BY tk.created_at DESC LIMIT 8`,
-      [tenantId],
+      `SELECT ${SELECT_COLS} ${FROM_JOINS} WHERE tk.tenant_id = $1${tkf} ORDER BY tk.created_at DESC LIMIT 8`,
+      params,
     ),
   ]);
 
@@ -386,7 +403,10 @@ function ticketRangeClause(
 }
 
 export async function getTicketKanban(
-  opts: { range?: TicketKanbanRange; from?: string | null; to?: string | null } = {},
+  opts: {
+    range?: TicketKanbanRange; from?: string | null; to?: string | null;
+    allowedBranchIds?: string[] | null;
+  } = {},
 ): Promise<{ columns: TicketKanbanColumn[]; total: number } | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
@@ -394,24 +414,33 @@ export async function getTicketKanban(
   const range = opts.range ?? "all";
   const from = opts.from ?? null;
   const to = opts.to ?? null;
+  const allowed = opts.allowedBranchIds ?? null;
 
-  // Count query: tenant is $1, so custom date params start at $2.
+  // Count query: tenant is $1, custom date params start at $2, branch allow-list
+  // (when present) takes the next slot.
   const countRange = ticketRangeClause(range, from, to, 2, "created_at");
+  const countParams: unknown[] = [tenantId, ...countRange.params];
+  let countBranch = "";
+  if (allowed) { countParams.push(allowed); countBranch = ` AND branch_id = ANY($${countParams.length}::text[])`; }
   const countRes = await queryCrmDb<{ status: string; n: string }>(
-    `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1${countRange.sql} GROUP BY status`,
-    [tenantId, ...countRange.params],
+    `SELECT status, COUNT(*)::int AS n FROM crm.tkt_ticket WHERE tenant_id = $1${countRange.sql}${countBranch} GROUP BY status`,
+    countParams,
   );
   const countByStatus = new Map((countRes?.rows ?? []).map((r) => [r.status, Number(r.n)]));
 
-  // Cards query: the date filter lives INSIDE the ranked CTE so ROW_NUMBER only
-  // ranks rows within the window. tenant is $1, custom date params $2…, then the
-  // per-column cap comes last.
+  // Cards query: the date + branch filters live INSIDE the ranked CTE so
+  // ROW_NUMBER only ranks rows within the window/branch. tenant $1, date params
+  // $2…, branch next, then the per-column cap comes last.
   const cardsRange = ticketRangeClause(range, from, to, 2, "tk.created_at");
-  const capIdx = 2 + cardsRange.params.length;
+  const cardParams: unknown[] = [tenantId, ...cardsRange.params];
+  let cardBranch = "";
+  if (allowed) { cardParams.push(allowed); cardBranch = ` AND tk.branch_id = ANY($${cardParams.length}::text[])`; }
+  cardParams.push(KANBAN_CARDS_PER_COL);
+  const capIdx = cardParams.length;
   const cardsRes = await queryCrmDb<RawTicket & { rn: number }>(
     `WITH ranked AS (
        SELECT tk.*, ROW_NUMBER() OVER (PARTITION BY tk.status ORDER BY tk.created_at DESC) AS rn
-         FROM crm.tkt_ticket tk WHERE tk.tenant_id = $1${cardsRange.sql}
+         FROM crm.tkt_ticket tk WHERE tk.tenant_id = $1${cardsRange.sql}${cardBranch}
      )
      SELECT ${SELECT_COLS}, tk.rn AS rn
        FROM ranked tk
@@ -420,7 +449,7 @@ export async function getTicketKanban(
        LEFT JOIN crm.crm_auth_user au ON au.id = tk.user_id
       WHERE tk.rn <= $${capIdx}
       ORDER BY tk.created_at DESC`,
-    [tenantId, ...cardsRange.params, KANBAN_CARDS_PER_COL],
+    cardParams,
   );
   const cardsByStatus = new Map<string, TicketRow[]>();
   for (const r of cardsRes?.rows ?? []) {

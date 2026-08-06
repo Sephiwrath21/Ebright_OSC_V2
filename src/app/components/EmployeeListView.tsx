@@ -105,7 +105,7 @@ function branchLabel(e: EmployeeRow): string {
   if (e.branchCode === "HQ") {
     return e.departmentName ? `HQ — ${e.departmentName}` : "HQ";
   }
-  return e.branchName ?? e.departmentName ?? "—";
+  return e.departmentName ?? e.branchName ?? "—";
 }
 
 export default function EmployeeListView({

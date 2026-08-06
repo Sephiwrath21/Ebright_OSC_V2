@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronRight, Home, LayoutGrid, List, Search } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import {
@@ -14,7 +16,7 @@ import {
   type EmployeeStage,
   type PositionGroup,
 } from "@/lib/employeeStages";
-import type { EmployeeOverviewRow, RealExitType } from "@/lib/employeeQueries";
+import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 
 const CARD_CAP = 6;
 
@@ -25,31 +27,24 @@ const MONTHS = [
   { value: "10", label: "October" }, { value: "11", label: "November" }, { value: "12", label: "December" },
 ];
 
-// Only resignation/eoc are ever populated (see listExitTypesByUserId) — the
-// other two are kept here since the reference defines colors for all four.
-const EXIT_TYPE_META: Record<string, { label: string; classes: string }> = {
-  resignation: { label: "Resignation", classes: "bg-[#90aeee7d] text-[#390ff2]" },
-  eoc: { label: "End of Contract", classes: "bg-[#67eab37d] text-[#307348]" },
-  "internship-completed": { label: "Internship Completed", classes: "bg-[#d8a1fa7d] text-[#621096]" },
-  termination: { label: "Termination/Dismissal", classes: "bg-[#f38e8e6b] text-[#961010]" },
-};
-
 interface Props {
   stage: EmployeeStage;
   groupBy: "branch" | "department";
   locationCode: string;
   locationName: string;
   rows: EmployeeOverviewRow[];
-  /** Real offboarding_case-derived exit type — only ever passed for stage="exit". */
-  exitTypeByUserId?: Record<number, RealExitType>;
 }
 
-export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows, exitTypeByUserId }: Props) {
-  const isExit = stage === "exit";
+export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows }: Props) {
+  const router = useRouter();
+  const handleDelete = async (id: number) => {
+    const result = await deleteEmployeeRecord(id);
+    if (result.ok) router.refresh();
+    return result;
+  };
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
-  const [exitTypeFilter, setExitTypeFilter] = useState("");
   const [openGroup, setOpenGroup] = useState<PositionGroup | null>(null);
 
   // Fixed link-back context for the profile breadcrumb — the URL's own
@@ -69,11 +64,10 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
     const q = search.trim().toLowerCase();
     if (q && !row.fullName.toLowerCase().includes(q) && !(row.position ?? "").toLowerCase().includes(q)) return false;
     if (typeFilter && positionGroup(row.position) !== typeFilter) return false;
-    if (isExit && exitTypeFilter && exitTypeByUserId?.[row.id] !== exitTypeFilter) return false;
     return true;
   };
 
-  const filteredRows = useMemo(() => rows.filter(matchesFilters), [rows, search, typeFilter, exitTypeFilter]);
+  const filteredRows = useMemo(() => rows.filter(matchesFilters), [rows, search, typeFilter]);
 
   const grouped = useMemo(() => {
     const out: Record<PositionGroup, EmployeeOverviewRow[]> = {
@@ -87,7 +81,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 pt-4 pb-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-10">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -105,43 +99,36 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           <span className="text-slate-900 font-medium">{locationName}</span>
         </nav>
 
-        {/* search-bar: search input + type filter (+ exit type filter) + search button */}
-        <div className="flex flex-wrap items-center gap-4 bg-white rounded-[20px] p-5 mb-3">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+        {/* search-bar: search input + type filter + search button, all on
+            one row at every width down to 375px. Search takes the remaining
+            space (flex-1, min-w-0 so it can shrink freely); the dropdown and
+            button are shrink-0 with deliberately narrow fixed widths/padding
+            on mobile so the three together never need to wrap. sm+ reverts
+            to the original sizing unchanged. */}
+        <div className="flex flex-nowrap items-center gap-2 sm:gap-4 bg-white rounded-[20px] p-4 sm:p-5 mb-3">
+          <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
+            <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
               type="search"
               placeholder="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 pl-8 sm:pl-9 pr-2 sm:pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as PositionGroup | "")}
-            className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px]"
+            className="shrink-0 w-[84px] sm:w-auto sm:min-w-[130px] h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate"
           >
             <option value="">All types</option>
             {POSITION_GROUPS.map((g) => (
               <option key={g} value={g}>{groupLabel(g)}</option>
             ))}
           </select>
-          {isExit && (
-            <select
-              value={exitTypeFilter}
-              onChange={(e) => setExitTypeFilter(e.target.value)}
-              className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px]"
-            >
-              <option value="">All exit types</option>
-              {Object.entries(EXIT_TYPE_META).map(([key, meta]) => (
-                <option key={key} value={key}>{meta.label}</option>
-              ))}
-            </select>
-          )}
           <button
             type="button"
-            className="h-10 px-6 rounded-lg bg-[#8ac4f3bd] text-sm font-bold text-[#004386c9] hover:bg-[#8ac4f3]"
+            className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-[#8ac4f3bd] text-xs sm:text-sm font-bold text-[#004386c9] hover:bg-[#8ac4f3]"
           >
             search
           </button>
@@ -189,20 +176,14 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
                   rows={grouped[group]}
                   stage={stage}
                   profileQuery={profileQuery}
-                  exitTypeByUserId={exitTypeByUserId}
                   onShowMore={() => setOpenGroup(group)}
+                  onDelete={handleDelete}
                 />
               ))
             )}
           </div>
         ) : (
-          <ListViewTable
-            stage={stage}
-            rows={filteredRows}
-            profileQuery={profileQuery}
-            thirdGroupLabel={thirdGroupLabel}
-            exitTypeByUserId={exitTypeByUserId}
-          />
+          <ListViewTable stage={stage} rows={filteredRows} profileQuery={profileQuery} thirdGroupLabel={thirdGroupLabel} onDelete={handleDelete} />
         )}
       </div>
 
@@ -212,8 +193,8 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           rows={grouped[openGroup]}
           stage={stage}
           profileQuery={profileQuery}
-          exitTypeByUserId={exitTypeByUserId}
           onClose={() => setOpenGroup(null)}
+          onDelete={handleDelete}
         />
       )}
     </div>
@@ -224,19 +205,19 @@ function PersonCard({
   row,
   stage,
   profileQuery,
-  exitType,
+  onDelete,
 }: {
   row: EmployeeOverviewRow;
   stage: EmployeeStage;
   profileQuery: string;
-  exitType?: RealExitType;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   return (
     <Link
       href={`/employee-folder/${stage}/employee/${row.id}${profileQuery}`}
       className="relative flex-1 basis-[130px] max-w-[150px] min-w-0 box-border bg-white border border-[#807d7d73] rounded-[15px] py-4 px-3 flex flex-col items-center text-center gap-1.5 hover:border-[#ee5f5f] hover:shadow-md transition-all"
     >
-      <RowActionMenu name={row.fullName} className="absolute top-1.5 right-1.5" />
+      <RowActionMenu name={row.fullName} className="absolute top-1.5 right-1.5" onDelete={() => onDelete(row.id)} />
       <div
         className={`w-[60px] h-[60px] rounded-full flex items-center justify-center font-medium text-lg shrink-0 ${
           STAGE_AVATAR_CLASSES[stage] ?? "bg-emerald-100 text-emerald-800"
@@ -246,11 +227,6 @@ function PersonCard({
       </div>
       <div className="text-base font-medium text-black/67 w-full truncate">{row.fullName}</div>
       <div className="text-sm font-medium text-black/67 w-full truncate">{row.position ?? "—"}</div>
-      {exitType && (
-        <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium mt-0.5 ${EXIT_TYPE_META[exitType].classes}`}>
-          {EXIT_TYPE_META[exitType].label}
-        </span>
-      )}
     </Link>
   );
 }
@@ -260,15 +236,15 @@ function CategorySection({
   rows,
   stage,
   profileQuery,
-  exitTypeByUserId,
   onShowMore,
+  onDelete,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
   onShowMore: () => void;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const shown = rows.slice(0, CARD_CAP);
   return (
@@ -278,7 +254,7 @@ function CategorySection({
         <div className="flex flex-col items-end w-full max-w-[1000px]">
           <div className="flex flex-wrap gap-4 self-stretch">
             {shown.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} exitType={exitTypeByUserId?.[row.id]} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} onDelete={onDelete} />
             ))}
           </div>
           {rows.length > CARD_CAP && (
@@ -301,15 +277,15 @@ function ShowMoreModal({
   rows,
   stage,
   profileQuery,
-  exitTypeByUserId,
   onClose,
+  onDelete,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
   onClose: () => void;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
@@ -338,19 +314,24 @@ function ShowMoreModal({
   return (
     <div className="fixed inset-0 z-[1000]">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40 cursor-pointer" />
-      <div className="relative w-[min(1040px,calc(100vw-64px))] max-h-[min(720px,calc(100vh-64px))] mx-auto my-8 bg-white rounded-3xl p-7 box-border flex flex-col gap-4">
-        <div className="flex items-center justify-between shrink-0">
+      <div className="relative w-[min(1040px,calc(100vw-32px))] max-h-[min(720px,calc(100vh-32px))] mx-auto my-4 sm:my-8 bg-white rounded-3xl p-4 sm:p-7 box-border flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3 shrink-0">
           <h3 className="text-xl font-semibold text-black">{label}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white text-sm font-medium text-[#7a1f1f] hover:bg-[#f48e8e24]"
+            className="shrink-0 min-h-11 px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white text-sm font-medium text-[#7a1f1f] hover:bg-[#f48e8e24]"
           >
             Show Less
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-3 shrink-0">
+        {/* Search + year + month all on one row down to 375px — search
+            takes the remaining space (flex-1, min-w-0, no longer a fixed
+            180px floor that forced month onto its own row); year/month are
+            shrink-0 with narrow fixed widths/padding on mobile, reverting to
+            the original sizing at sm+. */}
+        <div className="flex flex-nowrap gap-2 sm:gap-3 shrink-0">
           <input
             type="search"
             placeholder="search"
@@ -359,7 +340,7 @@ function ShowMoreModal({
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="flex-1 min-w-[180px] h-10 rounded-lg border-2 border-black/25 px-3.5 text-sm text-black/67 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-0 sm:min-w-[180px] h-11 rounded-lg border-2 border-black/25 px-2.5 sm:px-3.5 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={year}
@@ -367,7 +348,7 @@ function ShowMoreModal({
               setYear(e.target.value);
               setPage(1);
             }}
-            className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[100px]"
+            className="shrink-0 w-[64px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[100px]"
           >
             <option value="">year</option>
             {years.map((y) => (
@@ -380,7 +361,7 @@ function ShowMoreModal({
               setMonth(e.target.value);
               setPage(1);
             }}
-            className="h-10 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[120px]"
+            className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[120px]"
           >
             <option value="">month</option>
             {MONTHS.map((m) => (
@@ -394,7 +375,7 @@ function ShowMoreModal({
             <p className="col-span-full text-center text-sm text-slate-500 py-8">No matches.</p>
           ) : (
             visible.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} exitType={exitTypeByUserId?.[row.id]} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} onDelete={onDelete} />
             ))
           )}
         </div>
@@ -422,32 +403,41 @@ function ListViewTable({
   rows,
   profileQuery,
   thirdGroupLabel,
-  exitTypeByUserId,
+  onDelete,
 }: {
   stage: EmployeeStage;
   rows: EmployeeOverviewRow[];
   profileQuery: string;
   thirdGroupLabel: string;
-  exitTypeByUserId?: Record<number, RealExitType>;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const isExit = stage === "exit";
-  const gridColsClass = isExit
-    ? "grid-cols-[minmax(180px,2fr)_minmax(120px,1fr)_minmax(140px,1fr)_minmax(150px,1fr)_60px]"
-    : "grid-cols-[minmax(200px,2fr)_minmax(140px,1fr)_minmax(160px,1fr)_60px]";
+  const gridColsClass = "grid-cols-[minmax(200px,2fr)_minmax(140px,1fr)_minmax(160px,1fr)_60px]";
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const visible = rows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="mt-1">
-      <div className="bg-white rounded-[20px] overflow-hidden">
-        <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#a4e2f480] text-[15px] font-medium text-black`}>
+      {/* Each column already has a minmax() floor (see gridColsClass above),
+          so the grid itself won't shrink below a legible width — the
+          overflow-x-auto wrapper is what turns that into a horizontal swipe
+          on mobile instead of the whole page overflowing. The whole table
+          (including Name) scrolls together as one unit — deliberately no
+          sticky column. */}
+      <div className="bg-white rounded-[20px] overflow-x-auto">
+        {/* Opaque #d1f0f9 (the same #a4e2f480-over-white blend every other
+            header row uses) rather than the translucent color directly —
+            translucent backgrounds on a wide grid inside overflow-x-auto are
+            prone to partial-repaint glitches during horizontal scroll in
+            some browsers, which is what was actually showing as "Position"
+            losing its background. Visually identical against this card's
+            white background either way. */}
+        <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#d1f0f9] text-[15px] font-medium text-black`}>
           <span>Name</span>
           <span>Employment Type</span>
           <span>Position</span>
-          {isExit && <span>Exit Type</span>}
           <span />
         </div>
 
@@ -455,7 +445,6 @@ function ListViewTable({
           <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
         ) : (
           visible.map((row) => {
-            const exitType = exitTypeByUserId?.[row.id];
             return (
               <div
                 key={row.id}
@@ -483,19 +472,8 @@ function ListViewTable({
                   })()}
                 </span>
                 <span className="text-[15px] text-black/67 truncate">{row.position ?? "—"}</span>
-                {isExit && (
-                  <span>
-                    {exitType ? (
-                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${EXIT_TYPE_META[exitType].classes}`}>
-                        {EXIT_TYPE_META[exitType].label}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </span>
-                )}
                 <div className="flex justify-center">
-                  <RowActionMenu name={row.fullName} />
+                  <RowActionMenu name={row.fullName} onDelete={() => onDelete(row.id)} />
                 </div>
               </div>
             );

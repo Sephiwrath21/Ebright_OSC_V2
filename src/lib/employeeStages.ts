@@ -48,7 +48,20 @@ export const POSITION_GROUPS: readonly PositionGroup[] = ["Full Time", "Part Tim
 export function positionGroup(position: string | null): PositionGroup {
   if (!position) return "Full Time";
   const p = position.trim().toUpperCase();
-  if (p === "INTERN" || p.startsWith("INTERN")) return "Intern";
+  if (p.includes("INTERN")) return "Intern";
   if (p.startsWith("PT") || p.includes("PART")) return "Part Time";
   return "Full Time";
 }
+
+// The 6 real position values used for every Position dropdown across the app
+// (Promotion's Current/New Position, Add Pre-stage Employee's Position) —
+// values match real employment.position casing exactly (e.g. "PT COACH") so
+// positionGroup() classifies them correctly the moment they're saved.
+export const POSITION_OPTIONS: { value: string; label: string }[] = [
+  { value: "PT COACH", label: "PT Coach" },
+  { value: "FT COACH", label: "FT Coach" },
+  { value: "FT EXEC", label: "FT EXEC" },
+  { value: "FT HOD", label: "FT HOD" },
+  { value: "INTERN", label: "INTERN" },
+  { value: "BM", label: "BM" },
+];

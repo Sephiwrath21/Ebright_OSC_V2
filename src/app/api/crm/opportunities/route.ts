@@ -1,26 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { isCrmAvailable } from "@/lib/crm-db";
 import { getKanban } from "@/lib/crm-opportunities";
+import { buildAccess } from "@/lib/access/engine";
+import { resolveCrmBranchIds } from "@/lib/crm-scope";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/crm/opportunities — superadmin kanban (read-only, from ebright_crm).
-// scope = 'all' | <branchId>. Per-stage counts tally with v1; cards are capped.
+// GET /api/crm/opportunities — CNS kanban (read-only, from ebright_crm). Scope
+// follows the caller's `cns_opportunities` grant: global sees all branches,
+// region/branch confined to theirs. scope = 'all' | <branchId> (client picker,
+// clamped to the allowed set).
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
-  });
-  if (me?.role?.role_type !== "superadmin") {
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("cns_opportunities", "view")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const branchScope = await resolveCrmBranchIds(access, "cns_opportunities");
 
   if (!isCrmAvailable()) {
     return NextResponse.json({ error: "CRM database not configured (CRM_DATABASE_URL unset)" }, { status: 503 });
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
     const data = await getKanban({
       scope: sp.get("scope") ?? undefined,
       search: sp.get("search") ?? undefined,
+      allowedBranchIds: branchScope.all ? null : branchScope.ids,
     });
     if (!data) return NextResponse.json({ error: "CRM data unavailable" }, { status: 503 });
     return NextResponse.json(data);

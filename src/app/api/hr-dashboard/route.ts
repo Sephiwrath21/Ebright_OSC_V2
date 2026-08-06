@@ -398,10 +398,10 @@ export async function GET(req: NextRequest) {
       if (bs?.employee_id) onLeaveEmpNos.add(bs.employee_id);
     }
   }
-  // Today's justifications.
+  // Today's justifications (only HR-approved ones count as justified).
   const justRes = await queryEbrightHrfs<{ emp_no: string | null }>(
     `SELECT DISTINCT emp_no FROM public.attendance_justification
-       WHERE just_date = $1::date`,
+       WHERE just_date = $1::date AND status = 'approved'`,
     [today],
   );
   const justifiedEmpNos = new Set<string>();

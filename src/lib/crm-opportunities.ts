@@ -61,15 +61,25 @@ function ageCategory(age: string | null): OppCard["category"] {
   return null;
 }
 
-export async function getKanban(opts: { scope?: string; search?: string }): Promise<KanbanResult | null> {
+export async function getKanban(opts: {
+  scope?: string;
+  search?: string;
+  /** Access-enforced branch allow-list. When set (non-null), the caller may only
+   *  see these branches and the client `scope` picker is confined to them. */
+  allowedBranchIds?: string[] | null;
+}): Promise<KanbanResult | null> {
   const tenantId = await resolveTenantId();
   if (!tenantId) return null;
 
+  const allowed = opts.allowedBranchIds ?? null;
   const branchesRes = await queryCrmDb<{ id: string; name: string }>(
     `SELECT id, name FROM crm.crm_branch WHERE "tenantId" = $1 ORDER BY name ASC`,
     [tenantId],
   );
-  const branches = branchesRes?.rows ?? [];
+  // Restrict the branch picker to what the caller may see.
+  const branches = (branchesRes?.rows ?? []).filter(
+    (b) => allowed === null || allowed.includes(b.id),
+  );
 
   const scope = opts.scope && opts.scope !== "all" ? opts.scope : null; // branchId or all
   const search = opts.search?.trim() || null;
@@ -91,7 +101,16 @@ export async function getKanban(opts: { scope?: string; search?: string }): Prom
     `c."deletedAt" IS NULL`,
     `o."createdAt" >= $2`,
   ];
-  if (scope) { params.push(scope); filters.push(`o."branchId" = $${params.length}`); }
+  // Hard access boundary: confine to the allowed branches (empty ⇒ nothing).
+  if (allowed !== null) {
+    params.push(allowed);
+    filters.push(`o."branchId" = ANY($${params.length}::text[])`);
+  }
+  // Client-selected single branch (must be within the allowed set).
+  if (scope && (allowed === null || allowed.includes(scope))) {
+    params.push(scope);
+    filters.push(`o."branchId" = $${params.length}`);
+  }
   if (search) {
     const digits = search.replace(/\D/g, "");
     params.push(`%${search}%`);

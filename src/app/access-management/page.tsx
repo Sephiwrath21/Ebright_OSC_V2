@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
 import AccessManagementView from "@/app/components/AccessManagementView";
+import { ROLE_OPTIONS } from "@/lib/employeeQueries";
 import { ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -57,14 +58,28 @@ export default async function AccessManagementPage() {
 
   // Live roles from the DB — the matrix dropdown reflects whatever is actually
   // in the `role` table (superadmin is excluded in the view as always-full).
-  const roles = await prisma.role.findMany({
-    select: { role_id: true, role_type: true },
-    orderBy: { role_id: "asc" },
-  });
+  const [roles, departments] = await Promise.all([
+    prisma.role.findMany({
+      select: { role_id: true, role_type: true },
+      orderBy: { role_id: "asc" },
+    }),
+    prisma.department.findMany({
+      select: { department_id: true, department_code: true, department_name: true },
+      orderBy: { department_name: "asc" },
+    }),
+  ]);
+
+  // Only superadmin may edit; CEO (and anyone else with view) sees it read-only.
+  const canEdit = roleType === "superadmin";
 
   return (
     <AppShell email={userEmail} role={userRoleHeader} name={userName}>
-      <AccessManagementView roles={roles} />
+      <AccessManagementView
+        roles={roles}
+        departments={departments}
+        positions={[...ROLE_OPTIONS]}
+        canEdit={canEdit}
+      />
     </AppShell>
   );
 }

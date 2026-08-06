@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import { parsePhoneValue, composePhoneValue } from "@/lib/phoneEmail";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, positionGroup, type EmployeeStage } from "@/lib/employeeStages";
 import {
   STAGE_PROFILE_CONFIG,
@@ -16,6 +18,8 @@ import {
 import type {
   LeaveHistoryRow,
   EmployeeDetailFull,
+  BranchOpt,
+  DepartmentOpt,
   ResumeInfo,
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
@@ -38,6 +42,7 @@ import type {
 import {
   PanelHeading,
   RecordTable,
+  SidebarField,
   EmergencyContactPanel,
   PersonalInfoPanel,
   ResumePanel,
@@ -61,7 +66,13 @@ import {
   ExitInterviewNotesPanel,
 } from "@/app/components/ActiveProfilePanels";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
-import { updateEmergencyContact } from "@/lib/employeeRecordActions";
+import {
+  updateEmergencyContact,
+  proceedFromPreStage,
+  proceedFromProbation,
+  proceedFromOnboarding,
+  proceedFromActive,
+} from "@/lib/employeeRecordActions";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface Props {
@@ -91,6 +102,9 @@ interface Props {
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   /** Which branch/dept-scoped namelist this employee was opened from — null
    *  for Pre/Probation (no location layer) or when opened without that
    *  context. Drives the breadcrumb's dynamic branch/dept segment, mirroring
@@ -134,6 +148,8 @@ export default function StageProfileView({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  branches,
+  departments,
   locationGroup,
   locationCode,
   locationName,
@@ -162,8 +178,19 @@ export default function StageProfileView({
   const isFullTime = positionGroup(employeeDetail?.position ?? null) === "Full Time";
   const historyGroups = STAGE_HISTORY_GROUPS[stage].filter((g) => g.stage !== "probation" || isFullTime);
 
+  const router = useRouter();
   const proceedButton = STAGE_PROCEED_BUTTON[stage];
+  // Pre's own "Proceed" target depends on the employee's position (see
+  // isFullTime above) rather than the static nextStage every other stage's
+  // button uses — Full Time goes to Probation, everything else skips
+  // straight to Onboarding, same split js/pre-proceed.js already encodes.
+  const proceedTargetStage = stage === "pre" ? (isFullTime ? "probation" : "onboarding") : proceedButton?.nextStage;
+  // Probation's own "Next" only makes sense once Probation Status is
+  // actually Confirmed — In Progress/Extended/Stopped all keep the button
+  // disabled (re-checked server-side too, in proceedFromProbation).
+  const probationConfirmed = probationInfo?.probationStatus === "Confirmed";
   const [confirmingProceed, setConfirmingProceed] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
   const [proceedNotice, setProceedNotice] = useState<string | null>(null);
 
   const locationQuery = locationGroup && locationCode ? `?locGroup=${locationGroup}&locCode=${encodeURIComponent(locationCode)}` : "";
@@ -177,9 +204,257 @@ export default function StageProfileView({
     setInPageActive(key);
   }
 
+  // The section pills for the right-hand nav rail — pulled out to its own
+  // variable mainly so the rail's wrapping <nav> (further below) stays
+  // readable next to its width/style logic.
+  const navSections = (
+    <>
+      {topLevel.map((section) => {
+        const isActive = !history && section.key === currentKey;
+        const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+          isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+        }`;
+        if (config.profileMode === "in-page-tabs") {
+          return (
+            <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={className}>
+              {section.label}
+            </button>
+          );
+        }
+        return (
+          <Link key={section.key} href={sectionHref(section.key)} className={className}>
+            {section.label}
+          </Link>
+        );
+      })}
+
+      {groups.map((group) => {
+        const groupSections = config.sections.filter((s) => s.group === group);
+        const isGroupActive = !history && groupSections.some((s) => s.key === currentKey);
+        const isOpen = openGroup === group || isGroupActive;
+        return (
+          <div key={group} className="flex flex-col" style={{ gap: config.navRail.gapPx }}>
+            <button
+              type="button"
+              onClick={() => setOpenGroup((g) => (g === group ? null : group))}
+              aria-expanded={isOpen}
+              className={`w-full flex items-center justify-between box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+                isGroupActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+              }`}
+            >
+              {group}
+              <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+            </button>
+            {isOpen && (
+              <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
+                {groupSections.map((s) => {
+                  const isCurrent = !history && s.key === currentKey;
+                  return (
+                    <Link
+                      key={s.key}
+                      href={sectionHref(s.key)}
+                      className={`w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+                        isCurrent
+                          ? config.navRail.clearanceCurrent ?? config.navRail.current
+                          : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
+                      }`}
+                    >
+                      {s.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
+  // ─── Touch-only two-row nav (replaces both the vertical rail AND the
+  // History Tab Strip below on touch devices — see EmployeeRecordView.tsx's
+  // own comments for why [@media(hover:none)] rather than a lg: width
+  // breakpoint drives "touch vs desktop" here). Row 1 = a stage stepper
+  // (Pre/Probation/Onboarding/Active/Exit, progressively revealed up to
+  // this employee's current stage); Row 2 = whichever stage is selected in
+  // Row 1's own sections. Both rows reuse the exact same `history` state
+  // the desktop History Tab Strip already uses — Row 1's own current-stage
+  // tab clears it, a historical stage tab sets it to that stage's first
+  // section — so switching between the two navs (e.g. resizing across the
+  // touch/desktop boundary) never desyncs which section is actually shown. ───
+
+  // Row 1: historyGroups (already filtered to skip Probation for non-Full-
+  // Time employees — same rule the desktop History Tab Strip/Exit tiles
+  // already enforce) plus this employee's own current stage appended last,
+  // in chronological order (Pre -> ... -> current).
+  const mobileStageTabs = [...historyGroups.map((g) => g.stage), stage];
+  const mobileStageTabsRow = mobileStageTabs.map((s) => {
+    const isSelected = displayStage === s;
+    // STAGE_HISTORY_TAB_STYLE is the existing "this pill represents stage
+    // X, shown on a LATER stage's page" color table (distinct from that
+    // stage's OWN navRail colors, which are for its own page's UI) — reused
+    // here for the same reason the desktop History Tab Strip already uses
+    // it. It has no "exit" entry (nothing ever comes after Exit), so the
+    // fallback is that stage's own navRail.base — only ever exercised for
+    // Exit's own tab if a user browses back to an earlier stage from it.
+    const historyStyle = STAGE_HISTORY_TAB_STYLE[s];
+    const baseClass = historyStyle ? `${historyStyle.base} text-black` : STAGE_PROFILE_CONFIG[s].navRail.base;
+    const pillClassName = `shrink-0 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3.5 py-1.5 text-xs sm:text-sm ${
+      isSelected ? STAGE_PROFILE_CONFIG[s].navRail.current : `${baseClass} hover:brightness-95`
+    }`;
+    return (
+      <button
+        key={s}
+        type="button"
+        onClick={() => {
+          if (s === stage) {
+            setHistory(null);
+          } else {
+            const group = historyGroups.find((g) => g.stage === s);
+            if (group && group.sections.length > 0) setHistory({ stage: s, section: group.sections[0] });
+          }
+        }}
+        className={pillClassName}
+      >
+        {STAGE_LABELS[s]}
+      </button>
+    );
+  });
+
+  // Row 2, case A: Row 1's OWN current-stage tab is selected (history is
+  // null) — mirrors the desktop rail's own topLevel/groups split (ungrouped
+  // leaves first, then each group), but INLINE within this one row rather
+  // than a separate row below: an open group's own children are spliced in
+  // immediately after that group's own toggle pill, in the same flex-nowrap
+  // + overflow-x-auto row every other pill row in this app uses (an
+  // earlier separate-Row-3 version was tried and explicitly reverted per
+  // product decision). Clicking a leaf pill navigates/selects directly and
+  // also closes any open group (desktop's own topLevel leaf clicks don't
+  // do that — its accordion stays open independent of which tab is active
+  // — so this is deliberately mobile-only, not shared with navSections/
+  // goToCurrentSection above, which desktop's own rail also calls).
+  const mobileLeafSections = topLevel.map((section) => {
+    const isActive = !history && section.key === currentKey;
+    const pillClassName = `shrink-0 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3 py-1.5 text-xs sm:text-sm ${
+      isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+    }`;
+    if (config.profileMode === "in-page-tabs") {
+      return (
+        <button
+          key={section.key}
+          type="button"
+          onClick={() => {
+            goToCurrentSection(section.key);
+            setOpenGroup(null);
+          }}
+          className={pillClassName}
+        >
+          {section.label}
+        </button>
+      );
+    }
+    return (
+      <Link key={section.key} href={sectionHref(section.key)} onClick={() => setOpenGroup(null)} className={pillClassName}>
+        {section.label}
+      </Link>
+    );
+  });
+
+  const mobileRowTwoTopLevel: ReactNode[] = [...mobileLeafSections];
+  for (const group of groups) {
+    const groupSections = config.sections.filter((s) => s.group === group);
+    const isGroupActive = !history && groupSections.some((s) => s.key === currentKey);
+    const isOpen = openGroup === group;
+    mobileRowTwoTopLevel.push(
+      <button
+        key={group}
+        type="button"
+        onClick={() => setOpenGroup((g) => (g === group ? null : group))}
+        aria-expanded={isOpen}
+        className={`shrink-0 flex items-center gap-1 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3 py-1.5 text-xs sm:text-sm ${
+          isGroupActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
+        }`}
+      >
+        {group}
+        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>,
+    );
+    // Splice this group's own children in right here — immediately after
+    // its toggle pill, in the SAME row — only while it's open.
+    if (isOpen) {
+      for (const section of groupSections) {
+        const isCurrent = !history && section.key === currentKey;
+        const pillClassName = `shrink-0 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3 py-1.5 text-xs sm:text-sm ${
+          isCurrent
+            ? (config.navRail.clearanceCurrent ?? config.navRail.current)
+            : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
+        }`;
+        mobileRowTwoTopLevel.push(
+          config.profileMode === "in-page-tabs" ? (
+            <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={pillClassName}>
+              {section.label}
+            </button>
+          ) : (
+            <Link key={section.key} href={sectionHref(section.key)} className={pillClassName}>
+              {section.label}
+            </Link>
+          ),
+        );
+      }
+    }
+  }
+
+  // Row 2, case B: a HISTORICAL stage is selected in Row 1 — that stage's
+  // own sections (from historyGroups), each click resolving through the
+  // same setHistory(...) the desktop History Tab Strip already uses.
+  // Abbreviated HISTORY_TAB_LABEL (matching the desktop strip's own
+  // convention for historical sections specifically — see its doc comment
+  // in stageProfileConfig.ts) rather than the full section.label case A
+  // uses, since case A's labels are this employee's OWN current-stage
+  // sections (always shown at full length everywhere else in the app),
+  // while these are someone else's-page-style historical markers.
+  const selectedHistoryGroup = historyGroups.find((g) => g.stage === displayStage);
+  const historicalSubTabSections = (selectedHistoryGroup?.sections ?? []).map((section) => {
+    const isActive = history?.stage === displayStage && history.section.key === section.key;
+    const style = STAGE_HISTORY_TAB_STYLE[displayStage] ?? STAGE_HISTORY_TAB_STYLE.pre!;
+    return (
+      <button
+        key={section.key}
+        type="button"
+        onClick={() => setHistory({ stage: displayStage, section })}
+        className={`shrink-0 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3 py-1.5 text-xs sm:text-sm ${
+          isActive ? config.navRail.current : `${style.base} text-black hover:brightness-95`
+        }`}
+      >
+        {HISTORY_TAB_LABEL[section.key] ?? section.label}
+      </button>
+    );
+  });
+
+  const mobileRowTwoSections = displayStage === stage ? mobileRowTwoTopLevel : historicalSubTabSections;
+
   return (
     <div className="min-h-full bg-[#f9fbff]">
-      <div className="max-w-[1440px] mx-auto px-8 pt-4 pb-16">
+      {/* --rail-width (fluid, below lg) and --rail-width-lg (the exact
+          original per-stage pixel value, pinned at lg+ via the className's
+          own lg:w-[var(--rail-width-lg)]) are both declared once here so the
+          history strip, the rail, and the aside all size consistently.
+          Two separate properties — not one clamp() meant to "converge" to
+          the desktop value on its own — because relying on a single fluid
+          formula to land on exactly the right pixel width at arbitrary
+          desktop viewport sizes is exactly what produced the truncated rail
+          labels this fixes: at lg+ these should be governed by a literal,
+          unconditional value, not a calc() that merely happens to usually
+          work out. */}
+      <div
+        className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16"
+        style={
+          {
+            "--rail-width": `clamp(100px, 26vw, ${config.navRail.widthPx}px)`,
+            "--rail-width-lg": `${config.navRail.widthPx}px`,
+          } as React.CSSProperties
+        }
+      >
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
           <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
@@ -207,60 +482,124 @@ export default function StageProfileView({
 
         <h1 className="text-2xl font-semibold text-[#4b4949d6] mb-4">{STAGE_LABELS[stage]}</h1>
 
-        {historyGroups.length > 0 &&
-          (stage === "exit" ? (
-            <ExitHistoryTiles
-              stage={stage}
-              groups={historyGroups}
-              selected={history}
-              currentStyle={config.navRail.current}
-              onSelect={(sel) => setHistory(sel)}
-              className="mb-0"
-            />
-          ) : (
-            <HistoryTabStrip
-              variant={stage === "probation" ? "bookmark" : "top"}
-              groups={historyGroups}
-              selected={history}
-              currentStyle={config.navRail.current}
-              onSelect={(sel) => setHistory(sel)}
-              className="mb-0"
-            />
-          ))}
+        {/* Desktop/mouse-driven-browser-only ([@media(hover:none)]:hidden —
+            see EmployeeRecordView.tsx's own comments for why hover:none
+            rather than a lg: width breakpoint drives this). Width-capped to
+            match the white content card below (100% minus the rail and its
+            gap — the same split the card/rail flex row computes for
+            itself), not the full device width. Each strip itself is nowrap
+            + overflow-x-auto (see their own definitions) so tabs that don't
+            fit stay reachable by swipe instead of wrapping to a second row.
+            lg:w-auto removes that cap entirely at desktop — original,
+            unconstrained flex-wrap flow, exactly as before any of this
+            responsive work. On touch devices the two-row nav below (stage
+            stepper + that stage's own sections) replaces this entirely —
+            same browsing capability (current AND historical stages/
+            sections), just restructured into two distinct rows instead of
+            one combined strip, since that's what doesn't fit on a phone. */}
+        {historyGroups.length > 0 && (
+          <div className="[@media(hover:none)]:hidden w-[calc(100%-var(--rail-width)-16px)] lg:w-auto">
+            {stage === "exit" ? (
+              <ExitHistoryTiles
+                stage={stage}
+                groups={historyGroups}
+                selected={history}
+                currentStyle={config.navRail.current}
+                onSelect={(sel) => setHistory(sel)}
+                className="mb-0"
+              />
+            ) : (
+              <HistoryTabStrip
+                variant={stage === "probation" ? "bookmark" : "top"}
+                groups={historyGroups}
+                selected={history}
+                currentStyle={config.navRail.current}
+                onSelect={(sel) => setHistory(sel)}
+                className="mb-0"
+              />
+            )}
+          </div>
+        )}
 
-        {/* Card + vertical nav-pill rail as flex siblings — the reference docks
-            this rail to the right of the content card on every stage. */}
-        <div className="flex items-start gap-4">
-          <div className="relative flex-1 min-w-0 bg-white rounded-[35px] p-10 flex gap-10">
+        {/* Touch-only nav (hidden by default — desktop keeps the History
+            Tab Strip above and the vertical rail below instead, both
+            unchanged; [@media(hover:none)]:flex shows these on touch).
+            Row 1: stage stepper (mobileStageTabsRow). Row 2: whichever
+            stage is selected in Row 1's own sections — leaf sections plus
+            one toggle pill per group (only Exit's "Clearance" today),
+            mirroring the desktop rail's own topLevel/groups split. An open
+            group's own children are spliced inline into this SAME row,
+            immediately after its own toggle pill (mobileRowTwoTopLevel
+            above already interleaves them in the right order) — per
+            explicit product decision, NOT a separate row below (an earlier
+            version tried that and was reverted). Sits above the white
+            content card, same position Employee Record's own mobile
+            sub-tab row occupies. */}
+        <nav
+          aria-label="Stage"
+          className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1.5 mb-1.5 overflow-x-auto"
+        >
+          {mobileStageTabsRow}
+        </nav>
+        {mobileRowTwoSections.length > 1 && (
+          <nav
+            aria-label={`${STAGE_LABELS[displayStage]} sections`}
+            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1.5 mb-3 overflow-x-auto"
+          >
+            {mobileRowTwoSections}
+          </nav>
+        )}
+
+        {/* Card + vertical nav-pill rail as flex siblings — same side-by-side
+            structure as desktop at every breakpoint (never stacks below).
+            Below lg, the aside and rail fluidly narrow on small viewports
+            (see their own width styles) instead of wrapping under the
+            content, and content keeps a real minimum width so its fields
+            never get crushed illegibly; if those floors add up to more than
+            a given phone's width, overflow-x-auto lets this row scroll
+            horizontally as a unit. lg:overflow-visible turns that scroll
+            escape hatch off entirely at desktop — the aside/rail are pinned
+            to their exact original pixel widths there (see their own
+            lg:w-[...] overrides), so there is nothing left for it to ever
+            need to catch. */}
+        <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto lg:overflow-visible">
+          <div className="relative flex-1 min-w-0 bg-white rounded-[24px] lg:rounded-[35px] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10">
             {/* Left column: avatar/name/status/Branch-Dept/Position/Phone/Email + proceed button */}
-            <aside aria-label="Employee profile summary" className="flex-none w-[220px] flex flex-col items-start gap-2.5">
+            <aside
+              aria-label="Employee profile summary"
+              className="flex-none w-[var(--aside-width)] lg:w-[220px] flex flex-col items-start gap-2.5"
+              style={{ "--aside-width": "clamp(108px, 30vw, 220px)" } as React.CSSProperties}
+            >
               <div
-                className={`w-[122px] h-[118px] rounded-full flex items-center justify-center text-3xl font-semibold shrink-0 ${STAGE_PILL_CLASSES[stage]}`}
+                className={`w-[min(122px,100%)] aspect-square rounded-full flex items-center justify-center text-3xl font-semibold shrink-0 ${STAGE_PILL_CLASSES[stage]}`}
               >
                 {initialsFromName(employeeName)}
               </div>
               <h2 className="mt-1 w-full break-words text-2xl text-black">{employeeName}</h2>
+              {stage !== "pre" && employeeDetail?.employeeId && (
+                <span className="text-xs text-slate-500">ID: {employeeDetail.employeeId}</span>
+              )}
               <span className={`inline-block px-3.5 py-0.5 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
                 {STAGE_LABELS[stage]}
               </span>
 
               <SidebarField label="Branch/Dept">
-                {employeeDetail?.branchCode || employeeDetail?.departmentCode
-                  ? [employeeDetail?.branchCode, employeeDetail?.departmentCode].filter(Boolean).join(" / ")
-                  : "--"}
+                {employeeDetail?.departmentName ?? employeeDetail?.branchName ?? "--"}
               </SidebarField>
               <SidebarField label="Position">{employeeDetail?.position || "--"}</SidebarField>
-              <SidebarField label="Phone Number">{employeeDetail?.phone || "--"}</SidebarField>
+              <SidebarField label="Phone Number">{formatDisplayPhone(employeeDetail?.phone)}</SidebarField>
               <SidebarField label="Email">{employeeDetail?.email || "--"}</SidebarField>
 
               {proceedButton && (
                 <div className="relative mt-1 w-full">
                   <button
                     type="button"
+                    disabled={proceeding || (stage === "probation" && !probationConfirmed)}
+                    title={stage === "probation" && !probationConfirmed ? "Probation Status must be Confirmed first" : undefined}
                     onClick={() => setConfirmingProceed(true)}
-                    className="w-full h-10 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors"
+                    className="w-full min-h-11 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
                   >
-                    {proceedButton.label}
+                    {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
                   {proceedNotice && (
                     <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
@@ -274,7 +613,7 @@ export default function StageProfileView({
             <div className="w-0.5 self-stretch bg-[#d9d9d9] shrink-0" aria-hidden="true" />
 
             {/* Middle column: tab content */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-[130px]">
               {resolvePanel({
                 originStage: displayStage,
                 section: displaySection,
@@ -298,88 +637,68 @@ export default function StageProfileView({
                 resignationInfo,
                 referenceLetterInfo,
                 exitInterviewNoteInfo,
+                branches,
+                departments,
                 employeeId,
               })}
             </div>
           </div>
 
-          {/* Right column: vertical stage/action nav rail */}
+          {/* Right column: vertical stage/action nav rail — docked beside
+              the card on any mouse/trackpad-driven browser, regardless of
+              window width. Below lg, width fluidly narrows on small
+              (desktop) viewports (min 96px, via --rail-width). At lg+,
+              lg:w-[var(--rail-width-lg)] pins it to the exact original
+              per-stage pixel width unconditionally — not relying on the
+              clamp() to land there on its own, which is what let "Salary
+              Revision"/"Non-Compete" truncate at ordinary desktop widths.
+              [@media(hover:none)]:hidden removes it entirely on touch
+              devices (any size/orientation, including iPad Pro landscape)
+              — see EmployeeRecordView.tsx's own comments for why hover:none
+              rather than a lg: width breakpoint drives that distinction;
+              the mobile sub-tab row above replaces this there instead. */}
           <nav
             aria-label={`${STAGE_LABELS[stage]} sections`}
-            className="flex-none flex flex-col"
-            style={{ width: config.navRail.widthPx, gap: config.navRail.gapPx }}
+            className="flex-none flex flex-col w-[var(--rail-width)] lg:w-[var(--rail-width-lg)] [@media(hover:none)]:hidden"
+            style={{ gap: config.navRail.gapPx }}
           >
-            {topLevel.map((section) => {
-              const isActive = !history && section.key === currentKey;
-              const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
-              }`;
-              if (config.profileMode === "in-page-tabs") {
-                return (
-                  <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={className}>
-                    {section.label}
-                  </button>
-                );
-              }
-              return (
-                <Link key={section.key} href={sectionHref(section.key)} className={className}>
-                  {section.label}
-                </Link>
-              );
-            })}
-
-            {groups.map((group) => {
-              const groupSections = config.sections.filter((s) => s.group === group);
-              const isGroupActive = !history && groupSections.some((s) => s.key === currentKey);
-              const isOpen = openGroup === group || isGroupActive;
-              return (
-                <div key={group} className="flex flex-col" style={{ gap: config.navRail.gapPx }}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup((g) => (g === group ? null : group))}
-                    aria-expanded={isOpen}
-                    className={`w-full flex items-center justify-between box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                      isGroupActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
-                    }`}
-                  >
-                    {group}
-                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-                  </button>
-                  {isOpen && (
-                    <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
-                      {groupSections.map((s) => {
-                        const isCurrent = !history && s.key === currentKey;
-                        return (
-                          <Link
-                            key={s.key}
-                            href={sectionHref(s.key)}
-                            className={`w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                              isCurrent
-                                ? config.navRail.clearanceCurrent ?? config.navRail.current
-                                : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
-                            }`}
-                          >
-                            {s.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {navSections}
           </nav>
         </div>
       </div>
 
-      {confirmingProceed && proceedButton && (
+      {confirmingProceed && proceedButton && proceedTargetStage && (
         <ConfirmDialog
-          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedButton.nextStage]}?`}
+          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedTargetStage]}?`}
           onCancel={() => setConfirmingProceed(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
+            // Every stage with a Proceed/Next button is now wired to a real
+            // employment update — Exit is terminal, so there's no button (and
+            // no placeholder branch) left for it.
+            setProceeding(true);
+            const result =
+              stage === "pre"
+                ? await proceedFromPreStage(employeeId)
+                : stage === "probation"
+                  ? await proceedFromProbation(employeeId)
+                  : stage === "onboarding"
+                    ? await proceedFromOnboarding(employeeId)
+                    : await proceedFromActive(employeeId);
+            setProceeding(false);
             setConfirmingProceed(false);
-            setProceedNotice("Not moved — stage transitions aren't wired to a real employment-status update yet.");
-            setTimeout(() => setProceedNotice(null), 5000);
+            if (!result.ok) {
+              setProceedNotice(result.error ?? "Failed to proceed.");
+              setTimeout(() => setProceedNotice(null), 5000);
+              return;
+            }
+            // Deliberately no router.refresh() here — this navigates to a
+            // DIFFERENT route (the employee's new stage), which already
+            // fetches fresh server data on its own. Calling refresh() right
+            // after push() races with that pending navigation: it re-runs the
+            // OLD route's own data fetch, which now 404s (the employee no
+            // longer matches the old stage) and can swallow the navigation
+            // entirely — exactly the "stuck on the old page" bug this fixes.
+            router.push(profileUrlForStage(proceedTargetStage, employeeId));
           }}
         />
       )}
@@ -387,13 +706,27 @@ export default function StageProfileView({
   );
 }
 
-function SidebarField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="w-full">
-      <span className="block text-xs text-[#4b4949]">{label}</span>
-      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
-    </div>
-  );
+// Normalizes the sidebar's read-only phone display through the same
+// parse/compose pair PhoneField uses, so it always shows the standard
+// "+60 12-4680 797" style regardless of exactly how the stored string is
+// spaced/punctuated.
+function formatDisplayPhone(value: string | null | undefined): string {
+  if (!value) return "--";
+  const { countryCode, digits } = parsePhoneValue(value);
+  return composePhoneValue(countryCode, digits) || "--";
+}
+
+// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
+// Probation) have no section segment, "separate-pages" stages (Onboarding/
+// Active/Exit) land on their first section. Used to send "Proceed" straight
+// to the employee's new profile after a real stage move, whichever URL shape
+// that target stage actually uses.
+function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
+  const config = STAGE_PROFILE_CONFIG[stage];
+  if (config.profileMode === "separate-pages") {
+    return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
+  }
+  return `/employee-folder/${stage}/employee/${employeeId}`;
 }
 
 // Shared by both the current stage's own section and every history-tab
@@ -423,6 +756,8 @@ function resolvePanel({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  branches,
+  departments,
   employeeId,
 }: {
   originStage: EmployeeStage;
@@ -447,6 +782,8 @@ function resolvePanel({
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  branches?: BranchOpt[];
+  departments?: DepartmentOpt[];
   employeeId: number;
 }) {
   if (originStage === "active" && section.key === "mc-leave" && leaveHistory) {
@@ -507,10 +844,18 @@ function resolvePanel({
     return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} />;
   }
   if (section.key === "promotion" && promotions !== undefined) {
-    return <PromotionPanel userId={employeeId} data={promotions} />;
+    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} />;
   }
   if (section.key === "transfer" && transfers !== undefined) {
-    return <TransferPanel userId={employeeId} data={transfers} />;
+    return (
+      <TransferPanel
+        userId={employeeId}
+        data={transfers}
+        branches={branches ?? []}
+        departments={departments ?? []}
+        currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+      />
+    );
   }
   if (section.key === "training" && trainings !== undefined) {
     return <TrainingPanel userId={employeeId} data={trainings} />;
@@ -581,7 +926,7 @@ function HistoryTabStrip({
   const shape = variant === "bookmark" ? "rounded-t-[10px] rounded-b-none border-b-0" : "rounded-t-[10px] rounded-b-none border-b-0";
 
   return (
-    <nav aria-label="Previous stage sections" className={`flex flex-wrap gap-1 ${className}`}>
+    <nav aria-label="Previous stage sections" className={`flex flex-nowrap overflow-x-auto gap-1 ${className}`}>
       {groups.flatMap((group) =>
         group.sections.map((section) => {
           const isActive = selected?.stage === group.stage && selected.section.key === section.key;
@@ -591,7 +936,7 @@ function HistoryTabStrip({
               key={`${group.stage}-${section.key}`}
               type="button"
               onClick={() => onSelect({ stage: group.stage, section })}
-              className={`px-3.5 py-2 border-2 text-[13px] font-medium whitespace-nowrap transition-colors ${shape} ${
+              className={`shrink-0 px-3.5 py-2 border-2 text-[13px] font-medium whitespace-nowrap transition-colors ${shape} ${
                 isActive ? currentStyle : `${style.base} text-black hover:brightness-95`
               }`}
             >
@@ -643,12 +988,12 @@ function ExitHistoryTiles({
   );
 
   return (
-    <div aria-label="Previous stages" className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+    <div aria-label="Previous stages" className={`flex flex-nowrap overflow-x-auto items-center gap-1.5 ${className}`}>
       {groups.map((group) => {
         const isOpen = expanded === group.stage;
         const style = STAGE_HISTORY_TAB_STYLE[group.stage] ?? STAGE_HISTORY_TAB_STYLE.pre!;
         return (
-          <div key={group.stage} className="flex items-center gap-1">
+          <div key={group.stage} className="flex items-center gap-1 shrink-0">
             {!isOpen && (
               <button
                 type="button"
@@ -668,7 +1013,7 @@ function ExitHistoryTiles({
               </button>
             )}
             {isOpen && (
-              <div className="flex flex-wrap items-center gap-1">
+              <div className="flex flex-nowrap items-center gap-1">
                 {group.sections.map((section) => {
                   const isActive = selected?.stage === group.stage && selected.section.key === section.key;
                   return (
@@ -676,7 +1021,7 @@ function ExitHistoryTiles({
                       key={section.key}
                       type="button"
                       onClick={() => onSelect({ stage: group.stage, section })}
-                      className={`px-3.5 py-2 rounded-t-[10px] border-2 border-b-0 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                      className={`shrink-0 px-3.5 py-2 rounded-t-[10px] border-2 border-b-0 text-[13px] font-medium whitespace-nowrap transition-colors ${
                         isActive ? currentStyle : `${style.base} text-black hover:brightness-95`
                       }`}
                     >
