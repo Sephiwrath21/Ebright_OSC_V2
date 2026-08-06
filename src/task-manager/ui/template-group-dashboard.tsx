@@ -15,6 +15,7 @@ export function TemplateGroupDashboard({
   staff,
   control,
   hideCadence = false,
+  label = "Template",
 }: {
   staff: FlowStaffMember[];
   control: FlowTemplateGroupControl;
@@ -22,6 +23,9 @@ export function TemplateGroupDashboard({
    *  straight through to TemplateGroupAssignModal (mirrors
    *  assign-task-form.tsx's own hideCadence prop). */
   hideCadence?: boolean;
+  /** Display copy override (2026-08-06) — "Template" (default) or
+   *  "Package". Forwarded to both modals below. */
+  label?: string;
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
@@ -29,6 +33,7 @@ export function TemplateGroupDashboard({
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = React.useTransition();
+  const labelLower = label.toLowerCase();
 
   const remove = (groupId: string, name: string) => {
     if (busyId) return;
@@ -50,7 +55,7 @@ export function TemplateGroupDashboard({
       }
       const result = await control.remove(groupId);
       setBusyId(null);
-      setMessage(result.ok ? { ok: true, text: "Template deleted." } : { ok: false, text: result.message });
+      setMessage(result.ok ? { ok: true, text: `${label} deleted.` } : { ok: false, text: result.message });
     });
   };
 
@@ -60,14 +65,15 @@ export function TemplateGroupDashboard({
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500">
-          {control.list.length} template{control.list.length === 1 ? "" : "s"}
+          {control.list.length} {labelLower}
+          {control.list.length === 1 ? "" : "s"}
         </p>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
           className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          + New Template
+          + New {label}
         </button>
       </div>
 
@@ -77,7 +83,7 @@ export function TemplateGroupDashboard({
 
       {control.list.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
-          No templates yet — create one to bundle several tasks together for reuse.
+          No {labelLower}s yet — create one to bundle several tasks together for reuse.
         </div>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,9 +134,14 @@ export function TemplateGroupDashboard({
         </div>
       )}
 
-      {createOpen && <TemplateGroupFormModal control={control} onClose={() => setCreateOpen(false)} />}
+      {createOpen && <TemplateGroupFormModal control={control} onClose={() => setCreateOpen(false)} label={label} />}
       {editGroupId && (
-        <TemplateGroupFormModal control={control} groupId={editGroupId} onClose={() => setEditGroupId(null)} />
+        <TemplateGroupFormModal
+          control={control}
+          groupId={editGroupId}
+          onClose={() => setEditGroupId(null)}
+          label={label}
+        />
       )}
       {assignedGroup && (
         <TemplateGroupAssignModal
@@ -139,6 +150,7 @@ export function TemplateGroupDashboard({
           group={assignedGroup}
           onClose={() => setAssignGroupId(null)}
           hideCadence={hideCadence}
+          label={label}
         />
       )}
     </div>

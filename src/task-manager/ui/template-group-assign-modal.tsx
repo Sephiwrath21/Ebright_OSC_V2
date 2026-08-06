@@ -28,12 +28,15 @@ export function TemplateGroupAssignModal({
   group,
   onClose,
   hideCadence = false,
+  label = "Template",
 }: {
   control: FlowTemplateGroupControl;
   staff: FlowStaffMember[];
   group: FlowTemplateGroupSummary;
   onClose: () => void;
   hideCadence?: boolean;
+  /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
+  label?: string;
 }) {
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
@@ -107,8 +110,8 @@ export function TemplateGroupAssignModal({
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
           <p className="text-xs text-gray-400">
-            Creates all {group.taskCount} task{group.taskCount === 1 ? "" : "s"} in this template for every
-            recipient picked below.
+            Creates all {group.taskCount} task{group.taskCount === 1 ? "" : "s"} in this {label.toLowerCase()} for
+            every recipient picked below.
           </p>
           <RecipientPicker staff={staff} selected={userIds} onChange={setUserIds} />
           {!hideCadence && (

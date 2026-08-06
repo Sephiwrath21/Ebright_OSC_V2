@@ -16,12 +16,16 @@ export function TemplateGroupFormModal({
   control,
   groupId,
   onClose,
+  label = "Template",
 }: {
   control: FlowTemplateGroupControl;
   groupId?: string;
   onClose: () => void;
+  /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
+  label?: string;
 }) {
   const isEdit = Boolean(groupId);
+  const labelLower = label.toLowerCase();
   const [name, setName] = React.useState("");
   const [tasks, setTasks] = React.useState<FlowTemplateGroupTaskInput[]>([{ title: "", subtasks: [] }]);
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
@@ -69,7 +73,7 @@ export function TemplateGroupFormModal({
     if (pending) return;
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setMessage({ ok: false, text: "Give the template a name." });
+      setMessage({ ok: false, text: `Give the ${labelLower} a name.` });
       return;
     }
     const trimmedTasks = tasks.map((t) => ({ ...t, title: t.title.trim() }));
@@ -91,7 +95,7 @@ export function TemplateGroupFormModal({
           return;
         }
         if (impact.pendingTasks > 0) {
-          const warning = `This will update ${impact.pendingTasks} pending task${impact.pendingTasks === 1 ? "" : "s"} across ${impact.pendingEmployees} employee${impact.pendingEmployees === 1 ? "" : "s"} who haven't completed them yet (and cancel tasks for anything removed from this template). Completed records are kept.`;
+          const warning = `This will update ${impact.pendingTasks} pending task${impact.pendingTasks === 1 ? "" : "s"} across ${impact.pendingEmployees} employee${impact.pendingEmployees === 1 ? "" : "s"} who haven't completed them yet (and cancel tasks for anything removed from this ${labelLower}). Completed records are kept.`;
           if (!window.confirm(warning)) return;
         }
       }
@@ -113,7 +117,7 @@ export function TemplateGroupFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3">
-          <p className="text-sm font-semibold text-gray-900">{isEdit ? "Edit Template" : "New Template"}</p>
+          <p className="text-sm font-semibold text-gray-900">{isEdit ? `Edit ${label}` : `New ${label}`}</p>
           <button
             type="button"
             onClick={onClose}
@@ -129,7 +133,7 @@ export function TemplateGroupFormModal({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
             <label className="text-sm text-gray-600">
-              Template name
+              {label} name
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
