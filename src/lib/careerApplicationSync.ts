@@ -1,8 +1,18 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
-import { STAFF_ROLE_ID, resolveDepartmentBranch, type BranchOpt, type DepartmentOpt } from "@/lib/employeeQueries";
-import { positionGroup, type EmployeeStage } from "@/lib/employeeStages";
+import {
+  STAFF_ROLE_ID,
+  resolveDepartmentBranch,
+  listEmployeeOverviewRows,
+  listBranches,
+  listDepartments,
+  type EmployeeOverviewRow,
+  type BranchOpt,
+  type DepartmentOpt,
+} from "@/lib/employeeQueries";
+import { positionGroup, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
+import { titleCaseNameOrNull } from "@/lib/text";
 import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 
 export { BOARD_STAGE_TO_OUR_STAGE };
@@ -139,7 +149,19 @@ export type SyncAction =
   | { type: "skip"; reason: CareerApplicationSyncGap["reason"] };
 
 export function normalizeName(name: string): string {
-  return name.toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  return name
+    .toUpperCase()
+    // Malaysian/Indian relational honorifics ("daughter of"/"son of") are
+    // written inconsistently across systems — e.g. real user "Ramitha
+    // Moghan" vs onboarding_candidate's "Ramitha A/P Moghan" for the exact
+    // same person (confirmed via matching email), which silently produced
+    // TWO separate Pre-list rows for her before this fix. Stripped as whole
+    // tokens BEFORE punctuation removal, so they're dropped entirely rather
+    // than collapsing into "AP"/"AL" and staying part of the compared name.
+    .replace(/\bA\/P\b|\bA\/L\b|\bS\/O\b|\bD\/O\b/g, "")
+    .replace(/[^A-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function normalizeEmail(email: string): string {
@@ -568,4 +590,208 @@ export async function syncCareerApplicationsToPreStage(): Promise<CareerApplicat
   }
 
   return { created, updated, gaps };
+}
+
+// ─── Pre stage list membership, per explicit decision (see conversation) —
+// this REPLACES the earlier "real employment.status='pre' or future
+// start_date" definition entirely, not additive: someone belongs on Pre if
+// EITHER career_applications.board_stage is one of Hired/Intern/Full Time/
+// Part Time (a confirmed-hire outcome, not still-interviewing) OR they have
+// a hrfs.onboarding_candidate row (a real Prisma model in the app's OWN main
+// database — NOT ebright_hrfs, despite the naming pattern — confirmed by
+// direct schema read) with a start_date still in the future. Same OR-rule
+// shape as the Probation list's board_stage/rec_stage rule.
+//
+// One override on top of the raw OR-rule, found by checking live data
+// before implementing (per explicit request): if someone's REAL employment
+// record already shows a stage MORE ADVANCED than Pre (onboarding/
+// probation/active/exit), that real, current data wins over a stale
+// recruitment-pipeline signal — 6 real people currently matched this rule's
+// board_stage condition while already being real Active employees (their
+// board_stage/onboarding_candidate simply hasn't been updated since they
+// started). Without this, they'd wrongly show as not-yet-started on Pre
+// while correctly showing as Active everywhere else. A real row still
+// genuinely AT Pre (employment.status="pre") is unaffected — that's the
+// normal, expected case (40 of 51 raw matches).
+const PRE_TARGET_BOARD_STAGES = new Set(["Hired", "Intern", "Full Time", "Part Time"]);
+
+function boardStageToPositionGroup(boardStage: string): PositionGroup {
+  if (boardStage === "Intern") return "Intern";
+  if (boardStage === "Part Time") return "Part Time";
+  return "Full Time"; // Hired, Full Time
+}
+
+// One-off known-bad-data exception to the "real employment wins" override
+// above, per explicit decision (see conversation) — NOT a change to the
+// general rule, which stays correct for everyone else it excludes (Ayu,
+// Muhammad Al Amin, Thulasi, Muadh, Zahid). Tang Rui's own real employment
+// row (user_id 245, employment_id 200: status="active", start_date=
+// 2026-08-01) is itself wrong, confirmed directly by the user — his real
+// start date is 2026-08-15, matching onboarding_candidate's own record
+// (source_id 363), not his employment row. Deliberately keyed to his real
+// user_id specifically (not a name-based rule, which could accidentally
+// widen to someone else) and deliberately a display-only exception, not a
+// database correction — his employment row itself is left untouched.
+const PRE_OVERRIDE_EXCEPTION_USER_IDS = new Set([245]); // Tang Rui
+
+// A person built by the shared computation below, tagged with whether their
+// resolved start date has already passed — see the two exported functions
+// further down for how each half is used.
+interface PreEligibleRow {
+  row: EmployeeOverviewRow;
+  startDatePassed: boolean;
+}
+
+// Shared population + row-construction for both computePreStageRows() and
+// computePreStartDatePassedRows() below — same OR-rule union, same
+// real-data-wins override, same id/branch/department/position resolution.
+// Splitting it out here just once avoids the two callers silently drifting
+// apart on what "eligible" means.
+async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
+  const [careerApplications, candidates, realRows, branches, departments] = await Promise.all([
+    lookupCareerApplicationsByName(),
+    prisma.onboarding_candidate.findMany(),
+    listEmployeeOverviewRows({ skipScopeFilter: true }),
+    listBranches(),
+    listDepartments(),
+  ]);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const realByName = new Map<string, EmployeeOverviewRow>();
+  for (const r of realRows) realByName.set(normalizeName(r.fullName), r);
+
+  const candByName = new Map<string, (typeof candidates)[number]>();
+  for (const c of candidates) candByName.set(normalizeName(c.name), c);
+
+  // Union the two OR-conditions into one eligible-name map, keeping
+  // whichever board_stage/candidate data is available for each (a person
+  // can satisfy either or both conditions).
+  const eligible = new Map<string, { boardStage: string | null; candidate: (typeof candidates)[number] | undefined }>();
+  for (const [name, entry] of careerApplications) {
+    if (entry.boardStage && PRE_TARGET_BOARD_STAGES.has(entry.boardStage)) {
+      eligible.set(name, { boardStage: entry.boardStage, candidate: candByName.get(name) });
+    }
+  }
+  for (const c of candidates) {
+    if (c.start_date.toISOString().slice(0, 10) > todayIso) {
+      const key = normalizeName(c.name);
+      const existing = eligible.get(key);
+      eligible.set(key, { boardStage: existing?.boardStage ?? null, candidate: c });
+    }
+  }
+
+  const rows: PreEligibleRow[] = [];
+  for (const [name, { boardStage, candidate }] of eligible) {
+    const real = realByName.get(name);
+    // Real, more-advanced data wins — see the override note above — except
+    // for the narrow, explicit exception list (currently just Tang Rui;
+    // see PRE_OVERRIDE_EXCEPTION_USER_IDS).
+    if (real && real.stage !== "pre" && !PRE_OVERRIDE_EXCEPTION_USER_IDS.has(real.id)) continue;
+
+    let id: number;
+    let branchCode: string | null;
+    let branchName: string | null;
+    let departmentCode: string | null;
+    let departmentName: string | null;
+    let isCandidate = false;
+    if (real) {
+      id = real.id;
+      branchCode = real.branchCode;
+      branchName = real.branchName;
+      departmentCode = real.departmentCode;
+      departmentName = real.departmentName;
+    } else if (candidate) {
+      // No real portal account yet — same negative-sentinel convention as
+      // the rest of the app (see getOnboardingCandidateDetail).
+      id = -candidate.source_id;
+      isCandidate = true;
+      const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
+      branchCode = loc.branchCode;
+      branchName = loc.branchName;
+      departmentCode = loc.departmentCode;
+      departmentName = loc.departmentName;
+    } else {
+      // Matched via board_stage only, with neither a real portal account
+      // nor an onboarding_candidate row to source an id/location from —
+      // nothing to link a profile to. Not expected with current data (every
+      // one of the 51 live matches has one or the other) but skipped
+      // defensively rather than crashing or showing a dead link.
+      continue;
+    }
+
+    const startDate = candidate?.start_date
+      ? candidate.start_date.toISOString().slice(0, 10)
+      : (real?.date ?? null);
+
+    const boardGroup: PositionGroup | null = boardStage ? boardStageToPositionGroup(boardStage) : null;
+    const candGroup: PositionGroup | null = candidate?.position?.trim() ? positionGroup(candidate.position) : null;
+    let resolvedPositionType: PositionGroup | null;
+    let positionDiscrepancy = false;
+    let positionDiscrepancyDetail: string | null = null;
+    if (boardGroup && candGroup) {
+      resolvedPositionType = boardGroup;
+      if (boardGroup !== candGroup) {
+        positionDiscrepancy = true;
+        positionDiscrepancyDetail = `board_stage says ${boardGroup} ("${boardStage}"), HRFS onboarding_candidate says ${candGroup} ("${candidate!.position}")`;
+      }
+    } else {
+      resolvedPositionType = boardGroup ?? candGroup ?? null;
+    }
+
+    rows.push({
+      row: {
+        id,
+        employeeId: null,
+        fullName: real?.fullName ?? titleCaseNameOrNull(candidate?.name) ?? name,
+        position: real?.position ?? candidate?.position ?? null,
+        branchCode,
+        branchName,
+        departmentCode,
+        departmentName,
+        employmentType: null,
+        date: startDate,
+        stage: "pre",
+        isCandidate,
+        boardStage: boardStage ?? null,
+        resolvedPositionType,
+        positionDiscrepancy,
+        positionDiscrepancyDetail,
+      },
+      // Confirmed-hire (board_stage) or a real onboarding_candidate date
+      // that's already arrived both mean the same thing: this person has
+      // actually started, and Pre ("hasn't started yet") is no longer
+      // correct for them, regardless of which OR-condition originally
+      // matched them in. Real portal accounts only — see
+      // computePreStartDatePassedRows below for why candidate-only entries
+      // aren't included there.
+      startDatePassed: Boolean(startDate && startDate <= todayIso),
+    });
+  }
+
+  return rows;
+}
+
+export async function computePreStageRows(): Promise<EmployeeOverviewRow[]> {
+  return (await computePreEligibleRows()).filter((r) => !r.startDatePassed).map((r) => r.row);
+}
+
+// The other half of the split above — someone who matches the Pre OR-rule
+// but whose resolved start date has already arrived has actually started;
+// per explicit decision (see conversation — found live via Farzana Adilah
+// Binti Zainuddin and Nur Afrina Binti Nazaha both showing a past date while
+// still sitting on Pre), they belong on Onboarding instead, dual-listed the
+// same way computeOnboardingDualListedRows() dual-lists Probation-pipeline
+// people there — their own stored employment.status is untouched (still
+// "pre"; nothing here writes to the database), this only changes what
+// [stage]/page.tsx displays. Real portal accounts only: a candidate-only
+// entry (isCandidate, negative id) has no working profile at any stage
+// other than Pre (see [id]/page.tsx's `isCandidate && stage !== "pre" ->
+// notFound()` guard) — dual-listing one onto Onboarding would just be a
+// dead link, so it's excluded here rather than shown broken. Not observed
+// in current data (both live cases are real accounts) but flagged in case
+// it comes up.
+export async function computePreStartDatePassedRows(): Promise<EmployeeOverviewRow[]> {
+  return (await computePreEligibleRows())
+    .filter((r) => r.startDatePassed && !r.row.isCandidate)
+    .map((r) => ({ ...r.row, stage: "onboarding" as const }));
 }

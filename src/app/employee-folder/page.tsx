@@ -9,9 +9,12 @@ import {
   countEmployeeStages,
   getOverdueTaskCounts,
 } from "@/lib/employeeQueries";
+import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 import {
   lookupCareerApplicationsByName,
   enrichRowsWithBranchStaffLocation,
+  computePreStageRows,
+  computePreStartDatePassedRows,
   matchIsProbationPipeline,
   matchIsProbationOverrideExcluded,
   matchBelongsOnOnboardingList,
@@ -28,6 +31,19 @@ export default async function EmployeeFolderPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
+  // Individual staff logins (ownUserId scope) skip this dashboard entirely —
+  // straight to their own Employee Record (the same consolidated Personal
+  // Info/HR Info/Finance/Active Employment/Disciplinary/Task view every
+  // "Employee Records" table row links to — see EmployeeOverviewView.tsx —
+  // not the stage-flow profile template), same as clicking any stage nav
+  // link (see [stage]/page.tsx). /employee-record/[id] already applies this
+  // same ownUserId scope check itself (via getEmployeeOverviewRowById), so
+  // there's nothing more to validate here before redirecting. A dashboard
+  // of cards/records showing just one row isn't a meaningful landing page
+  // for an individual login anyway.
+  const scope = await getCurrentEmployeeScope();
+  if (scope?.ownUserId != null) redirect(`/employee-record/${scope.ownUserId}`);
+
   const rowsRaw = await listEmployeeOverviewRows();
   // Same live BranchStaff fallback the Probation/Onboarding pages use — the
   // "Employee Records" table (EmployeeOverviewView) shows this same
@@ -37,11 +53,17 @@ export default async function EmployeeFolderPage() {
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
   const rows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
   const counts = countEmployeeStages(rows);
-  // ebrightleads (onboarding_candidate) is no longer merged into Pre —
-  // disabled per decision; Pre now only reflects real employment rows
-  // (status="pre") plus, going forward, ebright_hrfs/career_applications
-  // syncs. See listUpcomingOnboardingCandidates in employeeQueries.ts,
-  // still defined but no longer called from here.
+  // Pre's card count must match what its own list page shows — Pre's
+  // membership is no longer employment.status="pre" (see
+  // computePreStageRows for the current, replaced definition); the
+  // "Employee Records" table below still shows real employment.status="pre"
+  // rows under a "Pre" pill regardless (their real employment row is
+  // untouched by this), so the table's own per-row labels and this card's
+  // total can now legitimately disagree — expected, not a bug, since they
+  // answer two different questions (this session's own real-time
+  // recruitment status vs. this table's stored employment record).
+  const prePipelineRows = await computePreStageRows();
+  counts.pre = scope ? filterRowsByScope(scope, prePipelineRows).length : 0;
   //
   // Both Probation's and Onboarding's card counts must match what their own
   // list pages show — Probation's membership rule is an OR across
@@ -68,7 +90,11 @@ export default async function EmployeeFolderPage() {
     if (matchBelongsOnOnboardingList(row, match)) onboardingDualListedCount += 1;
   }
   counts.probation = probationCount;
-  counts.onboarding += onboardingDualListedCount;
+  // Real Pre-eligible people whose resolved start date has already passed
+  // also count toward Onboarding — see computePreStartDatePassedRows.
+  const prePassedRows = await computePreStartDatePassedRows();
+  const prePassedCount = scope ? filterRowsByScope(scope, prePassedRows).length : 0;
+  counts.onboarding += onboardingDualListedCount + prePassedCount;
   const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));
 
   const userEmail = session.user.email;

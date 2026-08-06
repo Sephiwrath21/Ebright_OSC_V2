@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // here to avoid colliding with this file's own `prisma` (the main hrfs db).
 import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
-import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, positionGroup, type EmployeeStage } from "@/lib/employeeStages";
+import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, positionGroup, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
 
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
@@ -192,6 +192,18 @@ export interface EmployeeOverviewRow {
    *  no career_applications match (e.g. manually added via
    *  addPreStageEmployee). */
   boardStage?: string | null;
+  /** Pre stage list only (see computePreStageRows in careerApplicationSync.ts)
+   *  — the resolved employment-type, cross-checked between
+   *  career_applications.board_stage and onboarding_candidate.position.
+   *  null when neither source has a usable value. */
+  resolvedPositionType?: PositionGroup | null;
+  /** True when board_stage and onboarding_candidate.position resolve to
+   *  DIFFERENT groups for the same person — flagged rather than silently
+   *  picking a winner, per explicit decision. */
+  positionDiscrepancy?: boolean;
+  /** Human-readable detail for the discrepancy above (e.g. "board_stage:
+   *  Full Time, HRFS: Intern") — only set when positionDiscrepancy is true. */
+  positionDiscrepancyDetail?: string | null;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
@@ -313,7 +325,26 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
     });
   }
 
-  if (options.skipScopeFilter) return rows;
+  // Rule 3: resolve branch/department via the live BranchStaff fallback
+  // BEFORE scope-filtering below — a scoped (department/branch) viewer must
+  // be able to see rows whose real branch_id/department_id is still null
+  // but resolvable via ebright_hrfs.BranchStaff, same as the Probation/
+  // Onboarding dual-listing pages already display. Filtering ran BEFORE
+  // enrichment here previously, which made the fallback a no-op for every
+  // scoped viewer (a null-branch row was excluded before it ever got a
+  // chance to resolve) — fixed by enriching first. Dynamic import to avoid
+  // a circular dependency (careerApplicationSync.ts already imports several
+  // things from this file); skipped entirely (no extra queries) unless some
+  // row actually has neither field set.
+  const rowsWithLocation = rows.some((r) => !r.branchCode && !r.departmentCode)
+    ? await (async () => {
+        const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+        const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+        return enrichRowsWithBranchStaffLocation(rows, branches, departments);
+      })()
+    : rows;
+
+  if (options.skipScopeFilter) return rowsWithLocation;
 
   const scope = await getCurrentEmployeeScope();
   // No session -> the caller's own auth() gate (already required before
@@ -321,7 +352,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // everything unfiltered here would only matter if that gate were ever
   // missing, so fail closed instead.
   if (!scope) return [];
-  return filterRowsByScope(scope, rows);
+  return filterRowsByScope(scope, rowsWithLocation);
 }
 
 // Single-employee counterpart to listEmployeeOverviewRows() above — every
@@ -352,7 +383,7 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
   if (!stage) return null;
 
   const dateSource = dateSourceFor(stage, emp, u);
-  const row: EmployeeOverviewRow = {
+  let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
     fullName: titleCaseName(u.user_profile?.full_name) || u.email,
@@ -365,6 +396,16 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
     stage,
   };
+
+  // Rule 3: same live BranchStaff fallback as listEmployeeOverviewRows,
+  // applied before the scope check below for the same reason — a scoped
+  // viewer must be able to reach this row even if its real branch_id/
+  // department_id is still null but resolvable via BranchStaff.
+  if (!row.branchCode && !row.departmentCode) {
+    const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+    const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+    [row] = await enrichRowsWithBranchStaffLocation([row], branches, departments);
+  }
 
   const scope = await getCurrentEmployeeScope();
   if (!scope) return null;

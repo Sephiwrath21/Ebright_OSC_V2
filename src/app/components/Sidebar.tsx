@@ -69,7 +69,16 @@ const primaryNav: NavItem[] = [
       { name: "HR Dashboard", href: "/induction/hr-dashboard", feature: "hr_dashboard" },
       { name: "Manpower Cost Report", href: "/manpower-cost-report", feature: "manpower_cost" },
       { name: "Staff Directory", href: "/staff-directory", feature: "staff_directory" },
-      { name: "Employee Folder", href: "/employee-folder", feature: "employee_folder" },
+      // No `feature` gate — Employee Folder's real access control is
+      // employeeScope.ts (department/branch/own-record scoping), not the
+      // access-management role_permission matrix; that matrix currently has
+      // no grant configured for any role but department/HR, which was
+      // hiding this link for every branch/department/staff account even
+      // though their own /employee-folder route works fine and is properly
+      // scoped. Per explicit decision (see conversation) — visibility
+      // should follow the same rule the route itself enforces, not a
+      // separate, out-of-sync permission table.
+      { name: "Employee Folder", href: "/employee-folder" },
     ],
   },
   {

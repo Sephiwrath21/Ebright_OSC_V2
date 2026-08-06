@@ -150,6 +150,9 @@ const modules: HrmsModule[] = [
     accentHover: "group-hover:bg-indigo-700",
     feature: "staff_directory",
   },
+  // No `feature` gate — see Sidebar.tsx's matching Employee Folder entry
+  // for why (its real access control is employeeScope.ts, not the
+  // role_permission matrix this tile's feature key checks against).
   {
     id: "employee-folder",
     title: "Employee Folder",
@@ -158,7 +161,6 @@ const modules: HrmsModule[] = [
     Icon: FolderOpen,
     accent: "bg-cyan-600",
     accentHover: "group-hover:bg-cyan-700",
-    feature: "employee_folder",
   },
 ];
 

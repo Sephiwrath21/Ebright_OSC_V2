@@ -50,6 +50,7 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
 
   const emp = target.employment[0];
   const inScope = isRowInScope(scope, {
+    id: userId,
     departmentCode: emp?.department?.department_code ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
   });
@@ -1924,7 +1925,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
   if (!scope.fullAccess) {
+    // No real id yet (this employee doesn't exist until the insert below
+    // succeeds) — -1 can never equal a real user_id, so an ownUserId-scoped
+    // (individual staff) account correctly fails this check and can't
+    // create new employee records at all, only department/branch-scoped
+    // accounts (checked via departmentCode/branchCode, not id) can.
     const inScope = isRowInScope(scope, {
+      id: -1,
       departmentCode: input.departmentCode || null,
       branchCode: input.branchCode || null,
     });
@@ -2044,7 +2051,11 @@ export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
     if (!scope.fullAccess) {
       const [departments, branches] = await Promise.all([listDepartments(), listBranches()]);
       const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
-      if (!isRowInScope(scope, { departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
+      // No real user_id (this candidate has no portal account) — -1 can
+      // never equal a real user_id, so an ownUserId-scoped (individual
+      // staff) account correctly fails this check; only department/branch-
+      // scoped accounts can delete a candidate in their own department/branch.
+      if (!isRowInScope(scope, { id: -1, departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
         return { ok: false, error: "You do not have access to this candidate." };
       }
     }
