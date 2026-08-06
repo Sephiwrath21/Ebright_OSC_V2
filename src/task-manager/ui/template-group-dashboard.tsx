@@ -31,8 +31,9 @@ export function TemplateGroupDashboard({
   const [, startTransition] = React.useTransition();
 
   const remove = (groupId: string, name: string) => {
+    if (busyId) return;
+    setBusyId(groupId);
     startTransition(async () => {
-      setBusyId(groupId);
       const impact = await control.impact(groupId);
       if (!impact.ok) {
         setBusyId(null);
