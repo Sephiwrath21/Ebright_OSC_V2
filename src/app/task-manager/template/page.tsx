@@ -64,7 +64,7 @@ export default async function TaskManagerTemplatePage() {
   let role;
   try {
     const [groupsResult, staffResult, roleResult] = await Promise.all([
-      listTemplateGroups(email),
+      listTemplateGroups(email, "TEMPLATE"),
       getFlowStaff(),
       getMyRole(email),
     ]);
@@ -97,7 +97,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const group = await getTemplateGroup(email, groupId);
+      const group = await getTemplateGroup(email, groupId, "TEMPLATE");
       return { ok: true, group };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
@@ -112,7 +112,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const result = await createTemplateGroup(email, input);
+      const result = await createTemplateGroup(email, "TEMPLATE", input);
       revalidatePath("/task-manager/template");
       return { ok: true, id: result.id };
     } catch (err) {
@@ -128,7 +128,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const result = await editTemplateGroup(email, groupId, input);
+      const result = await editTemplateGroup(email, groupId, "TEMPLATE", input);
       revalidatePath("/task-manager/template");
       revalidatePath("/task-manager");
       return { ok: true, ...result };
@@ -142,7 +142,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const impact = await getGroupDeletionImpact(email, groupId);
+      const impact = await getGroupDeletionImpact(email, groupId, "TEMPLATE");
       return { ok: true, ...impact };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
@@ -154,7 +154,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const result = await deleteTemplateGroup(email, groupId);
+      const result = await deleteTemplateGroup(email, groupId, "TEMPLATE");
       revalidatePath("/task-manager/template");
       revalidatePath("/task-manager");
       return { ok: true, removedTasks: result.removedTasks, keptRecords: result.keptRecords };
@@ -171,7 +171,7 @@ export default async function TaskManagerTemplatePage() {
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const result = await applyTemplateGroup(email, groupId, input);
+      const result = await applyTemplateGroup(email, groupId, "TEMPLATE", input);
       revalidatePath("/task-manager");
       return { ok: true, created: result.created };
     } catch (err) {

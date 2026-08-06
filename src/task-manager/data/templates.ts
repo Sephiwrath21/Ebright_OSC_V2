@@ -161,24 +161,44 @@ export function getTemplateDeletionImpact(
 ): Promise<TemplateDeletionImpact> {
   return native(async () => {
     const user = await requireAssigner(email);
-    const id = z.string().min(1).parse(templateId);
-    const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
-      select: { id: true },
-    });
-    if (!template) throw new ApiHttpError(404, "Template not found");
-
-    const blocks = await prisma.runBlock.findMany({
-      where: { templateId: id, run: { status: { not: "CANCELLED" }, archivedAt: null } },
-      select: { assigneeId: true, status: true },
-    });
-    const pending = blocks.filter((b) => (PENDING_STATUSES as readonly string[]).includes(b.status));
-    return {
-      pendingTasks: pending.length,
-      pendingEmployees: new Set(pending.map((b) => b.assigneeId)).size,
-      completedKept: blocks.length - pending.length,
-    };
+    return getTemplateDeletionImpactCore(user, templateId);
   }, "getTemplateDeletionImpact");
+}
+
+/** Pre-authorized variant for callers (like data/template-groups.ts) that
+ *  have already run their own actor authorization and just need the same
+ *  deletion-impact calculation, without re-running requireAssigner's
+ *  narrower allow-list (which would incorrectly reject a Branch Manager
+ *  already authorized via requireGroupAccess — see template-groups.ts's
+ *  file header for the full double-gating explanation). */
+export function getTemplateDeletionImpactForUser(
+  user: { id: string },
+  templateId: string,
+): Promise<TemplateDeletionImpact> {
+  return native(() => getTemplateDeletionImpactCore(user, templateId), "getTemplateDeletionImpact");
+}
+
+async function getTemplateDeletionImpactCore(
+  user: { id: string },
+  templateId: string,
+): Promise<TemplateDeletionImpact> {
+  const id = z.string().min(1).parse(templateId);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+
+  const blocks = await prisma.runBlock.findMany({
+    where: { templateId: id, run: { status: { not: "CANCELLED" }, archivedAt: null } },
+    select: { assigneeId: true, status: true },
+  });
+  const pending = blocks.filter((b) => (PENDING_STATUSES as readonly string[]).includes(b.status));
+  return {
+    pendingTasks: pending.length,
+    pendingEmployees: new Set(pending.map((b) => b.assigneeId)).size,
+    completedKept: blocks.length - pending.length,
+  };
 }
 
 /** Shared cascade core: CANCEL the runs of every still-pending block of
@@ -223,16 +243,33 @@ export function deleteTaskTemplate(
 ): Promise<{ deleted: boolean; removedTasks: number; keptRecords: number }> {
   return native(async () => {
     const user = await requireAssigner(email);
-    const id = z.string().min(1).parse(templateId);
-    const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
-      select: { id: true },
-    });
-    if (!template) throw new ApiHttpError(404, "Template not found");
-    const result = await cancelPendingTemplateRuns(user.id, id, "template-deleted");
-    await prisma.taskTemplate.delete({ where: { id } });
-    return { deleted: true, ...result };
+    return deleteTaskTemplateCore(user, templateId);
   }, "deleteTaskTemplate");
+}
+
+/** Pre-authorized variant for callers (like data/template-groups.ts) that
+ *  have already run their own actor authorization and just need the same
+ *  cascade-safe deletion logic, without re-running requireAssigner's
+ *  narrower allow-list (which would incorrectly reject a Branch Manager
+ *  already authorized via requireGroupAccess — see template-groups.ts's
+ *  file header for the full double-gating explanation). */
+export function deleteTaskTemplateForUser(
+  user: { id: string },
+  templateId: string,
+): Promise<{ deleted: boolean; removedTasks: number; keptRecords: number }> {
+  return native(() => deleteTaskTemplateCore(user, templateId), "deleteTaskTemplate");
+}
+
+async function deleteTaskTemplateCore(user: { id: string }, templateId: string) {
+  const id = z.string().min(1).parse(templateId);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+  const result = await cancelPendingTemplateRuns(user.id, id, "template-deleted");
+  await prisma.taskTemplate.delete({ where: { id } });
+  return { deleted: true, ...result };
 }
 
 /** "Remove Task" in bulk (2026-07-31, + Task hub): cancel every pending
@@ -343,138 +380,160 @@ export function editTaskTemplate(
 ): Promise<{ updatedTasks: number; employees: number }> {
   return native(async () => {
     const user = await requireAssigner(email);
-    const id = z.string().min(1).parse(templateId);
-    const body = editTemplateSchema.parse(input);
-    const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
-      select: { id: true },
-    });
-    if (!template) throw new ApiHttpError(404, "Template not found");
+    return editTaskTemplateCore(user, templateId, input);
+  }, "editTaskTemplate");
+}
 
-    // 1) the template itself. The template NAME follows the title
-    // (2026-07-31 fix): after an edit, the picker label and the task
-    // title always read the same — no stale "Task (template)" name.
-    // (Manual Rename in the Manage panel still works for a deliberate
-    // divergence; the next title edit re-syncs.)
-    await prisma.taskTemplate.update({
-      where: { id },
+/** Pre-authorized variant for callers (like data/template-groups.ts) that
+ *  have already run their own actor authorization and just need the same
+ *  edit-and-propagate logic, without re-running requireAssigner's narrower
+ *  allow-list (which would incorrectly reject a Branch Manager already
+ *  authorized via requireGroupAccess — see template-groups.ts's file
+ *  header for the full double-gating explanation). */
+export function editTaskTemplateForUser(
+  user: { id: string },
+  templateId: string,
+  input: TemplateEditInput,
+): Promise<{ updatedTasks: number; employees: number }> {
+  return native(() => editTaskTemplateCore(user, templateId, input), "editTaskTemplate");
+}
+
+async function editTaskTemplateCore(
+  user: { id: string },
+  templateId: string,
+  input: TemplateEditInput,
+): Promise<{ updatedTasks: number; employees: number }> {
+  const id = z.string().min(1).parse(templateId);
+  const body = editTemplateSchema.parse(input);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+
+  // 1) the template itself. The template NAME follows the title
+  // (2026-07-31 fix): after an edit, the picker label and the task
+  // title always read the same — no stale "Task (template)" name.
+  // (Manual Rename in the Manage panel still works for a deliberate
+  // divergence; the next title edit re-syncs.)
+  await prisma.taskTemplate.update({
+    where: { id },
+    data: {
+      name: body.title,
+      title: body.title,
+      subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
+      guidelineUrl: body.guidelineUrl ?? null,
+      guidelineMime: body.guidelineImage?.mime ?? null,
+      guidelineImage: body.guidelineImage
+        ? Buffer.from(body.guidelineImage.dataBase64, "base64")
+        : null,
+    },
+  });
+
+  // 2) pending parents (with their run, for cloning subtask runs)
+  const parents = await prisma.runBlock.findMany({
+    where: {
+      templateId: id,
+      parentId: null,
+      status: { in: [...PENDING_STATUSES] },
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+    include: { run: true, runItems: true },
+  });
+
+  // ONE fresh shared Guideline row for the whole edit (or none).
+  let guidelineId: string | null = null;
+  if (body.guidelineUrl || body.guidelineImage) {
+    const guideline = await prisma.guideline.create({
       data: {
-        name: body.title,
-        title: body.title,
-        subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
-        guidelineUrl: body.guidelineUrl ?? null,
-        guidelineMime: body.guidelineImage?.mime ?? null,
-        guidelineImage: body.guidelineImage
+        url: body.guidelineUrl ?? null,
+        imageMime: body.guidelineImage?.mime ?? null,
+        imageData: body.guidelineImage
           ? Buffer.from(body.guidelineImage.dataBase64, "base64")
           : null,
       },
     });
+    guidelineId = guideline.id;
+  }
 
-    // 2) pending parents (with their run, for cloning subtask runs)
-    const parents = await prisma.runBlock.findMany({
+  for (const parent of parents) {
+    await prisma.runBlock.update({
+      where: { id: parent.id },
+      data: { title: body.title, guidelineId },
+    });
+    // Cancel this parent's PENDING subtasks (each is its own run)...
+    const pendingSubs = await prisma.runBlock.findMany({
       where: {
-        templateId: id,
-        parentId: null,
+        parentId: parent.id,
         status: { in: [...PENDING_STATUSES] },
         run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
-      include: { run: true, runItems: true },
+      select: { runId: true },
     });
-
-    // ONE fresh shared Guideline row for the whole edit (or none).
-    let guidelineId: string | null = null;
-    if (body.guidelineUrl || body.guidelineImage) {
-      const guideline = await prisma.guideline.create({
+    if (pendingSubs.length > 0) {
+      await prisma.flowRun.updateMany({
+        where: { id: { in: pendingSubs.map((s) => s.runId) } },
+        data: { status: "CANCELLED" },
+      });
+    }
+    // ...and recreate from the NEW list, same pattern as assignment.
+    for (const [subtaskIndex, subtaskTitle] of body.subtasks.entries()) {
+      const subRun = await prisma.flowRun.create({
         data: {
-          url: body.guidelineUrl ?? null,
-          imageMime: body.guidelineImage?.mime ?? null,
-          imageData: body.guidelineImage
-            ? Buffer.from(body.guidelineImage.dataBase64, "base64")
-            : null,
+          flowId: parent.run.flowId,
+          flowVersion: parent.run.flowVersion,
+          templateSnapshot: parent.run.templateSnapshot as Prisma.InputJsonValue,
+          name: subRunName(subtaskTitle, parent.run.name),
+          startedById: parent.run.startedById,
+          triggerType: "MANUAL",
+          status: "ACTIVE",
         },
       });
-      guidelineId = guideline.id;
-    }
-
-    for (const parent of parents) {
-      await prisma.runBlock.update({
-        where: { id: parent.id },
-        data: { title: body.title, guidelineId },
-      });
-      // Cancel this parent's PENDING subtasks (each is its own run)...
-      const pendingSubs = await prisma.runBlock.findMany({
-        where: {
+      await prisma.runBlock.create({
+        data: {
+          runId: subRun.id,
+          blockId: parent.blockId,
+          nodeId: parent.nodeId,
+          title: subtaskTitle,
+          assigneeId: parent.assigneeId,
+          status: "ACTIVE",
+          startedAt: new Date(),
+          dueAt: parent.dueAt,
+          cadence: parent.cadence,
           parentId: parent.id,
-          status: { in: [...PENDING_STATUSES] },
-          run: { status: { not: "CANCELLED" }, archivedAt: null },
-        },
-        select: { runId: true },
-      });
-      if (pendingSubs.length > 0) {
-        await prisma.flowRun.updateMany({
-          where: { id: { in: pendingSubs.map((s) => s.runId) } },
-          data: { status: "CANCELLED" },
-        });
-      }
-      // ...and recreate from the NEW list, same pattern as assignment.
-      for (const [subtaskIndex, subtaskTitle] of body.subtasks.entries()) {
-        const subRun = await prisma.flowRun.create({
-          data: {
-            flowId: parent.run.flowId,
-            flowVersion: parent.run.flowVersion,
-            templateSnapshot: parent.run.templateSnapshot as Prisma.InputJsonValue,
-            name: subRunName(subtaskTitle, parent.run.name),
-            startedById: parent.run.startedById,
-            triggerType: "MANUAL",
-            status: "ACTIVE",
-          },
-        });
-        await prisma.runBlock.create({
-          data: {
-            runId: subRun.id,
-            blockId: parent.blockId,
-            nodeId: parent.nodeId,
-            title: subtaskTitle,
-            assigneeId: parent.assigneeId,
-            status: "ACTIVE",
-            startedAt: new Date(),
-            dueAt: parent.dueAt,
-            cadence: parent.cadence,
-            parentId: parent.id,
-            templateId: id,
-            subtaskOrder: subtaskIndex,
-            runItems: {
-              create: parent.runItems.map((it) => ({
-                itemId: it.itemId,
-                order: it.order,
-                type: it.type,
-                label: it.label,
-                required: it.required,
-                config: it.config as Prisma.InputJsonValue,
-              })),
-            },
-          },
-        });
-      }
-    }
-    if (parents.length > 0) {
-      await prisma.auditLog.create({
-        data: {
-          actorId: user.id,
-          action: "BLOCK_STATUS_CHANGED",
-          detail: {
-            reason: "template-edited",
-            templateId: id,
-            updatedParents: parents.length,
+          templateId: id,
+          subtaskOrder: subtaskIndex,
+          runItems: {
+            create: parent.runItems.map((it) => ({
+              itemId: it.itemId,
+              order: it.order,
+              type: it.type,
+              label: it.label,
+              required: it.required,
+              config: it.config as Prisma.InputJsonValue,
+            })),
           },
         },
       });
     }
-    return {
-      updatedTasks: parents.length,
-      employees: new Set(parents.map((p) => p.assigneeId)).size,
-    };
-  }, "editTaskTemplate");
+  }
+  if (parents.length > 0) {
+    await prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: "BLOCK_STATUS_CHANGED",
+        detail: {
+          reason: "template-edited",
+          templateId: id,
+          updatedParents: parents.length,
+        },
+      },
+    });
+  }
+  return {
+    updatedTasks: parents.length,
+    employees: new Set(parents.map((p) => p.assigneeId)).size,
+  };
 }
 
 /** "{subtask} — {assignee}" naming, matching assignFlowTask's sub-runs:

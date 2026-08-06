@@ -1,29 +1,70 @@
 // Task Template Groups (2026-08-06): a named collection of several
-// top-level TaskTemplate rows ("Template" on /task-manager/template) —
-// grouping layer only. Each task inside a group is an ORDINARY TaskTemplate
-// row (templateGroupId set, groupPosition for display order); all
-// cascade-safety (pending-assignment cancellation, edit propagation,
-// deletion impact) is delegated to the existing single-task functions in
-// ./templates — this module only orchestrates them across a group's
-// members and adds the group wrapper itself. Creating/editing a group
-// never touches recipients/days/due-date/cadence — "Assign"
-// (applyTemplateGroup) is a separate action that picks those once and fans
-// out to assignFlowTask per member task.
+// top-level TaskTemplate rows — grouping layer only. Each task inside a
+// group is an ORDINARY TaskTemplate row (templateGroupId set, groupPosition
+// for display order); all cascade-safety (pending-assignment cancellation,
+// edit propagation, deletion impact) is delegated to the existing
+// single-task functions in ./templates — this module only orchestrates
+// them across a group's members and adds the group wrapper itself.
+// Creating/editing a group never touches recipients/days/due-date/cadence —
+// "Assign" (applyTemplateGroup) is a separate action that picks those once
+// and fans out to assignFlowTask per member task.
+//
+// Scope (2026-08-06): this same data model/logic powers TWO pages —
+// /task-manager/template ("Template", scope TEMPLATE) open to every
+// assign-capable role PLUS Branch Manager, and /task-manager/package
+// ("Package", scope PACKAGE) restricted to Branch Manager only. Every
+// function below takes `scope` and threads it through every query/write,
+// so the two pages' data can never cross. Authorization is scope-aware via
+// requireGroupAccess (below) — deliberately NOT the shared requireAssigner
+// in ./templates, since editing that would also widen the OLD single-task
+// "+ Task -> Start from a template" hub's access, which nobody asked for.
 import { z } from "zod";
-import type { Prisma } from "@/generated/task-manager-client";
+import type { Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
-import { native } from "./core";
+import { isElevatedDeptSite } from "../analytics/_lib";
+import { native, requireUserByEmail } from "./core";
 import {
-  deleteTaskTemplate,
-  editTaskTemplate,
-  getTemplateDeletionImpact,
-  requireAssigner,
+  deleteTaskTemplateForUser,
+  editTaskTemplateForUser,
+  getTemplateDeletionImpactForUser,
 } from "./templates";
 import { assignFlowTask } from "./tasks";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
+
+const NOUN: Record<TemplateGroupScope, string> = { TEMPLATE: "template", PACKAGE: "package" };
+const NOT_FOUND_MESSAGE: Record<TemplateGroupScope, string> = {
+  TEMPLATE: "Template not found",
+  PACKAGE: "Package not found",
+};
+
+/** Scope-aware authorization: TEMPLATE keeps the existing assign-capable
+ *  allow-list, now also including Branch Manager; PACKAGE is Branch
+ *  Manager only. Deliberately separate from ./templates's requireAssigner
+ *  — see the file header for why that shared helper stays untouched. */
+async function requireGroupAccess(email: string, scope: TemplateGroupScope) {
+  const user = await requireUserByEmail(email);
+  const allowed =
+    scope === "PACKAGE"
+      ? user.role === "BRANCH"
+      : user.role === "ADMIN" ||
+        user.role === "OPS" ||
+        user.role === "CEO" ||
+        user.role === "HOD" ||
+        user.role === "BRANCH" ||
+        isElevatedDeptSite(user);
+  if (!allowed) {
+    throw new ApiHttpError(
+      403,
+      scope === "PACKAGE"
+        ? "Only branch managers can manage packages"
+        : "Only assign-capable accounts can manage task templates",
+    );
+  }
+  return user;
+}
 
 const groupTaskSchema = z.object({
   /** Present = an existing member being kept (edit reconciliation); absent
@@ -66,12 +107,15 @@ export interface TemplateGroupDetail {
   tasks: TemplateGroupTask[];
 }
 
-/** Cards data for the /task-manager/template dashboard. */
-export function listTemplateGroups(email: string): Promise<TemplateGroupSummary[]> {
+/** Cards data for the /task-manager/template or /task-manager/package dashboard. */
+export function listTemplateGroups(
+  email: string,
+  scope: TemplateGroupScope,
+): Promise<TemplateGroupSummary[]> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const groups = await prisma.taskTemplateGroup.findMany({
-      where: { createdById: user.id, archivedAt: null },
+      where: { createdById: user.id, scope, archivedAt: null },
       orderBy: { updatedAt: "desc" },
       include: {
         templates: {
@@ -91,15 +135,19 @@ export function listTemplateGroups(email: string): Promise<TemplateGroupSummary[
 }
 
 /** Full detail for the Edit modal's prefill. */
-export function getTemplateGroup(email: string, groupId: string): Promise<TemplateGroupDetail> {
+export function getTemplateGroup(
+  email: string,
+  groupId: string,
+  scope: TemplateGroupScope,
+): Promise<TemplateGroupDetail> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id },
+      where: { id, createdById: user.id, scope },
       include: { templates: { orderBy: { groupPosition: "asc" } } },
     });
-    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
     return {
       id: group.id,
       name: group.name,
@@ -116,14 +164,15 @@ export function getTemplateGroup(email: string, groupId: string): Promise<Templa
  *  touches recipients/days/due-date/cadence (create-only, no assignee). */
 export function createTemplateGroup(
   email: string,
+  scope: TemplateGroupScope,
   input: CreateTemplateGroupInput,
 ): Promise<{ id: string }> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const body = createGroupSchema.parse(input);
     const group = await prisma.$transaction(async (tx) => {
       const g = await tx.taskTemplateGroup.create({
-        data: { createdById: user.id, name: body.name },
+        data: { createdById: user.id, name: body.name, scope },
       });
       for (const [index, t] of body.tasks.entries()) {
         await tx.taskTemplate.create({
@@ -167,17 +216,18 @@ export interface EditTemplateGroupResult {
 export function editTemplateGroup(
   email: string,
   groupId: string,
+  scope: TemplateGroupScope,
   input: EditTemplateGroupInput,
 ): Promise<EditTemplateGroupResult> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = editGroupSchema.parse(input);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id },
+      where: { id, createdById: user.id, scope },
       select: { id: true },
     });
-    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
     await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name } });
 
@@ -191,7 +241,7 @@ export function editTemplateGroup(
     let removedTasks = 0;
     for (const memberId of existingIds) {
       if (!submittedIds.has(memberId)) {
-        const result = await deleteTaskTemplate(email, memberId);
+        const result = await deleteTaskTemplateForUser(user, memberId);
         removedTasks += result.removedTasks;
       }
     }
@@ -201,7 +251,7 @@ export function editTemplateGroup(
     let employees = 0;
     for (const [index, t] of body.tasks.entries()) {
       if (t.id && existingIds.has(t.id)) {
-        const result = await editTaskTemplate(email, t.id, { title: t.title, subtasks: t.subtasks });
+        const result = await editTaskTemplateForUser(user, t.id, { title: t.title, subtasks: t.subtasks });
         updatedTasks += result.updatedTasks;
         employees += result.employees;
         await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
@@ -234,20 +284,21 @@ export interface GroupDeletionImpact {
 export function getGroupDeletionImpact(
   email: string,
   groupId: string,
+  scope: TemplateGroupScope,
 ): Promise<GroupDeletionImpact> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id },
+      where: { id, createdById: user.id, scope },
       include: { templates: { select: { id: true } } },
     });
-    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
     let pendingTasks = 0;
     let pendingEmployees = 0;
     let completedKept = 0;
     for (const t of group.templates) {
-      const impact = await getTemplateDeletionImpact(email, t.id);
+      const impact = await getTemplateDeletionImpactForUser(user, t.id);
       pendingTasks += impact.pendingTasks;
       pendingEmployees += impact.pendingEmployees;
       completedKept += impact.completedKept;
@@ -263,19 +314,20 @@ export function getGroupDeletionImpact(
 export function deleteTemplateGroup(
   email: string,
   groupId: string,
+  scope: TemplateGroupScope,
 ): Promise<{ deleted: boolean; removedTasks: number; keptRecords: number }> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id },
+      where: { id, createdById: user.id, scope },
       include: { templates: { select: { id: true } } },
     });
-    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
     let removedTasks = 0;
     let keptRecords = 0;
     for (const t of group.templates) {
-      const result = await deleteTaskTemplate(email, t.id);
+      const result = await deleteTaskTemplateForUser(user, t.id);
       removedTasks += result.removedTasks;
       keptRecords += result.keptRecords;
     }
@@ -296,34 +348,32 @@ export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
  *  WHOLE group, fanned out as one assignFlowTask call per member task —
  *  the same pipeline "Start from a template" already uses, just looped.
  *  fromTemplateId is set per task so each created assignment links back to
- *  its own TaskTemplate row (identical to using a single-task template
- *  today — same hub Edit/Remove/Reassign/Archive tabs would work on it,
- *  they're just not surfaced there per Task 2's picker filter).
- *  Not wrapped in a transaction across members — if one member's
- *  assignFlowTask call throws partway through, earlier iterations already
- *  created real FlowRun/RunBlock rows and the partial `created` count is
- *  lost to the caller. assignFlowTask has no idempotency guard, so a naive
- *  "retry the whole group" in response to that error would RE-ASSIGN the
- *  already-succeeded member tasks too, duplicating live tasks for the same
- *  recipients. Callers (the future Assign modal) should not blindly retry
- *  on failure — surface the error and let the admin verify actual state
- *  before re-attempting. */
+ *  its own TaskTemplate row. Not wrapped in a transaction across members —
+ *  if one member's assignFlowTask call throws partway through, earlier
+ *  iterations already created real FlowRun/RunBlock rows and the partial
+ *  `created` count is lost to the caller. assignFlowTask has no idempotency
+ *  guard, so a naive "retry the whole group" in response to that error
+ *  would RE-ASSIGN the already-succeeded member tasks too, duplicating
+ *  live tasks for the same recipients. Callers (the Assign modal) should
+ *  not blindly retry on failure — surface the error and let the admin
+ *  verify actual state before re-attempting. */
 export function applyTemplateGroup(
   email: string,
   groupId: string,
+  scope: TemplateGroupScope,
   input: ApplyTemplateGroupInput,
 ): Promise<{ created: number }> {
   return native(async () => {
-    const user = await requireAssigner(email);
+    const user = await requireGroupAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = applyGroupSchema.parse(input);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id },
+      where: { id, createdById: user.id, scope },
       include: { templates: { orderBy: { groupPosition: "asc" } } },
     });
-    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
     if (group.templates.length === 0) {
-      throw new ApiHttpError(400, "This template has no tasks to assign");
+      throw new ApiHttpError(400, `This ${NOUN[scope]} has no tasks to assign`);
     }
 
     let created = 0;
