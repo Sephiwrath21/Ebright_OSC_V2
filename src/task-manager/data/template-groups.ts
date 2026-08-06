@@ -41,7 +41,9 @@ import { native, requireUserByEmail } from "./core";
 import {
   deleteTaskTemplateCore,
   editTaskTemplateCore,
+  getTemplateAssigneesCore,
   getTemplateDeletionImpactCore,
+  removeTemplateAssigneeCore,
 } from "./templates-internal";
 import { assignFlowTaskCore } from "./tasks-internal";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
@@ -414,4 +416,77 @@ export function applyTemplateGroup(
     }
     return { created };
   }, "applyTemplateGroup");
+}
+
+export interface TemplateGroupAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+
+/** Everyone currently holding a pending instance of ANY task in this
+ *  group, aggregated across all member tasks — a person with pending
+ *  tasks from 2 different member tasks shows once, with a summed count.
+ *  Feeds the "View Assignees" modal. */
+export function getGroupAssignees(
+  email: string,
+  groupId: string,
+  scope: TemplateGroupScope,
+): Promise<TemplateGroupAssignee[]> {
+  return native(async () => {
+    const user = await requireGroupAccess(email, scope);
+    const id = z.string().min(1).parse(groupId);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id, scope },
+      include: { templates: { select: { id: true } } },
+    });
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
+
+    const merged = new Map<string, { name: string; pendingTasks: number }>();
+    for (const t of group.templates) {
+      const assignees = await getTemplateAssigneesCore(user, t.id);
+      for (const a of assignees) {
+        const existing = merged.get(a.userId);
+        merged.set(a.userId, {
+          name: a.name,
+          pendingTasks: (existing?.pendingTasks ?? 0) + a.pendingTasks,
+        });
+      }
+    }
+    return [...merged.entries()]
+      .map(([userId, v]) => ({ userId, name: v.name, pendingTasks: v.pendingTasks }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, "getGroupAssignees");
+}
+
+/** "Remove" for one assignee (View Assignees modal): cancels that
+ *  person's pending instances across every member task in this group —
+ *  completed/N-A history kept, same split cancelPendingTemplateRuns
+ *  already uses. Other assignees and the group/template itself are
+ *  untouched. */
+export function removeGroupAssignee(
+  email: string,
+  groupId: string,
+  scope: TemplateGroupScope,
+  userId: string,
+): Promise<{ removedTasks: number; keptRecords: number }> {
+  return native(async () => {
+    const user = await requireGroupAccess(email, scope);
+    const id = z.string().min(1).parse(groupId);
+    const targetUserId = z.string().min(1).parse(userId);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id, scope },
+      include: { templates: { select: { id: true } } },
+    });
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
+
+    let removedTasks = 0;
+    let keptRecords = 0;
+    for (const t of group.templates) {
+      const result = await removeTemplateAssigneeCore(user, t.id, targetUserId);
+      removedTasks += result.removedTasks;
+      keptRecords += result.keptRecords;
+    }
+    return { removedTasks, keptRecords };
+  }, "removeGroupAssignee");
 }

@@ -474,6 +474,18 @@ export interface FlowTemplateGroupApplyInput {
 }
 export type TemplateGroupApplyResult = { ok: true; created: number } | { ok: false; message: string };
 
+export interface FlowTemplateGroupAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateGroupAssigneesResult =
+  | { ok: true; assignees: FlowTemplateGroupAssignee[] }
+  | { ok: false; message: string };
+export type TemplateGroupRemoveAssigneeResult =
+  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: false; message: string };
+
 /** Everything the /task-manager/template dashboard needs, bundled as one
  *  prop — mirrors FlowTemplateControl's shape for the single-task feature. */
 export interface FlowTemplateGroupControl {
@@ -490,6 +502,8 @@ export interface FlowTemplateGroupControl {
   impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
   remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
   apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
+  assignees: (groupId: string) => Promise<TemplateGroupAssigneesResult>;
+  removeAssignee: (groupId: string, userId: string) => Promise<TemplateGroupRemoveAssigneeResult>;
 }
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the

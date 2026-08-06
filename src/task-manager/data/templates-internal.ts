@@ -20,6 +20,7 @@
 import { z } from "zod";
 import type { Prisma } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
+import { getUsersByIds } from "../lib/users";
 import { prisma } from "../prisma";
 
 /** "Still pending" for the deletion cascade = any non-terminal status —
@@ -73,9 +74,18 @@ export async function getTemplateDeletionImpactCore(
  *  and proof untouched. Nothing is hard-deleted. Exported so ./templates's
  *  removeTemplateAssignments (bulk "Remove Task") can reuse it without
  *  duplicating the logic. */
-export async function cancelPendingTemplateRuns(actorId: string, templateId: string, reason: string) {
+export async function cancelPendingTemplateRuns(
+  actorId: string,
+  templateId: string,
+  reason: string,
+  assigneeId?: string,
+) {
   const blocks = await prisma.runBlock.findMany({
-    where: { templateId, run: { status: { not: "CANCELLED" }, archivedAt: null } },
+    where: {
+      templateId,
+      ...(assigneeId ? { assigneeId } : {}),
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
     select: { runId: true, status: true },
   });
   const pendingRunIds = [
@@ -94,7 +104,7 @@ export async function cancelPendingTemplateRuns(actorId: string, templateId: str
       data: {
         actorId,
         action: "RUN_CANCELLED",
-        detail: { reason, templateId, cancelledRuns: pendingRunIds.length },
+        detail: { reason, templateId, cancelledRuns: pendingRunIds.length, ...(assigneeId ? { assigneeId } : {}) },
       },
     });
   }
@@ -283,4 +293,66 @@ export async function editTaskTemplateCore(
     updatedTasks: parents.length,
     employees: new Set(parents.map((p) => p.assigneeId)).size,
   };
+}
+
+export interface TemplateAssignee {
+  userId: string;
+  name: string;
+  /** Pending MAIN tasks (subtasks not counted separately). */
+  pendingTasks: number;
+}
+
+/** Who currently holds a PENDING instance of this template — Core version
+ *  with NO templateGroupId filter (unlike ./templates's own
+ *  getTemplateAssignees), so data/template-groups.ts can call this on
+ *  group-member rows to aggregate a group's assignees. */
+export async function getTemplateAssigneesCore(
+  user: { id: string },
+  templateId: string,
+): Promise<TemplateAssignee[]> {
+  const id = z.string().min(1).parse(templateId);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+
+  const parents = await prisma.runBlock.findMany({
+    where: {
+      templateId: id,
+      parentId: null,
+      status: { in: [...PENDING_STATUSES] },
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+    select: { assigneeId: true },
+  });
+  const counts = new Map<string, number>();
+  for (const p of parents) counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
+  const users = await getUsersByIds([...counts.keys()]);
+  return [...counts.entries()]
+    .map(([userId, pendingTasks]) => ({
+      userId,
+      name: users.get(userId)?.name ?? userId,
+      pendingTasks,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Cancel one assignee's pending instances of a template (their PENDING/
+ *  ACTIVE/OVERDUE/ESCALATED runs only — completed/N-A history is kept,
+ *  same split as cancelPendingTemplateRuns). No templateGroupId filter —
+ *  same reasoning as getTemplateAssigneesCore, this is meant to be usable
+ *  on group members via data/template-groups.ts. */
+export async function removeTemplateAssigneeCore(
+  user: { id: string },
+  templateId: string,
+  assigneeId: string,
+): Promise<{ removedTasks: number; keptRecords: number }> {
+  const id = z.string().min(1).parse(templateId);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+  return cancelPendingTemplateRuns(user.id, id, "template-assignee-removed", assigneeId);
 }
