@@ -87,6 +87,12 @@ export function AssignTaskForm({
   // Guideline (optional, 2026-07-30): SOP link and/or reference image —
   // both may stay empty; submission never depends on them.
   const [subtasks, setSubtasks] = React.useState<string[]>([]);
+  // Bumped to force-remount SubtaskListEditor (resetting its internal
+  // in-progress draft text) whenever the subtasks list itself gets
+  // replaced wholesale from outside — template load or a successful
+  // submit — so a half-typed draft from the old context can't silently
+  // leak into the next one.
+  const [subtaskEditorKey, setSubtaskEditorKey] = React.useState(0);
   const [guidelineUrl, setGuidelineUrl] = React.useState("");
   const [guidelineImage, setGuidelineImage] = React.useState<{
     mime: "image/png" | "image/jpeg" | "image/webp";
@@ -120,6 +126,7 @@ export function AssignTaskForm({
     const t = result.template;
     setTitle(t.title);
     setSubtasks(t.subtasks);
+    setSubtaskEditorKey((k) => k + 1);
     setCadence(hideCadence ? "daily" : t.cadence);
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
@@ -236,6 +243,7 @@ export function AssignTaskForm({
         setGuidelineUrl("");
         clearGuidelineImage();
         setSubtasks([]);
+        setSubtaskEditorKey((k) => k + 1);
         setTemplateId("");
         setSaveTemplate(false);
         setTemplateName("");
@@ -302,7 +310,7 @@ export function AssignTaskForm({
             for every recipient × day. Empty = a normal single task;
             nothing here ever blocks submission. */}
         <div className="ml-4 max-w-xl border-l-2 border-gray-200 pl-3">
-          <SubtaskListEditor subtasks={subtasks} onChange={setSubtasks} />
+          <SubtaskListEditor key={subtaskEditorKey} subtasks={subtasks} onChange={setSubtasks} />
         </div>
 
         <RecipientPicker

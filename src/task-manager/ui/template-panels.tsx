@@ -72,6 +72,11 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
   const [loaded, setLoaded] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [subtasks, setSubtasks] = React.useState<string[]>([]);
+  // Bumped to force-remount SubtaskListEditor (resetting its internal
+  // in-progress draft text) whenever a different template is picked and
+  // its subtasks replace the list wholesale — otherwise a half-typed
+  // draft from the previous template would silently persist.
+  const [subtaskEditorKey, setSubtaskEditorKey] = React.useState(0);
   const [guidelineUrl, setGuidelineUrl] = React.useState("");
   const [guidelineImage, setGuidelineImage] = React.useState<{
     mime: "image/png" | "image/jpeg" | "image/webp";
@@ -97,6 +102,7 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
     const t = result.template;
     setTitle(t.title);
     setSubtasks(t.subtasks);
+    setSubtaskEditorKey((k) => k + 1);
     setGuidelineUrl(t.guidelineUrl ?? "");
     setGuidelineImage(
       t.guidelineImage
@@ -189,7 +195,7 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
               className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
-          <SubtaskListEditor subtasks={subtasks} onChange={setSubtasks} />
+          <SubtaskListEditor key={subtaskEditorKey} subtasks={subtasks} onChange={setSubtasks} />
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
             <p className="text-sm font-medium text-gray-600">Guidelines</p>
             <label className="mt-2 block text-sm text-gray-600">
