@@ -412,6 +412,86 @@ export interface FlowTemplateControl {
   archived: () => Promise<ArchivedItemsResult>;
 }
 
+// ---- Task Template Groups (2026-08-06) — the /task-manager/template
+// page's multi-task "Template" concept, distinct from the single-task
+// FlowTemplateControl above. Each group task IS a TaskTemplate row under
+// the hood (see data/template-groups.ts) — these types are the group-level
+// wrapper the dashboard/modals actually work with.
+
+export interface FlowTemplateGroupSummary {
+  id: string;
+  name: string;
+  taskCount: number;
+  previewTitles: string[];
+  updatedAt: string; // ISO
+}
+
+export interface FlowTemplateGroupTask {
+  id: string;
+  title: string;
+  subtasks: string[];
+}
+
+export interface FlowTemplateGroupDetail {
+  id: string;
+  name: string;
+  tasks: FlowTemplateGroupTask[];
+}
+
+/** Task shape submitted from the Create/Edit form — `id` present only for
+ *  an existing member being kept (feeds the edit reconciliation). */
+export interface FlowTemplateGroupTaskInput {
+  id?: string;
+  title: string;
+  subtasks: string[];
+}
+
+export type TemplateGroupLoadResult =
+  | { ok: true; group: FlowTemplateGroupDetail }
+  | { ok: false; message: string };
+
+export type TemplateGroupSaveResult = { ok: true; id: string } | { ok: false; message: string };
+
+export type TemplateGroupEditResult =
+  | { ok: true; updatedTasks: number; createdTasks: number; removedTasks: number; employees: number }
+  | { ok: false; message: string };
+
+export type TemplateGroupImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
+export type TemplateGroupDeleteResult =
+  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: false; message: string };
+
+/** "Assign" input — one recipient/day/due-date/cadence choice applied to
+ *  every task in the group (see applyTemplateGroup). */
+export interface FlowTemplateGroupApplyInput {
+  userIds: string[];
+  days?: (typeof FLOW_DAYS)[number][];
+  dueDate?: string;
+  cadence: CadenceOption;
+}
+export type TemplateGroupApplyResult = { ok: true; created: number } | { ok: false; message: string };
+
+/** Everything the /task-manager/template dashboard needs, bundled as one
+ *  prop — mirrors FlowTemplateControl's shape for the single-task feature. */
+export interface FlowTemplateGroupControl {
+  list: FlowTemplateGroupSummary[];
+  load: (groupId: string) => Promise<TemplateGroupLoadResult>;
+  create: (input: {
+    name: string;
+    tasks: { title: string; subtasks: string[] }[];
+  }) => Promise<TemplateGroupSaveResult>;
+  edit: (
+    groupId: string,
+    input: { name: string; tasks: FlowTemplateGroupTaskInput[] },
+  ) => Promise<TemplateGroupEditResult>;
+  impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
+  remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
+  apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
+}
+
 /** Which Cadence pills the "+ Add Task" form should offer, given the
  *  currently-selected recipient(s) — Branch Manager keeps all 3 (the one
  *  branch-side role Ad hoc applies to); Coach/Branch Exec are restricted to
