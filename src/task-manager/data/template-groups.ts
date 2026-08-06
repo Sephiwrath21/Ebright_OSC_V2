@@ -91,10 +91,17 @@ async function requireGroupAccess(email: string, scope: TemplateGroupScope) {
 
 /** Assignment access (Assign, View Assignees, Remove Assignee): unrestricted
  *  for TEMPLATE (same allow-list as management), but PACKAGE assignment
- *  stays Branch Manager only, per the original Package requirement. */
+ *  stays limited to Branch Manager plus the existing elevated dept-site
+ *  "superadmin-equivalent" accounts (Operations/Optimisation) — the same
+ *  carve-out isAssignCapable already grants for general Package
+ *  management, so an elevated dept-site account isn't blocked from
+ *  assigning a package it can otherwise fully manage. Recipients are
+ *  restricted separately (see applyTemplateGroup's PACKAGE target check
+ *  below) — widening who may ACT here does not widen who may be picked. */
 async function requireGroupAssignAccess(email: string, scope: TemplateGroupScope) {
   const user = await requireUserByEmail(email);
-  const allowed = scope === "PACKAGE" ? user.role === "BRANCH" : isAssignCapable(user);
+  const allowed =
+    scope === "PACKAGE" ? user.role === "BRANCH" || isElevatedDeptSite(user) : isAssignCapable(user);
   if (!allowed) {
     throw new ApiHttpError(
       403,
