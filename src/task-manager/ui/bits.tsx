@@ -16,7 +16,7 @@ import type {
   FlowTaskRow,
   ProofUploadHandler,
 } from "./types";
-import { flowBucketTotal, formatDueDate } from "./types";
+import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
 import { compressImageFile, IMAGE_JPEG_QUALITY, IMAGE_MAX_DIMENSION } from "./image-compress";
 import { personSolidColor } from "./palette";
 import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
@@ -57,14 +57,25 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
 export function PageSectionHeading({
   children,
   action,
+  hideBorder,
 }: {
   children: React.ReactNode;
   /** Right-aligned control (e.g. a date filter) — optional, most headings
    *  have none. */
   action?: React.ReactNode;
+  /** Drop the bottom border (2026-08-05) — e.g. when a table with its own
+   *  header row (ResizableTaskList) sits directly beneath, which already
+   *  draws a border-b under ITS OWN column labels; the default border here
+   *  would otherwise sit as a second, redundant-looking line above it.
+   *  Bottom padding is kept either way, so spacing doesn't collapse. */
+  hideBorder?: boolean;
 }) {
   return (
-    <h2 className="mt-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+    <h2
+      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-lg font-semibold text-gray-900 ${
+        hideBorder ? "" : "border-b border-gray-200"
+      }`}
+    >
       <span>{children}</span>
       {action}
     </h2>
@@ -252,6 +263,17 @@ function statusCircleClasses(status: FlowTaskRow["status"]): string {
   return "border-2 border-red-400 bg-white";
 }
 
+/** Past-day lock (2026-08-05): a Daily task's day has passed, so it can no
+ *  longer be marked complete or have proof attached/replaced — mirrors the
+ *  server-authoritative checks in engine/run.ts's completeBlock and
+ *  data/tasks.ts's uploadFlowTaskProof (this is the disabled-UI half, not
+ *  the enforcement; a request that somehow reached the server anyway would
+ *  still be rejected there). Applies to every role — there's no exception
+ *  for elevated viewers completing on someone else's behalf. */
+function isLockedPastDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
+  return task.cadence === "DAILY" && isPastDueDay(task.dueAt);
+}
+
 /**
  * "My Tasks" mode's status circle — click opens a small dropdown (Pending /
  * Completed / N/A, each with the matching status dot/check) instead of
@@ -283,21 +305,47 @@ function StatusDropdown({
   const [busy, setBusy] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  // Portal position (2026-08-05 fix): "My Tasks" rows sit inside the
+  // horizontal-scroll wrapper added for the mobile table pan (bits.tsx's
+  // `overflow-x-auto` on the hideCompleted table) — setting overflow-x
+  // without overflow-y computes overflow-y to "auto" too per the CSS spec,
+  // so this menu (previously position:absolute, a DOM child of that
+  // wrapper) was getting clipped/hidden instead of floating over the row.
+  // Portaling to <body> with position:fixed at the trigger's actual screen
+  // coordinates escapes that ancestor's overflow entirely, same rationale
+  // as this file's existing modal createPortal calls.
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
   const isOwner = task.assigneeId === myUserId;
 
   React.useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !(menuRef.current && menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    // The menu's position:fixed coordinates are computed once on open —
+    // close on scroll (capture: true catches the table's own horizontal
+    // scroll container, not just window/document scroll) rather than
+    // leaving a stale, visually-detached menu floating over the wrong row.
+    const onScroll = () => setOpen(false);
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -318,34 +366,51 @@ function StatusDropdown({
     }
   };
 
+  // Past-day lock (2026-08-05): once locked, the WHOLE control is inert —
+  // the trigger itself is disabled (can't even open the menu), regardless
+  // of the task's current status. Not just canMarkDone/canMarkNA
+  // individually gated — a locked task offers no status action at all.
+  const locked = isLockedPastDay(task);
   const isResolved = task.status === "DONE" || task.status === "SKIPPED";
   const canReopen = Boolean(onReopen) && isResolved;
-  const canMarkDone = Boolean(onComplete) && task.quickCompletable && task.status !== "DONE";
-  const canMarkNA = Boolean(onSkip) && task.status !== "SKIPPED";
+  const canMarkDone = Boolean(onComplete) && task.quickCompletable && task.status !== "DONE" && !locked;
+  const canMarkNA = Boolean(onSkip) && task.status !== "SKIPPED" && !locked;
 
   return (
     <div ref={containerRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         title="Change status"
         aria-label="Change status"
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={busy}
+        disabled={busy || locked}
         onClick={() => {
           setErrorText(null);
-          setOpen((o) => !o);
+          setOpen((o) => {
+            const next = !o;
+            if (next && triggerRef.current) {
+              const rect = triggerRef.current.getBoundingClientRect();
+              setMenuPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            return next;
+          });
         }}
         className="flex size-3 shrink-0 items-center justify-center disabled:opacity-50"
       >
         {circle}
       </button>
       {errorText && <InlineActionError text={errorText} />}
-      {open && (
-        <div
-          role="menu"
-          className="absolute left-0 top-5 z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
-        >
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          >
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Statuses</p>
           <button
             type="button"
@@ -386,8 +451,9 @@ function StatusDropdown({
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
           </button>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -580,7 +646,7 @@ function ProofCell({
   const imageSrc = proofId
     ? `/api/task-manager/proof-image/${proofId}${version ? `?v=${version}` : ""}`
     : null;
-  const canUpload = isOwned && Boolean(onUploadProof);
+  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task);
 
   /** Review-before-submit (2026-07-31): picker, drop, paste, and camera
    *  all STAGE the image here — validated + previewed in the popover —
@@ -1073,7 +1139,7 @@ export function TaskRowLine({
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
-  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned;
+  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedPastDay(task);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1337,9 +1403,14 @@ function ToggleSwitch({
 function BulkActionsButton({
   count,
   actions,
+  disabled = false,
 }: {
   count: number;
   actions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[];
+  /** True when every currently-selected task is past-day locked (2026-08-05)
+   *  — the whole control goes inert, not just individual actions inside it,
+   *  matching StatusDropdown's own trigger-level lock. */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -1380,7 +1451,7 @@ function BulkActionsButton({
       <div className="relative inline-block">
         <button
           type="button"
-          disabled={busy || !only}
+          disabled={busy || disabled || !only}
           onClick={() => only && run(only.onRun)}
           className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
@@ -1396,7 +1467,7 @@ function BulkActionsButton({
       <button
         type="button"
         aria-label="Bulk actions"
-        disabled={busy}
+        disabled={busy || disabled}
         onClick={() => {
           setErrorText(null);
           setOpen((o) => !o);
@@ -1438,6 +1509,8 @@ export function ResizableTaskList({
   onUploadProof,
   emptyLabel,
   hideCompleted,
+  assigneeColumnLabel,
+  hideRowResizeDivider,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1450,6 +1523,20 @@ export function ResizableTaskList({
   onUploadProof?: ProofUploadHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
+  /** Header override for the Assignee column (2026-08-05) — e.g. "Assigned
+   *  To" for a "tasks I assigned" list, where the column shows who the
+   *  task went TO rather than who assigned it to the viewer (the usual
+   *  meaning elsewhere). Defaults to "Assignee". Cosmetic only — the
+   *  column's row content (task.assignerName) is unchanged either way. */
+  assigneeColumnLabel?: string;
+  /** Hide the per-row Task-column resize handle (2026-08-05) — that thin
+   *  vertical line between Task and the next column on every row is
+   *  TaskRowLine's own drag handle (each row can resize the column, not
+   *  just the header). Setting this only stops passing it to ROWS; the
+   *  header's own resize handle (HeaderResizeHandle, below) is untouched,
+   *  so the column stays resizable from there. Defaults to shown
+   *  (unchanged) everywhere this isn't explicitly set. */
+  hideRowResizeDivider?: boolean;
 }) {
   const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // Defaults to ON — completed tasks are visible immediately; toggling off
@@ -1722,7 +1809,11 @@ export function ResizableTaskList({
           ✓
         </span>
       ),
-      onRun: () => runBulk(onComplete, (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId),
+      onRun: () =>
+        runBulk(
+          onComplete,
+          (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId && !isLockedPastDay(t),
+        ),
     });
   }
   if (onSkip) {
@@ -1730,9 +1821,18 @@ export function ResizableTaskList({
       key: "na",
       label: "Mark N/A",
       icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
-      onRun: () => runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId),
+      onRun: () =>
+        runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId && !isLockedPastDay(t)),
     });
   }
+  // Past-day lock (2026-08-05): the WHOLE bulk-actions control goes inert
+  // when every currently-selected task is locked — mirrors StatusDropdown's
+  // own trigger-level lock rather than relying on per-action eligibility
+  // alone. A mixed selection (some locked, some not) leaves the button
+  // enabled; the eligible() filters above silently skip the locked ones
+  // when it runs, same as any other ineligible row already does.
+  const selectedBulkTasks = visibleTasks.filter((t) => selectedIds.has(t.runBlockId));
+  const allSelectedLocked = selectedBulkTasks.length > 0 && selectedBulkTasks.every(isLockedPastDay);
 
   // Select-all moved INTO the column header row (2026-07-31) — this slim
   // bar now only appears when it has something to show: the bulk-actions
@@ -1742,7 +1842,7 @@ export function ResizableTaskList({
       <div className="flex items-center justify-between gap-3 pb-2">
         <div className="flex items-center gap-3">
           {selectedIds.size > 0 && bulkActions.length > 0 && (
-            <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+            <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
           )}
         </div>
         {completedCount > 0 && (
@@ -1811,9 +1911,11 @@ export function ResizableTaskList({
           </span>
           {/* "Assignee" per the 2026-07-30 final spec (the shown value is
               the run's starter — assignerName — but the user explicitly
-              chose this label over "Assigned by"). */}
+              chose this label over "Assigned by"). Label overridable
+              (2026-08-05) via assigneeColumnLabel — e.g. "Assigned To" for
+              a "tasks I assigned" list. */}
           <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
-            Assignee
+            {assigneeColumnLabel ?? "Assignee"}
           </span>
           <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
             Due Date
@@ -1841,7 +1943,7 @@ export function ResizableTaskList({
                 task={t}
                 {...shared}
                 onComplete={kids.length > 0 && onComplete ? guardedComplete(t, kids) : onComplete}
-                onResizeStart={onResizeStart}
+                onResizeStart={hideRowResizeDivider ? undefined : onResizeStart}
                 selected={selectedIds.has(t.runBlockId)}
                 onToggleSelect={
                   hideCompleted
@@ -2245,7 +2347,8 @@ export function EntityDrillModal({
             ✓
           </span>
         ),
-        onRun: () => runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId),
+        onRun: () =>
+          runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId && !isLockedPastDay(t)),
       });
     }
     if (onSkip) {
@@ -2253,7 +2356,7 @@ export function EntityDrillModal({
         key: "na",
         label: "Mark N/A",
         icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
-        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId),
+        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
       });
     }
   } else if (onReopen) {
@@ -2261,9 +2364,13 @@ export function EntityDrillModal({
       key: "reopen",
       label: "Mark Pending",
       icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
-      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId),
+      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
     });
   }
+  // Past-day lock (2026-08-05) — same trigger-level lock as ResizableTaskList's
+  // bulk button; see its comment for the mixed-selection rationale.
+  const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
+  const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedPastDay);
 
   return (
     <div
@@ -2301,7 +2408,7 @@ export function EntityDrillModal({
               Select all
             </label>
             {selectedIds.size > 0 && bulkActions.length > 0 && (
-              <BulkActionsButton count={selectedIds.size} actions={bulkActions} />
+              <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
             )}
           </div>
         )}

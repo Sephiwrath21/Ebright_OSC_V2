@@ -245,6 +245,7 @@ export function RecipientPicker({
   onChange,
   restrictToGroup,
   quickSelfId,
+  groupOptions,
 }: {
   staff: FlowStaffMember[];
   selected: string[];
@@ -261,6 +262,14 @@ export function RecipientPicker({
    *  group's member list. Both chips merge into the same selection as
    *  individually-picked people. */
   quickSelfId?: string;
+  /** Package assign restriction (2026-08-06): narrows which options appear
+   *  in the "Group" dropdown, without restricting to a single forced group
+   *  like `restrictToGroup` (Person search + the normal Person/Group menu
+   *  both stay available). Callers should also pre-filter the `staff` array
+   *  itself to match — this only trims the dropdown's option list, it does
+   *  not filter `flowGroupMembers`'s results on its own. Omit for the full
+   *  FLOW_GROUPS list (unchanged default). */
+  groupOptions?: readonly FlowGroup[];
 }) {
   const [view, setView] = React.useState<PickerView>("menu");
   const [search, setSearch] = React.useState("");
@@ -414,7 +423,7 @@ export function RecipientPicker({
             className={`mb-2 ${selectClass}`}
           >
             <option value="">Select a group…</option>
-            {FLOW_GROUPS.map((g) => (
+            {(groupOptions ?? FLOW_GROUPS).map((g) => (
               <option key={g}>{g}</option>
             ))}
           </select>
