@@ -23,11 +23,13 @@ import {
   createTemplateGroup,
   deleteTemplateGroup,
   editTemplateGroup,
+  getGroupAssignees,
   getGroupDeletionImpact,
   getFlowStaff,
   getMyRole,
   getTemplateGroup,
   listTemplateGroups,
+  removeGroupAssignee,
   FlowBridgeError,
   NoAccountError,
   SetupPendingError,
@@ -42,10 +44,12 @@ import type {
   FlowTemplateGroupApplyInput,
   FlowTemplateGroupTaskInput,
   TemplateGroupApplyResult,
+  TemplateGroupAssigneesResult,
   TemplateGroupDeleteResult,
   TemplateGroupEditResult,
   TemplateGroupImpactResult,
   TemplateGroupLoadResult,
+  TemplateGroupRemoveAssigneeResult,
   TemplateGroupSaveResult,
 } from "@/task-manager/ui/types";
 
@@ -179,6 +183,34 @@ export default async function TaskManagerTemplatePage() {
     }
   }
 
+  async function groupAssignees(groupId: string): Promise<TemplateGroupAssigneesResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const assignees = await getGroupAssignees(email, groupId, "TEMPLATE");
+      return { ok: true, assignees };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function removeAssignee(
+    groupId: string,
+    userId: string,
+  ): Promise<TemplateGroupRemoveAssigneeResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await removeGroupAssignee(email, groupId, "TEMPLATE", userId);
+      revalidatePath("/task-manager");
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   return (
     <AppShell email={su.email} role={su.role} name={su.name}>
       <div className="mx-auto max-w-[1400px] p-6">
@@ -196,6 +228,8 @@ export default async function TaskManagerTemplatePage() {
               impact: groupImpact,
               remove: removeGroup,
               apply: applyGroup,
+              assignees: groupAssignees,
+              removeAssignee,
             }}
           />
         </div>

@@ -16,6 +16,7 @@ import { LayoutGrid, List } from "lucide-react";
 import type { FlowStaffMember, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
 import { TemplateGroupFormModal } from "./template-group-form";
 import { TemplateGroupAssignModal } from "./template-group-assign-modal";
+import { TemplateGroupAssigneesModal } from "./template-group-assignees-modal";
 
 type ViewMode = "grid" | "list";
 
@@ -31,12 +32,14 @@ function GroupActions({
   group,
   busyId,
   onAssign,
+  onViewAssignees,
   onEdit,
   onRemove,
 }: {
   group: FlowTemplateGroupSummary;
   busyId: string | null;
   onAssign: () => void;
+  onViewAssignees: () => void;
   onEdit: () => void;
   onRemove: () => void;
 }) {
@@ -48,6 +51,13 @@ function GroupActions({
         className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
       >
         Assign
+      </button>
+      <button
+        type="button"
+        onClick={onViewAssignees}
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
+      >
+        View Assignees
       </button>
       <button
         type="button"
@@ -87,6 +97,7 @@ export function TemplateGroupDashboard({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
   const [assignGroupId, setAssignGroupId] = React.useState<string | null>(null);
+  const [assigneesGroupId, setAssigneesGroupId] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = React.useTransition();
@@ -136,6 +147,7 @@ export function TemplateGroupDashboard({
   };
 
   const assignedGroup = control.list.find((g) => g.id === assignGroupId) ?? null;
+  const assigneesGroup = control.list.find((g) => g.id === assigneesGroupId) ?? null;
 
   return (
     <div>
@@ -214,6 +226,7 @@ export function TemplateGroupDashboard({
                   group={g}
                   busyId={busyId}
                   onAssign={() => setAssignGroupId(g.id)}
+                  onViewAssignees={() => setAssigneesGroupId(g.id)}
                   onEdit={() => setEditGroupId(g.id)}
                   onRemove={() => remove(g.id, g.name)}
                 />
@@ -244,6 +257,7 @@ export function TemplateGroupDashboard({
                         group={g}
                         busyId={busyId}
                         onAssign={() => setAssignGroupId(g.id)}
+                        onViewAssignees={() => setAssigneesGroupId(g.id)}
                         onEdit={() => setEditGroupId(g.id)}
                         onRemove={() => remove(g.id, g.name)}
                       />
@@ -272,6 +286,14 @@ export function TemplateGroupDashboard({
           group={assignedGroup}
           onClose={() => setAssignGroupId(null)}
           hideCadence={hideCadence}
+          label={label}
+        />
+      )}
+      {assigneesGroup && (
+        <TemplateGroupAssigneesModal
+          control={control}
+          group={assigneesGroup}
+          onClose={() => setAssigneesGroupId(null)}
           label={label}
         />
       )}
