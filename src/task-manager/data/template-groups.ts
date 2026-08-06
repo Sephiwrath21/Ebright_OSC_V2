@@ -3,11 +3,11 @@
 // group is an ORDINARY TaskTemplate row (templateGroupId set, groupPosition
 // for display order); all cascade-safety (pending-assignment cancellation,
 // edit propagation, deletion impact) is delegated to the existing
-// single-task functions in ./templates — this module only orchestrates
-// them across a group's members and adds the group wrapper itself.
-// Creating/editing a group never touches recipients/days/due-date/cadence —
-// "Assign" (applyTemplateGroup) is a separate action that picks those once
-// and fans out to assignFlowTask per member task.
+// single-task Core logic in ./templates-internal — this module only
+// orchestrates it across a group's members and adds the group wrapper
+// itself. Creating/editing a group never touches recipients/days/due-date/
+// cadence — "Assign" (applyTemplateGroup) is a separate action that picks
+// those once and fans out to assignFlowTask per member task.
 //
 // Scope (2026-08-06): this same data model/logic powers TWO pages —
 // /task-manager/template ("Template", scope TEMPLATE) open to every
@@ -18,6 +18,18 @@
 // requireGroupAccess (below) — deliberately NOT the shared requireAssigner
 // in ./templates, since editing that would also widen the OLD single-task
 // "+ Task -> Start from a template" hub's access, which nobody asked for.
+//
+// Delegation target (2026-08-06 fix): the per-member edit/delete/impact
+// calls below go to ./templates-internal's Core functions
+// (deleteTaskTemplateCore/editTaskTemplateCore/getTemplateDeletionImpactCore),
+// NOT to ./templates's exported deleteTaskTemplate/editTaskTemplate/
+// getTemplateDeletionImpact — those re-run requireAssigner internally,
+// whose allow-list has zero overlap with Branch Manager, which would
+// 403 every PACKAGE-scope call and every Branch-Manager TEMPLATE-scope
+// call even though requireGroupAccess (below) already authorized the
+// actor for this exact operation. ./templates-internal is intentionally
+// NOT re-exported by data.ts's `export *` barrel, so this file imports it
+// directly rather than via `@/task-manager/data`.
 import { z } from "zod";
 import type { Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
@@ -25,10 +37,10 @@ import { prisma } from "../prisma";
 import { isElevatedDeptSite } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
 import {
-  deleteTaskTemplateForUser,
-  editTaskTemplateForUser,
-  getTemplateDeletionImpactForUser,
-} from "./templates";
+  deleteTaskTemplateCore,
+  editTaskTemplateCore,
+  getTemplateDeletionImpactCore,
+} from "./templates-internal";
 import { assignFlowTask } from "./tasks";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
@@ -241,7 +253,7 @@ export function editTemplateGroup(
     let removedTasks = 0;
     for (const memberId of existingIds) {
       if (!submittedIds.has(memberId)) {
-        const result = await deleteTaskTemplateForUser(user, memberId);
+        const result = await deleteTaskTemplateCore(user, memberId);
         removedTasks += result.removedTasks;
       }
     }
@@ -251,7 +263,7 @@ export function editTemplateGroup(
     let employees = 0;
     for (const [index, t] of body.tasks.entries()) {
       if (t.id && existingIds.has(t.id)) {
-        const result = await editTaskTemplateForUser(user, t.id, { title: t.title, subtasks: t.subtasks });
+        const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
         updatedTasks += result.updatedTasks;
         employees += result.employees;
         await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
@@ -298,7 +310,7 @@ export function getGroupDeletionImpact(
     let pendingEmployees = 0;
     let completedKept = 0;
     for (const t of group.templates) {
-      const impact = await getTemplateDeletionImpactForUser(user, t.id);
+      const impact = await getTemplateDeletionImpactCore(user, t.id);
       pendingTasks += impact.pendingTasks;
       pendingEmployees += impact.pendingEmployees;
       completedKept += impact.completedKept;
@@ -327,7 +339,7 @@ export function deleteTemplateGroup(
     let removedTasks = 0;
     let keptRecords = 0;
     for (const t of group.templates) {
-      const result = await deleteTaskTemplateForUser(user, t.id);
+      const result = await deleteTaskTemplateCore(user, t.id);
       removedTasks += result.removedTasks;
       keptRecords += result.keptRecords;
     }
