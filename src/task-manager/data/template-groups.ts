@@ -283,3 +283,54 @@ export function deleteTemplateGroup(
     return { deleted: true, removedTasks, keptRecords };
   }, "deleteTemplateGroup");
 }
+
+const applyGroupSchema = z.object({
+  userIds: z.array(z.string().min(1)).min(1),
+  days: z.array(z.enum(FLOW_DAYS)).optional(),
+  dueDate: z.string().optional(),
+  cadence: z.enum(["daily", "monthly", "adhoc"]),
+});
+export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
+
+/** "Assign" (2026-08-06): one recipient/day/due-date/cadence choice for the
+ *  WHOLE group, fanned out as one assignFlowTask call per member task —
+ *  the same pipeline "Start from a template" already uses, just looped.
+ *  fromTemplateId is set per task so each created assignment links back to
+ *  its own TaskTemplate row (identical to using a single-task template
+ *  today — same hub Edit/Remove/Reassign/Archive tabs would work on it,
+ *  they're just not surfaced there per Task 2's picker filter). */
+export function applyTemplateGroup(
+  email: string,
+  groupId: string,
+  input: ApplyTemplateGroupInput,
+): Promise<{ created: number }> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(groupId);
+    const body = applyGroupSchema.parse(input);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id },
+      include: { templates: { orderBy: { groupPosition: "asc" } } },
+    });
+    if (!group) throw new ApiHttpError(404, "Template not found");
+    if (group.templates.length === 0) {
+      throw new ApiHttpError(400, "This template has no tasks to assign");
+    }
+
+    let created = 0;
+    for (const t of group.templates) {
+      const subtasks = Array.isArray(t.subtasks) ? (t.subtasks as string[]) : [];
+      const result = await assignFlowTask(email, {
+        title: t.title,
+        subtasks: subtasks.length > 0 ? subtasks : undefined,
+        userIds: body.userIds,
+        days: body.days,
+        dueDate: body.dueDate,
+        cadence: body.cadence,
+        fromTemplateId: t.id,
+      } satisfies FlowAssignInput);
+      created += result.created;
+    }
+    return { created };
+  }, "applyTemplateGroup");
+}
