@@ -984,9 +984,11 @@ export interface StageLocationSummary {
 // department text didn't match anything real (see careerApplicationSync.ts).
 // Without this bucket, these people were counted on the Employee Overview
 // card but had no "By Branch"/"By Department" entry that would ever show
-// them — silently uncounted on the only two pages that list Onboarding/
-// Active people (confirmed: 22 of 209 real Active-stage employees, 3 of 5
-// real Onboarding-stage employees, had no bucket to appear in at all).
+// them. Deliberately NOT used for Onboarding (see the stage === "onboarding"
+// checks below) — per explicit decision, removed there once the BranchStaff
+// live fallback (enrichRowsWithBranchStaffLocation) made it consistently
+// empty in practice; Active/Exit keep it, their own backfill decisions are
+// still pending (see conversation).
 export const UNASSIGNED_LOCATION_CODE = "unassigned";
 const UNASSIGNED_LOCATION_NAME = "Unassigned";
 
@@ -1008,6 +1010,7 @@ export function summarizeStageByBranch(
       const inBranch = stageRows.filter((r) => r.branchCode === b.code);
       return { code: b.code, name: b.name, count: inBranch.length };
     });
+  if (stage === "onboarding") return byBranch;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
   return [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
 }
@@ -1022,6 +1025,7 @@ export function summarizeStageByDepartment(
     const inDept = stageRows.filter((r) => r.departmentCode === d.code);
     return { code: d.code, name: d.name, count: inDept.length };
   });
+  if (stage === "onboarding") return byDept;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
   return [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
 }
@@ -1033,10 +1037,19 @@ export function filterStageByLocation(
   code: string,
 ): EmployeeOverviewRow[] {
   if (code === UNASSIGNED_LOCATION_CODE) {
+    if (stage === "onboarding") return [];
     return rows.filter((r) => r.stage === stage && !r.branchCode && !r.departmentCode);
   }
   return rows.filter((r) => r.stage === stage && (groupBy === "branch" ? r.branchCode === code : r.departmentCode === code));
 }
+
+// Onboarding-list dual-listing (real Probation-stage Full-Time people, and
+// real Active-stage Full-Time people whose recruitment pipeline still reads
+// "Probation") lives in careerApplicationSync.ts as
+// matchBelongsOnOnboardingList/computeOnboardingDualListedRows — it needs
+// the external career_applications/rec_recruit lookup this file doesn't
+// have, so it can't be a pure function here the way isDualListedOnProbation's
+// pure half is.
 
 export interface PendingRegistration {
   id: number;

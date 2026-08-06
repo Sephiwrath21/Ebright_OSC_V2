@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, Home, Search } from "lucide-react";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employeeQueries";
-import { deletePreStageEmployee } from "@/lib/employeeRecordActions";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 import Pagination from "@/app/components/Pagination";
 import RowActionMenu from "@/app/components/RowActionMenu";
@@ -233,14 +233,16 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                         <span className="text-sm text-slate-500">—</span>
                       )
                     ) : (
-                      // row.stage (not the page's own `stage`) — a dual-listed
-                      // row's REAL stage can differ from this page's stage
-                      // (e.g. an Onboarding/Active person whose recruitment
-                      // pipeline also flags them Probation, shown here too);
-                      // the badge must say what they actually are, not a flat
-                      // label matching whichever list happens to show them.
-                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
-                        {STAGE_LABELS[row.stage]}
+                      // Always this page's own stage label, deliberately NOT
+                      // row.stage — for Full-Time employees, Probation and
+                      // Onboarding run CONCURRENTLY (same person, both true
+                      // at once) until probation is formally confirmed and
+                      // they move to Active, so a dual-listed row's "real"
+                      // stage elsewhere isn't a more correct answer here, just
+                      // a different, equally-true one; showing it would read
+                      // as a contradiction rather than information.
+                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                        {STAGE_LABELS[stage]}
                       </span>
                     )}
                   </span>
@@ -248,7 +250,7 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                     <RowActionMenu
                       name={row.fullName}
                       onDelete={async () => {
-                        const result = await deletePreStageEmployee(row.id);
+                        const result = await deleteEmployeeRecord(row.id);
                         if (result.ok) router.refresh();
                         return result;
                       }}

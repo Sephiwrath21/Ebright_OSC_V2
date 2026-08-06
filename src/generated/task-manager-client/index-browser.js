@@ -280,8 +280,7 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
 exports.Prisma.ProofScalarFieldEnum = {
   id: 'id',
   runBlockId: 'runBlockId',
-  imageMime: 'imageMime',
-  imageData: 'imageData',
+  driveFileId: 'driveFileId',
   createdAt: 'createdAt'
 };
 

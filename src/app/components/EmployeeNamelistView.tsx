@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronRight, Home, LayoutGrid, List, Search } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import {
@@ -34,6 +36,12 @@ interface Props {
 }
 
 export default function EmployeeNamelistView({ stage, groupBy, locationCode, locationName, rows }: Props) {
+  const router = useRouter();
+  const handleDelete = async (id: number) => {
+    const result = await deleteEmployeeRecord(id);
+    if (result.ok) router.refresh();
+    return result;
+  };
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
@@ -169,12 +177,13 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
                   stage={stage}
                   profileQuery={profileQuery}
                   onShowMore={() => setOpenGroup(group)}
+                  onDelete={handleDelete}
                 />
               ))
             )}
           </div>
         ) : (
-          <ListViewTable stage={stage} rows={filteredRows} profileQuery={profileQuery} thirdGroupLabel={thirdGroupLabel} />
+          <ListViewTable stage={stage} rows={filteredRows} profileQuery={profileQuery} thirdGroupLabel={thirdGroupLabel} onDelete={handleDelete} />
         )}
       </div>
 
@@ -185,6 +194,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           stage={stage}
           profileQuery={profileQuery}
           onClose={() => setOpenGroup(null)}
+          onDelete={handleDelete}
         />
       )}
     </div>
@@ -195,17 +205,19 @@ function PersonCard({
   row,
   stage,
   profileQuery,
+  onDelete,
 }: {
   row: EmployeeOverviewRow;
   stage: EmployeeStage;
   profileQuery: string;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   return (
     <Link
       href={`/employee-folder/${stage}/employee/${row.id}${profileQuery}`}
       className="relative flex-1 basis-[130px] max-w-[150px] min-w-0 box-border bg-white border border-[#807d7d73] rounded-[15px] py-4 px-3 flex flex-col items-center text-center gap-1.5 hover:border-[#ee5f5f] hover:shadow-md transition-all"
     >
-      <RowActionMenu name={row.fullName} className="absolute top-1.5 right-1.5" />
+      <RowActionMenu name={row.fullName} className="absolute top-1.5 right-1.5" onDelete={() => onDelete(row.id)} />
       <div
         className={`w-[60px] h-[60px] rounded-full flex items-center justify-center font-medium text-lg shrink-0 ${
           STAGE_AVATAR_CLASSES[stage] ?? "bg-emerald-100 text-emerald-800"
@@ -225,12 +237,14 @@ function CategorySection({
   stage,
   profileQuery,
   onShowMore,
+  onDelete,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
   onShowMore: () => void;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const shown = rows.slice(0, CARD_CAP);
   return (
@@ -240,7 +254,7 @@ function CategorySection({
         <div className="flex flex-col items-end w-full max-w-[1000px]">
           <div className="flex flex-wrap gap-4 self-stretch">
             {shown.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} onDelete={onDelete} />
             ))}
           </div>
           {rows.length > CARD_CAP && (
@@ -264,12 +278,14 @@ function ShowMoreModal({
   stage,
   profileQuery,
   onClose,
+  onDelete,
 }: {
   label: string;
   rows: EmployeeOverviewRow[];
   stage: EmployeeStage;
   profileQuery: string;
   onClose: () => void;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
@@ -359,7 +375,7 @@ function ShowMoreModal({
             <p className="col-span-full text-center text-sm text-slate-500 py-8">No matches.</p>
           ) : (
             visible.map((row) => (
-              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} />
+              <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} onDelete={onDelete} />
             ))
           )}
         </div>
@@ -387,11 +403,13 @@ function ListViewTable({
   rows,
   profileQuery,
   thirdGroupLabel,
+  onDelete,
 }: {
   stage: EmployeeStage;
   rows: EmployeeOverviewRow[];
   profileQuery: string;
   thirdGroupLabel: string;
+  onDelete: (id: number) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -455,7 +473,7 @@ function ListViewTable({
                 </span>
                 <span className="text-[15px] text-black/67 truncate">{row.position ?? "—"}</span>
                 <div className="flex justify-center">
-                  <RowActionMenu name={row.fullName} />
+                  <RowActionMenu name={row.fullName} onDelete={() => onDelete(row.id)} />
                 </div>
               </div>
             );

@@ -2019,23 +2019,19 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
   }
 }
 
-// ─── Pre stage list's row-menu Delete — one action covering both row kinds
-// (see StageFlatListView/RowActionMenu), since they map to two different
-// tables with no shared id space:
+// ─── Every stage list's row-menu Delete (Pre/Probation/Onboarding/Active/
+// Exit/Employee Records — see RowActionMenu) — real hard delete, per
+// explicit decision (see conversation): clicking Delete removes the
+// employee record entirely, not an archive, regardless of what stage
+// they're currently at. One action covering both row kinds:
 // - Real employee (positive id, a genuine users row): deletes the users row
-//   outright. Every one of its relations (employment, user_profile, ...) is
-//   declared onDelete: Cascade in schema.prisma, so this is a clean single
-//   delete, not a manual multi-table teardown — and safe specifically because
-//   Pre-stage employees haven't accrued any real history yet (no leave,
-//   achievements, promotions, ...) worth preserving.
-// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail):
-//   deletes the onboarding_candidate row directly; there's no users row to
-//   remove.
-// Restricted to employees still actually in Pre — this only exists to back
-// the Pre-stage list's own Delete button, not as a general "delete any
-// employee" action, so a client can't repurpose it against someone who has
-// already moved on and has real history attached. ───
-export async function deletePreStageEmployee(id: number): Promise<ActionResult> {
+//   outright. Every one of its relations (employment, leave_request,
+//   resignation, ...) is declared onDelete: Cascade in schema.prisma, so
+//   this is a clean single delete, not a manual multi-table teardown.
+// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail,
+//   Pre-stage-only): deletes the onboarding_candidate row directly; there's
+//   no users row to remove.
+export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
   const authError = await requireSession();
   if (authError) return authError;
   const scope = await getCurrentEmployeeScope();
@@ -2062,7 +2058,6 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
 
   const row = await getEmployeeOverviewRowById(id);
   if (!row) return { ok: false, error: "This employee doesn't exist or you don't have access to them." };
-  if (row.stage !== "pre") return { ok: false, error: "Only Pre-stage employees can be deleted this way." };
 
   const scopeError = await requireEmployeeInScope(id);
   if (scopeError) return scopeError;

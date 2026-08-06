@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
 import { STAFF_ROLE_ID, resolveDepartmentBranch, type BranchOpt, type DepartmentOpt } from "@/lib/employeeQueries";
+import { positionGroup, type EmployeeStage } from "@/lib/employeeStages";
 import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
 
 export { BOARD_STAGE_TO_OUR_STAGE };
@@ -254,6 +255,49 @@ export async function isProbationOverrideExcluded(fullName: string): Promise<boo
   return matchIsProbationOverrideExcluded(map.get(normalizeName(fullName)));
 }
 
+// A person shows on the Onboarding list beyond their own real stage (their
+// stored stage is never touched) if EITHER: they're a real Probation-stage,
+// Full-Time employee (Probation and Onboarding run concurrently for
+// Full-Time hires, per explicit decision — same rule as
+// isDualListedOnOnboarding in employeeQueries.ts, reimplemented here since
+// this version also needs the pipeline check below in the same pass), OR
+// they're a real Active-stage, Full-Time employee whose recruitment
+// pipeline (board_stage/rec_stage) still reads "Probation" — i.e. exactly
+// the same people the Probation list itself dual-lists via
+// matchIsProbationPipeline (see [stage]/page.tsx's probation branch),
+// per explicit decision that anyone visible on Probation should also be
+// visible on Onboarding while Full-Time, not just the Probation-stage
+// subset of them. Never true for someone already natively Onboarding-stage
+// — they're already there, no dual-listing needed.
+export function matchBelongsOnOnboardingList(
+  row: { stage: EmployeeStage; position: string | null },
+  match: CareerApplicationLookupEntry | undefined,
+): boolean {
+  if (row.stage === "onboarding") return false;
+  if (positionGroup(row.position) !== "Full Time") return false;
+  if (row.stage === "probation") return true;
+  return matchIsProbationPipeline(match);
+}
+
+export async function computeOnboardingDualListedRows<
+  T extends { fullName: string; stage: EmployeeStage; position: string | null },
+>(rows: T[]): Promise<T[]> {
+  const map = await lookupCareerApplicationsByName();
+  return rows.filter((row) => matchBelongsOnOnboardingList(row, map.get(normalizeName(row.fullName))));
+}
+
+// Single-person version for the Onboarding profile page's stage guard —
+// same rule as computeOnboardingDualListedRows, just for whichever one row
+// that page is rendering.
+export async function isEligibleForOnboardingDualListing(row: {
+  fullName: string;
+  stage: EmployeeStage;
+  position: string | null;
+}): Promise<boolean> {
+  const map = await lookupCareerApplicationsByName();
+  return matchBelongsOnOnboardingList(row, map.get(normalizeName(row.fullName)));
+}
+
 // ebright_hrfs's real operational HR roster (confirmed table/columns by
 // direct schema inspection — not the auth `hrfs` Prisma database, a
 // same-named but unrelated thing; see ebright-hrfs.ts's own note on this).
@@ -288,6 +332,35 @@ export async function lookupBranchStaffLocationByName(
     if (resolved && (resolved.departmentCode || resolved.branchCode)) map.set(key, resolved);
   }
   return map;
+}
+
+// Display-only Branch/Department fallback for the By-Branch/By-Department
+// grouping and its drill-down lists (Onboarding/Active/Exit) — the same
+// BranchStaff lookup the Probation list already uses, generalized to
+// anyone with neither branch_id nor department_id set on their own
+// employment row, not just the people flagged in conversation. Returns NEW
+// row objects (never mutates the input) for rows it fills in; rows that
+// already have real data, or have no BranchStaff match, are returned
+// unchanged (by reference) so callers can freely mix this into a list
+// without extra copying. Purely for grouping/rendering — nothing here ever
+// writes to an employment record.
+export async function enrichRowsWithBranchStaffLocation<
+  T extends { fullName: string; branchCode: string | null; branchName: string | null; departmentCode: string | null; departmentName: string | null },
+>(rows: T[], branches: BranchOpt[], departments: DepartmentOpt[]): Promise<T[]> {
+  if (!rows.some((r) => !r.branchCode && !r.departmentCode)) return rows;
+  const branchStaffByName = await lookupBranchStaffLocationByName(branches, departments);
+  return rows.map((row) => {
+    if (row.branchCode || row.departmentCode) return row;
+    const loc = branchStaffByName.get(normalizeName(row.fullName));
+    if (!loc) return row;
+    return {
+      ...row,
+      branchCode: loc.branchCode ?? null,
+      branchName: loc.branchName ?? null,
+      departmentCode: loc.departmentCode ?? null,
+      departmentName: loc.departmentName ?? null,
+    };
+  });
 }
 
 // Pure per-applicant decision — no I/O, fully unit-testable without a

@@ -17,6 +17,8 @@ import {
 import {
   lookupCareerApplicationsByName,
   lookupBranchStaffLocationByName,
+  enrichRowsWithBranchStaffLocation,
+  computeOnboardingDualListedRows,
   matchIsProbationPipeline,
   matchIsProbationOverrideExcluded,
   normalizeName,
@@ -165,11 +167,29 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   const { by } = await searchParams;
   const groupBy = by === "department" ? "department" : "branch";
 
-  const [rows, branches, departments] = await Promise.all([
+  const [rowsBase, branches, departments] = await Promise.all([
     listEmployeeOverviewRows(),
     listBranches(),
     listDepartments(),
   ]);
+  // Real Probation-stage Full-Time people, and real Active-stage Full-Time
+  // people whose recruitment pipeline still reads "Probation", also count
+  // toward Onboarding here — see computeOnboardingDualListedRows — as
+  // clones with stage overridden to "onboarding" so the existing
+  // r.stage === stage filtering inside summarizeStageByBranch/Department
+  // picks them up for free. Their own stored stage is untouched; this
+  // array only exists for this render.
+  const rowsRaw =
+    stage === "onboarding"
+      ? [...rowsBase, ...(await computeOnboardingDualListedRows(rowsBase)).map((r) => ({ ...r, stage: "onboarding" as const }))]
+      : rowsBase;
+  // Same live BranchStaff fallback the Probation list uses — someone whose
+  // own employment row has neither branch_id nor department_id set yet
+  // (e.g. Onboarding/Active people still mid-pipeline) would otherwise only
+  // ever show up under "Unassigned" here despite the operational HR roster
+  // already having their real location. Read-only: fills in this summary's
+  // counts/grouping only, never writes back to the employment record.
+  const rows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
 
   const locations =
     groupBy === "branch"
