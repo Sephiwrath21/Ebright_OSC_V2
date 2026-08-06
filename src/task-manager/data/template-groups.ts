@@ -298,7 +298,16 @@ export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
  *  fromTemplateId is set per task so each created assignment links back to
  *  its own TaskTemplate row (identical to using a single-task template
  *  today — same hub Edit/Remove/Reassign/Archive tabs would work on it,
- *  they're just not surfaced there per Task 2's picker filter). */
+ *  they're just not surfaced there per Task 2's picker filter).
+ *  Not wrapped in a transaction across members — if one member's
+ *  assignFlowTask call throws partway through, earlier iterations already
+ *  created real FlowRun/RunBlock rows and the partial `created` count is
+ *  lost to the caller. assignFlowTask has no idempotency guard, so a naive
+ *  "retry the whole group" in response to that error would RE-ASSIGN the
+ *  already-succeeded member tasks too, duplicating live tasks for the same
+ *  recipients. Callers (the future Assign modal) should not blindly retry
+ *  on failure — surface the error and let the admin verify actual state
+ *  before re-attempting. */
 export function applyTemplateGroup(
   email: string,
   groupId: string,
