@@ -142,3 +142,136 @@ export function createTemplateGroup(
     return { id: group.id };
   }, "createTemplateGroup");
 }
+
+export interface EditTemplateGroupResult {
+  updatedTasks: number;
+  createdTasks: number;
+  removedTasks: number;
+  employees: number;
+}
+
+/** Renames the group and reconciles its member tasks against the submitted
+ *  list: kept members (id present) go through editTaskTemplate (propagates
+ *  to pending instances, same as the single-task Edit tab); removed
+ *  members go through deleteTaskTemplate (cancels their pending
+ *  instances); new members (id absent) are created fresh. `employees` sums
+ *  per-task counts and may double-count someone with pending tasks from
+ *  more than one member of this group — an acceptable approximation for a
+ *  summary count, same caveat the single-task Edit panel already has. */
+export function editTemplateGroup(
+  email: string,
+  groupId: string,
+  input: EditTemplateGroupInput,
+): Promise<EditTemplateGroupResult> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(groupId);
+    const body = editGroupSchema.parse(input);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id },
+      select: { id: true },
+    });
+    if (!group) throw new ApiHttpError(404, "Template not found");
+
+    await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name } });
+
+    const existing = await prisma.taskTemplate.findMany({
+      where: { templateGroupId: id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((t) => t.id));
+    const submittedIds = new Set(body.tasks.filter((t) => t.id).map((t) => t.id as string));
+
+    let removedTasks = 0;
+    for (const memberId of existingIds) {
+      if (!submittedIds.has(memberId)) {
+        const result = await deleteTaskTemplate(email, memberId);
+        removedTasks += result.removedTasks;
+      }
+    }
+
+    let updatedTasks = 0;
+    let createdTasks = 0;
+    let employees = 0;
+    for (const [index, t] of body.tasks.entries()) {
+      if (t.id && existingIds.has(t.id)) {
+        const result = await editTaskTemplate(email, t.id, { title: t.title, subtasks: t.subtasks });
+        updatedTasks += result.updatedTasks;
+        employees += result.employees;
+        await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
+      } else {
+        await prisma.taskTemplate.create({
+          data: {
+            createdById: user.id,
+            name: t.title,
+            title: t.title,
+            subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
+            templateGroupId: id,
+            groupPosition: index,
+          },
+        });
+        createdTasks += 1;
+      }
+    }
+    return { updatedTasks, createdTasks, removedTasks, employees };
+  }, "editTemplateGroup");
+}
+
+export interface GroupDeletionImpact {
+  pendingTasks: number;
+  pendingEmployees: number;
+  completedKept: number;
+}
+
+/** Aggregated pre-deletion preview across every member task — same
+ *  double-counting caveat as editTemplateGroup's `employees`. */
+export function getGroupDeletionImpact(
+  email: string,
+  groupId: string,
+): Promise<GroupDeletionImpact> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(groupId);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id },
+      include: { templates: { select: { id: true } } },
+    });
+    if (!group) throw new ApiHttpError(404, "Template not found");
+    let pendingTasks = 0;
+    let pendingEmployees = 0;
+    let completedKept = 0;
+    for (const t of group.templates) {
+      const impact = await getTemplateDeletionImpact(email, t.id);
+      pendingTasks += impact.pendingTasks;
+      pendingEmployees += impact.pendingEmployees;
+      completedKept += impact.completedKept;
+    }
+    return { pendingTasks, pendingEmployees, completedKept };
+  }, "getGroupDeletionImpact");
+}
+
+/** Deletes every member task (cascade-safe — see deleteTaskTemplate) then
+ *  the group row itself. */
+export function deleteTemplateGroup(
+  email: string,
+  groupId: string,
+): Promise<{ deleted: boolean; removedTasks: number; keptRecords: number }> {
+  return native(async () => {
+    const user = await requireAssigner(email);
+    const id = z.string().min(1).parse(groupId);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, createdById: user.id },
+      include: { templates: { select: { id: true } } },
+    });
+    if (!group) throw new ApiHttpError(404, "Template not found");
+    let removedTasks = 0;
+    let keptRecords = 0;
+    for (const t of group.templates) {
+      const result = await deleteTaskTemplate(email, t.id);
+      removedTasks += result.removedTasks;
+      keptRecords += result.keptRecords;
+    }
+    await prisma.taskTemplateGroup.delete({ where: { id } });
+    return { deleted: true, removedTasks, keptRecords };
+  }, "deleteTemplateGroup");
+}
