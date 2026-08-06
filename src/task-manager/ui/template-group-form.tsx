@@ -66,6 +66,7 @@ export function TemplateGroupFormModal({
   };
 
   const save = () => {
+    if (pending) return;
     const trimmedName = name.trim();
     if (!trimmedName) {
       setMessage({ ok: false, text: "Give the template a name." });

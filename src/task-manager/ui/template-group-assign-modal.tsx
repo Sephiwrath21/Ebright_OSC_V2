@@ -60,6 +60,7 @@ export function TemplateGroupAssignModal({
   };
 
   const submit = () => {
+    if (pending) return;
     if (userIds.length === 0) {
       setMessage({ ok: false, text: "Pick at least one recipient." });
       return;

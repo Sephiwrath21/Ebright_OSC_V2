@@ -93,7 +93,12 @@ export function getTaskTemplate(email: string, templateId: string): Promise<Task
     const user = await requireAssigner(email);
     const id = z.string().min(1).parse(templateId);
     const row = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
     });
     if (!row) throw new ApiHttpError(404, "Template not found");
     return {
@@ -121,7 +126,12 @@ export function renameTaskTemplate(
     const id = z.string().min(1).parse(templateId);
     const newName = z.string().trim().min(1).max(100).parse(name);
     const result = await prisma.taskTemplate.updateMany({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
       data: { name: newName },
     });
     if (result.count === 0) throw new ApiHttpError(404, "Template not found");
@@ -237,7 +247,12 @@ export function removeTemplateAssignments(
     const user = await requireAssigner(email);
     const id = z.string().min(1).parse(templateId);
     const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
       select: { id: true },
     });
     if (!template) throw new ApiHttpError(404, "Template not found");
@@ -264,7 +279,12 @@ export function getTemplateAssignees(
     const user = await requireAssigner(email);
     const id = z.string().min(1).parse(templateId);
     const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
       select: { id: true },
     });
     if (!template) throw new ApiHttpError(404, "Template not found");
@@ -503,7 +523,12 @@ export function archiveTemplateTasks(
     const user = await requireAssigner(email);
     const id = z.string().min(1).parse(templateId);
     const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
       select: { id: true },
     });
     if (!template) throw new ApiHttpError(404, "Template not found");
@@ -554,7 +579,12 @@ export function unarchiveTemplateTasks(
     const user = await requireAssigner(email);
     const id = z.string().min(1).parse(templateId);
     const template = await prisma.taskTemplate.findFirst({
-      where: { id, createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { id, createdById: user.id, templateGroupId: null },
       select: { id: true, archivedAt: true },
     });
     if (!template) throw new ApiHttpError(404, "Template not found");
@@ -601,7 +631,12 @@ export function listArchivedItems(email: string): Promise<ArchivedItems> {
   return native(async () => {
     const user = await requireAssigner(email);
     const all = await prisma.taskTemplate.findMany({
-      where: { createdById: user.id },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { createdById: user.id, templateGroupId: null },
       select: { id: true, name: true, title: true, archivedAt: true },
     });
     const byId = new Map(all.map((t) => [t.id, t]));
