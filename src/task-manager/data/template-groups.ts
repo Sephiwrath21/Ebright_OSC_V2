@@ -416,6 +416,23 @@ export function applyTemplateGroup(
     const user = await requireGroupAssignAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = applyGroupSchema.parse(input);
+    // Server-side backstop for the Package-assign recipient restriction:
+    // the Assign modal's picker already only offers BRANCH-role staff for
+    // PACKAGE scope, but requireGroupAssignAccess above only gates WHO may
+    // call this function, not WHO the submitted userIds belong to — an
+    // already-authorized Branch Manager caller could otherwise submit any
+    // staff id directly (bypassing the UI-only restriction) and
+    // assignFlowTaskCore would create the assignment regardless, since it
+    // has no PACKAGE-scope-aware target check of its own.
+    if (scope === "PACKAGE") {
+      const targets = await prisma.user.findMany({
+        where: { id: { in: body.userIds } },
+        select: { role: true },
+      });
+      if (targets.some((t) => t.role !== "BRANCH")) {
+        throw new ApiHttpError(400, "Packages can only be assigned to branch managers");
+      }
+    }
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
       include: { templates: { orderBy: { groupPosition: "asc" } } },

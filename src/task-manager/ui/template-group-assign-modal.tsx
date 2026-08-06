@@ -5,6 +5,18 @@
 // created for them in one submit via control.apply. Deliberately separate
 // from the Create/Edit modal — creating a template never asks for an
 // assignee (per the confirmed design).
+//
+// Package recipient restriction (2026-08-06): Package assignment is
+// Branch-Manager-only server-side (requireGroupAssignAccess in
+// template-groups.ts), so the picker here mirrors that — when
+// label === "Package", `staff` is pre-filtered to role === "BRANCH" (the
+// same definition the server check uses, NOT employmentType === "Manager",
+// which is a related but not-guaranteed-identical field) before it ever
+// reaches RecipientPicker, and the Group dropdown is trimmed to just
+// "Branch Manager" via `groupOptions` — every other FLOW_GROUPS option
+// would resolve empty against an already Branch-Manager-only staff list.
+// Template keeps the full, unrestricted picker (label defaults to
+// "Template", so `assignableStaff`/`groupOptions` fall through unchanged).
 import * as React from "react";
 import { FLOW_DAYS, visibleCadenceOptions, type CadenceOption } from "./types";
 import type { FlowStaffMember, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
@@ -45,7 +57,10 @@ export function TemplateGroupAssignModal({
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
 
-  const selectedStaff = staff.filter((s) => userIds.includes(s.id));
+  const assignableStaff = label === "Package" ? staff.filter((s) => s.role === "BRANCH") : staff;
+  const groupOptions = label === "Package" ? (["Branch Manager"] as const) : undefined;
+
+  const selectedStaff = assignableStaff.filter((s) => userIds.includes(s.id));
   const visibleCadences = visibleCadenceOptions(selectedStaff);
   React.useEffect(() => {
     if (hideCadence) return;
@@ -113,7 +128,12 @@ export function TemplateGroupAssignModal({
             Creates all {group.taskCount} task{group.taskCount === 1 ? "" : "s"} in this {label.toLowerCase()} for
             every recipient picked below.
           </p>
-          <RecipientPicker staff={staff} selected={userIds} onChange={setUserIds} />
+          <RecipientPicker
+            staff={assignableStaff}
+            selected={userIds}
+            onChange={setUserIds}
+            groupOptions={groupOptions}
+          />
           {!hideCadence && (
             <div className="text-sm text-gray-600">
               Cadence
