@@ -195,7 +195,12 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
               className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
-          <SubtaskListEditor key={subtaskEditorKey} subtasks={subtasks} onChange={setSubtasks} />
+          <SubtaskListEditor
+            key={subtaskEditorKey}
+            subtasks={subtasks}
+            onChange={setSubtasks}
+            showMaxMessage={false}
+          />
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
             <p className="text-sm font-medium text-gray-600">Guidelines</p>
             <label className="mt-2 block text-sm text-gray-600">

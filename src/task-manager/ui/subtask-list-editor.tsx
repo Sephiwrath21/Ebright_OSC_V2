@@ -13,10 +13,16 @@ export function SubtaskListEditor({
   subtasks,
   onChange,
   max = 20,
+  showMaxMessage = true,
 }: {
   subtasks: string[];
   onChange: (next: string[]) => void;
   max?: number;
+  /** Whether to render the "Maximum N subtasks." helper text once the cap
+   *  is hit. Defaults to true. template-panels.tsx's TemplateEditPanel
+   *  passes false — its pre-extraction original never showed this
+   *  message, unlike assign-task-form.tsx's. */
+  showMaxMessage?: boolean;
 }) {
   const [draft, setDraft] = React.useState("");
 
@@ -77,7 +83,7 @@ export function SubtaskListEditor({
           ))}
         </ol>
       )}
-      {subtasks.length >= max && (
+      {showMaxMessage && subtasks.length >= max && (
         <p className="mt-1.5 text-xs text-gray-400">Maximum {max} subtasks.</p>
       )}
     </div>
