@@ -36,7 +36,7 @@ export interface TaskTemplateDetail {
   guidelineImage: { mime: string; dataBase64: string } | null;
 }
 
-async function requireAssigner(email: string) {
+export async function requireAssigner(email: string) {
   const user = await requireUserByEmail(email);
   const allowed =
     user.role === "ADMIN" ||
@@ -56,7 +56,12 @@ export function listTaskTemplates(email: string): Promise<TaskTemplateSummary[]>
     const rows = await prisma.taskTemplate.findMany({
       // Archived templates leave every active surface (assign picker,
       // Edit/Remove/Reassign tabs) — the Archive tab lists them instead.
-      where: { createdById: user.id, archivedAt: null },
+      // Group members (Template Groups, 2026-08-06) are excluded too — they
+      // have their own dashboard at /task-manager/template, so the two
+      // "template" concepts stay visually separate despite sharing this
+      // table. This is a no-op for every pre-existing row (templateGroupId
+      // was always null before this feature).
+      where: { createdById: user.id, archivedAt: null, templateGroupId: null },
       orderBy: { updatedAt: "desc" },
       // Never select the image BYTES for a list — load-for-prefill only.
       select: {
