@@ -7,7 +7,7 @@
 // orchestrates it across a group's members and adds the group wrapper
 // itself. Creating/editing a group never touches recipients/days/due-date/
 // cadence — "Assign" (applyTemplateGroup) is a separate action that picks
-// those once and fans out to assignFlowTask per member task.
+// those once and fans out to assignFlowTaskCore per member task.
 //
 // Scope (2026-08-06): this same data model/logic powers TWO pages —
 // /task-manager/template ("Template", scope TEMPLATE) open to every
@@ -19,17 +19,19 @@
 // in ./templates, since editing that would also widen the OLD single-task
 // "+ Task -> Start from a template" hub's access, which nobody asked for.
 //
-// Delegation target (2026-08-06 fix): the per-member edit/delete/impact
-// calls below go to ./templates-internal's Core functions
+// Delegation target (2026-08-06 fix, two rounds): the per-member edit/
+// delete/impact calls below go to ./templates-internal's Core functions
 // (deleteTaskTemplateCore/editTaskTemplateCore/getTemplateDeletionImpactCore),
 // NOT to ./templates's exported deleteTaskTemplate/editTaskTemplate/
 // getTemplateDeletionImpact — those re-run requireAssigner internally,
-// whose allow-list has zero overlap with Branch Manager, which would
-// 403 every PACKAGE-scope call and every Branch-Manager TEMPLATE-scope
-// call even though requireGroupAccess (below) already authorized the
-// actor for this exact operation. ./templates-internal is intentionally
-// NOT re-exported by data.ts's `export *` barrel, so this file imports it
-// directly rather than via `@/task-manager/data`.
+// whose allow-list has zero overlap with Branch Manager. Same reasoning,
+// same fix, applies to "Assign" (applyTemplateGroup): it calls
+// ./tasks-internal's assignFlowTaskCore, NOT ./tasks's exported
+// assignFlowTask — that function re-runs its OWN separate actor check
+// (also with zero Branch Manager overlap). Both ./templates-internal and
+// ./tasks-internal are intentionally NOT re-exported by data.ts's
+// `export *` barrel, so this file imports them directly rather than via
+// `@/task-manager/data`.
 import { z } from "zod";
 import type { Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
@@ -41,7 +43,7 @@ import {
   editTaskTemplateCore,
   getTemplateDeletionImpactCore,
 } from "./templates-internal";
-import { assignFlowTask } from "./tasks";
+import { assignFlowTaskCore } from "./tasks-internal";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
@@ -357,18 +359,26 @@ const applyGroupSchema = z.object({
 export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
 
 /** "Assign" (2026-08-06): one recipient/day/due-date/cadence choice for the
- *  WHOLE group, fanned out as one assignFlowTask call per member task —
+ *  WHOLE group, fanned out as one assignFlowTaskCore call per member task —
  *  the same pipeline "Start from a template" already uses, just looped.
  *  fromTemplateId is set per task so each created assignment links back to
- *  its own TaskTemplate row. Not wrapped in a transaction across members —
- *  if one member's assignFlowTask call throws partway through, earlier
- *  iterations already created real FlowRun/RunBlock rows and the partial
- *  `created` count is lost to the caller. assignFlowTask has no idempotency
- *  guard, so a naive "retry the whole group" in response to that error
- *  would RE-ASSIGN the already-succeeded member tasks too, duplicating
- *  live tasks for the same recipients. Callers (the Assign modal) should
- *  not blindly retry on failure — surface the error and let the admin
- *  verify actual state before re-attempting. */
+ *  its own TaskTemplate row. Delegates to ./tasks-internal's
+ *  assignFlowTaskCore (2026-08-06 fix) rather than ./tasks's exported
+ *  assignFlowTask — that function re-runs its OWN actor check
+ *  (ADMIN|OPS|CEO|HOD|isElevatedDeptSite, no BRANCH) independent of this
+ *  file's requireGroupAccess above, which would 403 every Branch-Manager
+ *  call regardless of scope even though requireGroupAccess already
+ *  authorized this exact actor for this exact operation — same
+ *  double-gating class as the earlier templates.ts fix. Not wrapped in a
+ *  transaction across members — if one member's assignFlowTaskCore call
+ *  throws partway through, earlier iterations already created real
+ *  FlowRun/RunBlock rows and the partial `created` count is lost to the
+ *  caller. assignFlowTaskCore has no idempotency guard, so a naive "retry
+ *  the whole group" in response to that error would RE-ASSIGN the
+ *  already-succeeded member tasks too, duplicating live tasks for the same
+ *  recipients. Callers (the Assign modal) should not blindly retry on
+ *  failure — surface the error and let the admin verify actual state
+ *  before re-attempting. */
 export function applyTemplateGroup(
   email: string,
   groupId: string,
@@ -391,7 +401,7 @@ export function applyTemplateGroup(
     let created = 0;
     for (const t of group.templates) {
       const subtasks = Array.isArray(t.subtasks) ? (t.subtasks as string[]) : [];
-      const result = await assignFlowTask(email, {
+      const result = await assignFlowTaskCore(user, {
         title: t.title,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
         userIds: body.userIds,
