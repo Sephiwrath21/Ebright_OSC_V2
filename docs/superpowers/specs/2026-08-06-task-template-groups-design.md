@@ -119,8 +119,9 @@ no new cascade-safety logic is written from scratch.
 | `editTemplateGroup(email, groupId, {name, tasks})` | Renames the group. Reconciles the submitted task array against existing members: new entries → create; removed entries → `deleteTaskTemplate` (existing cascade-safety); kept entries → `editTaskTemplate` (existing pending-instance propagation). |
 | `getGroupDeletionImpact(email, groupId)` | Aggregates `getTemplateDeletionImpact` across all member tasks for a single confirm-dialog preview. |
 | `deleteTemplateGroup(email, groupId)` | Loops `deleteTaskTemplate` per member (cancels pending instances, keeps completed history), then deletes the group row. |
-| `archiveTemplateGroup` / `unarchiveTemplateGroup` | Loops the existing `archiveTemplateTasks` / `unarchiveTemplateTasks` per member, plus stamps/clears `TaskTemplateGroup.archivedAt`. |
 | `applyTemplateGroup(email, groupId, {assigneeIds, days, dueAt, cadence})` | The "Assign" action. One recipient/date/cadence choice; calls the existing `assignFlowTask` once per member task (`fromTemplateId` set per task), same as today's single-template apply — just looped across the group's tasks. |
+
+No `archiveTemplateGroup`/`unarchiveTemplateGroup` — the user's ask was Edit and Delete only (no Archive), and Delete already handles the pending-vs-completed split safely, so adding an unused archive path would be dead code.
 
 All functions call the existing `requireAssigner(email)` guard — no new
 authorization logic.
@@ -155,8 +156,13 @@ server-side).
 
 ## 7. Out of scope
 
-- No changes to the existing single-task `TaskTemplate` flow, the "+ Task"
-  hub modal, or its four existing tabs.
+- No changes to the existing single-task `TaskTemplate` flow's UX, the
+  "+ Task" hub modal, or its four existing tabs. One narrow, backward-
+  compatible exception: `listTaskTemplates`'s query gains a
+  `templateGroupId: null` filter so future group-member rows never leak
+  into that picker — a no-op for every pre-existing row (all had
+  `templateGroupId = null` already), so standalone templates behave
+  identically before and after.
 - No changes to `/task-manager/package` or `/task-manager/package-table`
   (separate, unspecified placeholders).
 - No bulk import/export of template groups.
