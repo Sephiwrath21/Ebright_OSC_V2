@@ -6,10 +6,24 @@
 // useTransition so revalidatePath's effect (a fresh `control.list` from
 // the parent server component) actually reaches this client tree — the
 // same pattern AssignTaskForm's submit() already uses.
+//
+// Grid/List view toggle (2026-08-06): purely a display preference, stored
+// in localStorage per `label` (so Template and Package remember their own
+// view independently) — no server round-trip, defaults to "grid" on first
+// visit or when localStorage is unavailable.
 import * as React from "react";
+import { LayoutGrid, List } from "lucide-react";
 import type { FlowStaffMember, FlowTemplateGroupControl } from "./types";
 import { TemplateGroupFormModal } from "./template-group-form";
 import { TemplateGroupAssignModal } from "./template-group-assign-modal";
+
+type ViewMode = "grid" | "list";
+
+function viewToggleButtonClass(active: boolean): string {
+  return `flex size-8 items-center justify-center rounded-full ${
+    active ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"
+  }`;
+}
 
 export function TemplateGroupDashboard({
   staff,
@@ -34,6 +48,26 @@ export function TemplateGroupDashboard({
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = React.useTransition();
   const labelLower = label.toLowerCase();
+
+  const viewStorageKey = `task-manager-group-view:${label}`;
+  const [view, setView] = React.useState<ViewMode>("grid");
+  React.useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(viewStorageKey);
+      if (stored === "grid" || stored === "list") setView(stored);
+    } catch {
+      // localStorage unavailable (private browsing, etc.) — stay on the "grid" default.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewStorageKey]);
+  const changeView = (next: ViewMode) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(viewStorageKey, next);
+    } catch {
+      // localStorage unavailable — the choice just won't persist this session.
+    }
+  };
 
   const remove = (groupId: string, name: string) => {
     if (busyId) return;
@@ -68,13 +102,41 @@ export function TemplateGroupDashboard({
           {control.list.length} {labelLower}
           {control.list.length === 1 ? "" : "s"}
         </p>
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          + New {label}
-        </button>
+        <div className="flex items-center gap-2">
+          <div
+            role="radiogroup"
+            aria-label="View"
+            className="flex items-center gap-0.5 rounded-full border border-gray-300 bg-white p-0.5"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={view === "grid"}
+              aria-label="Grid view"
+              onClick={() => changeView("grid")}
+              className={viewToggleButtonClass(view === "grid")}
+            >
+              <LayoutGrid className="size-4" />
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={view === "list"}
+              aria-label="List view"
+              onClick={() => changeView("list")}
+              className={viewToggleButtonClass(view === "list")}
+            >
+              <List className="size-4" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            + New {label}
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -85,7 +147,7 @@ export function TemplateGroupDashboard({
         <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
           No {labelLower}s yet — create one to bundle several tasks together for reuse.
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {control.list.map((g) => (
             <div key={g.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -131,6 +193,54 @@ export function TemplateGroupDashboard({
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Tasks</th>
+                <th className="px-4 py-3">Last Updated</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {control.list.map((g) => (
+                <tr key={g.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{g.taskCount}</td>
+                  <td className="px-4 py-3 text-gray-600">{g.updatedAt.slice(0, 10)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAssignGroupId(g.id)}
+                        className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                      >
+                        Assign
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditGroupId(g.id)}
+                        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === g.id}
+                        onClick={() => remove(g.id, g.name)}
+                        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
+                      >
+                        {busyId === g.id ? "Removing…" : "Delete"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
