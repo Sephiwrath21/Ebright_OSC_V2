@@ -6,7 +6,9 @@
 // kept, other assignees untouched — same convention the group's own
 // Delete action already uses).
 import * as React from "react";
-import type { FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
+import type { FlowTemplateGroupAssignee, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
+
+const FALLBACK_MESSAGE = "Something went wrong — please try again";
 
 export function TemplateGroupAssigneesModal({
   control,
@@ -20,22 +22,42 @@ export function TemplateGroupAssigneesModal({
   label?: "Template" | "Package";
 }) {
   const [loading, setLoading] = React.useState(true);
-  const [assignees, setAssignees] = React.useState<{ userId: string; name: string; pendingTasks: number }[]>([]);
+  const [assignees, setAssignees] = React.useState<FlowTemplateGroupAssignee[]>([]);
   const [busyUserId, setBusyUserId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = React.useTransition();
   const labelLower = label.toLowerCase();
 
+  // `load()` is invoked both by the mount effect below AND imperatively
+  // after a successful remove — a plain per-effect `cancelled` local
+  // (template-group-form.tsx's pattern) only guards the mount call, so a
+  // component-lifetime ref stands in for it here, guarding every call site
+  // against setState after the modal has been closed/unmounted mid-fetch.
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const load = React.useCallback(() => {
-    setLoading(true);
-    void control.assignees(group.id).then((result) => {
-      setLoading(false);
-      if (result.ok) {
-        setAssignees(result.assignees);
-      } else {
-        setMessage({ ok: false, text: result.message });
-      }
-    });
+    control
+      .assignees(group.id)
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setLoading(false);
+        if (result.ok) {
+          setAssignees(result.assignees);
+        } else {
+          setMessage({ ok: false, text: result.message });
+        }
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setLoading(false);
+        setMessage({ ok: false, text: FALLBACK_MESSAGE });
+      });
   }, [control, group.id]);
 
   React.useEffect(() => {
@@ -44,22 +66,29 @@ export function TemplateGroupAssigneesModal({
 
   const removeOne = (userId: string, name: string) => {
     if (busyUserId) return;
+    setBusyUserId(userId);
     if (
       !window.confirm(
         `Remove ${name}'s pending tasks from "${group.name}"? Their completed tasks stay untouched, and no one else assigned this ${labelLower} is affected.`,
       )
     ) {
+      setBusyUserId(null);
       return;
     }
-    setBusyUserId(userId);
     startTransition(async () => {
-      const result = await control.removeAssignee(group.id, userId);
-      setBusyUserId(null);
-      if (result.ok) {
-        setMessage({ ok: true, text: `Removed ${name}'s pending tasks.` });
-        load();
-      } else {
-        setMessage({ ok: false, text: result.message });
+      try {
+        const result = await control.removeAssignee(group.id, userId);
+        if (!mountedRef.current) return;
+        if (result.ok) {
+          setMessage({ ok: true, text: `Removed ${name}'s pending tasks.` });
+          load();
+        } else {
+          setMessage({ ok: false, text: result.message });
+        }
+      } catch {
+        if (mountedRef.current) setMessage({ ok: false, text: FALLBACK_MESSAGE });
+      } finally {
+        if (mountedRef.current) setBusyUserId(null);
       }
     });
   };
