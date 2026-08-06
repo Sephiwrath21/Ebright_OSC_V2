@@ -10,14 +10,26 @@
 // those once and fans out to assignFlowTaskCore per member task.
 //
 // Scope (2026-08-06): this same data model/logic powers TWO pages —
-// /task-manager/template ("Template", scope TEMPLATE) open to every
-// assign-capable role PLUS Branch Manager, and /task-manager/package
-// ("Package", scope PACKAGE) restricted to Branch Manager only. Every
-// function below takes `scope` and threads it through every query/write,
-// so the two pages' data can never cross. Authorization is scope-aware via
-// requireGroupAccess (below) — deliberately NOT the shared requireAssigner
-// in ./templates, since editing that would also widen the OLD single-task
-// "+ Task -> Start from a template" hub's access, which nobody asked for.
+// /task-manager/template ("Template", scope TEMPLATE) and
+// /task-manager/package ("Package", scope PACKAGE). Every function below
+// takes `scope` and threads it through every query/write, so the two
+// pages' data can never cross. Authorization is deliberately NOT the
+// shared requireAssigner in ./templates, since editing that would also
+// widen the OLD single-task "+ Task -> Start from a template" hub's
+// access, which nobody asked for.
+//
+// Two-tier authorization (2026-08-06, revised): general management
+// (list/view/create/edit/delete a group — requireGroupAccess) is open to
+// the same assign-capable allow-list for BOTH scopes, so any account that
+// can manage templates can also manage packages. "Assign" — actually
+// fanning a group out to recipients, plus View/Remove Assignees, which is
+// about the same population — is gated separately via
+// requireGroupAssignAccess: unrestricted for TEMPLATE (same allow-list as
+// management), but PACKAGE-scope assignment stays Branch Manager only.
+// This means a non-Branch-Manager can see and edit a package but gets a
+// 403 (surfaced as an inline error message, not a page redirect, since
+// Assign/View Assignees are action closures called after the page has
+// already loaded) if they try to assign it or view/remove its assignees.
 //
 // Delegation target (2026-08-06 fix, two rounds): the per-member edit/
 // delete/impact calls below go to ./templates-internal's Core functions
@@ -56,27 +68,39 @@ const NOT_FOUND_MESSAGE: Record<TemplateGroupScope, string> = {
   PACKAGE: "Package not found",
 };
 
-/** Scope-aware authorization: TEMPLATE keeps the existing assign-capable
- *  allow-list, now also including Branch Manager; PACKAGE is Branch
- *  Manager only. Deliberately separate from ./templates's requireAssigner
- *  — see the file header for why that shared helper stays untouched. */
+const ASSIGN_CAPABLE_ROLES = ["ADMIN", "OPS", "CEO", "HOD", "BRANCH"] as const;
+
+function isAssignCapable(user: { role: string; department: string | null }): boolean {
+  return (
+    (ASSIGN_CAPABLE_ROLES as readonly string[]).includes(user.role) || isElevatedDeptSite(user)
+  );
+}
+
+/** General management (list/view/create/edit/delete a group): the same
+ *  assign-capable allow-list for both scopes — Package management is not
+ *  restricted to Branch Manager. Deliberately separate from
+ *  ./templates's requireAssigner — see the file header for why that
+ *  shared helper stays untouched. */
 async function requireGroupAccess(email: string, scope: TemplateGroupScope) {
   const user = await requireUserByEmail(email);
-  const allowed =
-    scope === "PACKAGE"
-      ? user.role === "BRANCH"
-      : user.role === "ADMIN" ||
-        user.role === "OPS" ||
-        user.role === "CEO" ||
-        user.role === "HOD" ||
-        user.role === "BRANCH" ||
-        isElevatedDeptSite(user);
+  if (!isAssignCapable(user)) {
+    throw new ApiHttpError(403, `Only assign-capable accounts can manage ${NOUN[scope]}s`);
+  }
+  return user;
+}
+
+/** Assignment access (Assign, View Assignees, Remove Assignee): unrestricted
+ *  for TEMPLATE (same allow-list as management), but PACKAGE assignment
+ *  stays Branch Manager only, per the original Package requirement. */
+async function requireGroupAssignAccess(email: string, scope: TemplateGroupScope) {
+  const user = await requireUserByEmail(email);
+  const allowed = scope === "PACKAGE" ? user.role === "BRANCH" : isAssignCapable(user);
   if (!allowed) {
     throw new ApiHttpError(
       403,
       scope === "PACKAGE"
-        ? "Only branch managers can manage packages"
-        : "Only assign-capable accounts can manage task templates",
+        ? "Only branch managers can assign packages"
+        : "Only assign-capable accounts can assign task templates",
     );
   }
   return user;
@@ -368,10 +392,11 @@ export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
  *  assignFlowTaskCore (2026-08-06 fix) rather than ./tasks's exported
  *  assignFlowTask — that function re-runs its OWN actor check
  *  (ADMIN|OPS|CEO|HOD|isElevatedDeptSite, no BRANCH) independent of this
- *  file's requireGroupAccess above, which would 403 every Branch-Manager
- *  call regardless of scope even though requireGroupAccess already
- *  authorized this exact actor for this exact operation — same
- *  double-gating class as the earlier templates.ts fix. Not wrapped in a
+ *  file's requireGroupAssignAccess above, which would 403 every
+ *  Branch-Manager call regardless of scope even though
+ *  requireGroupAssignAccess already authorized this exact actor for this
+ *  exact operation — same double-gating class as the earlier templates.ts
+ *  fix. Not wrapped in a
  *  transaction across members — if one member's assignFlowTaskCore call
  *  throws partway through, earlier iterations already created real
  *  FlowRun/RunBlock rows and the partial `created` count is lost to the
@@ -388,7 +413,7 @@ export function applyTemplateGroup(
   input: ApplyTemplateGroupInput,
 ): Promise<{ created: number }> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupAssignAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = applyGroupSchema.parse(input);
     const group = await prisma.taskTemplateGroup.findFirst({
@@ -434,7 +459,7 @@ export function getGroupAssignees(
   scope: TemplateGroupScope,
 ): Promise<TemplateGroupAssignee[]> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupAssignAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
@@ -471,7 +496,7 @@ export function removeGroupAssignee(
   userId: string,
 ): Promise<{ removedTasks: number; keptRecords: number }> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupAssignAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const targetUserId = z.string().min(1).parse(userId);
     const group = await prisma.taskTemplateGroup.findFirst({

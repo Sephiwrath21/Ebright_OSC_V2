@@ -1,10 +1,10 @@
 // Task assignment — pre-authorized Core logic (2026-08-06): the actual
 // fan-out/creation logic behind ./tasks's exported assignFlowTask, factored
 // out so an ALREADY-authorized caller (data/template-groups.ts's
-// applyTemplateGroup, whose own requireGroupAccess uses a DIFFERENT
+// applyTemplateGroup, whose own requireGroupAssignAccess uses a DIFFERENT
 // per-scope allow-list than ./tasks's own actor check) can invoke the same
 // fan-out logic without re-running that narrower check — which would
-// incorrectly reject a Branch Manager requireGroupAccess already
+// incorrectly reject a Branch Manager requireGroupAssignAccess already
 // authorized. Same double-gating class of bug, same fix pattern, as
 // ./templates-internal's Core functions — see that file's header and
 // template-groups.ts's file header for the fuller explanation.

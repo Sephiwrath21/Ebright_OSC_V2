@@ -1,13 +1,20 @@
 // /task-manager/package — Package dashboard (2026-08-06): a second
 // instance of the Template Groups feature (see
-// task-manager/data/template-groups.ts), scoped to "PACKAGE" and
-// restricted to Branch Manager only. Wiring mirrors
-// /task-manager/template/page.tsx closely — same six "use server" action
-// closures, same three-way SetupPendingError/NoAccountError/generic-error
-// card handling, same 403-redirect pattern — just bound to scope: "PACKAGE"
-// throughout and labeled "Package" in the UI. Unlike Template's page, this
-// one has no CEO-hideCadence concern (Branch Managers are never CEOs), so
-// there's no getMyRole call here.
+// task-manager/data/template-groups.ts), scoped to "PACKAGE". General
+// management (view/create/edit/delete) is open to the same assign-capable
+// allow-list as Template — NOT restricted to Branch Manager (revised
+// 2026-08-06; see template-groups.ts's file header for the two-tier
+// authorization split). Only actually assigning a package to staff, plus
+// View/Remove Assignees, stays Branch Manager only — enforced server-side
+// in template-groups.ts via requireGroupAssignAccess, surfaced here as an
+// inline error message from the relevant action closure, not a redirect.
+// Wiring mirrors /task-manager/template/page.tsx closely — same "use
+// server" action closures, same three-way SetupPendingError/
+// NoAccountError/generic-error card handling, same 403-redirect pattern on
+// the initial load — just bound to scope: "PACKAGE" throughout and
+// labeled "Package" in the UI. Unlike Template's page, this one has no
+// CEO-hideCadence concern (Branch Managers are never CEOs), so there's no
+// getMyRole call here.
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
@@ -68,8 +75,9 @@ export default async function TaskManagerPackagePage() {
     groups = groupsResult;
     staff = staffResult.staff;
   } catch (err) {
-    // Genuine "not a branch manager" (403) bounces to /task-manager —
-    // everything else renders in place, same as /task-manager/template.
+    // Genuine "not assign-capable" (403 from listTemplateGroups's
+    // requireGroupAccess) bounces to /task-manager — everything else
+    // renders in place, same as /task-manager/template.
     if (err instanceof FlowBridgeError && err.status === 403) redirect("/task-manager");
     let card;
     if (err instanceof SetupPendingError) {

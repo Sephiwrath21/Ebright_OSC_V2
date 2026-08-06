@@ -8,8 +8,8 @@
 // assignFlowTask's actual fan-out logic lives in ./tasks-internal
 // (2026-08-06) — factored out so data/template-groups.ts's
 // applyTemplateGroup, which authorizes actors via its own
-// requireGroupAccess (a DIFFERENT per-scope allow-list than this file's
-// actor check below), can reuse that logic for an already-authorized
+// requireGroupAssignAccess (a DIFFERENT per-scope allow-list than this
+// file's actor check below), can reuse that logic for an already-authorized
 // actor without re-running this file's narrower check. That file is
 // deliberately NOT re-exported by data.ts's `export *` barrel — see its
 // header for the full explanation.
