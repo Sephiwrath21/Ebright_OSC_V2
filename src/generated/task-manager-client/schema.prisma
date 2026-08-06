@@ -368,6 +368,11 @@ model Guideline {
   blocks    RunBlock[]
 }
 
+enum TemplateGroupScope {
+  TEMPLATE
+  PACKAGE
+}
+
 /// Grouping layer for "Template Groups" (2026-08-06, /task-manager/template):
 /// a named collection of several TaskTemplate rows, created/edited/deleted/
 /// applied together. Each member task is an ORDINARY TaskTemplate row
@@ -378,16 +383,18 @@ model Guideline {
 /// ("+ Task → Start from a template"), which never sees grouped rows —
 /// listTaskTemplates excludes templateGroupId != null.
 model TaskTemplateGroup {
-  id          String    @id @default(cuid())
+  id          String             @id @default(cuid())
   createdById String
   name        String
+  scope       TemplateGroupScope @default(TEMPLATE)
   archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   templates TaskTemplate[]
 
   @@index([createdById])
+  @@index([scope])
 }
 
 /// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an

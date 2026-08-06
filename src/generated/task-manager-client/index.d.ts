@@ -210,6 +210,14 @@ export const RunStatus: {
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus]
 
 
+export const TemplateGroupScope: {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
+};
+
+export type TemplateGroupScope = (typeof TemplateGroupScope)[keyof typeof TemplateGroupScope]
+
+
 export const BlockStatus: {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
@@ -264,6 +272,10 @@ export const ItemType: typeof $Enums.ItemType
 export type RunStatus = $Enums.RunStatus
 
 export const RunStatus: typeof $Enums.RunStatus
+
+export type TemplateGroupScope = $Enums.TemplateGroupScope
+
+export const TemplateGroupScope: typeof $Enums.TemplateGroupScope
 
 export type BlockStatus = $Enums.BlockStatus
 
@@ -17455,6 +17467,7 @@ export namespace Prisma {
     id: string | null
     createdById: string | null
     name: string | null
+    scope: $Enums.TemplateGroupScope | null
     archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -17464,6 +17477,7 @@ export namespace Prisma {
     id: string | null
     createdById: string | null
     name: string | null
+    scope: $Enums.TemplateGroupScope | null
     archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -17473,6 +17487,7 @@ export namespace Prisma {
     id: number
     createdById: number
     name: number
+    scope: number
     archivedAt: number
     createdAt: number
     updatedAt: number
@@ -17484,6 +17499,7 @@ export namespace Prisma {
     id?: true
     createdById?: true
     name?: true
+    scope?: true
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
@@ -17493,6 +17509,7 @@ export namespace Prisma {
     id?: true
     createdById?: true
     name?: true
+    scope?: true
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
@@ -17502,6 +17519,7 @@ export namespace Prisma {
     id?: true
     createdById?: true
     name?: true
+    scope?: true
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
@@ -17584,6 +17602,7 @@ export namespace Prisma {
     id: string
     createdById: string
     name: string
+    scope: $Enums.TemplateGroupScope
     archivedAt: Date | null
     createdAt: Date
     updatedAt: Date
@@ -17610,6 +17629,7 @@ export namespace Prisma {
     id?: boolean
     createdById?: boolean
     name?: boolean
+    scope?: boolean
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -17621,6 +17641,7 @@ export namespace Prisma {
     id?: boolean
     createdById?: boolean
     name?: boolean
+    scope?: boolean
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -17630,6 +17651,7 @@ export namespace Prisma {
     id?: boolean
     createdById?: boolean
     name?: boolean
+    scope?: boolean
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -17639,12 +17661,13 @@ export namespace Prisma {
     id?: boolean
     createdById?: boolean
     name?: boolean
+    scope?: boolean
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplateGroup"]>
+  export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "scope" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplateGroup"]>
   export type TaskTemplateGroupInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
     _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
@@ -17661,6 +17684,7 @@ export namespace Prisma {
       id: string
       createdById: string
       name: string
+      scope: $Enums.TemplateGroupScope
       archivedAt: Date | null
       createdAt: Date
       updatedAt: Date
@@ -18091,6 +18115,7 @@ export namespace Prisma {
     readonly id: FieldRef<"TaskTemplateGroup", 'String'>
     readonly createdById: FieldRef<"TaskTemplateGroup", 'String'>
     readonly name: FieldRef<"TaskTemplateGroup", 'String'>
+    readonly scope: FieldRef<"TaskTemplateGroup", 'TemplateGroupScope'>
     readonly archivedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
     readonly createdAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
     readonly updatedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
@@ -29512,6 +29537,7 @@ export namespace Prisma {
     id: 'id',
     createdById: 'createdById',
     name: 'name',
+    scope: 'scope',
     archivedAt: 'archivedAt',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
@@ -29881,6 +29907,20 @@ export namespace Prisma {
    * Reference to a field of type 'Bytes[]'
    */
   export type ListBytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'TemplateGroupScope'
+   */
+  export type EnumTemplateGroupScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TemplateGroupScope'>
+    
+
+
+  /**
+   * Reference to a field of type 'TemplateGroupScope[]'
+   */
+  export type ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TemplateGroupScope[]'>
     
 
 
@@ -30878,6 +30918,7 @@ export namespace Prisma {
     id?: StringFilter<"TaskTemplateGroup"> | string
     createdById?: StringFilter<"TaskTemplateGroup"> | string
     name?: StringFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
     archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
@@ -30888,6 +30929,7 @@ export namespace Prisma {
     id?: SortOrder
     createdById?: SortOrder
     name?: SortOrder
+    scope?: SortOrder
     archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -30901,6 +30943,7 @@ export namespace Prisma {
     NOT?: TaskTemplateGroupWhereInput | TaskTemplateGroupWhereInput[]
     createdById?: StringFilter<"TaskTemplateGroup"> | string
     name?: StringFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
     archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
@@ -30911,6 +30954,7 @@ export namespace Prisma {
     id?: SortOrder
     createdById?: SortOrder
     name?: SortOrder
+    scope?: SortOrder
     archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -30926,6 +30970,7 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
     createdById?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
     name?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeWithAggregatesFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
     archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
@@ -32652,6 +32697,7 @@ export namespace Prisma {
     id?: string
     createdById: string
     name: string
+    scope?: $Enums.TemplateGroupScope
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -32662,6 +32708,7 @@ export namespace Prisma {
     id?: string
     createdById: string
     name: string
+    scope?: $Enums.TemplateGroupScope
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -32672,6 +32719,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32682,6 +32730,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32692,6 +32741,7 @@ export namespace Prisma {
     id?: string
     createdById: string
     name: string
+    scope?: $Enums.TemplateGroupScope
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -32701,6 +32751,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32710,6 +32761,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -34491,6 +34543,13 @@ export namespace Prisma {
     _max?: NestedBytesNullableFilter<$PrismaModel>
   }
 
+  export type EnumTemplateGroupScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeFilter<$PrismaModel> | $Enums.TemplateGroupScope
+  }
+
   export type TaskTemplateListRelationFilter = {
     every?: TaskTemplateWhereInput
     some?: TaskTemplateWhereInput
@@ -34505,6 +34564,7 @@ export namespace Prisma {
     id?: SortOrder
     createdById?: SortOrder
     name?: SortOrder
+    scope?: SortOrder
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -34514,6 +34574,7 @@ export namespace Prisma {
     id?: SortOrder
     createdById?: SortOrder
     name?: SortOrder
+    scope?: SortOrder
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -34523,9 +34584,20 @@ export namespace Prisma {
     id?: SortOrder
     createdById?: SortOrder
     name?: SortOrder
+    scope?: SortOrder
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+  }
+
+  export type EnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel> | $Enums.TemplateGroupScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+    _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
   }
 
   export type TaskTemplateGroupNullableScalarRelationFilter = {
@@ -35833,6 +35905,10 @@ export namespace Prisma {
     connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
   }
 
+  export type EnumTemplateGroupScopeFieldUpdateOperationsInput = {
+    set?: $Enums.TemplateGroupScope
+  }
+
   export type TaskTemplateUpdateManyWithoutGroupNestedInput = {
     create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
     connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
@@ -36340,6 +36416,23 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedBytesNullableFilter<$PrismaModel>
     _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
+  export type NestedEnumTemplateGroupScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeFilter<$PrismaModel> | $Enums.TemplateGroupScope
+  }
+
+  export type NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel> | $Enums.TemplateGroupScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+    _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -38540,6 +38633,7 @@ export namespace Prisma {
     id?: string
     createdById: string
     name: string
+    scope?: $Enums.TemplateGroupScope
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -38549,6 +38643,7 @@ export namespace Prisma {
     id?: string
     createdById: string
     name: string
+    scope?: $Enums.TemplateGroupScope
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -38574,6 +38669,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -38583,6 +38679,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdById?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string

@@ -266,6 +266,7 @@ exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
   id: 'id',
   createdById: 'createdById',
   name: 'name',
+  scope: 'scope',
   archivedAt: 'archivedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -455,6 +456,11 @@ exports.Cadence = exports.$Enums.Cadence = {
   DAILY: 'DAILY',
   MONTHLY: 'MONTHLY',
   ADHOC: 'ADHOC'
+};
+
+exports.TemplateGroupScope = exports.$Enums.TemplateGroupScope = {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
 };
 
 exports.ViewType = exports.$Enums.ViewType = {
