@@ -1,21 +1,165 @@
-// /task-manager/template — placeholder (2026-08-06). Sidebar sub-item under
-// Task Manager; content to be specified separately.
+// /task-manager/template — Template Groups dashboard (2026-08-06): manage
+// reusable multi-task templates (a named collection of several TaskTemplate
+// rows — see task-manager/data/template-groups.ts). Wiring mirrors
+// /task-manager's own page: server component fetches data + defines
+// "use server" action closures, passes both to a client dashboard
+// component. Gated by the same assign-capable allow-list as the rest of
+// Task Manager — the first fetch (listTemplateGroups) IS the gate: a
+// FlowBridgeError there means the account isn't assign-capable, so we
+// bounce to /task-manager instead of rendering an empty/broken page.
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
+import {
+  applyTemplateGroup,
+  createTemplateGroup,
+  deleteTemplateGroup,
+  editTemplateGroup,
+  getGroupDeletionImpact,
+  getFlowStaff,
+  getTemplateGroup,
+  listTemplateGroups,
+  FlowBridgeError,
+} from "@/task-manager/data";
+import { TemplateGroupDashboard } from "@/task-manager/ui/template-group-dashboard";
+import type {
+  FlowTemplateGroupApplyInput,
+  FlowTemplateGroupTaskInput,
+  TemplateGroupApplyResult,
+  TemplateGroupDeleteResult,
+  TemplateGroupEditResult,
+  TemplateGroupImpactResult,
+  TemplateGroupLoadResult,
+  TemplateGroupSaveResult,
+} from "@/task-manager/ui/types";
 
 export const dynamic = "force-dynamic";
+
+const FALLBACK_MESSAGE = "Something went wrong — please try again";
 
 export default async function TaskManagerTemplatePage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as { email: string; name?: string | null; role?: string };
+  const email = su.email;
+
+  let groups;
+  try {
+    groups = await listTemplateGroups(email);
+  } catch (err) {
+    if (err instanceof FlowBridgeError) redirect("/task-manager");
+    throw err;
+  }
+  const { staff } = await getFlowStaff();
+
+  async function loadGroup(groupId: string): Promise<TemplateGroupLoadResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const group = await getTemplateGroup(email, groupId);
+      return { ok: true, group };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function createGroup(input: {
+    name: string;
+    tasks: { title: string; subtasks: string[] }[];
+  }): Promise<TemplateGroupSaveResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await createTemplateGroup(email, input);
+      revalidatePath("/task-manager/template");
+      return { ok: true, id: result.id };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function editGroup(
+    groupId: string,
+    input: { name: string; tasks: FlowTemplateGroupTaskInput[] },
+  ): Promise<TemplateGroupEditResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await editTemplateGroup(email, groupId, input);
+      revalidatePath("/task-manager/template");
+      revalidatePath("/task-manager");
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function groupImpact(groupId: string): Promise<TemplateGroupImpactResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const impact = await getGroupDeletionImpact(email, groupId);
+      return { ok: true, ...impact };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function removeGroup(groupId: string): Promise<TemplateGroupDeleteResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await deleteTemplateGroup(email, groupId);
+      revalidatePath("/task-manager/template");
+      revalidatePath("/task-manager");
+      return { ok: true, removedTasks: result.removedTasks, keptRecords: result.keptRecords };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function applyGroup(
+    groupId: string,
+    input: FlowTemplateGroupApplyInput,
+  ): Promise<TemplateGroupApplyResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await applyTemplateGroup(email, groupId, input);
+      revalidatePath("/task-manager");
+      return { ok: true, created: result.created };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
 
   return (
     <AppShell email={su.email} role={su.role} name={su.name}>
       <div className="mx-auto max-w-[1400px] p-6">
-        <h1 className="text-2xl font-bold">Template</h1>
-        <p className="mt-2 text-sm text-gray-500">Coming soon.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Template</h1>
+        <p className="mt-1 text-sm text-gray-500">Reusable multi-task templates — create once, assign whenever.</p>
+        <div className="mt-6">
+          <TemplateGroupDashboard
+            staff={staff}
+            control={{
+              list: groups,
+              load: loadGroup,
+              create: createGroup,
+              edit: editGroup,
+              impact: groupImpact,
+              remove: removeGroup,
+              apply: applyGroup,
+            }}
+          />
+        </div>
       </div>
     </AppShell>
   );
