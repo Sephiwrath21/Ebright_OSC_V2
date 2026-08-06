@@ -366,6 +366,35 @@ model Guideline {
   blocks    RunBlock[]
 }
 
+enum TemplateGroupScope {
+  TEMPLATE
+  PACKAGE
+}
+
+/// Grouping layer for "Template Groups" (2026-08-06, /task-manager/template):
+/// a named collection of several TaskTemplate rows, created/edited/deleted/
+/// applied together. Each member task is an ORDINARY TaskTemplate row
+/// (templateGroupId set below) — this model adds nothing but the name and
+/// owner; all cascade-safety (pending-assignment cancellation, edit
+/// propagation) is delegated to the existing per-task functions in
+/// data/templates.ts. Distinct from the single-task TaskTemplate flow
+/// ("+ Task → Start from a template"), which never sees grouped rows —
+/// listTaskTemplates excludes templateGroupId != null.
+model TaskTemplateGroup {
+  id          String              @id @default(cuid())
+  createdById String
+  name        String
+  scope       TemplateGroupScope @default(TEMPLATE)
+  archivedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  templates   TaskTemplate[]
+
+  @@index([createdById])
+  @@index([scope])
+}
+
 /// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
 /// assignment — task title, subtasks, cadence, guideline link/image — but
 /// deliberately NOT recipients, days, due date, or any completion state
@@ -388,10 +417,18 @@ model TaskTemplate {
   // every hub tab except Archive (where Unarchive restores them + their
   // archived instances). Reversible counterpart to deletion.
   archivedAt     DateTime?
+  // Template Groups (2026-08-06): set when this task is a member of a
+  // TaskTemplateGroup — null for standalone single-task templates (all
+  // pre-existing rows, and every row created outside the group flow).
+  // groupPosition is the 0-based display order within the group.
+  templateGroupId String?
+  groupPosition   Int?
+  group           TaskTemplateGroup? @relation(fields: [templateGroupId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([createdById])
+  @@index([templateGroupId])
 }
 
 /// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —

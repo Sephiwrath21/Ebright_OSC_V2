@@ -43,6 +43,10 @@ export interface FlowTaskRow {
   assigneeId: string;
   dueAt: string | null; // ISO
   status: "PENDING" | "ACTIVE" | "OVERDUE" | "ESCALATED" | "DONE" | "SKIPPED";
+  /** Explicit Daily/Monthly/Ad hoc tag (2026-08-05: drives the past-day
+   *  completion/proof lock — DAILY + a past dueAt means locked). null for
+   *  untagged legacy rows, which the lock never applies to. */
+  cadence?: "DAILY" | "MONTHLY" | "ADHOC" | null;
   /** True when this task was created by a Manpower Schedule slot sync
    *  (vs. a manual/ad hoc assignment) — drives the "Scheduled" badge. */
   fromSchedule: boolean;
@@ -100,7 +104,7 @@ export interface FlowPersonal {
   streams: FlowTaskStream[];
   /** Delegated rows carry the assignee's name (unlike `tasks`/`streams`,
    *  where the assignee is always `me`) — the CEO's task table's "PIC"
-   *  column, and HOD's "Tasks I Assigned" card, both need to show who. */
+   *  column, and HOD's "Task Assignment" card, both need to show who. */
   delegated: { totals: FlowBucketTotals; tasks: FlowDrillTask[] } | null;
   /** ALL-TIME variants — the un-periodized overview cards ("CEO Tasks",
    *  "HOD assigned tasks": not daily or monthly). */
@@ -408,6 +412,100 @@ export interface FlowTemplateControl {
   archived: () => Promise<ArchivedItemsResult>;
 }
 
+// ---- Task Template Groups (2026-08-06) — the /task-manager/template
+// page's multi-task "Template" concept, distinct from the single-task
+// FlowTemplateControl above. Each group task IS a TaskTemplate row under
+// the hood (see data/template-groups.ts) — these types are the group-level
+// wrapper the dashboard/modals actually work with.
+
+export interface FlowTemplateGroupSummary {
+  id: string;
+  name: string;
+  taskCount: number;
+  previewTitles: string[];
+  updatedAt: string; // ISO
+}
+
+export interface FlowTemplateGroupTask {
+  id: string;
+  title: string;
+  subtasks: string[];
+}
+
+export interface FlowTemplateGroupDetail {
+  id: string;
+  name: string;
+  tasks: FlowTemplateGroupTask[];
+}
+
+/** Task shape submitted from the Create/Edit form — `id` present only for
+ *  an existing member being kept (feeds the edit reconciliation). */
+export interface FlowTemplateGroupTaskInput {
+  id?: string;
+  title: string;
+  subtasks: string[];
+}
+
+export type TemplateGroupLoadResult =
+  | { ok: true; group: FlowTemplateGroupDetail }
+  | { ok: false; message: string };
+
+export type TemplateGroupSaveResult = { ok: true; id: string } | { ok: false; message: string };
+
+export type TemplateGroupEditResult =
+  | { ok: true; updatedTasks: number; createdTasks: number; removedTasks: number; employees: number }
+  | { ok: false; message: string };
+
+export type TemplateGroupImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
+export type TemplateGroupDeleteResult =
+  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: false; message: string };
+
+/** "Assign" input — one recipient/day/due-date/cadence choice applied to
+ *  every task in the group (see applyTemplateGroup). */
+export interface FlowTemplateGroupApplyInput {
+  userIds: string[];
+  days?: (typeof FLOW_DAYS)[number][];
+  dueDate?: string;
+  cadence: CadenceOption;
+}
+export type TemplateGroupApplyResult = { ok: true; created: number } | { ok: false; message: string };
+
+export interface FlowTemplateGroupAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateGroupAssigneesResult =
+  | { ok: true; assignees: FlowTemplateGroupAssignee[] }
+  | { ok: false; message: string };
+export type TemplateGroupRemoveAssigneeResult =
+  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: false; message: string };
+
+/** Everything the /task-manager/template dashboard needs, bundled as one
+ *  prop — mirrors FlowTemplateControl's shape for the single-task feature. */
+export interface FlowTemplateGroupControl {
+  list: FlowTemplateGroupSummary[];
+  load: (groupId: string) => Promise<TemplateGroupLoadResult>;
+  create: (input: {
+    name: string;
+    tasks: { title: string; subtasks: string[] }[];
+  }) => Promise<TemplateGroupSaveResult>;
+  edit: (
+    groupId: string,
+    input: { name: string; tasks: FlowTemplateGroupTaskInput[] },
+  ) => Promise<TemplateGroupEditResult>;
+  impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
+  remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
+  apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
+  assignees: (groupId: string) => Promise<TemplateGroupAssigneesResult>;
+  removeAssignee: (groupId: string, userId: string) => Promise<TemplateGroupRemoveAssigneeResult>;
+}
+
 /** Which Cadence pills the "+ Add Task" form should offer, given the
  *  currently-selected recipient(s) — Branch Manager keeps all 3 (the one
  *  branch-side role Ad hoc applies to); Coach/Branch Exec are restricted to
@@ -683,21 +781,23 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Due-date label (2026-08-01 status rules): a "D/M" date followed by a
- *  status qualifier — "1/8 Overdue" (red) for TODAY and anything earlier,
- *  "2/8 Due Soon" (amber) for TOMORROW, a short weekday for 2–6 days out
- *  ("3/8 Mon", neutral gray, no status label), or the bare "15/8" date
- *  beyond a week (also neutral gray). Calendar-day difference, not a raw
- *  ms delta — a dueAt of 17:00 today still counts as today regardless of
- *  the current time. Returns null for no due date — callers keep
- *  rendering their own "—". */
+/** Due-date label (2026-08-05: split TODAY off from Overdue): "D/M Due"
+ *  (blue — this app's existing today/current convention, e.g. the weekday
+ *  sidebar's active-day highlight) for TODAY specifically, "D/M Overdue"
+ *  (red) for anything STRICTLY earlier, "2/8 Due Soon" (amber) for
+ *  TOMORROW, a short weekday for 2–6 days out ("3/8 Mon", neutral gray, no
+ *  status label), or the bare "15/8" date beyond a week (also neutral
+ *  gray). Calendar-day difference, not a raw ms delta — a dueAt of 17:00
+ *  today still counts as today regardless of the current time. Returns
+ *  null for no due date — callers keep rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays <= 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
+  if (diffDays === 0) return { text: `${dm} Due`, className: "text-blue-600 font-medium" };
+  if (diffDays < 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
   if (diffDays === 1) return { text: `${dm} Due Soon`, className: "text-amber-600 font-medium" };
   if (diffDays <= 6)
     return {
@@ -705,4 +805,25 @@ export function formatDueDate(due: Date | null): DueDateDisplay | null {
       className: "text-gray-400",
     };
   return { text: dm, className: "text-gray-400" };
+}
+
+/** Locked-past-day check (2026-08-05: Daily tasks can no longer be marked
+ *  complete, or have proof attached/replaced, once their day has passed) —
+ *  STRICTLY before today (diffDays < 0). Today must stay completable per
+ *  the product spec's own example ("if today is 5 Aug, tasks dated 4
+ *  Aug... should be locked" — 5 Aug itself is not locked). Same
+ *  calendar-day (not raw ms delta) boundary as formatDueDate's own
+ *  diffDays === 0 "Due" / diffDays < 0 "Overdue" split above, so the two
+ *  never disagree about which day a dueAt falls on. Accepts an ISO string
+ *  (the client-facing FlowTaskRow.dueAt shape) or a Date (server-side
+ *  RunBlock.dueAt) so both layers — the server-authoritative guard in
+ *  engine/run.ts's completeBlock/skipBlock/reopenBlock and data/tasks.ts's
+ *  uploadFlowTaskProof, and the client UX guard in bits.tsx — share the
+ *  exact same definition of "past". */
+export function isPastDueDay(due: string | Date | null): boolean {
+  if (!due) return false;
+  const d = typeof due === "string" ? new Date(due) : due;
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  return diffDays < 0;
 }

@@ -35,14 +35,14 @@ describe("formatDueDate", () => {
     expect(formatDueDate(null)).toBeNull();
   });
 
-  it("TODAY is 'Overdue' (red), time-of-day independent (2026-08-01 rules)", () => {
+  it("TODAY is 'D/M Due' (blue), time-of-day independent (2026-08-05 rules)", () => {
     expect(formatDueDate(daysFromToday(0, 23))).toEqual({
-      text: "15/1 Overdue",
-      className: "text-red-500 font-medium",
+      text: "15/1 Due",
+      className: "text-blue-600 font-medium",
     });
     expect(formatDueDate(daysFromToday(0, 0))).toEqual({
-      text: "15/1 Overdue",
-      className: "text-red-500 font-medium",
+      text: "15/1 Due",
+      className: "text-blue-600 font-medium",
     });
   });
 

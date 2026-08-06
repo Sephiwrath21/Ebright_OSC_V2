@@ -149,7 +149,17 @@ const primaryNav: NavItem[] = [
       { name: "Dashboard", href: "/dashboards/pcm", exact: true },
     ],
   },
-  { name: "Task Manager", href: "/task-manager", Icon: ListChecks },
+  {
+    name: "Task Manager",
+    href: "/task-manager",
+    Icon: ListChecks,
+    children: [
+      { name: "Overview", href: "/task-manager", exact: true },
+      { name: "Template", href: "/task-manager/template" },
+      { name: "Package", href: "/task-manager/package" },
+      { name: "Package Table", href: "/task-manager/package-table" },
+    ],
+  },
 ];
 
 const secondaryNav: NavItem[] = [
