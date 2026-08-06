@@ -22,7 +22,7 @@ export function TemplateGroupFormModal({
   groupId?: string;
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
-  label?: string;
+  label?: "Template" | "Package";
 }) {
   const isEdit = Boolean(groupId);
   const labelLower = label.toLowerCase();

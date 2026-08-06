@@ -13,7 +13,7 @@
 // visit or when localStorage is unavailable.
 import * as React from "react";
 import { LayoutGrid, List } from "lucide-react";
-import type { FlowStaffMember, FlowTemplateGroupControl } from "./types";
+import type { FlowStaffMember, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
 import { TemplateGroupFormModal } from "./template-group-form";
 import { TemplateGroupAssignModal } from "./template-group-assign-modal";
 
@@ -23,6 +23,49 @@ function viewToggleButtonClass(active: boolean): string {
   return `flex size-8 items-center justify-center rounded-full ${
     active ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"
   }`;
+}
+
+// Shared Assign/Edit/Delete trio (2026-08-06): both the grid cards and the
+// list table rows render this, so the two views can't drift out of sync.
+function GroupActions({
+  group,
+  busyId,
+  onAssign,
+  onEdit,
+  onRemove,
+}: {
+  group: FlowTemplateGroupSummary;
+  busyId: string | null;
+  onAssign: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onAssign}
+        className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+      >
+        Assign
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        disabled={busyId === group.id}
+        onClick={onRemove}
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
+      >
+        {busyId === group.id ? "Removing…" : "Delete"}
+      </button>
+    </>
+  );
 }
 
 export function TemplateGroupDashboard({
@@ -39,7 +82,7 @@ export function TemplateGroupDashboard({
   hideCadence?: boolean;
   /** Display copy override (2026-08-06) — "Template" (default) or
    *  "Package". Forwarded to both modals below. */
-  label?: string;
+  label?: "Template" | "Package";
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
@@ -58,7 +101,6 @@ export function TemplateGroupDashboard({
     } catch {
       // localStorage unavailable (private browsing, etc.) — stay on the "grid" default.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewStorageKey]);
   const changeView = (next: ViewMode) => {
     setView(next);
@@ -168,28 +210,13 @@ export function TemplateGroupDashboard({
                 </ul>
               )}
               <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setAssignGroupId(g.id)}
-                  className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                >
-                  Assign
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditGroupId(g.id)}
-                  className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === g.id}
-                  onClick={() => remove(g.id, g.name)}
-                  className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
-                >
-                  {busyId === g.id ? "Removing…" : "Delete"}
-                </button>
+                <GroupActions
+                  group={g}
+                  busyId={busyId}
+                  onAssign={() => setAssignGroupId(g.id)}
+                  onEdit={() => setEditGroupId(g.id)}
+                  onRemove={() => remove(g.id, g.name)}
+                />
               </div>
             </div>
           ))}
@@ -213,28 +240,13 @@ export function TemplateGroupDashboard({
                   <td className="px-4 py-3 text-gray-600">{g.updatedAt.slice(0, 10)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAssignGroupId(g.id)}
-                        className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                      >
-                        Assign
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditGroupId(g.id)}
-                        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyId === g.id}
-                        onClick={() => remove(g.id, g.name)}
-                        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
-                      >
-                        {busyId === g.id ? "Removing…" : "Delete"}
-                      </button>
+                      <GroupActions
+                        group={g}
+                        busyId={busyId}
+                        onAssign={() => setAssignGroupId(g.id)}
+                        onEdit={() => setEditGroupId(g.id)}
+                        onRemove={() => remove(g.id, g.name)}
+                      />
                     </div>
                   </td>
                 </tr>

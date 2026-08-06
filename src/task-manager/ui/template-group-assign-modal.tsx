@@ -36,7 +36,7 @@ export function TemplateGroupAssignModal({
   onClose: () => void;
   hideCadence?: boolean;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
-  label?: string;
+  label?: "Template" | "Package";
 }) {
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
