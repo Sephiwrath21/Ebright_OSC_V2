@@ -24,6 +24,7 @@ export function TemplateGroupFormModal({
   const isEdit = Boolean(groupId);
   const [name, setName] = React.useState("");
   const [tasks, setTasks] = React.useState<FlowTemplateGroupTaskInput[]>([{ title: "", subtasks: [] }]);
+  const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [loading, setLoading] = React.useState(isEdit);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -40,6 +41,7 @@ export function TemplateGroupFormModal({
       }
       setName(result.group.name);
       setTasks(result.group.tasks.map((t) => ({ id: t.id, title: t.title, subtasks: t.subtasks })));
+      setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
     });
     return () => {
       cancelled = true;
@@ -50,9 +52,11 @@ export function TemplateGroupFormModal({
   const addTask = () => {
     if (tasks.length >= TASK_MAX) return;
     setTasks((prev) => [...prev, { title: "", subtasks: [] }]);
+    setTaskKeys((prev) => [...prev, crypto.randomUUID()]);
   };
   const removeTask = (index: number) => {
     setTasks((prev) => prev.filter((_, i) => i !== index));
+    setTaskKeys((prev) => prev.filter((_, i) => i !== index));
   };
   const updateTitle = (index: number, title: string) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, title } : t)));
@@ -67,11 +71,17 @@ export function TemplateGroupFormModal({
       setMessage({ ok: false, text: "Give the template a name." });
       return;
     }
-    const cleanTasks = tasks.map((t) => ({ ...t, title: t.title.trim() })).filter((t) => t.title.length > 0);
-    if (cleanTasks.length === 0) {
+    const trimmedTasks = tasks.map((t) => ({ ...t, title: t.title.trim() }));
+    if (trimmedTasks.length === 0) {
       setMessage({ ok: false, text: "Add at least one task." });
       return;
     }
+    const blankIndex = trimmedTasks.findIndex((t) => t.title.length === 0);
+    if (blankIndex !== -1) {
+      setMessage({ ok: false, text: `Task ${blankIndex + 1} needs a title (or remove it with the ✕ button).` });
+      return;
+    }
+    const cleanTasks = trimmedTasks;
     startTransition(async () => {
       if (isEdit) {
         const impact = await control.impact(groupId as string);
@@ -129,7 +139,7 @@ export function TemplateGroupFormModal({
             </label>
 
             {tasks.map((task, index) => (
-              <div key={index} className="rounded-2xl border border-gray-200 p-3">
+              <div key={taskKeys[index]} className="rounded-2xl border border-gray-200 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <label className="flex-1 text-sm text-gray-600">
                     Task {index + 1}
