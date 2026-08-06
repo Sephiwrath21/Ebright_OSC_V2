@@ -27,14 +27,16 @@ export function TemplateGroupAssignModal({
   staff,
   group,
   onClose,
+  hideCadence = false,
 }: {
   control: FlowTemplateGroupControl;
   staff: FlowStaffMember[];
   group: FlowTemplateGroupSummary;
   onClose: () => void;
+  hideCadence?: boolean;
 }) {
   const [userIds, setUserIds] = React.useState<string[]>([]);
-  const [cadence, setCadence] = React.useState<CadenceOption | null>(null);
+  const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
   const [days, setDays] = React.useState<(typeof FLOW_DAYS)[number][]>([]);
   const [dueDate, setDueDate] = React.useState("");
   const [pending, startTransition] = React.useTransition();
@@ -43,6 +45,7 @@ export function TemplateGroupAssignModal({
   const selectedStaff = staff.filter((s) => userIds.includes(s.id));
   const visibleCadences = visibleCadenceOptions(selectedStaff);
   React.useEffect(() => {
+    if (hideCadence) return;
     setCadence((prev) => (prev && visibleCadences.includes(prev) ? prev : null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleCadences.join(",")]);
@@ -75,7 +78,10 @@ export function TemplateGroupAssignModal({
       if (result.ok) {
         onClose();
       } else {
-        setMessage({ ok: false, text: result.message });
+        setMessage({
+          ok: false,
+          text: `${result.message} Some tasks in this group may already have been assigned — check before retrying.`,
+        });
       }
     });
   };
@@ -104,30 +110,32 @@ export function TemplateGroupAssignModal({
             recipient picked below.
           </p>
           <RecipientPicker staff={staff} selected={userIds} onChange={setUserIds} />
-          <div className="text-sm text-gray-600">
-            Cadence
-            <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
-              {visibleCadences.map((value) => {
-                const active = cadence === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    onClick={() => setCadence(value)}
-                    aria-checked={active}
-                    className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-                      active
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                    }`}
-                  >
-                    {CADENCE_LABELS[value]}
-                  </button>
-                );
-              })}
+          {!hideCadence && (
+            <div className="text-sm text-gray-600">
+              Cadence
+              <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
+                {visibleCadences.map((value) => {
+                  const active = cadence === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      onClick={() => setCadence(value)}
+                      aria-checked={active}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+                        active
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                      }`}
+                    >
+                      {CADENCE_LABELS[value]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
           {showDay && (
             <div className="max-w-md">
               <p className="text-sm text-gray-600">Day</p>
