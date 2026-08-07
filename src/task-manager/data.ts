@@ -9,3 +9,4 @@ export * from "./data/templates";
 export * from "./data/template-groups";
 export * from "./data/manpower";
 export * from "./data/kanban";
+export * from "./data/branch-package-schedule";
