@@ -389,10 +389,42 @@ model TaskTemplateGroup {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
-  templates   TaskTemplate[]
+  templates       TaskTemplate[]
+  branchSchedules BranchPackageSchedule[]
 
   @@index([createdById])
   @@index([scope])
+}
+
+enum PackageScheduleWeekday {
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+// Branch Package Schedule (2026-08-07): one durable config row per
+// (branch, weekday) naming which Package (a PACKAGE-scope
+// TaskTemplateGroup) that branch's manager should have running that day
+// — the standing source of truth the grid reads/writes. Setting a cell
+// ALSO creates a real recurring cadence:"daily" assignment via the
+// existing engine (src/task-manager/data/branch-package-schedule.ts);
+// this row is the durable "what's configured" record, separate from the
+// FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
+// get replaced/cloned forward every week, this row does not).
+model BranchPackageSchedule {
+  id             String                 @id @default(cuid())
+  branch         String
+  weekday        PackageScheduleWeekday
+  packageGroupId String
+  packageGroup   TaskTemplateGroup      @relation(fields: [packageGroupId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([branch, weekday])
+  @@index([packageGroupId])
 }
 
 /// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an

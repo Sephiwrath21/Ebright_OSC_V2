@@ -272,6 +272,16 @@ exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.BranchPackageScheduleScalarFieldEnum = {
+  id: 'id',
+  branch: 'branch',
+  weekday: 'weekday',
+  packageGroupId: 'packageGroupId',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.TaskTemplateScalarFieldEnum = {
   id: 'id',
   createdById: 'createdById',
@@ -463,6 +473,14 @@ exports.TemplateGroupScope = exports.$Enums.TemplateGroupScope = {
   PACKAGE: 'PACKAGE'
 };
 
+exports.PackageScheduleWeekday = exports.$Enums.PackageScheduleWeekday = {
+  WED: 'WED',
+  THU: 'THU',
+  FRI: 'FRI',
+  SAT: 'SAT',
+  SUN: 'SUN'
+};
+
 exports.ViewType = exports.$Enums.ViewType = {
   TABLE: 'TABLE',
   BOARD: 'BOARD',
@@ -488,6 +506,7 @@ exports.Prisma.ModelName = {
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
   TaskTemplateGroup: 'TaskTemplateGroup',
+  BranchPackageSchedule: 'BranchPackageSchedule',
   TaskTemplate: 'TaskTemplate',
   Proof: 'Proof',
   RunItem: 'RunItem',
