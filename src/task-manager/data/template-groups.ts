@@ -347,18 +347,25 @@ function deriveFanOutSchedule(
 
 /** Renames the group and reconciles its member tasks against the submitted
  *  list: kept members (id present) go through editTaskTemplate (propagates
- *  to pending instances, same as the single-task Edit tab); removed
- *  members go through deleteTaskTemplate (cancels their pending
- *  instances); new members (id absent) are created fresh. `employees` sums
- *  per-task counts and may double-count someone with pending tasks from
- *  more than one member of this group — an acceptable approximation for a
- *  summary count, same caveat the single-task Edit panel already has.
- *  Not wrapped in a transaction across members — if one member's edit/
- *  delete throws partway through (e.g. concurrently deleted by another
- *  admin), earlier iterations' changes are already committed and the
- *  group is left partially reconciled. Accepted trade-off, matching
- *  templates.ts's own non-transactional multi-step writes; callers should
- *  treat a thrown error as "re-fetch and re-check," not "nothing happened." */
+ *  to pending instances, same as the single-task Edit tab, including the
+ *  past-due protection editTaskTemplateCore now enforces); removed members
+ *  go through deleteTaskTemplate (cancels their pending instances); new
+ *  members (id absent) are created fresh AND fanned out (2026-08-07) to
+ *  every existing assignee of the group's OTHER kept member tasks,
+ *  replicating each one's own cadence/day — see getGroupMemberSchedules/
+ *  deriveFanOutSchedule and the "New-member-task fan-out" comment below;
+ *  reported back via the result's newTaskAssignedTo/newTaskSkipped.
+ *  `employees` sums per-task counts and may double-count someone with
+ *  pending tasks from more than one member of this group — an acceptable
+ *  approximation for a summary count, same caveat the single-task Edit
+ *  panel already has. Not wrapped in a transaction across members — if one
+ *  member's edit/delete/fan-out-assign throws partway through (e.g.
+ *  concurrently deleted by another admin), earlier iterations' changes
+ *  (including any already-created fan-out assignments) are already
+ *  committed and the group is left partially reconciled. Accepted
+ *  trade-off, matching templates.ts's own non-transactional multi-step
+ *  writes; callers should treat a thrown error as "re-fetch and re-check,"
+ *  not "nothing happened." */
 export function editTemplateGroup(
   email: string,
   groupId: string,
