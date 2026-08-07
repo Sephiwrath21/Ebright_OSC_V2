@@ -11,7 +11,7 @@
 // route change, but it's kept as its own file/action rather than folded
 // into getNavAccess to avoid coupling two unrelated identity systems.
 import { auth } from "@/auth";
-import { requireUserByEmail } from "./data/core";
+import { NoAccountError, requireUserByEmail } from "./data/core";
 import { taskManagerNavAccess } from "./role-views";
 
 export interface TaskManagerNavAccess {
@@ -24,14 +24,21 @@ const NO_ACCESS: TaskManagerNavAccess = { template: false, package: false, packa
 
 /** Fail-closed: any error (no Task Manager account, DB not configured,
  *  etc.) hides all three gated sidebar items rather than leaking access
- *  or throwing and breaking the whole sidebar. */
+ *  or throwing and breaking the whole sidebar. `NoAccountError` is the
+ *  expected/normal case (most portal users have no Task Manager row) and
+ *  stays silent; anything else (DB not configured, a real bug, etc.) is
+ *  logged so an actual infra problem doesn't go invisible behind the same
+ *  fail-closed return value. */
 export async function getTaskManagerNavAccess(): Promise<TaskManagerNavAccess> {
   const session = await auth();
   if (!session?.user?.email) return NO_ACCESS;
   try {
     const user = await requireUserByEmail(session.user.email);
     return taskManagerNavAccess(user);
-  } catch {
+  } catch (err) {
+    if (!(err instanceof NoAccountError)) {
+      console.error("[task-manager] getTaskManagerNavAccess", err);
+    }
     return NO_ACCESS;
   }
 }
