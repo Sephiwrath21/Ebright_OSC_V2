@@ -453,7 +453,20 @@ export type TemplateGroupLoadResult =
 export type TemplateGroupSaveResult = { ok: true; id: string } | { ok: false; message: string };
 
 export type TemplateGroupEditResult =
-  | { ok: true; updatedTasks: number; createdTasks: number; removedTasks: number; employees: number }
+  | {
+      ok: true;
+      updatedTasks: number;
+      createdTasks: number;
+      removedTasks: number;
+      employees: number;
+      /** New-member-task fan-out (2026-08-07): existing group assignees a
+       *  brand-new member task was auto-created for (schedule replicated
+       *  from their other pending member-task instances), and how many
+       *  were skipped for having nothing pending to copy a schedule from —
+       *  see data/template-groups.ts's editTemplateGroup. */
+      newTaskAssignedTo: number;
+      newTaskSkipped: number;
+    }
   | { ok: false; message: string };
 
 export type TemplateGroupImpactResult =

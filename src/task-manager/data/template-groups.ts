@@ -48,8 +48,9 @@
 // `export *` barrel, so this file imports them directly rather than via
 // `@/task-manager/data`.
 import { z } from "zod";
-import type { Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
+import type { Cadence, Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
+import { todayStart } from "../lib/dates";
 import { prisma } from "../prisma";
 import { native, requireUserByEmail } from "./core";
 import { canManageTaskTemplateGroups, taskManagerNavAccess } from "../role-views";
@@ -58,9 +59,11 @@ import {
   editTaskTemplateCore,
   getTemplateAssigneesCore,
   getTemplateDeletionImpactCore,
+  PENDING_STATUSES,
   removeTemplateAssigneeCore,
 } from "./templates-internal";
 import { assignFlowTaskCore } from "./tasks-internal";
+import { formatLocalDate } from "../analytics/_lib";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
@@ -227,6 +230,119 @@ export interface EditTemplateGroupResult {
   createdTasks: number;
   removedTasks: number;
   employees: number;
+  /** New-member-task fan-out (2026-08-07): how many existing group
+   *  assignees (found via their OTHER still-pending member-task
+   *  instances) a brand-new member task was auto-created for, replicating
+   *  each one's own cadence/day — see editTemplateGroup's "new member
+   *  task" branch. */
+  newTaskAssignedTo: number;
+  /** Existing assignees who had nothing pending left to copy a schedule
+   *  from (e.g. every other member task already DONE/past-due-excluded
+   *  for them) — deliberately skipped rather than defaulted to a guessed
+   *  cadence/day. */
+  newTaskSkipped: number;
+}
+
+// Reverse of tasks-internal.ts's DAY_INDEX (JS Date.getDay() -> FLOW_DAYS
+// weekday name) — DAY_INDEX itself isn't exported from that file (only
+// assignFlowTaskCore is meant to be called from here), so this is a local
+// mirror, same precedent as branch-package-schedule.ts's own
+// WEEKDAY_TO_JS_DAY mirror of the same map. Monday (1) is deliberately
+// absent: FLOW_DAYS/DAY_INDEX have no Monday option, so a "daily"-cadence
+// RunBlock (which only ever gets a dueAt via nextOccurrence(day) for a
+// FLOW_DAYS day, or via weekly recurrence off of one) can never actually
+// land on one.
+const JS_DAY_TO_FLOW_DAY: Partial<Record<number, (typeof FLOW_DAYS)[number]>> = {
+  0: "Sun",
+  2: "Tue",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+};
+
+const CADENCE_FROM_PRISMA: Record<Cadence, "daily" | "monthly" | "adhoc"> = {
+  DAILY: "daily",
+  MONTHLY: "monthly",
+  ADHOC: "adhoc",
+};
+
+/** For each id in `templateIds` (a group's OTHER, already-existing member
+ *  tasks), find every CURRENT assignee — anyone with at least one
+ *  non-cancelled/non-archived top-level RunBlock of any of those tasks —
+ *  and map them to a representative still-pending, not-past-due block to
+ *  replicate a schedule from (any one is fine — a person with divergent
+ *  schedules across several member tasks of the same group is an accepted
+ *  edge case, not reconciled here), or `null` if NONE of their instances
+ *  currently qualify (e.g. every one is already DONE/SKIPPED, or is
+ *  pending-status but past-due per Task 2's protection window). The
+ *  eligibility test for "currently qualifies" is the SAME one
+ *  editTaskTemplateCore's own pending-parent query uses (PENDING_STATUSES
+ *  + not-cancelled/archived + the past-due `dueAt` exclusion via
+ *  todayStart()), reused so "who still has this group's work" can never
+ *  disagree between the two functions — but unlike that query, an
+ *  assignee here is NOT dropped just because their representative isn't
+ *  eligible; they stay in the map as a `null` entry precisely so
+ *  editTemplateGroup's fan-out can count them in `newTaskSkipped` instead
+ *  of silently omitting them (design decision #4: report the skip count,
+ *  don't swallow it). Feeds editTemplateGroup's new-member-task fan-out. */
+async function getGroupMemberSchedules(
+  templateIds: string[],
+): Promise<Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>> {
+  const map = new Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>();
+  if (templateIds.length === 0) return map;
+  const boundary = todayStart();
+  const blocks = await prisma.runBlock.findMany({
+    where: {
+      templateId: { in: templateIds },
+      parentId: null,
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+    select: { assigneeId: true, status: true, cadence: true, dueAt: true },
+  });
+  for (const b of blocks) {
+    const eligible =
+      (PENDING_STATUSES as readonly string[]).includes(b.status) &&
+      (b.dueAt === null || b.dueAt >= boundary);
+    if (eligible) {
+      // A real representative always wins over (replaces) a prior `null`
+      // placeholder from an earlier-seen, non-eligible instance of theirs.
+      if (!map.get(b.assigneeId)) map.set(b.assigneeId, { cadence: b.cadence, dueAt: b.dueAt });
+    } else if (!map.has(b.assigneeId)) {
+      map.set(b.assigneeId, null);
+    }
+  }
+  return map;
+}
+
+/** Derive the `{days, cadence}` or `{dueDate, cadence}` to hand
+ *  assignFlowTaskCore so a new member task replicates one assignee's
+ *  existing schedule (from a representative RunBlock of one of their
+ *  OTHER pending member-task instances in the same group). For "daily"
+ *  cadence (the only cadence recurrence actually perpetuates, see
+ *  engine/recurrence.ts), the day of week is derived from `dueAt` — a
+ *  "daily" block with no dueAt has nothing to derive a weekday from and
+ *  returns null (caller must skip, never guess). For "monthly"/"adhoc",
+ *  there's no repeating "day" concept — the representative's own `dueAt`
+ *  (if any) IS the one-off date to replicate as `dueDate`; a null dueAt
+ *  (an undated ad hoc instance) replicates as undated too, which is a
+ *  valid, derivable schedule, not a skip. A null `cadence` (untagged
+ *  legacy block — see FlowTaskRow.cadence's doc comment in ui/types.ts)
+ *  has nothing to replicate and also returns null — same as a `null` rep
+ *  itself (the assignee has nothing currently eligible to copy from at
+ *  all, see getGroupMemberSchedules). */
+function deriveFanOutSchedule(
+  rep: { cadence: Cadence | null; dueAt: Date | null } | null,
+): { days?: (typeof FLOW_DAYS)[number][]; dueDate?: string; cadence: "daily" | "monthly" | "adhoc" } | null {
+  if (!rep || !rep.cadence) return null;
+  const cadence = CADENCE_FROM_PRISMA[rep.cadence];
+  if (cadence === "daily") {
+    if (!rep.dueAt) return null;
+    const day = JS_DAY_TO_FLOW_DAY[rep.dueAt.getDay()];
+    return day ? { days: [day], cadence } : null;
+  }
+  if (!rep.dueAt) return { cadence };
+  return { dueDate: formatLocalDate(rep.dueAt), cadence };
 }
 
 /** Renames the group and reconciles its member tasks against the submitted
@@ -276,9 +392,25 @@ export function editTemplateGroup(
       }
     }
 
+    // New-member-task fan-out (2026-08-07): the schedule map is built once
+    // from the group's PRE-EDIT member tasks (`existingIds`, snapshotted
+    // above before this loop touches anything) and reused for every new
+    // task added in this same submission — a group edit can add more than
+    // one new member task at once, and each should fan out independently
+    // against the same "who already has this group's other work" snapshot,
+    // not against tasks created earlier in this very loop. Only queried
+    // when at least one task in the submission is actually new, to avoid
+    // the extra round-trip on a plain rename/reorder/edit-only submission.
+    const hasNewTask = body.tasks.some((t) => !(t.id && existingIds.has(t.id)));
+    const memberSchedules = hasNewTask
+      ? await getGroupMemberSchedules([...existingIds])
+      : new Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>();
+
     let updatedTasks = 0;
     let createdTasks = 0;
     let employees = 0;
+    let newTaskAssignedTo = 0;
+    let newTaskSkipped = 0;
     for (const [index, t] of body.tasks.entries()) {
       if (t.id && existingIds.has(t.id)) {
         const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
@@ -286,7 +418,7 @@ export function editTemplateGroup(
         employees += result.employees;
         await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
       } else {
-        await prisma.taskTemplate.create({
+        const newTask = await prisma.taskTemplate.create({
           data: {
             createdById: user.id,
             name: t.title,
@@ -297,9 +429,27 @@ export function editTemplateGroup(
           },
         });
         createdTasks += 1;
+
+        for (const [assigneeId, rep] of memberSchedules) {
+          const schedule = deriveFanOutSchedule(rep);
+          if (!schedule) {
+            newTaskSkipped += 1;
+            continue;
+          }
+          await assignFlowTaskCore(user, {
+            title: t.title,
+            subtasks: t.subtasks.length > 0 ? t.subtasks : undefined,
+            userIds: [assigneeId],
+            days: schedule.days,
+            dueDate: schedule.dueDate,
+            cadence: schedule.cadence,
+            fromTemplateId: newTask.id,
+          } satisfies FlowAssignInput);
+          newTaskAssignedTo += 1;
+        }
       }
     }
-    return { updatedTasks, createdTasks, removedTasks, employees };
+    return { updatedTasks, createdTasks, removedTasks, employees, newTaskAssignedTo, newTaskSkipped };
   }, "editTemplateGroup");
 }
 
