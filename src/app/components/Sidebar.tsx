@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ComponentType, SVGProps } from "react";
-import SwitchToClassicUi from "./SwitchToClassicUi";
 import {
   Home,
   Library,
@@ -227,10 +226,6 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
         <div className="my-3 mx-3 border-t border-slate-100" />
         <NavSection label="Quick Access" items={secondaryNav} pathname={pathname} collapsed={collapsed} />
       </nav>
-
-      {/* Pinned to the bottom: `nav` above is flex-1, so this sits at the foot
-          of the rail without absolute positioning. */}
-      <SwitchToClassicUi collapsed={collapsed} />
     </aside>
   );
 }
