@@ -8,15 +8,21 @@ WORKDIR /app
 RUN apk add --no-cache openssl tzdata
 ENV TZ=Asia/Kuala_Lumpur
 
-# Install deps first for better Docker layer caching
-COPY package*.json ./
+# Install deps first for better Docker layer caching. .npmrc carries
+# legacy-peer-deps=true — without it npm ci fails on packages whose peer
+# ranges predate React 19 (e.g. next-themes 0.3).
+COPY package*.json .npmrc ./
 RUN npm ci
 
 # Generate Prisma clients against the Linux target (host generates against Windows)
 COPY prisma ./prisma/
-COPY prisma.task-manager.config.ts ./
+COPY prisma.task-manager.config.ts prisma.crm.config.ts ./
 RUN npx prisma generate
 RUN npx prisma generate --config prisma.task-manager.config.ts
+# CRM client generates to src/generated/crm-client, which .dockerignore
+# excludes from the build context — it MUST be generated here or next build
+# fails with "Cannot find module '@/generated/crm-client'".
+RUN npx prisma generate --config prisma.crm.config.ts
 
 # Source + build
 ARG BUILD_DATE
