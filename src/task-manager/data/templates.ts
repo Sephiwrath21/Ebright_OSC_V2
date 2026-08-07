@@ -9,9 +9,10 @@
 // Cascade-safe Core logic for delete/edit/deletion-impact lives in
 // ./templates-internal (2026-08-06) — factored out so
 // data/template-groups.ts, which authorizes actors via its own
-// requireGroupAccess (a DIFFERENT per-scope allow-list than this file's
-// requireAssigner), can reuse that logic for an already-authorized actor
-// without re-running requireAssigner's narrower check. That file is
+// requireGroupEditAccess (Super Admin + elevated dept-site only, identical
+// for both TEMPLATE and PACKAGE scope — a DIFFERENT allow-list than this
+// file's requireAssigner), can reuse that logic for an already-authorized
+// actor without re-running requireAssigner's check. That file is
 // deliberately NOT re-exported by data.ts's `export * from "./data/templates"`
 // barrel, since its Core functions take a bare `{ id: string }` user with
 // no proof of authorization — see its file header for the full

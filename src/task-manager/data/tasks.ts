@@ -8,11 +8,16 @@
 // assignFlowTask's actual fan-out logic lives in ./tasks-internal
 // (2026-08-06) — factored out so data/template-groups.ts's
 // applyTemplateGroup, which authorizes actors via its own
-// requireGroupAssignAccess (a DIFFERENT per-scope allow-list than this
-// file's actor check below), can reuse that logic for an already-authorized
-// actor without re-running this file's narrower check. That file is
-// deliberately NOT re-exported by data.ts's `export *` barrel — see its
-// header for the full explanation.
+// requireGroupEditAccess (Super Admin + elevated Operations/Optimisation
+// dept-site only, identical for both TEMPLATE and PACKAGE scope — a
+// DIFFERENT allow-list than this file's own actor check below), can reuse
+// that fan-out logic without re-running this file's separate check.
+// Keeping the two allow-lists decoupled this way avoids double-gating
+// (an already-authorized caller getting silently rejected by a second,
+// differently-shaped check) even where today's requireGroupEditAccess
+// allow-list happens to be a subset of this one. That file is deliberately
+// NOT re-exported by data.ts's `export *` barrel — see its header for the
+// full explanation.
 import { z } from "zod";
 import type { FlowAssignInput } from "../ui/types";
 import { isPastDueDay } from "../ui/types";

@@ -91,7 +91,7 @@ async function requireGroupViewAccess(email: string, scope: TemplateGroupScope) 
 async function requireGroupEditAccess(email: string, scope: TemplateGroupScope) {
   const user = await requireUserByEmail(email);
   if (!canManageTaskTemplateGroups(user)) {
-    throw new ApiHttpError(403, `Only admins can manage ${NOUN[scope]}s`);
+    throw new ApiHttpError(403, `Only Super Admin and Operations can manage ${NOUN[scope]}s`);
   }
   return user;
 }

@@ -2,12 +2,14 @@
 // cascade-safe mutation/read logic behind ./templates's exported
 // deleteTaskTemplate/editTaskTemplate/getTemplateDeletionImpact, factored
 // out so an ALREADY-authorized caller (data/template-groups.ts, whose own
-// requireGroupAccess uses a DIFFERENT per-scope allow-list than
+// requireGroupEditAccess — Super Admin + elevated dept-site only, identical
+// for both TEMPLATE and PACKAGE scope — is a DIFFERENT allow-list than
 // ./templates's requireAssigner) can invoke the same logic without
-// re-running requireAssigner's narrower check — which would incorrectly
-// reject a Branch Manager requireGroupAccess already authorized. See
-// template-groups.ts's file header for the full double-gating
-// explanation.
+// re-running requireAssigner's check. Keeping the two allow-lists decoupled
+// this way avoids double-gating (an already-authorized caller getting
+// silently rejected by a second, differently-shaped check) if either one's
+// allow-list changes independently later. See template-groups.ts's file
+// header for the full double-gating explanation.
 //
 // Deliberately NOT re-exported by data.ts's `export * from "./data/templates"`
 // barrel (this file isn't re-exported by that barrel at all): every Core
