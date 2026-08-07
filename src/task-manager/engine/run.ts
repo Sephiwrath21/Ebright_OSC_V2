@@ -15,6 +15,7 @@ import { prisma } from "../prisma";
 import { getReminderQueue, reminderJobId } from "../lib/queues";
 import type { RunItemValue, SnapshotBlock, TemplateSnapshot } from "../lib/types";
 import { getUsersByIds } from "../lib/users";
+import { isPastDueDay } from "../ui/types";
 import { evaluateConditions } from "./conditions";
 import { buildTemplateSnapshot } from "./snapshot";
 
@@ -439,6 +440,13 @@ export async function completeBlock(input: CompleteBlockInput): Promise<Complete
   if (run.status !== "ACTIVE") throw new ApiHttpError(400, "Run is not active");
   if (runBlock.status === "DONE") throw new ApiHttpError(400, "This step is already completed");
   if (runBlock.status === "SKIPPED") throw new ApiHttpError(400, "This step was skipped");
+  // Past-day lock (2026-08-05): a Daily task's day has passed once its
+  // dueAt is strictly before today — completion closes for good at that
+  // point (server-authoritative; bits.tsx mirrors this for the disabled
+  // UI, but this is the check that actually can't be bypassed).
+  if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+    throw new ApiHttpError(400, "This task's day has passed and can no longer be marked complete");
+  }
 
   const actor = await getActor(actorId);
   if (runBlock.assigneeId !== actorId && !isElevated(actor)) {
@@ -676,6 +684,12 @@ export async function skipBlock(input: SkipBlockInput): Promise<SkipBlockResult>
   if (run.status !== "ACTIVE") throw new ApiHttpError(400, "Run is not active");
   if (runBlock.status === "DONE") throw new ApiHttpError(400, "This step is already completed");
   if (runBlock.status === "SKIPPED") throw new ApiHttpError(400, "This step is already marked N/A");
+  // Past-day lock (2026-08-05, extended from completeBlock to skipBlock —
+  // the "Mark N/A" half of the same status control): server-authoritative,
+  // bits.tsx mirrors this for the disabled UI.
+  if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+    throw new ApiHttpError(400, "This task's day has passed and can no longer be marked N/A");
+  }
 
   const actor = await getActor(actorId);
   if (runBlock.assigneeId !== actorId && !isElevated(actor)) {
@@ -799,6 +813,12 @@ export async function reopenBlock(input: ReopenBlockInput): Promise<ReopenBlockR
 
   if (runBlock.status !== "DONE" && runBlock.status !== "SKIPPED") {
     throw new ApiHttpError(400, "This step is already open");
+  }
+  // Past-day lock (2026-08-05): "no status change action is available
+  // anymore, full stop" — a past-day Daily task can't be reopened either,
+  // same as it can't be completed or marked N/A in the first place.
+  if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+    throw new ApiHttpError(400, "This task's day has passed and can no longer be reopened");
   }
 
   const actor = await getActor(actorId);

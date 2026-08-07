@@ -50,6 +50,7 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
 
   const emp = target.employment[0];
   const inScope = isRowInScope(scope, {
+    id: userId,
     departmentCode: emp?.department?.department_code ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
   });
@@ -1924,7 +1925,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
   if (!scope.fullAccess) {
+    // No real id yet (this employee doesn't exist until the insert below
+    // succeeds) — -1 can never equal a real user_id, so an ownUserId-scoped
+    // (individual staff) account correctly fails this check and can't
+    // create new employee records at all, only department/branch-scoped
+    // accounts (checked via departmentCode/branchCode, not id) can.
     const inScope = isRowInScope(scope, {
+      id: -1,
       departmentCode: input.departmentCode || null,
       branchCode: input.branchCode || null,
     });
@@ -1956,7 +1963,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
             branch_id: branch?.branch_id ?? null,
             department_id: department?.department_id ?? null,
             start_date: new Date(`${input.startDate}T00:00:00Z`),
-            status: "active",
+            // "pre" (not "active") — a distinct, literal marker so the
+            // automatic Pre -> Onboarding/Probation sweep (stageTransition
+            // Automation.ts) can find these rows by status alone once
+            // start_date arrives, without a new column. stageForRow's own
+            // Pre-branch never reads this field (start_date > today wins
+            // unconditionally), so this has no effect on display until then.
+            status: "pre",
           },
         },
       },
@@ -2013,23 +2026,19 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
   }
 }
 
-// ─── Pre stage list's row-menu Delete — one action covering both row kinds
-// (see StageFlatListView/RowActionMenu), since they map to two different
-// tables with no shared id space:
+// ─── Every stage list's row-menu Delete (Pre/Probation/Onboarding/Active/
+// Exit/Employee Records — see RowActionMenu) — real hard delete, per
+// explicit decision (see conversation): clicking Delete removes the
+// employee record entirely, not an archive, regardless of what stage
+// they're currently at. One action covering both row kinds:
 // - Real employee (positive id, a genuine users row): deletes the users row
-//   outright. Every one of its relations (employment, user_profile, ...) is
-//   declared onDelete: Cascade in schema.prisma, so this is a clean single
-//   delete, not a manual multi-table teardown — and safe specifically because
-//   Pre-stage employees haven't accrued any real history yet (no leave,
-//   achievements, promotions, ...) worth preserving.
-// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail):
-//   deletes the onboarding_candidate row directly; there's no users row to
-//   remove.
-// Restricted to employees still actually in Pre — this only exists to back
-// the Pre-stage list's own Delete button, not as a general "delete any
-// employee" action, so a client can't repurpose it against someone who has
-// already moved on and has real history attached. ───
-export async function deletePreStageEmployee(id: number): Promise<ActionResult> {
+//   outright. Every one of its relations (employment, leave_request,
+//   resignation, ...) is declared onDelete: Cascade in schema.prisma, so
+//   this is a clean single delete, not a manual multi-table teardown.
+// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail,
+//   Pre-stage-only): deletes the onboarding_candidate row directly; there's
+//   no users row to remove.
+export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
   const authError = await requireSession();
   if (authError) return authError;
   const scope = await getCurrentEmployeeScope();
@@ -2042,7 +2051,11 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
     if (!scope.fullAccess) {
       const [departments, branches] = await Promise.all([listDepartments(), listBranches()]);
       const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
-      if (!isRowInScope(scope, { departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
+      // No real user_id (this candidate has no portal account) — -1 can
+      // never equal a real user_id, so an ownUserId-scoped (individual
+      // staff) account correctly fails this check; only department/branch-
+      // scoped accounts can delete a candidate in their own department/branch.
+      if (!isRowInScope(scope, { id: -1, departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
         return { ok: false, error: "You do not have access to this candidate." };
       }
     }
@@ -2056,7 +2069,6 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
 
   const row = await getEmployeeOverviewRowById(id);
   if (!row) return { ok: false, error: "This employee doesn't exist or you don't have access to them." };
-  if (row.stage !== "pre") return { ok: false, error: "Only Pre-stage employees can be deleted this way." };
 
   const scopeError = await requireEmployeeInScope(id);
   if (scopeError) return scopeError;

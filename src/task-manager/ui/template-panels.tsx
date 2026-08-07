@@ -22,6 +22,7 @@ import type {
 } from "./types";
 import { personRowLabel, SinglePersonPickList } from "./recipient-picker";
 import { compressImageFile } from "./image-compress";
+import { SubtaskListEditor } from "./subtask-list-editor";
 
 const selectClass =
   "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
@@ -71,7 +72,11 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
   const [loaded, setLoaded] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [subtasks, setSubtasks] = React.useState<string[]>([]);
-  const [subtaskDraft, setSubtaskDraft] = React.useState("");
+  // Bumped to force-remount SubtaskListEditor (resetting its internal
+  // in-progress draft text) whenever a different template is picked and
+  // its subtasks replace the list wholesale — otherwise a half-typed
+  // draft from the previous template would silently persist.
+  const [subtaskEditorKey, setSubtaskEditorKey] = React.useState(0);
   const [guidelineUrl, setGuidelineUrl] = React.useState("");
   const [guidelineImage, setGuidelineImage] = React.useState<{
     mime: "image/png" | "image/jpeg" | "image/webp";
@@ -97,7 +102,7 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
     const t = result.template;
     setTitle(t.title);
     setSubtasks(t.subtasks);
-    setSubtaskDraft("");
+    setSubtaskEditorKey((k) => k + 1);
     setGuidelineUrl(t.guidelineUrl ?? "");
     setGuidelineImage(
       t.guidelineImage
@@ -190,60 +195,12 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
               className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-600">Subtasks</p>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={subtaskDraft}
-                onChange={(e) => setSubtaskDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const s = subtaskDraft.trim();
-                    if (s && subtasks.length < 20) {
-                      setSubtasks((prev) => [...prev, s]);
-                      setSubtaskDraft("");
-                    }
-                  }
-                }}
-                placeholder="Type a subtask..."
-                maxLength={200}
-                className="min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                disabled={!subtaskDraft.trim() || subtasks.length >= 20}
-                onClick={() => {
-                  setSubtasks((prev) => [...prev, subtaskDraft.trim()]);
-                  setSubtaskDraft("");
-                }}
-                className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40"
-              >
-                + Add
-              </button>
-            </div>
-            {subtasks.length > 0 && (
-              <ol className="mt-2 space-y-1">
-                {subtasks.map((s, i) => (
-                  <li
-                    key={`${i}-${s}`}
-                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
-                  >
-                    <span className="w-5 shrink-0 text-xs text-gray-400">{i + 1}.</span>
-                    <span className="min-w-0 flex-1 truncate">{s}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSubtasks((prev) => prev.filter((_, j) => j !== i))}
-                      aria-label={`Remove subtask ${s}`}
-                      className="shrink-0 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
+          <SubtaskListEditor
+            key={subtaskEditorKey}
+            subtasks={subtasks}
+            onChange={setSubtasks}
+            showMaxMessage={false}
+          />
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
             <p className="text-sm font-medium text-gray-600">Guidelines</p>
             <label className="mt-2 block text-sm text-gray-600">

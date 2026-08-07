@@ -48,7 +48,7 @@ export const POSITION_GROUPS: readonly PositionGroup[] = ["Full Time", "Part Tim
 export function positionGroup(position: string | null): PositionGroup {
   if (!position) return "Full Time";
   const p = position.trim().toUpperCase();
-  if (p === "INTERN" || p.startsWith("INTERN")) return "Intern";
+  if (p.includes("INTERN")) return "Intern";
   if (p.startsWith("PT") || p.includes("PART")) return "Part Time";
   return "Full Time";
 }

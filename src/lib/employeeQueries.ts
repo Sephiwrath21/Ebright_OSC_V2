@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // here to avoid colliding with this file's own `prisma` (the main hrfs db).
 import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
-import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage } from "@/lib/employeeStages";
+import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, positionGroup, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
 
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
@@ -186,6 +186,24 @@ export interface EmployeeOverviewRow {
    *  so there's no Employee Record to open. `id` is a negative sentinel
    *  (-source_id) for these, never a real user_id. */
   isCandidate?: boolean;
+  /** Pre stage list only — the matching career_applications row's current
+   *  board_stage (see lookupCareerApplicationsByName), attached by the page,
+   *  not this query. Undefined for every other stage and for Pre rows with
+   *  no career_applications match (e.g. manually added via
+   *  addPreStageEmployee). */
+  boardStage?: string | null;
+  /** Pre stage list only (see computePreStageRows in careerApplicationSync.ts)
+   *  — the resolved employment-type, cross-checked between
+   *  career_applications.board_stage and onboarding_candidate.position.
+   *  null when neither source has a usable value. */
+  resolvedPositionType?: PositionGroup | null;
+  /** True when board_stage and onboarding_candidate.position resolve to
+   *  DIFFERENT groups for the same person — flagged rather than silently
+   *  picking a winner, per explicit decision. */
+  positionDiscrepancy?: boolean;
+  /** Human-readable detail for the discrepancy above (e.g. "board_stage:
+   *  Full Time, HRFS: Intern") — only set when positionDiscrepancy is true. */
+  positionDiscrepancyDetail?: string | null;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
@@ -196,15 +214,41 @@ export interface EmployeeOverviewRow {
 // archive-status employee with no end_date falls through to active/
 // onboarding/probation like anyone else). "probation" is derived from the
 // probation flag — there's no separate DB stage for it.
-function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string, probation: boolean): EmployeeStage {
-  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status, probation);
+function stageFromEmployment(
+  status: string | null,
+  endIso: string | null,
+  todayIso: string,
+  probation: boolean,
+  position: string | null,
+): EmployeeStage {
+  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status, probation, position);
   if (status === "inactive") return "exit";
-  return nonExitStage(status, probation);
+  return nonExitStage(status, probation, position);
 }
 
-function nonExitStage(status: string | null, probation: boolean): EmployeeStage {
+// status === "pre" means start_date has arrived but the Pre -> Onboarding/
+// Probation transition (proceedFromPreStage, or the automatic sweep in
+// stageTransitionAutomation.ts) hasn't actually run yet — same lag a click-
+// or hourly-sweep-driven transition always has. Rather than display "Active"
+// (the old, wrong fallback) during that gap, compute live what the
+// transition WILL resolve to the instant it runs, mirroring the exact
+// Full-Time/not split proceedFromPreStage itself uses. No field is written
+// here — this is display-only; the actual status/probation write still
+// happens via the click or the sweep.
+// Exit falls back to updated_at, everything else falls back to created_at —
+// EXCEPT Pre, where a missing start_date must stay null (not silently
+// backfilled) so the UI can show/sort "no date yet" rows distinctly, e.g.
+// career_applications-synced Pre employees before HR fills in a start_date.
+function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end_date: Date | null } | undefined, u: { created_at: Date; updated_at: Date }): Date | null {
+  if (stage === "exit") return emp?.end_date ?? u.updated_at;
+  if (stage === "pre") return emp?.start_date ?? null;
+  return emp?.start_date ?? u.created_at;
+}
+
+function nonExitStage(status: string | null, probation: boolean, position: string | null): EmployeeStage {
   if (status === "onboarding") return "onboarding";
   if (probation) return "probation";
+  if (status === "pre") return positionGroup(position) === "Full Time" ? "probation" : "onboarding";
   return "active";
 }
 
@@ -225,16 +269,24 @@ function nonExitStage(status: string | null, probation: boolean): EmployeeStage 
 // stage that correctly represents them yet.
 function stageForRow(
   usersStatus: string | null,
-  emp: { status: string | null; probation: boolean; start_date: Date | null; end_date: Date | null } | undefined,
+  emp:
+    | { status: string | null; probation: boolean; start_date: Date | null; end_date: Date | null; position: string | null }
+    | undefined,
   todayIso: string,
 ): EmployeeStage | null {
   const startIso = emp?.start_date ? emp.start_date.toISOString().slice(0, 10) : null;
   if (startIso && startIso > todayIso) return "pre";
+  // status="pre" with no start_date at all (e.g. synced from
+  // career_applications with no known start date yet) — still Pre, just
+  // without a date to compare against today. Distinct from the "startIso in
+  // the past, sweep hasn't run yet" case below, which nonExitStage predicts
+  // via position instead.
+  if (!startIso && emp?.status === "pre") return "pre";
   if (usersStatus === "pending") {
     return startIso ? null : "pre";
   }
   const endIso = emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null;
-  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false);
+  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false, emp?.position ?? null);
 }
 
 export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
@@ -257,7 +309,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
     const emp = u.employment[0];
     const stage = stageForRow(u.status ?? null, emp, todayIso);
     if (!stage) continue;
-    const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
+    const dateSource = dateSourceFor(stage, emp, u);
     rows.push({
       id: u.user_id,
       employeeId: emp?.employee_id ?? null,
@@ -268,12 +320,31 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       departmentCode: emp?.department?.department_code ?? null,
       departmentName: emp?.department?.department_name ?? null,
       employmentType: emp?.employment_type ?? null,
-      date: dateSource.toISOString().slice(0, 10),
+      date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
       stage,
     });
   }
 
-  if (options.skipScopeFilter) return rows;
+  // Rule 3: resolve branch/department via the live BranchStaff fallback
+  // BEFORE scope-filtering below — a scoped (department/branch) viewer must
+  // be able to see rows whose real branch_id/department_id is still null
+  // but resolvable via ebright_hrfs.BranchStaff, same as the Probation/
+  // Onboarding dual-listing pages already display. Filtering ran BEFORE
+  // enrichment here previously, which made the fallback a no-op for every
+  // scoped viewer (a null-branch row was excluded before it ever got a
+  // chance to resolve) — fixed by enriching first. Dynamic import to avoid
+  // a circular dependency (careerApplicationSync.ts already imports several
+  // things from this file); skipped entirely (no extra queries) unless some
+  // row actually has neither field set.
+  const rowsWithLocation = rows.some((r) => !r.branchCode && !r.departmentCode)
+    ? await (async () => {
+        const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+        const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+        return enrichRowsWithBranchStaffLocation(rows, branches, departments);
+      })()
+    : rows;
+
+  if (options.skipScopeFilter) return rowsWithLocation;
 
   const scope = await getCurrentEmployeeScope();
   // No session -> the caller's own auth() gate (already required before
@@ -281,7 +352,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // everything unfiltered here would only matter if that gate were ever
   // missing, so fail closed instead.
   if (!scope) return [];
-  return filterRowsByScope(scope, rows);
+  return filterRowsByScope(scope, rowsWithLocation);
 }
 
 // Single-employee counterpart to listEmployeeOverviewRows() above — every
@@ -311,8 +382,8 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
   const stage = stageForRow(u.status ?? null, emp, todayIso);
   if (!stage) return null;
 
-  const dateSource = stage === "exit" ? emp?.end_date ?? u.updated_at : emp?.start_date ?? u.created_at;
-  const row: EmployeeOverviewRow = {
+  const dateSource = dateSourceFor(stage, emp, u);
+  let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
     fullName: titleCaseName(u.user_profile?.full_name) || u.email,
@@ -322,9 +393,19 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     departmentCode: emp?.department?.department_code ?? null,
     departmentName: emp?.department?.department_name ?? null,
     employmentType: emp?.employment_type ?? null,
-    date: dateSource.toISOString().slice(0, 10),
+    date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
     stage,
   };
+
+  // Rule 3: same live BranchStaff fallback as listEmployeeOverviewRows,
+  // applied before the scope check below for the same reason — a scoped
+  // viewer must be able to reach this row even if its real branch_id/
+  // department_id is still null but resolvable via BranchStaff.
+  if (!row.branchCode && !row.departmentCode) {
+    const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+    const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+    [row] = await enrichRowsWithBranchStaffLocation([row], branches, departments);
+  }
 
   const scope = await getCurrentEmployeeScope();
   if (!scope) return null;
@@ -364,6 +445,12 @@ export function resolveDepartmentBranch(
   };
 }
 
+// NOT CURRENTLY CALLED from the Pre stage list/count — disabled per decision
+// (ebrightleads no longer feeds Pre; see employee-folder/page.tsx and
+// employee-folder/[stage]/page.tsx). Left defined rather than deleted since
+// the underlying onboarding_candidate sync/table is still populated and this
+// may be reintroduced or reused elsewhere later.
+//
 // Pre stage's real-employee population (above) only covers people who
 // already have a portal account. Future hires still sitting in the external
 // ebrightleads pipeline — synced into onboarding_candidate, same source the
@@ -933,6 +1020,19 @@ export interface StageLocationSummary {
   count: number;
 }
 
+// Sentinel location code for employees with neither a branch nor a
+// department set — e.g. career_applications-synced people whose branch/
+// department text didn't match anything real (see careerApplicationSync.ts).
+// Without this bucket, these people were counted on the Employee Overview
+// card but had no "By Branch"/"By Department" entry that would ever show
+// them. Deliberately NOT used for Onboarding (see the stage === "onboarding"
+// checks below) — per explicit decision, removed there once the BranchStaff
+// live fallback (enrichRowsWithBranchStaffLocation) made it consistently
+// empty in practice; Active/Exit keep it, their own backfill decisions are
+// still pending (see conversation).
+export const UNASSIGNED_LOCATION_CODE = "unassigned";
+const UNASSIGNED_LOCATION_NAME = "Unassigned";
+
 export function summarizeStageByBranch(
   rows: EmployeeOverviewRow[],
   stage: EmployeeStage,
@@ -945,12 +1045,15 @@ export function summarizeStageByBranch(
   // confuses the two groupings. Excluded here only (not from listBranches()
   // itself, which other callers — Transfer's dropdown, the Add-employee
   // form — still need HQ in).
-  return branches
+  const byBranch = branches
     .filter((b) => b.code !== "HQ")
     .map((b) => {
       const inBranch = stageRows.filter((r) => r.branchCode === b.code);
       return { code: b.code, name: b.name, count: inBranch.length };
     });
+  if (stage === "onboarding") return byBranch;
+  const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
+  return [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
 }
 
 export function summarizeStageByDepartment(
@@ -959,10 +1062,13 @@ export function summarizeStageByDepartment(
   departments: DepartmentOpt[],
 ): StageLocationSummary[] {
   const stageRows = rows.filter((r) => r.stage === stage);
-  return departments.map((d) => {
+  const byDept = departments.map((d) => {
     const inDept = stageRows.filter((r) => r.departmentCode === d.code);
     return { code: d.code, name: d.name, count: inDept.length };
   });
+  if (stage === "onboarding") return byDept;
+  const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
+  return [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
 }
 
 export function filterStageByLocation(
@@ -971,8 +1077,20 @@ export function filterStageByLocation(
   groupBy: "branch" | "department",
   code: string,
 ): EmployeeOverviewRow[] {
+  if (code === UNASSIGNED_LOCATION_CODE) {
+    if (stage === "onboarding") return [];
+    return rows.filter((r) => r.stage === stage && !r.branchCode && !r.departmentCode);
+  }
   return rows.filter((r) => r.stage === stage && (groupBy === "branch" ? r.branchCode === code : r.departmentCode === code));
 }
+
+// Onboarding-list dual-listing (real Probation-stage Full-Time people, and
+// real Active-stage Full-Time people whose recruitment pipeline still reads
+// "Probation") lives in careerApplicationSync.ts as
+// matchBelongsOnOnboardingList/computeOnboardingDualListedRows — it needs
+// the external career_applications/rec_recruit lookup this file doesn't
+// have, so it can't be a pure function here the way isDualListedOnProbation's
+// pure half is.
 
 export interface PendingRegistration {
   id: number;
@@ -1092,16 +1210,30 @@ export interface InterviewAssessmentInfo {
 // numeric rating and Proceed/Hire/Hold/Reject, confirmed by reading both
 // hr_hiringNotes.html and pre_PersonalInfo.html directly. Genuinely two
 // separate forms, not a duplicate to unify like Resume/Personal Info were.
-export async function getInterviewAssessment(userId: number): Promise<InterviewAssessmentInfo | null> {
+//
+// hiringNote falls back to the matching career_applications row's
+// feedback1 (then feedback2) when there's no real hiring_note on file yet —
+// applies even when there's no interview_assessment row at all, which is the
+// normal case for a freshly career_applications-synced Pre employee (every
+// other field here still shows "Not provided" via the UI's own null
+// handling; only hiringNote gets this fallback). `fullName` is optional so
+// existing callers that don't have it handy keep working with no fallback.
+export async function getInterviewAssessment(userId: number, fullName?: string): Promise<InterviewAssessmentInfo | null> {
   const row = await prisma.interview_assessment.findUnique({ where: { user_id: userId } });
-  if (!row) return null;
+  let hiringNote = row?.hiring_note ?? null;
+  if (!hiringNote && fullName) {
+    const { lookupCareerApplicationsByName, normalizeName } = await import("@/lib/careerApplicationSync");
+    const match = (await lookupCareerApplicationsByName()).get(normalizeName(fullName));
+    hiringNote = match?.hiringNote ?? null;
+  }
+  if (!row && !hiringNote) return null;
   return {
-    intDate: row.int_date ? row.int_date.toISOString().slice(0, 10) : null,
-    overallRate: row.overall_rate,
-    recommendation: row.recommendation,
-    strength: row.strength,
-    weakness: row.weakness,
-    hiringNote: row.hiring_note,
+    intDate: row?.int_date ? row.int_date.toISOString().slice(0, 10) : null,
+    overallRate: row?.overall_rate ?? null,
+    recommendation: row?.recommendation ?? null,
+    strength: row?.strength ?? null,
+    weakness: row?.weakness ?? null,
+    hiringNote,
   };
 }
 
@@ -1401,9 +1533,6 @@ export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
 // matching email (unique on both sides) — an employee who was never
 // bootstrapped into Task Manager (or has no account yet) simply has no tasks
 // to show, not an error.
-/** Mirrors RunBlock.cadence's Cadence enum (prisma/task-manager/schema.prisma). */
-export type TaskCadence = "DAILY" | "MONTHLY" | "ADHOC";
-
 export interface EmployeeTaskRow {
   id: string;
   name: string;
@@ -1419,11 +1548,6 @@ export interface EmployeeTaskRow {
    *  resolution groupByAssignerRole (task-manager/analytics/_lib.ts) uses,
    *  just formatted as one string instead of a bucket key. */
   source: string;
-  /** Raw cadence, separate from the formatted `source` string — the Source
-   *  filter pills filter on this structured value (Daily/Monthly/Ad-hoc),
-   *  not by string-matching `source`, since a task's cadence and its "who
-   *  assigned it" role are two independent dimensions. */
-  cadence: TaskCadence | null;
 }
 
 export interface EmployeeTasksSummary {
@@ -1492,7 +1616,6 @@ function toEmployeeTaskRow(
     dueDate: row.dueAt ? row.dueAt.toISOString().slice(0, 10) : null,
     isOverdue: row.dueAt !== null && row.dueAt < startOfToday,
     source: taskSourceLabel(row.run.startedById, selfTmUserId, starterRoles, row.cadence),
-    cadence: (row.cadence as TaskCadence | null) ?? null,
   };
 }
 

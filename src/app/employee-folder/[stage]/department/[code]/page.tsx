@@ -6,11 +6,14 @@ import ExitListView from "@/app/components/ExitListView";
 import {
   filterStageByLocation,
   isEmployeeStage,
+  listBranches,
   listDepartments,
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
+  UNASSIGNED_LOCATION_CODE,
 } from "@/lib/employeeQueries";
+import { enrichRowsWithBranchStaffLocation, computeOnboardingDualListedRows } from "@/lib/careerApplicationSync";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
@@ -32,10 +35,26 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
   if (!scope) redirect("/login");
   if (!scope.fullAccess && scope.departmentCode !== code) notFound();
 
-  const [rows, departments] = await Promise.all([listEmployeeOverviewRows(), listDepartments()]);
-  const department = departments.find((d) => d.code === code);
+  const [rowsBase, branches, departments] = await Promise.all([listEmployeeOverviewRows(), listBranches(), listDepartments()]);
+  // Onboarding has no Unassigned bucket (see summarizeStageByDepartment) —
+  // direct URL access to it 404s like any other nonexistent department code.
+  const department =
+    code === UNASSIGNED_LOCATION_CODE && stage !== "onboarding"
+      ? { code: UNASSIGNED_LOCATION_CODE, name: "Unassigned" }
+      : departments.find((d) => d.code === code);
   if (!department) notFound();
 
+  // Same dual-listing as the summary page above it (see
+  // computeOnboardingDualListedRows).
+  const rowsRaw =
+    stage === "onboarding"
+      ? [...rowsBase, ...(await computeOnboardingDualListedRows(rowsBase)).map((r) => ({ ...r, stage: "onboarding" as const }))]
+      : rowsBase;
+  // Same live BranchStaff fallback as the summary page above it — must be
+  // applied here too, not just there, or someone whose grouping the summary
+  // corrected would still show up empty-handed on the very bucket it now
+  // counts them under.
+  const rows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
   const namelistRows = filterStageByLocation(rows, stage, "department", code);
   const [exitTypeByUserId, lastWorkingDateByUserId] =
     stage === "exit"

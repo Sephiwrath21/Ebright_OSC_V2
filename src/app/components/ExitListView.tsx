@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Home, Search } from "lucide-react";
 import { positionGroup, POSITION_GROUPS, type PositionGroup } from "@/lib/employeeStages";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
@@ -70,6 +72,7 @@ export default function ExitListView({
   departments = [],
   locationContext,
 }: Props) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PositionGroup | "">("");
   const [branchFilter, setBranchFilter] = useState("");
@@ -386,7 +389,14 @@ export default function ExitListView({
                     )}
                   </span>
                   <div className="flex justify-center">
-                    <RowActionMenu name={row.fullName} />
+                    <RowActionMenu
+                      name={row.fullName}
+                      onDelete={async () => {
+                        const result = await deleteEmployeeRecord(row.id);
+                        if (result.ok) router.refresh();
+                        return result;
+                      }}
+                    />
                   </div>
                 </div>
               );

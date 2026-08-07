@@ -11,12 +11,22 @@ import {
   listEmployeeOverviewRows,
   listResignationExitTypesByUserId,
   listLastWorkingDatesByUserId,
-  listUpcomingOnboardingCandidates,
   summarizeStageByBranch,
   summarizeStageByDepartment,
 } from "@/lib/employeeQueries";
+import {
+  lookupCareerApplicationsByName,
+  lookupBranchStaffLocationByName,
+  enrichRowsWithBranchStaffLocation,
+  computeOnboardingDualListedRows,
+  computePreStageRows,
+  computePreStartDatePassedRows,
+  matchIsProbationPipeline,
+  matchIsProbationOverrideExcluded,
+  normalizeName,
+} from "@/lib/careerApplicationSync";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
-import { getCurrentEmployeeScope } from "@/lib/employeeScope";
+import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
 
@@ -36,25 +46,97 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
 
+  // Individual staff logins (ownUserId scope) never see any list/overview
+  // here — regardless of which stage nav link they clicked, they land
+  // straight on their own Employee Record (same consolidated view every
+  // "Employee Records" table row links to, not the stage-flow profile
+  // template — see employee-folder/page.tsx's matching redirect for the
+  // full rationale). /employee-record/[id] applies this same ownUserId
+  // scope check itself, so there's nothing more to validate before
+  // redirecting. Fetched once and reused below (both by the department/
+  // branch redirect further down and Exit's own fullAccess branch) instead
+  // of re-querying getCurrentEmployeeScope() a second time.
+  const scope = await getCurrentEmployeeScope();
+  if (scope?.ownUserId != null) redirect(`/employee-record/${scope.ownUserId}`);
+
   // Reference (pre.html / probation.html): these two stages skip the
   // Branch/Department drill-down entirely — flat list straight to a profile.
   if (!STAGE_PROFILE_CONFIG[stage].hasLocationLayer) {
-    const rows = await listEmployeeOverviewRows();
-    const stageRows = rows.filter((r) => r.stage === stage);
-    // Pre also includes future hires with no portal account yet, sourced
-    // from the ebrightleads-synced onboarding_candidate table, plus the
-    // Branch/Department option lists for the "+ Add" form.
-    let branches: Awaited<ReturnType<typeof listBranches>> | undefined;
-    let departments: Awaited<ReturnType<typeof listDepartments>> | undefined;
+    // Pre membership, per explicit decision (see conversation) — REPLACES
+    // the earlier "real employment.status='pre' or future start_date"
+    // definition entirely (not additive, unlike Probation's OR-rule below):
+    // computePreStageRows() is the sole source of truth now, live from
+    // career_applications.board_stage / hrfs.onboarding_candidate, with its
+    // own real-data-wins override baked in (see that function's own
+    // comment). Scope-filtered here the same way listEmployeeOverviewRows()
+    // filters everything else, since computePreStageRows() itself returns
+    // unscoped rows (it needs every real row, unscoped, to correctly apply
+    // its own override check before scope ever enters the picture).
     if (stage === "pre") {
-      const [candidates, branchList, departmentList] = await Promise.all([
-        listUpcomingOnboardingCandidates(stageRows),
+      const [preRows, branchList, departmentList] = await Promise.all([
+        computePreStageRows(),
         listBranches(),
         listDepartments(),
       ]);
-      stageRows.push(...candidates);
+      const stageRows = scope ? filterRowsByScope(scope, preRows) : [];
+      return (
+        <AppShell email={userEmail} role={userRole} name={userName}>
+          <StageFlatListView stage={stage} rows={stageRows} branches={branchList} departments={departmentList} />
+        </AppShell>
+      );
+    }
+
+    const rows = await listEmployeeOverviewRows();
+    let stageRows = rows.filter((r) => r.stage === stage);
+    let branches: Awaited<ReturnType<typeof listBranches>> | undefined;
+    let departments: Awaited<ReturnType<typeof listDepartments>> | undefined;
+    if (stage === "probation") {
+      // Probation-list membership, per explicit decision (see
+      // conversation): a person belongs here if EITHER
+      // career_applications.board_stage OR rec_recruit/rec_stage.name reads
+      // "Probation" — an OR across both external pipeline fields, since
+      // each has separately been caught disagreeing with reality (and with
+      // each other). This can both ADD a row whose real, stored stage is
+      // something else entirely — Onboarding, or even Active, since the
+      // recruitment pipeline can lag behind someone's real progress — and
+      // REMOVE a row whose employment.probation flag is true (set by a
+      // manual "Proceed" click) when NEITHER pipeline field corroborates it
+      // anymore (matchIsProbationOverrideExcluded). No change to what's
+      // stored either way — this is display-only, same as before. A row's
+      // profile link always stays on /probation/employee/[id] here;
+      // [id]/page.tsx's guard (isDualListedOnProbation) allows it through
+      // for anyone this same OR-rule matches and renders the Probation
+      // profile template, while visiting that same person from their real
+      // stage's own list still shows that stage's own template.
+      const [careerApplications, branchList, departmentList] = await Promise.all([
+        lookupCareerApplicationsByName(),
+        listBranches(),
+        listDepartments(),
+      ]);
       branches = branchList;
       departments = departmentList;
+      const branchStaffByName = await lookupBranchStaffLocationByName(branchList, departmentList);
+
+      stageRows = stageRows.filter(
+        (row) => !matchIsProbationOverrideExcluded(careerApplications.get(normalizeName(row.fullName))),
+      );
+
+      const otherRows = rows.filter((r) => r.stage !== "probation");
+      for (const row of otherRows) {
+        if (!matchIsProbationPipeline(careerApplications.get(normalizeName(row.fullName)))) continue;
+        // Branch/Department: prefer the row's own real employment data;
+        // BranchStaff (ebright_hrfs's operational roster) only fills in
+        // when that's null — mid-pipeline dual-listed rows commonly have
+        // neither branch_id nor department_id set yet in our own system.
+        const loc = branchStaffByName.get(normalizeName(row.fullName));
+        stageRows.push({
+          ...row,
+          branchCode: row.branchCode ?? loc?.branchCode ?? null,
+          branchName: row.branchName ?? loc?.branchName ?? null,
+          departmentCode: row.departmentCode ?? loc?.departmentCode ?? null,
+          departmentName: row.departmentName ?? loc?.departmentName ?? null,
+        });
+      }
     }
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
@@ -70,7 +152,6 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   // Marketing) rather than making them pick their own department from a
   // list of every department. HR/Superadmin (fullAccess) keep seeing the
   // selection screen unchanged.
-  const scope = await getCurrentEmployeeScope();
   if (scope && !scope.fullAccess) {
     if (scope.departmentCode) redirect(`/employee-folder/${stage}/department/${scope.departmentCode}`);
     if (scope.branchCode) redirect(`/employee-folder/${stage}/branch/${scope.branchCode}`);
@@ -105,11 +186,36 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   const { by } = await searchParams;
   const groupBy = by === "department" ? "department" : "branch";
 
-  const [rows, branches, departments] = await Promise.all([
+  const [rowsBase, branches, departments] = await Promise.all([
     listEmployeeOverviewRows(),
     listBranches(),
     listDepartments(),
   ]);
+  // Real Probation-stage Full-Time people, and real Active-stage Full-Time
+  // people whose recruitment pipeline still reads "Probation", also count
+  // toward Onboarding here — see computeOnboardingDualListedRows — as
+  // clones with stage overridden to "onboarding" so the existing
+  // r.stage === stage filtering inside summarizeStageByBranch/Department
+  // picks them up for free. Their own stored stage is untouched; this
+  // array only exists for this render. Same treatment for real Pre-eligible
+  // people whose resolved start date has already passed (see
+  // computePreStartDatePassedRows) — they've actually started, so Pre list
+  // page.tsx excludes them and they land here instead.
+  const rowsRaw =
+    stage === "onboarding"
+      ? [
+          ...rowsBase,
+          ...(await computeOnboardingDualListedRows(rowsBase)).map((r) => ({ ...r, stage: "onboarding" as const })),
+          ...(await computePreStartDatePassedRows()),
+        ]
+      : rowsBase;
+  // Same live BranchStaff fallback the Probation list uses — someone whose
+  // own employment row has neither branch_id nor department_id set yet
+  // (e.g. Onboarding/Active people still mid-pipeline) would otherwise only
+  // ever show up under "Unassigned" here despite the operational HR roster
+  // already having their real location. Read-only: fills in this summary's
+  // counts/grouping only, never writes back to the employment record.
+  const rows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
 
   const locations =
     groupBy === "branch"

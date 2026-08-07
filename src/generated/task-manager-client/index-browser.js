@@ -262,6 +262,16 @@ exports.Prisma.GuidelineScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
+  id: 'id',
+  createdById: 'createdById',
+  name: 'name',
+  scope: 'scope',
+  archivedAt: 'archivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.TaskTemplateScalarFieldEnum = {
   id: 'id',
   createdById: 'createdById',
@@ -273,6 +283,8 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
   guidelineMime: 'guidelineMime',
   guidelineImage: 'guidelineImage',
   archivedAt: 'archivedAt',
+  templateGroupId: 'templateGroupId',
+  groupPosition: 'groupPosition',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -446,6 +458,11 @@ exports.Cadence = exports.$Enums.Cadence = {
   ADHOC: 'ADHOC'
 };
 
+exports.TemplateGroupScope = exports.$Enums.TemplateGroupScope = {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
+};
+
 exports.ViewType = exports.$Enums.ViewType = {
   TABLE: 'TABLE',
   BOARD: 'BOARD',
@@ -470,6 +487,7 @@ exports.Prisma.ModelName = {
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
+  TaskTemplateGroup: 'TaskTemplateGroup',
   TaskTemplate: 'TaskTemplate',
   Proof: 'Proof',
   RunItem: 'RunItem',

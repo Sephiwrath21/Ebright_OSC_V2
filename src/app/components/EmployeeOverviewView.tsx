@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronRight, Home, Search } from "lucide-react";
 import { EMPLOYEE_STAGES, STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts }: Props) {
+  const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
@@ -231,7 +234,14 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                       </span>
                     </span>
                     <div className="flex justify-center">
-                      <RowActionMenu name={row.fullName} />
+                      <RowActionMenu
+                        name={row.fullName}
+                        onDelete={async () => {
+                          const result = await deleteEmployeeRecord(row.id);
+                          if (result.ok) router.refresh();
+                          return result;
+                        }}
+                      />
                     </div>
                   </div>
                 ))

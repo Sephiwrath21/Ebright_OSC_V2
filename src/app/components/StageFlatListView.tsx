@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, Home, Search } from "lucide-react";
 import { STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employeeQueries";
-import { deletePreStageEmployee } from "@/lib/employeeRecordActions";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
+import Pagination from "@/app/components/Pagination";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import AddPreStageEmployeeModal from "@/app/components/AddPreStageEmployeeModal";
@@ -35,6 +36,10 @@ export default function StageFlatListView({ stage, rows, branches, departments }
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
   const [dateSort, setDateSort] = useState<DateSortState>("default");
+  // Pre only — same shared Pagination control the Employee Records table
+  // uses, added to the bottom of the name list per explicit request.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const years = useMemo(() => {
     const set = new Set(rows.map((r) => r.date?.slice(0, 4)).filter(Boolean) as string[]);
@@ -49,8 +54,17 @@ export default function StageFlatListView({ stage, rows, branches, departments }
       if (month && r.date?.slice(5, 7) !== month) return false;
       return true;
     });
-    return applyDateSort(result, dateSort, (r) => r.date, Boolean(year) || Boolean(month));
-  }, [rows, search, year, month, dateSort]);
+    return applyDateSort(
+      result,
+      dateSort,
+      (r) => r.date,
+      Boolean(year) || Boolean(month),
+      stage === "pre" ? "ascending" : "month-grouped",
+    );
+  }, [rows, search, year, month, dateSort, stage]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const visible = stage === "pre" ? filtered.slice((page - 1) * pageSize, page * pageSize) : filtered;
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -80,7 +94,10 @@ export default function StageFlatListView({ stage, rows, branches, departments }
               type="search"
               placeholder="Search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -122,15 +139,15 @@ export default function StageFlatListView({ stage, rows, branches, departments }
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
               <span>Name</span>
               <span>Branch/ Department</span>
-              <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
-              <span>Status</span>
+              <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} label={stage === "pre" ? "Start Date" : "Date"} />
+              <span>{stage === "pre" ? "Position" : "Status"}</span>
               <span />
             </div>
 
-            {filtered.length === 0 ? (
+            {visible.length === 0 ? (
               <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
             ) : (
-              filtered.map((row) => (
+              visible.map((row) => (
                 <Link
                   key={row.id}
                   href={`/employee-folder/${stage}/employee/${row.id}`}
@@ -140,15 +157,39 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                   <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
                   <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
                   <span>
-                    <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                      {STAGE_LABELS[stage]}
-                    </span>
+                    {stage === "pre" ? (
+                      row.resolvedPositionType ? (
+                        <span
+                          className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${
+                            row.positionDiscrepancy ? "bg-amber-100 text-amber-800" : "bg-purple-100 text-purple-700"
+                          }`}
+                          title={row.positionDiscrepancyDetail ?? undefined}
+                        >
+                          {row.resolvedPositionType}
+                          {row.positionDiscrepancy ? " ⚠" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-500">—</span>
+                      )
+                    ) : (
+                      // Always this page's own stage label, deliberately NOT
+                      // row.stage — for Full-Time employees, Probation and
+                      // Onboarding run CONCURRENTLY (same person, both true
+                      // at once) until probation is formally confirmed and
+                      // they move to Active, so a dual-listed row's "real"
+                      // stage elsewhere isn't a more correct answer here, just
+                      // a different, equally-true one; showing it would read
+                      // as a contradiction rather than information.
+                      <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                        {STAGE_LABELS[stage]}
+                      </span>
+                    )}
                   </span>
                   <div className="flex justify-center">
                     <RowActionMenu
                       name={row.fullName}
                       onDelete={async () => {
-                        const result = await deletePreStageEmployee(row.id);
+                        const result = await deleteEmployeeRecord(row.id);
                         if (result.ok) router.refresh();
                         return result;
                       }}
@@ -159,6 +200,23 @@ export default function StageFlatListView({ stage, rows, branches, departments }
             )}
           </div>
         </div>
+
+        {stage === "pre" && filtered.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            pageSizeOptions={[15, 50, 100]}
+            totalCount={filtered.length}
+            totalLabel="employees"
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            className="mt-4"
+          />
+        )}
       </div>
     </div>
   );

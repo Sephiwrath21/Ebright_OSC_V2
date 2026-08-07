@@ -15,6 +15,7 @@ import {
   resolveLocationName,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
+import { isDualListedOnProbation } from "@/lib/careerApplicationSync";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,21 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
     employeeDetail = candidate;
   } else {
     const found = await getEmployeeOverviewRowById(numId);
-    if (!found || found.stage !== stage) notFound();
+    if (!found) notFound();
+    if (found.stage !== stage) {
+      // The one allowed mismatch: someone whose real, stored stage is
+      // something else (Onboarding, or even Active — the external
+      // recruitment pipeline can lag behind real progress) but whose
+      // career_applications.board_stage OR rec_recruit/rec_stage.name reads
+      // "Probation" is dual-listed on the Probation list (see
+      // [stage]/page.tsx) and must be reachable at /probation/employee/[id]
+      // there — rendered with the Probation profile template below, not
+      // their real stage's one, and not a 404. Visiting them at their real
+      // stage's own URL still renders normally since found.stage === stage
+      // already matched above in that case.
+      const isDualListedProbationView = stage === "probation" && (await isDualListedOnProbation(found.fullName));
+      if (!isDualListedProbationView) notFound();
+    }
     employee = found;
     employeeDetail = await getEmployeeById(numId);
   }
@@ -69,7 +84,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // so there's no branch/dept-scoped namelist to have arrived from.
   const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, { locGroup, locCode }] = await Promise.all([
     getResumeInfo(numId),
-    getInterviewAssessment(numId),
+    getInterviewAssessment(numId, employee.fullName),
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),

@@ -29,6 +29,7 @@ import {
   listBranches,
   listDepartments,
 } from "@/lib/employeeQueries";
+import { isEligibleForOnboardingDualListing, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,26 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   if (Number.isNaN(numId)) notFound();
 
   const employee = await getEmployeeOverviewRowById(numId);
-  if (!employee || employee.stage !== stage) notFound();
+  if (!employee) notFound();
+  if (employee.stage !== stage) {
+    // The allowed mismatches here: (a) a real Probation-stage Full-Time
+    // person, or a real Active-stage Full-Time person whose recruitment
+    // pipeline still reads "Probation", is also dual-listed on the
+    // Onboarding list (see [stage]/page.tsx and
+    // computeOnboardingDualListedRows); (b) a real Pre-stage person whose
+    // resolved start date has already passed — they've actually started,
+    // per the Pre list's own definition (see computePreStartDatePassedRows)
+    // — is dual-listed there too. Both must be reachable at
+    // /onboarding/employee/[id]/... there, rendered with the Onboarding
+    // profile template below — not a 404. Visiting them at their real
+    // stage's own URL (e.g. /pre/employee/[id]) still shows that stage's
+    // content, unaffected by this.
+    const isDualListedOnboardingView =
+      stage === "onboarding" &&
+      ((await isEligibleForOnboardingDualListing(employee)) ||
+        (await computePreStartDatePassedRows()).some((r) => r.id === employee.id));
+    if (!isDualListedOnboardingView) notFound();
+  }
 
   const { locGroup, locCode } = await searchParams;
   const locationGroup = locGroup === "branch" || locGroup === "department" ? locGroup : null;
@@ -114,7 +134,7 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     activeOrAfter ? listLeaveHistory(numId) : Promise.resolve(undefined),
     getEmployeeById(numId),
     getResumeInfo(numId),
-    getInterviewAssessment(numId),
+    getInterviewAssessment(numId, employee.fullName),
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),
