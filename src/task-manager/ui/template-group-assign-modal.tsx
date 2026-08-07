@@ -6,15 +6,19 @@
 // from the Create/Edit modal — creating a template never asks for an
 // assignee (per the confirmed design).
 //
-// Package recipient restriction (2026-08-06): Package assignment is
-// Branch-Manager-only server-side (requireGroupAssignAccess in
-// template-groups.ts), so the picker here mirrors that — when
-// label === "Package", `staff` is pre-filtered to role === "BRANCH" (the
-// same definition the server check uses, NOT employmentType === "Manager",
-// which is a related but not-guaranteed-identical field) before it ever
-// reaches RecipientPicker, and the Group dropdown is trimmed to just
-// "Branch Manager" via `groupOptions` — every other FLOW_GROUPS option
-// would resolve empty against an already Branch-Manager-only staff list.
+// Package recipient restriction (2026-08-06, still enforced under the
+// 2026-08-07 View/Edit tier split): Package assignments can only target
+// Branch Manager recipients server-side (the explicit role !== "BRANCH"
+// target check in template-groups.ts's applyTemplateGroup — a separate
+// concern from WHO may call assign, which is now requireGroupEditAccess,
+// Super Admin + elevated dept-site only), so the picker here mirrors that
+// recipient restriction — when label === "Package", `staff` is
+// pre-filtered to role === "BRANCH" (the same definition the server check
+// uses, NOT employmentType === "Manager", which is a related but
+// not-guaranteed-identical field) before it ever reaches RecipientPicker,
+// and the Group dropdown is trimmed to just "Branch Manager" via
+// `groupOptions` — every other FLOW_GROUPS option would resolve empty
+// against an already Branch-Manager-only staff list.
 // Template keeps the full, unrestricted picker (label defaults to
 // "Template", so `assignableStaff`/`groupOptions` fall through unchanged).
 import * as React from "react";
