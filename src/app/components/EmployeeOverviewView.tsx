@@ -24,10 +24,24 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
+  //
+  // Draft vs applied, per explicit decision (see conversation): every field
+  // (search/status/year/month) only updates its own draft state as the user
+  // types/selects — none of them touch the table until Search is clicked or
+  // Enter is pressed in the search box (applyFilters below copies every
+  // draft into its applied counterpart in one go, so all 4 fields commit
+  // together, never some live and some not). `filtered` below reads only
+  // the applied state, never the drafts.
+  const [statusFilterDraft, setStatusFilterDraft] = useState<EmployeeStage | "">("");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [yearDraft, setYearDraft] = useState("");
+  const [monthDraft, setMonthDraft] = useState("");
+
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [dateSort, setDateSort] = useState<DateSortState>("default");
@@ -52,7 +66,19 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  function applyFilters() {
+    setStatusFilter(statusFilterDraft);
+    setSearch(searchDraft);
+    setYear(yearDraft);
+    setMonth(monthDraft);
+    setPage(1);
+  }
+
   function resetFilters() {
+    setStatusFilterDraft("");
+    setSearchDraft("");
+    setYearDraft("");
+    setMonthDraft("");
     setStatusFilter("");
     setSearch("");
     setYear("");
@@ -123,21 +149,21 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                 <input
                   type="search"
                   placeholder="Search"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyFilters();
+                    }
                   }}
                   className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as EmployeeStage | "");
-                  setPage(1);
-                }}
+                value={statusFilterDraft}
+                onChange={(e) => setStatusFilterDraft(e.target.value as EmployeeStage | "")}
                 className="shrink-0 w-[100px] sm:w-auto h-11 px-2 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[120px]"
               >
                 <option value="">status</option>
@@ -151,11 +177,8 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
             <div className="flex flex-nowrap items-center gap-2 sm:contents">
               <select
-                value={year}
-                onChange={(e) => {
-                  setYear(e.target.value);
-                  setPage(1);
-                }}
+                value={yearDraft}
+                onChange={(e) => setYearDraft(e.target.value)}
                 className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[110px]"
               >
                 <option value="">year</option>
@@ -167,11 +190,8 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               </select>
 
               <select
-                value={month}
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  setPage(1);
-                }}
+                value={monthDraft}
+                onChange={(e) => setMonthDraft(e.target.value)}
                 className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[130px]"
               >
                 <option value="">month</option>
@@ -184,6 +204,7 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
               <button
                 type="button"
+                onClick={applyFilters}
                 className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 text-blue-800 font-semibold text-xs sm:text-sm hover:bg-blue-200 transition-colors"
               >
                 Search
