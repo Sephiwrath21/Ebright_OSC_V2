@@ -149,7 +149,17 @@ async function requireSingleBranchManager(branch: string) {
  *  without it this would also cancel the same manager's OTHER-weekday
  *  assignment of the same package). Loops over every member TaskTemplate
  *  of the old package group, same shape as template-groups.ts's
- *  removeGroupAssignee, but weekday-scoped. */
+ *  removeGroupAssignee, but weekday-scoped.
+ *
+ *  Note the group lookup below has NO createdById filter — same org-wide
+ *  visibility reasoning as the rest of this file (see file header), but
+ *  called out again here specifically: removeGroupAssignee (the function
+ *  this one otherwise mirrors) DOES filter by createdById, so a future
+ *  maintainer "fixing" this to match that precedent more closely would
+ *  silently reintroduce ownership-scoping and break cancellation for
+ *  packages this manager's assignment used that this actor didn't create
+ *  — leaving it inconsistent with assignWeekday/listBranchPackageSchedule
+ *  below, which are already deliberately unscoped. */
 async function cancelWeekdayAssignment(
   actorId: string,
   packageGroupId: string,
@@ -208,7 +218,26 @@ async function assignWeekday(
  *  branch's single Branch Manager, cancels any prior package's
  *  weekday-scoped recurring assignment for them, and — if a new package
  *  was selected — creates the new one. Upserts the durable
- *  BranchPackageSchedule config row to match. */
+ *  BranchPackageSchedule config row to match.
+ *
+ *  Not wrapped in a transaction across its steps (find manager -> find
+ *  existing row -> cancel old assignment -> create new assignment ->
+ *  upsert the config row) — same accepted trade-off as
+ *  template-groups.ts's editTemplateGroup/deleteTemplateGroup/
+ *  applyTemplateGroup, whose multi-step writes are documented the same
+ *  way. The failure window here is arguably worse than that precedent's:
+ *  a crash between cancelWeekdayAssignment and the final upsert can leave
+ *  the durable config row pointing at the OLD package while the old
+ *  assignment is already cancelled and the new one was never created, or
+ *  leave a live new RunBlock created without the config row reflecting
+ *  it. Callers should treat a thrown error as "re-fetch and re-check,"
+ *  not "nothing happened" — same guidance as that file's callers.
+ *
+ *  Re-setting a cell to the packageGroupId it ALREADY holds still runs
+ *  the full cancel-then-reassign cycle rather than short-circuiting as a
+ *  no-op — deliberate: it discards any in-progress pending occurrence and
+ *  creates a fresh one, which may be desired (e.g. "give this manager a
+ *  clean occurrence starting now") rather than a true no-op. */
 export function setBranchPackageScheduleCell(
   email: string,
   input: SetBranchPackageScheduleCellInput,

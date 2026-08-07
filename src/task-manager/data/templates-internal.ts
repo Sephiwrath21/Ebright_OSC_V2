@@ -103,6 +103,11 @@ export async function cancelPendingTemplateRuns(
     },
     select: { runId: true, status: true, dueAt: true },
   });
+  // `b.dueAt?.getDay()` is `undefined` for a null dueAt, which never equals
+  // a numeric dueWeekday — a block with no due date is silently excluded
+  // whenever a weekday filter is applied. Harmless today: every current
+  // dueWeekday caller (Branch Package Schedule) always creates its blocks
+  // via assignFlowTaskCore with `days: [weekday]`, which always sets dueAt.
   const matchingBlocks =
     dueWeekday === undefined ? blocks : blocks.filter((b) => b.dueAt?.getDay() === dueWeekday);
   const pendingRunIds = [
