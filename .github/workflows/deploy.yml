@@ -71,6 +71,10 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
+            # Everything below redirects into ~/deploy.log on the server, so a
+            # failure looks like a bare "exit 1" in the Actions UI. Dump the
+            # log's tail on ANY exit so the real error is visible in CI.
+            trap 'echo "=== ~/deploy.log (last 120 lines) ==="; tail -120 ~/deploy.log 2>/dev/null || echo "(no deploy.log — failed before first redirect, e.g. cd)"' EXIT
             cd ~/Ebright_OSC_V2
 
             echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ===" > ~/deploy.log 2>&1
