@@ -63,7 +63,19 @@ export async function GET(
   ]);
 
   const canAccessClaim = !!claim && (isFinance || claim.user_id === me.user_id);
-  const canAccessLeave = !!leave && leave.user_id === me.user_id;
+  // Previously only the leave's own owner could view its attachment — HR/
+  // staff opening a DIFFERENT employee's Leave tab (the normal way this
+  // route is reached from a profile page) got a 404 even though they're
+  // allowed to see that employee's record at all. Extended to match: same
+  // department/branch/full-access scope check every other Employee Record
+  // view already applies (see employeeScope.ts) — getEmployeeOverviewRowById
+  // returns null for anyone outside the current session's scope, same as it
+  // does for the profile page itself.
+  let canAccessLeave = !!leave && leave.user_id === me.user_id;
+  if (!canAccessLeave && leave) {
+    const { getEmployeeOverviewRowById } = await import("@/lib/employeeQueries");
+    canAccessLeave = (await getEmployeeOverviewRowById(leave.user_id)) != null;
+  }
   if (!canAccessClaim && !canAccessLeave) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
