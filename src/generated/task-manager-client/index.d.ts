@@ -92,7 +92,20 @@ export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
 export type TaskTemplateGroup = $Result.DefaultSelection<Prisma.$TaskTemplateGroupPayload>
 /**
  * Model BranchPackageSchedule
- * 
+ * Branch Package Schedule (2026-08-07): one durable config row per
+ * (branch, weekday) naming which Package (a PACKAGE-scope
+ * TaskTemplateGroup) that branch's manager should have running that day
+ * — the standing source of truth the grid reads/writes. Setting a cell
+ * ALSO creates a real recurring cadence:"daily" assignment via the
+ * existing engine (src/task-manager/data/branch-package-schedule.ts);
+ * this row is the durable "what's configured" record, separate from the
+ * FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
+ * get replaced/cloned forward every week, this row does not). Note:
+ * PackageScheduleWeekday (WED/THU/FRI/SAT/SUN, 5 values) is NOT the same
+ * day-set as the TS FLOW_DAYS union (src/task-manager/ui/types.ts,
+ * Tue/Wed/Thu/Fri/Sat/Sun, 6 values, used by the regular Task assign
+ * flow's day picker) — FLOW_DAYS additionally includes Tuesday; don't
+ * conflate the two or copy-paste one where the other belongs.
  */
 export type BranchPackageSchedule = $Result.DefaultSelection<Prisma.$BranchPackageSchedulePayload>
 /**
