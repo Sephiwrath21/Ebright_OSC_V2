@@ -393,17 +393,28 @@ export function editTemplateGroup(
     }
 
     // New-member-task fan-out (2026-08-07): the schedule map is built once
-    // from the group's PRE-EDIT member tasks (`existingIds`, snapshotted
-    // above before this loop touches anything) and reused for every new
-    // task added in this same submission — a group edit can add more than
-    // one new member task at once, and each should fan out independently
-    // against the same "who already has this group's other work" snapshot,
-    // not against tasks created earlier in this very loop. Only queried
-    // when at least one task in the submission is actually new, to avoid
-    // the extra round-trip on a plain rename/reorder/edit-only submission.
+    // from the group's KEPT member tasks — existing member ids that are
+    // ALSO still present in this submission (`existingIds` intersected
+    // with `submittedIds`), not the raw pre-edit `existingIds` — and
+    // reused for every new task added in this same submission. Excluding
+    // just-removed member ids matters even though their PENDING instances
+    // self-correct (cancelled by the removal loop above, so the
+    // not-CANCELLED run filter already drops them): a removed task's
+    // COMPLETED (DONE/SKIPPED) instances are kept as history with a now-
+    // dangling templateId and would otherwise still surface as a `null`
+    // (ineligible) entry in getGroupMemberSchedules, inflating
+    // newTaskSkipped with someone who isn't a current assignee of
+    // anything remaining in the group. A group edit can add more than one
+    // new member task at once, and each should fan out independently
+    // against this same "who still has this group's other, kept work"
+    // snapshot, not against tasks created earlier in this very loop. Only
+    // queried when at least one task in the submission is actually new,
+    // to avoid the extra round-trip on a plain rename/reorder/edit-only
+    // submission.
     const hasNewTask = body.tasks.some((t) => !(t.id && existingIds.has(t.id)));
+    const keptMemberIds = [...existingIds].filter((tid) => submittedIds.has(tid));
     const memberSchedules = hasNewTask
-      ? await getGroupMemberSchedules([...existingIds])
+      ? await getGroupMemberSchedules(keptMemberIds)
       : new Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>();
 
     let updatedTasks = 0;
