@@ -54,7 +54,12 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const result = rows.filter((r) => {
-      if (statusFilter && r.stage !== statusFilter) return false;
+      // A row can genuinely belong to more than one stage at once (see
+      // extraStages — e.g. a real Probation-stage Full-Time row whose
+      // pipeline also qualifies it for Onboarding), shown as one row with
+      // multiple badges rather than duplicated — so the Status filter must
+      // match on either, not just the row's own primary stage.
+      if (statusFilter && r.stage !== statusFilter && !r.extraStages?.includes(statusFilter)) return false;
       if (q && !r.fullName.toLowerCase().includes(q)) return false;
       if (year && r.date?.slice(0, 4) !== year) return false;
       if (month && r.date?.slice(5, 7) !== month) return false;
@@ -249,10 +254,15 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                       {row.departmentName ?? row.branchName ?? "—"}
                     </span>
                     <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                    <span>
+                    <span className="flex flex-wrap gap-1.5">
                       <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
                         {STAGE_LABELS[row.stage]}
                       </span>
+                      {row.extraStages?.map((s) => (
+                        <span key={s} className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[s]}`}>
+                          {STAGE_LABELS[s]}
+                        </span>
+                      ))}
                     </span>
                     <div className="flex justify-center">
                       <RowActionMenu

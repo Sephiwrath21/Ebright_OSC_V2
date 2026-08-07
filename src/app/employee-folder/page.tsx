@@ -51,7 +51,22 @@ export default async function EmployeeFolderPage() {
   // rows whose own employment record has neither set yet. Fills in
   // display only, never writes back.
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
-  const enrichedRows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
+  const enrichedRowsAll = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
+
+  // A real Probation-stage row whose manual flag (employment.probation=true,
+  // set by someone clicking "Proceed") the recruitment pipeline actively
+  // contradicts — neither career_applications.board_stage nor
+  // rec_recruit/rec_stage.name says "Probation" — isn't really Probation at
+  // all, per explicit decision (see conversation): removed entirely from
+  // this page, not shown under any stage (not even Active), not counted
+  // toward any card. Same lookup used below for the OR-rule adds, needed
+  // here first since this exclusion has to apply before anything else
+  // (Pre-correction, the OR-rule counts, dual-listing) ever sees these rows.
+  const careerApplications = await lookupCareerApplicationsByName();
+  const enrichedRows = enrichedRowsAll.filter((r) => {
+    if (r.stage !== "probation") return true;
+    return !matchIsProbationOverrideExcluded(careerApplications.get(normalizeName(r.fullName)));
+  });
 
   // Correct Pre-stage membership to match computePreStageRows() — the same
   // definition the dedicated Pre list and its own summary card use — per
@@ -83,6 +98,45 @@ export default async function EmployeeFolderPage() {
     : [];
   const correctedPreById = new Map(correctedPreRows.filter((r) => !r.isCandidate).map((r) => [r.id, r]));
   const prePassedById = new Map(prePassedRows.map((r) => [r.id, r]));
+
+  // Probation's card count must match what its own list page shows —
+  // Probation's membership rule is an OR across career_applications.
+  // board_stage and rec_recruit/rec_stage.name (see matchIsProbationPipeline),
+  // which ADDS non-Probation-stage rows (the override-exclusion REMOVAL is
+  // already applied above, before enrichedRows even reaches here); Onboarding's
+  // dual-listing ADDS real Probation-stage Full-Time rows and real Active-
+  // stage Full-Time rows the same pipeline check flags Probation
+  // (matchBelongsOnOnboardingList) — see [stage]/page.tsx for the full
+  // rationale on both. Same lookup, same rules, computed once here over
+  // enrichedRows (the full, pre-Pre-correction population) — deliberately
+  // NOT the Pre-corrected `rows` below, since this OR-rule is its own
+  // independent mechanism unaffected by the separate Pre correction — and
+  // recorded per-row so the "Employee Records" table can show these
+  // memberships too: per explicit decision (see conversation), anyone
+  // counted on a card must also appear in the table, and since Probation and
+  // Onboarding can genuinely both be true for the same person at once
+  // (neither is "more real" than the other), that's a SINGLE row with both
+  // badges shown together (extraStages), never two separate rows for the
+  // same id.
+  const probationOnboardingExtrasById = new Map<number, ("probation" | "onboarding")[]>();
+  let probationCount = 0;
+  let onboardingDualListedCount = 0;
+  for (const row of enrichedRows) {
+    const match = careerApplications.get(normalizeName(row.fullName));
+    const extras: ("probation" | "onboarding")[] = [];
+    if (row.stage === "probation") {
+      probationCount += 1;
+    } else if (matchIsProbationPipeline(match)) {
+      probationCount += 1;
+      extras.push("probation");
+    }
+    if (matchBelongsOnOnboardingList(row, match)) {
+      onboardingDualListedCount += 1;
+      extras.push("onboarding");
+    }
+    if (extras.length > 0) probationOnboardingExtrasById.set(row.id, extras);
+  }
+
   const rows = enrichedRows
     .filter((r) => r.stage !== "pre" || correctedPreById.has(r.id) || prePassedById.has(r.id))
     .map((r) => {
@@ -94,9 +148,14 @@ export default async function EmployeeFolderPage() {
       // that's exactly the Tang Rui case, and the earlier version of this
       // fix silently missed it by only ever converting existing "pre" rows.
       const corrected = correctedPreById.get(r.id);
-      if (corrected) return { ...r, stage: "pre" as const, date: corrected.date };
       const passed = prePassedById.get(r.id);
-      return passed ? { ...r, stage: passed.stage, date: passed.date } : r;
+      const base = corrected
+        ? { ...r, stage: "pre" as const, date: corrected.date }
+        : passed
+          ? { ...r, stage: passed.stage, date: passed.date }
+          : r;
+      const extras = probationOnboardingExtrasById.get(r.id);
+      return extras ? { ...base, extraStages: extras } : base;
     })
     .concat(correctedPreCandidates);
 
@@ -107,36 +166,6 @@ export default async function EmployeeFolderPage() {
   // stays correct even if a future change to `rows` above narrows what the
   // table itself displays.
   counts.pre = scope ? filterRowsByScope(scope, correctedPreRows).length : 0;
-  //
-  // Probation's card count must match what its own list page shows —
-  // Probation's membership rule is an OR across career_applications.
-  // board_stage and rec_recruit/rec_stage.name (see matchIsProbationPipeline),
-  // which can both ADD non-Probation-stage rows and REMOVE real-Probation-
-  // stage rows whose manual flag neither pipeline field corroborates
-  // anymore (matchIsProbationOverrideExcluded); Onboarding's dual-listing
-  // ADDS real Probation-stage Full-Time rows and real Active-stage
-  // Full-Time rows the same pipeline check flags Probation
-  // (matchBelongsOnOnboardingList) — see [stage]/page.tsx for the full
-  // rationale on both. Same lookup, same rules, applied here just for the
-  // counts — deliberately over enrichedRows (the full, pre-correction
-  // population), not the Pre-corrected `rows` above: this OR-rule is its
-  // own independent, still list-only mechanism (per explicit decision, NOT
-  // folded into row.stage itself — see conversation), unaffected by the
-  // separate Pre correction. The "Employee Records" table below keeps
-  // showing each person once, under their real stage, so this only adjusts
-  // counts, never rows.
-  const careerApplications = await lookupCareerApplicationsByName();
-  let probationCount = 0;
-  let onboardingDualListedCount = 0;
-  for (const row of enrichedRows) {
-    const match = careerApplications.get(normalizeName(row.fullName));
-    if (row.stage === "probation") {
-      if (!matchIsProbationOverrideExcluded(match)) probationCount += 1;
-    } else if (matchIsProbationPipeline(match)) {
-      probationCount += 1;
-    }
-    if (matchBelongsOnOnboardingList(row, match)) onboardingDualListedCount += 1;
-  }
   counts.probation = probationCount;
   counts.onboarding += onboardingDualListedCount;
   const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));

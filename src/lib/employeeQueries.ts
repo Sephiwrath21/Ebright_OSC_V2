@@ -186,6 +186,16 @@ export interface EmployeeOverviewRow {
    *  so there's no Employee Record to open. `id` is a negative sentinel
    *  (-source_id) for these, never a real user_id. */
   isCandidate?: boolean;
+  /** Additional stages this row ALSO belongs to concurrently with `stage`
+   *  (e.g. a real Probation-stage Full-Time row whose recruitment pipeline
+   *  also qualifies it for Onboarding — see matchBelongsOnOnboardingList in
+   *  careerApplicationSync.ts; Probation and Onboarding genuinely run
+   *  concurrently for Full-Time hires, neither is "more real" than the
+   *  other). Attached by the Employee Records page only, for its combined-
+   *  badge display on a single row — undefined everywhere else, including
+   *  the dedicated per-stage list pages, which keep showing each
+   *  membership as its own separate row on its own separate page. */
+  extraStages?: EmployeeStage[];
   /** Pre stage list only — the matching career_applications row's current
    *  board_stage (see lookupCareerApplicationsByName), attached by the page,
    *  not this query. Undefined for every other stage and for Pre rows with

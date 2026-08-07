@@ -297,7 +297,13 @@ export function matchBelongsOnOnboardingList(
 ): boolean {
   if (row.stage === "onboarding") return false;
   if (positionGroup(row.position) !== "Full Time") return false;
-  if (row.stage === "probation") return true;
+  // A real Probation-stage row whose manual flag the pipeline actively
+  // contradicts (matchIsProbationOverrideExcluded) isn't really Probation at
+  // all per that same rule — per explicit decision, these people are
+  // removed entirely (no stage, no card, no list), so they must not
+  // qualify here either, the same way they no longer qualify for the
+  // Probation list itself.
+  if (row.stage === "probation") return !matchIsProbationOverrideExcluded(match);
   return matchIsProbationPipeline(match);
 }
 
