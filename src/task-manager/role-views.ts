@@ -218,10 +218,10 @@ export function isElevatedDeptSite(user: {
  *  deliberately NOT covered here — it stays visible to everyone via
  *  Sidebar's existing unconditional rendering, and its own edit-surface
  *  gating is unchanged, still driven entirely by ROLE_VIEWS/shows() above.
- *  Consumed by BOTH the sidebar's visibility filter and
- *  template-groups.ts's requireGroupViewAccess, so the two can never
- *  drift apart — a role hidden from the sidebar is always also rejected
- *  server-side, and vice versa. */
+ *  Designed to be consumed by BOTH the sidebar's visibility filter and
+ *  template-groups.ts's requireGroupViewAccess (once wired in Task 2/3 of
+ *  the RBAC plan), so the two can never drift apart — a role hidden from
+ *  the sidebar will always also be rejected server-side, and vice versa. */
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
@@ -229,10 +229,11 @@ export function taskManagerNavAccess(user: {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
   const branchManagerViewer = user.role === "BRANCH";
+  const packageViewer = manage || orgViewer || branchManagerViewer;
   return {
     template: manage || orgViewer,
-    package: manage || orgViewer || branchManagerViewer,
-    packageTable: manage || orgViewer || branchManagerViewer,
+    package: packageViewer,
+    packageTable: packageViewer,
   };
 }
 
