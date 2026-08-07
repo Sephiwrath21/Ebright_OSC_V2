@@ -277,6 +277,60 @@ export async function isProbationOverrideExcluded(fullName: string): Promise<boo
   return matchIsProbationOverrideExcluded(map.get(normalizeName(fullName)));
 }
 
+// A real Probation-stage row whose manual flag the pipeline actively
+// contradicts (matchIsProbationOverrideExcluded) isn't really Probation at
+// all, per explicit decision (see conversation) — removed entirely
+// wherever stage is displayed or counted, not just the dedicated Probation
+// list. Shared here so the Employee Records page and the dedicated
+// Probation/Onboarding/Active pages all apply the same removal to the same
+// population, instead of drifting.
+export function excludeOverrideRejectedRows<T extends { stage: EmployeeStage; fullName: string }>(
+  rows: T[],
+  careerApplications: Map<string, CareerApplicationLookupEntry>,
+): T[] {
+  return rows.filter(
+    (r) => r.stage !== "probation" || !matchIsProbationOverrideExcluded(careerApplications.get(normalizeName(r.fullName))),
+  );
+}
+
+// A real Active-stage row whose pipeline ALSO reads Probation (e.g. a
+// person whose employment.status="active" but career_applications.
+// board_stage/rec_recruit still says "Probation") is ambiguous on its own:
+// is the pipeline just lagging behind a real transition that already
+// happened, or is it the current, accurate state? Per explicit decision
+// (see conversation), resolved by the row's own employment.start_date —
+// see getLatestEmploymentStartDates for why that has to be the raw start
+// date, not EmployeeOverviewRow.date (which silently falls back to
+// created_at when start_date is null):
+//   - start_date has passed -> the pipeline is stale; genuinely Active
+//     only, no Probation/Onboarding badge or count.
+//   - start_date hasn't passed yet, or was never recorded -> Probation and
+//     Onboarding are the real, current state instead; no Active badge or
+//     count.
+// Returns the "passed" set — every OR-rule addition driven by
+// matchIsProbationPipeline/matchBelongsOnOnboardingList should skip rows in
+// this set and treat them as plain Active instead. Shared (dynamic import
+// of employeeQueries.ts to avoid the circular import both files already
+// have elsewhere) so every page applies the same rule to the same
+// population, not just the Employee Records table.
+export async function computeActivePipelineProbationPassedIds<T extends { id: number; stage: EmployeeStage; fullName: string }>(
+  rows: T[],
+  careerApplications: Map<string, CareerApplicationLookupEntry>,
+): Promise<Set<number>> {
+  const { getLatestEmploymentStartDates } = await import("@/lib/employeeQueries");
+  const ids = rows
+    .filter((r) => r.stage === "active" && matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))))
+    .map((r) => r.id);
+  const startDates = await getLatestEmploymentStartDates(ids);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return new Set(
+    ids.filter((id) => {
+      const startDate = startDates.get(id);
+      return startDate != null && startDate <= todayIso;
+    }),
+  );
+}
+
 // A person shows on the Onboarding list beyond their own real stage (their
 // stored stage is never touched) if EITHER: they're a real Probation-stage,
 // Full-Time employee (Probation and Onboarding run concurrently for

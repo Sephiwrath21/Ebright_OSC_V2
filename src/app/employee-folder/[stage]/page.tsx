@@ -22,7 +22,8 @@ import {
   computePreStageRows,
   computePreStartDatePassedRows,
   matchIsProbationPipeline,
-  matchIsProbationOverrideExcluded,
+  excludeOverrideRejectedRows,
+  computeActivePipelineProbationPassedIds,
   normalizeName,
 } from "@/lib/careerApplicationSync";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
@@ -117,12 +118,24 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
       departments = departmentList;
       const branchStaffByName = await lookupBranchStaffLocationByName(branchList, departmentList);
 
-      stageRows = stageRows.filter(
-        (row) => !matchIsProbationOverrideExcluded(careerApplications.get(normalizeName(row.fullName))),
-      );
+      // Real Probation-stage rows whose manual flag the pipeline actively
+      // contradicts are removed entirely — per explicit decision (see
+      // conversation), not just from this list's own membership but
+      // everywhere stage is shown/counted (see excludeOverrideRejectedRows).
+      stageRows = excludeOverrideRejectedRows(stageRows, careerApplications);
+
+      // Real Active-stage rows whose pipeline ALSO reads Probation are
+      // genuinely Probation (and Onboarding) only when their own
+      // employment.start_date hasn't passed yet — see
+      // computeActivePipelineProbationPassedIds. A "passed" one (e.g. Ayu
+      // Novitasari) is genuinely Active only and must not land on this
+      // Probation list at all, even though the pipeline still says
+      // Probation.
+      const activePipelineProbationPassedIds = await computeActivePipelineProbationPassedIds(rows, careerApplications);
 
       const otherRows = rows.filter((r) => r.stage !== "probation");
       for (const row of otherRows) {
+        if (activePipelineProbationPassedIds.has(row.id)) continue;
         if (!matchIsProbationPipeline(careerApplications.get(normalizeName(row.fullName)))) continue;
         // Branch/Department: prefer the row's own real employment data;
         // BranchStaff (ebright_hrfs's operational roster) only fills in
@@ -186,15 +199,29 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   const { by } = await searchParams;
   const groupBy = by === "department" ? "department" : "branch";
 
-  const [rowsBase, branches, departments] = await Promise.all([
+  const [rowsBaseRaw, branches, departments, careerApplications] = await Promise.all([
     listEmployeeOverviewRows(),
     listBranches(),
     listDepartments(),
+    lookupCareerApplicationsByName(),
   ]);
+  // Real Probation-stage rows whose manual flag the pipeline actively
+  // contradicts are removed entirely — same rule as the dedicated
+  // Probation list above (see excludeOverrideRejectedRows) — applied here
+  // too so Active/Onboarding/Exit never pick them up either.
+  const rowsBase = excludeOverrideRejectedRows(rowsBaseRaw, careerApplications);
+  // Real Active-stage rows whose pipeline ALSO reads Probation are only
+  // genuinely Active if their own employment.start_date has already
+  // passed — otherwise they're genuinely Probation+Onboarding instead (see
+  // computeActivePipelineProbationPassedIds). Needed by both the Active
+  // and Onboarding branches below, so computed once here regardless of
+  // which stage this render is for.
+  const activePipelineProbationPassedIds = await computeActivePipelineProbationPassedIds(rowsBase, careerApplications);
   // Real Probation-stage Full-Time people, and real Active-stage Full-Time
-  // people whose recruitment pipeline still reads "Probation", also count
-  // toward Onboarding here — see computeOnboardingDualListedRows — as
-  // clones with stage overridden to "onboarding" so the existing
+  // people whose recruitment pipeline still reads "Probation" (excluding
+  // the "already passed" ones above, who are genuinely Active only), also
+  // count toward Onboarding here — see computeOnboardingDualListedRows —
+  // as clones with stage overridden to "onboarding" so the existing
   // r.stage === stage filtering inside summarizeStageByBranch/Department
   // picks them up for free. Their own stored stage is untouched; this
   // array only exists for this render. Same treatment for real Pre-eligible
@@ -205,10 +232,21 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
     stage === "onboarding"
       ? [
           ...rowsBase,
-          ...(await computeOnboardingDualListedRows(rowsBase)).map((r) => ({ ...r, stage: "onboarding" as const })),
+          ...(await computeOnboardingDualListedRows(rowsBase))
+            .filter((r) => !activePipelineProbationPassedIds.has(r.id))
+            .map((r) => ({ ...r, stage: "onboarding" as const })),
           ...(await computePreStartDatePassedRows()),
         ]
-      : rowsBase;
+      : stage === "active"
+        ? rowsBase.filter(
+            (r) =>
+              !(
+                r.stage === "active" &&
+                matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))) &&
+                !activePipelineProbationPassedIds.has(r.id)
+              ),
+          )
+        : rowsBase;
   // Same live BranchStaff fallback the Probation list uses — someone whose
   // own employment row has neither branch_id nor department_id set yet
   // (e.g. Onboarding/Active people still mid-pipeline) would otherwise only

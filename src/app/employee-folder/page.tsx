@@ -8,7 +8,6 @@ import {
   listDepartments,
   countEmployeeStages,
   getOverdueTaskCounts,
-  getLatestEmploymentStartDates,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 import {
@@ -17,8 +16,9 @@ import {
   computePreStageRows,
   computePreStartDatePassedRows,
   matchIsProbationPipeline,
-  matchIsProbationOverrideExcluded,
   matchBelongsOnOnboardingList,
+  excludeOverrideRejectedRows,
+  computeActivePipelineProbationPassedIds,
   normalizeName,
 } from "@/lib/careerApplicationSync";
 
@@ -64,10 +64,7 @@ export default async function EmployeeFolderPage() {
   // here first since this exclusion has to apply before anything else
   // (Pre-correction, the OR-rule counts, dual-listing) ever sees these rows.
   const careerApplications = await lookupCareerApplicationsByName();
-  const enrichedRows = enrichedRowsAll.filter((r) => {
-    if (r.stage !== "probation") return true;
-    return !matchIsProbationOverrideExcluded(careerApplications.get(normalizeName(r.fullName)));
-  });
+  const enrichedRows = excludeOverrideRejectedRows(enrichedRowsAll, careerApplications);
 
   // Correct Pre-stage membership to match computePreStageRows() — the same
   // definition the dedicated Pre list and its own summary card use — per
@@ -121,30 +118,12 @@ export default async function EmployeeFolderPage() {
   // same id.
   // A real Active-stage row whose pipeline ALSO reads Probation (e.g. Ayu
   // Novitasari — employment.status="active", board_stage="Probation") is
-  // ambiguous on its own: is the pipeline just lagging behind a real
-  // transition that already happened, or is it the current, accurate state?
-  // Per explicit decision (see conversation), that's resolved by the row's
-  // own employment.start_date — not row.date, which silently falls back to
-  // created_at when start_date is null (see dateSourceFor) and so can't
-  // tell "never recorded" apart from "started a while ago":
-  //   - start_date has passed → the pipeline is stale; genuinely Active
-  //     only, no Probation/Onboarding badge or count.
-  //   - start_date hasn't passed yet, or was never recorded → Probation and
-  //     Onboarding are the real, current state instead (concurrent, per the
-  //     existing rule below); no Active badge or count.
-  // A general rule keyed to the pattern (Active-stage + pipeline match),
-  // not to specific people — applies to anyone matching it, now or later.
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const activePipelineProbationIds = enrichedRows
-    .filter((r) => r.stage === "active" && matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))))
-    .map((r) => r.id);
-  const activeStartDates = await getLatestEmploymentStartDates(activePipelineProbationIds);
-  const activePipelineProbationPassedIds = new Set(
-    activePipelineProbationIds.filter((id) => {
-      const startDate = activeStartDates.get(id);
-      return startDate != null && startDate <= todayIso;
-    }),
-  );
+  // resolved by the row's own employment.start_date — see
+  // computeActivePipelineProbationPassedIds's own comment for the full
+  // rationale and why this has to be a shared function, not just logic
+  // local to this page (the dedicated Probation/Onboarding/Active pages
+  // need the exact same disambiguation for the exact same population).
+  const activePipelineProbationPassedIds = await computeActivePipelineProbationPassedIds(enrichedRows, careerApplications);
 
   const probationOnboardingExtrasById = new Map<number, ("probation" | "onboarding")[]>();
   let probationCount = 0;
