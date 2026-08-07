@@ -21,6 +21,7 @@ import {
   computeActivePipelineProbationPassedIds,
   normalizeName,
 } from "@/lib/careerApplicationSync";
+import { computeAutoConfirmedProbationIds, computeProbationReminderCandidates } from "@/lib/probationDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -125,11 +126,27 @@ export default async function EmployeeFolderPage() {
   // need the exact same disambiguation for the exact same population).
   const activePipelineProbationPassedIds = await computeActivePipelineProbationPassedIds(enrichedRows, careerApplications);
 
+  // Probation's own Confirm outcome (see probationDecision.ts), live —
+  // per explicit decision (see conversation): a Full-Time person whose
+  // career_applications.status2 already reads "Accept" is effectively
+  // confirmed even before HR clicks anything (HR's own Confirmed decision
+  // already flips employment.status directly via decideProbationOutcome,
+  // so a row reaching this live check with no local decision is exactly
+  // the "status2 says Accept, nobody's acted on it yet" case). Computed
+  // over the same Probation-badged candidate population the extras loop
+  // below builds (real stage="probation" OR pipeline-matched) — anyone in
+  // this set skips Probation/Onboarding entirely and shows as Active
+  // instead, same as activePipelineProbationPassedIds' own pattern.
+  const probationBadgedCandidates = enrichedRows.filter(
+    (r) => r.stage === "probation" || matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))),
+  );
+  const autoConfirmedProbationIds = await computeAutoConfirmedProbationIds(probationBadgedCandidates, careerApplications);
+
   const probationOnboardingExtrasById = new Map<number, ("probation" | "onboarding")[]>();
   let probationCount = 0;
   let onboardingDualListedCount = 0;
   for (const row of enrichedRows) {
-    if (activePipelineProbationPassedIds.has(row.id)) continue;
+    if (activePipelineProbationPassedIds.has(row.id) || autoConfirmedProbationIds.has(row.id)) continue;
     const match = careerApplications.get(normalizeName(row.fullName));
     const extras: ("probation" | "onboarding")[] = [];
     if (row.stage === "probation") {
@@ -162,6 +179,12 @@ export default async function EmployeeFolderPage() {
         : passed
           ? { ...r, stage: passed.stage, date: passed.date }
           : r;
+      // Probation's own Confirm outcome (see autoConfirmedProbationIds
+      // above) — genuinely Active now, whatever their raw stage says (a
+      // real raw "probation" row whose employment.status hasn't been
+      // written yet, or an OR-rule Probation-pipeline match whose raw
+      // stage was never "probation" to begin with either way).
+      if (autoConfirmedProbationIds.has(r.id)) return { ...base, stage: "active" as const };
       const extras = probationOnboardingExtrasById.get(r.id);
       if (!extras) return base;
       // Real Active-stage + pipeline-Probation, start date not passed (see
@@ -186,13 +209,25 @@ export default async function EmployeeFolderPage() {
   counts.onboarding += onboardingDualListedCount;
   const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));
 
+  // Red dot on the Probation card — same reminder rule as the notification
+  // bell (see probationDecision.ts's computeProbationReminderCandidates),
+  // reusing the same probationBadgedCandidates population already built
+  // above rather than re-deriving it.
+  const probationReminders = await computeProbationReminderCandidates(probationBadgedCandidates, careerApplications);
+
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <EmployeeOverviewView rows={rows} counts={counts} userName={userName} overdueTaskCounts={overdueTaskCounts} />
+      <EmployeeOverviewView
+        rows={rows}
+        counts={counts}
+        userName={userName}
+        overdueTaskCounts={overdueTaskCounts}
+        hasProbationReminder={probationReminders.length > 0}
+      />
     </AppShell>
   );
 }

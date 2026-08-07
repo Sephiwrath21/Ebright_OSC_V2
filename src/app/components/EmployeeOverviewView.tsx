@@ -18,9 +18,16 @@ interface Props {
   userName?: string | null;
   /** userId -> overdue Task Manager task count, for the red dot next to Name. */
   overdueTaskCounts?: Record<number, number>;
+  /** True when at least one Full-Time employee's probation end date is
+   *  within 2 weeks (or already passed) with no Confirm/Extend/Stop
+   *  decision made yet — see probationDecision.ts's
+   *  computeProbationReminderCandidates. Drives the red dot on the
+   *  Probation summary card, same signal as the NotificationBell's own
+   *  Probation card. */
+  hasProbationReminder?: boolean;
 }
 
-export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts }: Props) {
+export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, hasProbationReminder }: Props) {
   const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
@@ -125,8 +132,13 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                 href={`/employee-folder/${stage}`}
                 className="relative text-left bg-white rounded-[27px] border-2 border-slate-200 p-5 min-h-[143px] flex flex-col justify-end gap-2.5 transition-all hover:border-slate-400 hover:shadow-md"
               >
-                <span className={`self-start inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                  {STAGE_LABELS[stage]}
+                <span className="self-start flex items-center gap-1.5">
+                  <span className={`inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                    {STAGE_LABELS[stage]}
+                  </span>
+                  {stage === "probation" && hasProbationReminder && (
+                    <OverdueDot count={1} label="Probation ending soon — needs a Confirm/Extend/Stop decision" />
+                  )}
                 </span>
                 <span className="text-4xl font-medium text-slate-900/70">{counts[stage]}</span>
                 <ChevronRight className="absolute top-3.5 right-4 w-5 h-5 text-slate-400" aria-hidden="true" />

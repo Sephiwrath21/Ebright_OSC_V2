@@ -12,6 +12,7 @@ import {
   updateReferenceCheck,
   updateMedicalCheck,
   updateProbationInfo,
+  decideProbationOutcome,
   updateDocuments,
   updatePayroll,
   updateBankDetails,
@@ -74,6 +75,7 @@ import type {
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
+import type { ProbationDisplayInfo } from "@/lib/probationDecision";
 import {
   COUNTRY_CODES,
   parsePhoneValue,
@@ -856,33 +858,59 @@ export function MedicalCheckPanel({
   );
 }
 
-const PROBATION_STATUS_OPTIONS = [
-  { value: "In Progress", label: "In Progress" },
-  { value: "Confirmed", label: "Confirmed" },
-  { value: "Extended", label: "Extended" },
-  { value: "Stopped", label: "Stopped" },
-];
+// Always-read-only field (unlike EditableField, ignores the panel's own
+// edit-mode toggle) — for values sourced from ebright_hrfs (BranchStaff/
+// career_applications) that must never become editable just because the
+// panel's other, still-local fields (Confirmation Date, letters) are being
+// edited. Same visual shape as EditableField's own read view.
+function StaticField({ label, value, full = false }: { label: string; value: string | null; full?: boolean }) {
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {value ? <span className={`${valueClass} whitespace-pre-wrap`}>{value}</span> : <span className={emptyClass}>Not provided</span>}
+    </div>
+  );
+}
+
+const PROBATION_STATUS_PILL_CLASSES: Record<string, string> = {
+  Confirm: "bg-emerald-100 text-emerald-700",
+  Stop: "bg-red-100 text-red-700",
+  Extended: "bg-amber-100 text-amber-700",
+  "In Progress": "bg-slate-100 text-slate-600",
+};
 
 // Real probation table — Probation stage's own tab only (no Employee Record
 // equivalent in the mock). confirmationLetter*/extensionLetter* are
 // independent Google Drive file fields, same pattern as resume.resume_file_id.
+// Start Date/End Date/Probation Status/Feedback are read-only here now (see
+// probationDecision.ts) — sourced from ebright_hrfs, not this panel's own
+// editable form; Confirmation Date/Extension End Date and the two letters
+// stay locally editable as before. canDecide (HR/Superadmin only, per
+// explicit decision — see conversation) gates the Confirm/Extend/Stop
+// buttons; the actual restriction is enforced server-side in
+// decideProbationOutcome regardless of what this prop says.
 export function ProbationPanel({
   userId,
   data,
+  display,
+  canDecide,
 }: {
   userId: number;
   data: ProbationInfo | null;
+  display: ProbationDisplayInfo;
+  canDecide: boolean;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState(data?.probationStatus ?? "");
-  const [startDate, setStartDate] = useState(data?.startDate ?? "");
-  const [endDate, setEndDate] = useState(data?.endDate ?? "");
   const [confirmDate, setConfirmDate] = useState(data?.confirmDate ?? "");
   const [extEndDate, setExtEndDate] = useState(data?.extEndDate ?? "");
   const [confirmationLetterFileId, setConfirmationLetterFileId] = useState(data?.confirmationLetterFileId ?? null);
   const [confirmationLetterPending, setConfirmationLetterPending] = useState<File | null>(null);
   const [extensionLetterFileId, setExtensionLetterFileId] = useState(data?.extensionLetterFileId ?? null);
   const [extensionLetterPending, setExtensionLetterPending] = useState<File | null>(null);
+
+  const [pendingOutcome, setPendingOutcome] = useState<"Confirmed" | "Extended" | "Stopped" | null>(null);
+  const [deciding, setDeciding] = useState(false);
+  const [decideError, setDecideError] = useState<string | null>(null);
 
   function clearConfirmationLetter() {
     if (confirmationLetterPending) setConfirmationLetterPending(null);
@@ -893,55 +921,120 @@ export function ProbationPanel({
     else setExtensionLetterFileId(null);
   }
 
+  async function confirmOutcome() {
+    if (!pendingOutcome) return;
+    setDeciding(true);
+    setDecideError(null);
+    const result = await decideProbationOutcome(userId, pendingOutcome);
+    setDeciding(false);
+    setPendingOutcome(null);
+    if (result.ok) router.refresh();
+    else setDecideError(result.error ?? "Failed to record probation decision.");
+  }
+
+  const OUTCOME_MESSAGE: Record<"Confirmed" | "Extended" | "Stopped", string> = {
+    Confirmed: "Confirm this employee's probation? Full-Time employees move straight to Active, out of Probation and Onboarding.",
+    Extended: "Extend this employee's probation?",
+    Stopped: "Stop this employee's probation? They stay in Probation stage, shown as \"Stop\".",
+  };
+
   return (
-    <EditableSection
-      onSave={async () => {
-        const result = await updateProbationInfo(userId, {
-          probationStatus: status,
-          startDate,
-          endDate,
-          confirmDate,
-          extEndDate,
-          confirmationLetterFileId,
-          confirmationLetterFile: confirmationLetterPending,
-          extensionLetterFileId,
-          extensionLetterFile: extensionLetterPending,
-        });
-        // StageProfileView's own "Next" button gates on this same Probation
-        // Status (probationInfo prop, from the server) — without a refresh
-        // here, that prop stays stale after a save (it's a server-fetched
-        // prop, not something this panel's own local state feeds), so the
-        // button would keep reading the pre-save value even though this
-        // panel already shows the freshly-saved one.
-        if (!result || result.ok !== false) router.refresh();
-        return result;
-      }}
-    >
-      <PanelHeading>Probation</PanelHeading>
-      <FieldGrid>
-        <EditableSelectField label="Probation Status" value={status} onChange={setStatus} options={PROBATION_STATUS_OPTIONS} full />
-        <EditableField label="Start Date" value={startDate} onChange={setStartDate} type="date" />
-        <EditableField label="End Date" value={endDate} onChange={setEndDate} type="date" />
-        <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
-        <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
-        <RealFileField
-          label="Confirmation Letter"
-          existingFileId={confirmationLetterFileId}
-          pendingFile={confirmationLetterPending}
-          onPick={setConfirmationLetterPending}
-          onClear={clearConfirmationLetter}
-          full
+    <>
+      <EditableSection
+        onSave={async () => {
+          const result = await updateProbationInfo(userId, {
+            confirmDate,
+            extEndDate,
+            confirmationLetterFileId,
+            confirmationLetterFile: confirmationLetterPending,
+            extensionLetterFileId,
+            extensionLetterFile: extensionLetterPending,
+          });
+          if (!result || result.ok !== false) router.refresh();
+          return result;
+        }}
+      >
+        <PanelHeading>Probation</PanelHeading>
+        <FieldGrid>
+          <StaticField label="Start Date" value={display.startDate} />
+          <StaticField label="End Date" value={display.endDate} />
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className={labelClass}>Probation Status</span>
+            <span
+              className={`self-start inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                PROBATION_STATUS_PILL_CLASSES[display.displayStatus] ?? "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {display.displayStatus}
+            </span>
+          </div>
+          <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
+          <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
+          <RealFileField
+            label="Confirmation Letter"
+            existingFileId={confirmationLetterFileId}
+            pendingFile={confirmationLetterPending}
+            onPick={setConfirmationLetterPending}
+            onClear={clearConfirmationLetter}
+            full
+          />
+          <RealFileField
+            label="Extension Letter"
+            existingFileId={extensionLetterFileId}
+            pendingFile={extensionLetterPending}
+            onPick={setExtensionLetterPending}
+            onClear={clearExtensionLetter}
+            full
+          />
+          <StaticField label="Feedback" value={display.feedback2} full />
+        </FieldGrid>
+      </EditableSection>
+
+      {canDecide && (
+        <div className="mt-6 pt-6 border-t border-black/10">
+          <SubsectionHeading>Probation Decision</SubsectionHeading>
+          {display.decidedByName && (
+            <p className="text-xs text-slate-500 mb-3">
+              Last decided by {display.decidedByName}
+              {display.decidedAt ? ` on ${new Date(display.decidedAt).toLocaleDateString()}` : ""}.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setPendingOutcome("Confirmed")}
+              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingOutcome("Extended")}
+              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+            >
+              Extend
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingOutcome("Stopped")}
+              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+            >
+              Stop
+            </button>
+          </div>
+          {decideError && <p className="mt-2 text-sm text-red-600">{decideError}</p>}
+        </div>
+      )}
+
+      {pendingOutcome && !deciding && (
+        <ConfirmDialog
+          message={OUTCOME_MESSAGE[pendingOutcome]}
+          confirmLabel={pendingOutcome === "Confirmed" ? "Confirm" : pendingOutcome === "Extended" ? "Extend" : "Stop"}
+          onCancel={() => setPendingOutcome(null)}
+          onConfirm={confirmOutcome}
         />
-        <RealFileField
-          label="Extension Letter"
-          existingFileId={extensionLetterFileId}
-          pendingFile={extensionLetterPending}
-          onPick={setExtensionLetterPending}
-          onClear={clearExtensionLetter}
-          full
-        />
-      </FieldGrid>
-    </EditableSection>
+      )}
+    </>
   );
 }
 

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bell, Hourglass, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Bell, Hourglass, UserPlus, X } from "lucide-react";
 
 const APPROVAL_ROLES = new Set(["superadmin"]);
 const INDUCTION_ROLES = new Set(["superadmin", "admin", "hr", "od"]);
+const PROBATION_DECISION_ROLES = new Set(["hr", "superadmin"]);
 
 interface Counts {
   approvals: number;
@@ -18,9 +19,12 @@ export default function NotificationBell({ role }: { role?: string }) {
   const showInductionRequests = INDUCTION_ROLES.has(normalizedRole);
   const shouldShow = showApprovals || showInductionRequests;
 
+  const showProbationDecisions = PROBATION_DECISION_ROLES.has(normalizedRole);
+
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
+  const [probationCount, setProbationCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,6 +81,31 @@ export default function NotificationBell({ role }: { role?: string }) {
     };
   }, []);
 
+  // Probation reminders — starting 2 weeks before a Full-Time employee's
+  // probation end date, per explicit decision (see conversation). Same
+  // computeProbationReminderCandidates rule as the Probation summary card's
+  // own red dot.
+  useEffect(() => {
+    if (!showProbationDecisions) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/probation/pending-decisions/count", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { count?: number };
+        if (!cancelled && typeof data.count === "number") setProbationCount(data.count);
+      } catch {
+        // network flake — no-op
+      }
+    };
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [showProbationDecisions]);
+
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -93,7 +122,7 @@ export default function NotificationBell({ role }: { role?: string }) {
     };
   }, [open]);
 
-  const totalCount = count + leaveCount;
+  const totalCount = count + leaveCount + probationCount;
   const leaveMessage =
     role === "hr"
       ? leaveCount === 1
@@ -215,6 +244,33 @@ export default function NotificationBell({ role }: { role?: string }) {
                       <div className="mt-3">
                         <Link
                           href="/attendance/leave/approvals"
+                          onClick={() => setOpen(false)}
+                          className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                          Review
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {probationCount > 0 && (
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0 ring-1 ring-inset ring-red-200">
+                      <AlertTriangle className="w-5 h-5 text-red-600" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">Probation ending soon</p>
+                      <p className="mt-0.5 text-sm text-slate-500 leading-snug">
+                        {probationCount === 1
+                          ? "1 employee's probation needs a Confirm/Extend/Stop decision."
+                          : `${probationCount} employees' probation needs a Confirm/Extend/Stop decision.`}
+                      </p>
+                      <div className="mt-3">
+                        <Link
+                          href="/employee-folder/probation"
                           onClick={() => setOpen(false)}
                           className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
                         >

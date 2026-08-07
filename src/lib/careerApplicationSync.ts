@@ -181,6 +181,13 @@ export interface CareerApplicationLookupEntry {
   // isProbationOverrideExcluded below), since each field alone has been
   // caught disagreeing with reality in different, unpredictable directions.
   recStage: string | null;
+  // Probation stage's own "Feedback" section (see probationDecision.ts) —
+  // feedback2 specifically, NOT the feedback1-or-feedback2 fallback pair
+  // hiringNote above already uses for a different, pre-existing UI element.
+  feedback2: string | null;
+  // Probation stage's own Confirm/Stop/In Progress display status (see
+  // probationDecision.ts) — "Accept"/"Rejected"/empty, read-only.
+  status2: string | null;
 }
 
 // Live name-matched lookup into career_applications AND rec_recruit/
@@ -200,7 +207,8 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
       board_stage: string | null;
       feedback1: string | null;
       feedback2: string | null;
-    }>(`select id, name, board_stage, feedback1, feedback2 from public.career_applications`),
+      status2: string | null;
+    }>(`select id, name, board_stage, feedback1, feedback2, status2 from public.career_applications`),
     queryEbrightHrfs<{ name: string; stageId: string | null }>(`select name, "stageId" from public.rec_recruit`),
     queryEbrightHrfs<{ id: string; name: string }>(`select id, name from public.rec_stage`),
   ]);
@@ -222,6 +230,8 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
       boardStage: r.board_stage,
       hiringNote: (r.feedback1?.trim() || r.feedback2?.trim()) || null,
       recStage: recStageByName.get(key) ?? null,
+      feedback2: r.feedback2?.trim() || null,
+      status2: r.status2?.trim() || null,
     });
   }
   // A rec_recruit row with no matching career_applications row (e.g.
@@ -230,23 +240,25 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
   // otherwise a real employee who only ever exists in rec_recruit could
   // never be OR-matched into the Probation list at all.
   for (const [key, recStage] of recStageByName) {
-    if (!map.has(key)) map.set(key, { applicationId: null, boardStage: null, hiringNote: null, recStage });
+    if (!map.has(key))
+      map.set(key, { applicationId: null, boardStage: null, hiringNote: null, recStage, feedback2: null, status2: null });
   }
   return map;
 }
 
-// Probation-list membership per explicit decision: a person belongs on the
-// Probation list if EITHER career_applications.board_stage OR
-// rec_recruit/rec_stage.name reads "Probation" — neither field alone is
-// trusted enough on its own (both have been caught disagreeing with the
-// other and with reality; see the recStage doc comment above). Pure,
-// map-lookup version — takes an already-fetched lookup entry so a caller
-// iterating many rows (the list page) can fetch lookupCareerApplicationsByName()
-// ONCE instead of once per row; matchIsProbationOverrideExcluded below is
-// its mirror. The single-name async wrappers further below wrap both for
-// one-off callers (the profile page, checking just the row it's rendering).
+// Probation-list membership, per explicit decision (see conversation) —
+// narrowed to career_applications.board_stage alone. rec_recruit/
+// rec_stage.name used to also count (an OR across both fields), but that's
+// been dropped; recStage is kept on CareerApplicationLookupEntry for
+// matchIsProbationOverrideExcluded below and any other existing reader, just
+// no longer consulted here. Pure, map-lookup version — takes an
+// already-fetched lookup entry so a caller iterating many rows (the list
+// page) can fetch lookupCareerApplicationsByName() ONCE instead of once per
+// row; matchIsProbationOverrideExcluded below is its mirror. The single-name
+// async wrappers further below wrap both for one-off callers (the profile
+// page, checking just the row it's rendering).
 export function matchIsProbationPipeline(match: CareerApplicationLookupEntry | undefined): boolean {
-  return Boolean(match && (match.boardStage === "Probation" || match.recStage === "Probation"));
+  return Boolean(match && match.boardStage === "Probation");
 }
 
 // The flip side of the same rule: a person whose OWN employment record has

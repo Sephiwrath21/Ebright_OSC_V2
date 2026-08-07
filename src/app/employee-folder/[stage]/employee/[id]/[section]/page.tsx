@@ -30,6 +30,7 @@ import {
   listDepartments,
 } from "@/lib/employeeQueries";
 import { isEligibleForOnboardingDualListing, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
+import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 
 export const dynamic = "force-dynamic";
@@ -116,6 +117,7 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     referenceCheck,
     medicalCheck,
     probationInfo,
+    probationDisplay,
     documentsInfo,
     payrollInfo,
     achievements,
@@ -138,6 +140,14 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),
+    // Only ever reachable here via a Probation history tab (this route is
+    // "separate-pages" stages only — Active/Onboarding/Exit — Probation
+    // itself uses "in-page-tabs", see [stage]/employee/[id]/page.tsx)
+    // decideProbationOutcome is deliberately NOT wired up from this history
+    // view (canDecideProbation is hardcoded false below) — decisions are
+    // only made from the employee's own current-stage Probation view, not a
+    // read-only history glance from a later stage.
+    getProbationDisplayInfo(numId, employee.fullName),
     getDocuments(numId),
     getPayrollInfo(numId),
     activeOrAfter ? listAchievements(numId) : Promise.resolve(undefined),
@@ -172,6 +182,8 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         referenceCheck={referenceCheck}
         medicalCheck={medicalCheck}
         probationInfo={probationInfo}
+        probationDisplay={probationDisplay}
+        canDecideProbation={false}
         documentsInfo={documentsInfo}
         payrollInfo={payrollInfo}
         achievements={achievements}

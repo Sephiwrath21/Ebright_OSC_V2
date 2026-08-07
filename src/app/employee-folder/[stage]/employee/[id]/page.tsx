@@ -16,6 +16,7 @@ import {
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 import { isDualListedOnProbation } from "@/lib/careerApplicationSync";
+import { getProbationDisplayInfo } from "@/lib/probationDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -82,20 +83,28 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // every stage now, same as the separate-pages route. Pre/Probation never
   // reach here with a locGroup/locCode — hasLocationLayer is false for both,
   // so there's no branch/dept-scoped namelist to have arrived from.
-  const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, { locGroup, locCode }] = await Promise.all([
-    getResumeInfo(numId),
-    getInterviewAssessment(numId, employee.fullName),
-    getReferenceCheck(numId),
-    getMedicalCheck(numId),
-    getProbationInfo(numId),
-    searchParams,
-  ]);
+  const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, probationDisplay, { locGroup, locCode }] =
+    await Promise.all([
+      getResumeInfo(numId),
+      getInterviewAssessment(numId, employee.fullName),
+      getReferenceCheck(numId),
+      getMedicalCheck(numId),
+      getProbationInfo(numId),
+      // Only needed on the Probation section itself — skips the BranchStaff/
+      // career_applications round trips everywhere else. Not meaningful for
+      // a candidate (isCandidate is only ever reachable at stage="pre", never
+      // "probation" — see the notFound() check above), so no isCandidate
+      // branch needed here either.
+      stage === "probation" ? getProbationDisplayInfo(numId, employee.fullName) : Promise.resolve(undefined),
+      searchParams,
+    ]);
   const locationGroup = locGroup === "branch" || locGroup === "department" ? locGroup : null;
   const locationName = await resolveLocationName(locationGroup, locCode ?? null);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  const canDecideProbation = ["hr", "superadmin"].includes(userRole.toLowerCase());
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -110,6 +119,8 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
         referenceCheck={referenceCheck}
         medicalCheck={medicalCheck}
         probationInfo={probationInfo}
+        probationDisplay={probationDisplay}
+        canDecideProbation={canDecideProbation}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

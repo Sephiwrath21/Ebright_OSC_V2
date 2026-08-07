@@ -32,6 +32,11 @@ interface RawBranchStaffProfileRow {
   employeeId: string | null;
   branch: string | null;
   department: string | null;
+  /** Probation stage's own End Date (see probationDecision.ts) — a
+   *  DIFFERENT column from endDate above (general employment/exit end
+   *  date); this one specifically holds the probation period's own end
+   *  date, when HR has entered one. */
+  probation: string | null;
 }
 
 export interface BranchStaffProfileFields {
@@ -54,6 +59,12 @@ export interface BranchStaffProfileFields {
   employeeId: string | null;
   startDate: Date | null;
   endDate: Date | null;
+  /** Probation stage's own End Date — parsed from BranchStaff.probation
+   *  when present, else start_date + 3 months (see probationDecision.ts's
+   *  own comment for the full rationale — this is a DIFFERENT date from
+   *  endDate above). Null only when there's no start_date to fall back
+   *  from either. */
+  probationEndDate: Date | null;
 }
 
 function blank(s: string | null | undefined): string | null {
@@ -84,6 +95,26 @@ function validDobText(s: string | null): string | null {
   return t && /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : null;
 }
 
+// Personal Info's Phone Number and Emergency Contact's Phone Number, per
+// explicit decision (see conversation) — display-only reformatting, never
+// written back to ebright_hrfs: strip a Malaysia country-code prefix
+// ("+60" or bare "60", the two shapes actually seen in this table's real
+// data — none of it carries a literal "+") down to the digits after it, or
+// for a number already in local 0-prefixed format, drop just the leading
+// 0. Baked into this mapping function itself (not a shared formatter
+// callable on any phone field) so it only ever touches BranchStaff-sourced
+// values — local hrfs phone data (user_profile.phone,
+// emergency_contact.phone) is never passed through this and stays exactly
+// as stored.
+function formatBranchStaffPhone(raw: string | null): string | null {
+  const t = blank(raw);
+  if (!t) return t;
+  if (t.startsWith("+60")) return t.slice(3);
+  if (t.startsWith("60") && t.length > 2) return t.slice(2);
+  if (t.startsWith("0") && t.length > 1) return t.slice(1);
+  return t;
+}
+
 export interface BranchStaffMatchIndex {
   bySourceId: Map<number, RawBranchStaffProfileRow>;
   byNormalizedName: Map<string, RawBranchStaffProfileRow[]>;
@@ -93,7 +124,7 @@ async function fetchAllBranchStaffProfileRows(): Promise<RawBranchStaffProfileRo
   const { rows } = await queryEbrightHrfs<RawBranchStaffProfileRow>(
     `SELECT id, name, gender, dob, nric, email, phone, home_address, bank, bank_name, bank_account,
             emergency_name, emergency_relation, emergency_phone, start_date, "endDate", "employeeId",
-            branch, department
+            branch, department, probation
        FROM public."BranchStaff"`,
   );
   return rows;
@@ -260,16 +291,33 @@ export function branchStaffProfileFields(row: RawBranchStaffProfileRow): BranchS
     dob: validDobText(row.dob),
     nric: blank(row.nric),
     email: blank(row.email),
-    phone: blank(row.phone),
+    phone: formatBranchStaffPhone(row.phone),
     homeAddress: blank(row.home_address),
     bankName: blank(row.bank),
     accountName: blank(row.bank_name),
     bankAccount: blank(row.bank_account),
     emergencyName: blank(row.emergency_name),
     emergencyRelation: blank(row.emergency_relation),
-    emergencyPhone: blank(row.emergency_phone),
+    emergencyPhone: formatBranchStaffPhone(row.emergency_phone),
     employeeId: blank(row.employeeId),
     startDate: parseHrfsTextDate(row.start_date),
     endDate: parseHrfsTextDate(row.endDate),
+    probationEndDate: resolveProbationEndDate(row),
   };
+}
+
+// Probation stage's End Date, per explicit decision (see conversation):
+// BranchStaff.probation when it's set (confirmed against real data — it's
+// already a "YYYY-MM-DD" date text, usually ~3 months after start_date,
+// entered by HR directly), else start_date + 3 months. Only 10 of 353
+// BranchStaff rows actually have this column set, so the fallback is the
+// common case in practice, not an edge case.
+function resolveProbationEndDate(row: RawBranchStaffProfileRow): Date | null {
+  const explicit = parseHrfsTextDate(row.probation);
+  if (explicit) return explicit;
+  const start = parseHrfsTextDate(row.start_date);
+  if (!start) return null;
+  const d = new Date(start);
+  d.setUTCMonth(d.getUTCMonth() + 3);
+  return d;
 }
