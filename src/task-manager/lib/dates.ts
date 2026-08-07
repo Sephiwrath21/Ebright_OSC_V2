@@ -19,7 +19,10 @@ export function resetHour(): number {
 
 /** Start of "today" per the module's day-boundary convention (local
  *  server time, shifted by resetHour()). Pass `now` explicitly in tests;
- *  defaults to the real current time. */
+ *  defaults to the real current time. Callers that need a deterministic
+ *  boundary for a historical/non-"now" date (e.g. a backfill or report job)
+ *  MUST pass `now` explicitly — omitting it silently falls back to wall-clock
+ *  time. */
 export function todayStart(now: Date = new Date()): Date {
   // Shift the day boundary by the configured reset hour: before TM_RESET_HOUR
   // o'clock, "today" still counts as yesterday, so due blocks don't advance

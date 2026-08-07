@@ -28,10 +28,10 @@ import { todayStart } from "@/task-manager/lib/dates";
 import { prisma } from "@/task-manager/prisma";
 
 /** Pure: the next occurrence of dueAt's weekday (same time-of-day) that is
- *  >= todayStart. Already-current dates return unchanged. */
-export function nextWeeklyDueAt(dueAt: Date, todayStart: Date): Date {
+ *  >= boundary. Already-current dates return unchanged. */
+export function nextWeeklyDueAt(dueAt: Date, boundary: Date): Date {
   const next = new Date(dueAt);
-  while (next < todayStart) next.setDate(next.getDate() + 7);
+  while (next < boundary) next.setDate(next.getDate() + 7);
   return next;
 }
 
