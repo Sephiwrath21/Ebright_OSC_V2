@@ -31,11 +31,17 @@ export const STAFF_ROLE_ID = 6;
 // employee, not just plain "staff" — HOD (7) and Branch Manager (8) are also
 // real individual employees with their own position/employment record (e.g.
 // Iqbal Hakim Bin Halim, FT HOD @ Optimisation); the elevated role_id is only
-// for permission scoping, same as "staff" being the baseline. "department"/
-// "branch"/"regional manager"/superadmin/ceo are excluded on purpose — those
-// are shared/administrative scoping-only logins, not individual staff to
-// track through the lifecycle stages.
-const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 7, 8];
+// for permission scoping, same as "staff" being the baseline. CEO (2) is the
+// same case — Kevin Khoo Kuan Xiong has a full personal profile (DOB, NRIC,
+// phone, home address) and a real single employment record (FT CEO,
+// department CEO), same shape as an HOD/Branch Manager account, not a
+// shared/administrative scoping-only login; the CEO department showing 0
+// people on the Active breakdown (see conversation) was this omission, not a
+// branch/department mapping gap. "department"/"branch"/"regional manager"/
+// superadmin are still excluded on purpose — those really are shared,
+// administrative scoping-only logins, not individual staff to track through
+// the lifecycle stages.
+const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 2, 7, 8];
 
 export interface EmployeeRow {
   id: number;
