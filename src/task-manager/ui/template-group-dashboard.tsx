@@ -241,17 +241,19 @@ export function TemplateGroupDashboard({
                   )}
                 </ul>
               )}
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                <GroupActions
-                  group={g}
-                  busyId={busyId}
-                  canEdit={canEdit}
-                  onAssign={() => setAssignGroupId(g.id)}
-                  onViewAssignees={() => setAssigneesGroupId(g.id)}
-                  onEdit={() => setEditGroupId(g.id)}
-                  onRemove={() => remove(g.id, g.name)}
-                />
-              </div>
+              {canEdit && (
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                  <GroupActions
+                    group={g}
+                    busyId={busyId}
+                    canEdit={canEdit}
+                    onAssign={() => setAssignGroupId(g.id)}
+                    onViewAssignees={() => setAssigneesGroupId(g.id)}
+                    onEdit={() => setEditGroupId(g.id)}
+                    onRemove={() => remove(g.id, g.name)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -263,7 +265,7 @@ export function TemplateGroupDashboard({
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Tasks</th>
                 <th className="px-4 py-3">Last Updated</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                {canEdit && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -272,19 +274,21 @@ export function TemplateGroupDashboard({
                   <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
                   <td className="px-4 py-3 text-gray-600">{g.taskCount}</td>
                   <td className="px-4 py-3 text-gray-600">{g.updatedAt.slice(0, 10)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <GroupActions
-                        group={g}
-                        busyId={busyId}
-                        canEdit={canEdit}
-                        onAssign={() => setAssignGroupId(g.id)}
-                        onViewAssignees={() => setAssigneesGroupId(g.id)}
-                        onEdit={() => setEditGroupId(g.id)}
-                        onRemove={() => remove(g.id, g.name)}
-                      />
-                    </div>
-                  </td>
+                  {canEdit && (
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <GroupActions
+                          group={g}
+                          busyId={busyId}
+                          canEdit={canEdit}
+                          onAssign={() => setAssignGroupId(g.id)}
+                          onViewAssignees={() => setAssigneesGroupId(g.id)}
+                          onEdit={() => setEditGroupId(g.id)}
+                          onRemove={() => remove(g.id, g.name)}
+                        />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
