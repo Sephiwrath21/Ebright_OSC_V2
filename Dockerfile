@@ -33,7 +33,12 @@ COPY . .
 # exists in the build context (dockerignored), so give the build a dummy URL —
 # nothing connects during build (all CRM pages are force-dynamic) and the real
 # URL comes from the container's runtime env.
-RUN CRM_DATABASE_URL="postgresql://build:build@127.0.0.1:5432/buildtime" \
+# SKIP_ENV_VALIDATION=1: next build runs with NODE_ENV=production but no real
+# secrets; src/lib/crm/auth.ts (BETTER_AUTH_SECRET) honours this flag during
+# page-data collection — same mechanism v1's Dockerfile uses. Runtime still
+# fails loudly if the real secrets are missing.
+RUN SKIP_ENV_VALIDATION=1 \
+    CRM_DATABASE_URL="postgresql://build:build@127.0.0.1:5432/buildtime" \
     NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Drop to non-root user
