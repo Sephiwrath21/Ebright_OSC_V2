@@ -75,12 +75,25 @@ export async function getTemplateDeletionImpactCore(
  *  every assignee's lists; completed/N-A records keep their runs, blocks,
  *  and proof untouched. Nothing is hard-deleted. Exported so ./templates's
  *  removeTemplateAssignments (bulk "Remove Task") can reuse it without
- *  duplicating the logic. */
+ *  duplicating the logic.
+ *
+ *  `dueWeekday` (2026-08-07, added for Branch Package Schedule): optional
+ *  JS `Date.getDay()` filter (0=Sun..6=Sat, matching tasks-internal.ts's
+ *  DAY_INDEX) applied AFTER the DB fetch. Without it, cancelling one
+ *  (templateId, assigneeId) pair cancels EVERY pending block for that pair
+ *  regardless of which day it's due — fine for the existing callers (they
+ *  mean "cancel this person's entire pending run of this template"), but
+ *  wrong for Branch Package Schedule, where clearing/changing ONE grid cell
+ *  (branch, weekday) must cancel only that weekday's recurring assignment
+ *  and leave the same manager's OTHER-weekday assignment of the same
+ *  package/template untouched. Both existing call sites omit it and keep
+ *  their unfiltered (all-weekdays) behavior unchanged. */
 export async function cancelPendingTemplateRuns(
   actorId: string,
   templateId: string,
   reason: string,
   assigneeId?: string,
+  dueWeekday?: number,
 ) {
   const blocks = await prisma.runBlock.findMany({
     where: {
@@ -88,11 +101,13 @@ export async function cancelPendingTemplateRuns(
       ...(assigneeId ? { assigneeId } : {}),
       run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
-    select: { runId: true, status: true },
+    select: { runId: true, status: true, dueAt: true },
   });
+  const matchingBlocks =
+    dueWeekday === undefined ? blocks : blocks.filter((b) => b.dueAt?.getDay() === dueWeekday);
   const pendingRunIds = [
     ...new Set(
-      blocks
+      matchingBlocks
         .filter((b) => (PENDING_STATUSES as readonly string[]).includes(b.status))
         .map((b) => b.runId),
     ),
@@ -106,11 +121,20 @@ export async function cancelPendingTemplateRuns(
       data: {
         actorId,
         action: "RUN_CANCELLED",
-        detail: { reason, templateId, cancelledRuns: pendingRunIds.length, ...(assigneeId ? { assigneeId } : {}) },
+        detail: {
+          reason,
+          templateId,
+          cancelledRuns: pendingRunIds.length,
+          ...(assigneeId ? { assigneeId } : {}),
+          ...(dueWeekday !== undefined ? { dueWeekday } : {}),
+        },
       },
     });
   }
-  return { removedTasks: pendingRunIds.length, keptRecords: blocks.length - pendingRunIds.length };
+  return {
+    removedTasks: pendingRunIds.length,
+    keptRecords: matchingBlocks.length - pendingRunIds.length,
+  };
 }
 
 /** Delete a template AND cascade to its assignments (2026-07-31 rule) —
