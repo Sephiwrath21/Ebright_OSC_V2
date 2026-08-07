@@ -28,7 +28,13 @@ RUN npx prisma generate --config prisma.crm.config.ts
 ARG BUILD_DATE
 RUN echo "Building version/date: ${BUILD_DATE}"
 COPY . .
-RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+# CRM_DATABASE_URL: src/lib/crm/db.ts throws at import when it is unset, and
+# next build's page-data collection imports the CRM route modules. No .env
+# exists in the build context (dockerignored), so give the build a dummy URL —
+# nothing connects during build (all CRM pages are force-dynamic) and the real
+# URL comes from the container's runtime env.
+RUN CRM_DATABASE_URL="postgresql://build:build@127.0.0.1:5432/buildtime" \
+    NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Drop to non-root user
 RUN addgroup -g 1001 -S nodejs && \
