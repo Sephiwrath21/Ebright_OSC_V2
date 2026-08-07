@@ -23,6 +23,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import type { NavAccess } from "./navAccess.types";
+import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -41,6 +42,13 @@ interface NavItem {
   feature?: string;
   /** Superadmin / CEO only (e.g. Account Management). */
   privileged?: boolean;
+  /** Task Manager-specific visibility key (2026-08-07) — checked against a
+   *  SEPARATE TaskManagerNavAccess prop, not the portal's `feature`/
+   *  `privileged` NavAccess system (Task Manager's role granularity —
+   *  Branch Manager, Coach, etc. — doesn't exist in that system). Omit for
+   *  items that don't need Task-Manager-specific gating (e.g. "Overview",
+   *  which stays unconditionally visible). */
+  taskManagerKey?: "template" | "package" | "packageTable";
   children?: NavItem[];
 }
 
@@ -155,9 +163,9 @@ const primaryNav: NavItem[] = [
     Icon: ListChecks,
     children: [
       { name: "Overview", href: "/task-manager", exact: true },
-      { name: "Template", href: "/task-manager/template" },
-      { name: "Package", href: "/task-manager/package" },
-      { name: "Package Table", href: "/task-manager/package-table" },
+      { name: "Template", href: "/task-manager/template", taskManagerKey: "template" },
+      { name: "Package", href: "/task-manager/package", taskManagerKey: "package" },
+      { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
     ],
   },
 ];
@@ -186,15 +194,28 @@ const secondaryNav: NavItem[] = [
  * isn't granted, and privileged-only items for non-privileged users. A parent
  * whose children all get filtered out disappears too. `null` access (still
  * loading) leaves the menu untouched so nothing flickers for privileged users.
+ * `taskManagerAccess` is a SEPARATE, independent access object (Task
+ * Manager's own role system, see nav-access.actions.ts) checked alongside
+ * the portal's `access`, not merged with it — same null-leaves-visible
+ * semantics while it's still loading.
  */
-function filterNav(items: NavItem[], access: NavAccess | null): NavItem[] {
+function filterNav(
+  items: NavItem[],
+  access: NavAccess | null,
+  taskManagerAccess: TaskManagerNavAccess | null,
+): NavItem[] {
   if (!access) return items;
   const out: NavItem[] = [];
   for (const item of items) {
     if (item.privileged && !access.privileged) continue;
     if (item.feature && !access.features.includes(item.feature)) continue;
+    if (item.taskManagerKey) {
+      // null (still loading) leaves it shown, matching the existing
+      // "null access leaves the menu untouched" behavior for navAccess.
+      if (taskManagerAccess && !taskManagerAccess[item.taskManagerKey]) continue;
+    }
     if (item.children?.length) {
-      const kids = filterNav(item.children, access);
+      const kids = filterNav(item.children, access, taskManagerAccess);
       if (kids.length === 0) continue;
       out.push({ ...item, children: kids });
     } else {
@@ -238,13 +259,15 @@ function firstHref(item: NavItem): string {
 export default function Sidebar({
   collapsed,
   navAccess = null,
+  taskManagerNavAccess = null,
 }: {
   collapsed: boolean;
   navAccess?: NavAccess | null;
+  taskManagerNavAccess?: TaskManagerNavAccess | null;
 }) {
   const pathname = usePathname();
-  const primaryItems = filterNav(primaryNav, navAccess);
-  const secondaryItems = filterNav(secondaryNav, navAccess);
+  const primaryItems = filterNav(primaryNav, navAccess, taskManagerNavAccess);
+  const secondaryItems = filterNav(secondaryNav, navAccess, taskManagerNavAccess);
 
   return (
     <aside
