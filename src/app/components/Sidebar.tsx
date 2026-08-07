@@ -83,7 +83,7 @@ const primaryNav: NavItem[] = [
   },
   {
     name: "CNS",
-    href: "/dashboards/crm",
+    href: "/crm/dashboard",
     Icon: Newspaper,
     feature: "cns_dashboard",
     children: [
@@ -104,11 +104,11 @@ const primaryNav: NavItem[] = [
       {
         name: "Ticket",
         children: [
-          { name: "Dashboard", href: "/crm/ticket/dashboard", exact: true },
-          { name: "Opportunities", href: "/crm/ticket/opportunities" },
-          { name: "My Tickets", href: "/crm/ticket/my-tickets" },
-          { name: "New Ticket", href: "/crm/ticket/new" },
-          { name: "Platforms", href: "/crm/ticket/platforms" },
+          { name: "Dashboard", href: "/crm/tickets/dashboard", exact: true },
+          { name: "Kanban", href: "/crm/tickets/kanban" },
+          { name: "My Tickets", href: "/crm/tickets" },
+          { name: "New Ticket", href: "/crm/tickets/new" },
+          { name: "Platforms", href: "/crm/tkt-platforms" },
         ],
       },
     ],
