@@ -8,6 +8,7 @@ import {
   listDepartments,
   countEmployeeStages,
   getOverdueTaskCounts,
+  getLatestEmploymentStartDates,
 } from "@/lib/employeeQueries";
 import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 import {
@@ -118,10 +119,38 @@ export default async function EmployeeFolderPage() {
   // (neither is "more real" than the other), that's a SINGLE row with both
   // badges shown together (extraStages), never two separate rows for the
   // same id.
+  // A real Active-stage row whose pipeline ALSO reads Probation (e.g. Ayu
+  // Novitasari — employment.status="active", board_stage="Probation") is
+  // ambiguous on its own: is the pipeline just lagging behind a real
+  // transition that already happened, or is it the current, accurate state?
+  // Per explicit decision (see conversation), that's resolved by the row's
+  // own employment.start_date — not row.date, which silently falls back to
+  // created_at when start_date is null (see dateSourceFor) and so can't
+  // tell "never recorded" apart from "started a while ago":
+  //   - start_date has passed → the pipeline is stale; genuinely Active
+  //     only, no Probation/Onboarding badge or count.
+  //   - start_date hasn't passed yet, or was never recorded → Probation and
+  //     Onboarding are the real, current state instead (concurrent, per the
+  //     existing rule below); no Active badge or count.
+  // A general rule keyed to the pattern (Active-stage + pipeline match),
+  // not to specific people — applies to anyone matching it, now or later.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const activePipelineProbationIds = enrichedRows
+    .filter((r) => r.stage === "active" && matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))))
+    .map((r) => r.id);
+  const activeStartDates = await getLatestEmploymentStartDates(activePipelineProbationIds);
+  const activePipelineProbationPassedIds = new Set(
+    activePipelineProbationIds.filter((id) => {
+      const startDate = activeStartDates.get(id);
+      return startDate != null && startDate <= todayIso;
+    }),
+  );
+
   const probationOnboardingExtrasById = new Map<number, ("probation" | "onboarding")[]>();
   let probationCount = 0;
   let onboardingDualListedCount = 0;
   for (const row of enrichedRows) {
+    if (activePipelineProbationPassedIds.has(row.id)) continue;
     const match = careerApplications.get(normalizeName(row.fullName));
     const extras: ("probation" | "onboarding")[] = [];
     if (row.stage === "probation") {
@@ -155,7 +184,15 @@ export default async function EmployeeFolderPage() {
           ? { ...r, stage: passed.stage, date: passed.date }
           : r;
       const extras = probationOnboardingExtrasById.get(r.id);
-      return extras ? { ...base, extraStages: extras } : base;
+      if (!extras) return base;
+      // Real Active-stage + pipeline-Probation, start date not passed (see
+      // activePipelineProbationPassedIds above): genuinely Probation +
+      // Onboarding, not Active — flip the primary badge away from Active
+      // instead of showing all three together.
+      if (base.stage === "active" && extras.includes("probation") && extras.includes("onboarding")) {
+        return { ...base, stage: "probation" as const, extraStages: ["onboarding"] as ("probation" | "onboarding")[] };
+      }
+      return { ...base, extraStages: extras };
     })
     .concat(correctedPreCandidates);
 
