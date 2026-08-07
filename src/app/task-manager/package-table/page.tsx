@@ -3,15 +3,18 @@
 // task-manager/data/branch-package-schedule.ts for the data layer this
 // wires into.
 //
-// Access (2026-08-07 View/Edit tier split, see role-views.ts): this page has
-// no data model of its own yet — unlike template/page.tsx and
-// package/page.tsx, whose View-tier gate is a side effect of their first
-// data fetch (listTemplateGroups's requireGroupViewAccess) — the View-tier
-// check here is done directly via getMyRole + taskManagerNavAccess. Package
-// Table's View tier matches Package's: Super Admin, elevated
-// Operations/Optimisation dept-site, HOD, CEO, and Branch Manager. Same
-// three-way SetupPendingError/NoAccountError/generic-error card handling as
-// the other two pages for the getMyRole call itself.
+// Access (2026-08-07 View/Edit tier split, see role-views.ts): mirrors
+// template/page.tsx and package/page.tsx exactly — the View-tier gate is a
+// side effect of the first fetch (listBranchPackageSchedule's own internal
+// requireViewAccess), not a separate direct check. getMyRole and
+// listBranchPackageSchedule are fetched together via Promise.all (both are
+// needed regardless of outcome, so there's no reason to serialize them or
+// have each independently re-derive the same View-tier gate); a genuine 403
+// from either redirects to /task-manager, same three-way
+// SetupPendingError/NoAccountError/generic-error card handling as the other
+// two pages otherwise. Package Table's View tier matches Package's: Super
+// Admin, elevated Operations/Optimisation dept-site, HOD, CEO, and Branch
+// Manager.
 //
 // Edit tier (the only tier that can set/clear cells) is
 // canManageTaskTemplateGroups(role) — same Edit tier as Template/Package —
@@ -26,7 +29,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
-import { canManageTaskTemplateGroups, taskManagerNavAccess } from "@/task-manager/role-views";
+import { canManageTaskTemplateGroups } from "@/task-manager/role-views";
 import {
   getMyRole,
   listBranchPackageSchedule,
@@ -55,9 +58,19 @@ export default async function TaskManagerPackageTablePage() {
   const email = su.email;
 
   let role: { role: string; department: string | null };
+  let data: BranchPackageScheduleData;
   try {
-    role = await getMyRole(email);
+    const [roleResult, dataResult] = await Promise.all([
+      getMyRole(email),
+      listBranchPackageSchedule(email),
+    ]);
+    role = roleResult;
+    data = dataResult;
   } catch (err) {
+    // Genuine "no View access" (403 from listBranchPackageSchedule's
+    // requireViewAccess) bounces to /task-manager — everything else renders
+    // in place, same as template/page.tsx and package/page.tsx.
+    if (err instanceof FlowBridgeError && err.status === 403) redirect("/task-manager");
     let card;
     if (err instanceof SetupPendingError) {
       card = <SetupPendingCard />;
@@ -68,25 +81,6 @@ export default async function TaskManagerPackageTablePage() {
         <TaskManagerErrorCard message={err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE} />
       );
     }
-    return (
-      <AppShell email={su.email} role={su.role} name={su.name}>
-        <div className="mx-auto max-w-[1400px] p-6">{card}</div>
-      </AppShell>
-    );
-  }
-
-  // Genuine "account exists but has no View access to Package Table" bounces
-  // to /task-manager — everything else (setup pending, no account, other
-  // errors) renders its status card in place above.
-  if (!taskManagerNavAccess(role).packageTable) redirect("/task-manager");
-
-  let data: BranchPackageScheduleData;
-  try {
-    data = await listBranchPackageSchedule(email);
-  } catch (err) {
-    const card = (
-      <TaskManagerErrorCard message={err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE} />
-    );
     return (
       <AppShell email={su.email} role={su.role} name={su.name}>
         <div className="mx-auto max-w-[1400px] p-6">{card}</div>

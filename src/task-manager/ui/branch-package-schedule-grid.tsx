@@ -74,7 +74,11 @@ function StaticCell({ cell }: { cell: BranchPackageScheduleCell }) {
   if (!cell.packageName) {
     return <span className="text-xs text-gray-300">–</span>;
   }
-  return <span className="text-xs font-medium text-gray-700">{cell.packageName}</span>;
+  return (
+    <span className="inline-flex w-full items-center justify-center rounded-md bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-700">
+      {cell.packageName}
+    </span>
+  );
 }
 
 export function BranchPackageScheduleGrid({
