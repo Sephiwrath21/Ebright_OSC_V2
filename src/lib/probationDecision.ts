@@ -83,6 +83,42 @@ export function isEffectivelyStopped(localProbationStatus: string | null, status
   return localProbationStatus === "Stopped" || status2 === "Rejected";
 }
 
+// Bulk probation END date resolution — used by
+// computeActivePipelineProbationPassedIds (careerApplicationSync.ts) to
+// decide whether a real Active-stage + pipeline-Probation person's
+// probation window has actually ended, not just whether their start date
+// has passed (see that function's own comment on why this replaced the
+// start-date check: Ayu Novitasari started 2026-05-23, which had already
+// passed, but her actual probation end date is 2026-08-23 — she was being
+// dropped to Active-only over two months before her probation genuinely
+// ended). Same BranchStaff.probation-or-start+3mo resolution as
+// getProbationDisplayInfo, falling back to local hrfs.probation.end_date,
+// but batched for a whole population instead of one row at a time — and,
+// like computeProbationReminderCandidates, skips the location cross-check
+// (lower stakes than Personal Info's PII fields; an ambiguous name match
+// still safely falls back to local data rather than guessing).
+export async function computeProbationEndDates<T extends { id: number; fullName: string }>(
+  rows: T[],
+): Promise<Map<number, string | null>> {
+  if (rows.length === 0) return new Map();
+  const [localRows, bsIndex] = await Promise.all([
+    prisma.probation.findMany({ where: { user_id: { in: rows.map((r) => r.id) } }, select: { user_id: true, end_date: true } }),
+    buildBranchStaffMatchIndex(),
+  ]);
+  const localByUserId = new Map(localRows.map((r) => [r.user_id, r]));
+
+  const result = new Map<number, string | null>();
+  for (const row of rows) {
+    const bsMatch = matchBranchStaffForRealAccount(row.fullName, null, null, bsIndex, [], []);
+    const local = localByUserId.get(row.id);
+    const endDate = bsMatch
+      ? (branchStaffProfileFields(bsMatch).probationEndDate?.toISOString().slice(0, 10) ?? null)
+      : (local?.end_date?.toISOString().slice(0, 10) ?? null);
+    result.set(row.id, endDate);
+  }
+  return result;
+}
+
 // Bulk version for the Employee Records table/cards and the dedicated stage
 // list pages (see employee-folder/page.tsx and [stage]/page.tsx) — same
 // isEffectivelyConfirmed check as the single-person version above, but for

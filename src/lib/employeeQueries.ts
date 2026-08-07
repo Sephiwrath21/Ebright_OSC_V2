@@ -1088,21 +1088,6 @@ export function countEmployeeStages(rows: EmployeeOverviewRow[]): Record<Employe
   return counts;
 }
 
-// Raw employment.start_date (ISO date, or null if never recorded) per user —
-// distinct from EmployeeOverviewRow.date, which falls back to created_at
-// when start_date is null (see dateSourceFor) and so can't be used to tell
-// "no start date on record" apart from "started a while ago". Same latest-
-// employment-row selection (orderBy start_date desc, take 1) as
-// listEmployeeOverviewRows uses.
-export async function getLatestEmploymentStartDates(userIds: number[]): Promise<Map<number, string | null>> {
-  if (userIds.length === 0) return new Map();
-  const users = await prisma.users.findMany({
-    where: { user_id: { in: userIds } },
-    select: { user_id: true, employment: { orderBy: { start_date: "desc" }, take: 1, select: { start_date: true } } },
-  });
-  return new Map(users.map((u) => [u.user_id, u.employment[0]?.start_date?.toISOString().slice(0, 10) ?? null]));
-}
-
 export interface StageLocationSummary {
   code: string;
   name: string;
