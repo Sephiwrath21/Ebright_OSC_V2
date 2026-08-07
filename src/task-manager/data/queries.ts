@@ -283,10 +283,10 @@ export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
  *  (mirrors /task-manager/page.tsx's `role === "CEO"` check, without
  *  fetching that page's full daily payload). Deliberately NOT the OSC
  *  portal session's own role field — a different identity system. */
-export function getMyRole(email: string): Promise<{ role: string }> {
+export function getMyRole(email: string): Promise<{ role: string; department: string | null }> {
   return native(async () => {
     const user = await requireUserByEmail(email);
-    return { role: user.role };
+    return { role: user.role, department: user.department };
   }, "getMyRole");
 }
 
