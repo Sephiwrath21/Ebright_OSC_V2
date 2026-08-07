@@ -118,6 +118,19 @@ jobs:
             printf '%s\n' 'GOOGLE_DRIVE_SA_PRIVATE_KEY="${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}"' >> .env
             printf '%s\n' 'GOOGLE_DRIVE_FOLDER_ID="${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}"' >> .env
 
+            # CRM runtime env (CRM port, 2026-08-07). Same pattern as the Drive
+            # keys above, but guarded: only rewrite when the GitHub secret is
+            # actually defined, so a manually-added value in the server's .env
+            # survives until the secrets are configured.
+            if [ -n "${{ secrets.CRM_DATABASE_URL }}" ]; then
+              sed -i '/^CRM_DATABASE_URL=/d' .env || true
+              printf '%s\n' 'CRM_DATABASE_URL="${{ secrets.CRM_DATABASE_URL }}"' >> .env
+            fi
+            if [ -n "${{ secrets.BETTER_AUTH_SECRET }}" ]; then
+              sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
+              printf '%s\n' 'BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}"' >> .env
+            fi
+
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on
             # the small deploy host runs out of memory / time and fails the
