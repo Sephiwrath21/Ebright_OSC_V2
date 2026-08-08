@@ -62,8 +62,11 @@ export interface BranchPackageOption {
 export interface BranchPackageScheduleCell {
   branch: string;
   weekday: PackageTableWeekday;
-  packageGroupId: string | null;
-  packageName: string | null;
+  /** Every Package currently configured for this (branch, weekday) cell —
+   *  empty array (never null) when nothing is configured. A cell may now
+   *  hold more than one Package (2026-08-08 multi-select reversal — see
+   *  file header). */
+  packages: BranchPackageOption[];
 }
 
 export interface BranchPackageScheduleData {
@@ -76,7 +79,11 @@ export interface BranchPackageScheduleData {
 /** Full grid data: canonical branch list (distinct role=BRANCH users'
  *  `branch` field), every non-archived Package org-wide (see file
  *  header — deliberately not createdById-scoped), and the current
- *  (branch, weekday) -> package config. */
+ *  (branch, weekday) -> package config. A cell may now be backed by
+ *  MULTIPLE `BranchPackageSchedule` rows (2026-08-08 multi-select
+ *  reversal — see file header and the model's schema comment), so every
+ *  matching row is grouped into that cell's `packages` array rather than
+ *  assuming at most one. */
 export function listBranchPackageSchedule(email: string): Promise<BranchPackageScheduleData> {
   return native(async () => {
     await requireViewAccess(email);
@@ -96,20 +103,23 @@ export function listBranchPackageSchedule(email: string): Promise<BranchPackageS
     });
 
     const existing = await prisma.branchPackageSchedule.findMany({
-      include: { packageGroup: { select: { name: true } } },
+      include: { packageGroup: { select: { id: true, name: true } } },
+      orderBy: { packageGroup: { name: "asc" } },
     });
-    const existingByKey = new Map(existing.map((e) => [`${e.branch}:${e.weekday}`, e]));
+    const existingByKey = new Map<string, BranchPackageOption[]>();
+    for (const row of existing) {
+      const key = `${row.branch}:${row.weekday}`;
+      const option: BranchPackageOption = { id: row.packageGroupId, name: row.packageGroup.name };
+      const list = existingByKey.get(key);
+      if (list) list.push(option);
+      else existingByKey.set(key, [option]);
+    }
 
     const cells: BranchPackageScheduleCell[] = [];
     for (const branch of branches) {
       for (const weekday of PACKAGE_TABLE_WEEKDAYS) {
-        const row = existingByKey.get(`${branch}:${WEEKDAY_TO_PRISMA[weekday]}`);
-        cells.push({
-          branch,
-          weekday,
-          packageGroupId: row?.packageGroupId ?? null,
-          packageName: row?.packageGroup.name ?? null,
-        });
+        const packages = existingByKey.get(`${branch}:${WEEKDAY_TO_PRISMA[weekday]}`) ?? [];
+        cells.push({ branch, weekday, packages });
       }
     }
 
@@ -120,7 +130,10 @@ export function listBranchPackageSchedule(email: string): Promise<BranchPackageS
 const setCellSchema = z.object({
   branch: z.string().trim().min(1).max(100),
   weekday: z.enum(PACKAGE_TABLE_WEEKDAYS),
-  packageGroupId: z.string().min(1).nullable(),
+  // FULL desired set of package ids for this cell (not a single delta) —
+  // 20 is a sanity cap, matching GROUP_TASK_MAX-style caps elsewhere in
+  // this module.
+  packageGroupIds: z.array(z.string().min(1)).max(20),
 });
 export type SetBranchPackageScheduleCellInput = z.input<typeof setCellSchema>;
 
@@ -214,30 +227,40 @@ async function assignWeekday(
   }
 }
 
-/** Set (or clear, if `packageGroupId` is null) one grid cell. Resolves the
- *  branch's single Branch Manager, cancels any prior package's
- *  weekday-scoped recurring assignment for them, and — if a new package
- *  was selected — creates the new one. Upserts the durable
- *  BranchPackageSchedule config row to match.
+/** Set one grid cell to the FULL desired set of packages
+ *  (`packageGroupIds` — an empty array clears the cell entirely, never
+ *  `null`). This is a DIFF against what's currently configured for this
+ *  (branch, weekday), not a wholesale replace: resolves the branch's
+ *  single Branch Manager, fetches the CURRENTLY-configured rows fresh
+ *  from the DB, and computes `toRemove`/`toAdd` against the caller's
+ *  desired set. Any package id present in BOTH sets is left completely
+ *  untouched — no cancel, no reassign, no DB write for it — only genuine
+ *  additions/removals reuse `cancelWeekdayAssignment`/`assignWeekday`
+ *  (verbatim, unmodified, called once per package) plus the matching
+ *  `BranchPackageSchedule` row delete/create.
  *
  *  Not wrapped in a transaction across its steps (find manager -> find
- *  existing row -> cancel old assignment -> create new assignment ->
- *  upsert the config row) — same accepted trade-off as
+ *  current rows -> per-removed-package cancel+delete -> per-added-package
+ *  assign+create) — same accepted trade-off as
  *  template-groups.ts's editTemplateGroup/deleteTemplateGroup/
  *  applyTemplateGroup, whose multi-step writes are documented the same
- *  way. The failure window here is arguably worse than that precedent's:
- *  a crash between cancelWeekdayAssignment and the final upsert can leave
- *  the durable config row pointing at the OLD package while the old
- *  assignment is already cancelled and the new one was never created, or
- *  leave a live new RunBlock created without the config row reflecting
- *  it. Callers should treat a thrown error as "re-fetch and re-check,"
- *  not "nothing happened" — same guidance as that file's callers.
+ *  way. This is the first place in this file where a SINGLE call can
+ *  touch MULTIPLE packages: a crash partway through a multi-item cell
+ *  change (e.g. after cancelling/removing package A but before
+ *  assigning/creating package B) leaves the cell in a partially-applied
+ *  state — some packages changed, others not — rather than all-or-
+ *  nothing. Callers should treat a thrown error as "re-fetch and
+ *  re-check, then retry with the still-desired set," not "nothing
+ *  happened" — same guidance as template-groups.ts's callers, extended
+ *  here to cover partial application across several packages in one
+ *  call, not just a single package's multi-step write.
  *
- *  Re-setting a cell to the packageGroupId it ALREADY holds still runs
- *  the full cancel-then-reassign cycle rather than short-circuiting as a
- *  no-op — deliberate: it discards any in-progress pending occurrence and
- *  creates a fresh one, which may be desired (e.g. "give this manager a
- *  clean occurrence starting now") rather than a true no-op. */
+ *  Re-including a package id the cell ALREADY holds in the desired set
+ *  leaves it untouched (it's in both `currentIds` and `desiredIds`) —
+ *  unlike the old single-select version, re-setting an unchanged package
+ *  no longer discards and recreates its in-progress occurrence; this is
+ *  the direct consequence of true diffing rather than always
+ *  cancel-then-reassign. */
 export function setBranchPackageScheduleCell(
   email: string,
   input: SetBranchPackageScheduleCellInput,
@@ -248,33 +271,30 @@ export function setBranchPackageScheduleCell(
     const manager = await requireSingleBranchManager(body.branch);
     const prismaWeekday = WEEKDAY_TO_PRISMA[body.weekday];
 
-    const existingRow = await prisma.branchPackageSchedule.findUnique({
-      where: { branch_weekday: { branch: body.branch, weekday: prismaWeekday } },
+    const existingRows = await prisma.branchPackageSchedule.findMany({
+      where: { branch: body.branch, weekday: prismaWeekday },
     });
+    const currentIds = existingRows.map((r) => r.packageGroupId);
+    const desiredIds = [...new Set(body.packageGroupIds)];
 
-    if (existingRow) {
-      await cancelWeekdayAssignment(actor.id, existingRow.packageGroupId, manager.id, body.weekday);
+    const toRemove = currentIds.filter((id) => !desiredIds.includes(id));
+    const toAdd = desiredIds.filter((id) => !currentIds.includes(id));
+
+    for (const id of toRemove) {
+      await cancelWeekdayAssignment(actor.id, id, manager.id, body.weekday);
+      await prisma.branchPackageSchedule.delete({
+        where: {
+          branch_weekday_packageGroupId: { branch: body.branch, weekday: prismaWeekday, packageGroupId: id },
+        },
+      });
     }
 
-    if (body.packageGroupId === null) {
-      if (existingRow) {
-        await prisma.branchPackageSchedule.delete({ where: { id: existingRow.id } });
-      }
-      return { ok: true };
+    for (const id of toAdd) {
+      await assignWeekday(actor, id, manager.id, body.weekday);
+      await prisma.branchPackageSchedule.create({
+        data: { branch: body.branch, weekday: prismaWeekday, packageGroupId: id, createdById: actor.id },
+      });
     }
-
-    await assignWeekday(actor, body.packageGroupId, manager.id, body.weekday);
-
-    await prisma.branchPackageSchedule.upsert({
-      where: { branch_weekday: { branch: body.branch, weekday: prismaWeekday } },
-      create: {
-        branch: body.branch,
-        weekday: prismaWeekday,
-        packageGroupId: body.packageGroupId,
-        createdById: actor.id,
-      },
-      update: { packageGroupId: body.packageGroupId },
-    });
 
     return { ok: true };
   }, "setBranchPackageScheduleCell");
