@@ -82,6 +82,9 @@ export async function HomeScopedOverviewSection({
     /** The Proof column's upload (2026-07-30) — same personal-only wiring
      *  as the status actions. */
     uploadProof?: import("@/task-manager/ui/types").ProofUploadHandler;
+    /** The Proof gallery's per-photo remove (2026-08-08) — same
+     *  personal-only wiring as the status actions. */
+    removeProof?: import("@/task-manager/ui/types").ProofRemoveHandler;
   };
 }) {
   try {
@@ -175,6 +178,7 @@ export async function HomeScopedOverviewSection({
       onSkip: actions.skip,
       onReopen: actions.reopen,
       onUploadProof: actions.uploadProof,
+      onRemoveProof: actions.removeProof,
     };
 
     // Assigner-stream card ("HOD assigned tasks" for staff, "CEO assigned

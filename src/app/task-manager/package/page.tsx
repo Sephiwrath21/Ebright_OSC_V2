@@ -1,25 +1,33 @@
 // /task-manager/package — Package dashboard (2026-08-06): a second
 // instance of the Template Groups feature (see
-// task-manager/data/template-groups.ts), scoped to "PACKAGE". General
-// management (view/create/edit/delete) is open to the same assign-capable
-// allow-list as Template — NOT restricted to Branch Manager (revised
-// 2026-08-06; see template-groups.ts's file header for the two-tier
-// authorization split). Only actually assigning a package to staff, plus
-// View/Remove Assignees, stays Branch Manager only — enforced server-side
-// in template-groups.ts via requireGroupAssignAccess, surfaced here as an
-// inline error message from the relevant action closure, not a redirect.
-// Wiring mirrors /task-manager/template/page.tsx closely — same "use
-// server" action closures, same three-way SetupPendingError/
-// NoAccountError/generic-error card handling, same 403-redirect pattern on
-// the initial load — just bound to scope: "PACKAGE" throughout and
-// labeled "Package" in the UI. Unlike Template's page, this one has no
-// CEO-hideCadence concern (Branch Managers are never CEOs), so there's no
-// getMyRole call here.
+// task-manager/data/template-groups.ts), scoped to "PACKAGE". Wiring
+// mirrors /task-manager/template/page.tsx closely — same "use server"
+// action closures, same three-way SetupPendingError/NoAccountError/
+// generic-error card handling, same 403-redirect pattern on the initial
+// load — just bound to scope: "PACKAGE" throughout and labeled "Package"
+// in the UI.
+//
+// Access (2026-08-07 View/Edit tier split, see role-views.ts and
+// template-groups.ts's file header): the first fetch (listTemplateGroups,
+// via template-groups.ts's requireGroupViewAccess) IS the View-tier gate —
+// a genuine 403 there redirects to /task-manager. Package's View tier is
+// wider than Template's: Super Admin, elevated Operations/Optimisation
+// dept-site, HOD, CEO, AND Branch Manager. Of those, only Edit-tier roles
+// (Super Admin + elevated dept-site — canManageTaskTemplateGroups) get the
+// create/edit/delete/assign action buttons — Branch Manager is View-only
+// here now (revised 2026-08-07; previously Branch Manager alone could
+// assign/view-assignees). `canEdit`, computed below from getMyRole +
+// canManageTaskTemplateGroups (same pattern as template/page.tsx), is
+// passed to TemplateGroupDashboard to gate those buttons client-side as a
+// UI-layer defense-in-depth — the real enforcement is
+// template-groups.ts's requireGroupEditAccess on every mutating action
+// closure below.
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
+import { canManageTaskTemplateGroups } from "@/task-manager/role-views";
 import {
   applyTemplateGroup,
   createTemplateGroup,
@@ -28,6 +36,7 @@ import {
   getGroupAssignees,
   getGroupDeletionImpact,
   getFlowStaff,
+  getMyRole,
   getTemplateGroup,
   listTemplateGroups,
   removeGroupAssignee,
@@ -67,16 +76,19 @@ export default async function TaskManagerPackagePage() {
 
   let groups;
   let staff;
+  let role: { role: string; department: string | null };
   try {
-    const [groupsResult, staffResult] = await Promise.all([
+    const [groupsResult, staffResult, roleResult] = await Promise.all([
       listTemplateGroups(email, SCOPE),
       getFlowStaff(),
+      getMyRole(email),
     ]);
     groups = groupsResult;
     staff = staffResult.staff;
+    role = roleResult;
   } catch (err) {
-    // Genuine "not assign-capable" (403 from listTemplateGroups's
-    // requireGroupAccess) bounces to /task-manager — everything else
+    // Genuine "no View access" (403 from listTemplateGroups's
+    // requireGroupViewAccess) bounces to /task-manager — everything else
     // renders in place, same as /task-manager/template.
     if (err instanceof FlowBridgeError && err.status === 403) redirect("/task-manager");
     let card;
@@ -219,6 +231,7 @@ export default async function TaskManagerPackagePage() {
           <TemplateGroupDashboard
             staff={staff}
             label="Package"
+            canEdit={canManageTaskTemplateGroups(role)}
             control={{
               list: groups,
               load: loadGroup,

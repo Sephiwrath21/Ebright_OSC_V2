@@ -506,9 +506,10 @@ export interface TaskRow {
   assignerId: string;
   assignerName?: string | null;
   /** Assignee-uploaded completion evidence (2026-07-30, the "Proof"
-   *  column) — null until uploaded. The image itself is served by
+   *  column; multi-photo 2026-08-08) — empty array until any are uploaded,
+   *  oldest-first. Each image is served by
    *  /api/task-manager/proof-image/[id]. */
-  proofId: string | null;
+  proofIds: string[];
   /** Main Task ↔ Subtask link (2026-07-30) — the parent RunBlock's id, or
    *  null for a top-level task. Drives the My Tasks tree display. */
   parentId: string | null;
@@ -548,7 +549,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
       ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }
       : null,
     assignerId: b.run.startedById,
-    proofId: b.proof?.id ?? null,
+    proofIds: b.proofs.map((p) => p.id),
     parentId: b.parentId,
     subtaskOrder: b.subtaskOrder,
     quickCompletable: isQuickCompletable(b),
@@ -583,8 +584,9 @@ export interface PeriodBlock {
   /** Assigner-attached SOP reference (2026-07-30) — url/mime only, the
    *  image BYTES are never selected here (served by their own route). */
   guideline: { id: string; url: string | null; imageMime: string | null } | null;
-  /** Assignee-uploaded proof — id only, bytes served by their own route. */
-  proof: { id: string } | null;
+  /** Assignee-uploaded proofs (2026-08-08: multi-photo) — id only, oldest
+   *  first, bytes served by their own route. */
+  proofs: { id: string }[];
   /** Parent RunBlock id for subtasks, null for top-level tasks. */
   parentId: string | null;
   subtaskOrder: number | null;
@@ -672,7 +674,7 @@ export async function fetchPeriodBlocks(
       scheduleSlotId: true,
       cadence: true,
       guideline: { select: { id: true, url: true, imageMime: true } },
-      proof: { select: { id: true } },
+      proofs: { select: { id: true }, orderBy: { createdAt: "asc" } },
       parentId: true,
       subtaskOrder: true,
       runItems: { select: { required: true, type: true } },
