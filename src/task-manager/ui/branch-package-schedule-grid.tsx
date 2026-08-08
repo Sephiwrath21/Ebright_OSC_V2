@@ -58,6 +58,18 @@ function idSet(packages: BranchPackageOption[]): Set<string> {
   return new Set(packages.map((p) => p.id));
 }
 
+// Collapsed-state chip cap (both the editable cell and the read-only
+// StaticCell) — the schema allows up to 20 packages per cell
+// (setCellSchema's sanity cap in branch-package-schedule.ts), and an
+// unbounded `flex flex-wrap` chip row would wrap across several lines for a
+// heavily-loaded cell, inflating that table row's height past its
+// neighbors. Mirrors the "+N more" truncation pattern already used for
+// Package/Template cards' task-title previews (template-group-dashboard.tsx,
+// `previewTitles` / `+{taskCount - previewTitles.length} more`). Only
+// affects the collapsed summary — the dropdown popover itself (which has
+// its own `max-h-56 overflow-y-auto` scroll) always lists every package.
+const COLLAPSED_CHIP_LIMIT = 4;
+
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
   return <p className="mt-1 text-xs text-red-600">{error}</p>;
@@ -111,6 +123,13 @@ function MultiPackageCell({
   error: string | null;
   onToggle: (packageId: string) => void;
 }) {
+  // `open` is local to each cell instance — nothing coordinates across the
+  // grid's up-to-110 cells, so more than one cell's popover can be open at
+  // once (e.g. via keyboard Tab-and-Enter into a second cell without
+  // closing the first; a mouse user effectively can't, since clicking
+  // elsewhere is itself an outside-click that closes the first). Accepted
+  // as a low-impact gap rather than adding a single-open-dropdown
+  // coordinator to this component.
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -133,6 +152,8 @@ function MultiPackageCell({
   }, [open]);
 
   const selected = packages.filter((p) => selectedIds.has(p.id));
+  const visibleChips = selected.slice(0, COLLAPSED_CHIP_LIMIT);
+  const hiddenChipCount = selected.length - visibleChips.length;
 
   return (
     <div ref={containerRef} className="relative">
@@ -141,7 +162,7 @@ function MultiPackageCell({
           selected.length > 0 ? "bg-blue-50" : "bg-gray-50"
         } ${dirty ? "ring-2 ring-amber-400" : ""}`}
       >
-        {selected.map((p) => (
+        {visibleChips.map((p) => (
           <span
             key={p.id}
             className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-700"
@@ -159,6 +180,19 @@ function MultiPackageCell({
             )}
           </span>
         ))}
+        {hiddenChipCount > 0 && (
+          <span className="text-[11px] font-medium text-gray-400">+{hiddenChipCount} more</span>
+        )}
+        {/* Deliberately always clickable/visible, unlike MemberDropdown
+            (which short-circuits to plain text when its member list is
+            empty) — `packages` here is `data.packages`, the SAME org-wide
+            package list for all ~110 cells in the grid, so it is either
+            non-empty for every cell or empty for every cell at once; the
+            open-but-empty state below already renders "No packages
+            available." A trigger that's occasionally empty-for-one-cell
+            isn't a real scenario here the way it is for MemberDropdown's
+            per-cell-different member lists, so the extra short-circuit
+            wasn't worth the branching. */}
         <button
           type="button"
           disabled={disabled}
@@ -180,8 +214,9 @@ function MultiPackageCell({
                 <button
                   key={p.id}
                   type="button"
+                  disabled={disabled}
                   onClick={() => onToggle(p.id)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
                     isSelected ? "bg-blue-50 text-blue-700" : "text-gray-700"
                   }`}
                 >
@@ -215,9 +250,11 @@ function StaticCell({ cell }: { cell: BranchPackageScheduleCell }) {
   if (cell.packages.length === 0) {
     return <span className="text-xs text-gray-300">–</span>;
   }
+  const visible = cell.packages.slice(0, COLLAPSED_CHIP_LIMIT);
+  const hiddenCount = cell.packages.length - visible.length;
   return (
-    <div className="flex flex-wrap gap-1">
-      {cell.packages.map((p) => (
+    <div className="flex flex-wrap items-center gap-1">
+      {visible.map((p) => (
         <span
           key={p.id}
           className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
@@ -225,6 +262,7 @@ function StaticCell({ cell }: { cell: BranchPackageScheduleCell }) {
           {p.name}
         </span>
       ))}
+      {hiddenCount > 0 && <span className="text-xs text-gray-400">+{hiddenCount} more</span>}
     </div>
   );
 }
