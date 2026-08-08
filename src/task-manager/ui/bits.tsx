@@ -20,6 +20,7 @@ import type {
 import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
 import {
   compressImageFile,
+  drawTimestampWatermark,
   IMAGE_JPEG_QUALITY,
   IMAGE_MAX_DIMENSION,
   type CompressedImage,
@@ -626,6 +627,28 @@ function ErrorLine({ error }: { error: string | null }) {
   return <p className="mt-1 text-xs text-red-600">{error}</p>;
 }
 
+/** Shared device check (2026-08-09) — computed once and cached at module
+ *  scope, not per ProofCell instance (a page can render one per task row).
+ *  User-agent + touch-points based, NOT a viewport-width breakpoint: the
+ *  question is "does this device have a native camera/photo picker",
+ *  which a resized desktop window answers differently than a phone even
+ *  at the same pixel width. Reused for both the Proof upload layout
+ *  (drop-zone + two buttons on desktop vs one combined button on mobile)
+ *  and openCamera's own camera-vs-webcam-preview decision, so there's
+ *  exactly one definition of "mobile" for this feature, not two that
+ *  could drift apart. Must only be called client-side (never during SSR
+ *  render — `navigator` doesn't exist there); callers gate this behind a
+ *  useEffect or an event handler, never the render body directly. */
+let cachedIsMobileDevice: boolean | null = null;
+function isMobileDevice(): boolean {
+  if (cachedIsMobileDevice === null) {
+    cachedIsMobileDevice =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+  }
+  return cachedIsMobileDevice;
+}
+
 /** The "Proof" column cell (2026-07-30, multi-photo 2026-08-08, explicit
  *  Upload + completion lock 2026-08-09): assignee-uploaded completion
  *  evidence, up to MAX_PROOFS_PER_TASK photos per task, always optional
@@ -636,13 +659,23 @@ function ErrorLine({ error }: { error: string | null }) {
  *  them individually, without affecting the rest. Rows that are neither
  *  owned nor proven show a plain dash.
  *
- *  Every "add a photo" entry point — file picker, drag-drop, clipboard
- *  paste, the mobile camera-or-gallery picker, the desktop getUserMedia
- *  webcam — compresses and STAGES the result locally (2026-08-09: reverses
- *  the prior "upload immediately" decision) rather than sending it; nothing
- *  reaches the server until the "Upload N photos" button is clicked, which
- *  then sends every staged photo in one batch. Staged photos count toward
- *  the cap so the user can't stage past it before uploading.
+ *  Every "add a photo" entry point — file picker, drag-drop (desktop
+ *  only), clipboard paste (desktop only), the mobile camera-or-gallery
+ *  picker, the desktop getUserMedia webcam — compresses and STAGES the
+ *  result locally (2026-08-09: reverses the prior "upload immediately"
+ *  decision) rather than sending it; nothing reaches the server until the
+ *  "Upload N photos" button is clicked, which then sends every staged
+ *  photo in one batch. Staged photos count toward the cap so the user
+ *  can't stage past it before uploading.
+ *
+ *  Layout differs by device (2026-08-09, isMobileLayout/isMobileDevice()):
+ *  desktop keeps the drop-zone plus two buttons (Upload File vs. Take
+ *  Photo's live webcam preview — genuinely different flows); mobile drops
+ *  the drop-zone (not a mobile interaction) and collapses to ONE "Add
+ *  Photo" button, since Upload File and Take Photo now open the identical
+ *  native camera-or-gallery picker on mobile (no capture attribute, same
+ *  underlying input) — two buttons doing the same thing would just be
+ *  redundant.
  *
  *  Once `task.status === "DONE"` (Complete), both uploading and removing
  *  are locked — same mechanism as the existing past-due-day lock
@@ -680,15 +713,27 @@ function ProofCell({
 
   /** The "Proof Of Completion" panel (2026-07-30, gallery 2026-08-08): ONE
    *  surface showing every attached photo (thumbnails + remove) AND, while
-   *  under the cap, all 4 add methods — file picker, drag-and-drop,
-   *  clipboard paste, and camera capture. */
+   *  under the cap, the add controls — desktop gets all 4 (file picker,
+   *  drag-and-drop, clipboard paste, camera capture); mobile collapses to
+   *  one combined button (see isMobileLayout above). */
   const [panelOpen, setPanelOpen] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   /** Which photo (by id) is shown enlarged — see the doc comment above
    *  that modal for why this is a single-photo view, not a carousel. */
   const [enlargedId, setEnlargedId] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const cameraRef = React.useRef<HTMLInputElement>(null);
+
+  // Mobile gets a simplified add-photo layout (2026-08-09): no drop-zone
+  // (not a mobile interaction), one combined button instead of two (Upload
+  // File and Take Photo now open the identical native picker on mobile,
+  // so two buttons doing the same thing was redundant clutter). Starts
+  // false so the client's first hydration render matches the server's
+  // (navigator isn't available during SSR) — the effect flips it right
+  // after mount, same pattern as any other client-only device check.
+  const [isMobileLayout, setIsMobileLayout] = React.useState(false);
+  React.useEffect(() => {
+    setIsMobileLayout(isMobileDevice());
+  }, []);
 
   // Completion lock (2026-08-09): once Complete, the attached photos are
   // the frozen record — same treatment as the past-due-day lock below, just
@@ -708,8 +753,11 @@ function ProofCell({
   const addFile = async (file: File) => {
     if (!canAddMore) return;
     setError(null);
-    // Compress BEFORE staging — the full-res original never leaves the browser.
-    const result = await compressImageFile(file);
+    // Compress BEFORE staging — the full-res original never leaves the
+    // browser. watermark:true (2026-08-09) — this is Proof of Completion,
+    // not the shared guideline-attachment path; see compressImageFile's
+    // own doc comment for why the option isn't just always-on.
+    const result = await compressImageFile(file, { watermark: true });
     if (!result.ok) {
       setError(result.message);
       return;
@@ -800,16 +848,14 @@ function ProofCell({
     }
   }, [panelOpen]);
 
-  // ---- "Take Photo" (2026-07-30 fix; camera-forcing removed 2026-08-08) --
-  // capture="environment" only ever affected PHONES/TABLETS — desktop
-  // browsers already ignored it and showed the ordinary file dialog. It
-  // ALSO forced phones straight into the camera app, skipping the gallery;
-  // removed (2026-08-08) so mobile "Take Photo" now opens the SAME
-  // camera-or-gallery chooser "Upload file" already does. Desktop keeps its
-  // own in-panel webcam preview via getUserMedia (a genuinely different
-  // code path, untouched); anything without a usable camera falls back to
-  // the picker with a hint. getUserMedia needs a secure context (HTTPS or
-  // localhost).
+  // ---- "Take Photo" (2026-07-30 fix; camera-forcing removed 2026-08-08;
+  // mobile branch removed 2026-08-09) — desktop-only now. Mobile gets its
+  // own single combined "Add Photo" button below (isMobileLayout) that
+  // clicks inputRef directly; openCamera is only ever wired to the desktop
+  // "Take Photo" button, so it no longer needs its own mobile detection or
+  // a separate cameraRef input — it goes straight to the in-panel webcam
+  // preview via getUserMedia. getUserMedia needs a secure context (HTTPS
+  // or localhost).
   const [cameraOpen, setCameraOpen] = React.useState(false);
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -823,15 +869,6 @@ function ProofCell({
 
   const openCamera = async () => {
     setCameraError(null);
-    // Phones/tablets: the native picker beats an in-page preview.
-    // (iPadOS reports itself as "Mac" but has >1 touch point.)
-    const isMobile =
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
-    if (isMobile) {
-      cameraRef.current?.click();
-      return;
-    }
     // On failure: SHOW the reason and stay in the panel — auto-opening the
     // file picker here made it look like Take Photo "was" the picker (the
     // original reported bug); the Upload file button is right next to it.
@@ -863,7 +900,12 @@ function ProofCell({
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // watermark (2026-08-09) — same shared helper compressImageFile uses,
+    // this path is always Proof of Completion (the desktop webcam capture
+    // has no other caller), so it's unconditional here, no opt-in needed.
+    if (ctx) drawTimestampWatermark(ctx, canvas.width, canvas.height);
     stopCamera();
     // Stages (2026-08-09) like every other entry point — capturing the
     // frame is no longer itself the "send" action, Upload is.
@@ -922,32 +964,21 @@ function ProofCell({
 
   return (
     <span className="relative flex shrink-0 items-center justify-center">
+      {/* Single hidden input now (2026-08-09) — the separate cameraRef
+          input was only ever clicked from openCamera's old mobile branch,
+          which no longer exists (mobile's own "Add Photo" button below
+          clicks this same input directly; desktop's "Take Photo" goes to
+          the getUserMedia preview instead, never touches this input). No
+          capture attribute (removed 2026-08-08) — see openCamera's doc
+          comment for why omitting it matters. */}
       {canUpload && (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={onFile}
-          />
-          {/* Step 1 fix (2026-08-08): capture="environment" removed — see
-              openCamera's doc comment above for why. accept narrowed to
-              match inputRef exactly (2026-08-09): some Android/Chrome
-              versions are reported to be more likely to default straight
-              to the camera app for the broader "image/*" than for an
-              explicit MIME list — low-confidence try, not a guaranteed
-              fix, since which UI Android shows for a bare file input is
-              ultimately an OS/browser heuristic outside this attribute's
-              control. */}
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={onFile}
-          />
-        </>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onFile}
+        />
       )}
       {proofIds.length > 0 ? (
         <button
@@ -1145,7 +1176,25 @@ function ProofCell({
                 {MAX_PROOFS_PER_TASK}/{MAX_PROOFS_PER_TASK} photos attached or staged — remove one to
                 add another.
               </p>
+            ) : canUpload && isMobileLayout ? (
+              // Mobile (2026-08-09): no drop-zone (not a mobile interaction
+              // pattern) and one combined button, not two — Upload File and
+              // Take Photo now open the identical native picker on mobile
+              // (same input, no capture attribute), so a second button
+              // doing the same thing would just be redundant clutter.
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+              >
+                ➕ Add Photo
+              </button>
             ) : canUpload ? (
+              // Desktop: drop-zone/paste (real interaction patterns here)
+              // plus two genuinely different buttons — Upload File opens a
+              // plain file dialog, Take Photo opens the in-panel getUserMedia
+              // webcam preview (openCamera), nothing else reaches that.
               <>
                 <div
                   onDragOver={(e) => {
