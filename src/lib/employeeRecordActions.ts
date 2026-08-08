@@ -2050,15 +2050,21 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
 
 // ─── Pre stage's "Proceed" button — the only stage-transition button that's
 // actually wired to a real employment update (the rest stay the pre-existing
-// "not wired up" placeholder). Full-time positions go to Probation
-// (probation=true); everything else (Part Time/Intern) goes to Onboarding
-// (status="onboarding") — same 2-way split positionGroup() already uses.
+// "not wired up" placeholder). Full Time's only path to Active is Probation
+// confirmation (see decideProbationOutcome/proceedFromProbation) — this
+// button must not bypass that, same rule proceedFromOnboarding already
+// enforces below (see its own comment) — must not let this button send a
+// Full-Time person straight to Active with no real board_stage-driven
+// Probation membership to back it up (see conversation: exactly this
+// produced a stuck, unreachable "Active" record for a Full-Time test
+// account with no career_applications match at all). Only Part Time/
+// Intern/Protege Intern proceed via this button, straight to Onboarding.
 // Also clears employment.start_date forward to today when it's still in the
-// future: Pre-stage membership is checked ahead of status/probation
-// (start_date in the future always wins), so without this the employee would
-// stay stuck in Pre no matter what status/probation gets set to here — this
-// button is an explicit "they're proceeding right now" override, not
-// something that waits for the originally-planned date to actually arrive. ───
+// future: Pre-stage membership is checked ahead of status (start_date in
+// the future always wins), so without this the employee would stay stuck
+// in Pre no matter what status gets set here — this button is an explicit
+// "they're proceeding right now" override, not something that waits for
+// the originally-planned date to actually arrive. ───
 
 export async function proceedFromPreStage(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2072,7 +2078,10 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
 
-    const isFullTime = positionGroup(employment.position) === "Full Time";
+    if (positionGroup(employment.position) === "Full Time") {
+      return { ok: false, error: "Full Time employees move to Active via Probation confirmation, not this button." };
+    }
+
     const todayIso = new Date().toISOString().slice(0, 10);
     const startIso = employment.start_date ? employment.start_date.toISOString().slice(0, 10) : null;
     const needsStartDateBump = !startIso || startIso > todayIso;
@@ -2081,8 +2090,8 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
       where: { employment_id: employment.employment_id },
       data: {
         ...(needsStartDateBump ? { start_date: new Date(`${todayIso}T00:00:00Z`) } : {}),
-        status: isFullTime ? "active" : "onboarding",
-        probation: isFullTime,
+        status: "onboarding",
+        probation: false,
       },
     });
 
