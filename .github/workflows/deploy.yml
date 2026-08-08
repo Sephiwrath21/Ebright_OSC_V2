@@ -122,13 +122,21 @@ jobs:
             # keys above, but guarded: only rewrite when the GitHub secret is
             # actually defined, so a manually-added value in the server's .env
             # survives until the secrets are configured.
-            if [ -n "${{ secrets.CRM_DATABASE_URL }}" ]; then
+            # The values are passed through tr -d '\r\n' because a secret
+            # pasted with a trailing newline writes a bare '"' line into .env,
+            # which breaks docker compose's env_file parser ("unexpected
+            # character '\"' in variable name"). Also heal any such orphan
+            # quote line an earlier deploy already left behind.
+            sed -i '/^"$/d' .env || true
+            CRM_URL="$(printf '%s' "${{ secrets.CRM_DATABASE_URL }}" | tr -d '\r\n')"
+            if [ -n "$CRM_URL" ]; then
               sed -i '/^CRM_DATABASE_URL=/d' .env || true
-              printf '%s\n' 'CRM_DATABASE_URL="${{ secrets.CRM_DATABASE_URL }}"' >> .env
+              printf 'CRM_DATABASE_URL="%s"\n' "$CRM_URL" >> .env
             fi
-            if [ -n "${{ secrets.BETTER_AUTH_SECRET }}" ]; then
+            BA_SECRET="$(printf '%s' "${{ secrets.BETTER_AUTH_SECRET }}" | tr -d '\r\n')"
+            if [ -n "$BA_SECRET" ]; then
               sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
-              printf '%s\n' 'BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}"' >> .env
+              printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
             fi
 
             # Build new image, force recreate so env_file changes apply.
