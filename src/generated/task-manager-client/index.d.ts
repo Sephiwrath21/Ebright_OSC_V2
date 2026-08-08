@@ -125,17 +125,32 @@ export type BranchPackageSchedule = $Result.DefaultSelection<Prisma.$BranchPacka
 export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
 /**
  * Model Proof
- * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
+ * Assignee-uploaded completion evidence for a RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
- * proof never gates completion. Re-uploading replaces the row (upsert on
- * runBlockId); deleting the block cascades the proof away. Images live in
- * Google Drive (2026-08-04 storage decision — high upload volume made
- * in-DB bytes impractical) — driveFileId is the sole reference for every
- * upload; served via /api/task-manager/proof-image/[id] (session-gated),
- * which proxies from Drive. The original in-DB-bytes columns
- * (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
- * (pre-dating the Drive cutover, all test data) were deleted — every
- * surviving/future row goes through Drive.
+ * proof never gates completion. One-to-many as of 2026-08-08 — up to 5
+ * rows per RunBlock (app-enforced cap, not a DB constraint; runBlockId is
+ * deliberately NOT unique, see @@index below). Each upload APPENDS a new
+ * row rather than replacing one; removing a single photo is a separate
+ * explicit action that deletes just that row and trashes just that row's
+ * Drive file. Deleting the block cascades all of its proof rows away.
+ * Images live in Google Drive (2026-08-04 storage decision — high upload
+ * volume made in-DB bytes impractical) — driveFileId is the sole
+ * reference for every upload; served via
+ * /api/task-manager/proof-image/[id] (session-gated), which proxies from
+ * Drive and needs no changes for the multi-row shape since it's already
+ * keyed on this model's own id, not runBlockId. The original in-DB-bytes
+ * columns (imageMime/imageData) were dropped 2026-08-04 after their only
+ * 7 rows (pre-dating the Drive cutover, all test data) were deleted —
+ * every surviving/future row goes through Drive.
+ * 
+ * NOTE for readers auditing this commit in isolation: the schema/relation
+ * change here (runBlockId losing @unique, RunBlock.proof -> proofs) is
+ * step 1 of 3 on this feature branch. The application code that reads/
+ * writes this relation (src/task-manager/data/tasks.ts's upload path,
+ * src/task-manager/analytics/_lib.ts's query + DTO shape, and the UI)
+ * still assumes the old 1:1 shape as of this commit and does not yet
+ * compile clean — that's intentional, fixed by the next two commits on
+ * this same branch, not an accidental break.
  */
 export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
 /**
