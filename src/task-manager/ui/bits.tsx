@@ -20,6 +20,7 @@ import type {
 import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
 import {
   compressImageFile,
+  drawTimestampWatermark,
   IMAGE_JPEG_QUALITY,
   IMAGE_MAX_DIMENSION,
   type CompressedImage,
@@ -752,8 +753,11 @@ function ProofCell({
   const addFile = async (file: File) => {
     if (!canAddMore) return;
     setError(null);
-    // Compress BEFORE staging — the full-res original never leaves the browser.
-    const result = await compressImageFile(file);
+    // Compress BEFORE staging — the full-res original never leaves the
+    // browser. watermark:true (2026-08-09) — this is Proof of Completion,
+    // not the shared guideline-attachment path; see compressImageFile's
+    // own doc comment for why the option isn't just always-on.
+    const result = await compressImageFile(file, { watermark: true });
     if (!result.ok) {
       setError(result.message);
       return;
@@ -896,7 +900,12 @@ function ProofCell({
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // watermark (2026-08-09) — same shared helper compressImageFile uses,
+    // this path is always Proof of Completion (the desktop webcam capture
+    // has no other caller), so it's unconditional here, no opt-in needed.
+    if (ctx) drawTimestampWatermark(ctx, canvas.width, canvas.height);
     stopCamera();
     // Stages (2026-08-09) like every other entry point — capturing the
     // frame is no longer itself the "send" action, Upload is.
