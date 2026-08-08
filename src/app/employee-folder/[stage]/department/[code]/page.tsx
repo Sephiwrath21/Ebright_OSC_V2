@@ -13,7 +13,12 @@ import {
   listLastWorkingDatesByUserId,
   UNASSIGNED_LOCATION_CODE,
 } from "@/lib/employeeQueries";
-import { enrichRowsWithBranchStaffLocation, computeOnboardingDualListedRows } from "@/lib/careerApplicationSync";
+import {
+  enrichRowsWithBranchStaffLocation,
+  computeRealAccountLifecycleOverrides,
+  computePreStartDatePassedRows,
+  lookupCareerApplicationsByName,
+} from "@/lib/careerApplicationSync";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +40,12 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
   if (!scope) redirect("/login");
   if (!scope.fullAccess && scope.departmentCode !== code) notFound();
 
-  const [rowsBase, branches, departments] = await Promise.all([listEmployeeOverviewRows(), listBranches(), listDepartments()]);
+  const [rowsBaseRaw, branches, departments, careerApplications] = await Promise.all([
+    listEmployeeOverviewRows(),
+    listBranches(),
+    listDepartments(),
+    lookupCareerApplicationsByName(),
+  ]);
   // Onboarding has no Unassigned bucket (see summarizeStageByDepartment) —
   // direct URL access to it 404s like any other nonexistent department code.
   const department =
@@ -44,11 +54,28 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
       : departments.find((d) => d.code === code);
   if (!department) notFound();
 
-  // Same dual-listing as the summary page above it (see
-  // computeOnboardingDualListedRows).
+  // Same real-account Probation/Onboarding/Active membership as Employee
+  // Overview and this stage's own summary page (see
+  // computeRealAccountLifecycleOverrides's own comment) — this namelist is
+  // the leaf a summary card's count links through to, so it has to resolve
+  // every row's stage identically, or the two disagree (see conversation:
+  // this page used to run the old, pre-redesign computeOnboardingDualListedRows
+  // independently of the summary page's overrides, producing duplicate rows
+  // for anyone dual-listed on Probation+Onboarding).
+  const overrides = await computeRealAccountLifecycleOverrides(rowsBaseRaw, careerApplications);
+  const rowsBase = rowsBaseRaw.map((r) => {
+    const o = overrides.get(r.id);
+    return o ? { ...r, stage: o.stage } : r;
+  });
   const rowsRaw =
     stage === "onboarding"
-      ? [...rowsBase, ...(await computeOnboardingDualListedRows(rowsBase)).map((r) => ({ ...r, stage: "onboarding" as const }))]
+      ? [
+          ...rowsBase,
+          ...rowsBaseRaw
+            .filter((r) => overrides.get(r.id)?.extraStages?.includes("onboarding"))
+            .map((r) => ({ ...r, stage: "onboarding" as const })),
+          ...(await computePreStartDatePassedRows()),
+        ]
       : rowsBase;
   // Same live BranchStaff fallback as the summary page above it — must be
   // applied here too, not just there, or someone whose grouping the summary
