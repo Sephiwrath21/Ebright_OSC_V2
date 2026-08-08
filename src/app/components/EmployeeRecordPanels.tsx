@@ -448,7 +448,7 @@ function PerformanceReviewAttachmentField({
       ) : existingFileId ? (
         <RealAttachmentLink fileId={existingFileId} />
       ) : (
-        <span className="text-sm italic text-slate-400">Not provided</span>
+        <span className="text-sm italic text-slate-400">-</span>
       )}
     </div>
   );

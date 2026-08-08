@@ -812,7 +812,7 @@ function resolvePanel({
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
-  // same populated data instead of a placeholder "Not provided".
+  // same populated data instead of a placeholder "-".
   if (section.key === "personal-info" && employeeDetail) {
     return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter />;
   }

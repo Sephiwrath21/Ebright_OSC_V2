@@ -15,13 +15,9 @@ import {
   enrichRowsWithBranchStaffLocation,
   computePreStageRows,
   computePreStartDatePassedRows,
-  matchIsProbationPipeline,
-  matchBelongsOnOnboardingList,
-  excludeOverrideRejectedRows,
-  computeActivePipelineProbationPassedIds,
-  normalizeName,
+  computeRealAccountLifecycleOverrides,
 } from "@/lib/careerApplicationSync";
-import { computeAutoConfirmedProbationIds, computeProbationReminderCandidates } from "@/lib/probationDecision";
+import { computeProbationReminderCandidates } from "@/lib/probationDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -55,17 +51,17 @@ export default async function EmployeeFolderPage() {
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
   const enrichedRowsAll = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
 
-  // A real Probation-stage row whose manual flag (employment.probation=true,
-  // set by someone clicking "Proceed") the recruitment pipeline actively
-  // contradicts — neither career_applications.board_stage nor
-  // rec_recruit/rec_stage.name says "Probation" — isn't really Probation at
-  // all, per explicit decision (see conversation): removed entirely from
-  // this page, not shown under any stage (not even Active), not counted
-  // toward any card. Same lookup used below for the OR-rule adds, needed
-  // here first since this exclusion has to apply before anything else
-  // (Pre-correction, the OR-rule counts, dual-listing) ever sees these rows.
+  // The old "manual probation flag vs. recruitment pipeline contradiction"
+  // exclusion (excludeOverrideRejectedRows) no longer applies — Probation/
+  // Onboarding/Active membership for real accounts is now decided by
+  // computeRealAccountLifecycleOverrides (start_date + position + Probation
+  // Confirm/day-count), not by career_applications board_stage/rec_stage at
+  // all, so there's nothing left for that contradiction check to catch.
+  // careerApplications is still fetched here — computeRealAccountLifecycle
+  // Overrides' Confirm check (via isEffectivelyConfirmed) still reads
+  // status2, and the Probation reminder card further down still needs it.
   const careerApplications = await lookupCareerApplicationsByName();
-  const enrichedRows = excludeOverrideRejectedRows(enrichedRowsAll, careerApplications);
+  const enrichedRows = enrichedRowsAll;
 
   // Correct Pre-stage membership to match computePreStageRows() — the same
   // definition the dedicated Pre list and its own summary card use — per
@@ -95,71 +91,34 @@ export default async function EmployeeFolderPage() {
   const correctedPreCandidates = scope
     ? filterRowsByScope(scope, correctedPreRows.filter((r) => r.isCandidate))
     : [];
+  // Candidate-only rows whose start_date has passed (see
+  // computePreStartDatePassedRows) — same treatment as correctedPreCandidates
+  // above, just landing on Onboarding (+ Probation extraStages for Full
+  // Time) instead of Pre.
+  const passedPreCandidates = scope
+    ? filterRowsByScope(scope, prePassedRows.filter((r) => r.isCandidate))
+    : [];
   const correctedPreById = new Map(correctedPreRows.filter((r) => !r.isCandidate).map((r) => [r.id, r]));
   const prePassedById = new Map(prePassedRows.map((r) => [r.id, r]));
 
-  // Probation's card count must match what its own list page shows —
-  // Probation's membership rule is an OR across career_applications.
-  // board_stage and rec_recruit/rec_stage.name (see matchIsProbationPipeline),
-  // which ADDS non-Probation-stage rows (the override-exclusion REMOVAL is
-  // already applied above, before enrichedRows even reaches here); Onboarding's
-  // dual-listing ADDS real Probation-stage Full-Time rows and real Active-
-  // stage Full-Time rows the same pipeline check flags Probation
-  // (matchBelongsOnOnboardingList) — see [stage]/page.tsx for the full
-  // rationale on both. Same lookup, same rules, computed once here over
-  // enrichedRows (the full, pre-Pre-correction population) — deliberately
-  // NOT the Pre-corrected `rows` below, since this OR-rule is its own
-  // independent mechanism unaffected by the separate Pre correction — and
-  // recorded per-row so the "Employee Records" table can show these
-  // memberships too: per explicit decision (see conversation), anyone
-  // counted on a card must also appear in the table, and since Probation and
-  // Onboarding can genuinely both be true for the same person at once
-  // (neither is "more real" than the other), that's a SINGLE row with both
-  // badges shown together (extraStages), never two separate rows for the
-  // same id.
-  // A real Active-stage row whose pipeline ALSO reads Probation (e.g. Ayu
-  // Novitasari — employment.status="active", board_stage="Probation") is
-  // resolved by the row's own employment.start_date — see
-  // computeActivePipelineProbationPassedIds's own comment for the full
-  // rationale and why this has to be a shared function, not just logic
-  // local to this page (the dedicated Probation/Onboarding/Active pages
-  // need the exact same disambiguation for the exact same population).
-  const activePipelineProbationPassedIds = await computeActivePipelineProbationPassedIds(enrichedRows, careerApplications);
+  // Real-account Probation/Onboarding/Active membership — see
+  // computeRealAccountLifecycleOverrides's own comment in
+  // careerApplicationSync.ts. Candidate-only rows (passedPreCandidates) are
+  // untouched by this, unrelated feature — counted separately below.
+  const overrides = await computeRealAccountLifecycleOverrides(enrichedRows, careerApplications);
 
-  // Probation's own Confirm outcome (see probationDecision.ts), live —
-  // per explicit decision (see conversation): a Full-Time person whose
-  // career_applications.status2 already reads "Accept" is effectively
-  // confirmed even before HR clicks anything (HR's own Confirmed decision
-  // already flips employment.status directly via decideProbationOutcome,
-  // so a row reaching this live check with no local decision is exactly
-  // the "status2 says Accept, nobody's acted on it yet" case). Computed
-  // over the same Probation-badged candidate population the extras loop
-  // below builds (real stage="probation" OR pipeline-matched) — anyone in
-  // this set skips Probation/Onboarding entirely and shows as Active
-  // instead, same as activePipelineProbationPassedIds' own pattern.
-  const probationBadgedCandidates = enrichedRows.filter(
-    (r) => r.stage === "probation" || matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))),
-  );
-  const autoConfirmedProbationIds = await computeAutoConfirmedProbationIds(probationBadgedCandidates, careerApplications);
-
-  const probationOnboardingExtrasById = new Map<number, ("probation" | "onboarding")[]>();
   let probationCount = 0;
   let onboardingDualListedCount = 0;
-  for (const row of enrichedRows) {
-    if (activePipelineProbationPassedIds.has(row.id) || autoConfirmedProbationIds.has(row.id)) continue;
-    const match = careerApplications.get(normalizeName(row.fullName));
-    const extras: ("probation" | "onboarding")[] = [];
-    if (row.stage === "probation") {
-      probationCount += 1;
-    } else if (matchIsProbationPipeline(match)) {
-      probationCount += 1;
-      extras.push("probation");
-    }
-    if (matchBelongsOnOnboardingList(row, match)) {
-      onboardingDualListedCount += 1;
-      extras.push("onboarding");
-    }
-    if (extras.length > 0) probationOnboardingExtrasById.set(row.id, extras);
+  for (const o of overrides.values()) {
+    if (o.stage === "probation") probationCount += 1;
+    if (o.extraStages?.includes("onboarding")) onboardingDualListedCount += 1;
+  }
+  // Candidate-only rows whose start_date has passed and resolve Full Time
+  // (see passedPreCandidates above) count toward Probation too — they never
+  // pass through overrides above since they have no real users/employment
+  // row to be in enrichedRows with.
+  for (const c of passedPreCandidates) {
+    if (c.extraStages?.includes("probation")) probationCount += 1;
   }
 
   const rows = enrichedRows
@@ -179,24 +138,16 @@ export default async function EmployeeFolderPage() {
         : passed
           ? { ...r, stage: passed.stage, date: passed.date }
           : r;
-      // Probation's own Confirm outcome (see autoConfirmedProbationIds
-      // above) — genuinely Active now, whatever their raw stage says (a
-      // real raw "probation" row whose employment.status hasn't been
-      // written yet, or an OR-rule Probation-pipeline match whose raw
-      // stage was never "probation" to begin with either way).
-      if (autoConfirmedProbationIds.has(r.id)) return { ...base, stage: "active" as const };
-      const extras = probationOnboardingExtrasById.get(r.id);
-      if (!extras) return base;
-      // Real Active-stage + pipeline-Probation, start date not passed (see
-      // activePipelineProbationPassedIds above): genuinely Probation +
-      // Onboarding, not Active — flip the primary badge away from Active
-      // instead of showing all three together.
-      if (base.stage === "active" && extras.includes("probation") && extras.includes("onboarding")) {
-        return { ...base, stage: "probation" as const, extraStages: ["onboarding"] as ("probation" | "onboarding")[] };
-      }
-      return { ...base, extraStages: extras };
+      // Real-account Probation/Onboarding/Active override (see
+      // computeRealAccountLifecycleOverrides) — genuinely Active now,
+      // Probation+Onboarding dual-listed, or Onboarding-only, whatever the
+      // raw base stage said.
+      const override = overrides.get(r.id);
+      if (!override) return base;
+      return { ...base, stage: override.stage, extraStages: override.extraStages };
     })
-    .concat(correctedPreCandidates);
+    .concat(correctedPreCandidates)
+    .concat(passedPreCandidates);
 
   const counts = countEmployeeStages(rows);
   // `rows` above already includes the scope-filtered candidates, so this
@@ -211,8 +162,9 @@ export default async function EmployeeFolderPage() {
 
   // Red dot on the Probation card — same reminder rule as the notification
   // bell (see probationDecision.ts's computeProbationReminderCandidates),
-  // reusing the same probationBadgedCandidates population already built
-  // above rather than re-deriving it.
+  // fed by the same real-account Probation population computeRealAccount
+  // LifecycleOverrides above just resolved (Full Time, not yet Confirmed).
+  const probationBadgedCandidates = enrichedRows.filter((r) => overrides.get(r.id)?.stage === "probation");
   const probationReminders = await computeProbationReminderCandidates(probationBadgedCandidates, careerApplications);
 
   const userEmail = session.user.email;

@@ -90,7 +90,7 @@ import {
 // cross-cutting Employee Record page: bold section title (rendered by
 // EditableSection's own Edit/Save button, top-right), optional bold
 // subsection headers, and fields laid out label-above/value-below — italic
-// gray "Not provided" when empty, plain dark text when filled, swapping to an
+// gray "-" when empty, plain dark text when filled, swapping to an
 // underlined input only while editing. Record-table/checklist content (MC/
 // Leave, Achievement's own history, Exit's clearance checklists, etc.) is
 // left alone — those are genuinely lists, not single-value fields, so this
@@ -137,7 +137,7 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
   return (
     <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
       <span className={labelClass}>{label}</span>
-      {value ? <span className={valueClass}>{value}</span> : <span className={emptyClass}>Not provided</span>}
+      {value ? <span className={valueClass}>{value}</span> : <span className={emptyClass}>-</span>}
     </div>
   );
 }
@@ -179,7 +179,7 @@ function EditableField({
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -254,7 +254,7 @@ function PhoneField({
       ) : value ? (
         <span className={valueClass}>{composePhoneValue(parsed.countryCode, parsed.digits)}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -294,7 +294,7 @@ function EmailField({
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -330,7 +330,7 @@ function EditableSelectField({
       ) : value ? (
         <span className={valueClass}>{displayLabel}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -383,7 +383,7 @@ function SelectWithOtherField({
         ) : displayText ? (
           <span className={valueClass}>{displayText}</span>
         ) : (
-          <span className={emptyClass}>Not provided</span>
+          <span className={emptyClass}>-</span>
         )}
       </div>
       {editing && isOther && (
@@ -421,7 +421,7 @@ function EditableTextArea({
       ) : value ? (
         <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -444,7 +444,7 @@ function PlaceholderField({ label, type = "text", full = false }: { label: strin
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -468,7 +468,7 @@ function PlaceholderSelectField({ label, options, full = false }: { label: strin
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -490,7 +490,7 @@ function PlaceholderTextArea({ label, full = true }: { label: string; full?: boo
       ) : value ? (
         <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -544,7 +544,7 @@ export function FilePickerControl({
     );
   }
 
-  if (!editing) return <span className={emptyClass}>Not provided</span>;
+  if (!editing) return <span className={emptyClass}>-</span>;
 
   return (
     <label className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] bg-[#f7f9fc] px-4 py-2 text-sm text-[#6b7280] cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd]">
@@ -667,7 +667,7 @@ export function RealFileField({
           Click to upload
         </label>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -867,7 +867,7 @@ function StaticField({ label, value, full = false }: { label: string; value: str
   return (
     <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
       <span className={labelClass}>{label}</span>
-      {value ? <span className={`${valueClass} whitespace-pre-wrap`}>{value}</span> : <span className={emptyClass}>Not provided</span>}
+      {value ? <span className={`${valueClass} whitespace-pre-wrap`}>{value}</span> : <span className={emptyClass}>-</span>}
     </div>
   );
 }
@@ -1777,7 +1777,7 @@ function SalaryRevisionAttachmentField({
       ) : existingFileId ? (
         <RealAttachmentLink fileId={existingFileId} />
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );

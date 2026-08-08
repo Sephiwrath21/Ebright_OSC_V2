@@ -311,13 +311,26 @@ function stageForRow(
   return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false, emp?.position ?? null);
 }
 
+// Pre-existing test/seed accounts (test-ceo@ebright.my and siblings) — no
+// employment record, never real people, confirmed via investigation (see
+// conversation). Kept in the database untouched per explicit decision; just
+// excluded from every Employee Overview/Folder view so they stop showing up
+// under Active > Unassigned. Exact id list, not an email-pattern match — a
+// future test-*@ebright.my account should still show up unless added here.
+const HIDDEN_TEST_USER_IDS = new Set([305, 306, 308, 324]);
+
 export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
   // One combined population: every staff-role user (any status) plus every
   // still-pending user regardless of role — status alone no longer decides
   // Pre membership (see stageForRow), so both groups have to be considered
   // together rather than as two disjoint queries.
   const users = await prisma.users.findMany({
-    where: { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
+    where: {
+      AND: [
+        { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
+        { user_id: { notIn: Array.from(HIDDEN_TEST_USER_IDS) } },
+      ],
+    },
     include: {
       user_profile: true,
       employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
@@ -1127,7 +1140,16 @@ export function summarizeStageByBranch(
     });
   if (stage === "onboarding") return byBranch;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
-  return [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
+  // Only shown when non-empty — an "Unassigned: 0" row is dead weight, and
+  // per explicit decision (see conversation, the 4 test accounts that used
+  // to populate this under Active) this bucket should disappear once
+  // nobody's actually in it, not linger as a permanent empty category. Still
+  // reappears automatically if a real employee genuinely ends up with
+  // neither a branch nor a department — that's a real data problem worth
+  // surfacing, not something to hide unconditionally.
+  return unassignedCount > 0
+    ? [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }]
+    : byBranch;
 }
 
 export function summarizeStageByDepartment(
@@ -1142,7 +1164,10 @@ export function summarizeStageByDepartment(
   });
   if (stage === "onboarding") return byDept;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
-  return [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
+  // Same "only show when non-empty" rule as summarizeStageByBranch above.
+  return unassignedCount > 0
+    ? [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }]
+    : byDept;
 }
 
 export function filterStageByLocation(
@@ -1289,7 +1314,7 @@ export interface InterviewAssessmentInfo {
 // feedback1 (then feedback2) when there's no real hiring_note on file yet —
 // applies even when there's no interview_assessment row at all, which is the
 // normal case for a freshly career_applications-synced Pre employee (every
-// other field here still shows "Not provided" via the UI's own null
+// other field here still shows "-" via the UI's own null
 // handling; only hiringNote gets this fallback). `fullName` is optional so
 // existing callers that don't have it handy keep working with no fallback.
 export async function getInterviewAssessment(userId: number, fullName?: string): Promise<InterviewAssessmentInfo | null> {

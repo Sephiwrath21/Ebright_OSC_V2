@@ -2194,13 +2194,15 @@ export async function proceedFromProbation(userId: number): Promise<ActionResult
   }
 }
 
-// ─── Onboarding stage's "Next" button — real employment update, no
-// prerequisite gate (unlike Probation's Confirmed-status requirement, nothing
-// was specified for Onboarding->Active, so the button stays always-enabled).
-// nonExitStage() checks status==="onboarding" before the probation flag, so
-// once status flips to "active" this employee is Active regardless of
-// probation — cleared here too for data cleanliness now that it no longer
-// applies, same as Probation's own transition. ───
+// ─── Onboarding stage's "Next" button — real employment update. Part Time/
+// Intern only (per explicit decision, see conversation) — this is their
+// manual early-advance out of the 3-fixed-day Onboarding window (see
+// computeRealAccountLifecycleOverrides); Full Time is gated out below since
+// their only path to Active is Probation confirmation. nonExitStage() checks
+// status==="onboarding" before the probation flag, so once status flips to
+// "active" this employee is Active regardless of probation — cleared here
+// too for data cleanliness now that it no longer applies, same as
+// Probation's own transition. ───
 
 export async function proceedFromOnboarding(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2213,6 +2215,13 @@ export async function proceedFromOnboarding(userId: number): Promise<ActionResul
       orderBy: { start_date: "desc" },
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
+    // Full Time's only path to Active is Probation confirmation (see
+    // decideProbationOutcome/proceedFromProbation) — must not let this
+    // button bypass that, now that Full Time rows are also dual-listed onto
+    // this same Onboarding view (see computeRealAccountLifecycleOverrides).
+    if (positionGroup(employment.position) === "Full Time") {
+      return { ok: false, error: "Full Time employees move to Active via Probation confirmation, not this button." };
+    }
 
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },

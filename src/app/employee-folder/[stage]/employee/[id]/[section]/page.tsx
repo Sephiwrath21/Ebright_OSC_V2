@@ -29,7 +29,7 @@ import {
   listBranches,
   listDepartments,
 } from "@/lib/employeeQueries";
-import { isEligibleForOnboardingDualListing, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
+import { getRealAccountLifecycleOverride, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 
@@ -70,7 +70,7 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     // content, unaffected by this.
     const isDualListedOnboardingView =
       stage === "onboarding" &&
-      ((await isEligibleForOnboardingDualListing(employee)) ||
+      ((await getRealAccountLifecycleOverride(employee))?.extraStages?.includes("onboarding") ||
         (await computePreStartDatePassedRows()).some((r) => r.id === employee.id));
     if (!isDualListedOnboardingView) notFound();
   }

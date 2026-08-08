@@ -397,6 +397,107 @@ export async function isEligibleForOnboardingDualListing(row: {
   return matchBelongsOnOnboardingList(row, map.get(normalizeName(row.fullName)));
 }
 
+export interface RealAccountLifecycleOverride {
+  stage: "probation" | "onboarding" | "active";
+  extraStages?: EmployeeStage[];
+}
+
+// Real-account Probation/Onboarding/Active membership, per explicit
+// decision (see conversation) — REPLACES matchIsProbationPipeline/
+// matchBelongsOnOnboardingList/computeActivePipelineProbationPassedIds's
+// role in deciding this for real accounts. career_applications board_stage/
+// rec_stage is no longer consulted for stage MEMBERSHIP (status2 is still
+// read, via isEffectivelyConfirmed/computeAutoConfirmedProbationIds, but
+// that's the Probation Confirm/Extend/Stop feature's own signal, not a
+// membership rule). Scope: real accounts only — a candidate with no real
+// users/employment row yet is untouched regardless of how far past their
+// onboarding_candidate.start_date is (see conversation: out of scope until
+// the existing induction/conversion flow gives them a real account).
+//
+// Only ever overrides rows whose base computed stage (stageForRow, see
+// employeeQueries.ts) is already "onboarding", "probation", or "active" —
+// Pre and Exit are untouched, already correctly resolved elsewhere
+// (computePreStageRows/computePreStartDatePassedRows for Pre, the base
+// stage computation's own end_date check for Exit).
+//
+// Full Time: Probation+Onboarding dual-stage until Probation Confirm
+// (isEffectivelyConfirmed, reused as-is from probationDecision.ts) — no day
+// count. Deliberately checked even when employment.status already reads
+// "active" (a Full-Time row can be raw-"active" without ever having been
+// Confirmed, e.g. status set prematurely) — same disambiguation Ayu
+// Novitasari's earlier fix needed, now driven by Confirm instead of
+// probation end date; must still display Probation+Onboarding until
+// Confirm, never silently trust a stray "active" for this position group.
+//
+// Part Time/Intern/Protege Intern: Onboarding only, no Probation. No
+// Confirm concept applies, so a real employment.status of "active" IS
+// trusted directly (covers the manual "Next" early-advance click). Otherwise
+// 3 FIXED CALENDAR days from employment.start_date (day 1 = start_date
+// itself, day 4 = start_date + 3 days) auto-advances to Active — purely
+// computed here, nothing written.
+export async function computeRealAccountLifecycleOverrides<
+  T extends { id: number; fullName: string; stage: EmployeeStage; position: string | null },
+>(
+  rows: T[],
+  careerApplications: Map<string, CareerApplicationLookupEntry>,
+): Promise<Map<number, RealAccountLifecycleOverride>> {
+  const eligible = rows.filter((r) => r.stage === "onboarding" || r.stage === "probation" || r.stage === "active");
+  const result = new Map<number, RealAccountLifecycleOverride>();
+  if (eligible.length === 0) return result;
+
+  const { computeAutoConfirmedProbationIds } = await import("@/lib/probationDecision");
+  const employments = await prisma.employment.findMany({
+    where: { user_id: { in: eligible.map((r) => r.id) } },
+    orderBy: { start_date: "desc" },
+    select: { user_id: true, status: true, start_date: true },
+  });
+  const empByUserId = new Map<number, (typeof employments)[number]>();
+  for (const e of employments) if (!empByUserId.has(e.user_id)) empByUserId.set(e.user_id, e);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const fullTimeStarted = eligible.filter((r) => {
+    const emp = empByUserId.get(r.id);
+    if (!emp?.start_date || positionGroup(r.position) !== "Full Time") return false;
+    return emp.start_date.toISOString().slice(0, 10) <= todayIso;
+  });
+  const confirmedIds = await computeAutoConfirmedProbationIds(fullTimeStarted, careerApplications);
+
+  for (const row of eligible) {
+    const emp = empByUserId.get(row.id);
+    if (!emp?.start_date) continue;
+    const startIso = emp.start_date.toISOString().slice(0, 10);
+    if (startIso > todayIso) continue;
+
+    if (positionGroup(row.position) === "Full Time") {
+      result.set(
+        row.id,
+        confirmedIds.has(row.id) ? { stage: "active" } : { stage: "probation", extraStages: ["onboarding"] },
+      );
+    } else {
+      if (emp.status === "active") {
+        result.set(row.id, { stage: "active" });
+        continue;
+      }
+      const daysSinceStart = Math.floor((Date.parse(todayIso) - Date.parse(startIso)) / 86_400_000);
+      result.set(row.id, daysSinceStart >= 3 ? { stage: "active" } : { stage: "onboarding" });
+    }
+  }
+  return result;
+}
+
+// Single-row wrapper for the profile-page guards.
+export async function getRealAccountLifecycleOverride(row: {
+  id: number;
+  fullName: string;
+  stage: EmployeeStage;
+  position: string | null;
+}): Promise<RealAccountLifecycleOverride | undefined> {
+  const careerApplications = await lookupCareerApplicationsByName();
+  const map = await computeRealAccountLifecycleOverrides([row], careerApplications);
+  return map.get(row.id);
+}
+
 // ebright_hrfs's real operational HR roster (confirmed table/columns by
 // direct schema inspection — not the auth `hrfs` Prisma database, a
 // same-named but unrelated thing; see ebright-hrfs.ts's own note on this).
@@ -670,33 +771,30 @@ export async function syncCareerApplicationsToPreStage(): Promise<CareerApplicat
 }
 
 // ─── Pre stage list membership, per explicit decision (see conversation) —
-// this REPLACES the earlier "real employment.status='pre' or future
-// start_date" definition entirely, not additive: someone belongs on Pre if
-// EITHER career_applications.board_stage is one of Hired/Intern/Full Time/
-// Part Time (a confirmed-hire outcome, not still-interviewing) OR they have
-// a hrfs.onboarding_candidate row (a real Prisma model in the app's OWN main
-// database — NOT ebright_hrfs, despite the naming pattern — confirmed by
-// direct schema read) with a start_date still in the future. Same OR-rule
-// shape as the Probation list's board_stage/rec_stage rule.
+// sourced SOLELY from hrfs.onboarding_candidate (a real Prisma model in the
+// app's OWN main database — NOT ebright_hrfs, despite the naming pattern —
+// confirmed by direct schema read): a person belongs on Pre if they have an
+// onboarding_candidate row with a start_date still in the future.
 //
-// One override on top of the raw OR-rule, found by checking live data
-// before implementing (per explicit request): if someone's REAL employment
-// record already shows a stage MORE ADVANCED than Pre (onboarding/
-// probation/active/exit), that real, current data wins over a stale
-// recruitment-pipeline signal — 6 real people currently matched this rule's
-// board_stage condition while already being real Active employees (their
-// board_stage/onboarding_candidate simply hasn't been updated since they
-// started). Without this, they'd wrongly show as not-yet-started on Pre
-// while correctly showing as Active everywhere else. A real row still
-// genuinely AT Pre (employment.status="pre") is unaffected — that's the
-// normal, expected case (40 of 51 raw matches).
-const PRE_TARGET_BOARD_STAGES = new Set(["Hired", "Intern", "Full Time", "Part Time"]);
-
-function boardStageToPositionGroup(boardStage: string): PositionGroup {
-  if (boardStage === "Intern") return "Intern";
-  if (boardStage === "Part Time") return "Part Time";
-  return "Full Time"; // Hired, Full Time
-}
+// This used to also match on career_applications.board_stage being one of
+// Hired/Intern/Full Time/Part Time (a confirmed-hire outcome). That branch
+// is gone per explicit decision (see conversation): its write-side sibling,
+// syncCareerApplicationsToPreStage() in this same file (now disabled — see
+// instrumentation.ts's CAREER_APPLICATION_SYNC_ENABLED), created a real
+// users/employment(status="pre") row for EVERY career_applications
+// applicant regardless of board_stage, which is what produced 192 stale
+// placeholder "employees" that had to be found and cleaned up. HRFS's
+// career_applications/rec_recruit/rec_stage tables are read-only external
+// data (ebright_hrfs) and are left completely untouched by this change —
+// only this app's OWN Pre-stage membership rule changed.
+//
+// One override on top of the onboarding_candidate rule, found by checking
+// live data before implementing (per explicit request): if someone's REAL
+// employment record already shows a stage MORE ADVANCED than Pre
+// (onboarding/probation/active/exit), that real, current data wins over a
+// stale onboarding_candidate row (its own BranchStaff-sourced start_date
+// simply hasn't been updated since they actually started). A real row still
+// genuinely AT Pre (employment.status="pre") is unaffected.
 
 // One-off known-bad-data exception to the "real employment wins" override
 // above, per explicit decision (see conversation) — NOT a change to the
@@ -725,8 +823,7 @@ interface PreEligibleRow {
 // Splitting it out here just once avoids the two callers silently drifting
 // apart on what "eligible" means.
 async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
-  const [careerApplications, candidates, realRows, branches, departments] = await Promise.all([
-    lookupCareerApplicationsByName(),
+  const [candidates, realRows, branches, departments] = await Promise.all([
     prisma.onboarding_candidate.findMany(),
     listEmployeeOverviewRows({ skipScopeFilter: true }),
     listBranches(),
@@ -737,28 +834,17 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
   const realByName = new Map<string, EmployeeOverviewRow>();
   for (const r of realRows) realByName.set(normalizeName(r.fullName), r);
 
-  const candByName = new Map<string, (typeof candidates)[number]>();
-  for (const c of candidates) candByName.set(normalizeName(c.name), c);
-
-  // Union the two OR-conditions into one eligible-name map, keeping
-  // whichever board_stage/candidate data is available for each (a person
-  // can satisfy either or both conditions).
-  const eligible = new Map<string, { boardStage: string | null; candidate: (typeof candidates)[number] | undefined }>();
-  for (const [name, entry] of careerApplications) {
-    if (entry.boardStage && PRE_TARGET_BOARD_STAGES.has(entry.boardStage)) {
-      eligible.set(name, { boardStage: entry.boardStage, candidate: candByName.get(name) });
-    }
-  }
+  // Sole eligibility condition: an onboarding_candidate row whose start_date
+  // hasn't arrived yet.
+  const eligible = new Map<string, (typeof candidates)[number]>();
   for (const c of candidates) {
     if (c.start_date.toISOString().slice(0, 10) > todayIso) {
-      const key = normalizeName(c.name);
-      const existing = eligible.get(key);
-      eligible.set(key, { boardStage: existing?.boardStage ?? null, candidate: c });
+      eligible.set(normalizeName(c.name), c);
     }
   }
 
   const rows: PreEligibleRow[] = [];
-  for (const [name, { boardStage, candidate }] of eligible) {
+  for (const [name, candidate] of eligible) {
     const real = realByName.get(name);
     // Real, more-advanced data wins — see the override note above — except
     // for the narrow, explicit exception list (currently just Tang Rui;
@@ -777,7 +863,7 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
       branchName = real.branchName;
       departmentCode = real.departmentCode;
       departmentName = real.departmentName;
-    } else if (candidate) {
+    } else {
       // No real portal account yet — same negative-sentinel convention as
       // the rest of the app (see getOnboardingCandidateDetail).
       id = -candidate.source_id;
@@ -787,40 +873,28 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
       branchName = loc.branchName;
       departmentCode = loc.departmentCode;
       departmentName = loc.departmentName;
-    } else {
-      // Matched via board_stage only, with neither a real portal account
-      // nor an onboarding_candidate row to source an id/location from —
-      // nothing to link a profile to. Not expected with current data (every
-      // one of the 51 live matches has one or the other) but skipped
-      // defensively rather than crashing or showing a dead link.
-      continue;
     }
 
-    const startDate = candidate?.start_date
-      ? candidate.start_date.toISOString().slice(0, 10)
-      : (real?.date ?? null);
-
-    const boardGroup: PositionGroup | null = boardStage ? boardStageToPositionGroup(boardStage) : null;
-    const candGroup: PositionGroup | null = candidate?.position?.trim() ? positionGroup(candidate.position) : null;
-    let resolvedPositionType: PositionGroup | null;
-    let positionDiscrepancy = false;
-    let positionDiscrepancyDetail: string | null = null;
-    if (boardGroup && candGroup) {
-      resolvedPositionType = boardGroup;
-      if (boardGroup !== candGroup) {
-        positionDiscrepancy = true;
-        positionDiscrepancyDetail = `board_stage says ${boardGroup} ("${boardStage}"), HRFS onboarding_candidate says ${candGroup} ("${candidate!.position}")`;
-      }
-    } else {
-      resolvedPositionType = boardGroup ?? candGroup ?? null;
-    }
+    // Prefer the real employment record's own date when one exists — it's
+    // authoritative over onboarding_candidate's BranchStaff-sourced
+    // start_date, which can go stale (still reading a future date after the
+    // real record shows they've actually already started).
+    const startDate = real?.date ?? candidate.start_date.toISOString().slice(0, 10);
+    // Prefer the real employment record's own position when one exists —
+    // onboarding_candidate.position (BranchStaff-sourced) is frequently
+    // blank/unreliable even when a real employment row already has a good
+    // value.
+    const positionSource = real?.position ?? candidate.position;
+    const resolvedPositionType: PositionGroup | null = positionSource?.trim()
+      ? positionGroup(positionSource)
+      : null;
 
     rows.push({
       row: {
         id,
         employeeId: null,
-        fullName: real?.fullName ?? titleCaseNameOrNull(candidate?.name) ?? name,
-        position: real?.position ?? candidate?.position ?? null,
+        fullName: real?.fullName ?? titleCaseNameOrNull(candidate.name) ?? name,
+        position: real?.position ?? candidate.position ?? null,
         branchCode,
         branchName,
         departmentCode,
@@ -829,19 +903,18 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
         date: startDate,
         stage: "pre",
         isCandidate,
-        boardStage: boardStage ?? null,
         resolvedPositionType,
-        positionDiscrepancy,
-        positionDiscrepancyDetail,
       },
-      // Confirmed-hire (board_stage) or a real onboarding_candidate date
-      // that's already arrived both mean the same thing: this person has
-      // actually started, and Pre ("hasn't started yet") is no longer
-      // correct for them, regardless of which OR-condition originally
-      // matched them in. Real portal accounts only — see
-      // computePreStartDatePassedRows below for why candidate-only entries
-      // aren't included there.
-      startDatePassed: Boolean(startDate && startDate <= todayIso),
+      // A real employee's own date that's already arrived means this person
+      // has actually started, and Pre ("hasn't started yet") is no longer
+      // correct for them, even though onboarding_candidate's own start_date
+      // still reads in the future. Candidate-only rows count too now (see
+      // computePreStartDatePassedRows below) — a pure candidate's date is
+      // always in the future by construction of `eligible` above UNTIL the
+      // day it arrives, at which point `eligible` itself excludes them
+      // (start_date is no longer > todayIso) and this is the only place
+      // left that still has their row to flag as passed.
+      startDatePassed: Boolean(startDate <= todayIso),
     });
   }
 
@@ -860,15 +933,23 @@ export async function computePreStageRows(): Promise<EmployeeOverviewRow[]> {
 // same way computeOnboardingDualListedRows() dual-lists Probation-pipeline
 // people there — their own stored employment.status is untouched (still
 // "pre"; nothing here writes to the database), this only changes what
-// [stage]/page.tsx displays. Real portal accounts only: a candidate-only
-// entry (isCandidate, negative id) has no working profile at any stage
-// other than Pre (see [id]/page.tsx's `isCandidate && stage !== "pre" ->
-// notFound()` guard) — dual-listing one onto Onboarding would just be a
-// dead link, so it's excluded here rather than shown broken. Not observed
-// in current data (both live cases are real accounts) but flagged in case
-// it comes up.
+// [stage]/page.tsx displays. Full Time additionally counts as Probation at
+// the same time — Onboarding and Probation are not mutually exclusive once
+// start_date has passed (see extraStages below); Part Time/Intern is
+// Onboarding only. Candidate-only rows (isCandidate, negative id) are
+// included here too — the [id]/page.tsx profile guard and the Overview/
+// dedicated-list pages that consume this were widened to give them a real
+// route on Onboarding (and Probation, via extraStages), same
+// getOnboardingCandidateDetail-backed profile Pre already uses.
 export async function computePreStartDatePassedRows(): Promise<EmployeeOverviewRow[]> {
   return (await computePreEligibleRows())
-    .filter((r) => r.startDatePassed && !r.row.isCandidate)
-    .map((r) => ({ ...r.row, stage: "onboarding" as const }));
+    .filter((r) => r.startDatePassed)
+    .map((r) => {
+      const isFullTime = r.row.resolvedPositionType === "Full Time";
+      return {
+        ...r.row,
+        stage: "onboarding" as const,
+        extraStages: isFullTime ? (["probation"] as const) : undefined,
+      };
+    });
 }

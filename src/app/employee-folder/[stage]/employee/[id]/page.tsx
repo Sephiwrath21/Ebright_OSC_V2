@@ -15,7 +15,7 @@ import {
   resolveLocationName,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
-import { isDualListedOnProbation } from "@/lib/careerApplicationSync";
+import { getRealAccountLifecycleOverride } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +49,11 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // real-table lookups below (getResumeInfo etc.) already no-op safely for a
   // user_id that doesn't exist, so they don't need special-casing.
   const isCandidate = numId < 0;
-  if (isCandidate && stage !== "pre") notFound();
+  // A candidate-only row can now also be reached via Onboarding once its
+  // start_date has passed (see computePreStartDatePassedRows) — same
+  // synthesized-from-onboarding_candidate profile, just a different
+  // stage label on the breadcrumb/URL.
+  if (isCandidate && stage !== "pre" && stage !== "onboarding") notFound();
 
   let employee: { id: number; fullName: string };
   let employeeDetail;
@@ -72,7 +76,8 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
       // their real stage's one, and not a 404. Visiting them at their real
       // stage's own URL still renders normally since found.stage === stage
       // already matched above in that case.
-      const isDualListedProbationView = stage === "probation" && (await isDualListedOnProbation(found.fullName));
+      const isDualListedProbationView =
+        stage === "probation" && (await getRealAccountLifecycleOverride(found))?.stage === "probation";
       if (!isDualListedProbationView) notFound();
     }
     employee = found;
