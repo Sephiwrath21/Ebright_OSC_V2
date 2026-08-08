@@ -428,7 +428,8 @@ model BranchPackageSchedule {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
-  @@unique([branch, weekday])
+  @@unique([branch, weekday, packageGroupId])
+  @@index([branch, weekday])
   @@index([packageGroupId])
 }
 

@@ -32278,7 +32278,7 @@ export namespace Prisma {
 
   export type BranchPackageScheduleWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    branch_weekday?: BranchPackageScheduleBranchWeekdayCompoundUniqueInput
+    branch_weekday_packageGroupId?: BranchPackageScheduleBranchWeekdayPackageGroupIdCompoundUniqueInput
     AND?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
     OR?: BranchPackageScheduleWhereInput[]
     NOT?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
@@ -32289,7 +32289,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
     updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
     packageGroup?: XOR<TaskTemplateGroupScalarRelationFilter, TaskTemplateGroupWhereInput>
-  }, "id" | "branch_weekday">
+  }, "id" | "branch_weekday_packageGroupId">
 
   export type BranchPackageScheduleOrderByWithAggregationInput = {
     id?: SortOrder
@@ -36036,9 +36036,10 @@ export namespace Prisma {
     isNot?: TaskTemplateGroupWhereInput
   }
 
-  export type BranchPackageScheduleBranchWeekdayCompoundUniqueInput = {
+  export type BranchPackageScheduleBranchWeekdayPackageGroupIdCompoundUniqueInput = {
     branch: string
     weekday: $Enums.PackageScheduleWeekday
+    packageGroupId: string
   }
 
   export type BranchPackageScheduleCountOrderByAggregateInput = {
