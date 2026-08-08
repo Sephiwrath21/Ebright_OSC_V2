@@ -43,6 +43,20 @@ const CAREER_APPLICATION_SYNC_ENABLED = false;
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Local-dev safety valve: when DISABLE_BACKGROUND_JOBS is set, skip ALL the
+  // background sweeps below. These sweeps WRITE to the database (transfer
+  // reverts, stage advances, scanner + career-application sync), so running a
+  // dev instance against the live/production DB would mutate real data from a
+  // laptop. Set DISABLE_BACKGROUND_JOBS=true in that .env to boot the app for
+  // UI/SSO testing without any of the writers firing. Unset in real
+  // deployments — default behaviour is unchanged when the flag is absent.
+  if (process.env.DISABLE_BACKGROUND_JOBS === "true") {
+    console.log(
+      "[instrumentation] DISABLE_BACKGROUND_JOBS=true — skipping all background sweeps (scanner-sync, transfer-revert, stage-transition, career-application-sync).",
+    );
+    return;
+  }
+
   // Local CRM development: the HR background pollers (scanner-sync every 10s,
   // hourly sweeps) open extra connections to the portal DB and can exhaust a
   // connection-limited remote Postgres — which then starves the CRM's own
