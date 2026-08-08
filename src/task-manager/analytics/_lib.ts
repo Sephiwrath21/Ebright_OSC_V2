@@ -494,6 +494,9 @@ export interface TaskRow {
   // happens explicitly here instead — see data/core.ts's file-header comment.)
   status: BlockStatus;
   fromSchedule: boolean;
+  /** Explicit Daily/Monthly/Ad hoc tag (2026-08-05: drives the past-day
+   *  completion/proof lock, mirrored on FlowTaskRow for the client). */
+  cadence: Cadence | null;
   /** Assigner-attached SOP reference (2026-07-30) — null when none. The
    *  image itself is served by /api/task-manager/guideline-image/[id]. */
   guideline: { id: string; url: string | null; hasImage: boolean } | null;
@@ -539,6 +542,7 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     assigneeId: b.assigneeId,
     dueAt: b.dueAt ? b.dueAt.toISOString() : null,
     status: b.status,
+    cadence: b.cadence,
     fromSchedule: b.scheduleSlotId !== null,
     guideline: b.guideline
       ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }

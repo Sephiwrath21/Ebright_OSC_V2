@@ -146,7 +146,48 @@ model probation {
   ext_end_date                DateTime? @db.Date
   confirmation_letter_file_id String?   @db.VarChar(128)
   extension_letter_file_id    String?   @db.VarChar(128)
+  // Audit trail for the HR Confirm/Extend/Stop decision (see
+  // decideProbationOutcome in employeeRecordActions.ts) — the one write path
+  // this feature introduces; everything else it reads is read-only from
+  // ebright_hrfs. Nullable: rows written by the older updateProbationInfo
+  // form flow (before this feature existed) have neither.
+  decided_by                  Int?
+  decided_at                  DateTime? @db.Timestamptz(6)
   users                       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_probation_user")
+  decided_by_user             users?    @relation("probation_decided_byTousers", fields: [decided_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_probation_decided_by")
+}
+
+// Live tables found on the shared hrfs database that were never declared
+// here (schema drift — added directly against the DB by something outside
+// this repo, not by anything in this codebase). Declared now, matching
+// their real live structure exactly (columns/nullability/defaults/indexes
+// confirmed via information_schema/pg_constraint), purely so `prisma db
+// push` stops treating them as extra tables to drop — this doesn't change
+// either table's actual data or structure, just makes the schema admit
+// they exist. Neither is used anywhere in this app's own code (no FK
+// constraints tie them to anything else in this schema either).
+model attendance_all {
+  id             Int       @id @default(autoincrement())
+  employee_id    String    @db.VarChar(50)
+  branch_id      Int?
+  date           DateTime  @db.Date
+  clock_in_time  DateTime? @db.Time
+  clock_out_time DateTime? @db.Time
+  status         String    @default("no record") @db.VarChar(20)
+  synced_at      DateTime  @default(now()) @db.Timestamptz(6)
+  scan_count     Int       @default(0)
+  device_name    String?
+
+  @@unique([employee_id, date], map: "uq_attendance_all_emp_date")
+  @@index([date], map: "idx_attendance_all_date")
+  @@index([branch_id], map: "idx_attendance_all_branch")
+}
+
+model od_tickets {
+  id    Int    @id @default(autoincrement())
+  name  String @unique @db.VarChar(50)
+  count Int    @default(0)
+  total Int    @default(10)
 }
 
 model documents {
@@ -667,6 +708,7 @@ model users {
   payroll                                        payroll?
   pip                                            pip[]
   probation_record                               probation?
+  probation_decisions_made                       probation[]                  @relation("probation_decided_byTousers")
   promotion                                      promotion[]
   assigned_recommendations                       recommendation[]             @relation("recommendation_assigned_to")
   reference_check                                reference_check?

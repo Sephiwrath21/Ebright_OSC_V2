@@ -368,6 +368,35 @@ model Guideline {
   blocks    RunBlock[]
 }
 
+enum TemplateGroupScope {
+  TEMPLATE
+  PACKAGE
+}
+
+/// Grouping layer for "Template Groups" (2026-08-06, /task-manager/template):
+/// a named collection of several TaskTemplate rows, created/edited/deleted/
+/// applied together. Each member task is an ORDINARY TaskTemplate row
+/// (templateGroupId set below) — this model adds nothing but the name and
+/// owner; all cascade-safety (pending-assignment cancellation, edit
+/// propagation) is delegated to the existing per-task functions in
+/// data/templates.ts. Distinct from the single-task TaskTemplate flow
+/// ("+ Task → Start from a template"), which never sees grouped rows —
+/// listTaskTemplates excludes templateGroupId != null.
+model TaskTemplateGroup {
+  id          String             @id @default(cuid())
+  createdById String
+  name        String
+  scope       TemplateGroupScope @default(TEMPLATE)
+  archivedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  templates TaskTemplate[]
+
+  @@index([createdById])
+  @@index([scope])
+}
+
 /// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
 /// assignment — task title, subtasks, cadence, guideline link/image — but
 /// deliberately NOT recipients, days, due date, or any completion state
@@ -377,38 +406,50 @@ model Guideline {
 /// only pre-fills the form — assignment then flows through the normal
 /// pipeline (fresh Guideline row per assignment), never mutating this row.
 model TaskTemplate {
-  id             String    @id @default(cuid())
-  createdById    String
-  name           String
-  title          String
-  subtasks       Json      @default("[]") // string[]
-  cadence        Cadence?
-  guidelineUrl   String?
-  guidelineMime  String? // image/png | image/jpeg | image/webp
-  guidelineImage Bytes?
+  id              String             @id @default(cuid())
+  createdById     String
+  name            String
+  title           String
+  subtasks        Json               @default("[]") // string[]
+  cadence         Cadence?
+  guidelineUrl    String?
+  guidelineMime   String? // image/png | image/jpeg | image/webp
+  guidelineImage  Bytes?
   // Archive (2026-07-31): archived templates leave the assign picker and
   // every hub tab except Archive (where Unarchive restores them + their
   // archived instances). Reversible counterpart to deletion.
-  archivedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  archivedAt      DateTime?
+  // Template Groups (2026-08-06): set when this task is a member of a
+  // TaskTemplateGroup — null for standalone single-task templates (all
+  // pre-existing rows, and every row created outside the group flow).
+  // groupPosition is the 0-based display order within the group.
+  templateGroupId String?
+  groupPosition   Int?
+  group           TaskTemplateGroup? @relation(fields: [templateGroupId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   @@index([createdById])
+  @@index([templateGroupId])
 }
 
 /// Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
 /// image only, capped at 2 MB by the upload action). Optional: uploading
 /// proof never gates completion. Re-uploading replaces the row (upsert on
-/// runBlockId); deleting the block cascades the proof away. Bytes live in
-/// the DB for the same reason as Guideline.imageData; served via
-/// /api/task-manager/proof-image/[id] (session-gated).
+/// runBlockId); deleting the block cascades the proof away. Images live in
+/// Google Drive (2026-08-04 storage decision — high upload volume made
+/// in-DB bytes impractical) — driveFileId is the sole reference for every
+/// upload; served via /api/task-manager/proof-image/[id] (session-gated),
+/// which proxies from Drive. The original in-DB-bytes columns
+/// (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
+/// (pre-dating the Drive cutover, all test data) were deleted — every
+/// surviving/future row goes through Drive.
 model Proof {
-  id         String   @id @default(cuid())
-  runBlockId String   @unique
-  runBlock   RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
-  imageMime  String // image/png | image/jpeg | image/webp
-  imageData  Bytes
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  runBlockId  String   @unique
+  runBlock    RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
+  driveFileId String? // Google Drive file id — set by every upload
+  createdAt   DateTime @default(now())
 }
 
 enum BlockStatus {

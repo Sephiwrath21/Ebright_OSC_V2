@@ -70,12 +70,21 @@ const primaryNav: NavItem[] = [
       { name: "HR Dashboard", href: "/induction/hr-dashboard", feature: "hr_dashboard" },
       { name: "Manpower Cost Report", href: "/manpower-cost-report", feature: "manpower_cost" },
       { name: "Staff Directory", href: "/staff-directory", feature: "staff_directory" },
-      { name: "Employee Folder", href: "/employee-folder", feature: "employee_folder" },
+      // No `feature` gate — Employee Folder's real access control is
+      // employeeScope.ts (department/branch/own-record scoping), not the
+      // access-management role_permission matrix; that matrix currently has
+      // no grant configured for any role but department/HR, which was
+      // hiding this link for every branch/department/staff account even
+      // though their own /employee-folder route works fine and is properly
+      // scoped. Per explicit decision (see conversation) — visibility
+      // should follow the same rule the route itself enforces, not a
+      // separate, out-of-sync permission table.
+      { name: "Employee Folder", href: "/employee-folder" },
     ],
   },
   {
     name: "CNS",
-    href: "/dashboards/crm",
+    href: "/crm/dashboard",
     Icon: Newspaper,
     feature: "cns_dashboard",
     children: [
@@ -96,11 +105,11 @@ const primaryNav: NavItem[] = [
       {
         name: "Ticket",
         children: [
-          { name: "Dashboard", href: "/crm/ticket/dashboard", exact: true },
-          { name: "Opportunities", href: "/crm/ticket/opportunities" },
-          { name: "My Tickets", href: "/crm/ticket/my-tickets" },
-          { name: "New Ticket", href: "/crm/ticket/new" },
-          { name: "Platforms", href: "/crm/ticket/platforms" },
+          { name: "Dashboard", href: "/crm/tickets/dashboard", exact: true },
+          { name: "Kanban", href: "/crm/tickets/kanban" },
+          { name: "My Tickets", href: "/crm/tickets" },
+          { name: "New Ticket", href: "/crm/tickets/new" },
+          { name: "Platforms", href: "/crm/tkt-platforms" },
         ],
       },
     ],
@@ -150,7 +159,17 @@ const primaryNav: NavItem[] = [
       { name: "Dashboard", href: "/dashboards/pcm", exact: true },
     ],
   },
-  { name: "Task Manager", href: "/task-manager", Icon: ListChecks },
+  {
+    name: "Task Manager",
+    href: "/task-manager",
+    Icon: ListChecks,
+    children: [
+      { name: "Overview", href: "/task-manager", exact: true },
+      { name: "Template", href: "/task-manager/template" },
+      { name: "Package", href: "/task-manager/package" },
+      { name: "Package Table", href: "/task-manager/package-table" },
+    ],
+  },
   { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan" },
 ];
 

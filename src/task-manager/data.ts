@@ -6,5 +6,6 @@ export * from "./data/queries";
 export * from "./data/ceo";
 export * from "./data/tasks";
 export * from "./data/templates";
+export * from "./data/template-groups";
 export * from "./data/manpower";
 export * from "./data/kanban";

@@ -50,10 +50,32 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
 
   const emp = target.employment[0];
   const inScope = isRowInScope(scope, {
+    id: userId,
     departmentCode: emp?.department?.department_code ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
   });
   if (!inScope) return { ok: false, error: "You do not have access to this employee's record." };
+  return null;
+}
+
+// Probation's Confirm/Extend/Stop decision (decideProbationOutcome below) is
+// deliberately narrower than every other write in this file — per explicit
+// decision (see conversation), restricted to role_type "hr"/"superadmin"
+// specifically, not the broader is_full_access flag or department/branch
+// scope that requireEmployeeInScope above allows for the general Probation
+// edit form. Checked in addition to (not instead of) requireEmployeeInScope,
+// so an HR account still can't decide for someone outside their scope.
+async function requireHrOrSuperadmin(): Promise<ActionResult | null> {
+  const session = await auth();
+  if (!session?.user?.email) return { ok: false, error: "Not signed in." };
+  const me = await prisma.users.findUnique({
+    where: { email: session.user.email },
+    select: { role: { select: { role_type: true } } },
+  });
+  const roleType = me?.role?.role_type?.toLowerCase();
+  if (roleType !== "hr" && roleType !== "superadmin") {
+    return { ok: false, error: "Only HR or Superadmin accounts can decide a probation outcome." };
+  }
   return null;
 }
 
@@ -385,11 +407,14 @@ export async function updateMedicalCheck(userId: number, input: UpdateMedicalChe
 
 // Real probation table — Probation stage's own tab. confirmationLetter*/
 // extensionLetter* follow updateResume's exact pattern (two independent
-// Drive-file fields, each replaced/cleared the same way).
+// Drive-file fields, each replaced/cleared the same way). probationStatus/
+// startDate/endDate deliberately removed from this input — per explicit
+// decision (see conversation), Start/End Date are now read-only from
+// ebright_hrfs.BranchStaff (see probationDecision.ts) and Probation Status
+// is only ever settable via the HR/Superadmin-only decideProbationOutcome
+// below, not this broader-access form — keeping them here would have left
+// exactly the loophole that restriction was meant to close.
 export interface UpdateProbationInput {
-  probationStatus: string;
-  startDate: string; // yyyy-mm-dd, "" = unset
-  endDate: string;
   confirmDate: string;
   extEndDate: string;
   confirmationLetterFileId: string | null;
@@ -431,9 +456,6 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     }
 
     const data = {
-      probation_status: input.probationStatus || null,
-      start_date: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
-      end_date: input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
       confirm_date: input.confirmDate ? new Date(`${input.confirmDate}T00:00:00Z`) : null,
       ext_end_date: input.extEndDate ? new Date(`${input.extEndDate}T00:00:00Z`) : null,
       confirmation_letter_file_id: confirmationLetterFileId,
@@ -447,6 +469,51 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Probation." };
+  }
+}
+
+// The one write path this whole Probation feature introduces (see
+// conversation) — everything else it reads (BranchStaff dates,
+// career_applications feedback2/status2) is read-only. HR/Superadmin only
+// (requireHrOrSuperadmin above), on top of the usual scope check. Writes
+// ONLY to the probation table, per explicit decision (see conversation) —
+// no other hrfs table is touched by this action, including employment.
+// "Confirmed" still moves a Full-Time employee to Active immediately in
+// effect, without a second write: computeAutoConfirmedProbationIds (see
+// probationDecision.ts) already treats a local probation_status="Confirmed"
+// exactly the same as a live status2="Accept" read, live, on every render —
+// the same mechanism that already handles the "nobody's clicked anything,
+// status2 already says Accept" case. So the moment this upsert lands, the
+// very next page load already shows them as Active, purely from this one
+// write. Extended/Stopped only ever write the decision either way — Stopped
+// stays in Probation with its display flipped to "Stop", Extended just
+// keeps the existing timeline.
+export async function decideProbationOutcome(
+  userId: number,
+  outcome: "Confirmed" | "Extended" | "Stopped",
+): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
+
+  try {
+    const session = await auth();
+    const me = await prisma.users.findUnique({ where: { email: session!.user!.email! }, select: { user_id: true } });
+    if (!me) return { ok: false, error: "Not signed in." };
+
+    const now = new Date();
+    await prisma.probation.upsert({
+      where: { user_id: userId },
+      update: { probation_status: outcome, decided_by: me.user_id, decided_at: now },
+      create: { user_id: userId, probation_status: outcome, decided_by: me.user_id, decided_at: now },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to record probation decision." };
   }
 }
 
@@ -1924,7 +1991,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
   if (!scope.fullAccess) {
+    // No real id yet (this employee doesn't exist until the insert below
+    // succeeds) — -1 can never equal a real user_id, so an ownUserId-scoped
+    // (individual staff) account correctly fails this check and can't
+    // create new employee records at all, only department/branch-scoped
+    // accounts (checked via departmentCode/branchCode, not id) can.
     const inScope = isRowInScope(scope, {
+      id: -1,
       departmentCode: input.departmentCode || null,
       branchCode: input.branchCode || null,
     });
@@ -2019,23 +2092,19 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
   }
 }
 
-// ─── Pre stage list's row-menu Delete — one action covering both row kinds
-// (see StageFlatListView/RowActionMenu), since they map to two different
-// tables with no shared id space:
+// ─── Every stage list's row-menu Delete (Pre/Probation/Onboarding/Active/
+// Exit/Employee Records — see RowActionMenu) — real hard delete, per
+// explicit decision (see conversation): clicking Delete removes the
+// employee record entirely, not an archive, regardless of what stage
+// they're currently at. One action covering both row kinds:
 // - Real employee (positive id, a genuine users row): deletes the users row
-//   outright. Every one of its relations (employment, user_profile, ...) is
-//   declared onDelete: Cascade in schema.prisma, so this is a clean single
-//   delete, not a manual multi-table teardown — and safe specifically because
-//   Pre-stage employees haven't accrued any real history yet (no leave,
-//   achievements, promotions, ...) worth preserving.
-// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail):
-//   deletes the onboarding_candidate row directly; there's no users row to
-//   remove.
-// Restricted to employees still actually in Pre — this only exists to back
-// the Pre-stage list's own Delete button, not as a general "delete any
-// employee" action, so a client can't repurpose it against someone who has
-// already moved on and has real history attached. ───
-export async function deletePreStageEmployee(id: number): Promise<ActionResult> {
+//   outright. Every one of its relations (employment, leave_request,
+//   resignation, ...) is declared onDelete: Cascade in schema.prisma, so
+//   this is a clean single delete, not a manual multi-table teardown.
+// - Candidate (negative sentinel, -source_id — see getOnboardingCandidateDetail,
+//   Pre-stage-only): deletes the onboarding_candidate row directly; there's
+//   no users row to remove.
+export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
   const authError = await requireSession();
   if (authError) return authError;
   const scope = await getCurrentEmployeeScope();
@@ -2048,7 +2117,11 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
     if (!scope.fullAccess) {
       const [departments, branches] = await Promise.all([listDepartments(), listBranches()]);
       const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
-      if (!isRowInScope(scope, { departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
+      // No real user_id (this candidate has no portal account) — -1 can
+      // never equal a real user_id, so an ownUserId-scoped (individual
+      // staff) account correctly fails this check; only department/branch-
+      // scoped accounts can delete a candidate in their own department/branch.
+      if (!isRowInScope(scope, { id: -1, departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
         return { ok: false, error: "You do not have access to this candidate." };
       }
     }
@@ -2062,7 +2135,6 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
 
   const row = await getEmployeeOverviewRowById(id);
   if (!row) return { ok: false, error: "This employee doesn't exist or you don't have access to them." };
-  if (row.stage !== "pre") return { ok: false, error: "Only Pre-stage employees can be deleted this way." };
 
   const scopeError = await requireEmployeeInScope(id);
   if (scopeError) return scopeError;
@@ -2077,11 +2149,19 @@ export async function deletePreStageEmployee(id: number): Promise<ActionResult> 
 // ─── Probation stage's "Next" button — real employment update, gated on the
 // probation table's own Probation Status being "Confirmed" (re-checked here
 // server-side too, not just via the UI's disabled button, since a client
-// could otherwise call this action directly). Setting status="onboarding"
-// clears them out of Probation the same way it clears a non-full-time
-// employee out of Pre — nonExitStage() checks status==="onboarding" before
-// the probation flag, so probation is also reset to false here for data
-// cleanliness now that it no longer applies. ───
+// could otherwise call this action directly). Target changed from
+// "onboarding" to "active" per explicit decision (see conversation) — this
+// used to send a Confirmed employee back to plain Onboarding (Probation and
+// Onboarding ran concurrently, so "done with Probation" meant "now just
+// Onboarding"); now Confirmed means straight to Active, removed from both
+// Probation and Onboarding, matching decideProbationOutcome's own immediate
+// effect above (the two are now equivalent for a real Probation-stage
+// employee — this button is largely superseded by the Confirm button on the
+// new decision UI, kept working rather than removed since nothing asked for
+// it to be deleted). Full Time only, same as decideProbationOutcome — a
+// non-Full-Time employee with a "Confirmed" status (shouldn't normally
+// happen, since this flow is Full-Time-specific) gets a clear error instead
+// of a silent no-op. ───
 
 export async function proceedFromProbation(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2099,10 +2179,13 @@ export async function proceedFromProbation(userId: number): Promise<ActionResult
       orderBy: { start_date: "desc" },
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
+    if (positionGroup(employment.position) !== "Full Time") {
+      return { ok: false, error: "This transition applies to Full Time employees only." };
+    }
 
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },
-      data: { status: "onboarding", probation: false },
+      data: { status: "active", probation: false },
     });
 
     return { ok: true };
@@ -2111,13 +2194,15 @@ export async function proceedFromProbation(userId: number): Promise<ActionResult
   }
 }
 
-// ─── Onboarding stage's "Next" button — real employment update, no
-// prerequisite gate (unlike Probation's Confirmed-status requirement, nothing
-// was specified for Onboarding->Active, so the button stays always-enabled).
-// nonExitStage() checks status==="onboarding" before the probation flag, so
-// once status flips to "active" this employee is Active regardless of
-// probation — cleared here too for data cleanliness now that it no longer
-// applies, same as Probation's own transition. ───
+// ─── Onboarding stage's "Next" button — real employment update. Part Time/
+// Intern only (per explicit decision, see conversation) — this is their
+// manual early-advance out of the 3-fixed-day Onboarding window (see
+// computeRealAccountLifecycleOverrides); Full Time is gated out below since
+// their only path to Active is Probation confirmation. nonExitStage() checks
+// status==="onboarding" before the probation flag, so once status flips to
+// "active" this employee is Active regardless of probation — cleared here
+// too for data cleanliness now that it no longer applies, same as
+// Probation's own transition. ───
 
 export async function proceedFromOnboarding(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2130,6 +2215,13 @@ export async function proceedFromOnboarding(userId: number): Promise<ActionResul
       orderBy: { start_date: "desc" },
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
+    // Full Time's only path to Active is Probation confirmation (see
+    // decideProbationOutcome/proceedFromProbation) — must not let this
+    // button bypass that, now that Full Time rows are also dual-listed onto
+    // this same Onboarding view (see computeRealAccountLifecycleOverrides).
+    if (positionGroup(employment.position) === "Full Time") {
+      return { ok: false, error: "Full Time employees move to Active via Probation confirmation, not this button." };
+    }
 
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },

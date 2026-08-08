@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronRight, Home, Search } from "lucide-react";
 import { EMPLOYEE_STAGES, STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
+import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
@@ -16,15 +18,37 @@ interface Props {
   userName?: string | null;
   /** userId -> overdue Task Manager task count, for the red dot next to Name. */
   overdueTaskCounts?: Record<number, number>;
+  /** True when at least one Full-Time employee's probation end date is
+   *  within 2 weeks (or already passed) with no Confirm/Extend/Stop
+   *  decision made yet — see probationDecision.ts's
+   *  computeProbationReminderCandidates. Drives the red dot on the
+   *  Probation summary card, same signal as the NotificationBell's own
+   *  Probation card. */
+  hasProbationReminder?: boolean;
 }
 
-export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts }: Props) {
+export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, hasProbationReminder }: Props) {
+  const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
+  //
+  // Draft vs applied, per explicit decision (see conversation): every field
+  // (search/status/year/month) only updates its own draft state as the user
+  // types/selects — none of them touch the table until Search is clicked or
+  // Enter is pressed in the search box (applyFilters below copies every
+  // draft into its applied counterpart in one go, so all 4 fields commit
+  // together, never some live and some not). `filtered` below reads only
+  // the applied state, never the drafts.
+  const [statusFilterDraft, setStatusFilterDraft] = useState<EmployeeStage | "">("");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [yearDraft, setYearDraft] = useState("");
+  const [monthDraft, setMonthDraft] = useState("");
+
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [dateSort, setDateSort] = useState<DateSortState>("default");
@@ -37,7 +61,12 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const result = rows.filter((r) => {
-      if (statusFilter && r.stage !== statusFilter) return false;
+      // A row can genuinely belong to more than one stage at once (see
+      // extraStages — e.g. a real Probation-stage Full-Time row whose
+      // pipeline also qualifies it for Onboarding), shown as one row with
+      // multiple badges rather than duplicated — so the Status filter must
+      // match on either, not just the row's own primary stage.
+      if (statusFilter && r.stage !== statusFilter && !r.extraStages?.includes(statusFilter)) return false;
       if (q && !r.fullName.toLowerCase().includes(q)) return false;
       if (year && r.date?.slice(0, 4) !== year) return false;
       if (month && r.date?.slice(5, 7) !== month) return false;
@@ -49,7 +78,19 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  function applyFilters() {
+    setStatusFilter(statusFilterDraft);
+    setSearch(searchDraft);
+    setYear(yearDraft);
+    setMonth(monthDraft);
+    setPage(1);
+  }
+
   function resetFilters() {
+    setStatusFilterDraft("");
+    setSearchDraft("");
+    setYearDraft("");
+    setMonthDraft("");
     setStatusFilter("");
     setSearch("");
     setYear("");
@@ -91,8 +132,13 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                 href={`/employee-folder/${stage}`}
                 className="relative text-left bg-white rounded-[27px] border-2 border-slate-200 p-5 min-h-[143px] flex flex-col justify-end gap-2.5 transition-all hover:border-slate-400 hover:shadow-md"
               >
-                <span className={`self-start inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                  {STAGE_LABELS[stage]}
+                <span className="self-start flex items-center gap-1.5">
+                  <span className={`inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                    {STAGE_LABELS[stage]}
+                  </span>
+                  {stage === "probation" && hasProbationReminder && (
+                    <OverdueDot count={1} label="Probation ending soon — needs a Confirm/Extend/Stop decision" />
+                  )}
                 </span>
                 <span className="text-4xl font-medium text-slate-900/70">{counts[stage]}</span>
                 <ChevronRight className="absolute top-3.5 right-4 w-5 h-5 text-slate-400" aria-hidden="true" />
@@ -120,21 +166,21 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                 <input
                   type="search"
                   placeholder="Search"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyFilters();
+                    }
                   }}
                   className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as EmployeeStage | "");
-                  setPage(1);
-                }}
+                value={statusFilterDraft}
+                onChange={(e) => setStatusFilterDraft(e.target.value as EmployeeStage | "")}
                 className="shrink-0 w-[100px] sm:w-auto h-11 px-2 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[120px]"
               >
                 <option value="">status</option>
@@ -148,11 +194,8 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
             <div className="flex flex-nowrap items-center gap-2 sm:contents">
               <select
-                value={year}
-                onChange={(e) => {
-                  setYear(e.target.value);
-                  setPage(1);
-                }}
+                value={yearDraft}
+                onChange={(e) => setYearDraft(e.target.value)}
                 className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[110px]"
               >
                 <option value="">year</option>
@@ -164,11 +207,8 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               </select>
 
               <select
-                value={month}
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  setPage(1);
-                }}
+                value={monthDraft}
+                onChange={(e) => setMonthDraft(e.target.value)}
                 className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[130px]"
               >
                 <option value="">month</option>
@@ -181,6 +221,7 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
               <button
                 type="button"
+                onClick={applyFilters}
                 className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 text-blue-800 font-semibold text-xs sm:text-sm hover:bg-blue-200 transition-colors"
               >
                 Search
@@ -225,13 +266,25 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                       {row.departmentName ?? row.branchName ?? "—"}
                     </span>
                     <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                    <span>
+                    <span className="flex flex-wrap gap-1.5">
                       <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
                         {STAGE_LABELS[row.stage]}
                       </span>
+                      {row.extraStages?.map((s) => (
+                        <span key={s} className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[s]}`}>
+                          {STAGE_LABELS[s]}
+                        </span>
+                      ))}
                     </span>
                     <div className="flex justify-center">
-                      <RowActionMenu name={row.fullName} />
+                      <RowActionMenu
+                        name={row.fullName}
+                        onDelete={async () => {
+                          const result = await deleteEmployeeRecord(row.id);
+                          if (result.ok) router.refresh();
+                          return result;
+                        }}
+                      />
                     </div>
                   </div>
                 ))

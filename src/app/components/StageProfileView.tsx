@@ -39,6 +39,7 @@ import type {
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
 } from "@/lib/employeeQueries";
+import type { ProbationDisplayInfo } from "@/lib/probationDecision";
 import {
   PanelHeading,
   RecordTable,
@@ -89,6 +90,14 @@ interface Props {
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
   probationInfo?: ProbationInfo | null;
+  /** BranchStaff/career_applications-derived Start Date/End Date/Feedback/
+   *  display status (see probationDecision.ts) — undefined only when this
+   *  isn't the Probation section (mirrors probationInfo's own gating). */
+  probationDisplay?: ProbationDisplayInfo;
+  /** HR/Superadmin only, per explicit decision (see conversation) — gates
+   *  the Confirm/Extend/Stop buttons; decideProbationOutcome re-checks this
+   *  server-side regardless. */
+  canDecideProbation?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -135,6 +144,8 @@ export default function StageProfileView({
   referenceCheck,
   medicalCheck,
   probationInfo,
+  probationDisplay,
+  canDecideProbation,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -624,6 +635,8 @@ export default function StageProfileView({
                 referenceCheck,
                 medicalCheck,
                 probationInfo,
+                probationDisplay,
+                canDecideProbation,
                 documentsInfo,
                 payrollInfo,
                 achievements,
@@ -743,6 +756,8 @@ function resolvePanel({
   referenceCheck,
   medicalCheck,
   probationInfo,
+  probationDisplay,
+  canDecideProbation,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -769,6 +784,8 @@ function resolvePanel({
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
   probationInfo?: ProbationInfo | null;
+  probationDisplay?: ProbationDisplayInfo;
+  canDecideProbation?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -795,7 +812,7 @@ function resolvePanel({
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
-  // same populated data instead of a placeholder "Not provided".
+  // same populated data instead of a placeholder "-".
   if (section.key === "personal-info" && employeeDetail) {
     return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter />;
   }
@@ -820,8 +837,8 @@ function resolvePanel({
   if (section.key === "medical" && medicalCheck !== undefined) {
     return <MedicalCheckPanel userId={employeeId} data={medicalCheck} />;
   }
-  if (section.key === "probation" && probationInfo !== undefined) {
-    return <ProbationPanel userId={employeeId} data={probationInfo} />;
+  if (section.key === "probation" && probationInfo !== undefined && probationDisplay) {
+    return <ProbationPanel userId={employeeId} data={probationInfo} display={probationDisplay} canDecide={canDecideProbation ?? false} />;
   }
   // Real documents table — shared with Employee Record's HR Info > Handbook tab.
   if (section.key === "documents" && documentsInfo !== undefined) {

@@ -78,6 +78,19 @@ export type RunBlock = $Result.DefaultSelection<Prisma.$RunBlockPayload>
  */
 export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
 /**
+ * Model TaskTemplateGroup
+ * Grouping layer for "Template Groups" (2026-08-06, /task-manager/template):
+ * a named collection of several TaskTemplate rows, created/edited/deleted/
+ * applied together. Each member task is an ORDINARY TaskTemplate row
+ * (templateGroupId set below) — this model adds nothing but the name and
+ * owner; all cascade-safety (pending-assignment cancellation, edit
+ * propagation) is delegated to the existing per-task functions in
+ * data/templates.ts. Distinct from the single-task TaskTemplate flow
+ * ("+ Task → Start from a template"), which never sees grouped rows —
+ * listTaskTemplates excludes templateGroupId != null.
+ */
+export type TaskTemplateGroup = $Result.DefaultSelection<Prisma.$TaskTemplateGroupPayload>
+/**
  * Model TaskTemplate
  * Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
  * assignment — task title, subtasks, cadence, guideline link/image — but
@@ -94,9 +107,14 @@ export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
  * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
  * proof never gates completion. Re-uploading replaces the row (upsert on
- * runBlockId); deleting the block cascades the proof away. Bytes live in
- * the DB for the same reason as Guideline.imageData; served via
- * /api/task-manager/proof-image/[id] (session-gated).
+ * runBlockId); deleting the block cascades the proof away. Images live in
+ * Google Drive (2026-08-04 storage decision — high upload volume made
+ * in-DB bytes impractical) — driveFileId is the sole reference for every
+ * upload; served via /api/task-manager/proof-image/[id] (session-gated),
+ * which proxies from Drive. The original in-DB-bytes columns
+ * (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
+ * (pre-dating the Drive cutover, all test data) were deleted — every
+ * surviving/future row goes through Drive.
  */
 export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
 /**
@@ -192,6 +210,14 @@ export const RunStatus: {
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus]
 
 
+export const TemplateGroupScope: {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
+};
+
+export type TemplateGroupScope = (typeof TemplateGroupScope)[keyof typeof TemplateGroupScope]
+
+
 export const BlockStatus: {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
@@ -246,6 +272,10 @@ export const ItemType: typeof $Enums.ItemType
 export type RunStatus = $Enums.RunStatus
 
 export const RunStatus: typeof $Enums.RunStatus
+
+export type TemplateGroupScope = $Enums.TemplateGroupScope
+
+export const TemplateGroupScope: typeof $Enums.TemplateGroupScope
 
 export type BlockStatus = $Enums.BlockStatus
 
@@ -303,7 +333,7 @@ export class PrismaClient<
    * Read more in our [docs](https://pris.ly/d/client).
    */
 
-  constructor(optionsArg ?: Prisma.Subset<ClientOptions, Prisma.PrismaClientOptions>);
+  constructor(optionsArg ?: Prisma.PrismaClientConstructorArgs<ClientOptions>);
   $on<V extends U>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
 
   /**
@@ -376,7 +406,7 @@ export class PrismaClient<
    * 
    * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
    */
-  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
+  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
 
   $transaction<R>(fn: (prisma: Omit<PrismaClient, runtime.ITXClientDenyList>) => $Utils.JsPromise<R>, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<R>
 
@@ -503,6 +533,16 @@ export class PrismaClient<
     * ```
     */
   get guideline(): Prisma.GuidelineDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.taskTemplateGroup`: Exposes CRUD operations for the **TaskTemplateGroup** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more TaskTemplateGroups
+    * const taskTemplateGroups = await prisma.taskTemplateGroup.findMany()
+    * ```
+    */
+  get taskTemplateGroup(): Prisma.TaskTemplateGroupDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.taskTemplate`: Exposes CRUD operations for the **TaskTemplate** model.
@@ -653,8 +693,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 7.7.0
-   * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+   * Prisma Client JS version: 7.9.1
+   * Query Engine version: e922089b7d7502aff4249d5da3420f6fa55fc6ad
    */
   export type PrismaVersion = {
     client: string
@@ -789,6 +829,19 @@ export namespace Prisma {
   };
 
   /**
+   * Resolved type of the argument passed to the `PrismaClient` constructor.
+   *
+   * When called without a narrower options type (the common case), this resolves
+   * to `PrismaClientOptions` directly, which produces a clear TypeScript error
+   * message (`not assignable to parameter of type 'PrismaClientOptions'`) when
+   * the argument is missing or incomplete. When the user supplies a narrower
+   * options type (e.g. via a literal), it falls back to `Subset` to keep
+   * filtering out unknown properties.
+   */
+  export type PrismaClientConstructorArgs<Options extends PrismaClientOptions> =
+    [PrismaClientOptions] extends [Options] ? PrismaClientOptions : Subset<Options, PrismaClientOptions>;
+
+  /**
    * SelectSubset
    * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
    * Additionally, it validates, if both select and include are present. If the case, it errors.
@@ -820,7 +873,7 @@ export namespace Prisma {
   type XOR<T, U> =
     T extends object ?
     U extends object ?
-      (Without<T, U> & U) | (Without<U, T> & T)
+      ((Without<T, U> & U) | (Without<U, T> & T)) & object
     : U : T
 
 
@@ -1049,6 +1102,7 @@ export namespace Prisma {
     FlowRun: 'FlowRun',
     RunBlock: 'RunBlock',
     Guideline: 'Guideline',
+    TaskTemplateGroup: 'TaskTemplateGroup',
     TaskTemplate: 'TaskTemplate',
     Proof: 'Proof',
     RunItem: 'RunItem',
@@ -1074,7 +1128,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskTemplateGroup" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1966,6 +2020,80 @@ export namespace Prisma {
           }
         }
       }
+      TaskTemplateGroup: {
+        payload: Prisma.$TaskTemplateGroupPayload<ExtArgs>
+        fields: Prisma.TaskTemplateGroupFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.TaskTemplateGroupFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.TaskTemplateGroupFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          findFirst: {
+            args: Prisma.TaskTemplateGroupFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.TaskTemplateGroupFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          findMany: {
+            args: Prisma.TaskTemplateGroupFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>[]
+          }
+          create: {
+            args: Prisma.TaskTemplateGroupCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          createMany: {
+            args: Prisma.TaskTemplateGroupCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.TaskTemplateGroupCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>[]
+          }
+          delete: {
+            args: Prisma.TaskTemplateGroupDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          update: {
+            args: Prisma.TaskTemplateGroupUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          deleteMany: {
+            args: Prisma.TaskTemplateGroupDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.TaskTemplateGroupUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.TaskTemplateGroupUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>[]
+          }
+          upsert: {
+            args: Prisma.TaskTemplateGroupUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateGroupPayload>
+          }
+          aggregate: {
+            args: Prisma.TaskTemplateGroupAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateTaskTemplateGroup>
+          }
+          groupBy: {
+            args: Prisma.TaskTemplateGroupGroupByArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateGroupGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.TaskTemplateGroupCountArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateGroupCountAggregateOutputType> | number
+          }
+        }
+      }
       TaskTemplate: {
         payload: Prisma.$TaskTemplatePayload<ExtArgs>
         fields: Prisma.TaskTemplateFieldRefs
@@ -2774,11 +2902,26 @@ export namespace Prisma {
       isolationLevel?: Prisma.TransactionIsolationLevel
     }
     /**
-     * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-planetscale`
+     * A driver adapter that PrismaClient uses to connect to your database, such as the ones provided by `@prisma/adapter-pg`, `@prisma/adapter-libsql`, `@prisma/adapter-planetscale`, etc.
+     * 
+     * A driver adapter is **required** unless you connect to your database through Prisma Accelerate (in which case use `accelerateUrl` instead).
+     * 
+     * Learn more: https://pris.ly/d/driver-adapters
+     * 
+     * @example
+     * ```ts
+     * import { PrismaPg } from '@prisma/adapter-pg'
+     * import { PrismaClient } from './generated/prisma/client'
+     * 
+     * const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+     * const prisma = new PrismaClient({ adapter })
+     * ```
      */
     adapter?: runtime.SqlDriverAdapterFactory
     /**
-     * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
+     * The Prisma Accelerate connection URL. Use this option to connect to your database through Prisma Accelerate instead of using a driver adapter to connect directly.
+     * 
+     * Learn more: https://pris.ly/d/accelerate
      */
     accelerateUrl?: string
     /**
@@ -2826,6 +2969,7 @@ export namespace Prisma {
     flowRun?: FlowRunOmit
     runBlock?: RunBlockOmit
     guideline?: GuidelineOmit
+    taskTemplateGroup?: TaskTemplateGroupOmit
     taskTemplate?: TaskTemplateOmit
     proof?: ProofOmit
     runItem?: RunItemOmit
@@ -3170,6 +3314,37 @@ export namespace Prisma {
    */
   export type GuidelineCountOutputTypeCountBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RunBlockWhereInput
+  }
+
+
+  /**
+   * Count Type TaskTemplateGroupCountOutputType
+   */
+
+  export type TaskTemplateGroupCountOutputType = {
+    templates: number
+  }
+
+  export type TaskTemplateGroupCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    templates?: boolean | TaskTemplateGroupCountOutputTypeCountTemplatesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * TaskTemplateGroupCountOutputType without action
+   */
+  export type TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroupCountOutputType
+     */
+    select?: TaskTemplateGroupCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * TaskTemplateGroupCountOutputType without action
+   */
+  export type TaskTemplateGroupCountOutputTypeCountTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateWhereInput
   }
 
 
@@ -17307,13 +17482,1124 @@ export namespace Prisma {
 
 
   /**
+   * Model TaskTemplateGroup
+   */
+
+  export type AggregateTaskTemplateGroup = {
+    _count: TaskTemplateGroupCountAggregateOutputType | null
+    _min: TaskTemplateGroupMinAggregateOutputType | null
+    _max: TaskTemplateGroupMaxAggregateOutputType | null
+  }
+
+  export type TaskTemplateGroupMinAggregateOutputType = {
+    id: string | null
+    createdById: string | null
+    name: string | null
+    scope: $Enums.TemplateGroupScope | null
+    archivedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type TaskTemplateGroupMaxAggregateOutputType = {
+    id: string | null
+    createdById: string | null
+    name: string | null
+    scope: $Enums.TemplateGroupScope | null
+    archivedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type TaskTemplateGroupCountAggregateOutputType = {
+    id: number
+    createdById: number
+    name: number
+    scope: number
+    archivedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type TaskTemplateGroupMinAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    scope?: true
+    archivedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type TaskTemplateGroupMaxAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    scope?: true
+    archivedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type TaskTemplateGroupCountAggregateInputType = {
+    id?: true
+    createdById?: true
+    name?: true
+    scope?: true
+    archivedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type TaskTemplateGroupAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplateGroup to aggregate.
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateGroups to fetch.
+     */
+    orderBy?: TaskTemplateGroupOrderByWithRelationInput | TaskTemplateGroupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: TaskTemplateGroupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateGroups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateGroups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned TaskTemplateGroups
+    **/
+    _count?: true | TaskTemplateGroupCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: TaskTemplateGroupMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: TaskTemplateGroupMaxAggregateInputType
+  }
+
+  export type GetTaskTemplateGroupAggregateType<T extends TaskTemplateGroupAggregateArgs> = {
+        [P in keyof T & keyof AggregateTaskTemplateGroup]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateTaskTemplateGroup[P]>
+      : GetScalarType<T[P], AggregateTaskTemplateGroup[P]>
+  }
+
+
+
+
+  export type TaskTemplateGroupGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateGroupWhereInput
+    orderBy?: TaskTemplateGroupOrderByWithAggregationInput | TaskTemplateGroupOrderByWithAggregationInput[]
+    by: TaskTemplateGroupScalarFieldEnum[] | TaskTemplateGroupScalarFieldEnum
+    having?: TaskTemplateGroupScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: TaskTemplateGroupCountAggregateInputType | true
+    _min?: TaskTemplateGroupMinAggregateInputType
+    _max?: TaskTemplateGroupMaxAggregateInputType
+  }
+
+  export type TaskTemplateGroupGroupByOutputType = {
+    id: string
+    createdById: string
+    name: string
+    scope: $Enums.TemplateGroupScope
+    archivedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: TaskTemplateGroupCountAggregateOutputType | null
+    _min: TaskTemplateGroupMinAggregateOutputType | null
+    _max: TaskTemplateGroupMaxAggregateOutputType | null
+  }
+
+  type GetTaskTemplateGroupGroupByPayload<T extends TaskTemplateGroupGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<TaskTemplateGroupGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof TaskTemplateGroupGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], TaskTemplateGroupGroupByOutputType[P]>
+            : GetScalarType<T[P], TaskTemplateGroupGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type TaskTemplateGroupSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    scope?: boolean
+    archivedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
+    _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["taskTemplateGroup"]>
+
+  export type TaskTemplateGroupSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    scope?: boolean
+    archivedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["taskTemplateGroup"]>
+
+  export type TaskTemplateGroupSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    scope?: boolean
+    archivedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["taskTemplateGroup"]>
+
+  export type TaskTemplateGroupSelectScalar = {
+    id?: boolean
+    createdById?: boolean
+    name?: boolean
+    scope?: boolean
+    archivedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "scope" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplateGroup"]>
+  export type TaskTemplateGroupInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
+    _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type TaskTemplateGroupIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type TaskTemplateGroupIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $TaskTemplateGroupPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "TaskTemplateGroup"
+    objects: {
+      templates: Prisma.$TaskTemplatePayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      createdById: string
+      name: string
+      scope: $Enums.TemplateGroupScope
+      archivedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["taskTemplateGroup"]>
+    composites: {}
+  }
+
+  type TaskTemplateGroupGetPayload<S extends boolean | null | undefined | TaskTemplateGroupDefaultArgs> = $Result.GetResult<Prisma.$TaskTemplateGroupPayload, S>
+
+  type TaskTemplateGroupCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<TaskTemplateGroupFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: TaskTemplateGroupCountAggregateInputType | true
+    }
+
+  export interface TaskTemplateGroupDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['TaskTemplateGroup'], meta: { name: 'TaskTemplateGroup' } }
+    /**
+     * Find zero or one TaskTemplateGroup that matches the filter.
+     * @param {TaskTemplateGroupFindUniqueArgs} args - Arguments to find a TaskTemplateGroup
+     * @example
+     * // Get one TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends TaskTemplateGroupFindUniqueArgs>(args: SelectSubset<T, TaskTemplateGroupFindUniqueArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one TaskTemplateGroup that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {TaskTemplateGroupFindUniqueOrThrowArgs} args - Arguments to find a TaskTemplateGroup
+     * @example
+     * // Get one TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends TaskTemplateGroupFindUniqueOrThrowArgs>(args: SelectSubset<T, TaskTemplateGroupFindUniqueOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplateGroup that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupFindFirstArgs} args - Arguments to find a TaskTemplateGroup
+     * @example
+     * // Get one TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends TaskTemplateGroupFindFirstArgs>(args?: SelectSubset<T, TaskTemplateGroupFindFirstArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplateGroup that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupFindFirstOrThrowArgs} args - Arguments to find a TaskTemplateGroup
+     * @example
+     * // Get one TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends TaskTemplateGroupFindFirstOrThrowArgs>(args?: SelectSubset<T, TaskTemplateGroupFindFirstOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more TaskTemplateGroups that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all TaskTemplateGroups
+     * const taskTemplateGroups = await prisma.taskTemplateGroup.findMany()
+     * 
+     * // Get first 10 TaskTemplateGroups
+     * const taskTemplateGroups = await prisma.taskTemplateGroup.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const taskTemplateGroupWithIdOnly = await prisma.taskTemplateGroup.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends TaskTemplateGroupFindManyArgs>(args?: SelectSubset<T, TaskTemplateGroupFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a TaskTemplateGroup.
+     * @param {TaskTemplateGroupCreateArgs} args - Arguments to create a TaskTemplateGroup.
+     * @example
+     * // Create one TaskTemplateGroup
+     * const TaskTemplateGroup = await prisma.taskTemplateGroup.create({
+     *   data: {
+     *     // ... data to create a TaskTemplateGroup
+     *   }
+     * })
+     * 
+     */
+    create<T extends TaskTemplateGroupCreateArgs>(args: SelectSubset<T, TaskTemplateGroupCreateArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many TaskTemplateGroups.
+     * @param {TaskTemplateGroupCreateManyArgs} args - Arguments to create many TaskTemplateGroups.
+     * @example
+     * // Create many TaskTemplateGroups
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends TaskTemplateGroupCreateManyArgs>(args?: SelectSubset<T, TaskTemplateGroupCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many TaskTemplateGroups and returns the data saved in the database.
+     * @param {TaskTemplateGroupCreateManyAndReturnArgs} args - Arguments to create many TaskTemplateGroups.
+     * @example
+     * // Create many TaskTemplateGroups
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many TaskTemplateGroups and only return the `id`
+     * const taskTemplateGroupWithIdOnly = await prisma.taskTemplateGroup.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends TaskTemplateGroupCreateManyAndReturnArgs>(args?: SelectSubset<T, TaskTemplateGroupCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a TaskTemplateGroup.
+     * @param {TaskTemplateGroupDeleteArgs} args - Arguments to delete one TaskTemplateGroup.
+     * @example
+     * // Delete one TaskTemplateGroup
+     * const TaskTemplateGroup = await prisma.taskTemplateGroup.delete({
+     *   where: {
+     *     // ... filter to delete one TaskTemplateGroup
+     *   }
+     * })
+     * 
+     */
+    delete<T extends TaskTemplateGroupDeleteArgs>(args: SelectSubset<T, TaskTemplateGroupDeleteArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one TaskTemplateGroup.
+     * @param {TaskTemplateGroupUpdateArgs} args - Arguments to update one TaskTemplateGroup.
+     * @example
+     * // Update one TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends TaskTemplateGroupUpdateArgs>(args: SelectSubset<T, TaskTemplateGroupUpdateArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more TaskTemplateGroups.
+     * @param {TaskTemplateGroupDeleteManyArgs} args - Arguments to filter TaskTemplateGroups to delete.
+     * @example
+     * // Delete a few TaskTemplateGroups
+     * const { count } = await prisma.taskTemplateGroup.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends TaskTemplateGroupDeleteManyArgs>(args?: SelectSubset<T, TaskTemplateGroupDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplateGroups.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many TaskTemplateGroups
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends TaskTemplateGroupUpdateManyArgs>(args: SelectSubset<T, TaskTemplateGroupUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplateGroups and returns the data updated in the database.
+     * @param {TaskTemplateGroupUpdateManyAndReturnArgs} args - Arguments to update many TaskTemplateGroups.
+     * @example
+     * // Update many TaskTemplateGroups
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more TaskTemplateGroups and only return the `id`
+     * const taskTemplateGroupWithIdOnly = await prisma.taskTemplateGroup.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends TaskTemplateGroupUpdateManyAndReturnArgs>(args: SelectSubset<T, TaskTemplateGroupUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one TaskTemplateGroup.
+     * @param {TaskTemplateGroupUpsertArgs} args - Arguments to update or create a TaskTemplateGroup.
+     * @example
+     * // Update or create a TaskTemplateGroup
+     * const taskTemplateGroup = await prisma.taskTemplateGroup.upsert({
+     *   create: {
+     *     // ... data to create a TaskTemplateGroup
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the TaskTemplateGroup we want to update
+     *   }
+     * })
+     */
+    upsert<T extends TaskTemplateGroupUpsertArgs>(args: SelectSubset<T, TaskTemplateGroupUpsertArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of TaskTemplateGroups.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupCountArgs} args - Arguments to filter TaskTemplateGroups to count.
+     * @example
+     * // Count the number of TaskTemplateGroups
+     * const count = await prisma.taskTemplateGroup.count({
+     *   where: {
+     *     // ... the filter for the TaskTemplateGroups we want to count
+     *   }
+     * })
+    **/
+    count<T extends TaskTemplateGroupCountArgs>(
+      args?: Subset<T, TaskTemplateGroupCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], TaskTemplateGroupCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a TaskTemplateGroup.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends TaskTemplateGroupAggregateArgs>(args: Subset<T, TaskTemplateGroupAggregateArgs>): Prisma.PrismaPromise<GetTaskTemplateGroupAggregateType<T>>
+
+    /**
+     * Group by TaskTemplateGroup.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateGroupGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends TaskTemplateGroupGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: TaskTemplateGroupGroupByArgs['orderBy'] }
+        : { orderBy?: TaskTemplateGroupGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, TaskTemplateGroupGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetTaskTemplateGroupGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the TaskTemplateGroup model
+   */
+  readonly fields: TaskTemplateGroupFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for TaskTemplateGroup.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__TaskTemplateGroupClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    templates<T extends TaskTemplateGroup$templatesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$templatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the TaskTemplateGroup model
+   */
+  interface TaskTemplateGroupFieldRefs {
+    readonly id: FieldRef<"TaskTemplateGroup", 'String'>
+    readonly createdById: FieldRef<"TaskTemplateGroup", 'String'>
+    readonly name: FieldRef<"TaskTemplateGroup", 'String'>
+    readonly scope: FieldRef<"TaskTemplateGroup", 'TemplateGroupScope'>
+    readonly archivedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
+    readonly createdAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
+    readonly updatedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * TaskTemplateGroup findUnique
+   */
+  export type TaskTemplateGroupFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateGroup to fetch.
+     */
+    where: TaskTemplateGroupWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateGroup findUniqueOrThrow
+   */
+  export type TaskTemplateGroupFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateGroup to fetch.
+     */
+    where: TaskTemplateGroupWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateGroup findFirst
+   */
+  export type TaskTemplateGroupFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateGroup to fetch.
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateGroups to fetch.
+     */
+    orderBy?: TaskTemplateGroupOrderByWithRelationInput | TaskTemplateGroupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplateGroups.
+     */
+    cursor?: TaskTemplateGroupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateGroups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateGroups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateGroups.
+     */
+    distinct?: TaskTemplateGroupScalarFieldEnum | TaskTemplateGroupScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateGroup findFirstOrThrow
+   */
+  export type TaskTemplateGroupFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateGroup to fetch.
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateGroups to fetch.
+     */
+    orderBy?: TaskTemplateGroupOrderByWithRelationInput | TaskTemplateGroupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplateGroups.
+     */
+    cursor?: TaskTemplateGroupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateGroups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateGroups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateGroups.
+     */
+    distinct?: TaskTemplateGroupScalarFieldEnum | TaskTemplateGroupScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateGroup findMany
+   */
+  export type TaskTemplateGroupFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateGroups to fetch.
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateGroups to fetch.
+     */
+    orderBy?: TaskTemplateGroupOrderByWithRelationInput | TaskTemplateGroupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing TaskTemplateGroups.
+     */
+    cursor?: TaskTemplateGroupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateGroups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateGroups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateGroups.
+     */
+    distinct?: TaskTemplateGroupScalarFieldEnum | TaskTemplateGroupScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateGroup create
+   */
+  export type TaskTemplateGroupCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * The data needed to create a TaskTemplateGroup.
+     */
+    data: XOR<TaskTemplateGroupCreateInput, TaskTemplateGroupUncheckedCreateInput>
+  }
+
+  /**
+   * TaskTemplateGroup createMany
+   */
+  export type TaskTemplateGroupCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many TaskTemplateGroups.
+     */
+    data: TaskTemplateGroupCreateManyInput | TaskTemplateGroupCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TaskTemplateGroup createManyAndReturn
+   */
+  export type TaskTemplateGroupCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * The data used to create many TaskTemplateGroups.
+     */
+    data: TaskTemplateGroupCreateManyInput | TaskTemplateGroupCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TaskTemplateGroup update
+   */
+  export type TaskTemplateGroupUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * The data needed to update a TaskTemplateGroup.
+     */
+    data: XOR<TaskTemplateGroupUpdateInput, TaskTemplateGroupUncheckedUpdateInput>
+    /**
+     * Choose, which TaskTemplateGroup to update.
+     */
+    where: TaskTemplateGroupWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateGroup updateMany
+   */
+  export type TaskTemplateGroupUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update TaskTemplateGroups.
+     */
+    data: XOR<TaskTemplateGroupUpdateManyMutationInput, TaskTemplateGroupUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplateGroups to update
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * Limit how many TaskTemplateGroups to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplateGroup updateManyAndReturn
+   */
+  export type TaskTemplateGroupUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * The data used to update TaskTemplateGroups.
+     */
+    data: XOR<TaskTemplateGroupUpdateManyMutationInput, TaskTemplateGroupUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplateGroups to update
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * Limit how many TaskTemplateGroups to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplateGroup upsert
+   */
+  export type TaskTemplateGroupUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * The filter to search for the TaskTemplateGroup to update in case it exists.
+     */
+    where: TaskTemplateGroupWhereUniqueInput
+    /**
+     * In case the TaskTemplateGroup found by the `where` argument doesn't exist, create a new TaskTemplateGroup with this data.
+     */
+    create: XOR<TaskTemplateGroupCreateInput, TaskTemplateGroupUncheckedCreateInput>
+    /**
+     * In case the TaskTemplateGroup was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<TaskTemplateGroupUpdateInput, TaskTemplateGroupUncheckedUpdateInput>
+  }
+
+  /**
+   * TaskTemplateGroup delete
+   */
+  export type TaskTemplateGroupDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    /**
+     * Filter which TaskTemplateGroup to delete.
+     */
+    where: TaskTemplateGroupWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateGroup deleteMany
+   */
+  export type TaskTemplateGroupDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplateGroups to delete
+     */
+    where?: TaskTemplateGroupWhereInput
+    /**
+     * Limit how many TaskTemplateGroups to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplateGroup.templates
+   */
+  export type TaskTemplateGroup$templatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplate
+     */
+    select?: TaskTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplate
+     */
+    omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    where?: TaskTemplateWhereInput
+    orderBy?: TaskTemplateOrderByWithRelationInput | TaskTemplateOrderByWithRelationInput[]
+    cursor?: TaskTemplateWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: TaskTemplateScalarFieldEnum | TaskTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateGroup without action
+   */
+  export type TaskTemplateGroupDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model TaskTemplate
    */
 
   export type AggregateTaskTemplate = {
     _count: TaskTemplateCountAggregateOutputType | null
+    _avg: TaskTemplateAvgAggregateOutputType | null
+    _sum: TaskTemplateSumAggregateOutputType | null
     _min: TaskTemplateMinAggregateOutputType | null
     _max: TaskTemplateMaxAggregateOutputType | null
+  }
+
+  export type TaskTemplateAvgAggregateOutputType = {
+    groupPosition: number | null
+  }
+
+  export type TaskTemplateSumAggregateOutputType = {
+    groupPosition: number | null
   }
 
   export type TaskTemplateMinAggregateOutputType = {
@@ -17326,6 +18612,8 @@ export namespace Prisma {
     guidelineMime: string | null
     guidelineImage: Bytes | null
     archivedAt: Date | null
+    templateGroupId: string | null
+    groupPosition: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -17340,6 +18628,8 @@ export namespace Prisma {
     guidelineMime: string | null
     guidelineImage: Bytes | null
     archivedAt: Date | null
+    templateGroupId: string | null
+    groupPosition: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -17355,11 +18645,21 @@ export namespace Prisma {
     guidelineMime: number
     guidelineImage: number
     archivedAt: number
+    templateGroupId: number
+    groupPosition: number
     createdAt: number
     updatedAt: number
     _all: number
   }
 
+
+  export type TaskTemplateAvgAggregateInputType = {
+    groupPosition?: true
+  }
+
+  export type TaskTemplateSumAggregateInputType = {
+    groupPosition?: true
+  }
 
   export type TaskTemplateMinAggregateInputType = {
     id?: true
@@ -17371,6 +18671,8 @@ export namespace Prisma {
     guidelineMime?: true
     guidelineImage?: true
     archivedAt?: true
+    templateGroupId?: true
+    groupPosition?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -17385,6 +18687,8 @@ export namespace Prisma {
     guidelineMime?: true
     guidelineImage?: true
     archivedAt?: true
+    templateGroupId?: true
+    groupPosition?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -17400,6 +18704,8 @@ export namespace Prisma {
     guidelineMime?: true
     guidelineImage?: true
     archivedAt?: true
+    templateGroupId?: true
+    groupPosition?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -17443,6 +18749,18 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
+     * Select which fields to average
+    **/
+    _avg?: TaskTemplateAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: TaskTemplateSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
      * Select which fields to find the minimum value
     **/
     _min?: TaskTemplateMinAggregateInputType
@@ -17473,6 +18791,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: TaskTemplateCountAggregateInputType | true
+    _avg?: TaskTemplateAvgAggregateInputType
+    _sum?: TaskTemplateSumAggregateInputType
     _min?: TaskTemplateMinAggregateInputType
     _max?: TaskTemplateMaxAggregateInputType
   }
@@ -17488,9 +18808,13 @@ export namespace Prisma {
     guidelineMime: string | null
     guidelineImage: Bytes | null
     archivedAt: Date | null
+    templateGroupId: string | null
+    groupPosition: number | null
     createdAt: Date
     updatedAt: Date
     _count: TaskTemplateCountAggregateOutputType | null
+    _avg: TaskTemplateAvgAggregateOutputType | null
+    _sum: TaskTemplateSumAggregateOutputType | null
     _min: TaskTemplateMinAggregateOutputType | null
     _max: TaskTemplateMaxAggregateOutputType | null
   }
@@ -17520,8 +18844,11 @@ export namespace Prisma {
     guidelineMime?: boolean
     guidelineImage?: boolean
     archivedAt?: boolean
+    templateGroupId?: boolean
+    groupPosition?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplate"]>
 
   export type TaskTemplateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -17535,8 +18862,11 @@ export namespace Prisma {
     guidelineMime?: boolean
     guidelineImage?: boolean
     archivedAt?: boolean
+    templateGroupId?: boolean
+    groupPosition?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplate"]>
 
   export type TaskTemplateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -17550,8 +18880,11 @@ export namespace Prisma {
     guidelineMime?: boolean
     guidelineImage?: boolean
     archivedAt?: boolean
+    templateGroupId?: boolean
+    groupPosition?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplate"]>
 
   export type TaskTemplateSelectScalar = {
@@ -17565,15 +18898,28 @@ export namespace Prisma {
     guidelineMime?: boolean
     guidelineImage?: boolean
     archivedAt?: boolean
+    templateGroupId?: boolean
+    groupPosition?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type TaskTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "title" | "subtasks" | "cadence" | "guidelineUrl" | "guidelineMime" | "guidelineImage" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplate"]>
+  export type TaskTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "title" | "subtasks" | "cadence" | "guidelineUrl" | "guidelineMime" | "guidelineImage" | "archivedAt" | "templateGroupId" | "groupPosition" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplate"]>
+  export type TaskTemplateInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
+  }
+  export type TaskTemplateIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
+  }
+  export type TaskTemplateIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    group?: boolean | TaskTemplate$groupArgs<ExtArgs>
+  }
 
   export type $TaskTemplatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "TaskTemplate"
-    objects: {}
+    objects: {
+      group: Prisma.$TaskTemplateGroupPayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       createdById: string
@@ -17585,6 +18931,8 @@ export namespace Prisma {
       guidelineMime: string | null
       guidelineImage: Prisma.Bytes | null
       archivedAt: Date | null
+      templateGroupId: string | null
+      groupPosition: number | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["taskTemplate"]>
@@ -17981,6 +19329,7 @@ export namespace Prisma {
    */
   export interface Prisma__TaskTemplateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    group<T extends TaskTemplate$groupArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplate$groupArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -18020,6 +19369,8 @@ export namespace Prisma {
     readonly guidelineMime: FieldRef<"TaskTemplate", 'String'>
     readonly guidelineImage: FieldRef<"TaskTemplate", 'Bytes'>
     readonly archivedAt: FieldRef<"TaskTemplate", 'DateTime'>
+    readonly templateGroupId: FieldRef<"TaskTemplate", 'String'>
+    readonly groupPosition: FieldRef<"TaskTemplate", 'Int'>
     readonly createdAt: FieldRef<"TaskTemplate", 'DateTime'>
     readonly updatedAt: FieldRef<"TaskTemplate", 'DateTime'>
   }
@@ -18039,6 +19390,10 @@ export namespace Prisma {
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    /**
      * Filter, which TaskTemplate to fetch.
      */
     where: TaskTemplateWhereUniqueInput
@@ -18057,6 +19412,10 @@ export namespace Prisma {
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    /**
      * Filter, which TaskTemplate to fetch.
      */
     where: TaskTemplateWhereUniqueInput
@@ -18074,6 +19433,10 @@ export namespace Prisma {
      * Omit specific fields from the TaskTemplate
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
     /**
      * Filter, which TaskTemplate to fetch.
      */
@@ -18123,6 +19486,10 @@ export namespace Prisma {
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    /**
      * Filter, which TaskTemplate to fetch.
      */
     where?: TaskTemplateWhereInput
@@ -18170,6 +19537,10 @@ export namespace Prisma {
      * Omit specific fields from the TaskTemplate
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
     /**
      * Filter, which TaskTemplates to fetch.
      */
@@ -18219,6 +19590,10 @@ export namespace Prisma {
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    /**
      * The data needed to create a TaskTemplate.
      */
     data: XOR<TaskTemplateCreateInput, TaskTemplateUncheckedCreateInput>
@@ -18252,6 +19627,10 @@ export namespace Prisma {
      */
     data: TaskTemplateCreateManyInput | TaskTemplateCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -18266,6 +19645,10 @@ export namespace Prisma {
      * Omit specific fields from the TaskTemplate
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
     /**
      * The data needed to update a TaskTemplate.
      */
@@ -18318,6 +19701,10 @@ export namespace Prisma {
      * Limit how many TaskTemplates to update.
      */
     limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateIncludeUpdateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -18332,6 +19719,10 @@ export namespace Prisma {
      * Omit specific fields from the TaskTemplate
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
     /**
      * The filter to search for the TaskTemplate to update in case it exists.
      */
@@ -18359,6 +19750,10 @@ export namespace Prisma {
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
+    /**
      * Filter which TaskTemplate to delete.
      */
     where: TaskTemplateWhereUniqueInput
@@ -18379,6 +19774,25 @@ export namespace Prisma {
   }
 
   /**
+   * TaskTemplate.group
+   */
+  export type TaskTemplate$groupArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    where?: TaskTemplateGroupWhereInput
+  }
+
+  /**
    * TaskTemplate without action
    */
   export type TaskTemplateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -18390,6 +19804,10 @@ export namespace Prisma {
      * Omit specific fields from the TaskTemplate
      */
     omit?: TaskTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateInclude<ExtArgs> | null
   }
 
 
@@ -18406,24 +19824,21 @@ export namespace Prisma {
   export type ProofMinAggregateOutputType = {
     id: string | null
     runBlockId: string | null
-    imageMime: string | null
-    imageData: Bytes | null
+    driveFileId: string | null
     createdAt: Date | null
   }
 
   export type ProofMaxAggregateOutputType = {
     id: string | null
     runBlockId: string | null
-    imageMime: string | null
-    imageData: Bytes | null
+    driveFileId: string | null
     createdAt: Date | null
   }
 
   export type ProofCountAggregateOutputType = {
     id: number
     runBlockId: number
-    imageMime: number
-    imageData: number
+    driveFileId: number
     createdAt: number
     _all: number
   }
@@ -18432,24 +19847,21 @@ export namespace Prisma {
   export type ProofMinAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
   }
 
   export type ProofMaxAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
   }
 
   export type ProofCountAggregateInputType = {
     id?: true
     runBlockId?: true
-    imageMime?: true
-    imageData?: true
+    driveFileId?: true
     createdAt?: true
     _all?: true
   }
@@ -18529,8 +19941,7 @@ export namespace Prisma {
   export type ProofGroupByOutputType = {
     id: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId: string | null
     createdAt: Date
     _count: ProofCountAggregateOutputType | null
     _min: ProofMinAggregateOutputType | null
@@ -18554,8 +19965,7 @@ export namespace Prisma {
   export type ProofSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18563,8 +19973,7 @@ export namespace Prisma {
   export type ProofSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18572,8 +19981,7 @@ export namespace Prisma {
   export type ProofSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["proof"]>
@@ -18581,12 +19989,11 @@ export namespace Prisma {
   export type ProofSelectScalar = {
     id?: boolean
     runBlockId?: boolean
-    imageMime?: boolean
-    imageData?: boolean
+    driveFileId?: boolean
     createdAt?: boolean
   }
 
-  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "imageMime" | "imageData" | "createdAt", ExtArgs["result"]["proof"]>
+  export type ProofOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runBlockId" | "driveFileId" | "createdAt", ExtArgs["result"]["proof"]>
   export type ProofInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runBlock?: boolean | RunBlockDefaultArgs<ExtArgs>
   }
@@ -18605,8 +20012,7 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       runBlockId: string
-      imageMime: string
-      imageData: Prisma.Bytes
+      driveFileId: string | null
       createdAt: Date
     }, ExtArgs["result"]["proof"]>
     composites: {}
@@ -19034,8 +20440,7 @@ export namespace Prisma {
   interface ProofFieldRefs {
     readonly id: FieldRef<"Proof", 'String'>
     readonly runBlockId: FieldRef<"Proof", 'String'>
-    readonly imageMime: FieldRef<"Proof", 'String'>
-    readonly imageData: FieldRef<"Proof", 'Bytes'>
+    readonly driveFileId: FieldRef<"Proof", 'String'>
     readonly createdAt: FieldRef<"Proof", 'DateTime'>
   }
     
@@ -28156,6 +29561,19 @@ export namespace Prisma {
   export type GuidelineScalarFieldEnum = (typeof GuidelineScalarFieldEnum)[keyof typeof GuidelineScalarFieldEnum]
 
 
+  export const TaskTemplateGroupScalarFieldEnum: {
+    id: 'id',
+    createdById: 'createdById',
+    name: 'name',
+    scope: 'scope',
+    archivedAt: 'archivedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type TaskTemplateGroupScalarFieldEnum = (typeof TaskTemplateGroupScalarFieldEnum)[keyof typeof TaskTemplateGroupScalarFieldEnum]
+
+
   export const TaskTemplateScalarFieldEnum: {
     id: 'id',
     createdById: 'createdById',
@@ -28167,6 +29585,8 @@ export namespace Prisma {
     guidelineMime: 'guidelineMime',
     guidelineImage: 'guidelineImage',
     archivedAt: 'archivedAt',
+    templateGroupId: 'templateGroupId',
+    groupPosition: 'groupPosition',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -28177,8 +29597,7 @@ export namespace Prisma {
   export const ProofScalarFieldEnum: {
     id: 'id',
     runBlockId: 'runBlockId',
-    imageMime: 'imageMime',
-    imageData: 'imageData',
+    driveFileId: 'driveFileId',
     createdAt: 'createdAt'
   };
 
@@ -28516,6 +29935,20 @@ export namespace Prisma {
    * Reference to a field of type 'Bytes[]'
    */
   export type ListBytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'TemplateGroupScope'
+   */
+  export type EnumTemplateGroupScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TemplateGroupScope'>
+    
+
+
+  /**
+   * Reference to a field of type 'TemplateGroupScope[]'
+   */
+  export type ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TemplateGroupScope[]'>
     
 
 
@@ -29506,6 +30939,71 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Guideline"> | Date | string
   }
 
+  export type TaskTemplateGroupWhereInput = {
+    AND?: TaskTemplateGroupWhereInput | TaskTemplateGroupWhereInput[]
+    OR?: TaskTemplateGroupWhereInput[]
+    NOT?: TaskTemplateGroupWhereInput | TaskTemplateGroupWhereInput[]
+    id?: StringFilter<"TaskTemplateGroup"> | string
+    createdById?: StringFilter<"TaskTemplateGroup"> | string
+    name?: StringFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
+    archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
+    createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    templates?: TaskTemplateListRelationFilter
+  }
+
+  export type TaskTemplateGroupOrderByWithRelationInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    scope?: SortOrder
+    archivedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    templates?: TaskTemplateOrderByRelationAggregateInput
+  }
+
+  export type TaskTemplateGroupWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: TaskTemplateGroupWhereInput | TaskTemplateGroupWhereInput[]
+    OR?: TaskTemplateGroupWhereInput[]
+    NOT?: TaskTemplateGroupWhereInput | TaskTemplateGroupWhereInput[]
+    createdById?: StringFilter<"TaskTemplateGroup"> | string
+    name?: StringFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
+    archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
+    createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    templates?: TaskTemplateListRelationFilter
+  }, "id">
+
+  export type TaskTemplateGroupOrderByWithAggregationInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    scope?: SortOrder
+    archivedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: TaskTemplateGroupCountOrderByAggregateInput
+    _max?: TaskTemplateGroupMaxOrderByAggregateInput
+    _min?: TaskTemplateGroupMinOrderByAggregateInput
+  }
+
+  export type TaskTemplateGroupScalarWhereWithAggregatesInput = {
+    AND?: TaskTemplateGroupScalarWhereWithAggregatesInput | TaskTemplateGroupScalarWhereWithAggregatesInput[]
+    OR?: TaskTemplateGroupScalarWhereWithAggregatesInput[]
+    NOT?: TaskTemplateGroupScalarWhereWithAggregatesInput | TaskTemplateGroupScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
+    createdById?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
+    name?: StringWithAggregatesFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeWithAggregatesFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
+    archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplateGroup"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
+  }
+
   export type TaskTemplateWhereInput = {
     AND?: TaskTemplateWhereInput | TaskTemplateWhereInput[]
     OR?: TaskTemplateWhereInput[]
@@ -29520,8 +31018,11 @@ export namespace Prisma {
     guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
     archivedAt?: DateTimeNullableFilter<"TaskTemplate"> | Date | string | null
+    templateGroupId?: StringNullableFilter<"TaskTemplate"> | string | null
+    groupPosition?: IntNullableFilter<"TaskTemplate"> | number | null
     createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+    group?: XOR<TaskTemplateGroupNullableScalarRelationFilter, TaskTemplateGroupWhereInput> | null
   }
 
   export type TaskTemplateOrderByWithRelationInput = {
@@ -29535,8 +31036,11 @@ export namespace Prisma {
     guidelineMime?: SortOrderInput | SortOrder
     guidelineImage?: SortOrderInput | SortOrder
     archivedAt?: SortOrderInput | SortOrder
+    templateGroupId?: SortOrderInput | SortOrder
+    groupPosition?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    group?: TaskTemplateGroupOrderByWithRelationInput
   }
 
   export type TaskTemplateWhereUniqueInput = Prisma.AtLeast<{
@@ -29553,8 +31057,11 @@ export namespace Prisma {
     guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
     archivedAt?: DateTimeNullableFilter<"TaskTemplate"> | Date | string | null
+    templateGroupId?: StringNullableFilter<"TaskTemplate"> | string | null
+    groupPosition?: IntNullableFilter<"TaskTemplate"> | number | null
     createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+    group?: XOR<TaskTemplateGroupNullableScalarRelationFilter, TaskTemplateGroupWhereInput> | null
   }, "id">
 
   export type TaskTemplateOrderByWithAggregationInput = {
@@ -29568,11 +31075,15 @@ export namespace Prisma {
     guidelineMime?: SortOrderInput | SortOrder
     guidelineImage?: SortOrderInput | SortOrder
     archivedAt?: SortOrderInput | SortOrder
+    templateGroupId?: SortOrderInput | SortOrder
+    groupPosition?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: TaskTemplateCountOrderByAggregateInput
+    _avg?: TaskTemplateAvgOrderByAggregateInput
     _max?: TaskTemplateMaxOrderByAggregateInput
     _min?: TaskTemplateMinOrderByAggregateInput
+    _sum?: TaskTemplateSumOrderByAggregateInput
   }
 
   export type TaskTemplateScalarWhereWithAggregatesInput = {
@@ -29589,6 +31100,8 @@ export namespace Prisma {
     guidelineMime?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
     guidelineImage?: BytesNullableWithAggregatesFilter<"TaskTemplate"> | Bytes | null
     archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplate"> | Date | string | null
+    templateGroupId?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
+    groupPosition?: IntNullableWithAggregatesFilter<"TaskTemplate"> | number | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
   }
@@ -29599,8 +31112,7 @@ export namespace Prisma {
     NOT?: ProofWhereInput | ProofWhereInput[]
     id?: StringFilter<"Proof"> | string
     runBlockId?: StringFilter<"Proof"> | string
-    imageMime?: StringFilter<"Proof"> | string
-    imageData?: BytesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
   }
@@ -29608,8 +31120,7 @@ export namespace Prisma {
   export type ProofOrderByWithRelationInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     runBlock?: RunBlockOrderByWithRelationInput
   }
@@ -29620,8 +31131,7 @@ export namespace Prisma {
     AND?: ProofWhereInput | ProofWhereInput[]
     OR?: ProofWhereInput[]
     NOT?: ProofWhereInput | ProofWhereInput[]
-    imageMime?: StringFilter<"Proof"> | string
-    imageData?: BytesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
   }, "id" | "runBlockId">
@@ -29629,8 +31139,7 @@ export namespace Prisma {
   export type ProofOrderByWithAggregationInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: ProofCountOrderByAggregateInput
     _max?: ProofMaxOrderByAggregateInput
@@ -29643,8 +31152,7 @@ export namespace Prisma {
     NOT?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Proof"> | string
     runBlockId?: StringWithAggregatesFilter<"Proof"> | string
-    imageMime?: StringWithAggregatesFilter<"Proof"> | string
-    imageData?: BytesWithAggregatesFilter<"Proof"> | Bytes
+    driveFileId?: StringNullableWithAggregatesFilter<"Proof"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
   }
 
@@ -31213,6 +32721,80 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type TaskTemplateGroupCreateInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateCreateNestedManyWithoutGroupInput
+  }
+
+  export type TaskTemplateGroupUncheckedCreateInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
+  }
+
+  export type TaskTemplateGroupUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
+  }
+
+  export type TaskTemplateGroupCreateManyInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateGroupUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type TaskTemplateCreateInput = {
     id?: string
     createdById: string
@@ -31224,8 +32806,10 @@ export namespace Prisma {
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
     archivedAt?: Date | string | null
+    groupPosition?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    group?: TaskTemplateGroupCreateNestedOneWithoutTemplatesInput
   }
 
   export type TaskTemplateUncheckedCreateInput = {
@@ -31239,6 +32823,8 @@ export namespace Prisma {
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
     archivedAt?: Date | string | null
+    templateGroupId?: string | null
+    groupPosition?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -31254,8 +32840,10 @@ export namespace Prisma {
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    group?: TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateInput = {
@@ -31269,6 +32857,8 @@ export namespace Prisma {
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    templateGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31284,6 +32874,8 @@ export namespace Prisma {
     guidelineMime?: string | null
     guidelineImage?: Bytes | null
     archivedAt?: Date | string | null
+    templateGroupId?: string | null
+    groupPosition?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -31299,6 +32891,7 @@ export namespace Prisma {
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -31314,14 +32907,15 @@ export namespace Prisma {
     guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    templateGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofCreateInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
     runBlock: RunBlockCreateNestedOneWithoutProofInput
   }
@@ -31329,15 +32923,13 @@ export namespace Prisma {
   export type ProofUncheckedCreateInput = {
     id?: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
   }
@@ -31345,31 +32937,27 @@ export namespace Prisma {
   export type ProofUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     runBlockId?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofCreateManyInput = {
     id?: string
     runBlockId: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     runBlockId?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -32983,6 +34571,68 @@ export namespace Prisma {
     _max?: NestedBytesNullableFilter<$PrismaModel>
   }
 
+  export type EnumTemplateGroupScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeFilter<$PrismaModel> | $Enums.TemplateGroupScope
+  }
+
+  export type TaskTemplateListRelationFilter = {
+    every?: TaskTemplateWhereInput
+    some?: TaskTemplateWhereInput
+    none?: TaskTemplateWhereInput
+  }
+
+  export type TaskTemplateOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type TaskTemplateGroupCountOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    scope?: SortOrder
+    archivedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateGroupMaxOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    scope?: SortOrder
+    archivedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateGroupMinOrderByAggregateInput = {
+    id?: SortOrder
+    createdById?: SortOrder
+    name?: SortOrder
+    scope?: SortOrder
+    archivedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel> | $Enums.TemplateGroupScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+    _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+  }
+
+  export type TaskTemplateGroupNullableScalarRelationFilter = {
+    is?: TaskTemplateGroupWhereInput | null
+    isNot?: TaskTemplateGroupWhereInput | null
+  }
+
   export type TaskTemplateCountOrderByAggregateInput = {
     id?: SortOrder
     createdById?: SortOrder
@@ -32994,8 +34644,14 @@ export namespace Prisma {
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
     archivedAt?: SortOrder
+    templateGroupId?: SortOrder
+    groupPosition?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+  }
+
+  export type TaskTemplateAvgOrderByAggregateInput = {
+    groupPosition?: SortOrder
   }
 
   export type TaskTemplateMaxOrderByAggregateInput = {
@@ -33008,6 +34664,8 @@ export namespace Prisma {
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
     archivedAt?: SortOrder
+    templateGroupId?: SortOrder
+    groupPosition?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -33022,15 +34680,14 @@ export namespace Prisma {
     guidelineMime?: SortOrder
     guidelineImage?: SortOrder
     archivedAt?: SortOrder
+    templateGroupId?: SortOrder
+    groupPosition?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
-  export type BytesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  export type TaskTemplateSumOrderByAggregateInput = {
+    groupPosition?: SortOrder
   }
 
   export type RunBlockScalarRelationFilter = {
@@ -33041,35 +34698,22 @@ export namespace Prisma {
   export type ProofCountOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
   }
 
   export type ProofMaxOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
   }
 
   export type ProofMinOrderByAggregateInput = {
     id?: SortOrder
     runBlockId?: SortOrder
-    imageMime?: SortOrder
-    imageData?: SortOrder
+    driveFileId?: SortOrder
     createdAt?: SortOrder
-  }
-
-  export type BytesWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBytesFilter<$PrismaModel>
-    _max?: NestedBytesFilter<$PrismaModel>
   }
   export type JsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -34275,14 +35919,72 @@ export namespace Prisma {
     deleteMany?: RunBlockScalarWhereInput | RunBlockScalarWhereInput[]
   }
 
+  export type TaskTemplateCreateNestedManyWithoutGroupInput = {
+    create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
+    createMany?: TaskTemplateCreateManyGroupInputEnvelope
+    connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+  }
+
+  export type TaskTemplateUncheckedCreateNestedManyWithoutGroupInput = {
+    create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
+    createMany?: TaskTemplateCreateManyGroupInputEnvelope
+    connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+  }
+
+  export type EnumTemplateGroupScopeFieldUpdateOperationsInput = {
+    set?: $Enums.TemplateGroupScope
+  }
+
+  export type TaskTemplateUpdateManyWithoutGroupNestedInput = {
+    create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
+    upsert?: TaskTemplateUpsertWithWhereUniqueWithoutGroupInput | TaskTemplateUpsertWithWhereUniqueWithoutGroupInput[]
+    createMany?: TaskTemplateCreateManyGroupInputEnvelope
+    set?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    disconnect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    delete?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    update?: TaskTemplateUpdateWithWhereUniqueWithoutGroupInput | TaskTemplateUpdateWithWhereUniqueWithoutGroupInput[]
+    updateMany?: TaskTemplateUpdateManyWithWhereWithoutGroupInput | TaskTemplateUpdateManyWithWhereWithoutGroupInput[]
+    deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+  }
+
+  export type TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput = {
+    create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
+    upsert?: TaskTemplateUpsertWithWhereUniqueWithoutGroupInput | TaskTemplateUpsertWithWhereUniqueWithoutGroupInput[]
+    createMany?: TaskTemplateCreateManyGroupInputEnvelope
+    set?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    disconnect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    delete?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+    update?: TaskTemplateUpdateWithWhereUniqueWithoutGroupInput | TaskTemplateUpdateWithWhereUniqueWithoutGroupInput[]
+    updateMany?: TaskTemplateUpdateManyWithWhereWithoutGroupInput | TaskTemplateUpdateManyWithWhereWithoutGroupInput[]
+    deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+  }
+
+  export type TaskTemplateGroupCreateNestedOneWithoutTemplatesInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutTemplatesInput
+    connect?: TaskTemplateGroupWhereUniqueInput
+  }
+
+  export type TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutTemplatesInput
+    upsert?: TaskTemplateGroupUpsertWithoutTemplatesInput
+    disconnect?: TaskTemplateGroupWhereInput | boolean
+    delete?: TaskTemplateGroupWhereInput | boolean
+    connect?: TaskTemplateGroupWhereUniqueInput
+    update?: XOR<XOR<TaskTemplateGroupUpdateToOneWithWhereWithoutTemplatesInput, TaskTemplateGroupUpdateWithoutTemplatesInput>, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
+  }
+
   export type RunBlockCreateNestedOneWithoutProofInput = {
     create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
     connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
     connect?: RunBlockWhereUniqueInput
-  }
-
-  export type BytesFieldUpdateOperationsInput = {
-    set?: Bytes
   }
 
   export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
@@ -34744,21 +36446,21 @@ export namespace Prisma {
     _max?: NestedBytesNullableFilter<$PrismaModel>
   }
 
-  export type NestedBytesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesFilter<$PrismaModel> | Bytes
+  export type NestedEnumTemplateGroupScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeFilter<$PrismaModel> | $Enums.TemplateGroupScope
   }
 
-  export type NestedBytesWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Bytes | BytesFieldRefInput<$PrismaModel>
-    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel>
-    not?: NestedBytesWithAggregatesFilter<$PrismaModel> | Bytes
+  export type NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TemplateGroupScope | EnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.TemplateGroupScope[] | ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel> | $Enums.TemplateGroupScope
     _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBytesFilter<$PrismaModel>
-    _max?: NestedBytesFilter<$PrismaModel>
+    _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+    _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -36338,15 +38040,13 @@ export namespace Prisma {
 
   export type ProofCreateWithoutRunBlockInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
   export type ProofUncheckedCreateWithoutRunBlockInput = {
     id?: string
-    imageMime: string
-    imageData: Bytes
+    driveFileId?: string | null
     createdAt?: Date | string
   }
 
@@ -36712,15 +38412,13 @@ export namespace Prisma {
 
   export type ProofUpdateWithoutRunBlockInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofUncheckedUpdateWithoutRunBlockInput = {
     id?: StringFieldUpdateOperationsInput | string
-    imageMime?: StringFieldUpdateOperationsInput | string
-    imageData?: BytesFieldUpdateOperationsInput | Bytes
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -36879,6 +38577,140 @@ export namespace Prisma {
   export type RunBlockUpdateManyWithWhereWithoutGuidelineInput = {
     where: RunBlockScalarWhereInput
     data: XOR<RunBlockUpdateManyMutationInput, RunBlockUncheckedUpdateManyWithoutGuidelineInput>
+  }
+
+  export type TaskTemplateCreateWithoutGroupInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
+    groupPosition?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateUncheckedCreateWithoutGroupInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
+    groupPosition?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateCreateOrConnectWithoutGroupInput = {
+    where: TaskTemplateWhereUniqueInput
+    create: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput>
+  }
+
+  export type TaskTemplateCreateManyGroupInputEnvelope = {
+    data: TaskTemplateCreateManyGroupInput | TaskTemplateCreateManyGroupInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type TaskTemplateUpsertWithWhereUniqueWithoutGroupInput = {
+    where: TaskTemplateWhereUniqueInput
+    update: XOR<TaskTemplateUpdateWithoutGroupInput, TaskTemplateUncheckedUpdateWithoutGroupInput>
+    create: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput>
+  }
+
+  export type TaskTemplateUpdateWithWhereUniqueWithoutGroupInput = {
+    where: TaskTemplateWhereUniqueInput
+    data: XOR<TaskTemplateUpdateWithoutGroupInput, TaskTemplateUncheckedUpdateWithoutGroupInput>
+  }
+
+  export type TaskTemplateUpdateManyWithWhereWithoutGroupInput = {
+    where: TaskTemplateScalarWhereInput
+    data: XOR<TaskTemplateUpdateManyMutationInput, TaskTemplateUncheckedUpdateManyWithoutGroupInput>
+  }
+
+  export type TaskTemplateScalarWhereInput = {
+    AND?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+    OR?: TaskTemplateScalarWhereInput[]
+    NOT?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+    id?: StringFilter<"TaskTemplate"> | string
+    createdById?: StringFilter<"TaskTemplate"> | string
+    name?: StringFilter<"TaskTemplate"> | string
+    title?: StringFilter<"TaskTemplate"> | string
+    subtasks?: JsonFilter<"TaskTemplate">
+    cadence?: EnumCadenceNullableFilter<"TaskTemplate"> | $Enums.Cadence | null
+    guidelineUrl?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineMime?: StringNullableFilter<"TaskTemplate"> | string | null
+    guidelineImage?: BytesNullableFilter<"TaskTemplate"> | Bytes | null
+    archivedAt?: DateTimeNullableFilter<"TaskTemplate"> | Date | string | null
+    templateGroupId?: StringNullableFilter<"TaskTemplate"> | string | null
+    groupPosition?: IntNullableFilter<"TaskTemplate"> | number | null
+    createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+  }
+
+  export type TaskTemplateGroupCreateWithoutTemplatesInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateGroupUncheckedCreateWithoutTemplatesInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateGroupCreateOrConnectWithoutTemplatesInput = {
+    where: TaskTemplateGroupWhereUniqueInput
+    create: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
+  }
+
+  export type TaskTemplateGroupUpsertWithoutTemplatesInput = {
+    update: XOR<TaskTemplateGroupUpdateWithoutTemplatesInput, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
+    create: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
+    where?: TaskTemplateGroupWhereInput
+  }
+
+  export type TaskTemplateGroupUpdateToOneWithWhereWithoutTemplatesInput = {
+    where?: TaskTemplateGroupWhereInput
+    data: XOR<TaskTemplateGroupUpdateWithoutTemplatesInput, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
+  }
+
+  export type TaskTemplateGroupUpdateWithoutTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type RunBlockCreateWithoutProofInput = {
@@ -38016,6 +39848,70 @@ export namespace Prisma {
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type TaskTemplateCreateManyGroupInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
+    groupPosition?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateUpdateWithoutGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateUncheckedUpdateWithoutGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateUncheckedUpdateManyWithoutGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ScheduleSlotCreateManyScheduleInput = {

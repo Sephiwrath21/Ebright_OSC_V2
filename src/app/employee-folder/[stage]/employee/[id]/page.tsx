@@ -15,6 +15,8 @@ import {
   resolveLocationName,
 } from "@/lib/employeeQueries";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
+import { getRealAccountLifecycleOverride } from "@/lib/careerApplicationSync";
+import { getProbationDisplayInfo } from "@/lib/probationDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,11 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // real-table lookups below (getResumeInfo etc.) already no-op safely for a
   // user_id that doesn't exist, so they don't need special-casing.
   const isCandidate = numId < 0;
-  if (isCandidate && stage !== "pre") notFound();
+  // A candidate-only row can now also be reached via Onboarding once its
+  // start_date has passed (see computePreStartDatePassedRows) — same
+  // synthesized-from-onboarding_candidate profile, just a different
+  // stage label on the breadcrumb/URL.
+  if (isCandidate && stage !== "pre" && stage !== "onboarding") notFound();
 
   let employee: { id: number; fullName: string };
   let employeeDetail;
@@ -58,7 +64,22 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
     employeeDetail = candidate;
   } else {
     const found = await getEmployeeOverviewRowById(numId);
-    if (!found || found.stage !== stage) notFound();
+    if (!found) notFound();
+    if (found.stage !== stage) {
+      // The one allowed mismatch: someone whose real, stored stage is
+      // something else (Onboarding, or even Active — the external
+      // recruitment pipeline can lag behind real progress) but whose
+      // career_applications.board_stage OR rec_recruit/rec_stage.name reads
+      // "Probation" is dual-listed on the Probation list (see
+      // [stage]/page.tsx) and must be reachable at /probation/employee/[id]
+      // there — rendered with the Probation profile template below, not
+      // their real stage's one, and not a 404. Visiting them at their real
+      // stage's own URL still renders normally since found.stage === stage
+      // already matched above in that case.
+      const isDualListedProbationView =
+        stage === "probation" && (await getRealAccountLifecycleOverride(found))?.stage === "probation";
+      if (!isDualListedProbationView) notFound();
+    }
     employee = found;
     employeeDetail = await getEmployeeById(numId);
   }
@@ -67,20 +88,28 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // every stage now, same as the separate-pages route. Pre/Probation never
   // reach here with a locGroup/locCode — hasLocationLayer is false for both,
   // so there's no branch/dept-scoped namelist to have arrived from.
-  const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, { locGroup, locCode }] = await Promise.all([
-    getResumeInfo(numId),
-    getInterviewAssessment(numId, employee.fullName),
-    getReferenceCheck(numId),
-    getMedicalCheck(numId),
-    getProbationInfo(numId),
-    searchParams,
-  ]);
+  const [resumeInfo, interviewAssessment, referenceCheck, medicalCheck, probationInfo, probationDisplay, { locGroup, locCode }] =
+    await Promise.all([
+      getResumeInfo(numId),
+      getInterviewAssessment(numId, employee.fullName),
+      getReferenceCheck(numId),
+      getMedicalCheck(numId),
+      getProbationInfo(numId),
+      // Only needed on the Probation section itself — skips the BranchStaff/
+      // career_applications round trips everywhere else. Not meaningful for
+      // a candidate (isCandidate is only ever reachable at stage="pre", never
+      // "probation" — see the notFound() check above), so no isCandidate
+      // branch needed here either.
+      stage === "probation" ? getProbationDisplayInfo(numId, employee.fullName) : Promise.resolve(undefined),
+      searchParams,
+    ]);
   const locationGroup = locGroup === "branch" || locGroup === "department" ? locGroup : null;
   const locationName = await resolveLocationName(locationGroup, locCode ?? null);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  const canDecideProbation = ["hr", "superadmin"].includes(userRole.toLowerCase());
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -95,6 +124,8 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
         referenceCheck={referenceCheck}
         medicalCheck={medicalCheck}
         probationInfo={probationInfo}
+        probationDisplay={probationDisplay}
+        canDecideProbation={canDecideProbation}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

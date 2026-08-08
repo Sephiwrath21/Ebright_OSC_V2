@@ -24,12 +24,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 7.7.0
- * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+ * Prisma Client JS version: 7.9.1
+ * Query Engine version: e922089b7d7502aff4249d5da3420f6fa55fc6ad
  */
 Prisma.prismaVersion = {
-  client: "7.7.0",
-  engine: "75cbdc1eb7150937890ad5465d861175c6624711"
+  client: "7.9.1",
+  engine: "e922089b7d7502aff4249d5da3420f6fa55fc6ad"
 }
 
 Prisma.PrismaClientKnownRequestError = () => {
@@ -262,6 +262,16 @@ exports.Prisma.GuidelineScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
+  id: 'id',
+  createdById: 'createdById',
+  name: 'name',
+  scope: 'scope',
+  archivedAt: 'archivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.TaskTemplateScalarFieldEnum = {
   id: 'id',
   createdById: 'createdById',
@@ -273,6 +283,8 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
   guidelineMime: 'guidelineMime',
   guidelineImage: 'guidelineImage',
   archivedAt: 'archivedAt',
+  templateGroupId: 'templateGroupId',
+  groupPosition: 'groupPosition',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -280,8 +292,7 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
 exports.Prisma.ProofScalarFieldEnum = {
   id: 'id',
   runBlockId: 'runBlockId',
-  imageMime: 'imageMime',
-  imageData: 'imageData',
+  driveFileId: 'driveFileId',
   createdAt: 'createdAt'
 };
 
@@ -447,6 +458,11 @@ exports.Cadence = exports.$Enums.Cadence = {
   ADHOC: 'ADHOC'
 };
 
+exports.TemplateGroupScope = exports.$Enums.TemplateGroupScope = {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
+};
+
 exports.ViewType = exports.$Enums.ViewType = {
   TABLE: 'TABLE',
   BOARD: 'BOARD',
@@ -471,6 +487,7 @@ exports.Prisma.ModelName = {
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
+  TaskTemplateGroup: 'TaskTemplateGroup',
   TaskTemplate: 'TaskTemplate',
   Proof: 'Proof',
   RunItem: 'RunItem',

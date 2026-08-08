@@ -76,7 +76,7 @@ export interface MePayload {
   streams: TaskStreamPayload[];
   /** Delegated rows carry the ASSIGNEE's name (unlike `tasks`/`streams`,
    *  where the assignee is always `me`) — the CEO's task table's "PIC"
-   *  column, and HOD's "Tasks I Assigned" card, both need to show who. */
+   *  column, and HOD's "Task Assignment" card, both need to show who. */
   delegated: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
   /** Same as streams/delegated but ALL-TIME — the un-periodized overview
    *  cards ("CEO Tasks", "HOD assigned tasks": not daily or monthly). */

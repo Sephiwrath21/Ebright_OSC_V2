@@ -66,7 +66,18 @@ function placeholder(overrides: Partial<PlaceholderRecord> = {}): PlaceholderRec
 
 describe("normalizeName", () => {
   it("uppercases, strips punctuation, and collapses whitespace", () => {
-    expect(normalizeName("  Harshini A/P C.Rethnam  ")).toBe("HARSHINI AP CRETHNAM");
+    expect(normalizeName("  Farah   Binti C.Rethnam  ")).toBe("FARAH BINTI CRETHNAM");
+  });
+
+  it("strips A/P, A/L, S/O, D/O relational honorifics as whole tokens", () => {
+    // Same real person written differently across systems — e.g. our own
+    // portal has "Ramitha Moghan" while onboarding_candidate has "Ramitha
+    // A/P Moghan" — must normalize to the same key or the two get treated
+    // as two different people (confirmed live: this silently duplicated her
+    // onto the Pre list before this fix).
+    expect(normalizeName("Ramitha A/P Moghan")).toBe(normalizeName("Ramitha Moghan"));
+    expect(normalizeName("Harshini A/P C.Rethnam")).toBe("HARSHINI CRETHNAM");
+    expect(normalizeName("Aadesh Abhayaprada A/L Balamurugan")).toBe("AADESH ABHAYAPRADA BALAMURUGAN");
   });
 });
 

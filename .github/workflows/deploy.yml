@@ -71,6 +71,10 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
+            # Everything below redirects into ~/deploy.log on the server, so a
+            # failure looks like a bare "exit 1" in the Actions UI. Dump the
+            # log's tail on ANY exit so the real error is visible in CI.
+            trap 'echo "=== ~/deploy.log (last 120 lines) ==="; tail -120 ~/deploy.log 2>/dev/null || echo "(no deploy.log — failed before first redirect, e.g. cd)"' EXIT
             cd ~/Ebright_OSC_V2
 
             echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ===" > ~/deploy.log 2>&1
@@ -113,6 +117,27 @@ jobs:
             printf '%s\n' 'GOOGLE_DRIVE_SA_EMAIL="${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}"' >> .env
             printf '%s\n' 'GOOGLE_DRIVE_SA_PRIVATE_KEY="${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}"' >> .env
             printf '%s\n' 'GOOGLE_DRIVE_FOLDER_ID="${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}"' >> .env
+
+            # CRM runtime env (CRM port, 2026-08-07). Same pattern as the Drive
+            # keys above, but guarded: only rewrite when the GitHub secret is
+            # actually defined, so a manually-added value in the server's .env
+            # survives until the secrets are configured.
+            # The values are passed through tr -d '\r\n' because a secret
+            # pasted with a trailing newline writes a bare '"' line into .env,
+            # which breaks docker compose's env_file parser ("unexpected
+            # character '\"' in variable name"). Also heal any such orphan
+            # quote line an earlier deploy already left behind.
+            sed -i '/^"$/d' .env || true
+            CRM_URL="$(printf '%s' "${{ secrets.CRM_DATABASE_URL }}" | tr -d '\r\n')"
+            if [ -n "$CRM_URL" ]; then
+              sed -i '/^CRM_DATABASE_URL=/d' .env || true
+              printf 'CRM_DATABASE_URL="%s"\n' "$CRM_URL" >> .env
+            fi
+            BA_SECRET="$(printf '%s' "${{ secrets.BETTER_AUTH_SECRET }}" | tr -d '\r\n')"
+            if [ -n "$BA_SECRET" ]; then
+              sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
+              printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
+            fi
 
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on

@@ -240,7 +240,7 @@ export function TaskManagerView({
       />
     ));
 
-  // "Tasks I Assigned" (HOD's own delegated-work card) — all-time, no period
+  // "Task Assignment" (HOD's own delegated-work card) — all-time, no period
   // split. The CEO's equivalent is a table now (CeoTaskTable, below), not
   // this donut — current.kind is always "org" for CEO, so this card (only
   // rendered under the member/department overview block) never reaches them.
@@ -248,7 +248,7 @@ export function TaskManagerView({
   // the viewer is never the assignee — not a personal task list.
   const delegatedCard = me.delegatedAll && (
     <StatusOverviewCard
-      title="Tasks I Assigned"
+      title="Task Assignment"
       totals={me.delegatedAll.totals}
       tasks={flowBucketize(me.delegatedAll.tasks)}
       reassign={reassign}
@@ -356,8 +356,19 @@ export function TaskManagerView({
 
           {/* ---- CEO Task Overview — grouped table, not a donut (status
               groups, Task/PIC/Due date columns). Tasks the CEO delegated
-              OUT to others — the opposite direction from My Tasks. ---- */}
-          {me.delegatedAll && <CeoTaskTable tasks={flowBucketize(me.delegatedAll.tasks)} />}
+              OUT to others — the opposite direction from My Tasks. Given
+              the same "Task Assignment" heading as HOD's equivalent list
+              (2026-08-05) — CeoTaskTable itself is untouched (unlike
+              HOD's, it renders its own fully-bordered card, so the
+              heading sits as a plain sibling above it, same pattern as
+              "Department Daily Overview" above CeoDashboardSection below,
+              not wrapped together into one shared card). ---- */}
+          {me.delegatedAll && (
+            <>
+              <PageSectionHeading>Task Assignment</PageSectionHeading>
+              <CeoTaskTable tasks={flowBucketize(me.delegatedAll.tasks)} />
+            </>
+          )}
 
           {/* ---- Section 3: Department Daily Overview — Kanban (own
               independent department list/order, never shared with Monthly) ---- */}
@@ -505,6 +516,37 @@ export function TaskManagerView({
             actions={hodKanban.actions}
           />
         </>
+      )}
+
+      {/* ---- Task Assignment (2026-08-05): HOD's delegated-OUT work —
+          the SAME shared My Tasks table (Task / Assigned To / Proof of
+          Completion / Due Date), reused read-only exactly like department-
+          overview.tsx's member drill-down (no myUserId/actions, so status
+          circles are static and Proof is view-only). The table's
+          Assignee column actually renders `assignerName` under the hood
+          (it's "who assigned this to me" in the normal My Tasks context)
+          — here every row's assigner is always "me", so it's remapped to
+          the row's real assignee instead, the useful direction for a
+          delegated-OUT list — labeled "Assigned To" here (via
+          assigneeColumnLabel) rather than "Assignee" for clarity, since
+          it means the opposite thing in this context. CEO's equivalent
+          stays the separate, unchanged CeoTaskTable (grouped sections)
+          below — this list is HOD-only by design. ---- */}
+      {shows(view, "taskManager", "assignedByMeList") && me.delegatedAll && (
+        // Card wrapper (2026-08-05) — matches My Board's own card styling
+        // (hod-kanban.tsx's root div) so this section reads as one
+        // distinct card like every other bordered section on this page,
+        // instead of floating on the bare page background.
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <PageSectionHeading hideBorder>Task Assignment</PageSectionHeading>
+          <ResizableTaskList
+            tasks={me.delegatedAll.tasks.map((t) => ({ ...t, assignerName: t.assigneeName }))}
+            emptyLabel="You haven't assigned any tasks yet."
+            hideCompleted
+            assigneeColumnLabel="Assigned To"
+            hideRowResizeDivider
+          />
+        </div>
       )}
 
       {/* ---- Department Overview: the full department view (chips + donut
