@@ -103,7 +103,7 @@ export function listBranchPackageSchedule(email: string): Promise<BranchPackageS
     });
 
     const existing = await prisma.branchPackageSchedule.findMany({
-      include: { packageGroup: { select: { id: true, name: true } } },
+      include: { packageGroup: { select: { name: true } } },
       orderBy: { packageGroup: { name: "asc" } },
     });
     const existingByKey = new Map<string, BranchPackageOption[]>();
@@ -255,6 +255,23 @@ async function assignWeekday(
  *  here to cover partial application across several packages in one
  *  call, not just a single package's multi-step write.
  *
+ *  That retry guidance is NOT symmetric between removals and additions,
+ *  though, and a caller that doesn't know this can duplicate live tasks:
+ *  `cancelWeekdayAssignment` (via `cancelPendingTemplateRuns`) is
+ *  idempotent — it only acts on runs that aren't already CANCELLED — so
+ *  if a removal's cancel succeeds but the following row `delete` fails,
+ *  a naive retry safely re-runs both and self-heals. `assignWeekday`
+ *  (via `assignFlowTaskCore`) has NO such guard: if an addition's
+ *  `assignWeekday` succeeds but the following row `create` fails, the
+ *  config row is never written, so `currentIds` still won't contain that
+ *  package id on a retry — the id lands back in `toAdd` and
+ *  `assignWeekday` fires a SECOND time, creating a duplicate live
+ *  assignment. Do not blindly retry a failed add with the same desired
+ *  set — first verify (e.g. a `getGroupAssignees`-style check against
+ *  the actual RunBlock/FlowRun state for that package+weekday+manager)
+ *  whether the assignment was already created before deciding whether to
+ *  retry `assignWeekday` again.
+ *
  *  Re-including a package id the cell ALREADY holds in the desired set
  *  leaves it untouched (it's in both `currentIds` and `desiredIds`) —
  *  unlike the old single-select version, re-setting an unchanged package
@@ -275,10 +292,15 @@ export function setBranchPackageScheduleCell(
       where: { branch: body.branch, weekday: prismaWeekday },
     });
     const currentIds = existingRows.map((r) => r.packageGroupId);
-    const desiredIds = [...new Set(body.packageGroupIds)];
+    // Caller may submit the same id twice; dedupe so it's not
+    // double-processed (a repeated id would otherwise fire a second
+    // assignWeekday — a duplicate live assignment — followed by a second
+    // branchPackageSchedule.create that throws on the unique constraint).
+    const currentSet = new Set(currentIds);
+    const desiredSet = new Set(body.packageGroupIds);
 
-    const toRemove = currentIds.filter((id) => !desiredIds.includes(id));
-    const toAdd = desiredIds.filter((id) => !currentIds.includes(id));
+    const toRemove = currentIds.filter((id) => !desiredSet.has(id));
+    const toAdd = [...desiredSet].filter((id) => !currentSet.has(id));
 
     for (const id of toRemove) {
       await cancelWeekdayAssignment(actor.id, id, manager.id, body.weekday);
