@@ -104,6 +104,9 @@ export const FEATURES: FeatureDef[] = [
   // Self-service
   { key: "claim", label: "Claims", group: "Self-service", actions: CRUD },
   { key: "leave", label: "Leave", group: "Self-service", actions: CRUD },
+
+  // Flowghan (embedded workflow / process tracker — apps/doomtracker)
+  { key: "flowghan", label: "Flowghan", group: "Flowghan", actions: CRUDX },
 ];
 
 export const FEATURE_KEYS = FEATURES.map((f) => f.key);
