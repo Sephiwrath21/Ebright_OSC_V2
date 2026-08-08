@@ -692,6 +692,8 @@ function ProofCell({
       } else {
         setError(result.message);
       }
+    } catch {
+      setError("Upload failed — check your connection and try again.");
     } finally {
       setUploading(false);
     }
@@ -727,6 +729,8 @@ function ProofCell({
       } else {
         setRemoveError(result.message);
       }
+    } catch {
+      setRemoveError("Remove failed — check your connection and try again.");
     } finally {
       setRemovingId(null);
     }
@@ -963,7 +967,7 @@ function ProofCell({
                         onClick={() => void handleRemove(id)}
                         title="Remove photo"
                         aria-label="Remove this photo"
-                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
                       >
                         {removingId === id ? "…" : "×"}
                       </button>
