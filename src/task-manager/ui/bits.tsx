@@ -932,11 +932,18 @@ function ProofCell({
             onChange={onFile}
           />
           {/* Step 1 fix (2026-08-08): capture="environment" removed — see
-              openCamera's doc comment above for why. */}
+              openCamera's doc comment above for why. accept narrowed to
+              match inputRef exactly (2026-08-09): some Android/Chrome
+              versions are reported to be more likely to default straight
+              to the camera app for the broader "image/*" than for an
+              explicit MIME list — low-confidence try, not a guaranteed
+              fix, since which UI Android shows for a bare file input is
+              ultimately an OS/browser heuristic outside this attribute's
+              control. */}
           <input
             ref={cameraRef}
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={onFile}
           />
