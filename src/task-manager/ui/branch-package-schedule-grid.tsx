@@ -58,6 +58,36 @@ function idSet(packages: BranchPackageOption[]): Set<string> {
   return new Set(packages.map((p) => p.id));
 }
 
+// Date-picker column highlight (2026-08-08) — purely visual, no effect on
+// any cell's data/save behavior. `Date.getDay()` -> PackageTableWeekday;
+// Monday/Tuesday are intentionally absent (no matching column exists, same
+// day-set as PACKAGE_TABLE_WEEKDAYS server-side) — a picked date landing on
+// either just clears the highlight rather than erroring.
+const JS_DAY_TO_HIGHLIGHT_WEEKDAY: Partial<Record<number, PackageTableWeekday>> = {
+  0: "Sun",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+};
+
+/** Parsed as local midnight (not UTC) via the "T00:00:00" suffix, so the
+ *  derived weekday matches what the date input visually shows regardless of
+ *  the browser's UTC offset. */
+function weekdayForDate(dateStr: string): PackageTableWeekday | null {
+  if (!dateStr) return null;
+  const parsed = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return JS_DAY_TO_HIGHLIGHT_WEEKDAY[parsed.getDay()] ?? null;
+}
+
+function todayDateString(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 // Collapsed-state chip cap (both the editable cell and the read-only
 // StaticCell) — the schema allows up to 20 packages per cell
 // (setCellSchema's sanity cap in branch-package-schedule.ts), and an
@@ -257,7 +287,7 @@ function StaticCell({ cell }: { cell: BranchPackageScheduleCell }) {
       {visible.map((p) => (
         <span
           key={p.id}
-          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+          className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
         >
           {p.name}
         </span>
@@ -297,6 +327,13 @@ export function BranchPackageScheduleGrid({
   const [errors, setErrors] = React.useState<Map<string, string>>(new Map());
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [summary, setSummary] = React.useState<string | null>(null);
+
+  // Column highlight (2026-08-08) — defaults to today so the current day's
+  // column is highlighted on first load. Purely presentational: does not
+  // filter/hide any row, cell, or data — only changes header/cell
+  // background color for the matching weekday column.
+  const [highlightDate, setHighlightDate] = React.useState<string>(todayDateString);
+  const highlightedWeekday = weekdayForDate(highlightDate);
 
   const dirty = pending.size > 0;
 
@@ -420,7 +457,18 @@ export function BranchPackageScheduleGrid({
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Package Table</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Package Table</h3>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            Highlight day
+            <input
+              type="date"
+              value={highlightDate}
+              onChange={(e) => setHighlightDate(e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+        </div>
         {canEdit && (
           <div className="flex items-center gap-3">
             {dirty && saveState !== "saving" && (
@@ -451,7 +499,14 @@ export function BranchPackageScheduleGrid({
             <tr>
               <th className="px-2 text-left text-xs font-semibold text-gray-500">Branch</th>
               {data.weekdays.map((weekday) => (
-                <th key={weekday} className="px-2 text-left text-xs font-semibold text-gray-500">
+                <th
+                  key={weekday}
+                  className={`px-2 text-left text-xs font-semibold ${
+                    weekday === highlightedWeekday
+                      ? "rounded-t-md bg-blue-200 text-blue-900"
+                      : "text-gray-500"
+                  }`}
+                >
                   {weekday}
                 </th>
               ))}
@@ -464,10 +519,20 @@ export function BranchPackageScheduleGrid({
                   {branch}
                 </td>
                 {data.weekdays.map((weekday) => {
+                  // One shade darker than the "populated cell" bg-blue-50
+                  // used inside MultiPackageCell/StaticCell — otherwise a
+                  // populated cell in the highlighted column would blend
+                  // into the column's own background with no visible
+                  // boundary (caught in review).
+                  const columnHighlightClass =
+                    weekday === highlightedWeekday ? "bg-blue-100" : "";
                   const cell = cellAt.get(cellKey(branch, weekday));
                   if (!cell) {
                     return (
-                      <td key={weekday} className="min-w-32 px-2 py-1 align-top">
+                      <td
+                        key={weekday}
+                        className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}
+                      >
                         <span className="text-xs text-gray-300">–</span>
                       </td>
                     );
@@ -478,7 +543,7 @@ export function BranchPackageScheduleGrid({
                     ? (pending.get(key) as Set<string>)
                     : idSet(cell.packages);
                   return (
-                    <td key={weekday} className="min-w-32 px-2 py-1 align-top">
+                    <td key={weekday} className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}>
                       {canEdit ? (
                         <MultiPackageCell
                           packages={data.packages}
