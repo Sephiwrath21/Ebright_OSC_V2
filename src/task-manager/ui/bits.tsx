@@ -18,7 +18,12 @@ import type {
   ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
-import { compressImageFile, IMAGE_JPEG_QUALITY, IMAGE_MAX_DIMENSION } from "./image-compress";
+import {
+  compressImageFile,
+  IMAGE_JPEG_QUALITY,
+  IMAGE_MAX_DIMENSION,
+  type CompressedImage,
+} from "./image-compress";
 import { personSolidColor } from "./palette";
 import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
 
@@ -621,20 +626,29 @@ function ErrorLine({ error }: { error: string | null }) {
   return <p className="mt-1 text-xs text-red-600">{error}</p>;
 }
 
-/** The "Proof" column cell (2026-07-30, multi-photo 2026-08-08): assignee-
- *  uploaded completion evidence, up to MAX_PROOFS_PER_TASK photos per task,
- *  always optional (never gates the status dropdown). Owner of a proof-less
- *  row gets a ＋ button; once any photo exists, EVERYONE sees a small ✓
- *  gallery indicator that opens a panel listing every photo as thumbnails
- *  (served by /api/task-manager/proof-image/[id]) — the owner can remove
- *  any one of them individually, without affecting the rest. Rows that are
- *  neither owned nor proven show a plain dash.
+/** The "Proof" column cell (2026-07-30, multi-photo 2026-08-08, explicit
+ *  Upload + completion lock 2026-08-09): assignee-uploaded completion
+ *  evidence, up to MAX_PROOFS_PER_TASK photos per task, always optional
+ *  (never gates the status dropdown). Owner of a proof-less row gets a ＋
+ *  button; once any photo exists, EVERYONE sees a small ✓ gallery indicator
+ *  that opens a panel listing every photo as thumbnails (served by
+ *  /api/task-manager/proof-image/[id]) — the owner can remove any one of
+ *  them individually, without affecting the rest. Rows that are neither
+ *  owned nor proven show a plain dash.
  *
  *  Every "add a photo" entry point — file picker, drag-drop, clipboard
  *  paste, the mobile camera-or-gallery picker, the desktop getUserMedia
- *  webcam — compresses THEN uploads immediately (2026-08-08 design
- *  decision: no staged/batch step, each pick is independent), appending
- *  the returned id straight onto the local gallery on success. */
+ *  webcam — compresses and STAGES the result locally (2026-08-09: reverses
+ *  the prior "upload immediately" decision) rather than sending it; nothing
+ *  reaches the server until the "Upload N photos" button is clicked, which
+ *  then sends every staged photo in one batch. Staged photos count toward
+ *  the cap so the user can't stage past it before uploading.
+ *
+ *  Once `task.status === "DONE"` (Complete), both uploading and removing
+ *  are locked — same mechanism as the existing past-due-day lock
+ *  (`isLockedPastDay`), just gated on a different condition, and enforced
+ *  again server-side in uploadFlowTaskProof/removeFlowTaskProof so a stale
+ *  tab or direct request can't bypass it. */
 function ProofCell({
   task,
   isOwned,
@@ -653,6 +667,12 @@ function ProofCell({
   // has its own permanent id (never reused/replaced), so unlike the old
   // single-slot version there's no cache-busting `?v=` to carry.
   const [proofIds, setProofIds] = React.useState<string[]>(task.proofIds);
+  // Staged-but-not-yet-uploaded photos (2026-08-09) — compressed locally,
+  // shown as previews, sent only when uploadPending() runs. Each item
+  // tracks its own error so a partial batch failure doesn't lose the rest.
+  const [pending, setPending] = React.useState<
+    { localId: string; image: CompressedImage; error: string | null }[]
+  >([]);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [removingId, setRemovingId] = React.useState<string | null>(null);
@@ -670,45 +690,76 @@ function ProofCell({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const cameraRef = React.useRef<HTMLInputElement>(null);
 
-  const atCap = proofIds.length >= MAX_PROOFS_PER_TASK;
-  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task);
-  // Same ownership/past-day guard as upload, applied symmetrically
-  // (2026-08-08 design decision #4) — a task whose day has passed
-  // shouldn't have its evidence altered either way.
-  const canRemove = isOwned && Boolean(onRemoveProof) && !isLockedPastDay(task);
+  // Completion lock (2026-08-09): once Complete, the attached photos are
+  // the frozen record — same treatment as the past-due-day lock below, just
+  // a different condition. Server-enforced too, see uploadFlowTaskProof.
+  const isCompleted = task.status === "DONE";
+  const atCap = proofIds.length + pending.length >= MAX_PROOFS_PER_TASK;
+  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task) && !isCompleted;
+  // Same ownership/past-day/completion guards as upload, applied
+  // symmetrically (2026-08-08 design decision #4) — a task whose day has
+  // passed, or that's already Complete, shouldn't have its evidence
+  // altered either way.
+  const canRemove = isOwned && Boolean(onRemoveProof) && !isLockedPastDay(task) && !isCompleted;
   const canAddMore = canUpload && !atCap && !uploading;
 
-  /** The ONE place an upload actually happens — every entry point below
-   *  funnels here after compressing. Success appends to the gallery;
-   *  failure surfaces inline without touching any existing photo. */
-  const uploadCompressed = async (image: { mime: string; dataBase64: string }) => {
-    if (!onUploadProof) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const result = await onUploadProof(task.runBlockId, image);
-      if (result.ok) {
-        setProofIds((prev) => [...prev, result.proofId]);
-      } else {
-        setError(result.message);
-      }
-    } catch {
-      setError("Upload failed — check your connection and try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  /** Stages one compressed image locally (2026-08-09: explicit-Upload
+   *  redesign) — nothing reaches the server until uploadPending() runs. */
   const addFile = async (file: File) => {
     if (!canAddMore) return;
     setError(null);
-    // Compress BEFORE upload — the full-res original never leaves the browser.
+    // Compress BEFORE staging — the full-res original never leaves the browser.
     const result = await compressImageFile(file);
     if (!result.ok) {
       setError(result.message);
       return;
     }
-    await uploadCompressed({ mime: result.image.mime, dataBase64: result.image.dataBase64 });
+    setPending((prev) => [...prev, { localId: crypto.randomUUID(), image: result.image, error: null }]);
+  };
+
+  const removePending = (localId: string) => {
+    setPending((prev) => prev.filter((p) => p.localId !== localId));
+  };
+
+  /** The "Upload N photos" button: sends every staged photo SEQUENTIALLY,
+   *  not in parallel — the server's 5-photo cap is a plain count-then-
+   *  create with a documented, accepted one-photo race tolerance (see
+   *  MAX_PROOFS_PER_TASK's comment in data/tasks.ts); firing a whole batch
+   *  at once would let that same race compound into a worse overshoot.
+   *  Each photo succeeds or fails independently: a failure leaves that one
+   *  photo staged with its own inline error (so it stays retry-able by
+   *  clicking Upload again) while the batch continues to the next photo —
+   *  mirrors how a failed remove never touches the rest of the gallery.
+   *  `canAddMore` being false while `uploading` is true prevents new items
+   *  from being staged mid-batch, so the loop below never races new adds. */
+  const uploadPending = async () => {
+    if (!onUploadProof || pending.length === 0) return;
+    setUploading(true);
+    for (const item of pending) {
+      try {
+        const result = await onUploadProof(task.runBlockId, {
+          mime: item.image.mime,
+          dataBase64: item.image.dataBase64,
+        });
+        if (result.ok) {
+          setProofIds((prev) => [...prev, result.proofId]);
+          setPending((prev) => prev.filter((p) => p.localId !== item.localId));
+        } else {
+          setPending((prev) =>
+            prev.map((p) => (p.localId === item.localId ? { ...p, error: result.message } : p)),
+          );
+        }
+      } catch {
+        setPending((prev) =>
+          prev.map((p) =>
+            p.localId === item.localId
+              ? { ...p, error: "Upload failed — check your connection and try again." }
+              : p,
+          ),
+        );
+      }
+    }
+    setUploading(false);
   };
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -736,8 +787,12 @@ function ProofCell({
     }
   };
 
-  // Closing the panel just clears stale errors — there's no staged image to
-  // discard anymore (every pick already uploaded on its own).
+  // Closing the panel only clears stale errors — `pending` deliberately
+  // survives close/reopen (2026-08-09: staged photos are real, meaningful
+  // state now that Upload is a separate step, not something to discard just
+  // because the panel was closed). The Upload button itself re-checks
+  // canUpload every render, so a task completed elsewhere while photos sat
+  // staged still locks correctly next time this panel opens.
   React.useEffect(() => {
     if (!panelOpen) {
       setError(null);
@@ -810,11 +865,15 @@ function ProofCell({
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     stopCamera();
+    // Stages (2026-08-09) like every other entry point — capturing the
+    // frame is no longer itself the "send" action, Upload is.
     const previewUrl = canvas.toDataURL("image/jpeg", IMAGE_JPEG_QUALITY);
-    void uploadCompressed({
-      mime: "image/jpeg",
-      dataBase64: previewUrl.slice(previewUrl.indexOf(",") + 1),
-    });
+    const dataBase64 = previewUrl.slice(previewUrl.indexOf(",") + 1);
+    const bytes = Math.ceil((dataBase64.length * 3) / 4);
+    setPending((prev) => [
+      ...prev,
+      { localId: crypto.randomUUID(), image: { mime: "image/jpeg", dataBase64, previewUrl, bytes }, error: null },
+    ]);
   };
 
   // Wire the stream to the <video> once it's mounted; stop the webcam
@@ -978,6 +1037,72 @@ function ProofCell({
             )}
             <ErrorLine error={removeError} />
 
+            {/* Staged photos (2026-08-09): compressed but not yet sent —
+                each has its own discard × (pure local removal, nothing to
+                undo server-side) and its own error if a previous Upload
+                attempt for it failed; failed items stay here, retry-able
+                by clicking Upload again. */}
+            {pending.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-medium text-gray-500">Ready to upload</p>
+                <div className="flex flex-wrap gap-2">
+                  {pending.map((p) => (
+                    <div key={p.localId} className="group relative">
+                      <div className="block size-16 overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.image.previewUrl}
+                          alt="Photo staged for upload"
+                          className="size-16 object-cover"
+                        />
+                      </div>
+                      {/* disabled={uploading} blocks discard on every staged
+                          item while the batch is running, not just the one
+                          currently in flight — uploading is one global flag,
+                          not per-item. Accepted: batches are small (≤5) and
+                          each item's round trip is quick. */}
+                      <button
+                        type="button"
+                        disabled={uploading}
+                        onClick={() => removePending(p.localId)}
+                        title="Discard"
+                        aria-label="Discard this photo before uploading"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                      >
+                        ×
+                      </button>
+                      {p.error && (
+                        <p className="mt-1 w-16 text-[10px] leading-tight text-red-600">{p.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Gated on canUpload, not just pending.length (2026-08-09
+                    fix): a photo can be staged, then the task marked
+                    Complete from elsewhere before Upload is clicked — the
+                    button must disappear along with everything else the
+                    completion lock hides, not stay live only to be
+                    rejected server-side. Discard above stays unconditional
+                    since it's a pure local action with no server effect. */}
+                {canUpload ? (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void uploadPending()}
+                    className="mt-2 w-full rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {uploading
+                      ? "Uploading…"
+                      : `Upload ${pending.length} photo${pending.length === 1 ? "" : "s"}`}
+                  </button>
+                ) : isCompleted && isOwned ? (
+                  <p className="mt-2 text-center text-[11px] text-gray-400">
+                    🔒 Task is complete — these can no longer be uploaded.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
             {cameraOpen ? (
               <>
                 {/* Live desktop webcam preview (getUserMedia) — 📸 draws
@@ -1010,7 +1135,8 @@ function ProofCell({
               </>
             ) : canUpload && atCap ? (
               <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
-                {MAX_PROOFS_PER_TASK}/{MAX_PROOFS_PER_TASK} photos attached — remove one to add another.
+                {MAX_PROOFS_PER_TASK}/{MAX_PROOFS_PER_TASK} photos attached or staged — remove one to
+                add another.
               </p>
             ) : canUpload ? (
               <>
@@ -1055,14 +1181,18 @@ function ProofCell({
                   </button>
                 </div>
               </>
+            ) : isCompleted && isOwned ? (
+              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
+                🔒 Task is complete — photos are locked.
+              </p>
             ) : null}
-            {uploading && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             <ErrorLine error={error} />
             {canUpload && !atCap && !cameraOpen && (
               <p className="mt-2 text-[11px] text-gray-400">
                 PNG / JPEG / WebP · photos are auto-compressed (max 1280px) ·{" "}
                 {proofIds.length}/{MAX_PROOFS_PER_TASK} attached
+                {pending.length > 0 ? `, ${pending.length} staged` : ""}
               </p>
             )}
           </div>

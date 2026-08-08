@@ -304,7 +304,7 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true, title: true, cadence: true, dueAt: true },
+      select: { assigneeId: true, title: true, cadence: true, dueAt: true, status: true },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
@@ -315,6 +315,14 @@ export function uploadFlowTaskProof(
     // proof can no longer be attached OR replaced for it either.
     if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
+    }
+    // Completion lock (2026-08-09): once marked Complete, the attached
+    // photos become the frozen record of what was submitted — no further
+    // uploads (or removes, see removeFlowTaskProof below). Reopening a task
+    // (if that ever happens) flips status back off DONE, which naturally
+    // un-locks this too — no separate unlock path needed.
+    if (runBlock.status === "DONE") {
+      throw new ApiHttpError(400, "This task is already complete and can no longer accept proof");
     }
 
     // Count-then-create, not a transaction: two uploads landing in the same
@@ -360,8 +368,9 @@ export function uploadFlowTaskProof(
 /** Remove ONE proof photo (2026-08-08, the gallery's per-thumbnail ×):
  *  assignee-only, deletes exactly the one `Proof` row identified by its OWN
  *  id — every other photo on the same task is untouched. Same ownership
- *  (403) and past-due-day (400) guards as uploadFlowTaskProof above, applied
- *  symmetrically: a task whose day has passed shouldn't have its evidence
+ *  (403), past-due-day (400), and completion-lock (400, 2026-08-09) guards
+ *  as uploadFlowTaskProof above, applied symmetrically: a task whose day has
+ *  passed, or that's already marked Complete, shouldn't have its evidence
  *  altered in either direction.
  *
  *  Ordering (deliberate, mirrors template-groups.ts's multi-step-write
@@ -383,7 +392,7 @@ export function removeFlowTaskProof(
       where: { id },
       select: {
         driveFileId: true,
-        runBlock: { select: { assigneeId: true, cadence: true, dueAt: true } },
+        runBlock: { select: { assigneeId: true, cadence: true, dueAt: true, status: true } },
       },
     });
     if (!proof) throw new ApiHttpError(404, "Proof not found");
@@ -392,6 +401,9 @@ export function removeFlowTaskProof(
     }
     if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
+    }
+    if (proof.runBlock.status === "DONE") {
+      throw new ApiHttpError(400, "This task is already complete and can no longer be changed");
     }
 
     await prisma.proof.delete({ where: { id } });
