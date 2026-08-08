@@ -881,6 +881,21 @@ export async function syncCareerApplicationsToPreStage(): Promise<CareerApplicat
 // stale onboarding_candidate row (its own BranchStaff-sourced start_date
 // simply hasn't been updated since they actually started). A real row still
 // genuinely AT Pre (employment.status="pre") is unaffected.
+//
+// A second addition, per explicit decision (see conversation): a real
+// account genuinely AT Pre with NO onboarding_candidate row at all also
+// belongs here, using its own data directly — the manual "+ Add" button on
+// this list (addPreStageEmployeeModal.tsx -> addPreStageEmployee) creates
+// exactly this shape (a real users/employment(status="pre") row, no
+// onboarding_candidate row) and was left with no way to ever become visible
+// once this function stopped trusting employment.status="pre" on its own.
+// addPreStageEmployee() itself is untouched — this is a read-side fix only.
+// Deliberately scoped to "no onboarding_candidate row matches this name AT
+// ALL" (any date, not just future), not "not currently eligible" — a real
+// account whose name DOES match a stale/past-dated onboarding_candidate row
+// keeps going through the OR-rule above unaffected; this only picks up
+// names onboarding_candidate has never heard of. Still no
+// career_applications/rec_recruit involvement of any kind.
 
 // One-off known-bad-data exception to the "real employment wins" override
 // above, per explicit decision (see conversation) — NOT a change to the
@@ -909,11 +924,12 @@ interface PreEligibleRow {
 // Splitting it out here just once avoids the two callers silently drifting
 // apart on what "eligible" means.
 async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
-  const [candidates, realRows, branches, departments] = await Promise.all([
+  const [candidates, realRows, branches, departments, branchStaffPositionGroups] = await Promise.all([
     prisma.onboarding_candidate.findMany(),
     listEmployeeOverviewRows({ skipScopeFilter: true }),
     listBranches(),
     listDepartments(),
+    lookupBranchStaffPositionGroupByName(),
   ]);
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -969,11 +985,18 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
     // Prefer the real employment record's own position when one exists —
     // onboarding_candidate.position (BranchStaff-sourced) is frequently
     // blank/unreliable even when a real employment row already has a good
-    // value.
+    // value. When NEITHER has a usable position string (common for a pure
+    // candidate — onboarding_candidate's own sync only ever captures
+    // BranchStaff.position, never employment_type/role, so it's blank even
+    // when BranchStaff clearly knows Full Time/Part Time/Intern), fall back
+    // to the live BranchStaff signal — same
+    // lookupBranchStaffPositionGroupByName resolver
+    // computeRealAccountLifecycleOverrides uses, batched once above rather
+    // than per row.
     const positionSource = real?.position ?? candidate.position;
     const resolvedPositionType: PositionGroup | null = positionSource?.trim()
       ? positionGroup(positionSource)
-      : null;
+      : (branchStaffPositionGroups.get(name) ?? null);
 
     rows.push({
       row: {
@@ -1001,6 +1024,27 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
       // (start_date is no longer > todayIso) and this is the only place
       // left that still has their row to flag as passed.
       startDatePassed: Boolean(startDate <= todayIso),
+    });
+  }
+
+  // Real accounts genuinely at Pre with no onboarding_candidate row at all —
+  // see this function's own doc comment above for the full rationale
+  // (addPreStageEmployee's manual "+ Add" rows land here). Their own real
+  // data is already authoritative (no stale/synced row to prefer over), so
+  // this just carries it straight through, unlike the onboarding_candidate
+  // branch above which has to choose between two possible sources per field.
+  const candidateNames = new Set(candidates.map((c) => normalizeName(c.name)));
+  for (const real of realRows) {
+    if (real.stage !== "pre") continue;
+    if (candidateNames.has(normalizeName(real.fullName))) continue;
+    rows.push({
+      row: {
+        ...real,
+        stage: "pre",
+        isCandidate: false,
+        resolvedPositionType: real.position?.trim() ? positionGroup(real.position) : null,
+      },
+      startDatePassed: Boolean(real.date && real.date <= todayIso),
     });
   }
 
