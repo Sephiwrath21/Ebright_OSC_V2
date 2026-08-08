@@ -459,15 +459,13 @@ export function BranchPackageScheduleGrid({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Package Table</h3>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            Highlight day
-            <input
-              type="date"
-              value={highlightDate}
-              onChange={(e) => setHighlightDate(e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
-            />
-          </label>
+          <input
+            type="date"
+            value={highlightDate}
+            onChange={(e) => setHighlightDate(e.target.value)}
+            aria-label="Highlight day"
+            className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+          />
         </div>
         {canEdit && (
           <div className="flex items-center gap-3">
