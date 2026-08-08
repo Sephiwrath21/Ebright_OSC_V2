@@ -404,12 +404,15 @@ enum PackageScheduleWeekday {
   SUN
 }
 
-/// Branch Package Schedule (2026-08-07): one durable config row per
-/// (branch, weekday) naming which Package (a PACKAGE-scope
-/// TaskTemplateGroup) that branch's manager should have running that day
-/// — the standing source of truth the grid reads/writes. Setting a cell
-/// ALSO creates a real recurring cadence:"daily" assignment via the
-/// existing engine (src/task-manager/data/branch-package-schedule.ts);
+/// Branch Package Schedule (2026-08-07, multi-package cells 2026-08-08):
+/// one durable config row per (branch, weekday, packageGroupId) — a branch
+/// can now have MULTIPLE Packages (each a PACKAGE-scope TaskTemplateGroup)
+/// running the same weekday, so a given (branch, weekday) cell may be
+/// backed by more than one row, one per configured package. Together
+/// these rows are the standing source of truth the grid reads/writes.
+/// Setting a cell ALSO creates a real recurring cadence:"daily" assignment
+/// per package via the existing engine
+/// (src/task-manager/data/branch-package-schedule.ts);
 /// this row is the durable "what's configured" record, separate from the
 /// FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
 /// get replaced/cloned forward every week, this row does not). Note:
