@@ -317,6 +317,12 @@ export function uploadFlowTaskProof(
       throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
     }
 
+    // Count-then-create, not a transaction: two uploads landing in the same
+    // instant could both pass this check and land 6 rows. Accepted — this
+    // is a soft UX cap (nudge the assignee to stop attaching more, not a
+    // security/storage boundary), and a one-photo overshoot under a real
+    // concurrent-upload race is harmless enough not to justify serializing
+    // every upload through a transaction.
     const existingCount = await prisma.proof.count({ where: { runBlockId: id } });
     if (existingCount >= MAX_PROOFS_PER_TASK) {
       throw new ApiHttpError(400, `You can attach at most ${MAX_PROOFS_PER_TASK} photos to this task`);
