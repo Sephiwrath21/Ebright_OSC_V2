@@ -91,13 +91,13 @@ export default async function TaskManagerPackageTablePage() {
   async function setCell(
     branch: string,
     weekday: PackageTableWeekday,
-    packageGroupId: string | null,
+    packageGroupIds: string[],
   ): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      await setBranchPackageScheduleCell(email, { branch, weekday, packageGroupId });
+      await setBranchPackageScheduleCell(email, { branch, weekday, packageGroupIds });
       revalidatePath("/task-manager/package-table");
       return { ok: true };
     } catch (err) {

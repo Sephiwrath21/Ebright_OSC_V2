@@ -4,6 +4,13 @@
 // cell a Package selector. Setting a cell fans out through the recurring
 // task engine server-side (see data/branch-package-schedule.ts).
 //
+// Multi-select (2026-08-08): a cell may now hold MULTIPLE packages (see
+// branch-package-schedule.ts's file header for the design reversal). The
+// cell control is a chips+dropdown widget modeled on recipient-picker.tsx's
+// MemberDropdown — click to open, checkbox rows toggle a package in/out of
+// the cell's pending set WITHOUT closing the dropdown (so several picks
+// happen in one open session), closes on outside-click/Escape/"Done".
+//
 // Batch-save (2026-08-07, revised): cell edits accumulate in local `pending`
 // state as the user fills out the table — nothing is saved/applied until
 // "Save" is clicked. This deliberately replaced the original immediate-
@@ -18,9 +25,18 @@
 // intercepted; that would be new, unprecedented App-Router-navigation-guard
 // territory this codebase doesn't otherwise have, and was deliberately
 // scoped out.
+//
+// `pending` now maps cellKey -> Set<string> (the FULL desired set of
+// package ids for that cell), not a single nullable id — every place that
+// used to compare/read a single value now does SET comparison against the
+// server's current package-id set for that cell (see `setsEqual` below).
+// Editing a cell's set back to exactly the server's current set un-dirties
+// it, same "editing back to the original value is a no-op" principle the
+// single-select version had.
 import * as React from "react";
 import type { ActionResult } from "./types";
 import type {
+  BranchPackageOption,
   BranchPackageScheduleCell,
   BranchPackageScheduleData,
   PackageTableWeekday,
@@ -30,56 +46,186 @@ function cellKey(branch: string, weekday: PackageTableWeekday): string {
   return `${branch}::${weekday}`;
 }
 
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) {
+    if (!b.has(v)) return false;
+  }
+  return true;
+}
+
+function idSet(packages: BranchPackageOption[]): Set<string> {
+  return new Set(packages.map((p) => p.id));
+}
+
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
   return <p className="mt-1 text-xs text-red-600">{error}</p>;
 }
 
-function EditableCell({
-  value,
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className="size-3">
+      <path
+        d="M3 8.5L6.5 12L13 4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Chips + dropdown cell control (not a native <select multiple> — those
+ *  have terrible multi-pick UX). Collapsed state shows a removable chip per
+ *  currently-selected package plus a "+" click-target. Clicking "+" opens a
+ *  checkbox list of every available package; each row toggles that
+ *  package's membership in the cell's set and the list STAYS OPEN across
+ *  multiple picks — mirrors MemberDropdown's explicit "stays open" design
+ *  (recipient-picker.tsx) so several packages can be picked/removed in one
+ *  session. Closes on outside-click, Escape, or the "Done" row.
+ *
+ *  Positioning: plain `relative` container + `absolute z-20 mt-1`, same as
+ *  MemberDropdown itself — deliberately not portaled to document.body
+ *  (contrast Sidebar.tsx's flyout, which portals because it must escape a
+ *  fixed-width, height-clipped rail). The table's own wrapper is only
+ *  `overflow-x-auto` (no fixed height, no overflow-y clipping), and the
+ *  page/card is wide enough in normal use that a cell's popover doesn't
+ *  need to escape it — same trade-off MemberDropdown already makes
+ *  elsewhere in this module. Rightmost-column popovers can still overhang
+ *  the card edge on a narrow viewport; accepted as a pre-existing class of
+ *  limitation rather than reason to add portal machinery here. */
+function MultiPackageCell({
   packages,
+  selectedIds,
   dirty,
   disabled,
   error,
-  onChange,
+  onToggle,
 }: {
-  value: string | null;
-  packages: BranchPackageScheduleData["packages"];
+  packages: BranchPackageOption[];
+  selectedIds: Set<string>;
   dirty: boolean;
   disabled: boolean;
   error: string | null;
-  onChange: (packageGroupId: string | null) => void;
+  onToggle: (packageId: string) => void;
 }) {
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const selected = packages.filter((p) => selectedIds.has(p.id));
+
   return (
-    <div>
-      <select
-        value={value ?? ""}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value || null)}
-        className={`w-full rounded-md border-0 px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          value ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-400"
+    <div ref={containerRef} className="relative">
+      <div
+        className={`flex min-h-[30px] w-full flex-wrap items-center gap-1 rounded-md px-1.5 py-1 ${
+          selected.length > 0 ? "bg-blue-50" : "bg-gray-50"
         } ${dirty ? "ring-2 ring-amber-400" : ""}`}
       >
-        <option value="">–</option>
-        {packages.map((p) => (
-          <option key={p.id} value={p.id}>
+        {selected.map((p) => (
+          <span
+            key={p.id}
+            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-700"
+          >
             {p.name}
-          </option>
+            {!disabled && (
+              <button
+                type="button"
+                onClick={() => onToggle(p.id)}
+                className="text-blue-400 hover:text-blue-700"
+                aria-label={`Remove ${p.name}`}
+              >
+                ×
+              </button>
+            )}
+          </span>
         ))}
-      </select>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen((o) => !o)}
+          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {selected.length === 0 ? "+ Add" : "+"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-56 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {packages.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-gray-400">No packages available.</p>
+          ) : (
+            packages.map((p) => {
+              const isSelected = selectedIds.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onToggle(p.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${
+                    isSelected ? "bg-blue-50 text-blue-700" : "text-gray-700"
+                  }`}
+                >
+                  <span
+                    className={`flex size-3.5 shrink-0 items-center justify-center rounded border ${
+                      isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300"
+                    }`}
+                  >
+                    {isSelected && <CheckIcon />}
+                  </span>
+                  <span className="truncate">{p.name}</span>
+                </button>
+              );
+            })
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="block w-full border-t border-gray-100 px-3 py-1.5 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          >
+            Done
+          </button>
+        </div>
+      )}
       <ErrorLine error={error} />
     </div>
   );
 }
 
 function StaticCell({ cell }: { cell: BranchPackageScheduleCell }) {
-  if (!cell.packageName) {
+  if (cell.packages.length === 0) {
     return <span className="text-xs text-gray-300">–</span>;
   }
   return (
-    <span className="inline-flex w-full items-center justify-center rounded-md bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-700">
-      {cell.packageName}
-    </span>
+    <div className="flex flex-wrap gap-1">
+      {cell.packages.map((p) => (
+        <span
+          key={p.id}
+          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+        >
+          {p.name}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -95,7 +241,7 @@ export function BranchPackageScheduleGrid({
   onSetCell: (
     branch: string,
     weekday: PackageTableWeekday,
-    packageGroupId: string | null,
+    packageGroupIds: string[],
   ) => Promise<ActionResult>;
 }) {
   const cellAt = React.useMemo(
@@ -103,12 +249,13 @@ export function BranchPackageScheduleGrid({
     [data.cells],
   );
 
-  // (branch, weekday) -> locally-edited, not-yet-saved packageGroupId (or
-  // null for "clear"). Absent from this map = "shows the server value,
-  // unchanged." A successful save does NOT delete its key immediately —
-  // see the pruning effect below for why (avoids a flash back to the old
-  // value while waiting for revalidatePath's refreshed `data` to land).
-  const [pending, setPending] = React.useState<Map<string, string | null>>(new Map());
+  // (branch, weekday) -> locally-edited, not-yet-saved FULL desired set of
+  // package ids for that cell. Absent from this map = "shows the server
+  // value, unchanged." A successful save does NOT delete its key
+  // immediately — see the pruning effect below for why (avoids a flash
+  // back to the old value while waiting for revalidatePath's refreshed
+  // `data` to land).
+  const [pending, setPending] = React.useState<Map<string, Set<string>>>(new Map());
   const [errors, setErrors] = React.useState<Map<string, string>>(new Map());
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [summary, setSummary] = React.useState<string | null>(null);
@@ -122,13 +269,16 @@ export function BranchPackageScheduleGrid({
   // its pending value continuously (pending -> now-matching-server value),
   // rather than being cleared eagerly on the action's success signal and
   // briefly falling back to a not-yet-refreshed server value in between.
+  // Set-equality comparison (not single-value equality) against `data`'s
+  // current cell packages, since `pending` now holds full sets.
   React.useEffect(() => {
     setPending((prev) => {
       if (prev.size === 0) return prev;
       let changed = false;
       const next = new Map(prev);
       for (const [key, value] of prev) {
-        if ((cellAt.get(key)?.packageGroupId ?? null) === value) {
+        const serverIds = idSet(cellAt.get(key)?.packages ?? []);
+        if (setsEqual(value, serverIds)) {
           next.delete(key);
           changed = true;
         }
@@ -149,16 +299,23 @@ export function BranchPackageScheduleGrid({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  const setLocalCell = (branch: string, weekday: PackageTableWeekday, packageGroupId: string | null) => {
+  const toggleCellPackage = (branch: string, weekday: PackageTableWeekday, packageId: string) => {
     const key = cellKey(branch, weekday);
-    const serverValue = cellAt.get(key)?.packageGroupId ?? null;
+    const serverIds = idSet(cellAt.get(key)?.packages ?? []);
     setPending((prev) => {
+      const baseline = prev.get(key) ?? new Set(serverIds);
+      const nextSet = new Set(baseline);
+      if (nextSet.has(packageId)) {
+        nextSet.delete(packageId);
+      } else {
+        nextSet.add(packageId);
+      }
       const next = new Map(prev);
-      if (packageGroupId === serverValue) {
-        // Editing back to the already-saved value is a no-op, not a pending edit.
+      if (setsEqual(nextSet, serverIds)) {
+        // Editing back to the already-saved set is a no-op, not a pending edit.
         next.delete(key);
       } else {
-        next.set(key, packageGroupId);
+        next.set(key, nextSet);
       }
       return next;
     });
@@ -179,14 +336,14 @@ export function BranchPackageScheduleGrid({
     (async () => {
       let succeeded = 0;
       const failedKeys = new Map<string, string>();
-      for (const [key, packageGroupId] of entries) {
+      for (const [key, packageIds] of entries) {
         const [branch, weekday] = key.split("::") as [string, PackageTableWeekday];
         // A transient network/session failure must degrade to a normal
         // per-cell error, not abort the whole batch and wedge saveState
         // on "saving" forever — the remaining cells still get attempted.
         let result: ActionResult;
         try {
-          result = await onSetCell(branch, weekday, packageGroupId);
+          result = await onSetCell(branch, weekday, [...packageIds]);
         } catch {
           result = { ok: false, message: "Network error — try saving again" };
         }
@@ -279,17 +436,19 @@ export function BranchPackageScheduleGrid({
                   }
                   const key = cellKey(branch, weekday);
                   const isDirty = pending.has(key);
-                  const value = isDirty ? (pending.get(key) as string | null) : cell.packageGroupId;
+                  const selectedIds = isDirty
+                    ? (pending.get(key) as Set<string>)
+                    : idSet(cell.packages);
                   return (
                     <td key={weekday} className="min-w-32 px-2 py-1 align-top">
                       {canEdit ? (
-                        <EditableCell
-                          value={value}
+                        <MultiPackageCell
                           packages={data.packages}
+                          selectedIds={selectedIds}
                           dirty={isDirty}
                           disabled={saveState === "saving"}
                           error={errors.get(key) ?? null}
-                          onChange={(packageGroupId) => setLocalCell(branch, weekday, packageGroupId)}
+                          onToggle={(packageId) => toggleCellPackage(branch, weekday, packageId)}
                         />
                       ) : (
                         <StaticCell cell={cell} />
