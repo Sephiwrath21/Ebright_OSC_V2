@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // here to avoid colliding with this file's own `prisma` (the main hrfs db).
 import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
-import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, positionGroup, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
+import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
 // Type-only — erased at compile time, so this doesn't create the runtime
 // circular dependency a value import would (branchStaffProfile.ts statically
@@ -236,27 +236,32 @@ export interface EmployeeOverviewRow {
 // archive-status employee with no end_date falls through to active/
 // onboarding/probation like anyone else). "probation" is derived from the
 // probation flag — there's no separate DB stage for it.
-function stageFromEmployment(
-  status: string | null,
-  endIso: string | null,
-  todayIso: string,
-  probation: boolean,
-  position: string | null,
-): EmployeeStage {
-  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status, probation, position);
+function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
+  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status);
   if (status === "inactive") return "exit";
-  return nonExitStage(status, probation, position);
+  return nonExitStage(status);
 }
 
 // status === "pre" means start_date has arrived but the Pre -> Onboarding/
-// Probation transition (proceedFromPreStage, or the automatic sweep in
+// Active transition (proceedFromPreStage, or the automatic sweep in
 // stageTransitionAutomation.ts) hasn't actually run yet — same lag a click-
 // or hourly-sweep-driven transition always has. Rather than display "Active"
-// (the old, wrong fallback) during that gap, compute live what the
-// transition WILL resolve to the instant it runs, mirroring the exact
-// Full-Time/not split proceedFromPreStage itself uses. No field is written
-// here — this is display-only; the actual status/probation write still
-// happens via the click or the sweep.
+// (the old, wrong fallback) during that gap, this shows "Onboarding" as the
+// live-computed placeholder. No field is written here — this is
+// display-only; the actual status/probation write still happens via the
+// click or the sweep. Probation membership itself is never guessed here —
+// nonExitStage used to independently promote a Full-Time "pre" row straight
+// to "probation" (and separately trusted employment.probation directly for
+// "active" rows), both by-position/by-flag guesses that bypassed
+// career_applications.board_stage entirely and produced real false
+// positives (see conversation — Wan Noraina Sofia Binti Mior Rasdi via the
+// position guess; Nurul Athirah Bt Yusri/Siti Amierah Binti Mohd Awaluddin/
+// Demo02 via a stale manual probation flag with board_stage="Rejected").
+// Probation is now decided solely by computeRealAccountLifecycleOverrides
+// (careerApplicationSync.ts) layered on top of whatever this function
+// returns — it treats "onboarding"/"active" as equally eligible for a
+// Probation override, so removing these two guesses doesn't lose real
+// Probation membership for anyone board_stage genuinely matches.
 // Exit falls back to updated_at, everything else falls back to created_at —
 // EXCEPT Pre, where a missing start_date must stay null (not silently
 // backfilled) so the UI can show/sort "no date yet" rows distinctly, e.g.
@@ -267,10 +272,9 @@ function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end
   return emp?.start_date ?? u.created_at;
 }
 
-function nonExitStage(status: string | null, probation: boolean, position: string | null): EmployeeStage {
+function nonExitStage(status: string | null): EmployeeStage {
   if (status === "onboarding") return "onboarding";
-  if (probation) return "probation";
-  if (status === "pre") return positionGroup(position) === "Full Time" ? "probation" : "onboarding";
+  if (status === "pre") return "onboarding";
   return "active";
 }
 
@@ -301,14 +305,14 @@ function stageForRow(
   // status="pre" with no start_date at all (e.g. synced from
   // career_applications with no known start date yet) — still Pre, just
   // without a date to compare against today. Distinct from the "startIso in
-  // the past, sweep hasn't run yet" case below, which nonExitStage predicts
-  // via position instead.
+  // the past, sweep hasn't run yet" case below, which nonExitStage now
+  // simply shows as Onboarding (see its own comment).
   if (!startIso && emp?.status === "pre") return "pre";
   if (usersStatus === "pending") {
     return startIso ? null : "pre";
   }
   const endIso = emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null;
-  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false, emp?.position ?? null);
+  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso);
 }
 
 // Pre-existing test/seed accounts (test-ceo@ebright.my and siblings) — no

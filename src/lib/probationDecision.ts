@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { titleCaseName } from "@/lib/text";
-import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
+import { lookupCareerApplicationsByName, lookupBranchStaffPositionGroupByName, normalizeName } from "@/lib/careerApplicationSync";
 import {
   buildBranchStaffMatchIndex,
   matchBranchStaffForRealAccount,
@@ -137,7 +137,15 @@ export async function computeProbationEndDates<T extends { id: number; fullName:
 export async function computeAutoConfirmedProbationIds<
   T extends { id: number; fullName: string; position: string | null },
 >(candidateRows: T[], careerApplications: Map<string, CareerApplicationLookupEntry>): Promise<Set<number>> {
-  const eligible = candidateRows.filter((r) => positionGroup(r.position) === "Full Time");
+  // Live BranchStaff signal wins over employment.position, same as
+  // computeRealAccountLifecycleOverrides — candidateRows here is already
+  // that function's own board_stage-matched output, so this must agree
+  // with it or a BranchStaff-corrected Full Time row would get silently
+  // re-excluded from the Confirm-gate check by the stale local position.
+  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const eligible = candidateRows.filter(
+    (r) => (branchStaffPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
+  );
   if (eligible.length === 0) return new Set();
 
   const localRows = await prisma.probation.findMany({
@@ -176,7 +184,12 @@ export async function computeProbationReminderCandidates<
   probationBadgedRows: T[],
   careerApplications: Map<string, CareerApplicationLookupEntry>,
 ): Promise<ProbationReminderCandidate[]> {
-  const fullTimeRows = probationBadgedRows.filter((r) => positionGroup(r.position) === "Full Time");
+  // Live BranchStaff signal wins over employment.position — same reasoning
+  // as computeAutoConfirmedProbationIds above.
+  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const fullTimeRows = probationBadgedRows.filter(
+    (r) => (branchStaffPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
+  );
   if (fullTimeRows.length === 0) return [];
 
   const [localRows, bsIndex] = await Promise.all([

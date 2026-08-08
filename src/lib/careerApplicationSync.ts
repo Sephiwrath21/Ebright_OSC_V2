@@ -246,6 +246,37 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
   return map;
 }
 
+// Live Full Time/Part Time/Intern signal for real-account classification —
+// used by computeRealAccountLifecycleOverrides below and by
+// probationDecision.ts's own Full-Time filters — resolved directly from
+// ebright_hrfs.BranchStaff.employment_type (the clean "Part Time"/
+// "Full Time" value HR actually maintains there), falling back to
+// BranchStaff.role (free-text but still classifiable, e.g. "PT Coach")
+// when employment_type itself is blank. Deliberately NOT sourced from
+// employment.position (can be stale/ghost-originated — see
+// syncCareerApplicationsToPreStage's fake positions) or
+// onboarding_candidate.position (frequently null — the BranchStaff sync
+// that populates it never captured employment_type/role at all; see
+// conversation, Wan Noraina Sofia Binti Mior Rasdi's own BranchStaff row:
+// employment_type="Part Time", role="PT Coach", position=null). Same
+// simple one-batch-query, last-write-wins-by-normalized-name pattern as
+// lookupCareerApplicationsByName() above — every caller falls back to
+// positionGroup(row.position) when a name has no BranchStaff match, same
+// as before this function existed.
+export async function lookupBranchStaffPositionGroupByName(): Promise<Map<string, PositionGroup>> {
+  const { rows } = await queryEbrightHrfs<{ name: string; employment_type: string | null; role: string | null }>(
+    `select name, employment_type, role from public."BranchStaff"`,
+  );
+  const map = new Map<string, PositionGroup>();
+  for (const r of rows) {
+    const key = normalizeName(r.name);
+    if (!key) continue;
+    const signal = r.employment_type?.trim() || r.role?.trim();
+    if (signal) map.set(key, positionGroup(signal));
+  }
+  return map;
+}
+
 // Probation-list membership, per explicit decision (see conversation) —
 // narrowed to career_applications.board_stage alone. rec_recruit/
 // rec_stage.name used to also count (an OR across both fields), but that's
@@ -403,13 +434,9 @@ export interface RealAccountLifecycleOverride {
 }
 
 // Real-account Probation/Onboarding/Active membership, per explicit
-// decision (see conversation) — REPLACES matchIsProbationPipeline/
-// matchBelongsOnOnboardingList/computeActivePipelineProbationPassedIds's
-// role in deciding this for real accounts. career_applications board_stage/
-// rec_stage is no longer consulted for stage MEMBERSHIP (status2 is still
-// read, via isEffectivelyConfirmed/computeAutoConfirmedProbationIds, but
-// that's the Probation Confirm/Extend/Stop feature's own signal, not a
-// membership rule). Scope: real accounts only — a candidate with no real
+// decision (see conversation) — REPLACES matchBelongsOnOnboardingList/
+// computeActivePipelineProbationPassedIds's role in deciding this for real
+// accounts. Scope: real accounts only — a candidate with no real
 // users/employment row yet is untouched regardless of how far past their
 // onboarding_candidate.start_date is (see conversation: out of scope until
 // the existing induction/conversion flow gives them a real account).
@@ -420,16 +447,41 @@ export interface RealAccountLifecycleOverride {
 // (computePreStageRows/computePreStartDatePassedRows for Pre, the base
 // stage computation's own end_date check for Exit).
 //
-// Full Time: Probation+Onboarding dual-stage until Probation Confirm
-// (isEffectivelyConfirmed, reused as-is from probationDecision.ts) — no day
-// count. Deliberately checked even when employment.status already reads
-// "active" (a Full-Time row can be raw-"active" without ever having been
-// Confirmed, e.g. status set prematurely) — same disambiguation Ayu
-// Novitasari's earlier fix needed, now driven by Confirm instead of
-// probation end date; must still display Probation+Onboarding until
-// Confirm, never silently trust a stray "active" for this position group.
+// Probation MEMBERSHIP (entry), per explicit decision (see conversation,
+// correcting an earlier version of this rule that used Full Time + not-yet-
+// Confirmed as the trigger and caught long-standing real employees who
+// predate this feature — Ng Ying Chen/Iqbal Hakim Bin Halim/Muhammad Adam
+// Shah Bin Jasmin): BOTH resolvePositionGroup(row) === "Full Time" (live
+// BranchStaff signal, falling back to employment.position — see
+// lookupBranchStaffPositionGroupByName) AND career_applications.board_stage
+// === "Probation" (name-matched via matchIsProbationPipeline) — surveyed
+// live, this is a clean, unambiguous
+// value with no spelling variants to worry about (6 real matches, all Full
+// Time, all with sensible past start_dates). Part Time/Intern/Protege
+// Intern are NEVER eligible for Probation regardless of board_stage — they
+// stay in the Onboarding-only 3-day flow below unconditionally.
 //
-// Part Time/Intern/Protege Intern: Onboarding only, no Probation. No
+// Probation EXIT (to Active) is unchanged from before — still purely
+// isEffectivelyConfirmed (Confirm/Extend/Stop's local decision, or external
+// status2="Accept"), reused as-is from probationDecision.ts, no day count.
+// Same narrow exception as before for a board_stage-matched row with NO
+// probation row at all yet (never Confirmed, Extended, Stopped, or even
+// opened): falls back to the resolved probation end date
+// (computeProbationEndDates — BranchStaff.probation, or start_date+3
+// months fallback), rather than staying stuck in Probation forever just
+// because nobody ever opened a probation record. A row that DOES have a
+// probation row, whatever its status, always keeps the plain Confirm-gate
+// with no date fallback — an explicit HR signal wins outright. (Live data:
+// Ayu Novitasari's own resolved end date, 2026-08-23, is still in the
+// future, so she's unaffected — stays Probation+Onboarding, exactly the
+// case this exception was built to protect.)
+//
+// Full Time rows that are NOT board_stage-matched get no override here at
+// all — they keep whatever their raw/base stage already is (e.g. genuinely
+// "active", or a stored "onboarding"/"probation" from elsewhere), same as
+// any other row this function doesn't touch.
+//
+// Part Time/Intern/Protege Intern: Onboarding only, no Probation, ever. No
 // Confirm concept applies, so a real employment.status of "active" IS
 // trusted directly (covers the manual "Next" early-advance click). Otherwise
 // 3 FIXED CALENDAR days from employment.start_date (day 1 = start_date
@@ -445,7 +497,7 @@ export async function computeRealAccountLifecycleOverrides<
   const result = new Map<number, RealAccountLifecycleOverride>();
   if (eligible.length === 0) return result;
 
-  const { computeAutoConfirmedProbationIds } = await import("@/lib/probationDecision");
+  const { computeAutoConfirmedProbationIds, computeProbationEndDates } = await import("@/lib/probationDecision");
   const employments = await prisma.employment.findMany({
     where: { user_id: { in: eligible.map((r) => r.id) } },
     orderBy: { start_date: "desc" },
@@ -454,27 +506,59 @@ export async function computeRealAccountLifecycleOverrides<
   const empByUserId = new Map<number, (typeof employments)[number]>();
   for (const e of employments) if (!empByUserId.has(e.user_id)) empByUserId.set(e.user_id, e);
 
+  // Live BranchStaff signal wins over employment.position — see
+  // lookupBranchStaffPositionGroupByName's own comment.
+  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const resolvePositionGroup = (row: T): PositionGroup =>
+    branchStaffPositionGroups.get(normalizeName(row.fullName)) ?? positionGroup(row.position);
+
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  const fullTimeStarted = eligible.filter((r) => {
-    const emp = empByUserId.get(r.id);
-    if (!emp?.start_date || positionGroup(r.position) !== "Full Time") return false;
-    return emp.start_date.toISOString().slice(0, 10) <= todayIso;
+  const probationMatched = eligible.filter((r) => {
+    if (resolvePositionGroup(r) !== "Full Time") return false;
+    return matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName)));
   });
-  const confirmedIds = await computeAutoConfirmedProbationIds(fullTimeStarted, careerApplications);
+  const probationMatchedIds = new Set(probationMatched.map((r) => r.id));
+  const confirmedIds = await computeAutoConfirmedProbationIds(probationMatched, careerApplications);
+
+  // board_stage-matched rows with NO probation row at all yet — see the
+  // function's own doc comment above.
+  const probationRows = await prisma.probation.findMany({
+    where: { user_id: { in: probationMatched.map((r) => r.id) } },
+    select: { user_id: true },
+  });
+  const hasProbationRow = new Set(probationRows.map((p) => p.user_id));
+  const noProbationRowRows = probationMatched.filter((r) => !confirmedIds.has(r.id) && !hasProbationRow.has(r.id));
+  const probationEndDates = await computeProbationEndDates(noProbationRowRows);
+  const pastEndDateIds = new Set(
+    noProbationRowRows
+      .filter((r) => {
+        const endDate = probationEndDates.get(r.id);
+        return endDate != null && endDate <= todayIso;
+      })
+      .map((r) => r.id),
+  );
 
   for (const row of eligible) {
+    // board_stage-matched Probation membership doesn't depend on
+    // employment.start_date at all (several of the 6 real matches have a
+    // null start_date — a leftover gap from the old ghost-manufacturing
+    // sync — and the old career_applications-pipeline mechanism this
+    // replaces never required one either) — checked and resolved before
+    // the start_date gate below, which only applies to the Part Time/
+    // Intern day-count branch that genuinely needs a date to count from.
+    if (probationMatchedIds.has(row.id)) {
+      const effectivelyDone = confirmedIds.has(row.id) || pastEndDateIds.has(row.id);
+      result.set(row.id, effectivelyDone ? { stage: "active" } : { stage: "probation", extraStages: ["onboarding"] });
+      continue;
+    }
+
     const emp = empByUserId.get(row.id);
     if (!emp?.start_date) continue;
     const startIso = emp.start_date.toISOString().slice(0, 10);
     if (startIso > todayIso) continue;
 
-    if (positionGroup(row.position) === "Full Time") {
-      result.set(
-        row.id,
-        confirmedIds.has(row.id) ? { stage: "active" } : { stage: "probation", extraStages: ["onboarding"] },
-      );
-    } else {
+    if (resolvePositionGroup(row) !== "Full Time") {
       if (emp.status === "active") {
         result.set(row.id, { stage: "active" });
         continue;
@@ -482,6 +566,8 @@ export async function computeRealAccountLifecycleOverrides<
       const daysSinceStart = Math.floor((Date.parse(todayIso) - Date.parse(startIso)) / 86_400_000);
       result.set(row.id, daysSinceStart >= 3 ? { stage: "active" } : { stage: "onboarding" });
     }
+    // else: Full Time, not board_stage-matched — no override, keeps
+    // whatever raw/base stage this row already had.
   }
   return result;
 }
