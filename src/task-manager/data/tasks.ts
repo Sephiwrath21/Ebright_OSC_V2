@@ -8,11 +8,16 @@
 // assignFlowTask's actual fan-out logic lives in ./tasks-internal
 // (2026-08-06) — factored out so data/template-groups.ts's
 // applyTemplateGroup, which authorizes actors via its own
-// requireGroupAssignAccess (a DIFFERENT per-scope allow-list than this
-// file's actor check below), can reuse that logic for an already-authorized
-// actor without re-running this file's narrower check. That file is
-// deliberately NOT re-exported by data.ts's `export *` barrel — see its
-// header for the full explanation.
+// requireGroupEditAccess (Super Admin + elevated Operations/Optimisation
+// dept-site only, identical for both TEMPLATE and PACKAGE scope — a
+// DIFFERENT allow-list than this file's own actor check below), can reuse
+// that fan-out logic without re-running this file's separate check.
+// Keeping the two allow-lists decoupled this way avoids double-gating
+// (an already-authorized caller getting silently rejected by a second,
+// differently-shaped check) even where today's requireGroupEditAccess
+// allow-list happens to be a subset of this one. That file is deliberately
+// NOT re-exported by data.ts's `export *` barrel — see its header for the
+// full explanation.
 import { z } from "zod";
 import type { FlowAssignInput } from "../ui/types";
 import { isPastDueDay } from "../ui/types";
@@ -228,25 +233,31 @@ export function reopenFlowTask(
   }, "reopenFlowTask");
 }
 
-/** The My Tasks "Proof" column (2026-07-30): assignee-only upload of ONE
- *  completion-evidence image per task. Always optional — never gates the
- *  status-dot completion path above. Re-uploading replaces the previous
- *  image (upsert on runBlockId). 2 MB cap (2026-08-01 storage decision:
- *  images are compressed CLIENT-side to ≤1280px JPEG before upload — see
- *  ui/image-compress.ts — so this server cap is the bypass-proof
- *  enforcement of the same limit, not the primary size control).
+/** The My Tasks "Proof" column (2026-07-30, multi-photo 2026-08-08):
+ *  assignee-only upload of completion-evidence images, up to
+ *  MAX_PROOFS_PER_TASK per task. Always optional — never gates the
+ *  status-dot completion path above. Uploading APPENDS a new `Proof` row
+ *  rather than replacing any existing one (2026-08-08 — previously this
+ *  was an upsert-on-runBlockId that deleted the prior Drive file; `Proof`
+ *  is now 1:many with `RunBlock`, so every accepted upload simply adds a
+ *  row, and removing a specific photo is its own explicit action, see
+ *  removeFlowTaskProof below). 2 MB cap per image (2026-08-01 storage
+ *  decision: images are compressed CLIENT-side to ≤1280px JPEG before
+ *  upload — see ui/image-compress.ts — so this server cap is the
+ *  bypass-proof enforcement of the same limit, not the primary size
+ *  control).
  *
  *  Storage (2026-08-04): the compressed image is uploaded to Google Drive
  *  (src/lib/drive.ts — the SAME shared helper the HR module's resume/
  *  payslip/etc. uploads use, called here as-is, never modified) under its
  *  OWN dedicated folder (GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID — separate from
  *  the shared GOOGLE_DRIVE_FOLDER_ID root every other module defaults to,
- *  since this is a high-volume feature that deserves its own space).
- *  Only the returned Drive file id is stored (Proof.driveFileId); a
- *  replace deletes the previous file from Drive. The original in-DB-bytes
- *  columns (imageMime/imageData) were dropped 2026-08-04 once their only 7
- *  rows — all test data pre-dating this cutover — were deleted; every row
- *  now goes through Drive, no fallback branch needed anymore.
+ *  since this is a high-volume feature that deserves its own space). Only
+ *  the returned Drive file id is stored (Proof.driveFileId). The original
+ *  in-DB-bytes columns (imageMime/imageData) were dropped 2026-08-04 once
+ *  their only 7 rows — all test data pre-dating this cutover — were
+ *  deleted; every row now goes through Drive, no fallback branch needed
+ *  anymore.
  *
  *  Folder structure (2026-08-04, mirrors the Inventory repo's dated-
  *  hierarchy convention for the same reason — easing QA/QC of a high-
@@ -257,8 +268,14 @@ export function reopenFlowTask(
  *  staff role-views.ts already documents elsewhere). The filename is built
  *  from the assignee + task title as uploadToDrive's `prefix` — its own
  *  `${prefix}-${Date.now()}-${fileName}` naming already bakes in a
- *  timestamp, so nothing here duplicates one. */
+ *  timestamp, so nothing here duplicates one (and, now that multiple
+ *  photos accumulate per task, is also how multiple uploads for the same
+ *  task never collide on a filename). */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
+/** Multi-photo cap (2026-08-08 design decision #1): reject the 6th upload
+ *  attempt for a task with a clear error rather than silently dropping or
+ *  replacing anything. */
+const MAX_PROOFS_PER_TASK = 5;
 const proofImageSchema = z.object({
   mime: z.enum(GUIDELINE_IMAGE_MIMES),
   dataBase64: z.string().min(1).max(PROOF_IMAGE_MAX_BASE64),
@@ -287,7 +304,7 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true, title: true, cadence: true, dueAt: true },
+      select: { assigneeId: true, title: true, cadence: true, dueAt: true, status: true },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
@@ -299,11 +316,25 @@ export function uploadFlowTaskProof(
     if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
     }
+    // Completion lock (2026-08-09): once marked Complete, the attached
+    // photos become the frozen record of what was submitted — no further
+    // uploads (or removes, see removeFlowTaskProof below). Reopening a task
+    // (if that ever happens) flips status back off DONE, which naturally
+    // un-locks this too — no separate unlock path needed.
+    if (runBlock.status === "DONE") {
+      throw new ApiHttpError(400, "This task is already complete and can no longer accept proof");
+    }
 
-    const existing = await prisma.proof.findUnique({
-      where: { runBlockId: id },
-      select: { driveFileId: true },
-    });
+    // Count-then-create, not a transaction: two uploads landing in the same
+    // instant could both pass this check and land 6 rows. Accepted — this
+    // is a soft UX cap (nudge the assignee to stop attaching more, not a
+    // security/storage boundary), and a one-photo overshoot under a real
+    // concurrent-upload race is harmless enough not to justify serializing
+    // every upload through a transaction.
+    const existingCount = await prisma.proof.count({ where: { runBlockId: id } });
+    if (existingCount >= MAX_PROOFS_PER_TASK) {
+      throw new ApiHttpError(400, `You can attach at most ${MAX_PROOFS_PER_TASK} photos to this task`);
+    }
 
     // Department for dept-side staff, Branch for branch-side staff — same
     // split as role-views.ts. "Unassigned" is the documented fallback for
@@ -326,16 +357,60 @@ export function uploadFlowTaskProof(
       folderEnvVar: "GOOGLE_DRIVE_TASK_PROOF_FOLDER_ID",
     });
 
-    const proof = await prisma.proof.upsert({
-      where: { runBlockId: id },
-      create: { runBlockId: id, driveFileId: uploaded.id },
-      update: { driveFileId: uploaded.id },
+    const proof = await prisma.proof.create({
+      data: { runBlockId: id, driveFileId: uploaded.id },
     });
-
-    if (existing?.driveFileId && existing.driveFileId !== uploaded.id) {
-      await deleteFromDrive(existing.driveFileId);
-    }
 
     return { proofId: proof.id };
   }, "uploadFlowTaskProof");
+}
+
+/** Remove ONE proof photo (2026-08-08, the gallery's per-thumbnail ×):
+ *  assignee-only, deletes exactly the one `Proof` row identified by its OWN
+ *  id — every other photo on the same task is untouched. Same ownership
+ *  (403), past-due-day (400), and completion-lock (400, 2026-08-09) guards
+ *  as uploadFlowTaskProof above, applied symmetrically: a task whose day has
+ *  passed, or that's already marked Complete, shouldn't have its evidence
+ *  altered in either direction.
+ *
+ *  Ordering (deliberate, mirrors template-groups.ts's multi-step-write
+ *  trade-off documentation): the DB row is deleted BEFORE the Drive file is
+ *  trashed. If the Drive delete then fails, the file is orphaned-but-harmless
+ *  in Drive (nothing in the DB points at it anymore, so it never surfaces
+ *  through the proof-image proxy route); the reverse order would risk the
+ *  DB still pointing at a Drive file that's already gone, which is the worse
+ *  failure mode of the two. */
+export function removeFlowTaskProof(
+  actorEmail: string,
+  proofId: string,
+): Promise<{ ok: true }> {
+  return native(async () => {
+    const id = z.string().min(1).parse(proofId);
+    const user = await requireUserByEmail(actorEmail);
+
+    const proof = await prisma.proof.findUnique({
+      where: { id },
+      select: {
+        driveFileId: true,
+        runBlock: { select: { assigneeId: true, cadence: true, dueAt: true, status: true } },
+      },
+    });
+    if (!proof) throw new ApiHttpError(404, "Proof not found");
+    if (proof.runBlock.assigneeId !== user.id) {
+      throw new ApiHttpError(403, "You can only remove proof from your own tasks");
+    }
+    if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
+    }
+    if (proof.runBlock.status === "DONE") {
+      throw new ApiHttpError(400, "This task is already complete and can no longer be changed");
+    }
+
+    await prisma.proof.delete({ where: { id } });
+    if (proof.driveFileId) {
+      await deleteFromDrive(proof.driveFileId);
+    }
+
+    return { ok: true };
+  }, "removeFlowTaskProof");
 }

@@ -53,6 +53,7 @@ import {
   saveCeoDashboardConfig,
   skipFlowTask,
   uploadFlowTaskProof,
+  removeFlowTaskProof,
   FlowBridgeError,
   NoAccountError,
   SetupPendingError,
@@ -263,6 +264,21 @@ export default async function TaskManagerPage({
       const { proofId } = await uploadFlowTaskProof(email, runBlockId, image);
       revalidatePath("/task-manager");
       return { ok: true, proofId };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  async function removeProof(
+    proofId: string,
+  ): Promise<import("@/task-manager/ui/types").ProofRemoveResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      await removeFlowTaskProof(email, proofId);
+      revalidatePath("/task-manager");
+      return { ok: true };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
@@ -982,6 +998,7 @@ export default async function TaskManagerPage({
         skipTaskAction={skipTask}
         reopenTaskAction={reopenTask}
         uploadProofAction={uploadProof}
+        removeProofAction={removeProof}
         reassign={reassign}
         manpowerScheduleHref="/task-manager/manpower-schedule"
         ceoDashboard={ceoDashboard}

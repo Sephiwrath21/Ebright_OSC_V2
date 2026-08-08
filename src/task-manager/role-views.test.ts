@@ -5,10 +5,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canManageTaskTemplateGroups,
   ROLE_VIEWS,
   resolveViewRole,
   shows,
   showsAddTaskHeader,
+  taskManagerNavAccess,
   weekdayRangeOf,
   type ViewRole,
 } from "./role-views";
@@ -173,5 +175,91 @@ describe("cross-page consistency invariants", () => {
     expect(withDailyTable).toEqual(
       ["BRANCH_MANAGER", "BRANCH_MEMBER", "CEO", "COACH", "DEPT_MEMBER", "HOD", "OPS"].sort(),
     );
+  });
+});
+
+describe("canManageTaskTemplateGroups", () => {
+  it("true for ADMIN", () => {
+    expect(canManageTaskTemplateGroups({ role: "ADMIN", department: null })).toBe(true);
+  });
+  it("true for elevated dept-site (Operations)", () => {
+    expect(canManageTaskTemplateGroups({ role: "DEPT_SITE", department: "Operations" })).toBe(true);
+  });
+  it("true for elevated dept-site (Optimisation)", () => {
+    expect(canManageTaskTemplateGroups({ role: "DEPT_SITE", department: "Optimisation" })).toBe(true);
+  });
+  it("false for non-elevated dept-site", () => {
+    expect(canManageTaskTemplateGroups({ role: "DEPT_SITE", department: "Finance" })).toBe(false);
+  });
+  it("false for CEO, HOD, OPS, BRANCH, BRANCH_SITE, MEMBER", () => {
+    for (const role of ["CEO", "HOD", "OPS", "BRANCH", "BRANCH_SITE", "MEMBER"]) {
+      expect(canManageTaskTemplateGroups({ role, department: null })).toBe(false);
+    }
+  });
+});
+
+describe("taskManagerNavAccess", () => {
+  it("Super Admin (ADMIN): all three true", () => {
+    expect(taskManagerNavAccess({ role: "ADMIN", department: null })).toEqual({
+      template: true,
+      package: true,
+      packageTable: true,
+    });
+  });
+  it("Operation (elevated dept-site): all three true", () => {
+    expect(taskManagerNavAccess({ role: "DEPT_SITE", department: "Operations" })).toEqual({
+      template: true,
+      package: true,
+      packageTable: true,
+    });
+  });
+  it("HOD: all three true (view-only, but sidebar-visible)", () => {
+    expect(taskManagerNavAccess({ role: "HOD", department: null })).toEqual({
+      template: true,
+      package: true,
+      packageTable: true,
+    });
+  });
+  it("CEO: all three true (view-only, but sidebar-visible)", () => {
+    expect(taskManagerNavAccess({ role: "CEO", department: null })).toEqual({
+      template: true,
+      package: true,
+      packageTable: true,
+    });
+  });
+  it("Branch Manager (BRANCH): template false, package/packageTable true", () => {
+    expect(taskManagerNavAccess({ role: "BRANCH", department: null })).toEqual({
+      template: false,
+      package: true,
+      packageTable: true,
+    });
+  });
+  it("OPS role: all three false (not in the matrix)", () => {
+    expect(taskManagerNavAccess({ role: "OPS", department: null })).toEqual({
+      template: false,
+      package: false,
+      packageTable: false,
+    });
+  });
+  it("non-elevated dept-site (Department): all three false", () => {
+    expect(taskManagerNavAccess({ role: "DEPT_SITE", department: "Finance" })).toEqual({
+      template: false,
+      package: false,
+      packageTable: false,
+    });
+  });
+  it("BRANCH_SITE (Branch): all three false", () => {
+    expect(taskManagerNavAccess({ role: "BRANCH_SITE", department: null })).toEqual({
+      template: false,
+      package: false,
+      packageTable: false,
+    });
+  });
+  it("MEMBER (Intern/HQ Exec/Branch Exec/Coach/unspecified): all three false", () => {
+    expect(taskManagerNavAccess({ role: "MEMBER", department: null })).toEqual({
+      template: false,
+      package: false,
+      packageTable: false,
+    });
   });
 });

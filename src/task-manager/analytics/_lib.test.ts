@@ -295,7 +295,7 @@ describe("sortTaskRows", () => {
     fromSchedule: false,
     guideline: null,
     assignerId: "u-assigner",
-    proofId: null,
+    proofIds: [],
     parentId: null,
     subtaskOrder: null,
     quickCompletable: false,

@@ -18,18 +18,21 @@
 // widen the OLD single-task "+ Task -> Start from a template" hub's
 // access, which nobody asked for.
 //
-// Two-tier authorization (2026-08-06, revised): general management
-// (list/view/create/edit/delete a group — requireGroupAccess) is open to
-// the same assign-capable allow-list for BOTH scopes, so any account that
-// can manage templates can also manage packages. "Assign" — actually
-// fanning a group out to recipients, plus View/Remove Assignees, which is
-// about the same population — is gated separately via
-// requireGroupAssignAccess: unrestricted for TEMPLATE (same allow-list as
-// management), but PACKAGE-scope assignment stays Branch Manager only.
-// This means a non-Branch-Manager can see and edit a package but gets a
-// 403 (surfaced as an inline error message, not a page redirect, since
-// Assign/View Assignees are action closures called after the page has
-// already loaded) if they try to assign it or view/remove its assignees.
+// Two-tier authorization (2026-08-07 permission matrix, revised again):
+// View tier (list/view a group — requireGroupViewAccess) and Edit tier
+// (create/edit/delete/assign/view-assignees/remove-assignee —
+// requireGroupEditAccess) are now both driven by role-views.ts's
+// taskManagerNavAccess/canManageTaskTemplateGroups, the SAME functions the
+// Task Manager sidebar's visibility filter consults — so the sidebar and
+// this file's server-side enforcement can never drift apart. Edit tier is
+// identical across both scopes (Super Admin + elevated Operations/
+// Optimisation dept-site only); View tier differs only by scope: TEMPLATE
+// excludes Branch Manager, PACKAGE (and PACKAGE_TABLE) include it. This
+// means a View-only role (HOD/CEO, and — Package only — Branch Manager)
+// can see a group but gets a 403 (surfaced as an inline error message, not
+// a page redirect, since these are action closures called after the page
+// has already loaded) if they try to create/edit/delete/assign it or view/
+// remove its assignees.
 //
 // Delegation target (2026-08-06 fix, two rounds): the per-member edit/
 // delete/impact calls below go to ./templates-internal's Core functions
@@ -45,19 +48,22 @@
 // `export *` barrel, so this file imports them directly rather than via
 // `@/task-manager/data`.
 import { z } from "zod";
-import type { Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
+import type { Cadence, Prisma, TemplateGroupScope } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
+import { todayStart } from "../lib/dates";
 import { prisma } from "../prisma";
-import { isElevatedDeptSite } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
+import { canManageTaskTemplateGroups, taskManagerNavAccess } from "../role-views";
 import {
   deleteTaskTemplateCore,
   editTaskTemplateCore,
   getTemplateAssigneesCore,
   getTemplateDeletionImpactCore,
+  PENDING_STATUSES,
   removeTemplateAssigneeCore,
 } from "./templates-internal";
 import { assignFlowTaskCore } from "./tasks-internal";
+import { formatLocalDate } from "../analytics/_lib";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
@@ -68,50 +74,27 @@ const NOT_FOUND_MESSAGE: Record<TemplateGroupScope, string> = {
   PACKAGE: "Package not found",
 };
 
-const ASSIGN_CAPABLE_ROLES = ["ADMIN", "OPS", "CEO", "HOD", "BRANCH"] as const;
-
-function isAssignCapable(user: { role: string; department: string | null }): boolean {
-  return (
-    (ASSIGN_CAPABLE_ROLES as readonly string[]).includes(user.role) || isElevatedDeptSite(user)
-  );
-}
-
-/** General management (list/view/create/edit/delete a group): the same
- *  assign-capable allow-list for both scopes — Package management is not
- *  restricted to Branch Manager. Deliberately separate from
- *  ./templates's requireAssigner — see the file header for why that
- *  shared helper stays untouched. */
-async function requireGroupAccess(email: string, scope: TemplateGroupScope) {
+/** View access (list/view a group): the 2026-08-07 permission matrix's
+ *  View tier, scope-aware via taskManagerNavAccess — TEMPLATE excludes
+ *  Branch Manager, PACKAGE/PACKAGE_TABLE include it. This is the SAME
+ *  function the sidebar's visibility check calls (taskManagerNavAccess)
+ *  — a role hidden from the sidebar always also 403s here. */
+async function requireGroupViewAccess(email: string, scope: TemplateGroupScope) {
   const user = await requireUserByEmail(email);
-  if (!isAssignCapable(user)) {
-    throw new ApiHttpError(403, `Only assign-capable accounts can manage ${NOUN[scope]}s`);
+  const access = taskManagerNavAccess(user);
+  const allowed = scope === "PACKAGE" ? access.package : access.template;
+  if (!allowed) {
+    throw new ApiHttpError(403, `You don't have access to view ${NOUN[scope]}s`);
   }
   return user;
 }
 
-/** Assignment access (Assign, View Assignees, Remove Assignee): unrestricted
- *  for TEMPLATE (same allow-list as management), but PACKAGE assignment
- *  stays limited to Branch Manager, ADMIN (system-wide superadmin
- *  override — treated as such everywhere else in this file too), and the
- *  existing elevated dept-site "superadmin-equivalent" accounts
- *  (Operations/Optimisation) — so an ADMIN or elevated dept-site account
- *  isn't blocked from assigning a package it can otherwise fully manage.
- *  Recipients are restricted separately (see applyTemplateGroup's PACKAGE
- *  target check below) — widening who may ACT here does not widen who
- *  may be picked. */
-async function requireGroupAssignAccess(email: string, scope: TemplateGroupScope) {
+/** Edit access (create/edit/delete/assign/view-assignees/remove-assignee):
+ *  identical for both scopes — Super Admin + elevated dept-site only. */
+async function requireGroupEditAccess(email: string, scope: TemplateGroupScope) {
   const user = await requireUserByEmail(email);
-  const allowed =
-    scope === "PACKAGE"
-      ? user.role === "BRANCH" || user.role === "ADMIN" || isElevatedDeptSite(user)
-      : isAssignCapable(user);
-  if (!allowed) {
-    throw new ApiHttpError(
-      403,
-      scope === "PACKAGE"
-        ? "Only branch managers can assign packages"
-        : "Only assign-capable accounts can assign task templates",
-    );
+  if (!canManageTaskTemplateGroups(user)) {
+    throw new ApiHttpError(403, `Only Super Admin and Operations can manage ${NOUN[scope]}s`);
   }
   return user;
 }
@@ -163,7 +146,7 @@ export function listTemplateGroups(
   scope: TemplateGroupScope,
 ): Promise<TemplateGroupSummary[]> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupViewAccess(email, scope);
     const groups = await prisma.taskTemplateGroup.findMany({
       where: { createdById: user.id, scope, archivedAt: null },
       orderBy: { updatedAt: "desc" },
@@ -191,7 +174,7 @@ export function getTemplateGroup(
   scope: TemplateGroupScope,
 ): Promise<TemplateGroupDetail> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupViewAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
@@ -218,7 +201,7 @@ export function createTemplateGroup(
   input: CreateTemplateGroupInput,
 ): Promise<{ id: string }> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const body = createGroupSchema.parse(input);
     const group = await prisma.$transaction(async (tx) => {
       const g = await tx.taskTemplateGroup.create({
@@ -247,22 +230,142 @@ export interface EditTemplateGroupResult {
   createdTasks: number;
   removedTasks: number;
   employees: number;
+  /** New-member-task fan-out (2026-08-07): how many existing group
+   *  assignees (found via their OTHER still-pending member-task
+   *  instances) a brand-new member task was auto-created for, replicating
+   *  each one's own cadence/day — see editTemplateGroup's "new member
+   *  task" branch. */
+  newTaskAssignedTo: number;
+  /** Existing assignees who had nothing pending left to copy a schedule
+   *  from (e.g. every other member task already DONE/past-due-excluded
+   *  for them) — deliberately skipped rather than defaulted to a guessed
+   *  cadence/day. */
+  newTaskSkipped: number;
+}
+
+// Reverse of tasks-internal.ts's DAY_INDEX (JS Date.getDay() -> FLOW_DAYS
+// weekday name) — DAY_INDEX itself isn't exported from that file (only
+// assignFlowTaskCore is meant to be called from here), so this is a local
+// mirror, same precedent as branch-package-schedule.ts's own
+// WEEKDAY_TO_JS_DAY mirror of the same map. Monday (1) is deliberately
+// absent: FLOW_DAYS/DAY_INDEX have no Monday option, so a "daily"-cadence
+// RunBlock (which only ever gets a dueAt via nextOccurrence(day) for a
+// FLOW_DAYS day, or via weekly recurrence off of one) can never actually
+// land on one.
+const JS_DAY_TO_FLOW_DAY: Partial<Record<number, (typeof FLOW_DAYS)[number]>> = {
+  0: "Sun",
+  2: "Tue",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+};
+
+const CADENCE_FROM_PRISMA: Record<Cadence, "daily" | "monthly" | "adhoc"> = {
+  DAILY: "daily",
+  MONTHLY: "monthly",
+  ADHOC: "adhoc",
+};
+
+/** For each id in `templateIds` (a group's OTHER, already-existing member
+ *  tasks), find every CURRENT assignee — anyone with at least one
+ *  non-cancelled/non-archived top-level RunBlock of any of those tasks —
+ *  and map them to a representative still-pending, not-past-due block to
+ *  replicate a schedule from (any one is fine — a person with divergent
+ *  schedules across several member tasks of the same group is an accepted
+ *  edge case, not reconciled here), or `null` if NONE of their instances
+ *  currently qualify (e.g. every one is already DONE/SKIPPED, or is
+ *  pending-status but past-due per Task 2's protection window). The
+ *  eligibility test for "currently qualifies" is the SAME one
+ *  editTaskTemplateCore's own pending-parent query uses (PENDING_STATUSES
+ *  + not-cancelled/archived + the past-due `dueAt` exclusion via
+ *  todayStart()), reused so "who still has this group's work" can never
+ *  disagree between the two functions — but unlike that query, an
+ *  assignee here is NOT dropped just because their representative isn't
+ *  eligible; they stay in the map as a `null` entry precisely so
+ *  editTemplateGroup's fan-out can count them in `newTaskSkipped` instead
+ *  of silently omitting them (design decision #4: report the skip count,
+ *  don't swallow it). Feeds editTemplateGroup's new-member-task fan-out. */
+async function getGroupMemberSchedules(
+  templateIds: string[],
+): Promise<Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>> {
+  const map = new Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>();
+  if (templateIds.length === 0) return map;
+  const boundary = todayStart();
+  const blocks = await prisma.runBlock.findMany({
+    where: {
+      templateId: { in: templateIds },
+      parentId: null,
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+    select: { assigneeId: true, status: true, cadence: true, dueAt: true },
+  });
+  for (const b of blocks) {
+    const eligible =
+      (PENDING_STATUSES as readonly string[]).includes(b.status) &&
+      (b.dueAt === null || b.dueAt >= boundary);
+    if (eligible) {
+      // A real representative always wins over (replaces) a prior `null`
+      // placeholder from an earlier-seen, non-eligible instance of theirs.
+      if (!map.get(b.assigneeId)) map.set(b.assigneeId, { cadence: b.cadence, dueAt: b.dueAt });
+    } else if (!map.has(b.assigneeId)) {
+      map.set(b.assigneeId, null);
+    }
+  }
+  return map;
+}
+
+/** Derive the `{days, cadence}` or `{dueDate, cadence}` to hand
+ *  assignFlowTaskCore so a new member task replicates one assignee's
+ *  existing schedule (from a representative RunBlock of one of their
+ *  OTHER pending member-task instances in the same group). For "daily"
+ *  cadence (the only cadence recurrence actually perpetuates, see
+ *  engine/recurrence.ts), the day of week is derived from `dueAt` — a
+ *  "daily" block with no dueAt has nothing to derive a weekday from and
+ *  returns null (caller must skip, never guess). For "monthly"/"adhoc",
+ *  there's no repeating "day" concept — the representative's own `dueAt`
+ *  (if any) IS the one-off date to replicate as `dueDate`; a null dueAt
+ *  (an undated ad hoc instance) replicates as undated too, which is a
+ *  valid, derivable schedule, not a skip. A null `cadence` (untagged
+ *  legacy block — see FlowTaskRow.cadence's doc comment in ui/types.ts)
+ *  has nothing to replicate and also returns null — same as a `null` rep
+ *  itself (the assignee has nothing currently eligible to copy from at
+ *  all, see getGroupMemberSchedules). */
+function deriveFanOutSchedule(
+  rep: { cadence: Cadence | null; dueAt: Date | null } | null,
+): { days?: (typeof FLOW_DAYS)[number][]; dueDate?: string; cadence: "daily" | "monthly" | "adhoc" } | null {
+  if (!rep || !rep.cadence) return null;
+  const cadence = CADENCE_FROM_PRISMA[rep.cadence];
+  if (cadence === "daily") {
+    if (!rep.dueAt) return null;
+    const day = JS_DAY_TO_FLOW_DAY[rep.dueAt.getDay()];
+    return day ? { days: [day], cadence } : null;
+  }
+  if (!rep.dueAt) return { cadence };
+  return { dueDate: formatLocalDate(rep.dueAt), cadence };
 }
 
 /** Renames the group and reconciles its member tasks against the submitted
  *  list: kept members (id present) go through editTaskTemplate (propagates
- *  to pending instances, same as the single-task Edit tab); removed
- *  members go through deleteTaskTemplate (cancels their pending
- *  instances); new members (id absent) are created fresh. `employees` sums
- *  per-task counts and may double-count someone with pending tasks from
- *  more than one member of this group — an acceptable approximation for a
- *  summary count, same caveat the single-task Edit panel already has.
- *  Not wrapped in a transaction across members — if one member's edit/
- *  delete throws partway through (e.g. concurrently deleted by another
- *  admin), earlier iterations' changes are already committed and the
- *  group is left partially reconciled. Accepted trade-off, matching
- *  templates.ts's own non-transactional multi-step writes; callers should
- *  treat a thrown error as "re-fetch and re-check," not "nothing happened." */
+ *  to pending instances, same as the single-task Edit tab, including the
+ *  past-due protection editTaskTemplateCore now enforces); removed members
+ *  go through deleteTaskTemplate (cancels their pending instances); new
+ *  members (id absent) are created fresh AND fanned out (2026-08-07) to
+ *  every existing assignee of the group's OTHER kept member tasks,
+ *  replicating each one's own cadence/day — see getGroupMemberSchedules/
+ *  deriveFanOutSchedule and the "New-member-task fan-out" comment below;
+ *  reported back via the result's newTaskAssignedTo/newTaskSkipped.
+ *  `employees` sums per-task counts and may double-count someone with
+ *  pending tasks from more than one member of this group — an acceptable
+ *  approximation for a summary count, same caveat the single-task Edit
+ *  panel already has. Not wrapped in a transaction across members — if one
+ *  member's edit/delete/fan-out-assign throws partway through (e.g.
+ *  concurrently deleted by another admin), earlier iterations' changes
+ *  (including any already-created fan-out assignments) are already
+ *  committed and the group is left partially reconciled. Accepted
+ *  trade-off, matching templates.ts's own non-transactional multi-step
+ *  writes; callers should treat a thrown error as "re-fetch and re-check,"
+ *  not "nothing happened." */
 export function editTemplateGroup(
   email: string,
   groupId: string,
@@ -270,7 +373,7 @@ export function editTemplateGroup(
   input: EditTemplateGroupInput,
 ): Promise<EditTemplateGroupResult> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = editGroupSchema.parse(input);
     const group = await prisma.taskTemplateGroup.findFirst({
@@ -296,9 +399,36 @@ export function editTemplateGroup(
       }
     }
 
+    // New-member-task fan-out (2026-08-07): the schedule map is built once
+    // from the group's KEPT member tasks — existing member ids that are
+    // ALSO still present in this submission (`existingIds` intersected
+    // with `submittedIds`), not the raw pre-edit `existingIds` — and
+    // reused for every new task added in this same submission. Excluding
+    // just-removed member ids matters even though their PENDING instances
+    // self-correct (cancelled by the removal loop above, so the
+    // not-CANCELLED run filter already drops them): a removed task's
+    // COMPLETED (DONE/SKIPPED) instances are kept as history with a now-
+    // dangling templateId and would otherwise still surface as a `null`
+    // (ineligible) entry in getGroupMemberSchedules, inflating
+    // newTaskSkipped with someone who isn't a current assignee of
+    // anything remaining in the group. A group edit can add more than one
+    // new member task at once, and each should fan out independently
+    // against this same "who still has this group's other, kept work"
+    // snapshot, not against tasks created earlier in this very loop. Only
+    // queried when at least one task in the submission is actually new,
+    // to avoid the extra round-trip on a plain rename/reorder/edit-only
+    // submission.
+    const hasNewTask = body.tasks.some((t) => !(t.id && existingIds.has(t.id)));
+    const keptMemberIds = [...existingIds].filter((tid) => submittedIds.has(tid));
+    const memberSchedules = hasNewTask
+      ? await getGroupMemberSchedules(keptMemberIds)
+      : new Map<string, { cadence: Cadence | null; dueAt: Date | null } | null>();
+
     let updatedTasks = 0;
     let createdTasks = 0;
     let employees = 0;
+    let newTaskAssignedTo = 0;
+    let newTaskSkipped = 0;
     for (const [index, t] of body.tasks.entries()) {
       if (t.id && existingIds.has(t.id)) {
         const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
@@ -306,7 +436,7 @@ export function editTemplateGroup(
         employees += result.employees;
         await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
       } else {
-        await prisma.taskTemplate.create({
+        const newTask = await prisma.taskTemplate.create({
           data: {
             createdById: user.id,
             name: t.title,
@@ -317,9 +447,27 @@ export function editTemplateGroup(
           },
         });
         createdTasks += 1;
+
+        for (const [assigneeId, rep] of memberSchedules) {
+          const schedule = deriveFanOutSchedule(rep);
+          if (!schedule) {
+            newTaskSkipped += 1;
+            continue;
+          }
+          await assignFlowTaskCore(user, {
+            title: t.title,
+            subtasks: t.subtasks.length > 0 ? t.subtasks : undefined,
+            userIds: [assigneeId],
+            days: schedule.days,
+            dueDate: schedule.dueDate,
+            cadence: schedule.cadence,
+            fromTemplateId: newTask.id,
+          } satisfies FlowAssignInput);
+          newTaskAssignedTo += 1;
+        }
       }
     }
-    return { updatedTasks, createdTasks, removedTasks, employees };
+    return { updatedTasks, createdTasks, removedTasks, employees, newTaskAssignedTo, newTaskSkipped };
   }, "editTemplateGroup");
 }
 
@@ -337,7 +485,7 @@ export function getGroupDeletionImpact(
   scope: TemplateGroupScope,
 ): Promise<GroupDeletionImpact> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
@@ -367,7 +515,7 @@ export function deleteTemplateGroup(
   scope: TemplateGroupScope,
 ): Promise<{ deleted: boolean; removedTasks: number; keptRecords: number }> {
   return native(async () => {
-    const user = await requireGroupAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
@@ -400,13 +548,12 @@ export type ApplyTemplateGroupInput = z.input<typeof applyGroupSchema>;
  *  fromTemplateId is set per task so each created assignment links back to
  *  its own TaskTemplate row. Delegates to ./tasks-internal's
  *  assignFlowTaskCore (2026-08-06 fix) rather than ./tasks's exported
- *  assignFlowTask — that function re-runs its OWN actor check
- *  (ADMIN|OPS|CEO|HOD|isElevatedDeptSite, no BRANCH) independent of this
- *  file's requireGroupAssignAccess above, which would 403 every
- *  Branch-Manager call regardless of scope even though
- *  requireGroupAssignAccess already authorized this exact actor for this
- *  exact operation — same double-gating class as the earlier templates.ts
- *  fix. Not wrapped in a
+ *  assignFlowTask — that function re-runs its OWN separate actor check
+ *  (ADMIN|OPS|CEO|HOD|isElevatedDeptSite) independent of this file's
+ *  requireGroupEditAccess above; delegating to the Core function avoids
+ *  that double-gating (an already-authorized caller getting re-checked
+ *  against a second, differently-shaped allow-list) — same class of fix as
+ *  the earlier templates.ts one. Not wrapped in a
  *  transaction across members — if one member's assignFlowTaskCore call
  *  throws partway through, earlier iterations already created real
  *  FlowRun/RunBlock rows and the partial `created` count is lost to the
@@ -423,17 +570,18 @@ export function applyTemplateGroup(
   input: ApplyTemplateGroupInput,
 ): Promise<{ created: number }> {
   return native(async () => {
-    const user = await requireGroupAssignAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const body = applyGroupSchema.parse(input);
     // Server-side backstop for the Package-assign recipient restriction:
     // the Assign modal's picker already only offers BRANCH-role staff for
-    // PACKAGE scope, but requireGroupAssignAccess above only gates WHO may
-    // call this function, not WHO the submitted userIds belong to — an
-    // already-authorized Branch Manager caller could otherwise submit any
-    // staff id directly (bypassing the UI-only restriction) and
-    // assignFlowTaskCore would create the assignment regardless, since it
-    // has no PACKAGE-scope-aware target check of its own.
+    // PACKAGE scope, but requireGroupEditAccess above only gates WHO may
+    // call this function (Super Admin/elevated dept-site), not WHO the
+    // submitted userIds belong to — an already-authorized caller could
+    // otherwise submit any staff id directly (bypassing the UI-only
+    // restriction) and assignFlowTaskCore would create the assignment
+    // regardless, since it has no PACKAGE-scope-aware target check of its
+    // own.
     if (scope === "PACKAGE") {
       const targets = await prisma.user.findMany({
         where: { id: { in: body.userIds } },
@@ -486,7 +634,7 @@ export function getGroupAssignees(
   scope: TemplateGroupScope,
 ): Promise<TemplateGroupAssignee[]> {
   return native(async () => {
-    const user = await requireGroupAssignAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, createdById: user.id, scope },
@@ -523,7 +671,7 @@ export function removeGroupAssignee(
   userId: string,
 ): Promise<{ removedTasks: number; keptRecords: number }> {
   return native(async () => {
-    const user = await requireGroupAssignAccess(email, scope);
+    const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const targetUserId = z.string().min(1).parse(userId);
     const group = await prisma.taskTemplateGroup.findFirst({

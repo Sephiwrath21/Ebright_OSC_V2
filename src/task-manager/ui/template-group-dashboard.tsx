@@ -28,9 +28,16 @@ function viewToggleButtonClass(active: boolean): string {
 
 // Shared Assign/Edit/Delete trio (2026-08-06): both the grid cards and the
 // list table rows render this, so the two views can't drift out of sync.
+// canEdit (2026-08-07): view-only roles (HOD, CEO always; Branch Manager on
+// Package specifically — see role-views.ts's canManageTaskTemplateGroups)
+// get NONE of these four buttons — genuinely omitted from the render tree,
+// not just disabled/hidden via CSS, since the server already 403s these
+// actions (template-groups.ts's requireGroupEditAccess) and this is only a
+// defense-in-depth UI layer on top of that.
 function GroupActions({
   group,
   busyId,
+  canEdit,
   onAssign,
   onViewAssignees,
   onEdit,
@@ -38,11 +45,13 @@ function GroupActions({
 }: {
   group: FlowTemplateGroupSummary;
   busyId: string | null;
+  canEdit: boolean;
   onAssign: () => void;
   onViewAssignees: () => void;
   onEdit: () => void;
   onRemove: () => void;
 }) {
+  if (!canEdit) return null;
   return (
     <>
       <button
@@ -83,6 +92,7 @@ export function TemplateGroupDashboard({
   control,
   hideCadence = false,
   label = "Template",
+  canEdit = true,
 }: {
   staff: FlowStaffMember[];
   control: FlowTemplateGroupControl;
@@ -93,6 +103,14 @@ export function TemplateGroupDashboard({
   /** Display copy override (2026-08-06) — "Template" (default) or
    *  "Package". Forwarded to both modals below. */
   label?: "Template" | "Package";
+  /** Edit-tier gate (2026-08-07, see role-views.ts's
+   *  canManageTaskTemplateGroups) — defaults to `true` so any caller that
+   *  doesn't pass it explicitly keeps pre-2026-08-07 behavior. When
+   *  `false`, the "+ New {label}" button and every GroupActions button
+   *  (Assign/View Assignees/Edit/Delete) are omitted entirely — the card's
+   *  own name/task-count/preview content and the grid/list view toggle are
+   *  unaffected, view-only roles still see their cards. */
+  canEdit?: boolean;
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
@@ -183,13 +201,15 @@ export function TemplateGroupDashboard({
               <List className="size-4" />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            + New {label}
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              + New {label}
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,16 +241,19 @@ export function TemplateGroupDashboard({
                   )}
                 </ul>
               )}
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                <GroupActions
-                  group={g}
-                  busyId={busyId}
-                  onAssign={() => setAssignGroupId(g.id)}
-                  onViewAssignees={() => setAssigneesGroupId(g.id)}
-                  onEdit={() => setEditGroupId(g.id)}
-                  onRemove={() => remove(g.id, g.name)}
-                />
-              </div>
+              {canEdit && (
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                  <GroupActions
+                    group={g}
+                    busyId={busyId}
+                    canEdit={canEdit}
+                    onAssign={() => setAssignGroupId(g.id)}
+                    onViewAssignees={() => setAssigneesGroupId(g.id)}
+                    onEdit={() => setEditGroupId(g.id)}
+                    onRemove={() => remove(g.id, g.name)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -242,7 +265,7 @@ export function TemplateGroupDashboard({
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Tasks</th>
                 <th className="px-4 py-3">Last Updated</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                {canEdit && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -251,18 +274,21 @@ export function TemplateGroupDashboard({
                   <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
                   <td className="px-4 py-3 text-gray-600">{g.taskCount}</td>
                   <td className="px-4 py-3 text-gray-600">{g.updatedAt.slice(0, 10)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <GroupActions
-                        group={g}
-                        busyId={busyId}
-                        onAssign={() => setAssignGroupId(g.id)}
-                        onViewAssignees={() => setAssigneesGroupId(g.id)}
-                        onEdit={() => setEditGroupId(g.id)}
-                        onRemove={() => remove(g.id, g.name)}
-                      />
-                    </div>
-                  </td>
+                  {canEdit && (
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <GroupActions
+                          group={g}
+                          busyId={busyId}
+                          canEdit={canEdit}
+                          onAssign={() => setAssignGroupId(g.id)}
+                          onViewAssignees={() => setAssigneesGroupId(g.id)}
+                          onEdit={() => setEditGroupId(g.id)}
+                          onRemove={() => remove(g.id, g.name)}
+                        />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

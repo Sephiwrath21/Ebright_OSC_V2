@@ -3,21 +3,31 @@
 // rows — see task-manager/data/template-groups.ts). Wiring mirrors
 // /task-manager's own page: server component fetches data + defines
 // "use server" action closures, passes both to a client dashboard
-// component. Gated by the same assign-capable allow-list as the rest of
-// Task Manager — the first fetch (listTemplateGroups, via requireAssigner)
-// IS the gate. Mirrors /task-manager/page.tsx's own three-way error
-// handling for its first fetch: SetupPendingError -> SetupPendingCard,
-// NoAccountError -> NoAccountCard, any other unexpected failure ->
-// TaskManagerErrorCard with the real message. Only a genuine 403 (account
-// exists but isn't assign-capable — requireAssigner's own ApiHttpError(403,
-// ...), which native() re-throws as a FlowBridgeError carrying that same
-// status) redirects to /task-manager instead of rendering an empty/broken
-// page here.
+// component. Mirrors /task-manager/page.tsx's own three-way error handling
+// for its first fetch: SetupPendingError -> SetupPendingCard, NoAccountError
+// -> NoAccountCard, any other unexpected failure -> TaskManagerErrorCard
+// with the real message.
+//
+// Access (2026-08-07 View/Edit tier split, see role-views.ts and
+// template-groups.ts's file header): the first fetch (listTemplateGroups,
+// via template-groups.ts's requireGroupViewAccess) IS the View-tier gate —
+// a genuine 403 there (account exists but has no View access to TEMPLATE
+// scope — Super Admin, elevated Operations/Optimisation dept-site, HOD, and
+// CEO only; Branch Manager is View-only on Package/Package Table but has NO
+// access here) redirects to /task-manager instead of rendering an empty/
+// broken page. Everyone who clears that gate can VIEW the page, but only
+// Edit-tier roles (Super Admin + elevated dept-site — canManageTaskTemplate
+// Groups) get the create/edit/delete/assign action buttons; `canEdit`,
+// computed below from getMyRole + canManageTaskTemplateGroups, is passed to
+// TemplateGroupDashboard to gate those buttons client-side as a UI-layer
+// defense-in-depth (the real enforcement is template-groups.ts's
+// requireGroupEditAccess on every mutating action closure below).
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
+import { canManageTaskTemplateGroups } from "@/task-manager/role-views";
 import {
   applyTemplateGroup,
   createTemplateGroup,
@@ -65,7 +75,7 @@ export default async function TaskManagerTemplatePage() {
 
   let groups;
   let staff;
-  let role;
+  let role: { role: string; department: string | null };
   try {
     const [groupsResult, staffResult, roleResult] = await Promise.all([
       listTemplateGroups(email, "TEMPLATE"),
@@ -74,10 +84,11 @@ export default async function TaskManagerTemplatePage() {
     ]);
     groups = groupsResult;
     staff = staffResult.staff;
-    role = roleResult.role;
+    role = roleResult;
   } catch (err) {
-    // Genuine "not assign-capable" (403) is the only case that bounces
-    // elsewhere — everything else renders in place, same as /task-manager.
+    // Genuine "no View access" (403 from requireGroupViewAccess) is the
+    // only case that bounces elsewhere — everything else renders in place,
+    // same as /task-manager.
     if (err instanceof FlowBridgeError && err.status === 403) redirect("/task-manager");
     let card;
     if (err instanceof SetupPendingError) {
@@ -218,7 +229,8 @@ export default async function TaskManagerTemplatePage() {
         <div className="mt-6">
           <TemplateGroupDashboard
             staff={staff}
-            hideCadence={role === "CEO"}
+            hideCadence={role.role === "CEO"}
+            canEdit={canManageTaskTemplateGroups(role)}
             control={{
               list: groups,
               load: loadGroup,

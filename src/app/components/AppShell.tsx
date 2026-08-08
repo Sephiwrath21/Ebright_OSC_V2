@@ -7,6 +7,8 @@ import TopBar from "./TopBar";
 import { BreadcrumbProvider } from "./BreadcrumbContext";
 import { getNavAccess } from "./navAccess.actions";
 import type { NavAccess } from "./navAccess.types";
+import { getTaskManagerNavAccess } from "@/task-manager/nav-access.actions";
+import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
 
 interface AppShellProps {
   children: ReactNode;
@@ -23,6 +25,11 @@ let isFirstLoad = true;
 // every client navigation (each route re-renders AppShell).
 let cachedNavAccess: NavAccess | null = null;
 
+// Separate session-lived cache for Task Manager's own sidebar visibility —
+// a parallel, independent mechanism from cachedNavAccess above (see
+// src/task-manager/nav-access.actions.ts for why it's kept separate).
+let cachedTaskManagerNavAccess: TaskManagerNavAccess | null = null;
+
 export default function AppShell({ children, email, role, name }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(() => {
     return isFirstLoad ? false : globalCollapsed;
@@ -31,6 +38,9 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
   // desktop collapse state above.
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navAccess, setNavAccess] = useState<NavAccess | null>(cachedNavAccess);
+  const [taskManagerNavAccess, setTaskManagerNavAccess] = useState<TaskManagerNavAccess | null>(
+    cachedTaskManagerNavAccess,
+  );
   const pathname = usePathname();
 
   // Fetch the viewable-module set once per session; reuse the cache thereafter.
@@ -44,6 +54,25 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
       })
       .catch(() => {
         /* leave the menu unfiltered if access can't be resolved */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetch Task Manager's own sidebar visibility once per session — a
+  // separate, parallel fetch from the one above, following the same
+  // fetch-once-cache-in-module-variable pattern.
+  useEffect(() => {
+    if (cachedTaskManagerNavAccess) return;
+    let cancelled = false;
+    getTaskManagerNavAccess()
+      .then((a) => {
+        cachedTaskManagerNavAccess = a;
+        if (!cancelled) setTaskManagerNavAccess(a);
+      })
+      .catch(() => {
+        /* leave Template/Package/Package Table hidden if access can't be resolved */
       });
     return () => {
       cancelled = true;
@@ -93,7 +122,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
       <div className="flex h-screen bg-slate-50 overflow-hidden">
         {/* Desktop sidebar rail (inline, collapsible). */}
         <div className="hidden lg:flex">
-          <Sidebar collapsed={collapsed} navAccess={navAccess} />
+          <Sidebar collapsed={collapsed} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
         </div>
 
         {/* Mobile off-canvas drawer + backdrop. */}
@@ -112,7 +141,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
               mobileOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
-            <Sidebar collapsed={false} navAccess={navAccess} />
+            <Sidebar collapsed={false} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
           </div>
         </div>
 

@@ -66,6 +66,7 @@ export function TaskManagerView({
   skipTaskAction,
   reopenTaskAction,
   uploadProofAction,
+  removeProofAction,
   reassign,
   manpowerScheduleHref,
   ceoDashboard,
@@ -107,6 +108,9 @@ export function TaskManagerView({
    *  evidence; optional, never gates completion. Wired to the same personal
    *  surfaces as the status actions (see completeProps note below). */
   uploadProofAction?: import("./types").ProofUploadHandler;
+  /** The Proof gallery's per-photo remove (2026-08-08) — same personal-only
+   *  wiring as uploadProofAction. */
+  removeProofAction?: import("./types").ProofRemoveHandler;
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
@@ -216,6 +220,7 @@ export function TaskManagerView({
     onSkip: skipTaskAction,
     onReopen: reopenTaskAction,
     onUploadProof: uploadProofAction,
+    onRemoveProof: removeProofAction,
     reassign,
   };
 

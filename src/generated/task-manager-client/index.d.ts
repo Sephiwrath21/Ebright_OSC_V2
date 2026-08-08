@@ -91,6 +91,27 @@ export type Guideline = $Result.DefaultSelection<Prisma.$GuidelinePayload>
  */
 export type TaskTemplateGroup = $Result.DefaultSelection<Prisma.$TaskTemplateGroupPayload>
 /**
+ * Model BranchPackageSchedule
+ * Branch Package Schedule (2026-08-07, multi-package cells 2026-08-08):
+ * one durable config row per (branch, weekday, packageGroupId) — a branch
+ * can now have MULTIPLE Packages (each a PACKAGE-scope TaskTemplateGroup)
+ * running the same weekday, so a given (branch, weekday) cell may be
+ * backed by more than one row, one per configured package. Together
+ * these rows are the standing source of truth the grid reads/writes.
+ * Setting a cell ALSO creates a real recurring cadence:"daily" assignment
+ * per package via the existing engine
+ * (src/task-manager/data/branch-package-schedule.ts);
+ * this row is the durable "what's configured" record, separate from the
+ * FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
+ * get replaced/cloned forward every week, this row does not). Note:
+ * PackageScheduleWeekday (WED/THU/FRI/SAT/SUN, 5 values) is NOT the same
+ * day-set as the TS FLOW_DAYS union (src/task-manager/ui/types.ts,
+ * Tue/Wed/Thu/Fri/Sat/Sun, 6 values, used by the regular Task assign
+ * flow's day picker) — FLOW_DAYS additionally includes Tuesday; don't
+ * conflate the two or copy-paste one where the other belongs.
+ */
+export type BranchPackageSchedule = $Result.DefaultSelection<Prisma.$BranchPackageSchedulePayload>
+/**
  * Model TaskTemplate
  * Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
  * assignment — task title, subtasks, cadence, guideline link/image — but
@@ -104,17 +125,32 @@ export type TaskTemplateGroup = $Result.DefaultSelection<Prisma.$TaskTemplateGro
 export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
 /**
  * Model Proof
- * Assignee-uploaded completion evidence for ONE RunBlock (a screenshot —
+ * Assignee-uploaded completion evidence for a RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
- * proof never gates completion. Re-uploading replaces the row (upsert on
- * runBlockId); deleting the block cascades the proof away. Images live in
- * Google Drive (2026-08-04 storage decision — high upload volume made
- * in-DB bytes impractical) — driveFileId is the sole reference for every
- * upload; served via /api/task-manager/proof-image/[id] (session-gated),
- * which proxies from Drive. The original in-DB-bytes columns
- * (imageMime/imageData) were dropped 2026-08-04 after their only 7 rows
- * (pre-dating the Drive cutover, all test data) were deleted — every
- * surviving/future row goes through Drive.
+ * proof never gates completion. One-to-many as of 2026-08-08 — up to 5
+ * rows per RunBlock (app-enforced cap, not a DB constraint; runBlockId is
+ * deliberately NOT unique, see @@index below). Each upload APPENDS a new
+ * row rather than replacing one; removing a single photo is a separate
+ * explicit action that deletes just that row and trashes just that row's
+ * Drive file. Deleting the block cascades all of its proof rows away.
+ * Images live in Google Drive (2026-08-04 storage decision — high upload
+ * volume made in-DB bytes impractical) — driveFileId is the sole
+ * reference for every upload; served via
+ * /api/task-manager/proof-image/[id] (session-gated), which proxies from
+ * Drive and needs no changes for the multi-row shape since it's already
+ * keyed on this model's own id, not runBlockId. The original in-DB-bytes
+ * columns (imageMime/imageData) were dropped 2026-08-04 after their only
+ * 7 rows (pre-dating the Drive cutover, all test data) were deleted —
+ * every surviving/future row goes through Drive.
+ * 
+ * NOTE for readers auditing this commit in isolation: the schema/relation
+ * change here (runBlockId losing @unique, RunBlock.proof -> proofs) is
+ * step 1 of 3 on this feature branch. The application code that reads/
+ * writes this relation (src/task-manager/data/tasks.ts's upload path,
+ * src/task-manager/analytics/_lib.ts's query + DTO shape, and the UI)
+ * still assumes the old 1:1 shape as of this commit and does not yet
+ * compile clean — that's intentional, fixed by the next two commits on
+ * this same branch, not an accidental break.
  */
 export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
 /**
@@ -218,6 +254,17 @@ export const TemplateGroupScope: {
 export type TemplateGroupScope = (typeof TemplateGroupScope)[keyof typeof TemplateGroupScope]
 
 
+export const PackageScheduleWeekday: {
+  WED: 'WED',
+  THU: 'THU',
+  FRI: 'FRI',
+  SAT: 'SAT',
+  SUN: 'SUN'
+};
+
+export type PackageScheduleWeekday = (typeof PackageScheduleWeekday)[keyof typeof PackageScheduleWeekday]
+
+
 export const BlockStatus: {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
@@ -276,6 +323,10 @@ export const RunStatus: typeof $Enums.RunStatus
 export type TemplateGroupScope = $Enums.TemplateGroupScope
 
 export const TemplateGroupScope: typeof $Enums.TemplateGroupScope
+
+export type PackageScheduleWeekday = $Enums.PackageScheduleWeekday
+
+export const PackageScheduleWeekday: typeof $Enums.PackageScheduleWeekday
 
 export type BlockStatus = $Enums.BlockStatus
 
@@ -543,6 +594,16 @@ export class PrismaClient<
     * ```
     */
   get taskTemplateGroup(): Prisma.TaskTemplateGroupDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.branchPackageSchedule`: Exposes CRUD operations for the **BranchPackageSchedule** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BranchPackageSchedules
+    * const branchPackageSchedules = await prisma.branchPackageSchedule.findMany()
+    * ```
+    */
+  get branchPackageSchedule(): Prisma.BranchPackageScheduleDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.taskTemplate`: Exposes CRUD operations for the **TaskTemplate** model.
@@ -1103,6 +1164,7 @@ export namespace Prisma {
     RunBlock: 'RunBlock',
     Guideline: 'Guideline',
     TaskTemplateGroup: 'TaskTemplateGroup',
+    BranchPackageSchedule: 'BranchPackageSchedule',
     TaskTemplate: 'TaskTemplate',
     Proof: 'Proof',
     RunItem: 'RunItem',
@@ -1128,7 +1190,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskTemplateGroup" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskTemplateGroup" | "branchPackageSchedule" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2094,6 +2156,80 @@ export namespace Prisma {
           }
         }
       }
+      BranchPackageSchedule: {
+        payload: Prisma.$BranchPackageSchedulePayload<ExtArgs>
+        fields: Prisma.BranchPackageScheduleFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BranchPackageScheduleFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BranchPackageScheduleFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          findFirst: {
+            args: Prisma.BranchPackageScheduleFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BranchPackageScheduleFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          findMany: {
+            args: Prisma.BranchPackageScheduleFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>[]
+          }
+          create: {
+            args: Prisma.BranchPackageScheduleCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          createMany: {
+            args: Prisma.BranchPackageScheduleCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BranchPackageScheduleCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>[]
+          }
+          delete: {
+            args: Prisma.BranchPackageScheduleDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          update: {
+            args: Prisma.BranchPackageScheduleUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          deleteMany: {
+            args: Prisma.BranchPackageScheduleDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BranchPackageScheduleUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BranchPackageScheduleUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>[]
+          }
+          upsert: {
+            args: Prisma.BranchPackageScheduleUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BranchPackageSchedulePayload>
+          }
+          aggregate: {
+            args: Prisma.BranchPackageScheduleAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBranchPackageSchedule>
+          }
+          groupBy: {
+            args: Prisma.BranchPackageScheduleGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BranchPackageScheduleGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BranchPackageScheduleCountArgs<ExtArgs>
+            result: $Utils.Optional<BranchPackageScheduleCountAggregateOutputType> | number
+          }
+        }
+      }
       TaskTemplate: {
         payload: Prisma.$TaskTemplatePayload<ExtArgs>
         fields: Prisma.TaskTemplateFieldRefs
@@ -2970,6 +3106,7 @@ export namespace Prisma {
     runBlock?: RunBlockOmit
     guideline?: GuidelineOmit
     taskTemplateGroup?: TaskTemplateGroupOmit
+    branchPackageSchedule?: BranchPackageScheduleOmit
     taskTemplate?: TaskTemplateOmit
     proof?: ProofOmit
     runItem?: RunItemOmit
@@ -3252,11 +3389,13 @@ export namespace Prisma {
 
   export type RunBlockCountOutputType = {
     runItems: number
+    proofs: number
     subtasks: number
   }
 
   export type RunBlockCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runItems?: boolean | RunBlockCountOutputTypeCountRunItemsArgs
+    proofs?: boolean | RunBlockCountOutputTypeCountProofsArgs
     subtasks?: boolean | RunBlockCountOutputTypeCountSubtasksArgs
   }
 
@@ -3276,6 +3415,13 @@ export namespace Prisma {
    */
   export type RunBlockCountOutputTypeCountRunItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RunItemWhereInput
+  }
+
+  /**
+   * RunBlockCountOutputType without action
+   */
+  export type RunBlockCountOutputTypeCountProofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
   }
 
   /**
@@ -3323,10 +3469,12 @@ export namespace Prisma {
 
   export type TaskTemplateGroupCountOutputType = {
     templates: number
+    branchSchedules: number
   }
 
   export type TaskTemplateGroupCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     templates?: boolean | TaskTemplateGroupCountOutputTypeCountTemplatesArgs
+    branchSchedules?: boolean | TaskTemplateGroupCountOutputTypeCountBranchSchedulesArgs
   }
 
   // Custom InputTypes
@@ -3345,6 +3493,13 @@ export namespace Prisma {
    */
   export type TaskTemplateGroupCountOutputTypeCountTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: TaskTemplateWhereInput
+  }
+
+  /**
+   * TaskTemplateGroupCountOutputType without action
+   */
+  export type TaskTemplateGroupCountOutputTypeCountBranchSchedulesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BranchPackageScheduleWhereInput
   }
 
 
@@ -15252,7 +15407,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
-    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    proofs?: boolean | RunBlock$proofsArgs<ExtArgs>
     parent?: boolean | RunBlock$parentArgs<ExtArgs>
     subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
@@ -15342,7 +15497,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
-    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    proofs?: boolean | RunBlock$proofsArgs<ExtArgs>
     parent?: boolean | RunBlock$parentArgs<ExtArgs>
     subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
@@ -15368,7 +15523,7 @@ export namespace Prisma {
       recurrenceOf: Prisma.$RunBlockPayload<ExtArgs> | null
       successor: Prisma.$RunBlockPayload<ExtArgs> | null
       guideline: Prisma.$GuidelinePayload<ExtArgs> | null
-      proof: Prisma.$ProofPayload<ExtArgs> | null
+      proofs: Prisma.$ProofPayload<ExtArgs>[]
       parent: Prisma.$RunBlockPayload<ExtArgs> | null
       subtasks: Prisma.$RunBlockPayload<ExtArgs>[]
     }
@@ -15792,7 +15947,7 @@ export namespace Prisma {
     recurrenceOf<T extends RunBlock$recurrenceOfArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$recurrenceOfArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     guideline<T extends RunBlock$guidelineArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$guidelineArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-    proof<T extends RunBlock$proofArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    proofs<T extends RunBlock$proofsArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     parent<T extends RunBlock$parentArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$parentArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     subtasks<T extends RunBlock$subtasksArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$subtasksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -16326,9 +16481,9 @@ export namespace Prisma {
   }
 
   /**
-   * RunBlock.proof
+   * RunBlock.proofs
    */
-  export type RunBlock$proofArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type RunBlock$proofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
      * Select specific fields to fetch from the Proof
      */
@@ -16342,6 +16497,11 @@ export namespace Prisma {
      */
     include?: ProofInclude<ExtArgs> | null
     where?: ProofWhereInput
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    cursor?: ProofWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
   }
 
   /**
@@ -17662,6 +17822,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
+    branchSchedules?: boolean | TaskTemplateGroup$branchSchedulesArgs<ExtArgs>
     _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateGroup"]>
 
@@ -17698,6 +17859,7 @@ export namespace Prisma {
   export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "scope" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplateGroup"]>
   export type TaskTemplateGroupInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
+    branchSchedules?: boolean | TaskTemplateGroup$branchSchedulesArgs<ExtArgs>
     _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type TaskTemplateGroupIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -17707,6 +17869,7 @@ export namespace Prisma {
     name: "TaskTemplateGroup"
     objects: {
       templates: Prisma.$TaskTemplatePayload<ExtArgs>[]
+      branchSchedules: Prisma.$BranchPackageSchedulePayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -18111,6 +18274,7 @@ export namespace Prisma {
   export interface Prisma__TaskTemplateGroupClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     templates<T extends TaskTemplateGroup$templatesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$templatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    branchSchedules<T extends TaskTemplateGroup$branchSchedulesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$branchSchedulesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -18564,6 +18728,30 @@ export namespace Prisma {
   }
 
   /**
+   * TaskTemplateGroup.branchSchedules
+   */
+  export type TaskTemplateGroup$branchSchedulesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    where?: BranchPackageScheduleWhereInput
+    orderBy?: BranchPackageScheduleOrderByWithRelationInput | BranchPackageScheduleOrderByWithRelationInput[]
+    cursor?: BranchPackageScheduleWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BranchPackageScheduleScalarFieldEnum | BranchPackageScheduleScalarFieldEnum[]
+  }
+
+  /**
    * TaskTemplateGroup without action
    */
   export type TaskTemplateGroupDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -18579,6 +18767,1095 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: TaskTemplateGroupInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model BranchPackageSchedule
+   */
+
+  export type AggregateBranchPackageSchedule = {
+    _count: BranchPackageScheduleCountAggregateOutputType | null
+    _min: BranchPackageScheduleMinAggregateOutputType | null
+    _max: BranchPackageScheduleMaxAggregateOutputType | null
+  }
+
+  export type BranchPackageScheduleMinAggregateOutputType = {
+    id: string | null
+    branch: string | null
+    weekday: $Enums.PackageScheduleWeekday | null
+    packageGroupId: string | null
+    createdById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BranchPackageScheduleMaxAggregateOutputType = {
+    id: string | null
+    branch: string | null
+    weekday: $Enums.PackageScheduleWeekday | null
+    packageGroupId: string | null
+    createdById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BranchPackageScheduleCountAggregateOutputType = {
+    id: number
+    branch: number
+    weekday: number
+    packageGroupId: number
+    createdById: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type BranchPackageScheduleMinAggregateInputType = {
+    id?: true
+    branch?: true
+    weekday?: true
+    packageGroupId?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BranchPackageScheduleMaxAggregateInputType = {
+    id?: true
+    branch?: true
+    weekday?: true
+    packageGroupId?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BranchPackageScheduleCountAggregateInputType = {
+    id?: true
+    branch?: true
+    weekday?: true
+    packageGroupId?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type BranchPackageScheduleAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BranchPackageSchedule to aggregate.
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BranchPackageSchedules to fetch.
+     */
+    orderBy?: BranchPackageScheduleOrderByWithRelationInput | BranchPackageScheduleOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BranchPackageScheduleWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BranchPackageSchedules from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BranchPackageSchedules.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BranchPackageSchedules
+    **/
+    _count?: true | BranchPackageScheduleCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BranchPackageScheduleMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BranchPackageScheduleMaxAggregateInputType
+  }
+
+  export type GetBranchPackageScheduleAggregateType<T extends BranchPackageScheduleAggregateArgs> = {
+        [P in keyof T & keyof AggregateBranchPackageSchedule]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBranchPackageSchedule[P]>
+      : GetScalarType<T[P], AggregateBranchPackageSchedule[P]>
+  }
+
+
+
+
+  export type BranchPackageScheduleGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BranchPackageScheduleWhereInput
+    orderBy?: BranchPackageScheduleOrderByWithAggregationInput | BranchPackageScheduleOrderByWithAggregationInput[]
+    by: BranchPackageScheduleScalarFieldEnum[] | BranchPackageScheduleScalarFieldEnum
+    having?: BranchPackageScheduleScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BranchPackageScheduleCountAggregateInputType | true
+    _min?: BranchPackageScheduleMinAggregateInputType
+    _max?: BranchPackageScheduleMaxAggregateInputType
+  }
+
+  export type BranchPackageScheduleGroupByOutputType = {
+    id: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    packageGroupId: string
+    createdById: string
+    createdAt: Date
+    updatedAt: Date
+    _count: BranchPackageScheduleCountAggregateOutputType | null
+    _min: BranchPackageScheduleMinAggregateOutputType | null
+    _max: BranchPackageScheduleMaxAggregateOutputType | null
+  }
+
+  type GetBranchPackageScheduleGroupByPayload<T extends BranchPackageScheduleGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BranchPackageScheduleGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BranchPackageScheduleGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BranchPackageScheduleGroupByOutputType[P]>
+            : GetScalarType<T[P], BranchPackageScheduleGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BranchPackageScheduleSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    branch?: boolean
+    weekday?: boolean
+    packageGroupId?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["branchPackageSchedule"]>
+
+  export type BranchPackageScheduleSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    branch?: boolean
+    weekday?: boolean
+    packageGroupId?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["branchPackageSchedule"]>
+
+  export type BranchPackageScheduleSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    branch?: boolean
+    weekday?: boolean
+    packageGroupId?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["branchPackageSchedule"]>
+
+  export type BranchPackageScheduleSelectScalar = {
+    id?: boolean
+    branch?: boolean
+    weekday?: boolean
+    packageGroupId?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type BranchPackageScheduleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "branch" | "weekday" | "packageGroupId" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["branchPackageSchedule"]>
+  export type BranchPackageScheduleInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }
+  export type BranchPackageScheduleIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }
+  export type BranchPackageScheduleIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
+  }
+
+  export type $BranchPackageSchedulePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BranchPackageSchedule"
+    objects: {
+      packageGroup: Prisma.$TaskTemplateGroupPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      branch: string
+      weekday: $Enums.PackageScheduleWeekday
+      packageGroupId: string
+      createdById: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["branchPackageSchedule"]>
+    composites: {}
+  }
+
+  type BranchPackageScheduleGetPayload<S extends boolean | null | undefined | BranchPackageScheduleDefaultArgs> = $Result.GetResult<Prisma.$BranchPackageSchedulePayload, S>
+
+  type BranchPackageScheduleCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BranchPackageScheduleFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BranchPackageScheduleCountAggregateInputType | true
+    }
+
+  export interface BranchPackageScheduleDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BranchPackageSchedule'], meta: { name: 'BranchPackageSchedule' } }
+    /**
+     * Find zero or one BranchPackageSchedule that matches the filter.
+     * @param {BranchPackageScheduleFindUniqueArgs} args - Arguments to find a BranchPackageSchedule
+     * @example
+     * // Get one BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BranchPackageScheduleFindUniqueArgs>(args: SelectSubset<T, BranchPackageScheduleFindUniqueArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BranchPackageSchedule that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BranchPackageScheduleFindUniqueOrThrowArgs} args - Arguments to find a BranchPackageSchedule
+     * @example
+     * // Get one BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BranchPackageScheduleFindUniqueOrThrowArgs>(args: SelectSubset<T, BranchPackageScheduleFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BranchPackageSchedule that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleFindFirstArgs} args - Arguments to find a BranchPackageSchedule
+     * @example
+     * // Get one BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BranchPackageScheduleFindFirstArgs>(args?: SelectSubset<T, BranchPackageScheduleFindFirstArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BranchPackageSchedule that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleFindFirstOrThrowArgs} args - Arguments to find a BranchPackageSchedule
+     * @example
+     * // Get one BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BranchPackageScheduleFindFirstOrThrowArgs>(args?: SelectSubset<T, BranchPackageScheduleFindFirstOrThrowArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BranchPackageSchedules that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BranchPackageSchedules
+     * const branchPackageSchedules = await prisma.branchPackageSchedule.findMany()
+     * 
+     * // Get first 10 BranchPackageSchedules
+     * const branchPackageSchedules = await prisma.branchPackageSchedule.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const branchPackageScheduleWithIdOnly = await prisma.branchPackageSchedule.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BranchPackageScheduleFindManyArgs>(args?: SelectSubset<T, BranchPackageScheduleFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BranchPackageSchedule.
+     * @param {BranchPackageScheduleCreateArgs} args - Arguments to create a BranchPackageSchedule.
+     * @example
+     * // Create one BranchPackageSchedule
+     * const BranchPackageSchedule = await prisma.branchPackageSchedule.create({
+     *   data: {
+     *     // ... data to create a BranchPackageSchedule
+     *   }
+     * })
+     * 
+     */
+    create<T extends BranchPackageScheduleCreateArgs>(args: SelectSubset<T, BranchPackageScheduleCreateArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BranchPackageSchedules.
+     * @param {BranchPackageScheduleCreateManyArgs} args - Arguments to create many BranchPackageSchedules.
+     * @example
+     * // Create many BranchPackageSchedules
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BranchPackageScheduleCreateManyArgs>(args?: SelectSubset<T, BranchPackageScheduleCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BranchPackageSchedules and returns the data saved in the database.
+     * @param {BranchPackageScheduleCreateManyAndReturnArgs} args - Arguments to create many BranchPackageSchedules.
+     * @example
+     * // Create many BranchPackageSchedules
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BranchPackageSchedules and only return the `id`
+     * const branchPackageScheduleWithIdOnly = await prisma.branchPackageSchedule.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BranchPackageScheduleCreateManyAndReturnArgs>(args?: SelectSubset<T, BranchPackageScheduleCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BranchPackageSchedule.
+     * @param {BranchPackageScheduleDeleteArgs} args - Arguments to delete one BranchPackageSchedule.
+     * @example
+     * // Delete one BranchPackageSchedule
+     * const BranchPackageSchedule = await prisma.branchPackageSchedule.delete({
+     *   where: {
+     *     // ... filter to delete one BranchPackageSchedule
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BranchPackageScheduleDeleteArgs>(args: SelectSubset<T, BranchPackageScheduleDeleteArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BranchPackageSchedule.
+     * @param {BranchPackageScheduleUpdateArgs} args - Arguments to update one BranchPackageSchedule.
+     * @example
+     * // Update one BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BranchPackageScheduleUpdateArgs>(args: SelectSubset<T, BranchPackageScheduleUpdateArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BranchPackageSchedules.
+     * @param {BranchPackageScheduleDeleteManyArgs} args - Arguments to filter BranchPackageSchedules to delete.
+     * @example
+     * // Delete a few BranchPackageSchedules
+     * const { count } = await prisma.branchPackageSchedule.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BranchPackageScheduleDeleteManyArgs>(args?: SelectSubset<T, BranchPackageScheduleDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BranchPackageSchedules.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BranchPackageSchedules
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BranchPackageScheduleUpdateManyArgs>(args: SelectSubset<T, BranchPackageScheduleUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BranchPackageSchedules and returns the data updated in the database.
+     * @param {BranchPackageScheduleUpdateManyAndReturnArgs} args - Arguments to update many BranchPackageSchedules.
+     * @example
+     * // Update many BranchPackageSchedules
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BranchPackageSchedules and only return the `id`
+     * const branchPackageScheduleWithIdOnly = await prisma.branchPackageSchedule.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BranchPackageScheduleUpdateManyAndReturnArgs>(args: SelectSubset<T, BranchPackageScheduleUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BranchPackageSchedule.
+     * @param {BranchPackageScheduleUpsertArgs} args - Arguments to update or create a BranchPackageSchedule.
+     * @example
+     * // Update or create a BranchPackageSchedule
+     * const branchPackageSchedule = await prisma.branchPackageSchedule.upsert({
+     *   create: {
+     *     // ... data to create a BranchPackageSchedule
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BranchPackageSchedule we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BranchPackageScheduleUpsertArgs>(args: SelectSubset<T, BranchPackageScheduleUpsertArgs<ExtArgs>>): Prisma__BranchPackageScheduleClient<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BranchPackageSchedules.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleCountArgs} args - Arguments to filter BranchPackageSchedules to count.
+     * @example
+     * // Count the number of BranchPackageSchedules
+     * const count = await prisma.branchPackageSchedule.count({
+     *   where: {
+     *     // ... the filter for the BranchPackageSchedules we want to count
+     *   }
+     * })
+    **/
+    count<T extends BranchPackageScheduleCountArgs>(
+      args?: Subset<T, BranchPackageScheduleCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BranchPackageScheduleCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BranchPackageSchedule.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BranchPackageScheduleAggregateArgs>(args: Subset<T, BranchPackageScheduleAggregateArgs>): Prisma.PrismaPromise<GetBranchPackageScheduleAggregateType<T>>
+
+    /**
+     * Group by BranchPackageSchedule.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BranchPackageScheduleGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BranchPackageScheduleGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BranchPackageScheduleGroupByArgs['orderBy'] }
+        : { orderBy?: BranchPackageScheduleGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BranchPackageScheduleGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBranchPackageScheduleGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BranchPackageSchedule model
+   */
+  readonly fields: BranchPackageScheduleFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BranchPackageSchedule.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BranchPackageScheduleClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    packageGroup<T extends TaskTemplateGroupDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroupDefaultArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BranchPackageSchedule model
+   */
+  interface BranchPackageScheduleFieldRefs {
+    readonly id: FieldRef<"BranchPackageSchedule", 'String'>
+    readonly branch: FieldRef<"BranchPackageSchedule", 'String'>
+    readonly weekday: FieldRef<"BranchPackageSchedule", 'PackageScheduleWeekday'>
+    readonly packageGroupId: FieldRef<"BranchPackageSchedule", 'String'>
+    readonly createdById: FieldRef<"BranchPackageSchedule", 'String'>
+    readonly createdAt: FieldRef<"BranchPackageSchedule", 'DateTime'>
+    readonly updatedAt: FieldRef<"BranchPackageSchedule", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BranchPackageSchedule findUnique
+   */
+  export type BranchPackageScheduleFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter, which BranchPackageSchedule to fetch.
+     */
+    where: BranchPackageScheduleWhereUniqueInput
+  }
+
+  /**
+   * BranchPackageSchedule findUniqueOrThrow
+   */
+  export type BranchPackageScheduleFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter, which BranchPackageSchedule to fetch.
+     */
+    where: BranchPackageScheduleWhereUniqueInput
+  }
+
+  /**
+   * BranchPackageSchedule findFirst
+   */
+  export type BranchPackageScheduleFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter, which BranchPackageSchedule to fetch.
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BranchPackageSchedules to fetch.
+     */
+    orderBy?: BranchPackageScheduleOrderByWithRelationInput | BranchPackageScheduleOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BranchPackageSchedules.
+     */
+    cursor?: BranchPackageScheduleWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BranchPackageSchedules from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BranchPackageSchedules.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BranchPackageSchedules.
+     */
+    distinct?: BranchPackageScheduleScalarFieldEnum | BranchPackageScheduleScalarFieldEnum[]
+  }
+
+  /**
+   * BranchPackageSchedule findFirstOrThrow
+   */
+  export type BranchPackageScheduleFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter, which BranchPackageSchedule to fetch.
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BranchPackageSchedules to fetch.
+     */
+    orderBy?: BranchPackageScheduleOrderByWithRelationInput | BranchPackageScheduleOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BranchPackageSchedules.
+     */
+    cursor?: BranchPackageScheduleWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BranchPackageSchedules from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BranchPackageSchedules.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BranchPackageSchedules.
+     */
+    distinct?: BranchPackageScheduleScalarFieldEnum | BranchPackageScheduleScalarFieldEnum[]
+  }
+
+  /**
+   * BranchPackageSchedule findMany
+   */
+  export type BranchPackageScheduleFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter, which BranchPackageSchedules to fetch.
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BranchPackageSchedules to fetch.
+     */
+    orderBy?: BranchPackageScheduleOrderByWithRelationInput | BranchPackageScheduleOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BranchPackageSchedules.
+     */
+    cursor?: BranchPackageScheduleWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BranchPackageSchedules from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BranchPackageSchedules.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BranchPackageSchedules.
+     */
+    distinct?: BranchPackageScheduleScalarFieldEnum | BranchPackageScheduleScalarFieldEnum[]
+  }
+
+  /**
+   * BranchPackageSchedule create
+   */
+  export type BranchPackageScheduleCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * The data needed to create a BranchPackageSchedule.
+     */
+    data: XOR<BranchPackageScheduleCreateInput, BranchPackageScheduleUncheckedCreateInput>
+  }
+
+  /**
+   * BranchPackageSchedule createMany
+   */
+  export type BranchPackageScheduleCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BranchPackageSchedules.
+     */
+    data: BranchPackageScheduleCreateManyInput | BranchPackageScheduleCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BranchPackageSchedule createManyAndReturn
+   */
+  export type BranchPackageScheduleCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * The data used to create many BranchPackageSchedules.
+     */
+    data: BranchPackageScheduleCreateManyInput | BranchPackageScheduleCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BranchPackageSchedule update
+   */
+  export type BranchPackageScheduleUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * The data needed to update a BranchPackageSchedule.
+     */
+    data: XOR<BranchPackageScheduleUpdateInput, BranchPackageScheduleUncheckedUpdateInput>
+    /**
+     * Choose, which BranchPackageSchedule to update.
+     */
+    where: BranchPackageScheduleWhereUniqueInput
+  }
+
+  /**
+   * BranchPackageSchedule updateMany
+   */
+  export type BranchPackageScheduleUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BranchPackageSchedules.
+     */
+    data: XOR<BranchPackageScheduleUpdateManyMutationInput, BranchPackageScheduleUncheckedUpdateManyInput>
+    /**
+     * Filter which BranchPackageSchedules to update
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * Limit how many BranchPackageSchedules to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BranchPackageSchedule updateManyAndReturn
+   */
+  export type BranchPackageScheduleUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * The data used to update BranchPackageSchedules.
+     */
+    data: XOR<BranchPackageScheduleUpdateManyMutationInput, BranchPackageScheduleUncheckedUpdateManyInput>
+    /**
+     * Filter which BranchPackageSchedules to update
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * Limit how many BranchPackageSchedules to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BranchPackageSchedule upsert
+   */
+  export type BranchPackageScheduleUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * The filter to search for the BranchPackageSchedule to update in case it exists.
+     */
+    where: BranchPackageScheduleWhereUniqueInput
+    /**
+     * In case the BranchPackageSchedule found by the `where` argument doesn't exist, create a new BranchPackageSchedule with this data.
+     */
+    create: XOR<BranchPackageScheduleCreateInput, BranchPackageScheduleUncheckedCreateInput>
+    /**
+     * In case the BranchPackageSchedule was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BranchPackageScheduleUpdateInput, BranchPackageScheduleUncheckedUpdateInput>
+  }
+
+  /**
+   * BranchPackageSchedule delete
+   */
+  export type BranchPackageScheduleDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
+    /**
+     * Filter which BranchPackageSchedule to delete.
+     */
+    where: BranchPackageScheduleWhereUniqueInput
+  }
+
+  /**
+   * BranchPackageSchedule deleteMany
+   */
+  export type BranchPackageScheduleDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BranchPackageSchedules to delete
+     */
+    where?: BranchPackageScheduleWhereInput
+    /**
+     * Limit how many BranchPackageSchedules to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BranchPackageSchedule without action
+   */
+  export type BranchPackageScheduleDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BranchPackageSchedule
+     */
+    select?: BranchPackageScheduleSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BranchPackageSchedule
+     */
+    omit?: BranchPackageScheduleOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BranchPackageScheduleInclude<ExtArgs> | null
   }
 
 
@@ -29574,6 +30851,19 @@ export namespace Prisma {
   export type TaskTemplateGroupScalarFieldEnum = (typeof TaskTemplateGroupScalarFieldEnum)[keyof typeof TaskTemplateGroupScalarFieldEnum]
 
 
+  export const BranchPackageScheduleScalarFieldEnum: {
+    id: 'id',
+    branch: 'branch',
+    weekday: 'weekday',
+    packageGroupId: 'packageGroupId',
+    createdById: 'createdById',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type BranchPackageScheduleScalarFieldEnum = (typeof BranchPackageScheduleScalarFieldEnum)[keyof typeof BranchPackageScheduleScalarFieldEnum]
+
+
   export const TaskTemplateScalarFieldEnum: {
     id: 'id',
     createdById: 'createdById',
@@ -29949,6 +31239,20 @@ export namespace Prisma {
    * Reference to a field of type 'TemplateGroupScope[]'
    */
   export type ListEnumTemplateGroupScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TemplateGroupScope[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'PackageScheduleWeekday'
+   */
+  export type EnumPackageScheduleWeekdayFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PackageScheduleWeekday'>
+    
+
+
+  /**
+   * Reference to a field of type 'PackageScheduleWeekday[]'
+   */
+  export type ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PackageScheduleWeekday[]'>
     
 
 
@@ -30759,7 +32063,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
-    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    proofs?: ProofListRelationFilter
     parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     subtasks?: RunBlockListRelationFilter
   }
@@ -30790,7 +32094,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockOrderByWithRelationInput
     successor?: RunBlockOrderByWithRelationInput
     guideline?: GuidelineOrderByWithRelationInput
-    proof?: ProofOrderByWithRelationInput
+    proofs?: ProofOrderByRelationAggregateInput
     parent?: RunBlockOrderByWithRelationInput
     subtasks?: RunBlockOrderByRelationAggregateInput
   }
@@ -30825,7 +32129,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
-    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    proofs?: ProofListRelationFilter
     parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     subtasks?: RunBlockListRelationFilter
   }, "id" | "recurrenceOfId" | "runId_nodeId">
@@ -30951,6 +32255,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     templates?: TaskTemplateListRelationFilter
+    branchSchedules?: BranchPackageScheduleListRelationFilter
   }
 
   export type TaskTemplateGroupOrderByWithRelationInput = {
@@ -30962,6 +32267,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     templates?: TaskTemplateOrderByRelationAggregateInput
+    branchSchedules?: BranchPackageScheduleOrderByRelationAggregateInput
   }
 
   export type TaskTemplateGroupWhereUniqueInput = Prisma.AtLeast<{
@@ -30976,6 +32282,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     templates?: TaskTemplateListRelationFilter
+    branchSchedules?: BranchPackageScheduleListRelationFilter
   }, "id">
 
   export type TaskTemplateGroupOrderByWithAggregationInput = {
@@ -31002,6 +32309,72 @@ export namespace Prisma {
     archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
+  }
+
+  export type BranchPackageScheduleWhereInput = {
+    AND?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
+    OR?: BranchPackageScheduleWhereInput[]
+    NOT?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
+    id?: StringFilter<"BranchPackageSchedule"> | string
+    branch?: StringFilter<"BranchPackageSchedule"> | string
+    weekday?: EnumPackageScheduleWeekdayFilter<"BranchPackageSchedule"> | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringFilter<"BranchPackageSchedule"> | string
+    createdById?: StringFilter<"BranchPackageSchedule"> | string
+    createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    packageGroup?: XOR<TaskTemplateGroupScalarRelationFilter, TaskTemplateGroupWhereInput>
+  }
+
+  export type BranchPackageScheduleOrderByWithRelationInput = {
+    id?: SortOrder
+    branch?: SortOrder
+    weekday?: SortOrder
+    packageGroupId?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    packageGroup?: TaskTemplateGroupOrderByWithRelationInput
+  }
+
+  export type BranchPackageScheduleWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    branch_weekday_packageGroupId?: BranchPackageScheduleBranchWeekdayPackageGroupIdCompoundUniqueInput
+    AND?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
+    OR?: BranchPackageScheduleWhereInput[]
+    NOT?: BranchPackageScheduleWhereInput | BranchPackageScheduleWhereInput[]
+    branch?: StringFilter<"BranchPackageSchedule"> | string
+    weekday?: EnumPackageScheduleWeekdayFilter<"BranchPackageSchedule"> | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringFilter<"BranchPackageSchedule"> | string
+    createdById?: StringFilter<"BranchPackageSchedule"> | string
+    createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    packageGroup?: XOR<TaskTemplateGroupScalarRelationFilter, TaskTemplateGroupWhereInput>
+  }, "id" | "branch_weekday_packageGroupId">
+
+  export type BranchPackageScheduleOrderByWithAggregationInput = {
+    id?: SortOrder
+    branch?: SortOrder
+    weekday?: SortOrder
+    packageGroupId?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: BranchPackageScheduleCountOrderByAggregateInput
+    _max?: BranchPackageScheduleMaxOrderByAggregateInput
+    _min?: BranchPackageScheduleMinOrderByAggregateInput
+  }
+
+  export type BranchPackageScheduleScalarWhereWithAggregatesInput = {
+    AND?: BranchPackageScheduleScalarWhereWithAggregatesInput | BranchPackageScheduleScalarWhereWithAggregatesInput[]
+    OR?: BranchPackageScheduleScalarWhereWithAggregatesInput[]
+    NOT?: BranchPackageScheduleScalarWhereWithAggregatesInput | BranchPackageScheduleScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BranchPackageSchedule"> | string
+    branch?: StringWithAggregatesFilter<"BranchPackageSchedule"> | string
+    weekday?: EnumPackageScheduleWeekdayWithAggregatesFilter<"BranchPackageSchedule"> | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringWithAggregatesFilter<"BranchPackageSchedule"> | string
+    createdById?: StringWithAggregatesFilter<"BranchPackageSchedule"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"BranchPackageSchedule"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"BranchPackageSchedule"> | Date | string
   }
 
   export type TaskTemplateWhereInput = {
@@ -31127,14 +32500,14 @@ export namespace Prisma {
 
   export type ProofWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    runBlockId?: string
     AND?: ProofWhereInput | ProofWhereInput[]
     OR?: ProofWhereInput[]
     NOT?: ProofWhereInput | ProofWhereInput[]
+    runBlockId?: StringFilter<"Proof"> | string
     driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
-  }, "id" | "runBlockId">
+  }, "id">
 
   export type ProofOrderByWithAggregationInput = {
     id?: SortOrder
@@ -32510,7 +33883,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -32538,7 +33911,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -32564,7 +33937,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -32592,7 +33965,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -32730,6 +34103,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     templates?: TaskTemplateCreateNestedManyWithoutGroupInput
+    branchSchedules?: BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput
   }
 
   export type TaskTemplateGroupUncheckedCreateInput = {
@@ -32741,6 +34115,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
+    branchSchedules?: BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput
   }
 
   export type TaskTemplateGroupUpdateInput = {
@@ -32752,6 +34127,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
+    branchSchedules?: BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput
   }
 
   export type TaskTemplateGroupUncheckedUpdateInput = {
@@ -32763,6 +34139,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
+    branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
   }
 
   export type TaskTemplateGroupCreateManyInput = {
@@ -32791,6 +34168,75 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleCreateInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    packageGroup: TaskTemplateGroupCreateNestedOneWithoutBranchSchedulesInput
+  }
+
+  export type BranchPackageScheduleUncheckedCreateInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    packageGroupId: string
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BranchPackageScheduleUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    packageGroup?: TaskTemplateGroupUpdateOneRequiredWithoutBranchSchedulesNestedInput
+  }
+
+  export type BranchPackageScheduleUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleCreateManyInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    packageGroupId: string
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BranchPackageScheduleUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -32917,7 +34363,7 @@ export namespace Prisma {
     id?: string
     driveFileId?: string | null
     createdAt?: Date | string
-    runBlock: RunBlockCreateNestedOneWithoutProofInput
+    runBlock: RunBlockCreateNestedOneWithoutProofsInput
   }
 
   export type ProofUncheckedCreateInput = {
@@ -32931,7 +34377,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
+    runBlock?: RunBlockUpdateOneRequiredWithoutProofsNestedInput
   }
 
   export type ProofUncheckedUpdateInput = {
@@ -34417,12 +35863,17 @@ export namespace Prisma {
     isNot?: GuidelineWhereInput | null
   }
 
-  export type ProofNullableScalarRelationFilter = {
-    is?: ProofWhereInput | null
-    isNot?: ProofWhereInput | null
+  export type ProofListRelationFilter = {
+    every?: ProofWhereInput
+    some?: ProofWhereInput
+    none?: ProofWhereInput
   }
 
   export type RunItemOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ProofOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -34584,7 +36035,17 @@ export namespace Prisma {
     none?: TaskTemplateWhereInput
   }
 
+  export type BranchPackageScheduleListRelationFilter = {
+    every?: BranchPackageScheduleWhereInput
+    some?: BranchPackageScheduleWhereInput
+    none?: BranchPackageScheduleWhereInput
+  }
+
   export type TaskTemplateOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BranchPackageScheduleOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -34626,6 +36087,64 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
     _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+  }
+
+  export type EnumPackageScheduleWeekdayFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageScheduleWeekday | EnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel> | $Enums.PackageScheduleWeekday
+  }
+
+  export type TaskTemplateGroupScalarRelationFilter = {
+    is?: TaskTemplateGroupWhereInput
+    isNot?: TaskTemplateGroupWhereInput
+  }
+
+  export type BranchPackageScheduleBranchWeekdayPackageGroupIdCompoundUniqueInput = {
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    packageGroupId: string
+  }
+
+  export type BranchPackageScheduleCountOrderByAggregateInput = {
+    id?: SortOrder
+    branch?: SortOrder
+    weekday?: SortOrder
+    packageGroupId?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BranchPackageScheduleMaxOrderByAggregateInput = {
+    id?: SortOrder
+    branch?: SortOrder
+    weekday?: SortOrder
+    packageGroupId?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BranchPackageScheduleMinOrderByAggregateInput = {
+    id?: SortOrder
+    branch?: SortOrder
+    weekday?: SortOrder
+    packageGroupId?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumPackageScheduleWeekdayWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageScheduleWeekday | EnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageScheduleWeekdayWithAggregatesFilter<$PrismaModel> | $Enums.PackageScheduleWeekday
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel>
+    _max?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel>
   }
 
   export type TaskTemplateGroupNullableScalarRelationFilter = {
@@ -35686,10 +37205,11 @@ export namespace Prisma {
     connect?: GuidelineWhereUniqueInput
   }
 
-  export type ProofCreateNestedOneWithoutRunBlockInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    connect?: ProofWhereUniqueInput
+  export type ProofCreateNestedManyWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
   }
 
   export type RunBlockCreateNestedOneWithoutSubtasksInput = {
@@ -35718,10 +37238,11 @@ export namespace Prisma {
     connect?: RunBlockWhereUniqueInput
   }
 
-  export type ProofUncheckedCreateNestedOneWithoutRunBlockInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    connect?: ProofWhereUniqueInput
+  export type ProofUncheckedCreateNestedManyWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
   }
 
   export type RunBlockUncheckedCreateNestedManyWithoutParentInput = {
@@ -35791,14 +37312,18 @@ export namespace Prisma {
     update?: XOR<XOR<GuidelineUpdateToOneWithWhereWithoutBlocksInput, GuidelineUpdateWithoutBlocksInput>, GuidelineUncheckedUpdateWithoutBlocksInput>
   }
 
-  export type ProofUpdateOneWithoutRunBlockNestedInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    upsert?: ProofUpsertWithoutRunBlockInput
-    disconnect?: ProofWhereInput | boolean
-    delete?: ProofWhereInput | boolean
-    connect?: ProofWhereUniqueInput
-    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  export type ProofUpdateManyWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutRunBlockInput | ProofUpsertWithWhereUniqueWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutRunBlockInput | ProofUpdateWithWhereUniqueWithoutRunBlockInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutRunBlockInput | ProofUpdateManyWithWhereWithoutRunBlockInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
   }
 
   export type RunBlockUpdateOneWithoutSubtasksNestedInput = {
@@ -35849,14 +37374,18 @@ export namespace Prisma {
     update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
   }
 
-  export type ProofUncheckedUpdateOneWithoutRunBlockNestedInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    upsert?: ProofUpsertWithoutRunBlockInput
-    disconnect?: ProofWhereInput | boolean
-    delete?: ProofWhereInput | boolean
-    connect?: ProofWhereUniqueInput
-    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  export type ProofUncheckedUpdateManyWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutRunBlockInput | ProofUpsertWithWhereUniqueWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutRunBlockInput | ProofUpdateWithWhereUniqueWithoutRunBlockInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutRunBlockInput | ProofUpdateManyWithWhereWithoutRunBlockInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
   }
 
   export type RunBlockUncheckedUpdateManyWithoutParentNestedInput = {
@@ -35926,11 +37455,25 @@ export namespace Prisma {
     connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
   }
 
+  export type BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput = {
+    create?: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput> | BranchPackageScheduleCreateWithoutPackageGroupInput[] | BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput[]
+    connectOrCreate?: BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput | BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput[]
+    createMany?: BranchPackageScheduleCreateManyPackageGroupInputEnvelope
+    connect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+  }
+
   export type TaskTemplateUncheckedCreateNestedManyWithoutGroupInput = {
     create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
     connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
     createMany?: TaskTemplateCreateManyGroupInputEnvelope
     connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+  }
+
+  export type BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput = {
+    create?: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput> | BranchPackageScheduleCreateWithoutPackageGroupInput[] | BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput[]
+    connectOrCreate?: BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput | BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput[]
+    createMany?: BranchPackageScheduleCreateManyPackageGroupInputEnvelope
+    connect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
   }
 
   export type EnumTemplateGroupScopeFieldUpdateOperationsInput = {
@@ -35951,6 +37494,20 @@ export namespace Prisma {
     deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
   }
 
+  export type BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput = {
+    create?: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput> | BranchPackageScheduleCreateWithoutPackageGroupInput[] | BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput[]
+    connectOrCreate?: BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput | BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput[]
+    upsert?: BranchPackageScheduleUpsertWithWhereUniqueWithoutPackageGroupInput | BranchPackageScheduleUpsertWithWhereUniqueWithoutPackageGroupInput[]
+    createMany?: BranchPackageScheduleCreateManyPackageGroupInputEnvelope
+    set?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    disconnect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    delete?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    connect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    update?: BranchPackageScheduleUpdateWithWhereUniqueWithoutPackageGroupInput | BranchPackageScheduleUpdateWithWhereUniqueWithoutPackageGroupInput[]
+    updateMany?: BranchPackageScheduleUpdateManyWithWhereWithoutPackageGroupInput | BranchPackageScheduleUpdateManyWithWhereWithoutPackageGroupInput[]
+    deleteMany?: BranchPackageScheduleScalarWhereInput | BranchPackageScheduleScalarWhereInput[]
+  }
+
   export type TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput = {
     create?: XOR<TaskTemplateCreateWithoutGroupInput, TaskTemplateUncheckedCreateWithoutGroupInput> | TaskTemplateCreateWithoutGroupInput[] | TaskTemplateUncheckedCreateWithoutGroupInput[]
     connectOrCreate?: TaskTemplateCreateOrConnectWithoutGroupInput | TaskTemplateCreateOrConnectWithoutGroupInput[]
@@ -35963,6 +37520,38 @@ export namespace Prisma {
     update?: TaskTemplateUpdateWithWhereUniqueWithoutGroupInput | TaskTemplateUpdateWithWhereUniqueWithoutGroupInput[]
     updateMany?: TaskTemplateUpdateManyWithWhereWithoutGroupInput | TaskTemplateUpdateManyWithWhereWithoutGroupInput[]
     deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+  }
+
+  export type BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput = {
+    create?: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput> | BranchPackageScheduleCreateWithoutPackageGroupInput[] | BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput[]
+    connectOrCreate?: BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput | BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput[]
+    upsert?: BranchPackageScheduleUpsertWithWhereUniqueWithoutPackageGroupInput | BranchPackageScheduleUpsertWithWhereUniqueWithoutPackageGroupInput[]
+    createMany?: BranchPackageScheduleCreateManyPackageGroupInputEnvelope
+    set?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    disconnect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    delete?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    connect?: BranchPackageScheduleWhereUniqueInput | BranchPackageScheduleWhereUniqueInput[]
+    update?: BranchPackageScheduleUpdateWithWhereUniqueWithoutPackageGroupInput | BranchPackageScheduleUpdateWithWhereUniqueWithoutPackageGroupInput[]
+    updateMany?: BranchPackageScheduleUpdateManyWithWhereWithoutPackageGroupInput | BranchPackageScheduleUpdateManyWithWhereWithoutPackageGroupInput[]
+    deleteMany?: BranchPackageScheduleScalarWhereInput | BranchPackageScheduleScalarWhereInput[]
+  }
+
+  export type TaskTemplateGroupCreateNestedOneWithoutBranchSchedulesInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedCreateWithoutBranchSchedulesInput>
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutBranchSchedulesInput
+    connect?: TaskTemplateGroupWhereUniqueInput
+  }
+
+  export type EnumPackageScheduleWeekdayFieldUpdateOperationsInput = {
+    set?: $Enums.PackageScheduleWeekday
+  }
+
+  export type TaskTemplateGroupUpdateOneRequiredWithoutBranchSchedulesNestedInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedCreateWithoutBranchSchedulesInput>
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutBranchSchedulesInput
+    upsert?: TaskTemplateGroupUpsertWithoutBranchSchedulesInput
+    connect?: TaskTemplateGroupWhereUniqueInput
+    update?: XOR<XOR<TaskTemplateGroupUpdateToOneWithWhereWithoutBranchSchedulesInput, TaskTemplateGroupUpdateWithoutBranchSchedulesInput>, TaskTemplateGroupUncheckedUpdateWithoutBranchSchedulesInput>
   }
 
   export type TaskTemplateGroupCreateNestedOneWithoutTemplatesInput = {
@@ -35981,18 +37570,18 @@ export namespace Prisma {
     update?: XOR<XOR<TaskTemplateGroupUpdateToOneWithWhereWithoutTemplatesInput, TaskTemplateGroupUpdateWithoutTemplatesInput>, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
   }
 
-  export type RunBlockCreateNestedOneWithoutProofInput = {
-    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
-    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+  export type RunBlockCreateNestedOneWithoutProofsInput = {
+    create?: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofsInput
     connect?: RunBlockWhereUniqueInput
   }
 
-  export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
-    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
-    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
-    upsert?: RunBlockUpsertWithoutProofInput
+  export type RunBlockUpdateOneRequiredWithoutProofsNestedInput = {
+    create?: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofsInput
+    upsert?: RunBlockUpsertWithoutProofsInput
     connect?: RunBlockWhereUniqueInput
-    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofInput, RunBlockUpdateWithoutProofInput>, RunBlockUncheckedUpdateWithoutProofInput>
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofsInput, RunBlockUpdateWithoutProofsInput>, RunBlockUncheckedUpdateWithoutProofsInput>
   }
 
   export type RunBlockCreateNestedOneWithoutRunItemsInput = {
@@ -36461,6 +38050,23 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
     _max?: NestedEnumTemplateGroupScopeFilter<$PrismaModel>
+  }
+
+  export type NestedEnumPackageScheduleWeekdayFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageScheduleWeekday | EnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel> | $Enums.PackageScheduleWeekday
+  }
+
+  export type NestedEnumPackageScheduleWeekdayWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageScheduleWeekday | EnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageScheduleWeekday[] | ListEnumPackageScheduleWeekdayFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageScheduleWeekdayWithAggregatesFilter<$PrismaModel> | $Enums.PackageScheduleWeekday
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel>
+    _max?: NestedEnumPackageScheduleWeekdayFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -37698,7 +39304,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -37725,7 +39331,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -37924,7 +39530,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -37951,7 +39557,7 @@ export namespace Prisma {
     subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -37981,7 +39587,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -38008,7 +39614,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -38055,6 +39661,11 @@ export namespace Prisma {
     create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
   }
 
+  export type ProofCreateManyRunBlockInputEnvelope = {
+    data: ProofCreateManyRunBlockInput | ProofCreateManyRunBlockInput[]
+    skipDuplicates?: boolean
+  }
+
   export type RunBlockCreateWithoutSubtasksInput = {
     id?: string
     blockId: string
@@ -38077,7 +39688,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
   }
 
@@ -38104,7 +39715,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutSubtasksInput = {
@@ -38134,7 +39745,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
@@ -38160,7 +39771,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -38278,7 +39889,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -38305,7 +39916,7 @@ export namespace Prisma {
     subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -38341,7 +39952,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -38368,7 +39979,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -38399,27 +40010,30 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-  export type ProofUpsertWithoutRunBlockInput = {
+  export type ProofUpsertWithWhereUniqueWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
     update: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
     create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    where?: ProofWhereInput
   }
 
-  export type ProofUpdateToOneWithWhereWithoutRunBlockInput = {
-    where?: ProofWhereInput
+  export type ProofUpdateWithWhereUniqueWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
     data: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
   }
 
-  export type ProofUpdateWithoutRunBlockInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  export type ProofUpdateManyWithWhereWithoutRunBlockInput = {
+    where: ProofScalarWhereInput
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyWithoutRunBlockInput>
   }
 
-  export type ProofUncheckedUpdateWithoutRunBlockInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  export type ProofScalarWhereInput = {
+    AND?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    OR?: ProofScalarWhereInput[]
+    NOT?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    runBlockId?: StringFilter<"Proof"> | string
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
   }
 
   export type RunBlockUpsertWithoutSubtasksInput = {
@@ -38455,7 +40069,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
   }
 
@@ -38482,7 +40096,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
   }
 
   export type RunBlockUpsertWithWhereUniqueWithoutParentInput = {
@@ -38522,7 +40136,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -38549,7 +40163,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -38621,6 +40235,34 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type BranchPackageScheduleCreateWithoutPackageGroupInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput = {
+    where: BranchPackageScheduleWhereUniqueInput
+    create: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput>
+  }
+
+  export type BranchPackageScheduleCreateManyPackageGroupInputEnvelope = {
+    data: BranchPackageScheduleCreateManyPackageGroupInput | BranchPackageScheduleCreateManyPackageGroupInput[]
+    skipDuplicates?: boolean
+  }
+
   export type TaskTemplateUpsertWithWhereUniqueWithoutGroupInput = {
     where: TaskTemplateWhereUniqueInput
     update: XOR<TaskTemplateUpdateWithoutGroupInput, TaskTemplateUncheckedUpdateWithoutGroupInput>
@@ -38657,6 +40299,95 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
   }
 
+  export type BranchPackageScheduleUpsertWithWhereUniqueWithoutPackageGroupInput = {
+    where: BranchPackageScheduleWhereUniqueInput
+    update: XOR<BranchPackageScheduleUpdateWithoutPackageGroupInput, BranchPackageScheduleUncheckedUpdateWithoutPackageGroupInput>
+    create: XOR<BranchPackageScheduleCreateWithoutPackageGroupInput, BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput>
+  }
+
+  export type BranchPackageScheduleUpdateWithWhereUniqueWithoutPackageGroupInput = {
+    where: BranchPackageScheduleWhereUniqueInput
+    data: XOR<BranchPackageScheduleUpdateWithoutPackageGroupInput, BranchPackageScheduleUncheckedUpdateWithoutPackageGroupInput>
+  }
+
+  export type BranchPackageScheduleUpdateManyWithWhereWithoutPackageGroupInput = {
+    where: BranchPackageScheduleScalarWhereInput
+    data: XOR<BranchPackageScheduleUpdateManyMutationInput, BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupInput>
+  }
+
+  export type BranchPackageScheduleScalarWhereInput = {
+    AND?: BranchPackageScheduleScalarWhereInput | BranchPackageScheduleScalarWhereInput[]
+    OR?: BranchPackageScheduleScalarWhereInput[]
+    NOT?: BranchPackageScheduleScalarWhereInput | BranchPackageScheduleScalarWhereInput[]
+    id?: StringFilter<"BranchPackageSchedule"> | string
+    branch?: StringFilter<"BranchPackageSchedule"> | string
+    weekday?: EnumPackageScheduleWeekdayFilter<"BranchPackageSchedule"> | $Enums.PackageScheduleWeekday
+    packageGroupId?: StringFilter<"BranchPackageSchedule"> | string
+    createdById?: StringFilter<"BranchPackageSchedule"> | string
+    createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+  }
+
+  export type TaskTemplateGroupCreateWithoutBranchSchedulesInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateCreateNestedManyWithoutGroupInput
+  }
+
+  export type TaskTemplateGroupUncheckedCreateWithoutBranchSchedulesInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
+  }
+
+  export type TaskTemplateGroupCreateOrConnectWithoutBranchSchedulesInput = {
+    where: TaskTemplateGroupWhereUniqueInput
+    create: XOR<TaskTemplateGroupCreateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedCreateWithoutBranchSchedulesInput>
+  }
+
+  export type TaskTemplateGroupUpsertWithoutBranchSchedulesInput = {
+    update: XOR<TaskTemplateGroupUpdateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedUpdateWithoutBranchSchedulesInput>
+    create: XOR<TaskTemplateGroupCreateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedCreateWithoutBranchSchedulesInput>
+    where?: TaskTemplateGroupWhereInput
+  }
+
+  export type TaskTemplateGroupUpdateToOneWithWhereWithoutBranchSchedulesInput = {
+    where?: TaskTemplateGroupWhereInput
+    data: XOR<TaskTemplateGroupUpdateWithoutBranchSchedulesInput, TaskTemplateGroupUncheckedUpdateWithoutBranchSchedulesInput>
+  }
+
+  export type TaskTemplateGroupUpdateWithoutBranchSchedulesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateWithoutBranchSchedulesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
+  }
+
   export type TaskTemplateGroupCreateWithoutTemplatesInput = {
     id?: string
     createdById: string
@@ -38665,6 +40396,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    branchSchedules?: BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput
   }
 
   export type TaskTemplateGroupUncheckedCreateWithoutTemplatesInput = {
@@ -38675,6 +40407,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    branchSchedules?: BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput
   }
 
   export type TaskTemplateGroupCreateOrConnectWithoutTemplatesInput = {
@@ -38701,6 +40434,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    branchSchedules?: BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput
   }
 
   export type TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput = {
@@ -38711,9 +40445,10 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
   }
 
-  export type RunBlockCreateWithoutProofInput = {
+  export type RunBlockCreateWithoutProofsInput = {
     id?: string
     blockId: string
     nodeId: string
@@ -38739,7 +40474,7 @@ export namespace Prisma {
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
-  export type RunBlockUncheckedCreateWithoutProofInput = {
+  export type RunBlockUncheckedCreateWithoutProofsInput = {
     id?: string
     runId: string
     blockId: string
@@ -38765,23 +40500,23 @@ export namespace Prisma {
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
-  export type RunBlockCreateOrConnectWithoutProofInput = {
+  export type RunBlockCreateOrConnectWithoutProofsInput = {
     where: RunBlockWhereUniqueInput
-    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    create: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
   }
 
-  export type RunBlockUpsertWithoutProofInput = {
-    update: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
-    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+  export type RunBlockUpsertWithoutProofsInput = {
+    update: XOR<RunBlockUpdateWithoutProofsInput, RunBlockUncheckedUpdateWithoutProofsInput>
+    create: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
     where?: RunBlockWhereInput
   }
 
-  export type RunBlockUpdateToOneWithWhereWithoutProofInput = {
+  export type RunBlockUpdateToOneWithWhereWithoutProofsInput = {
     where?: RunBlockWhereInput
-    data: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+    data: XOR<RunBlockUpdateWithoutProofsInput, RunBlockUncheckedUpdateWithoutProofsInput>
   }
 
-  export type RunBlockUpdateWithoutProofInput = {
+  export type RunBlockUpdateWithoutProofsInput = {
     id?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
     nodeId?: StringFieldUpdateOperationsInput | string
@@ -38807,7 +40542,7 @@ export namespace Prisma {
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
-  export type RunBlockUncheckedUpdateWithoutProofInput = {
+  export type RunBlockUncheckedUpdateWithoutProofsInput = {
     id?: StringFieldUpdateOperationsInput | string
     runId?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
@@ -38854,7 +40589,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -38881,7 +40616,7 @@ export namespace Prisma {
     subtaskOrder?: number | null
     templateId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -38922,7 +40657,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -38949,7 +40684,7 @@ export namespace Prisma {
     subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39553,7 +41288,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -39580,7 +41315,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39617,6 +41352,12 @@ export namespace Prisma {
     value?: NullableJsonNullValueInput | InputJsonValue
     completedAt?: Date | string | null
     completedBy?: string | null
+  }
+
+  export type ProofCreateManyRunBlockInput = {
+    id?: string
+    driveFileId?: string | null
+    createdAt?: Date | string
   }
 
   export type RunBlockCreateManyParentInput = {
@@ -39680,6 +41421,24 @@ export namespace Prisma {
     completedBy?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
+  export type ProofUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateManyWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type RunBlockUpdateWithoutParentInput = {
     id?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
@@ -39702,7 +41461,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
@@ -39728,7 +41487,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39797,7 +41556,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -39824,7 +41583,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39862,6 +41621,15 @@ export namespace Prisma {
     guidelineImage?: Bytes | null
     archivedAt?: Date | string | null
     groupPosition?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BranchPackageScheduleCreateManyPackageGroupInput = {
+    id?: string
+    branch: string
+    weekday: $Enums.PackageScheduleWeekday
+    createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -39910,6 +41678,33 @@ export namespace Prisma {
     guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleUpdateWithoutPackageGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleUncheckedUpdateWithoutPackageGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    branch?: StringFieldUpdateOperationsInput | string
+    weekday?: EnumPackageScheduleWeekdayFieldUpdateOperationsInput | $Enums.PackageScheduleWeekday
+    createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

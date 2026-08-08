@@ -212,6 +212,44 @@ export function isElevatedDeptSite(user: {
   );
 }
 
+/** Task Manager sidebar visibility for Template/Package/Package Table
+ *  (2026-08-07 permission matrix) — View tier only, separate from edit
+ *  capability (see canManageTaskTemplateGroups below). Overview is
+ *  deliberately NOT covered here — it stays visible to everyone via
+ *  Sidebar's existing unconditional rendering, and its own edit-surface
+ *  gating is unchanged, still driven entirely by ROLE_VIEWS/shows() above.
+ *  Designed to be consumed by BOTH the sidebar's visibility filter and
+ *  template-groups.ts's requireGroupViewAccess (once wired in Task 2/3 of
+ *  the RBAC plan), so the two can never drift apart — a role hidden from
+ *  the sidebar will always also be rejected server-side, and vice versa. */
+export function taskManagerNavAccess(user: {
+  role: string;
+  department: string | null;
+}): { template: boolean; package: boolean; packageTable: boolean } {
+  const manage = canManageTaskTemplateGroups(user);
+  const orgViewer = user.role === "CEO" || user.role === "HOD";
+  const branchManagerViewer = user.role === "BRANCH";
+  const packageViewer = manage || orgViewer || branchManagerViewer;
+  return {
+    template: manage || orgViewer,
+    package: packageViewer,
+    packageTable: packageViewer,
+  };
+}
+
+/** Task Manager Template/Package/Package Table EDIT capability
+ *  (create/edit/delete/assign) — identical for all three pages under the
+ *  2026-08-07 matrix: Super Admin (ADMIN) and the elevated
+ *  Operations/Optimisation dept-site accounts only. Everyone else who can
+ *  still VIEW (HOD, CEO, and — Package/Package Table only — Branch
+ *  Manager, per taskManagerNavAccess above) is read-only. */
+export function canManageTaskTemplateGroups(user: {
+  role: string;
+  department: string | null;
+}): boolean {
+  return user.role === "ADMIN" || isElevatedDeptSite(user);
+}
+
 /** Raw role (+ department/branch/employmentType) → UI view identity. */
 export function resolveViewRole(user: {
   role: string;

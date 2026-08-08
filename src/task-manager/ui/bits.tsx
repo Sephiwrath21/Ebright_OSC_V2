@@ -14,10 +14,17 @@ import type {
   FlowDrillTask,
   FlowStaffMember,
   FlowTaskRow,
+  ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
-import { compressImageFile, IMAGE_JPEG_QUALITY, IMAGE_MAX_DIMENSION } from "./image-compress";
+import {
+  compressImageFile,
+  drawTimestampWatermark,
+  IMAGE_JPEG_QUALITY,
+  IMAGE_MAX_DIMENSION,
+  type CompressedImage,
+} from "./image-compress";
 import { personSolidColor } from "./palette";
 import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
 
@@ -603,126 +610,252 @@ function GuidelineIndicator({
   );
 }
 
-// Proof images are COMPRESSED client-side before staging (2026-08-01
+// Proof images are COMPRESSED client-side before upload (2026-08-01
 // storage decision — see image-compress.ts: 1280px max, JPEG 75%, 2 MB
 // post-compression cap mirrored by the server).
 
-/** The "Proof" column cell (2026-07-30): assignee-uploaded completion
- *  evidence, always optional (never gates the status dropdown). Owner of a
- *  proof-less row gets a ＋ upload button; once uploaded, EVERYONE sees a
- *  📎 that opens the image in a viewer modal (served by
- *  /api/task-manager/proof-image/[id]); the owner can replace it from
- *  there. Rows that are neither owned nor proven show a plain dash. */
+/** Server-side cap mirrored here purely for UI messaging (data/tasks.ts's
+ *  own MAX_PROOFS_PER_TASK is the actual enforcement — this local copy
+ *  only drives disabling further adds / the "5/5 photos attached" state
+ *  before a wasted round trip; the server rejects a 6th regardless). */
+const MAX_PROOFS_PER_TASK = 5;
+
+/** Same red-text-under-content pattern as branch-package-schedule-grid.tsx's
+ *  own ErrorLine (that file doesn't export it, so this is a local copy). */
+function ErrorLine({ error }: { error: string | null }) {
+  if (!error) return null;
+  return <p className="mt-1 text-xs text-red-600">{error}</p>;
+}
+
+/** Shared device check (2026-08-09) — computed once and cached at module
+ *  scope, not per ProofCell instance (a page can render one per task row).
+ *  User-agent + touch-points based, NOT a viewport-width breakpoint: the
+ *  question is "does this device have a native camera/photo picker",
+ *  which a resized desktop window answers differently than a phone even
+ *  at the same pixel width. Reused for both the Proof upload layout
+ *  (drop-zone + two buttons on desktop vs one combined button on mobile)
+ *  and openCamera's own camera-vs-webcam-preview decision, so there's
+ *  exactly one definition of "mobile" for this feature, not two that
+ *  could drift apart. Must only be called client-side (never during SSR
+ *  render — `navigator` doesn't exist there); callers gate this behind a
+ *  useEffect or an event handler, never the render body directly. */
+let cachedIsMobileDevice: boolean | null = null;
+function isMobileDevice(): boolean {
+  if (cachedIsMobileDevice === null) {
+    cachedIsMobileDevice =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+  }
+  return cachedIsMobileDevice;
+}
+
+/** The "Proof" column cell (2026-07-30, multi-photo 2026-08-08, explicit
+ *  Upload + completion lock 2026-08-09): assignee-uploaded completion
+ *  evidence, up to MAX_PROOFS_PER_TASK photos per task, always optional
+ *  (never gates the status dropdown). Owner of a proof-less row gets a ＋
+ *  button; once any photo exists, EVERYONE sees a small ✓ gallery indicator
+ *  that opens a panel listing every photo as thumbnails (served by
+ *  /api/task-manager/proof-image/[id]) — the owner can remove any one of
+ *  them individually, without affecting the rest. Rows that are neither
+ *  owned nor proven show a plain dash.
+ *
+ *  Every "add a photo" entry point — file picker, drag-drop (desktop
+ *  only), clipboard paste (desktop only), the mobile camera-or-gallery
+ *  picker, the desktop getUserMedia webcam — compresses and STAGES the
+ *  result locally (2026-08-09: reverses the prior "upload immediately"
+ *  decision) rather than sending it; nothing reaches the server until the
+ *  "Upload N photos" button is clicked, which then sends every staged
+ *  photo in one batch. Staged photos count toward the cap so the user
+ *  can't stage past it before uploading.
+ *
+ *  Layout differs by device (2026-08-09, isMobileLayout/isMobileDevice()):
+ *  desktop keeps the drop-zone plus two buttons (Upload File vs. Take
+ *  Photo's live webcam preview — genuinely different flows); mobile drops
+ *  the drop-zone (not a mobile interaction) and collapses to ONE "Add
+ *  Photo" button, since Upload File and Take Photo now open the identical
+ *  native camera-or-gallery picker on mobile (no capture attribute, same
+ *  underlying input) — two buttons doing the same thing would just be
+ *  redundant.
+ *
+ *  Once `task.status === "DONE"` (Complete), both uploading and removing
+ *  are locked — same mechanism as the existing past-due-day lock
+ *  (`isLockedPastDay`), just gated on a different condition, and enforced
+ *  again server-side in uploadFlowTaskProof/removeFlowTaskProof so a stale
+ *  tab or direct request can't bypass it. */
 function ProofCell({
   task,
   isOwned,
   onUploadProof,
+  onRemoveProof,
 }: {
   task: FlowTaskRow;
   isOwned: boolean;
   onUploadProof?: ProofUploadHandler;
+  onRemoveProof?: ProofRemoveHandler;
 }) {
-  const [busy, setBusy] = React.useState(false);
-  const [viewerOpen, setViewerOpen] = React.useState(false);
-  /** The "Attach Proof Of Completion" popover (2026-07-30): ONE surface
-   *  accepting all 4 input methods — file picker, drag-and-drop,
-   *  clipboard paste, and camera capture — all staging into the same
-   *  preview-then-Upload flow (stageFile/submitPending). */
-  const [attachOpen, setAttachOpen] = React.useState(false);
+  // Local overlay list: seeded from the server payload, then every
+  // successful add/remove mutates it directly — same "local state is the
+  // source of truth once mounted" approach the old single-proof version
+  // used its localProofId overlay for, just list-shaped now. Each photo
+  // has its own permanent id (never reused/replaced), so unlike the old
+  // single-slot version there's no cache-busting `?v=` to carry.
+  const [proofIds, setProofIds] = React.useState<string[]>(task.proofIds);
+  // Staged-but-not-yet-uploaded photos (2026-08-09) — compressed locally,
+  // shown as previews, sent only when uploadPending() runs. Each item
+  // tracks its own error so a partial batch failure doesn't lose the rest.
+  const [pending, setPending] = React.useState<
+    { localId: string; image: CompressedImage; error: string | null }[]
+  >([]);
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [removingId, setRemovingId] = React.useState<string | null>(null);
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
+
+  /** The "Proof Of Completion" panel (2026-07-30, gallery 2026-08-08): ONE
+   *  surface showing every attached photo (thumbnails + remove) AND, while
+   *  under the cap, the add controls — desktop gets all 4 (file picker,
+   *  drag-and-drop, clipboard paste, camera capture); mobile collapses to
+   *  one combined button (see isMobileLayout above). */
+  const [panelOpen, setPanelOpen] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
-  const [errorText, setErrorText] = React.useState<string | null>(null);
-  // A fresh upload shows its 📎 immediately (before the refreshed payload
-  // arrives); `version` cache-busts the image URL after a replace, since a
-  // re-upload keeps the same Proof id.
-  const [localProofId, setLocalProofId] = React.useState<string | null>(null);
-  const [version, setVersion] = React.useState(0);
+  /** Which photo (by id) is shown enlarged — see the doc comment above
+   *  that modal for why this is a single-photo view, not a carousel. */
+  const [enlargedId, setEnlargedId] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  /** capture="environment" input — phones/tablets open the native camera
-   *  app directly; desktop browsers ignore `capture` and fall back to the
-   *  ordinary file picker (browser-defined behavior, no permission code). */
-  const cameraRef = React.useRef<HTMLInputElement>(null);
 
-  const proofId = localProofId ?? task.proofId ?? null;
-  const imageSrc = proofId
-    ? `/api/task-manager/proof-image/${proofId}${version ? `?v=${version}` : ""}`
-    : null;
-  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task);
+  // Mobile gets a simplified add-photo layout (2026-08-09): no drop-zone
+  // (not a mobile interaction), one combined button instead of two (Upload
+  // File and Take Photo now open the identical native picker on mobile,
+  // so two buttons doing the same thing was redundant clutter). Starts
+  // false so the client's first hydration render matches the server's
+  // (navigator isn't available during SSR) — the effect flips it right
+  // after mount, same pattern as any other client-only device check.
+  const [isMobileLayout, setIsMobileLayout] = React.useState(false);
+  React.useEffect(() => {
+    setIsMobileLayout(isMobileDevice());
+  }, []);
 
-  /** Review-before-submit (2026-07-31): picker, drop, paste, and camera
-   *  all STAGE the image here — validated + previewed in the popover —
-   *  and nothing is uploaded until the user clicks the Upload button
-   *  (submitPending below). Picking again replaces the staged image. */
-  const [pendingImage, setPendingImage] = React.useState<{
-    mime: string;
-    dataBase64: string;
-    previewUrl: string;
-    name: string;
-  } | null>(null);
+  // Completion lock (2026-08-09): once Complete, the attached photos are
+  // the frozen record — same treatment as the past-due-day lock below, just
+  // a different condition. Server-enforced too, see uploadFlowTaskProof.
+  const isCompleted = task.status === "DONE";
+  const atCap = proofIds.length + pending.length >= MAX_PROOFS_PER_TASK;
+  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task) && !isCompleted;
+  // Same ownership/past-day/completion guards as upload, applied
+  // symmetrically (2026-08-08 design decision #4) — a task whose day has
+  // passed, or that's already Complete, shouldn't have its evidence
+  // altered either way.
+  const canRemove = isOwned && Boolean(onRemoveProof) && !isLockedPastDay(task) && !isCompleted;
+  const canAddMore = canUpload && !atCap && !uploading;
 
-  const stageFile = async (file: File) => {
-    if (!onUploadProof) return;
-    setErrorText(null);
+  /** Stages one compressed image locally (2026-08-09: explicit-Upload
+   *  redesign) — nothing reaches the server until uploadPending() runs. */
+  const addFile = async (file: File) => {
+    if (!canAddMore) return;
+    setError(null);
     // Compress BEFORE staging — the full-res original never leaves the
-    // browser; what the user previews is exactly what gets stored.
-    const result = await compressImageFile(file);
+    // browser. watermark:true (2026-08-09) — this is Proof of Completion,
+    // not the shared guideline-attachment path; see compressImageFile's
+    // own doc comment for why the option isn't just always-on.
+    const result = await compressImageFile(file, { watermark: true });
     if (!result.ok) {
-      setErrorText(result.message);
+      setError(result.message);
       return;
     }
-    setPendingImage({
-      mime: result.image.mime,
-      dataBase64: result.image.dataBase64,
-      previewUrl: result.image.previewUrl,
-      name: file.name || "captured image",
-    });
+    setPending((prev) => [...prev, { localId: crypto.randomUUID(), image: result.image, error: null }]);
   };
 
-  /** The ONLY place the proof actually uploads — the modal's Upload
-   *  button. Success closes the popover and flips the row to ✓. */
-  const submitPending = async () => {
-    if (!onUploadProof || !pendingImage) return;
-    setBusy(true);
-    setErrorText(null);
-    try {
-      const result = await onUploadProof(task.runBlockId, {
-        mime: pendingImage.mime,
-        dataBase64: pendingImage.dataBase64,
-      });
-      if (result.ok) {
-        setLocalProofId(result.proofId);
-        setVersion((v) => v + 1);
-        setPendingImage(null);
-        setAttachOpen(false);
-      } else {
-        setErrorText(result.message);
+  const removePending = (localId: string) => {
+    setPending((prev) => prev.filter((p) => p.localId !== localId));
+  };
+
+  /** The "Upload N photos" button: sends every staged photo SEQUENTIALLY,
+   *  not in parallel — the server's 5-photo cap is a plain count-then-
+   *  create with a documented, accepted one-photo race tolerance (see
+   *  MAX_PROOFS_PER_TASK's comment in data/tasks.ts); firing a whole batch
+   *  at once would let that same race compound into a worse overshoot.
+   *  Each photo succeeds or fails independently: a failure leaves that one
+   *  photo staged with its own inline error (so it stays retry-able by
+   *  clicking Upload again) while the batch continues to the next photo —
+   *  mirrors how a failed remove never touches the rest of the gallery.
+   *  `canAddMore` being false while `uploading` is true prevents new items
+   *  from being staged mid-batch, so the loop below never races new adds. */
+  const uploadPending = async () => {
+    if (!onUploadProof || pending.length === 0) return;
+    setUploading(true);
+    for (const item of pending) {
+      try {
+        const result = await onUploadProof(task.runBlockId, {
+          mime: item.image.mime,
+          dataBase64: item.image.dataBase64,
+        });
+        if (result.ok) {
+          setProofIds((prev) => [...prev, result.proofId]);
+          setPending((prev) => prev.filter((p) => p.localId !== item.localId));
+        } else {
+          setPending((prev) =>
+            prev.map((p) => (p.localId === item.localId ? { ...p, error: result.message } : p)),
+          );
+        }
+      } catch {
+        setPending((prev) =>
+          prev.map((p) =>
+            p.localId === item.localId
+              ? { ...p, error: "Upload failed — check your connection and try again." }
+              : p,
+          ),
+        );
       }
-    } finally {
-      setBusy(false);
     }
+    setUploading(false);
   };
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) void stageFile(file);
+    if (file) void addFile(file);
   };
 
-  // Closing the popover (✕ / outside / Escape) discards any un-submitted
-  // staged image and stale errors — nothing was uploaded yet.
-  React.useEffect(() => {
-    if (!attachOpen) {
-      setPendingImage(null);
-      setErrorText(null);
+  const handleRemove = async (proofId: string) => {
+    if (!onRemoveProof) return;
+    setRemovingId(proofId);
+    setRemoveError(null);
+    try {
+      const result = await onRemoveProof(proofId);
+      if (result.ok) {
+        setProofIds((prev) => prev.filter((id) => id !== proofId));
+        setEnlargedId((cur) => (cur === proofId ? null : cur));
+      } else {
+        setRemoveError(result.message);
+      }
+    } catch {
+      setRemoveError("Remove failed — check your connection and try again.");
+    } finally {
+      setRemovingId(null);
     }
-  }, [attachOpen]);
+  };
 
-  // ---- "Take Photo" (2026-07-30 fix) ----------------------------------
-  // The capture="environment" input only opens a camera on PHONES/TABLETS
-  // — desktop browsers ignore `capture` and show the ordinary file dialog
-  // (that was the reported bug). So: mobile keeps the native camera input,
-  // desktop gets a real in-popover webcam preview via getUserMedia, and
-  // anything without a usable camera falls back to the picker with a hint.
-  // getUserMedia needs a secure context (HTTPS or localhost).
+  // Closing the panel only clears stale errors — `pending` deliberately
+  // survives close/reopen (2026-08-09: staged photos are real, meaningful
+  // state now that Upload is a separate step, not something to discard just
+  // because the panel was closed). The Upload button itself re-checks
+  // canUpload every render, so a task completed elsewhere while photos sat
+  // staged still locks correctly next time this panel opens.
+  React.useEffect(() => {
+    if (!panelOpen) {
+      setError(null);
+      setRemoveError(null);
+    }
+  }, [panelOpen]);
+
+  // ---- "Take Photo" (2026-07-30 fix; camera-forcing removed 2026-08-08;
+  // mobile branch removed 2026-08-09) — desktop-only now. Mobile gets its
+  // own single combined "Add Photo" button below (isMobileLayout) that
+  // clicks inputRef directly; openCamera is only ever wired to the desktop
+  // "Take Photo" button, so it no longer needs its own mobile detection or
+  // a separate cameraRef input — it goes straight to the in-panel webcam
+  // preview via getUserMedia. getUserMedia needs a secure context (HTTPS
+  // or localhost).
   const [cameraOpen, setCameraOpen] = React.useState(false);
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -736,18 +869,9 @@ function ProofCell({
 
   const openCamera = async () => {
     setCameraError(null);
-    // Phones/tablets: the native camera app beats an in-page preview.
-    // (iPadOS reports itself as "Mac" but has >1 touch point.)
-    const isMobile =
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
-    if (isMobile) {
-      cameraRef.current?.click();
-      return;
-    }
-    // On failure: SHOW the reason and stay in the popover — auto-opening
-    // the file picker here made it look like Take Photo "was" the picker
-    // (the reported bug); the Upload file button is right next to it.
+    // On failure: SHOW the reason and stay in the panel — auto-opening the
+    // file picker here made it look like Take Photo "was" the picker (the
+    // original reported bug); the Upload file button is right next to it.
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("Camera needs a secure connection (HTTPS) — use Upload file instead.");
       return;
@@ -776,19 +900,26 @@ function ProofCell({
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // watermark (2026-08-09) — same shared helper compressImageFile uses,
+    // this path is always Proof of Completion (the desktop webcam capture
+    // has no other caller), so it's unconditional here, no opt-in needed.
+    if (ctx) drawTimestampWatermark(ctx, canvas.width, canvas.height);
     stopCamera();
+    // Stages (2026-08-09) like every other entry point — capturing the
+    // frame is no longer itself the "send" action, Upload is.
     const previewUrl = canvas.toDataURL("image/jpeg", IMAGE_JPEG_QUALITY);
-    setPendingImage({
-      mime: "image/jpeg",
-      dataBase64: previewUrl.slice(previewUrl.indexOf(",") + 1),
-      previewUrl,
-      name: "camera-photo.jpg",
-    });
+    const dataBase64 = previewUrl.slice(previewUrl.indexOf(",") + 1);
+    const bytes = Math.ceil((dataBase64.length * 3) / 4);
+    setPending((prev) => [
+      ...prev,
+      { localId: crypto.randomUUID(), image: { mime: "image/jpeg", dataBase64, previewUrl, bytes }, error: null },
+    ]);
   };
 
   // Wire the stream to the <video> once it's mounted; stop the webcam
-  // whenever the popover closes (Esc/click-outside included) or the row
+  // whenever the panel closes (Esc/click-outside included) or the row
   // unmounts — never leave the camera light on.
   React.useEffect(() => {
     if (cameraOpen && videoRef.current && streamRef.current) {
@@ -797,8 +928,8 @@ function ProofCell({
     }
   }, [cameraOpen]);
   React.useEffect(() => {
-    if (!attachOpen && streamRef.current) stopCamera();
-  }, [attachOpen, stopCamera]);
+    if (!panelOpen && streamRef.current) stopCamera();
+  }, [panelOpen, stopCamera]);
   React.useEffect(
     () => () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -806,21 +937,21 @@ function ProofCell({
     [],
   );
 
-  // While the popover is open: Ctrl/Cmd+V anywhere attaches the clipboard
+  // While the panel is open: Ctrl/Cmd+V anywhere attaches the clipboard
   // image (screenshot-paste workflow), Escape closes. Document-level so
   // the user doesn't have to focus anything first.
   React.useEffect(() => {
-    if (!attachOpen) return;
+    if (!panelOpen) return;
     const onPaste = (e: ClipboardEvent) => {
       const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
       const file = item?.getAsFile();
       if (file) {
         e.preventDefault();
-        void stageFile(file);
+        void addFile(file);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAttachOpen(false);
+      if (e.key === "Escape") setPanelOpen(false);
     };
     document.addEventListener("paste", onPaste);
     document.addEventListener("keydown", onKeyDown);
@@ -829,66 +960,62 @@ function ProofCell({
       document.removeEventListener("keydown", onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attachOpen]);
+  }, [panelOpen]);
 
   return (
     <span className="relative flex shrink-0 items-center justify-center">
+      {/* Single hidden input now (2026-08-09) — the separate cameraRef
+          input was only ever clicked from openCamera's old mobile branch,
+          which no longer exists (mobile's own "Add Photo" button below
+          clicks this same input directly; desktop's "Take Photo" goes to
+          the getUserMedia preview instead, never touches this input). No
+          capture attribute (removed 2026-08-08) — see openCamera's doc
+          comment for why omitting it matters. */}
       {canUpload && (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={onFile}
-          />
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={onFile}
-          />
-        </>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onFile}
+        />
       )}
-      {proofId ? (
+      {proofIds.length > 0 ? (
         <button
           type="button"
-          onClick={() => setViewerOpen(true)}
-          title="View proof"
-          aria-label={`View proof for ${task.blockTitle}`}
-          className="inline-flex size-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-500 hover:bg-emerald-100"
+          onClick={() => setPanelOpen(true)}
+          title={`View proof (${proofIds.length}/${MAX_PROOFS_PER_TASK})`}
+          aria-label={`View proof for ${task.blockTitle} (${proofIds.length} photo${proofIds.length === 1 ? "" : "s"})`}
+          className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-50 px-1.5 text-xs font-bold text-emerald-500 hover:bg-emerald-100"
         >
-          ✓
+          {proofIds.length > 1 ? `✓ ${proofIds.length}` : "✓"}
         </button>
       ) : canUpload ? (
         <button
           type="button"
-          disabled={busy}
+          disabled={uploading}
           onClick={() => {
-            setErrorText(null);
-            setAttachOpen(true);
+            setError(null);
+            setPanelOpen(true);
           }}
           title="Attach Proof Of Completion — drop, paste, upload, or take a photo"
           aria-label={`Attach proof of completion for ${task.blockTitle}`}
           className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
         >
-          {busy ? "…" : "＋"}
+          {uploading ? "…" : "＋"}
         </button>
       ) : (
         <span className="text-xs text-gray-300">—</span>
       )}
-      {errorText && !attachOpen && <InlineActionError text={errorText} />}
-      {/* Both modals render through a PORTAL to <body> (2026-07-30 fix):
+      {/* Both panels render through a PORTAL to <body> (2026-07-30 fix):
           completed rows carry opacity-60, and CSS opacity on an ancestor
           dims even position:fixed descendants — rendered in place, the
-          whole modal (white card included) went see-through. */}
-      {attachOpen &&
+          whole panel (white card included) went see-through. */}
+      {panelOpen &&
         createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setAttachOpen(false)}
+          onClick={() => setPanelOpen(false)}
         >
           <div
             className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
@@ -896,18 +1023,124 @@ function ProofCell({
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900">Attach Proof Of Completion</h4>
+                <h4 className="text-sm font-semibold text-gray-900">Proof Of Completion</h4>
                 <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
               </div>
               <button
                 type="button"
-                onClick={() => setAttachOpen(false)}
+                onClick={() => setPanelOpen(false)}
                 aria-label="Close"
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 ✕
               </button>
             </div>
+
+            {/* Gallery (2026-08-08): every attached photo, individually
+                removable by the owner without disturbing the rest. Clicking
+                a thumbnail opens a single enlarged view below. */}
+            {proofIds.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {proofIds.map((id) => (
+                  <div key={id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => setEnlargedId(id)}
+                      title="View photo"
+                      aria-label={`View proof photo for ${task.blockTitle}`}
+                      className="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/task-manager/proof-image/${id}`}
+                        alt={`Proof for ${task.blockTitle}`}
+                        className="size-16 object-cover"
+                      />
+                    </button>
+                    {canRemove && (
+                      <button
+                        type="button"
+                        disabled={removingId === id}
+                        onClick={() => void handleRemove(id)}
+                        title="Remove photo"
+                        aria-label="Remove this photo"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                      >
+                        {removingId === id ? "…" : "×"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <ErrorLine error={removeError} />
+
+            {/* Staged photos (2026-08-09): compressed but not yet sent —
+                each has its own discard × (pure local removal, nothing to
+                undo server-side) and its own error if a previous Upload
+                attempt for it failed; failed items stay here, retry-able
+                by clicking Upload again. */}
+            {pending.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-medium text-gray-500">Ready to upload</p>
+                <div className="flex flex-wrap gap-2">
+                  {pending.map((p) => (
+                    <div key={p.localId} className="group relative">
+                      <div className="block size-16 overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.image.previewUrl}
+                          alt="Photo staged for upload"
+                          className="size-16 object-cover"
+                        />
+                      </div>
+                      {/* disabled={uploading} blocks discard on every staged
+                          item while the batch is running, not just the one
+                          currently in flight — uploading is one global flag,
+                          not per-item. Accepted: batches are small (≤5) and
+                          each item's round trip is quick. */}
+                      <button
+                        type="button"
+                        disabled={uploading}
+                        onClick={() => removePending(p.localId)}
+                        title="Discard"
+                        aria-label="Discard this photo before uploading"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                      >
+                        ×
+                      </button>
+                      {p.error && (
+                        <p className="mt-1 w-16 text-[10px] leading-tight text-red-600">{p.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Gated on canUpload, not just pending.length (2026-08-09
+                    fix): a photo can be staged, then the task marked
+                    Complete from elsewhere before Upload is clicked — the
+                    button must disappear along with everything else the
+                    completion lock hides, not stay live only to be
+                    rejected server-side. Discard above stays unconditional
+                    since it's a pure local action with no server effect. */}
+                {canUpload ? (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void uploadPending()}
+                    className="mt-2 w-full rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {uploading
+                      ? "Uploading…"
+                      : `Upload ${pending.length} photo${pending.length === 1 ? "" : "s"}`}
+                  </button>
+                ) : isCompleted && isOwned ? (
+                  <p className="mt-2 text-center text-[11px] text-gray-400">
+                    🔒 Task is complete — these can no longer be uploaded.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
             {cameraOpen ? (
               <>
                 {/* Live desktop webcam preview (getUserMedia) — 📸 draws
@@ -923,7 +1156,7 @@ function ProofCell({
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={uploading}
                     onClick={capturePhoto}
                     className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                   >
@@ -938,41 +1171,30 @@ function ProofCell({
                   </button>
                 </div>
               </>
-            ) : pendingImage ? (
-              <>
-                {/* Review step (2026-07-31): the staged image — from ANY of
-                    the 4 methods — shows here first; nothing uploads until
-                    the Upload button below is clicked. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pendingImage.previewUrl}
-                  alt={`Proof preview for ${task.blockTitle}`}
-                  className="max-h-64 w-full rounded-xl border border-gray-200 bg-gray-50 object-contain"
-                />
-                <p className="mt-1.5 truncate text-xs text-gray-500">{pendingImage.name}</p>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void submitPending()}
-                    className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {busy ? "Uploading…" : "Upload"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setPendingImage(null);
-                      setErrorText(null);
-                    }}
-                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </>
-            ) : (
+            ) : canUpload && atCap ? (
+              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
+                {MAX_PROOFS_PER_TASK}/{MAX_PROOFS_PER_TASK} photos attached or staged — remove one to
+                add another.
+              </p>
+            ) : canUpload && isMobileLayout ? (
+              // Mobile (2026-08-09): no drop-zone (not a mobile interaction
+              // pattern) and one combined button, not two — Upload File and
+              // Take Photo now open the identical native picker on mobile
+              // (same input, no capture attribute), so a second button
+              // doing the same thing would just be redundant clutter.
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+              >
+                ➕ Add Photo
+              </button>
+            ) : canUpload ? (
+              // Desktop: drop-zone/paste (real interaction patterns here)
+              // plus two genuinely different buttons — Upload File opens a
+              // plain file dialog, Take Photo opens the in-panel getUserMedia
+              // webcam preview (openCamera), nothing else reaches that.
               <>
                 <div
                   onDragOver={(e) => {
@@ -984,7 +1206,7 @@ function ProofCell({
                     e.preventDefault();
                     setDragOver(false);
                     const file = e.dataTransfer.files?.[0];
-                    if (file) void stageFile(file);
+                    if (file) void addFile(file);
                   }}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
                     dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
@@ -999,7 +1221,7 @@ function ProofCell({
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={uploading}
                     onClick={() => inputRef.current?.click()}
                     className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
                   >
@@ -1007,7 +1229,7 @@ function ProofCell({
                   </button>
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={uploading}
                     onClick={() => void openCamera()}
                     className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
                   >
@@ -1015,23 +1237,34 @@ function ProofCell({
                   </button>
                 </div>
               </>
-            )}
-            {busy && <p className="mt-2 text-xs text-gray-500">Uploading…</p>}
+            ) : isCompleted && isOwned ? (
+              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
+                🔒 Task is complete — photos are locked.
+              </p>
+            ) : null}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
-            {errorText && <p className="mt-2 text-xs text-red-600">{errorText}</p>}
-            <p className="mt-2 text-[11px] text-gray-400">
-              PNG / JPEG / WebP · photos are auto-compressed (max 1280px)
-            </p>
+            <ErrorLine error={error} />
+            {canUpload && !atCap && !cameraOpen && (
+              <p className="mt-2 text-[11px] text-gray-400">
+                PNG / JPEG / WebP · photos are auto-compressed (max 1280px) ·{" "}
+                {proofIds.length}/{MAX_PROOFS_PER_TASK} attached
+                {pending.length > 0 ? `, ${pending.length} staged` : ""}
+              </p>
+            )}
           </div>
         </div>,
         document.body,
       )}
-      {viewerOpen &&
-        imageSrc &&
+      {/* Single enlarged photo (2026-08-08): deliberately NOT a next/prev
+          carousel — the panel above already lists every photo as
+          thumbnails, so "enlarge one" only needs to show that one photo
+          plus its own Remove button; a full carousel here would just
+          duplicate the panel's own navigation for little real benefit. */}
+      {enlargedId &&
         createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setViewerOpen(false)}
+          onClick={() => setEnlargedId(null)}
         >
           <div
             className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
@@ -1044,35 +1277,39 @@ function ProofCell({
               </div>
               <button
                 type="button"
-                onClick={() => setViewerOpen(false)}
+                onClick={() => setEnlargedId(null)}
                 aria-label="Close"
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 ✕
               </button>
             </div>
-            <a href={imageSrc} target="_blank" rel="noopener noreferrer" title="Open full size">
+            <a
+              href={`/api/task-manager/proof-image/${enlargedId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open full size"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={imageSrc}
+                src={`/api/task-manager/proof-image/${enlargedId}`}
                 alt={`Proof for ${task.blockTitle}`}
                 className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
               />
             </a>
-            {canUpload && (
+            {canRemove && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={removingId === enlargedId}
                 onClick={() => {
-                  setViewerOpen(false);
-                  setErrorText(null);
-                  setAttachOpen(true);
+                  if (enlargedId) void handleRemove(enlargedId);
                 }}
-                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
               >
-                {busy ? "Uploading…" : "Replace image"}
+                {removingId === enlargedId ? "Removing…" : "Remove photo"}
               </button>
             )}
+            <ErrorLine error={removeError} />
           </div>
         </div>,
         document.body,
@@ -1088,6 +1325,7 @@ export function TaskRowLine({
   onSkip,
   onReopen,
   onUploadProof,
+  onRemoveProof,
   nameWidth,
   proofWidth,
   assignerWidth,
@@ -1109,8 +1347,13 @@ export function TaskRowLine({
    *  (reopen). Omit to disable reopening (option stays but is disabled). */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
   /** The Proof column's upload action — see ProofCell. Omit to make every
-   *  proof cell view-only (📎 still shows where proof exists). */
+   *  proof cell view-only (the gallery indicator still shows where proof
+   *  exists). */
   onUploadProof?: ProofUploadHandler;
+  /** The Proof gallery's per-photo remove action (2026-08-08) — see
+   *  ProofCell. Omit to make every existing photo non-removable (view-only,
+   *  same as omitting onUploadProof does for adding). */
+  onRemoveProof?: ProofRemoveHandler;
   /** Column widths (2026-07-30): a number OR a CSS length/var() string —
    *  ResizableTaskList passes "var(--tm-col-*)" so a header drag updates
    *  every row without re-rendering them (see its startResize).
@@ -1271,7 +1514,7 @@ export function TaskRowLine({
           by. Width tracks the header's drag handle. */}
       {hideCompleted && (
         <span className="flex shrink-0 justify-center" style={{ width: proofWidth ?? 40 }}>
-          <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} />
+          <ProofCell task={task} isOwned={isOwned} onUploadProof={onUploadProof} onRemoveProof={onRemoveProof} />
         </span>
       )}
       {/* "Assignee" column (2026-07-30) — personal My Tasks lists only
@@ -1507,6 +1750,7 @@ export function ResizableTaskList({
   onSkip,
   onReopen,
   onUploadProof,
+  onRemoveProof,
   emptyLabel,
   hideCompleted,
   assigneeColumnLabel,
@@ -1521,6 +1765,8 @@ export function ResizableTaskList({
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
   /** The Proof column's upload action — see ProofCell. */
   onUploadProof?: ProofUploadHandler;
+  /** The Proof gallery's per-photo remove action — see ProofCell. */
+  onRemoveProof?: ProofRemoveHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
   /** Header override for the Assignee column (2026-08-05) — e.g. "Assigned
@@ -1932,6 +2178,7 @@ export function ResizableTaskList({
             onSkip,
             onReopen,
             onUploadProof,
+            onRemoveProof,
             nameWidth,
             proofWidth: PROOF_COL_WIDTH,
             assignerWidth: ASSIGNER_COL_WIDTH,
@@ -2097,6 +2344,7 @@ export function StatusOverviewCard({
   onSkip,
   onReopen,
   onUploadProof,
+  onRemoveProof,
   reassign,
 }: {
   title: string;
@@ -2127,6 +2375,9 @@ export function StatusOverviewCard({
   /** Proof upload handler, passed straight to EntityDrillModal — see
    *  ProofCell. */
   onUploadProof?: ProofUploadHandler;
+  /** Proof gallery per-photo remove handler, passed straight to
+   *  EntityDrillModal — see ProofCell. */
+  onRemoveProof?: ProofRemoveHandler;
   /** "Assign to Others" control, passed straight to EntityDrillModal. */
   reassign?: ReassignControl;
 }) {
@@ -2162,6 +2413,7 @@ export function StatusOverviewCard({
           onSkip={onSkip}
           onReopen={onReopen}
           onUploadProof={onUploadProof}
+          onRemoveProof={onRemoveProof}
           reassign={reassign}
         />
       )}
@@ -2258,6 +2510,7 @@ export function EntityDrillModal({
   onSkip,
   onReopen,
   onUploadProof,
+  onRemoveProof,
   reassign,
 }: {
   name: string;
@@ -2273,10 +2526,13 @@ export function EntityDrillModal({
   onSkip?: (runBlockId: string) => Promise<ActionResult>;
   /** "Mark Pending" (reopen) handler — see TaskRowLine's onReopen. */
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
-  /** Proof upload — the viewer's OWN rows get the ＋/📎 cell (see
+  /** Proof upload — the viewer's OWN rows get the ＋/gallery cell (see
    *  ProofCell); omitted on read-only oversight cards, where existing
-   *  proof still shows its 📎. */
+   *  proof still shows its gallery indicator. */
   onUploadProof?: ProofUploadHandler;
+  /** Proof gallery per-photo remove — see ProofCell. Omitted on read-only
+   *  oversight cards, same as onUploadProof. */
+  onRemoveProof?: ProofRemoveHandler;
   /** "Assign to Others" (2026-07-25): when provided, every PENDING row gets
    *  a reassign control opening an inline person picker. Only passed for
    *  the 5 assign-capable identities; the server action re-checks. */
@@ -2471,8 +2727,13 @@ export function EntityDrillModal({
                         rows, 📎 view for anyone once uploaded. Only takes
                         space when actionable/present — the modal is too
                         narrow for a dash placeholder column. */}
-                    {(t.proofId || (isOwned && onUploadProof)) && (
-                      <ProofCell task={t} isOwned={isOwned} onUploadProof={onUploadProof} />
+                    {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
+                      <ProofCell
+                        task={t}
+                        isOwned={isOwned}
+                        onUploadProof={onUploadProof}
+                        onRemoveProof={onRemoveProof}
+                      />
                     )}
                     {dueDisplay && (
                       <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>

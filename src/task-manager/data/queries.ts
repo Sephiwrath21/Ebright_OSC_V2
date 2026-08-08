@@ -277,16 +277,20 @@ export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
   }, "getFlowStaff");
 }
 
-/** Just the caller's own Task Manager domain role (User.role) — a light
+/** Just the caller's own Task Manager domain role (+ department) — a light
  *  alternative to getFlowDetail/getFlowOverview for callers that only need
  *  the role, e.g. deciding whether to hide the Cadence picker for a CEO
  *  (mirrors /task-manager/page.tsx's `role === "CEO"` check, without
  *  fetching that page's full daily payload). Deliberately NOT the OSC
- *  portal session's own role field — a different identity system. */
-export function getMyRole(email: string): Promise<{ role: string }> {
+ *  portal session's own role field — a different identity system.
+ *  `department` (2026-08-07, RBAC plan) travels alongside `role` because
+ *  `canManageTaskTemplateGroups`/`taskManagerNavAccess` (see role-views.ts)
+ *  need both together — used by template/page.tsx, package/page.tsx, and
+ *  package-table/page.tsx to compute their `canEdit`/view-access checks. */
+export function getMyRole(email: string): Promise<{ role: string; department: string | null }> {
   return native(async () => {
     const user = await requireUserByEmail(email);
-    return { role: user.role };
+    return { role: user.role, department: user.department };
   }, "getMyRole");
 }
 

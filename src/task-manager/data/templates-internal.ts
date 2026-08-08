@@ -2,12 +2,14 @@
 // cascade-safe mutation/read logic behind ./templates's exported
 // deleteTaskTemplate/editTaskTemplate/getTemplateDeletionImpact, factored
 // out so an ALREADY-authorized caller (data/template-groups.ts, whose own
-// requireGroupAccess uses a DIFFERENT per-scope allow-list than
+// requireGroupEditAccess — Super Admin + elevated dept-site only, identical
+// for both TEMPLATE and PACKAGE scope — is a DIFFERENT allow-list than
 // ./templates's requireAssigner) can invoke the same logic without
-// re-running requireAssigner's narrower check — which would incorrectly
-// reject a Branch Manager requireGroupAccess already authorized. See
-// template-groups.ts's file header for the full double-gating
-// explanation.
+// re-running requireAssigner's check. Keeping the two allow-lists decoupled
+// this way avoids double-gating (an already-authorized caller getting
+// silently rejected by a second, differently-shaped check) if either one's
+// allow-list changes independently later. See template-groups.ts's file
+// header for the full double-gating explanation.
 //
 // Deliberately NOT re-exported by data.ts's `export * from "./data/templates"`
 // barrel (this file isn't re-exported by that barrel at all): every Core
@@ -20,6 +22,7 @@
 import { z } from "zod";
 import type { Prisma } from "@/generated/task-manager-client";
 import { ApiHttpError } from "../lib/api-server";
+import { todayStart } from "../lib/dates";
 import { getUsersByIds } from "../lib/users";
 import { prisma } from "../prisma";
 
@@ -73,12 +76,25 @@ export async function getTemplateDeletionImpactCore(
  *  every assignee's lists; completed/N-A records keep their runs, blocks,
  *  and proof untouched. Nothing is hard-deleted. Exported so ./templates's
  *  removeTemplateAssignments (bulk "Remove Task") can reuse it without
- *  duplicating the logic. */
+ *  duplicating the logic.
+ *
+ *  `dueWeekday` (2026-08-07, added for Branch Package Schedule): optional
+ *  JS `Date.getDay()` filter (0=Sun..6=Sat, matching tasks-internal.ts's
+ *  DAY_INDEX) applied AFTER the DB fetch. Without it, cancelling one
+ *  (templateId, assigneeId) pair cancels EVERY pending block for that pair
+ *  regardless of which day it's due — fine for the existing callers (they
+ *  mean "cancel this person's entire pending run of this template"), but
+ *  wrong for Branch Package Schedule, where clearing/changing ONE grid cell
+ *  (branch, weekday) must cancel only that weekday's recurring assignment
+ *  and leave the same manager's OTHER-weekday assignment of the same
+ *  package/template untouched. Both existing call sites omit it and keep
+ *  their unfiltered (all-weekdays) behavior unchanged. */
 export async function cancelPendingTemplateRuns(
   actorId: string,
   templateId: string,
   reason: string,
   assigneeId?: string,
+  dueWeekday?: number,
 ) {
   const blocks = await prisma.runBlock.findMany({
     where: {
@@ -86,11 +102,18 @@ export async function cancelPendingTemplateRuns(
       ...(assigneeId ? { assigneeId } : {}),
       run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
-    select: { runId: true, status: true },
+    select: { runId: true, status: true, dueAt: true },
   });
+  // `b.dueAt?.getDay()` is `undefined` for a null dueAt, which never equals
+  // a numeric dueWeekday — a block with no due date is silently excluded
+  // whenever a weekday filter is applied. Harmless today: every current
+  // dueWeekday caller (Branch Package Schedule) always creates its blocks
+  // via assignFlowTaskCore with `days: [weekday]`, which always sets dueAt.
+  const matchingBlocks =
+    dueWeekday === undefined ? blocks : blocks.filter((b) => b.dueAt?.getDay() === dueWeekday);
   const pendingRunIds = [
     ...new Set(
-      blocks
+      matchingBlocks
         .filter((b) => (PENDING_STATUSES as readonly string[]).includes(b.status))
         .map((b) => b.runId),
     ),
@@ -104,11 +127,20 @@ export async function cancelPendingTemplateRuns(
       data: {
         actorId,
         action: "RUN_CANCELLED",
-        detail: { reason, templateId, cancelledRuns: pendingRunIds.length, ...(assigneeId ? { assigneeId } : {}) },
+        detail: {
+          reason,
+          templateId,
+          cancelledRuns: pendingRunIds.length,
+          ...(assigneeId ? { assigneeId } : {}),
+          ...(dueWeekday !== undefined ? { dueWeekday } : {}),
+        },
       },
     });
   }
-  return { removedTasks: pendingRunIds.length, keptRecords: blocks.length - pendingRunIds.length };
+  return {
+    removedTasks: pendingRunIds.length,
+    keptRecords: matchingBlocks.length - pendingRunIds.length,
+  };
 }
 
 /** Delete a template AND cascade to its assignments (2026-07-31 rule) —
@@ -155,6 +187,19 @@ function subRunName(subtaskTitle: string, parentRunName: string): string {
  *    subtasks stay untouched as history.
  *  - Completed parent instances (and their whole records) are never
  *    modified — they reflect the task as it was when finished.
+ *  - Past-due protection (2026-08-07): a pending parent is ALSO excluded
+ *    from the sync if it's past-due — `dueAt` non-null AND before
+ *    `todayStart()` — even though its status is still non-terminal (e.g.
+ *    OVERDUE/ESCALATED). This is a SEPARATE exclusion from, and additive
+ *    to, the existing status-based one above: a block can be non-terminal
+ *    status (still "pending" in the PENDING_STATUSES sense) AND past-due
+ *    at the same time, and it's specifically that combination this
+ *    excludes — an overdue instance reflects the task as it was assigned,
+ *    same rationale as completed instances, and must not be silently
+ *    rewritten out from under whoever already missed it. Null-`dueAt`
+ *    (adhoc/undated) instances are NOT considered past and stay eligible.
+ *    Applies to BOTH the single-task "+ Task" hub's Edit tab and
+ *    Template/Package group edits, since both call this shared Core.
  *  - Cadence/recipients/days are NOT part of editing: cadence changes only
  *    affect future assignments; recipients are per-assignment. */
 export async function editTaskTemplateCore(
@@ -169,6 +214,7 @@ export async function editTaskTemplateCore(
     select: { id: true },
   });
   if (!template) throw new ApiHttpError(404, "Template not found");
+  const boundary = todayStart();
 
   // 1) the template itself. The template NAME follows the title
   // (2026-07-31 fix): after an edit, the picker label and the task
@@ -189,13 +235,16 @@ export async function editTaskTemplateCore(
     },
   });
 
-  // 2) pending parents (with their run, for cloning subtask runs)
+  // 2) pending parents (with their run, for cloning subtask runs) —
+  // excludes past-due instances (dueAt non-null and before today), see
+  // the past-due-protection doc note above.
   const parents = await prisma.runBlock.findMany({
     where: {
       templateId: id,
       parentId: null,
       status: { in: [...PENDING_STATUSES] },
       run: { status: { not: "CANCELLED" }, archivedAt: null },
+      OR: [{ dueAt: null }, { dueAt: { gte: boundary } }],
     },
     include: { run: true, runItems: true },
   });
