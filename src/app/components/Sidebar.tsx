@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Award,
   ClipboardList,
+  Workflow,
 } from "lucide-react";
 import type { NavAccess } from "./navAccess.types";
 
@@ -150,6 +151,7 @@ const primaryNav: NavItem[] = [
     ],
   },
   { name: "Task Manager", href: "/task-manager", Icon: ListChecks },
+  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan" },
 ];
 
 const secondaryNav: NavItem[] = [
