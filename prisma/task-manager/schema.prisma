@@ -316,8 +316,10 @@ model RunBlock {
   // Optional assignee-uploaded completion evidence (2026-07-30, the My
   // Tasks "Proof" column). Unlike guideline (shared, assigner-attached),
   // proof is strictly per-block and NEVER inherited by recurrence
-  // successors — it's evidence for THIS occurrence only.
-  proof Proof?
+  // successors — it's evidence for THIS occurrence only. One-to-many as of
+  // 2026-08-08 (up to 5 photos per task, see Proof's own comment) —
+  // formerly a single nullable Proof (runBlockId @unique).
+  proofs Proof[]
 
   // Main Task ↔ Subtask link (2026-07-30): a subtask is a FULL RunBlock in
   // its own run (own status/proof/due — completion fully independent of
@@ -485,10 +487,12 @@ model TaskTemplate {
 /// surviving/future row goes through Drive.
 model Proof {
   id          String   @id @default(cuid())
-  runBlockId  String   @unique
+  runBlockId  String
   runBlock    RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
   driveFileId String? // Google Drive file id — set by every upload
   createdAt   DateTime @default(now())
+
+  @@index([runBlockId])
 }
 
 enum BlockStatus {

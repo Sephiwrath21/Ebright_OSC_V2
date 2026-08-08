@@ -3346,11 +3346,13 @@ export namespace Prisma {
 
   export type RunBlockCountOutputType = {
     runItems: number
+    proofs: number
     subtasks: number
   }
 
   export type RunBlockCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runItems?: boolean | RunBlockCountOutputTypeCountRunItemsArgs
+    proofs?: boolean | RunBlockCountOutputTypeCountProofsArgs
     subtasks?: boolean | RunBlockCountOutputTypeCountSubtasksArgs
   }
 
@@ -3370,6 +3372,13 @@ export namespace Prisma {
    */
   export type RunBlockCountOutputTypeCountRunItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RunItemWhereInput
+  }
+
+  /**
+   * RunBlockCountOutputType without action
+   */
+  export type RunBlockCountOutputTypeCountProofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
   }
 
   /**
@@ -15355,7 +15364,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
-    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    proofs?: boolean | RunBlock$proofsArgs<ExtArgs>
     parent?: boolean | RunBlock$parentArgs<ExtArgs>
     subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
@@ -15445,7 +15454,7 @@ export namespace Prisma {
     recurrenceOf?: boolean | RunBlock$recurrenceOfArgs<ExtArgs>
     successor?: boolean | RunBlock$successorArgs<ExtArgs>
     guideline?: boolean | RunBlock$guidelineArgs<ExtArgs>
-    proof?: boolean | RunBlock$proofArgs<ExtArgs>
+    proofs?: boolean | RunBlock$proofsArgs<ExtArgs>
     parent?: boolean | RunBlock$parentArgs<ExtArgs>
     subtasks?: boolean | RunBlock$subtasksArgs<ExtArgs>
     _count?: boolean | RunBlockCountOutputTypeDefaultArgs<ExtArgs>
@@ -15471,7 +15480,7 @@ export namespace Prisma {
       recurrenceOf: Prisma.$RunBlockPayload<ExtArgs> | null
       successor: Prisma.$RunBlockPayload<ExtArgs> | null
       guideline: Prisma.$GuidelinePayload<ExtArgs> | null
-      proof: Prisma.$ProofPayload<ExtArgs> | null
+      proofs: Prisma.$ProofPayload<ExtArgs>[]
       parent: Prisma.$RunBlockPayload<ExtArgs> | null
       subtasks: Prisma.$RunBlockPayload<ExtArgs>[]
     }
@@ -15895,7 +15904,7 @@ export namespace Prisma {
     recurrenceOf<T extends RunBlock$recurrenceOfArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$recurrenceOfArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     successor<T extends RunBlock$successorArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$successorArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     guideline<T extends RunBlock$guidelineArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$guidelineArgs<ExtArgs>>): Prisma__GuidelineClient<$Result.GetResult<Prisma.$GuidelinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-    proof<T extends RunBlock$proofArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    proofs<T extends RunBlock$proofsArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$proofsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     parent<T extends RunBlock$parentArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$parentArgs<ExtArgs>>): Prisma__RunBlockClient<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     subtasks<T extends RunBlock$subtasksArgs<ExtArgs> = {}>(args?: Subset<T, RunBlock$subtasksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -16429,9 +16438,9 @@ export namespace Prisma {
   }
 
   /**
-   * RunBlock.proof
+   * RunBlock.proofs
    */
-  export type RunBlock$proofArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type RunBlock$proofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
      * Select specific fields to fetch from the Proof
      */
@@ -16445,6 +16454,11 @@ export namespace Prisma {
      */
     include?: ProofInclude<ExtArgs> | null
     where?: ProofWhereInput
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    cursor?: ProofWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
   }
 
   /**
@@ -32006,7 +32020,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
-    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    proofs?: ProofListRelationFilter
     parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     subtasks?: RunBlockListRelationFilter
   }
@@ -32037,7 +32051,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockOrderByWithRelationInput
     successor?: RunBlockOrderByWithRelationInput
     guideline?: GuidelineOrderByWithRelationInput
-    proof?: ProofOrderByWithRelationInput
+    proofs?: ProofOrderByRelationAggregateInput
     parent?: RunBlockOrderByWithRelationInput
     subtasks?: RunBlockOrderByRelationAggregateInput
   }
@@ -32072,7 +32086,7 @@ export namespace Prisma {
     recurrenceOf?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     successor?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     guideline?: XOR<GuidelineNullableScalarRelationFilter, GuidelineWhereInput> | null
-    proof?: XOR<ProofNullableScalarRelationFilter, ProofWhereInput> | null
+    proofs?: ProofListRelationFilter
     parent?: XOR<RunBlockNullableScalarRelationFilter, RunBlockWhereInput> | null
     subtasks?: RunBlockListRelationFilter
   }, "id" | "recurrenceOfId" | "runId_nodeId">
@@ -32443,14 +32457,14 @@ export namespace Prisma {
 
   export type ProofWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    runBlockId?: string
     AND?: ProofWhereInput | ProofWhereInput[]
     OR?: ProofWhereInput[]
     NOT?: ProofWhereInput | ProofWhereInput[]
+    runBlockId?: StringFilter<"Proof"> | string
     driveFileId?: StringNullableFilter<"Proof"> | string | null
     createdAt?: DateTimeFilter<"Proof"> | Date | string
     runBlock?: XOR<RunBlockScalarRelationFilter, RunBlockWhereInput>
-  }, "id" | "runBlockId">
+  }, "id">
 
   export type ProofOrderByWithAggregationInput = {
     id?: SortOrder
@@ -33826,7 +33840,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -33854,7 +33868,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -33880,7 +33894,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -33908,7 +33922,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -34306,7 +34320,7 @@ export namespace Prisma {
     id?: string
     driveFileId?: string | null
     createdAt?: Date | string
-    runBlock: RunBlockCreateNestedOneWithoutProofInput
+    runBlock: RunBlockCreateNestedOneWithoutProofsInput
   }
 
   export type ProofUncheckedCreateInput = {
@@ -34320,7 +34334,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    runBlock?: RunBlockUpdateOneRequiredWithoutProofNestedInput
+    runBlock?: RunBlockUpdateOneRequiredWithoutProofsNestedInput
   }
 
   export type ProofUncheckedUpdateInput = {
@@ -35806,12 +35820,17 @@ export namespace Prisma {
     isNot?: GuidelineWhereInput | null
   }
 
-  export type ProofNullableScalarRelationFilter = {
-    is?: ProofWhereInput | null
-    isNot?: ProofWhereInput | null
+  export type ProofListRelationFilter = {
+    every?: ProofWhereInput
+    some?: ProofWhereInput
+    none?: ProofWhereInput
   }
 
   export type RunItemOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ProofOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -37143,10 +37162,11 @@ export namespace Prisma {
     connect?: GuidelineWhereUniqueInput
   }
 
-  export type ProofCreateNestedOneWithoutRunBlockInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    connect?: ProofWhereUniqueInput
+  export type ProofCreateNestedManyWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
   }
 
   export type RunBlockCreateNestedOneWithoutSubtasksInput = {
@@ -37175,10 +37195,11 @@ export namespace Prisma {
     connect?: RunBlockWhereUniqueInput
   }
 
-  export type ProofUncheckedCreateNestedOneWithoutRunBlockInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    connect?: ProofWhereUniqueInput
+  export type ProofUncheckedCreateNestedManyWithoutRunBlockInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
   }
 
   export type RunBlockUncheckedCreateNestedManyWithoutParentInput = {
@@ -37248,14 +37269,18 @@ export namespace Prisma {
     update?: XOR<XOR<GuidelineUpdateToOneWithWhereWithoutBlocksInput, GuidelineUpdateWithoutBlocksInput>, GuidelineUncheckedUpdateWithoutBlocksInput>
   }
 
-  export type ProofUpdateOneWithoutRunBlockNestedInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    upsert?: ProofUpsertWithoutRunBlockInput
-    disconnect?: ProofWhereInput | boolean
-    delete?: ProofWhereInput | boolean
-    connect?: ProofWhereUniqueInput
-    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  export type ProofUpdateManyWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutRunBlockInput | ProofUpsertWithWhereUniqueWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutRunBlockInput | ProofUpdateWithWhereUniqueWithoutRunBlockInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutRunBlockInput | ProofUpdateManyWithWhereWithoutRunBlockInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
   }
 
   export type RunBlockUpdateOneWithoutSubtasksNestedInput = {
@@ -37306,14 +37331,18 @@ export namespace Prisma {
     update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutRecurrenceOfInput, RunBlockUpdateWithoutRecurrenceOfInput>, RunBlockUncheckedUpdateWithoutRecurrenceOfInput>
   }
 
-  export type ProofUncheckedUpdateOneWithoutRunBlockNestedInput = {
-    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput
-    upsert?: ProofUpsertWithoutRunBlockInput
-    disconnect?: ProofWhereInput | boolean
-    delete?: ProofWhereInput | boolean
-    connect?: ProofWhereUniqueInput
-    update?: XOR<XOR<ProofUpdateToOneWithWhereWithoutRunBlockInput, ProofUpdateWithoutRunBlockInput>, ProofUncheckedUpdateWithoutRunBlockInput>
+  export type ProofUncheckedUpdateManyWithoutRunBlockNestedInput = {
+    create?: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput> | ProofCreateWithoutRunBlockInput[] | ProofUncheckedCreateWithoutRunBlockInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutRunBlockInput | ProofCreateOrConnectWithoutRunBlockInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutRunBlockInput | ProofUpsertWithWhereUniqueWithoutRunBlockInput[]
+    createMany?: ProofCreateManyRunBlockInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutRunBlockInput | ProofUpdateWithWhereUniqueWithoutRunBlockInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutRunBlockInput | ProofUpdateManyWithWhereWithoutRunBlockInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
   }
 
   export type RunBlockUncheckedUpdateManyWithoutParentNestedInput = {
@@ -37498,18 +37527,18 @@ export namespace Prisma {
     update?: XOR<XOR<TaskTemplateGroupUpdateToOneWithWhereWithoutTemplatesInput, TaskTemplateGroupUpdateWithoutTemplatesInput>, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
   }
 
-  export type RunBlockCreateNestedOneWithoutProofInput = {
-    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
-    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
+  export type RunBlockCreateNestedOneWithoutProofsInput = {
+    create?: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofsInput
     connect?: RunBlockWhereUniqueInput
   }
 
-  export type RunBlockUpdateOneRequiredWithoutProofNestedInput = {
-    create?: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
-    connectOrCreate?: RunBlockCreateOrConnectWithoutProofInput
-    upsert?: RunBlockUpsertWithoutProofInput
+  export type RunBlockUpdateOneRequiredWithoutProofsNestedInput = {
+    create?: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: RunBlockCreateOrConnectWithoutProofsInput
+    upsert?: RunBlockUpsertWithoutProofsInput
     connect?: RunBlockWhereUniqueInput
-    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofInput, RunBlockUpdateWithoutProofInput>, RunBlockUncheckedUpdateWithoutProofInput>
+    update?: XOR<XOR<RunBlockUpdateToOneWithWhereWithoutProofsInput, RunBlockUpdateWithoutProofsInput>, RunBlockUncheckedUpdateWithoutProofsInput>
   }
 
   export type RunBlockCreateNestedOneWithoutRunItemsInput = {
@@ -39232,7 +39261,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -39259,7 +39288,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -39458,7 +39487,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -39485,7 +39514,7 @@ export namespace Prisma {
     subtaskOrder?: number | null
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -39515,7 +39544,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -39542,7 +39571,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -39589,6 +39618,11 @@ export namespace Prisma {
     create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
   }
 
+  export type ProofCreateManyRunBlockInputEnvelope = {
+    data: ProofCreateManyRunBlockInput | ProofCreateManyRunBlockInput[]
+    skipDuplicates?: boolean
+  }
+
   export type RunBlockCreateWithoutSubtasksInput = {
     id?: string
     blockId: string
@@ -39611,7 +39645,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
   }
 
@@ -39638,7 +39672,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
   }
 
   export type RunBlockCreateOrConnectWithoutSubtasksInput = {
@@ -39668,7 +39702,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
@@ -39694,7 +39728,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -39812,7 +39846,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -39839,7 +39873,7 @@ export namespace Prisma {
     subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39875,7 +39909,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -39902,7 +39936,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -39933,27 +39967,30 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-  export type ProofUpsertWithoutRunBlockInput = {
+  export type ProofUpsertWithWhereUniqueWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
     update: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
     create: XOR<ProofCreateWithoutRunBlockInput, ProofUncheckedCreateWithoutRunBlockInput>
-    where?: ProofWhereInput
   }
 
-  export type ProofUpdateToOneWithWhereWithoutRunBlockInput = {
-    where?: ProofWhereInput
+  export type ProofUpdateWithWhereUniqueWithoutRunBlockInput = {
+    where: ProofWhereUniqueInput
     data: XOR<ProofUpdateWithoutRunBlockInput, ProofUncheckedUpdateWithoutRunBlockInput>
   }
 
-  export type ProofUpdateWithoutRunBlockInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  export type ProofUpdateManyWithWhereWithoutRunBlockInput = {
+    where: ProofScalarWhereInput
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyWithoutRunBlockInput>
   }
 
-  export type ProofUncheckedUpdateWithoutRunBlockInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  export type ProofScalarWhereInput = {
+    AND?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    OR?: ProofScalarWhereInput[]
+    NOT?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    runBlockId?: StringFilter<"Proof"> | string
+    driveFileId?: StringNullableFilter<"Proof"> | string | null
+    createdAt?: DateTimeFilter<"Proof"> | Date | string
   }
 
   export type RunBlockUpsertWithoutSubtasksInput = {
@@ -39989,7 +40026,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
   }
 
@@ -40016,7 +40053,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
   }
 
   export type RunBlockUpsertWithWhereUniqueWithoutParentInput = {
@@ -40056,7 +40093,7 @@ export namespace Prisma {
     runItems?: RunItemCreateNestedManyWithoutRunBlockInput
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -40083,7 +40120,7 @@ export namespace Prisma {
     templateId?: string | null
     runItems?: RunItemUncheckedCreateNestedManyWithoutRunBlockInput
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -40368,7 +40405,7 @@ export namespace Prisma {
     branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
   }
 
-  export type RunBlockCreateWithoutProofInput = {
+  export type RunBlockCreateWithoutProofsInput = {
     id?: string
     blockId: string
     nodeId: string
@@ -40394,7 +40431,7 @@ export namespace Prisma {
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
 
-  export type RunBlockUncheckedCreateWithoutProofInput = {
+  export type RunBlockUncheckedCreateWithoutProofsInput = {
     id?: string
     runId: string
     blockId: string
@@ -40420,23 +40457,23 @@ export namespace Prisma {
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
-  export type RunBlockCreateOrConnectWithoutProofInput = {
+  export type RunBlockCreateOrConnectWithoutProofsInput = {
     where: RunBlockWhereUniqueInput
-    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+    create: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
   }
 
-  export type RunBlockUpsertWithoutProofInput = {
-    update: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
-    create: XOR<RunBlockCreateWithoutProofInput, RunBlockUncheckedCreateWithoutProofInput>
+  export type RunBlockUpsertWithoutProofsInput = {
+    update: XOR<RunBlockUpdateWithoutProofsInput, RunBlockUncheckedUpdateWithoutProofsInput>
+    create: XOR<RunBlockCreateWithoutProofsInput, RunBlockUncheckedCreateWithoutProofsInput>
     where?: RunBlockWhereInput
   }
 
-  export type RunBlockUpdateToOneWithWhereWithoutProofInput = {
+  export type RunBlockUpdateToOneWithWhereWithoutProofsInput = {
     where?: RunBlockWhereInput
-    data: XOR<RunBlockUpdateWithoutProofInput, RunBlockUncheckedUpdateWithoutProofInput>
+    data: XOR<RunBlockUpdateWithoutProofsInput, RunBlockUncheckedUpdateWithoutProofsInput>
   }
 
-  export type RunBlockUpdateWithoutProofInput = {
+  export type RunBlockUpdateWithoutProofsInput = {
     id?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
     nodeId?: StringFieldUpdateOperationsInput | string
@@ -40462,7 +40499,7 @@ export namespace Prisma {
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
-  export type RunBlockUncheckedUpdateWithoutProofInput = {
+  export type RunBlockUncheckedUpdateWithoutProofsInput = {
     id?: StringFieldUpdateOperationsInput | string
     runId?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
@@ -40509,7 +40546,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockCreateNestedOneWithoutSuccessorInput
     successor?: RunBlockCreateNestedOneWithoutRecurrenceOfInput
     guideline?: GuidelineCreateNestedOneWithoutBlocksInput
-    proof?: ProofCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofCreateNestedManyWithoutRunBlockInput
     parent?: RunBlockCreateNestedOneWithoutSubtasksInput
     subtasks?: RunBlockCreateNestedManyWithoutParentInput
   }
@@ -40536,7 +40573,7 @@ export namespace Prisma {
     subtaskOrder?: number | null
     templateId?: string | null
     successor?: RunBlockUncheckedCreateNestedOneWithoutRecurrenceOfInput
-    proof?: ProofUncheckedCreateNestedOneWithoutRunBlockInput
+    proofs?: ProofUncheckedCreateNestedManyWithoutRunBlockInput
     subtasks?: RunBlockUncheckedCreateNestedManyWithoutParentInput
   }
 
@@ -40577,7 +40614,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -40604,7 +40641,7 @@ export namespace Prisma {
     subtaskOrder?: NullableIntFieldUpdateOperationsInput | number | null
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -41208,7 +41245,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -41235,7 +41272,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -41272,6 +41309,12 @@ export namespace Prisma {
     value?: NullableJsonNullValueInput | InputJsonValue
     completedAt?: Date | string | null
     completedBy?: string | null
+  }
+
+  export type ProofCreateManyRunBlockInput = {
+    id?: string
+    driveFileId?: string | null
+    createdAt?: Date | string
   }
 
   export type RunBlockCreateManyParentInput = {
@@ -41335,6 +41378,24 @@ export namespace Prisma {
     completedBy?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
+  export type ProofUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofUncheckedUpdateManyWithoutRunBlockInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    driveFileId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type RunBlockUpdateWithoutParentInput = {
     id?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
@@ -41357,7 +41418,7 @@ export namespace Prisma {
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
     guideline?: GuidelineUpdateOneWithoutBlocksNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
 
@@ -41383,7 +41444,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
@@ -41452,7 +41513,7 @@ export namespace Prisma {
     runItems?: RunItemUpdateManyWithoutRunBlockNestedInput
     recurrenceOf?: RunBlockUpdateOneWithoutSuccessorNestedInput
     successor?: RunBlockUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUpdateManyWithoutRunBlockNestedInput
     parent?: RunBlockUpdateOneWithoutSubtasksNestedInput
     subtasks?: RunBlockUpdateManyWithoutParentNestedInput
   }
@@ -41479,7 +41540,7 @@ export namespace Prisma {
     templateId?: NullableStringFieldUpdateOperationsInput | string | null
     runItems?: RunItemUncheckedUpdateManyWithoutRunBlockNestedInput
     successor?: RunBlockUncheckedUpdateOneWithoutRecurrenceOfNestedInput
-    proof?: ProofUncheckedUpdateOneWithoutRunBlockNestedInput
+    proofs?: ProofUncheckedUpdateManyWithoutRunBlockNestedInput
     subtasks?: RunBlockUncheckedUpdateManyWithoutParentNestedInput
   }
 
