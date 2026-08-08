@@ -16,6 +16,11 @@ export type ProofUploadHandler = (
   runBlockId: string,
   image: { mime: string; dataBase64: string },
 ) => Promise<ProofUploadResult>;
+/** The Proof gallery's per-thumbnail remove action (2026-08-08, multi-photo)
+ *  — identifies the photo by its own Proof id, not the task's runBlockId,
+ *  since a task can now have several. */
+export type ProofRemoveResult = { ok: true } | { ok: false; message: string };
+export type ProofRemoveHandler = (proofId: string) => Promise<ProofRemoveResult>;
 
 export type FlowRole =
   | "ADMIN"
@@ -57,11 +62,11 @@ export interface FlowTaskRow {
    *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
    *  undefined elsewhere (column shows a dash). */
   assignerName?: string | null;
-  /** Assignee-uploaded completion evidence (2026-07-30) — drives the
-   *  "Proof" column. null until uploaded; image served by
-   *  /api/task-manager/proof-image/[id]. Optional so older payload shapes
-   *  (undefined) render the same as "no proof". */
-  proofId?: string | null;
+  /** Assignee-uploaded completion evidence (2026-07-30, multi-photo
+   *  2026-08-08) — drives the "Proof" column's gallery. Empty array is the
+   *  "no proof" case now (no undefined/null/[] three-way ambiguity); each
+   *  image is served by /api/task-manager/proof-image/[id]. */
+  proofIds: string[];
   /** Main Task ↔ Subtask link (2026-07-30): the parent task's runBlockId,
    *  or null/undefined for a top-level task. ResizableTaskList groups rows
    *  by this into the chevron/indent tree. */
