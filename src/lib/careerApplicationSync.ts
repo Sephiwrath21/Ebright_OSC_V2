@@ -451,35 +451,53 @@ export interface RealAccountLifecycleOverride {
 // correcting an earlier version of this rule that used Full Time + not-yet-
 // Confirmed as the trigger and caught long-standing real employees who
 // predate this feature — Ng Ying Chen/Iqbal Hakim Bin Halim/Muhammad Adam
-// Shah Bin Jasmin): BOTH resolvePositionGroup(row) === "Full Time" (live
+// Shah Bin Jasmin): resolvePositionGroup(row) === "Full Time" (live
 // BranchStaff signal, falling back to employment.position — see
-// lookupBranchStaffPositionGroupByName) AND career_applications.board_stage
-// === "Probation" (name-matched via matchIsProbationPipeline) — surveyed
-// live, this is a clean, unambiguous
-// value with no spelling variants to worry about (6 real matches, all Full
-// Time, all with sensible past start_dates). Part Time/Intern/Protege
-// Intern are NEVER eligible for Probation regardless of board_stage — they
-// stay in the Onboarding-only 3-day flow below unconditionally.
+// lookupBranchStaffPositionGroupByName) AND EITHER of two independent
+// paths, split by whether this person has any recruitment-pipeline
+// footprint at all:
+//   - Has a career_applications/rec_recruit match (name-matched via
+//     lookupCareerApplicationsByName): career_applications.board_stage ===
+//     "Probation" (via matchIsProbationPipeline) — surveyed live, this is a
+//     clean, unambiguous value with no spelling variants to worry about (6
+//     real matches, all Full Time, all with sensible past start_dates). A
+//     match with any OTHER board_stage (e.g. "Rejected") does NOT fall
+//     through to the second path below — having a match at all, even a
+//     non-"Probation" one, is what disqualifies someone from it.
+//   - No match at all: Full Time + employment.start_date already arrived
+//     is itself sufficient — no board_stage to check, no manual button, no
+//     pre-existing probation row required. This is exactly
+//     addPreStageEmployee's manual "+ Add" shape (see conversation — Test
+//     Rui En was permanently stuck at Onboarding before this path
+//     existed). Long-standing employees who also have no pipeline match
+//     (Ng Ying Chen et al.) hit this path too, but computeProbationEndDates'
+//     start_date+3-months fallback below is what keeps them correctly at
+//     Active instead of stuck — same mechanism, not a special case.
+// Part Time/Intern/Protege Intern are NEVER eligible for Probation via
+// either path — they stay in the Onboarding-only 3-day flow below
+// unconditionally.
 //
 // Probation EXIT (to Active) is unchanged from before — still purely
 // isEffectivelyConfirmed (Confirm/Extend/Stop's local decision, or external
 // status2="Accept"), reused as-is from probationDecision.ts, no day count.
-// Same narrow exception as before for a board_stage-matched row with NO
-// probation row at all yet (never Confirmed, Extended, Stopped, or even
-// opened): falls back to the resolved probation end date
-// (computeProbationEndDates — BranchStaff.probation, or start_date+3
-// months fallback), rather than staying stuck in Probation forever just
-// because nobody ever opened a probation record. A row that DOES have a
-// probation row, whatever its status, always keeps the plain Confirm-gate
+// Same narrow exception as before for a row with NO probation row at all
+// yet (never Confirmed, Extended, Stopped, or even opened) — applies to
+// BOTH membership paths above identically, not just the board_stage one:
+// falls back to the resolved probation end date (computeProbationEndDates
+// — BranchStaff.probation, local probation.end_date, or start_date+3
+// months, in that order), rather than staying stuck in Probation forever
+// just because nobody ever opened a probation record. A row that DOES have
+// a probation row, whatever its status, always keeps the plain Confirm-gate
 // with no date fallback — an explicit HR signal wins outright. (Live data:
 // Ayu Novitasari's own resolved end date, 2026-08-23, is still in the
 // future, so she's unaffected — stays Probation+Onboarding, exactly the
 // case this exception was built to protect.)
 //
-// Full Time rows that are NOT board_stage-matched get no override here at
-// all — they keep whatever their raw/base stage already is (e.g. genuinely
-// "active", or a stored "onboarding"/"probation" from elsewhere), same as
-// any other row this function doesn't touch.
+// Full Time rows that match NEITHER path above (has a pipeline entry, but
+// its board_stage isn't "Probation") get no override here at all — they
+// keep whatever their raw/base stage already is (e.g. genuinely "active",
+// or a stored "onboarding"/"probation" from elsewhere), same as any other
+// row this function doesn't touch.
 //
 // Part Time/Intern/Protege Intern: Onboarding only, no Probation, ever. No
 // Confirm concept applies, so a real employment.status of "active" IS
@@ -492,6 +510,14 @@ export async function computeRealAccountLifecycleOverrides<
 >(
   rows: T[],
   careerApplications: Map<string, CareerApplicationLookupEntry>,
+  // Optional — pass the already-fetched map when the caller's own page
+  // needs it in more than one place (Employee Overview, the stage summary
+  // pages, the two leaf namelist pages all do), so this doesn't re-run the
+  // same unfiltered BranchStaff table scan once per call. Falls back to
+  // fetching its own when omitted (single-row callers like
+  // getRealAccountLifecycleOverride below don't need to bother threading
+  // it through).
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
 ): Promise<Map<number, RealAccountLifecycleOverride>> {
   const eligible = rows.filter((r) => r.stage === "onboarding" || r.stage === "probation" || r.stage === "active");
   const result = new Map<number, RealAccountLifecycleOverride>();
@@ -508,18 +534,34 @@ export async function computeRealAccountLifecycleOverrides<
 
   // Live BranchStaff signal wins over employment.position — see
   // lookupBranchStaffPositionGroupByName's own comment.
-  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const bsPositionGroups = branchStaffPositionGroups ?? (await lookupBranchStaffPositionGroupByName());
   const resolvePositionGroup = (row: T): PositionGroup =>
-    branchStaffPositionGroups.get(normalizeName(row.fullName)) ?? positionGroup(row.position);
+    bsPositionGroups.get(normalizeName(row.fullName)) ?? positionGroup(row.position);
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const probationMatched = eligible.filter((r) => {
     if (resolvePositionGroup(r) !== "Full Time") return false;
-    return matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName)));
+    const match = careerApplications.get(normalizeName(r.fullName));
+    if (matchIsProbationPipeline(match)) return true;
+    // Second, independent path into Probation, per explicit decision (see
+    // conversation): a Full-Time real account with NO career_applications/
+    // rec_recruit footprint AT ALL (not "has an entry with some other
+    // board_stage" — that's `match` being truthy but not Probation, which
+    // stays excluded here, same as before) has no pipeline to check in the
+    // first place — addPreStageEmployee's manual "+ Add" is exactly this
+    // shape. Once their start_date has arrived, Full Time + started is
+    // itself sufficient. No manual button, no pre-existing probation row
+    // required — membership alone; computeProbationEndDates' fallback
+    // below (start_date + 3 months) is what keeps a long-standing employee
+    // in this bucket (e.g. Ng Ying Chen, started 2020) from getting stuck
+    // here instead of Active — see that function's own comment.
+    if (match) return false;
+    const emp = empByUserId.get(r.id);
+    return Boolean(emp?.start_date && emp.start_date.toISOString().slice(0, 10) <= todayIso);
   });
   const probationMatchedIds = new Set(probationMatched.map((r) => r.id));
-  const confirmedIds = await computeAutoConfirmedProbationIds(probationMatched, careerApplications);
+  const confirmedIds = await computeAutoConfirmedProbationIds(probationMatched, careerApplications, bsPositionGroups);
 
   // board_stage-matched rows with NO probation row at all yet — see the
   // function's own doc comment above.
@@ -923,13 +965,15 @@ interface PreEligibleRow {
 // real-data-wins override, same id/branch/department/position resolution.
 // Splitting it out here just once avoids the two callers silently drifting
 // apart on what "eligible" means.
-async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
-  const [candidates, realRows, branches, departments, branchStaffPositionGroups] = await Promise.all([
+async function computePreEligibleRows(
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
+): Promise<PreEligibleRow[]> {
+  const [candidates, realRows, branches, departments, bsPositionGroups] = await Promise.all([
     prisma.onboarding_candidate.findMany(),
     listEmployeeOverviewRows({ skipScopeFilter: true }),
     listBranches(),
     listDepartments(),
-    lookupBranchStaffPositionGroupByName(),
+    branchStaffPositionGroups ? Promise.resolve(branchStaffPositionGroups) : lookupBranchStaffPositionGroupByName(),
   ]);
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -996,7 +1040,7 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
     const positionSource = real?.position ?? candidate.position;
     const resolvedPositionType: PositionGroup | null = positionSource?.trim()
       ? positionGroup(positionSource)
-      : (branchStaffPositionGroups.get(name) ?? null);
+      : (bsPositionGroups.get(name) ?? null);
 
     rows.push({
       row: {
@@ -1051,8 +1095,10 @@ async function computePreEligibleRows(): Promise<PreEligibleRow[]> {
   return rows;
 }
 
-export async function computePreStageRows(): Promise<EmployeeOverviewRow[]> {
-  return (await computePreEligibleRows()).filter((r) => !r.startDatePassed).map((r) => r.row);
+export async function computePreStageRows(
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
+): Promise<EmployeeOverviewRow[]> {
+  return (await computePreEligibleRows(branchStaffPositionGroups)).filter((r) => !r.startDatePassed).map((r) => r.row);
 }
 
 // The other half of the split above — someone who matches the Pre OR-rule
@@ -1071,8 +1117,10 @@ export async function computePreStageRows(): Promise<EmployeeOverviewRow[]> {
 // dedicated-list pages that consume this were widened to give them a real
 // route on Onboarding (and Probation, via extraStages), same
 // getOnboardingCandidateDetail-backed profile Pre already uses.
-export async function computePreStartDatePassedRows(): Promise<EmployeeOverviewRow[]> {
-  return (await computePreEligibleRows())
+export async function computePreStartDatePassedRows(
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
+): Promise<EmployeeOverviewRow[]> {
+  return (await computePreEligibleRows(branchStaffPositionGroups))
     .filter((r) => r.startDatePassed)
     .map((r) => {
       const isFullTime = r.row.resolvedPositionType === "Full Time";

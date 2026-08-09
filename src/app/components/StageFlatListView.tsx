@@ -171,6 +171,17 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                       ) : (
                         <span className="text-sm text-slate-500">—</span>
                       )
+                    ) : row.probationStopped ? (
+                      // Exception to the "always this page's own stage
+                      // label" rule below — a Stopped decision (see
+                      // computeStoppedProbationIds) is worth surfacing here
+                      // even though the row stays on this Probation list;
+                      // unlike the stage-label case, showing "Stop" isn't a
+                      // contradiction, it's the one piece of row-specific
+                      // status that's actually useful at a glance.
+                      <span className="inline-block px-4 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
+                        Stop
+                      </span>
                     ) : (
                       // Always this page's own stage label, deliberately NOT
                       // row.stage — for Full-Time employees, Probation and

@@ -10,7 +10,7 @@ import {
   type AmbiguousBranchStaffMatch,
 } from "@/lib/branchStaffProfile";
 import { listBranches, listDepartments } from "@/lib/employeeQueries";
-import { positionGroup } from "@/lib/employeeStages";
+import { positionGroup, type PositionGroup } from "@/lib/employeeStages";
 import type { CareerApplicationLookupEntry } from "@/lib/careerApplicationSync";
 
 // Probation stage's full requirements, per explicit decision (see
@@ -34,6 +34,12 @@ export interface ProbationDisplayInfo {
   startDate: string | null;
   endDate: string | null;
   feedback2: string | null;
+  /** True when a career_applications match exists at all (regardless of its
+   *  board_stage) — drives the Feedback field's source/editability, per
+   *  explicit decision (see conversation): true means feedback2 (external,
+   *  read-only) is the applicable source; false means probation.
+   *  local_feedback (HR-editable, see ProbationInfo.localFeedback) is. */
+  hasCareerApplicationMatch: boolean;
   displayStatus: ProbationDisplayStatus;
   /** True when this person should be treated as confirmed (removed from
    *  Probation/Onboarding, added to Active — Full Time only; see
@@ -83,6 +89,52 @@ export function isEffectivelyStopped(localProbationStatus: string | null, status
   return localProbationStatus === "Stopped" || status2 === "Rejected";
 }
 
+// Local-only fallback when NEITHER a BranchStaff match NOR a local
+// probation.end_date exists — same "+3 months" formula as BranchStaff's
+// own fallback (resolveProbationEndDate in branchStaffProfile.ts), just
+// computed from this app's own employment.start_date instead of a synced
+// BranchStaff value, since there's nothing else to go on. Only ever
+// reached for the second Probation-membership path in
+// computeRealAccountLifecycleOverrides (see conversation) — a real Full-
+// Time account with no BranchStaff match and no career_applications entry
+// at all (addPreStageEmployee's manual "+ Add"). Load-bearing, not
+// cosmetic: without this, a long-standing employee who also has no
+// pipeline match (e.g. Ng Ying Chen, started 2020) would resolve to a null
+// end date here and never fall past the "no probation row" fallback below,
+// getting stuck in Probation forever instead of correctly landing on
+// Active — the exact bug this whole end-date fallback exists to prevent.
+function fallbackProbationEndDate(startDate: Date | null): string | null {
+  if (!startDate) return null;
+  const d = new Date(startDate);
+  d.setUTCMonth(d.getUTCMonth() + 3);
+  return d.toISOString().slice(0, 10);
+}
+
+// Resolves what the LOCAL probation row's own end_date should be WRITTEN as
+// the moment someone newly enters Probation (see proceedFromPreStage in
+// employeeRecordActions.ts) — same BranchStaff-match-first, then
+// fallbackProbationEndDate priority getProbationDisplayInfo already reads
+// at display time (BranchStaff always wins there regardless of what's
+// stored locally, so writing its value here is harmless, just a consistent
+// fallback record). Exists because proceedFromPreStage previously only
+// touched employment, never created a probation row at all — for the exact
+// population this button now advances (manually-added Full-Time, no
+// BranchStaff match, no career_applications entry), that left
+// getProbationDisplayInfo with nothing in EITHER branch of its own fallback
+// chain, showing blank Start/End Date forever instead of the 3-months-out
+// value every other Full-Time-with-no-match person already gets.
+export async function resolveNewProbationEndDate(
+  fullName: string,
+  startDate: Date,
+  branchCode: string | null,
+  departmentCode: string | null,
+): Promise<string> {
+  const [branches, departments, bsIndex] = await Promise.all([listBranches(), listDepartments(), buildBranchStaffMatchIndex()]);
+  const bsMatch = matchBranchStaffForRealAccount(fullName, branchCode, departmentCode, bsIndex, branches, departments, []);
+  const bsEndDate = bsMatch ? branchStaffProfileFields(bsMatch).probationEndDate : null;
+  return bsEndDate ? bsEndDate.toISOString().slice(0, 10) : (fallbackProbationEndDate(startDate) ?? startDate.toISOString().slice(0, 10));
+}
+
 // Bulk probation END date resolution — used by
 // computeActivePipelineProbationPassedIds (careerApplicationSync.ts) to
 // decide whether a real Active-stage + pipeline-Probation person's
@@ -101,11 +153,18 @@ export async function computeProbationEndDates<T extends { id: number; fullName:
   rows: T[],
 ): Promise<Map<number, string | null>> {
   if (rows.length === 0) return new Map();
-  const [localRows, bsIndex] = await Promise.all([
+  const [localRows, bsIndex, employments] = await Promise.all([
     prisma.probation.findMany({ where: { user_id: { in: rows.map((r) => r.id) } }, select: { user_id: true, end_date: true } }),
     buildBranchStaffMatchIndex(),
+    prisma.employment.findMany({
+      where: { user_id: { in: rows.map((r) => r.id) } },
+      orderBy: { start_date: "desc" },
+      select: { user_id: true, start_date: true },
+    }),
   ]);
   const localByUserId = new Map(localRows.map((r) => [r.user_id, r]));
+  const empByUserId = new Map<number, (typeof employments)[number]>();
+  for (const e of employments) if (!empByUserId.has(e.user_id)) empByUserId.set(e.user_id, e);
 
   const result = new Map<number, string | null>();
   for (const row of rows) {
@@ -113,7 +172,7 @@ export async function computeProbationEndDates<T extends { id: number; fullName:
     const local = localByUserId.get(row.id);
     const endDate = bsMatch
       ? (branchStaffProfileFields(bsMatch).probationEndDate?.toISOString().slice(0, 10) ?? null)
-      : (local?.end_date?.toISOString().slice(0, 10) ?? null);
+      : (local?.end_date?.toISOString().slice(0, 10) ?? fallbackProbationEndDate(empByUserId.get(row.id)?.start_date ?? null));
     result.set(row.id, endDate);
   }
   return result;
@@ -136,15 +195,23 @@ export async function computeProbationEndDates<T extends { id: number; fullName:
 // status.
 export async function computeAutoConfirmedProbationIds<
   T extends { id: number; fullName: string; position: string | null },
->(candidateRows: T[], careerApplications: Map<string, CareerApplicationLookupEntry>): Promise<Set<number>> {
+>(
+  candidateRows: T[],
+  careerApplications: Map<string, CareerApplicationLookupEntry>,
+  // Optional — computeRealAccountLifecycleOverrides (the only caller today)
+  // already has this fetched and passes it straight through, so this never
+  // re-queries BranchStaff on top of its caller's own fetch. Falls back to
+  // fetching its own for any future standalone caller.
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
+): Promise<Set<number>> {
   // Live BranchStaff signal wins over employment.position, same as
   // computeRealAccountLifecycleOverrides — candidateRows here is already
   // that function's own board_stage-matched output, so this must agree
   // with it or a BranchStaff-corrected Full Time row would get silently
   // re-excluded from the Confirm-gate check by the stale local position.
-  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const bsPositionGroups = branchStaffPositionGroups ?? (await lookupBranchStaffPositionGroupByName());
   const eligible = candidateRows.filter(
-    (r) => (branchStaffPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
+    (r) => (bsPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
   );
   if (eligible.length === 0) return new Set();
 
@@ -162,48 +229,94 @@ export async function computeAutoConfirmedProbationIds<
   return result;
 }
 
+// Same shape as computeAutoConfirmedProbationIds above, just isEffectivelyStopped
+// instead of isEffectivelyConfirmed — drives the Probation namelist's Status
+// column showing "Stop" instead of the page's own "Probation" label for a
+// row whose decision is Stopped (see conversation, StageFlatListView.tsx).
+// A Stopped row's raw stage stays "probation" (decideProbationOutcome never
+// touches employment.status for this outcome), so unlike the Confirmed case
+// above, every genuinely-Stopped row really is still present in whatever
+// candidateRows set the caller passes in — nothing to reconcile against.
+export async function computeStoppedProbationIds<
+  T extends { id: number; fullName: string; position: string | null },
+>(
+  candidateRows: T[],
+  careerApplications: Map<string, CareerApplicationLookupEntry>,
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
+): Promise<Set<number>> {
+  const bsPositionGroups = branchStaffPositionGroups ?? (await lookupBranchStaffPositionGroupByName());
+  const eligible = candidateRows.filter(
+    (r) => (bsPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
+  );
+  if (eligible.length === 0) return new Set();
+
+  const localRows = await prisma.probation.findMany({
+    where: { user_id: { in: eligible.map((r) => r.id) } },
+    select: { user_id: true, probation_status: true },
+  });
+  const localStatusById = new Map(localRows.map((r) => [r.user_id, r.probation_status]));
+
+  const result = new Set<number>();
+  for (const row of eligible) {
+    const status2 = careerApplications.get(normalizeName(row.fullName))?.status2 ?? null;
+    if (isEffectivelyStopped(localStatusById.get(row.id) ?? null, status2)) result.add(row.id);
+  }
+  return result;
+}
+
 export interface ProbationReminderCandidate {
   id: number;
   fullName: string;
   endDate: string;
 }
 
-// Drives the red dot on the Probation summary card and the HR notification
-// bell card (see conversation) — starting 2 weeks before a Full-Time
-// person's probation end date, until HR (or ebright_hrfs's own status2)
-// resolves an outcome. "Within 2 weeks" includes already-overdue ones (a
-// reminder that's overdue is still owed, not dismissed by time alone).
-// Lower-stakes than the Personal Info/Bank Detail BranchStaff matching
-// (this only surfaces a count + end date, no PII), so the location
-// cross-check those use is skipped here — an ambiguous NAME match (2+
-// BranchStaff rows) still safely falls back to no reminder rather than
+// Drives the red dot (+ tooltip) on the Probation summary card and the HR
+// notification bell card (see conversation) — starting 3 days before a
+// Full-Time person's probation end date, until HR (or ebright_hrfs's own
+// status2) resolves an outcome. "Within 3 days" includes already-overdue
+// ones (a reminder that's overdue is still owed, not dismissed by time
+// alone). Lower-stakes than the Personal Info/Bank Detail BranchStaff
+// matching (this only surfaces a name + end date, no other PII), so the
+// location cross-check those use is skipped here — an ambiguous NAME match
+// (2+ BranchStaff rows) still safely falls back to no reminder rather than
 // guessing, same as everywhere else.
 export async function computeProbationReminderCandidates<
   T extends { id: number; fullName: string; position: string | null },
 >(
   probationBadgedRows: T[],
   careerApplications: Map<string, CareerApplicationLookupEntry>,
+  // Optional — pass the caller's already-fetched map (see
+  // computeAutoConfirmedProbationIds's own comment); falls back to fetching
+  // its own when omitted.
+  branchStaffPositionGroups?: Map<string, PositionGroup>,
 ): Promise<ProbationReminderCandidate[]> {
   // Live BranchStaff signal wins over employment.position — same reasoning
   // as computeAutoConfirmedProbationIds above.
-  const branchStaffPositionGroups = await lookupBranchStaffPositionGroupByName();
+  const bsPositionGroups = branchStaffPositionGroups ?? (await lookupBranchStaffPositionGroupByName());
   const fullTimeRows = probationBadgedRows.filter(
-    (r) => (branchStaffPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
+    (r) => (bsPositionGroups.get(normalizeName(r.fullName)) ?? positionGroup(r.position)) === "Full Time",
   );
   if (fullTimeRows.length === 0) return [];
 
-  const [localRows, bsIndex] = await Promise.all([
+  const [localRows, bsIndex, employments] = await Promise.all([
     prisma.probation.findMany({
       where: { user_id: { in: fullTimeRows.map((r) => r.id) } },
       select: { user_id: true, probation_status: true, end_date: true },
     }),
     buildBranchStaffMatchIndex(),
+    prisma.employment.findMany({
+      where: { user_id: { in: fullTimeRows.map((r) => r.id) } },
+      orderBy: { start_date: "desc" },
+      select: { user_id: true, start_date: true },
+    }),
   ]);
   const localByUserId = new Map(localRows.map((r) => [r.user_id, r]));
+  const empByUserId = new Map<number, (typeof employments)[number]>();
+  for (const e of employments) if (!empByUserId.has(e.user_id)) empByUserId.set(e.user_id, e);
 
-  // No lower bound on purpose — "within 2 weeks" includes already-overdue
+  // No lower bound on purpose — "within 3 days" includes already-overdue
   // end dates (see this function's own doc comment above).
-  const twoWeeksOutIso = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const threeDaysOutIso = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const result: ProbationReminderCandidate[] = [];
   for (const row of fullTimeRows) {
@@ -215,12 +328,10 @@ export async function computeProbationReminderCandidates<
 
     const bsMatch = matchBranchStaffForRealAccount(row.fullName, null, null, bsIndex, [], []);
     const endDate = bsMatch
-      ? branchStaffProfileFields(bsMatch).probationEndDate?.toISOString().slice(0, 10)
-      : local?.end_date
-        ? local.end_date.toISOString().slice(0, 10)
-        : null;
+      ? (branchStaffProfileFields(bsMatch).probationEndDate?.toISOString().slice(0, 10) ?? null)
+      : (local?.end_date?.toISOString().slice(0, 10) ?? fallbackProbationEndDate(empByUserId.get(row.id)?.start_date ?? null));
     if (!endDate) continue;
-    if (endDate <= twoWeeksOutIso) {
+    if (endDate <= threeDaysOutIso) {
       result.push({ id: row.id, fullName: row.fullName, endDate });
     }
   }
@@ -280,6 +391,7 @@ export async function getProbationDisplayInfo(userId: number, fullName: string):
     startDate,
     endDate,
     feedback2,
+    hasCareerApplicationMatch: careerMatch != null,
     displayStatus: computeProbationDisplayStatus(localProbationStatus, status2),
     effectivelyConfirmed: isEffectivelyConfirmed(localProbationStatus, status2),
     effectivelyStopped: isEffectivelyStopped(localProbationStatus, status2),

@@ -25,6 +25,10 @@ import {
   getResignation,
   getReferenceLetter,
   getExitInterviewNote,
+  getKnowledgeTransferChecklist,
+  getAssetRecoveryChecklist,
+  getSystemRevocationChecklist,
+  getFinancialSettlement,
   resolveLocationName,
   listBranches,
   listDepartments,
@@ -132,6 +136,10 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     resignationInfo,
     referenceLetterInfo,
     exitInterviewNoteInfo,
+    knowledgeTransferChecklist,
+    assetRecoveryChecklist,
+    systemRevocationChecklist,
+    financialSettlement,
   ] = await Promise.all([
     activeOrAfter ? listLeaveHistory(numId) : Promise.resolve(undefined),
     getEmployeeById(numId),
@@ -162,11 +170,20 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     isExit ? getResignation(numId) : Promise.resolve(undefined),
     isExit ? getReferenceLetter(numId) : Promise.resolve(undefined),
     isExit ? getExitInterviewNote(numId) : Promise.resolve(undefined),
+    isExit ? getKnowledgeTransferChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getAssetRecoveryChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getSystemRevocationChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getFinancialSettlement(numId) : Promise.resolve(undefined),
   ]);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  // Gates the "+ Add Item" affordance on Exit's 3 Clearance checklists —
+  // same role check as canDecideProbation above, reused per explicit
+  // instruction (see conversation) rather than a new one. Re-checked
+  // server-side by addKnowledgeTransferItem/etc regardless.
+  const canAddChecklistItem = ["hr", "superadmin"].includes(userRole.toLowerCase());
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -199,6 +216,11 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         resignationInfo={resignationInfo}
         referenceLetterInfo={referenceLetterInfo}
         exitInterviewNoteInfo={exitInterviewNoteInfo}
+        knowledgeTransferChecklist={knowledgeTransferChecklist}
+        assetRecoveryChecklist={assetRecoveryChecklist}
+        systemRevocationChecklist={systemRevocationChecklist}
+        financialSettlement={financialSettlement}
+        canAddChecklistItem={canAddChecklistItem}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

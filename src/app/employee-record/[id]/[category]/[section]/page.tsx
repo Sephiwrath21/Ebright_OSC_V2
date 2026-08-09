@@ -200,6 +200,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         paymentInfo={paymentInfo}
         performanceReview={performanceReview}
         payslip={payslip}
+        payslipHistory={payslipHistory}
         tasks={tasks}
       />
     </AppShell>

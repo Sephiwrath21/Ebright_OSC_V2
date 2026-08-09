@@ -226,6 +226,12 @@ export interface EmployeeOverviewRow {
   /** Human-readable detail for the discrepancy above (e.g. "board_stage:
    *  Full Time, HRFS: Intern") — only set when positionDiscrepancy is true. */
   positionDiscrepancyDetail?: string | null;
+  /** Probation stage list only (see computeStoppedProbationIds in
+   *  probationDecision.ts), attached by the page, not this query — true
+   *  when this row's probation decision is effectively Stopped, so the
+   *  namelist's Status column shows "Stop" instead of the page's own
+   *  "Probation" label for just this row. Undefined everywhere else. */
+  probationStopped?: boolean;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
@@ -1044,6 +1050,83 @@ export async function getExitInterviewNote(userId: number): Promise<ExitIntervie
   };
 }
 
+// ─── Exit > Clearance: Knowledge Transfer/Asset Recovery/System Revocation
+// checklists + Financial Settlement form — per explicit design (see
+// conversation). Each checklist's items table merges the global master list
+// (user_id null) with this one employee's own custom additions (user_id set
+// to userId); checked state is a separate per-(user, item) table, joined
+// here in application code rather than a single SQL join since a missing
+// state row simply means unchecked (see exit_knowledge_transfer_state's own
+// schema comment) — no LEFT JOIN null-handling needed.
+export interface ExitChecklistItem {
+  id: number;
+  label: string;
+  checked: boolean;
+  /** True for an item added via "Only this employee" — false for a global
+   *  (master list) item, including one added via "Apply to all". Not used
+   *  to gate anything server-side (both are equally real/checkable); purely
+   *  informational for the UI (e.g. to visually distinguish custom items). */
+  isCustom: boolean;
+}
+
+export async function getKnowledgeTransferChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_knowledge_transfer_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_knowledge_transfer_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export async function getAssetRecoveryChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_asset_recovery_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_asset_recovery_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export async function getSystemRevocationChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_system_revocation_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_system_revocation_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export interface FinancialSettlementInfo {
+  finalPayDate: string | null;
+  outstandingLeavePayout: string | null;
+  outstandingClaims: string | null;
+  loanAdvanceDeduction: string | null;
+  notes: string | null;
+  settlementLetterFileId: string | null;
+}
+
+export async function getFinancialSettlement(userId: number): Promise<FinancialSettlementInfo | null> {
+  const row = await prisma.exit_financial_settlement.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    finalPayDate: row.final_pay_date ? row.final_pay_date.toISOString().slice(0, 10) : null,
+    outstandingLeavePayout: row.outstanding_leave_payout?.toString() ?? null,
+    outstandingClaims: row.outstanding_claims?.toString() ?? null,
+    loanAdvanceDeduction: row.loan_advance_deduction?.toString() ?? null,
+    notes: row.notes,
+    settlementLetterFileId: row.settlement_letter_file_id,
+  };
+}
+
 // Exit list's "Exit Type" column/filter follows the Resignation tab's own
 // Exit Type field (resignation.exit_type) — same value the user sets on that
 // profile page, stored as the exact display label ("Resignation"/"End of
@@ -1390,6 +1473,10 @@ export interface ProbationInfo {
   extEndDate: string | null;
   confirmationLetterFileId: string | null;
   extensionLetterFileId: string | null;
+  /** HR-editable Feedback — only used/shown for someone with no
+   *  career_applications match (see probation.local_feedback's own schema
+   *  comment); null for a matched person, who reads feedback2 instead. */
+  localFeedback: string | null;
 }
 
 // Real probation table — Probation stage's own tab only (no Employee Record
@@ -1407,6 +1494,7 @@ export async function getProbationInfo(userId: number): Promise<ProbationInfo | 
     extEndDate: row.ext_end_date ? row.ext_end_date.toISOString().slice(0, 10) : null,
     confirmationLetterFileId: row.confirmation_letter_file_id,
     extensionLetterFileId: row.extension_letter_file_id,
+    localFeedback: row.local_feedback,
   };
 }
 

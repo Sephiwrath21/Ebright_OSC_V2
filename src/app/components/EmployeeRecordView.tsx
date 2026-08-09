@@ -336,7 +336,15 @@ export default function EmployeeRecordView({
               if (category.key === "hr-info" && sectionKey === "handbook" && documentsInfo !== undefined)
                 return <DocumentsPanel userId={employeeId} data={documentsInfo} showEmploymentContract={false} />;
               if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
-                return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
+                return (
+                  <OnboardingPayrollPanel
+                    userId={employeeId}
+                    data={payrollInfo}
+                    employeeDetail={employeeDetail}
+                    heading="Tax Info"
+                    showBankDetails={false}
+                  />
+                );
               if (
                 category.key === "finance" &&
                 sectionKey === "payroll" &&

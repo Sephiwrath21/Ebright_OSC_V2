@@ -50,6 +50,21 @@ import {
   updateResignation,
   updateReferenceLetter,
   updateExitInterviewNote,
+  addKnowledgeTransferItem,
+  toggleKnowledgeTransferItem,
+  renameKnowledgeTransferItem,
+  deleteKnowledgeTransferItem,
+  addAssetRecoveryItem,
+  toggleAssetRecoveryItem,
+  renameAssetRecoveryItem,
+  deleteAssetRecoveryItem,
+  addSystemRevocationItem,
+  toggleSystemRevocationItem,
+  renameSystemRevocationItem,
+  deleteSystemRevocationItem,
+  updateFinancialSettlement,
+  type AddExitChecklistItemInput,
+  type ActionResult,
 } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
@@ -77,8 +92,11 @@ import type {
   ResignationInfo,
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
+  ExitChecklistItem,
+  FinancialSettlementInfo,
 } from "@/lib/employeeQueries";
 import type { ProbationDisplayInfo } from "@/lib/probationDecision";
+import { profileUrlForStage } from "@/lib/stageProfileConfig";
 import {
   COUNTRY_CODES,
   parsePhoneValue,
@@ -882,16 +900,83 @@ const PROBATION_STATUS_PILL_CLASSES: Record<string, string> = {
   "In Progress": "bg-slate-100 text-slate-600",
 };
 
+// Confirm/Extend/Stop only render once Edit is clicked (per explicit
+// decision — see conversation), same "everything's gated by the panel's own
+// Edit/Save toggle" convention as every other field here. A private child
+// of ProbationPanel's own <EditableSection> so useEditMode() reads that
+// section's real state, same reason SalaryRevisionAttachmentField/
+// ExitChecklistAddItemRow above are their own small components rather than
+// a plain read in the parent body.
+function ProbationDecisionSection({
+  canDecide,
+  display,
+  onPick,
+  decideError,
+}: {
+  canDecide: boolean;
+  display: ProbationDisplayInfo;
+  onPick: (outcome: "Confirmed" | "Extended" | "Stopped") => void;
+  decideError: string | null;
+}) {
+  const editing = useEditMode();
+  if (!editing || !canDecide) return null;
+  return (
+    <div className="mt-6 pt-6 border-t border-black/10">
+      <SubsectionHeading>Probation Decision</SubsectionHeading>
+      {display.decidedByName && (
+        <p className="text-xs text-slate-500 mb-3">
+          Last decided by {display.decidedByName}
+          {display.decidedAt ? ` on ${new Date(display.decidedAt).toLocaleDateString()}` : ""}.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => onPick("Confirmed")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+        >
+          Confirm
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("Extended")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+        >
+          Extend
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("Stopped")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+        >
+          Stop
+        </button>
+      </div>
+      {decideError && <p className="mt-2 text-sm text-red-600">{decideError}</p>}
+    </div>
+  );
+}
+
 // Real probation table — Probation stage's own tab only (no Employee Record
 // equivalent in the mock). confirmationLetter*/extensionLetter* are
 // independent Google Drive file fields, same pattern as resume.resume_file_id.
-// Start Date/End Date/Probation Status/Feedback are read-only here now (see
+// Start Date/End Date/Probation Status are read-only here (see
 // probationDecision.ts) — sourced from ebright_hrfs, not this panel's own
 // editable form; Confirmation Date/Extension End Date and the two letters
 // stay locally editable as before. canDecide (HR/Superadmin only, per
 // explicit decision — see conversation) gates the Confirm/Extend/Stop
 // buttons; the actual restriction is enforced server-side in
 // decideProbationOutcome regardless of what this prop says.
+//
+// Feedback is a hybrid source now, per explicit decision (see conversation):
+// display.hasCareerApplicationMatch true -> feedback2 (external, read-only,
+// unchanged); false -> probation.local_feedback (HR-editable — the field
+// only exists at all for someone with no recruitment-pipeline footprint,
+// who has nothing for feedback2 to ever source from). Confirm/Stop both
+// require whichever of the two applies to be non-empty first — checked here
+// (before opening the confirm dialog, for immediate feedback) AND again
+// server-side in decideProbationOutcome (the actual enforcement — this
+// client check is just UX, a direct call could otherwise skip it).
 export function ProbationPanel({
   userId,
   data,
@@ -910,6 +995,7 @@ export function ProbationPanel({
   const [confirmationLetterPending, setConfirmationLetterPending] = useState<File | null>(null);
   const [extensionLetterFileId, setExtensionLetterFileId] = useState(data?.extensionLetterFileId ?? null);
   const [extensionLetterPending, setExtensionLetterPending] = useState<File | null>(null);
+  const [localFeedback, setLocalFeedback] = useState(data?.localFeedback ?? "");
 
   const [pendingOutcome, setPendingOutcome] = useState<"Confirmed" | "Extended" | "Stopped" | null>(null);
   const [deciding, setDeciding] = useState(false);
@@ -924,15 +1010,45 @@ export function ProbationPanel({
     else setExtensionLetterFileId(null);
   }
 
+  function pickOutcome(outcome: "Confirmed" | "Extended" | "Stopped") {
+    if (outcome !== "Extended") {
+      const effectiveFeedback = display.hasCareerApplicationMatch ? display.feedback2 : localFeedback;
+      if (!effectiveFeedback || !effectiveFeedback.trim()) {
+        setDecideError("Feedback must be filled in before Confirm or Stop.");
+        return;
+      }
+    }
+    setDecideError(null);
+    setPendingOutcome(outcome);
+  }
+
   async function confirmOutcome() {
     if (!pendingOutcome) return;
+    const outcome = pendingOutcome;
     setDeciding(true);
     setDecideError(null);
-    const result = await decideProbationOutcome(userId, pendingOutcome);
+    const result = await decideProbationOutcome(
+      userId,
+      outcome,
+      display.hasCareerApplicationMatch ? undefined : localFeedback,
+    );
     setDeciding(false);
     setPendingOutcome(null);
-    if (result.ok) router.refresh();
-    else setDecideError(result.error ?? "Failed to record probation decision.");
+    if (!result.ok) {
+      setDecideError(result.error ?? "Failed to record probation decision.");
+      return;
+    }
+    // Confirmed moves this person to Active — isEffectivelyConfirmed now
+    // makes the live-computed override for this URL resolve to "active",
+    // not "probation", so refreshing the SAME /probation/employee/[id] page
+    // 404s (its own dual-listing guard no longer allows it — see
+    // conversation, live bug report). Navigate to their new Active profile
+    // instead, same reason StageProfileView's own Proceed handlers push
+    // rather than refresh after a real stage move. Extended/Stopped both
+    // keep them on this same Probation page, so refresh is still correct
+    // there.
+    if (outcome === "Confirmed") router.push(profileUrlForStage("active", userId));
+    else router.refresh();
   }
 
   const OUTCOME_MESSAGE: Record<"Confirmed" | "Extended" | "Stopped", string> = {
@@ -972,7 +1088,9 @@ export function ProbationPanel({
             </span>
           </div>
           <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
-          <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
+          {display.displayStatus === "Extended" && (
+            <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
+          )}
           <RealFileField
             label="Confirmation Letter"
             existingFileId={confirmationLetterFileId}
@@ -989,45 +1107,15 @@ export function ProbationPanel({
             onClear={clearExtensionLetter}
             full
           />
-          <StaticField label="Feedback" value={display.feedback2} full />
-        </FieldGrid>
-      </EditableSection>
-
-      {canDecide && (
-        <div className="mt-6 pt-6 border-t border-black/10">
-          <SubsectionHeading>Probation Decision</SubsectionHeading>
-          {display.decidedByName && (
-            <p className="text-xs text-slate-500 mb-3">
-              Last decided by {display.decidedByName}
-              {display.decidedAt ? ` on ${new Date(display.decidedAt).toLocaleDateString()}` : ""}.
-            </p>
+          {display.hasCareerApplicationMatch ? (
+            <StaticField label="Feedback" value={display.feedback2} full />
+          ) : (
+            <EditableTextArea label="Feedback" value={localFeedback} onChange={setLocalFeedback} full />
           )}
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setPendingOutcome("Confirmed")}
-              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              onClick={() => setPendingOutcome("Extended")}
-              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
-            >
-              Extend
-            </button>
-            <button
-              type="button"
-              onClick={() => setPendingOutcome("Stopped")}
-              className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
-            >
-              Stop
-            </button>
-          </div>
-          {decideError && <p className="mt-2 text-sm text-red-600">{decideError}</p>}
-        </div>
-      )}
+        </FieldGrid>
+
+        <ProbationDecisionSection canDecide={canDecide} display={display} onPick={pickOutcome} decideError={decideError} />
+      </EditableSection>
 
       {pendingOutcome && !deciding && (
         <ConfirmDialog
@@ -1126,14 +1214,26 @@ const PCB_FORM_OPTIONS = [
 // updateBankDetails — same data Employee Record's own "Payment & Bank Info"
 // tab already reads/writes, saved together with payroll in one Edit/Save
 // cycle since this panel shows both subsections at once.
+//
+// Employee Record's Tax Info instance drops Bank Details entirely (already
+// shown, on its own, under Personal Info > Payment — this panel's copy was
+// a pure duplicate there) and renames the heading to match — Onboarding's
+// own Payroll tab is unaffected, both default to the original combined
+// behavior. showBankDetails=false also skips the updateBankDetails() call
+// on Save, not just the section's visibility — Tax Info never reads or
+// edits bank_details in that mode, so there's nothing for it to write back.
 export function OnboardingPayrollPanel({
   userId,
   data,
   employeeDetail,
+  heading = "Payroll",
+  showBankDetails = true,
 }: {
   userId: number;
   data: PayrollInfo | null;
   employeeDetail: EmployeeDetailFull;
+  heading?: string;
+  showBankDetails?: boolean;
 }) {
   const [epfNumber, setEpfNumber] = useState(data?.epfNumber ?? "");
   const [socsoNumber, setSocsoNumber] = useState(data?.socsoNumber ?? "");
@@ -1155,24 +1255,23 @@ export function OnboardingPayrollPanel({
   return (
     <EditableSection
       onSave={async () => {
-        const [payrollResult, bankResult] = await Promise.all([
-          updatePayroll(userId, {
-            epfNumber,
-            socsoNumber,
-            eisNumber,
-            taxNumber,
-            pcbForm,
-            pcbAttachmentFileId: pcbFileId,
-            pcbAttachmentFile: pcbPending,
-          }),
-          updateBankDetails(userId, { bankName, accountName, bankAccount }),
-        ]);
+        const payrollResult = await updatePayroll(userId, {
+          epfNumber,
+          socsoNumber,
+          eisNumber,
+          taxNumber,
+          pcbForm,
+          pcbAttachmentFileId: pcbFileId,
+          pcbAttachmentFile: pcbPending,
+        });
         if (!payrollResult.ok) return payrollResult;
+        if (!showBankDetails) return { ok: true };
+        const bankResult = await updateBankDetails(userId, { bankName, accountName, bankAccount });
         if (!bankResult.ok) return bankResult;
         return { ok: true };
       }}
     >
-      <PanelHeading>Payroll</PanelHeading>
+      <PanelHeading>{heading}</PanelHeading>
       <Subsection heading="Statutory Information">
         <EditableField label="EPF Number" value={epfNumber} onChange={setEpfNumber} />
         <EditableField label="SOCSO Number" value={socsoNumber} onChange={setSocsoNumber} />
@@ -1190,11 +1289,13 @@ export function OnboardingPayrollPanel({
           full
         />
       </Subsection>
-      <Subsection heading="Bank Details">
-        <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
-        <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
-        <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
-      </Subsection>
+      {showBankDetails && (
+        <Subsection heading="Bank Details">
+          <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
+          <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
+          <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
+        </Subsection>
+      )}
     </EditableSection>
   );
 }
@@ -1207,27 +1308,6 @@ function PlaceholderUploadField({ label, full = false }: { label: string; full?:
       <span className={labelClass}>{label}</span>
       <FilePickerControl file={file} onChange={setFile} editing={editing} />
     </div>
-  );
-}
-
-// Checkbox checklist (Exit's Clearance sub-tabs) — a genuinely different
-// content shape from a single-value field, so it keeps its own look rather
-// than forcing a label/value pattern onto it.
-function Checklist({ items }: { items: string[] }) {
-  const editing = useEditMode();
-  return (
-    <ul className="flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item} className="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            disabled={!editing}
-            className="mt-1 w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
-          />
-          <span className="text-sm text-[#4b4949]">{item}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -1355,7 +1435,13 @@ function RecordTable({
 export interface RecordField {
   key: string;
   label: string;
-  type: "text" | "date" | "textarea" | "file" | "select";
+  /** "year-month" renders YearMonthPicker (a </> year stepper over a
+   *  12-month list, saving "YYYY-MM") instead of a plain <select> — built
+   *  specifically for Payslip History's Month field, per explicit decision
+   *  (see conversation): a flat <select> would need one option per
+   *  month-per-year (26+ entries to scroll through) instead of stepping
+   *  years and picking from a fixed 12. */
+  type: "text" | "date" | "textarea" | "file" | "select" | "year-month";
   full?: boolean;
   /** Flat option list — required when type is "select" unless optionGroups is set. */
   options?: { value: string; label: string }[];
@@ -1384,6 +1470,160 @@ export type RecordEditValues = Record<string, string>;
 
 const recordModalInputClass =
   "h-11 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// Shared "YYYY-MM" -> "Month YYYY" formatter — used by YearMonthPicker's own
+// closed-state label and by PayslipHistoryPanel's table rows, so both stay
+// in sync on how a stored value displays.
+function formatMonthLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  const [year, month] = value.split("-");
+  const name = MONTH_NAMES[Number(month) - 1];
+  return name ? `${name} ${year}` : value;
+}
+
+const YEAR_MONTH_DROPDOWN_MARGIN = 6;
+
+// Year-stepper + 12-month picker — see RecordField.type's own "year-month"
+// comment for why this exists instead of a flat <select>. This trigger
+// lives inside RecordAddModal's own field list, which has overflow-y-auto
+// so the modal itself can scroll when it has many fields — a plain
+// position:absolute dropdown gets clipped to that scrollable ancestor
+// instead of floating free (confirmed live: only a sliver of the month
+// list rendered, per explicit decision/bug report — see conversation).
+// Fixed the same way RowActionMenu already solves this exact problem
+// elsewhere in this app: switch to viewport-relative position:fixed,
+// computed from the trigger's own getBoundingClientRect() after the
+// dropdown mounts (needs its own rendered height first), flipped above the
+// trigger when there's no room below. A fixed-position dropdown would
+// otherwise drift away from its trigger if the modal's field list scrolls
+// underneath it while open, so it just closes on scroll instead of trying
+// to re-track — same choice RowActionMenu makes, for the same reason.
+function YearMonthPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [yearStr, monthStr] = value ? value.split("-") : [undefined, undefined];
+  const selectedYear = yearStr ? Number(yearStr) : undefined;
+  const selectedMonth = monthStr ? Number(monthStr) : undefined;
+  const [displayYear, setDisplayYear] = useState(selectedYear ?? new Date().getFullYear());
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function onScroll(e: Event) {
+      // Unlike RowActionMenu (whose menu is never itself scrollable), this
+      // picker's own month list is — scrolling it dispatches a (non-
+      // bubbling) "scroll" event that this capture-phase listener would
+      // otherwise see too, closing the dropdown on its own internal scroll.
+      // Only close for scrolling OUTSIDE the menu (e.g. the modal's field
+      // list scrolling underneath it).
+      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !btnRef.current || !menuRef.current) return;
+    const btnRect = btnRef.current.getBoundingClientRect();
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const openUp = btnRect.bottom + menuRect.height + YEAR_MONTH_DROPDOWN_MARGIN > window.innerHeight;
+    const top = openUp ? btnRect.top - menuRect.height - YEAR_MONTH_DROPDOWN_MARGIN : btnRect.bottom + YEAR_MONTH_DROPDOWN_MARGIN;
+    setMenuPos({ top, left: btnRect.left, width: btnRect.width });
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => {
+          setDisplayYear(selectedYear ?? new Date().getFullYear());
+          setOpen((o) => !o);
+        }}
+        className={`${recordModalInputClass} w-full text-left flex items-center justify-between`}
+      >
+        <span className={value ? "" : "text-[#4b4949a3]"}>{value ? formatMonthLabel(value) : "Select month"}</span>
+        <span className="text-[#4b4949a3]" aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          style={
+            menuPos
+              ? { position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }
+              : { position: "fixed", top: -9999, left: -9999 }
+          }
+          className="z-[2100] rounded-[10px] border border-black/10 bg-white shadow-[0_4px_14px_0_#0000001a] overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b border-black/10 bg-[#f0f0f0a6]">
+            <button
+              type="button"
+              onClick={() => setDisplayYear((y) => y - 1)}
+              aria-label="Previous year"
+              className="px-2 py-0.5 rounded hover:bg-black/10 text-[#4b4949] font-medium"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-semibold text-[#4b4949]">{displayYear}</span>
+            <button
+              type="button"
+              onClick={() => setDisplayYear((y) => y + 1)}
+              aria-label="Next year"
+              className="px-2 py-0.5 rounded hover:bg-black/10 text-[#4b4949] font-medium"
+            >
+              ›
+            </button>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {MONTH_NAMES.map((name, i) => {
+              const monthNum = i + 1;
+              const isSelected = selectedYear === displayYear && selectedMonth === monthNum;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => {
+                    onChange(`${displayYear}-${String(monthNum).padStart(2, "0")}`);
+                    setOpen(false);
+                  }}
+                  className={`block w-full text-left px-3.5 py-2 text-sm ${
+                    isSelected ? "bg-[#4a90e2] text-white font-medium" : "text-[#4b4949] hover:bg-[#f0f4fa]"
+                  }`}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RecordAddModal({
   title,
@@ -1481,6 +1721,8 @@ function RecordAddModal({
                       </label>
                     </div>
                   )
+                ) : f.type === "year-month" ? (
+                  <YearMonthPicker value={values[f.key] ?? ""} onChange={(v) => setField(f.key, v)} />
                 ) : f.type === "select" ? (
                   <select value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} className={recordModalInputClass}>
                     <option value=""></option>
@@ -1725,39 +1967,23 @@ export function AchievementPanel({ userId, data }: { userId: number; data: Achie
   );
 }
 
-// Past 24 months through 1 ahead — a generous backlog window for logging
-// existing payslips plus the upcoming one, without an unbounded dropdown.
-// Recomputed per render rather than a module-level constant since it's
-// relative to "now" — stays correct across a month boundary without a
-// stale cached list; the list is only ~26 entries, cheap either way.
-function payslipMonthOptions(): { value: string; label: string }[] {
-  const now = new Date();
-  const options: { value: string; label: string }[] = [];
-  for (let offset = -24; offset <= 1; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    options.push({ value, label: d.toLocaleString("en-US", { month: "long", year: "numeric" }) });
-  }
-  return options.reverse();
-}
-
 // Replaces the old single-upload Payslip widget (payslip.attachment_file_id
 // — see that table's own schema comment) with a repeatable history, one row
 // per month, per explicit decision (see conversation). Same
-// RepeatableRecordSection pattern as Achievement/Training. Deliberately no
-// EditableSection wrapper of its own here — rendered inside PayrollPanel's
-// existing one (EmployeeRecordPanels.tsx), same as SalaryRevisionFields;
-// its useEditMode() reads that ambient context instead of creating a new
-// one. Add + Delete only, same as Training — no in-place edit.
+// RepeatableRecordSection pattern as Achievement/Training, except Month
+// uses YearMonthPicker (type: "year-month") instead of a flat <select> —
+// see that field type's own comment. Deliberately no EditableSection
+// wrapper of its own here — rendered inside PayrollPanel's existing one
+// (EmployeeRecordPanels.tsx), same as SalaryRevisionFields; its
+// useEditMode() reads that ambient context instead of creating a new one.
+// Add + Delete only, same as Training — no in-place edit.
 export function PayslipHistoryPanel({ userId, data }: { userId: number; data: PayslipHistoryEntry[] }) {
-  const monthOptions = payslipMonthOptions();
-  const monthLabelByValue = new Map(monthOptions.map((o) => [o.value, o.label]));
   return (
     <RepeatableRecordSection
       heading="Payslip"
       addLabel="+ Add Payslip"
       fields={[
-        { key: "month", label: "Month", type: "select", options: monthOptions },
+        { key: "month", label: "Month", type: "year-month" },
         { key: "attachment", label: "Payslip file", type: "file" },
       ]}
       columns={[
@@ -1766,7 +1992,7 @@ export function PayslipHistoryPanel({ userId, data }: { userId: number; data: Pa
         { key: "uploadDate", label: "Upload Date" },
       ]}
       rows={data.map((r) => ({
-        month: (r.month && monthLabelByValue.get(r.month)) ?? r.month ?? "—",
+        month: formatMonthLabel(r.month),
         attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
         uploadDate: r.uploadDate ?? "—",
       }))}
@@ -1781,8 +2007,67 @@ function parseAmount(val: string): number | null {
   const n = parseFloat(val.replace(/[^0-9.-]/g, ""));
   return isNaN(n) ? null : n;
 }
+// No space between "RM" and the number — matches CurrencyField's own
+// read-only display exactly (see conversation: unified so Salary Revision's
+// Adjustment field/History table don't show a visually different RM style
+// than the Current/New Salary inputs right next to them).
 function formatAmount(n: number): string {
-  return (n < 0 ? "-RM " : "RM ") + Math.abs(n).toFixed(2);
+  return (n < 0 ? "-RM" : "RM") + Math.abs(n).toFixed(2);
+}
+
+// Editable currency input — RM prefix + fixed 2-decimal display, per
+// explicit spec (see conversation: Financial Settlement's amount fields).
+// No existing editable-currency component to reuse: Salary Revision's
+// Current/New Salary and Payslip's Basic Salary are all plain EditableField
+// (raw text, no prefix/formatting at all) — formatAmount() above is
+// display-only, used for Salary Revision's read-only Adjustment field and
+// its history table rows, never for a live input. Modeled on PhoneField's
+// boxed-prefix layout instead, the closest existing "prefix + input"
+// convention in this file. Note the "RM0.00" (no space) display here is a
+// deliberate divergence from formatAmount()'s "RM 0.00" (with a space) —
+// matches this feature's explicit spec exactly rather than silently
+// reusing the other convention; flagged, not unified, since nothing asked
+// for the two to match. Normalizes to 2 decimals on blur, not on every
+// keystroke, so a half-typed value isn't fought mid-entry.
+function CurrencyField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  function handleBlur() {
+    const n = parseAmount(value);
+    onChange(n !== null ? n.toFixed(2) : "");
+  }
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <div className="flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+          <span className="flex items-center pl-3 pr-1 text-sm text-[#4b4949a3] select-none">RM</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={handleBlur}
+            placeholder="0.00"
+            className="flex-1 min-w-0 pr-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+          />
+        </div>
+      ) : value ? (
+        <span className={valueClass}>{`RM${Number.parseFloat(value).toFixed(2)}`}</span>
+      ) : (
+        <span className={emptyClass}>-</span>
+      )}
+    </div>
+  );
 }
 
 const APPROVED_BY_OPTIONS = [
@@ -1987,8 +2272,8 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
       <FieldGrid>
         <EditableField label="Issue Date" value={issuedDate} onChange={setIssuedDate} type="date" />
         <EditableField label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} type="date" />
-        <EditableField label="Current Salary" value={currentSalary} onChange={setCurrentSalary} />
-        <EditableField label="New Salary" value={newSalary} onChange={setNewSalary} />
+        <CurrencyField label="Current Salary" value={currentSalary} onChange={setCurrentSalary} />
+        <CurrencyField label="New Salary" value={newSalary} onChange={setNewSalary} />
         <FieldDisplay label="Salary Adjustment" value={adjustment !== null ? formatAmount(adjustment) : null} full />
         <EditableTextArea label="Reason" value={reason} onChange={setReason} full />
         <EditableSelectField label="Approved By" value={approvedBy} onChange={setApprovedBy} options={APPROVED_BY_OPTIONS} full />
@@ -2937,6 +3222,320 @@ export function ExitInterviewNotesPanel({ userId, data }: { userId: number; data
   );
 }
 
+// Exit > Clearance's 3 checklists (Knowledge Transfer/Asset Recovery/System
+// Revocation) — real now, per explicit design (see conversation). ONE
+// Save button total (EditableSection's own top-right one) — checking/
+// unchecking, deleting an item, and typing a new item's label all just
+// accumulate in local state; clicking Save batches everything: toggle calls
+// for changed rows, delete calls for pending-deleted rows, and (if a new
+// label was typed) an add call. Adding/deleting a row is HR/Superadmin-only
+// (canAddItem, resolved server-side from the session role — see the
+// page-level fetch); toggling is open to any in-scope role. If a new label
+// is pending, Save first blocks on AddItemScopeDialog ("Apply to all
+// employees" writes a global item, user_id null; "Only this employee"
+// scopes it to just this one) before the batch actually runs — canceling
+// that dialog voids the WHOLE pending batch, not just the new item: this
+// app's Edit/Save model has no separate Cancel (EditMode.tsx's own button
+// always flips Edit -> Save, no third state), so a half-committed save
+// would be a more confusing outcome than discarding everything.
+function AddItemScopeDialog({ onCancel, onChoose }: { onCancel: () => void; onChoose: (scope: "all" | "employee") => void }) {
+  return (
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm text-[#4b4949] mb-[22px]">Add this item to:</p>
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={() => onChoose("all")}
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] transition-colors"
+          >
+            Apply to all employees
+          </button>
+          <button
+            type="button"
+            onClick={() => onChoose("employee")}
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/25 hover:bg-[#f0f4fa] transition-colors"
+          >
+            Only this employee
+          </button>
+          <button type="button" onClick={onCancel} className="mt-1 text-xs text-slate-500 hover:underline">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExitChecklistPanel({
+  heading,
+  userId,
+  items,
+  canAddItem,
+  onToggle,
+  onRename,
+  onAdd,
+  onDelete,
+}: {
+  heading: string;
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  onToggle: (userId: number, itemId: number, checked: boolean) => Promise<ActionResult>;
+  onRename: (userId: number, itemId: number, label: string) => Promise<ActionResult>;
+  onAdd: (userId: number, input: AddExitChecklistItemInput) => Promise<ActionResult>;
+  onDelete: (userId: number, itemId: number) => Promise<ActionResult>;
+}) {
+  const router = useRouter();
+  const [pendingChecked, setPendingChecked] = useState<Record<number, boolean>>({});
+  const [pendingLabels, setPendingLabels] = useState<Record<number, string>>({});
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
+  const [newLabel, setNewLabel] = useState("");
+  const [choosingScope, setChoosingScope] = useState(false);
+  const scopeChoiceRef = useRef<((scope: "all" | "employee" | null) => void) | null>(null);
+
+  function resetPending() {
+    setPendingChecked(Object.fromEntries(items.map((item) => [item.id, item.checked])));
+    setPendingLabels(Object.fromEntries(items.map((item) => [item.id, item.label])));
+    setPendingDeleteIds(new Set());
+    setNewLabel("");
+  }
+
+  // Re-baselines whenever fresh data arrives (mount, and after this panel's
+  // own post-Save router.refresh() below) — items is the source of truth;
+  // pendingChecked/pendingLabels/pendingDeleteIds/newLabel only exist to
+  // hold in-progress edits between here and the next Save.
+  useEffect(() => {
+    resetPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  async function handleSave(): Promise<SaveResult> {
+    let scope: "all" | "employee" | null = null;
+    const label = newLabel.trim();
+    if (label) {
+      scope = await new Promise<"all" | "employee" | null>((resolve) => {
+        scopeChoiceRef.current = resolve;
+        setChoosingScope(true);
+      });
+      setChoosingScope(false);
+      if (scope === null) {
+        resetPending();
+        return { ok: true };
+      }
+    }
+
+    const toggled = items.filter((item) => !pendingDeleteIds.has(item.id) && pendingChecked[item.id] !== item.checked);
+    const renamed = items.filter(
+      (item) => !pendingDeleteIds.has(item.id) && pendingLabels[item.id]?.trim() && pendingLabels[item.id].trim() !== item.label,
+    );
+    const deleted = items.filter((item) => pendingDeleteIds.has(item.id));
+    if (toggled.length === 0 && renamed.length === 0 && deleted.length === 0 && !label) return { ok: true };
+
+    const results = await Promise.all([
+      ...toggled.map((item) => onToggle(userId, item.id, pendingChecked[item.id])),
+      ...renamed.map((item) => onRename(userId, item.id, pendingLabels[item.id].trim())),
+      ...deleted.map((item) => onDelete(userId, item.id)),
+      ...(label ? [onAdd(userId, { label, scope: scope! })] : []),
+    ]);
+    const failed = results.find((r) => r && r.ok === false);
+    if (failed) return failed;
+    router.refresh();
+    return { ok: true };
+  }
+
+  return (
+    <EditableSection onSave={handleSave}>
+      <PanelHeading>{heading}</PanelHeading>
+      <ExitChecklistItems
+        items={items.filter((item) => !pendingDeleteIds.has(item.id))}
+        pendingChecked={pendingChecked}
+        pendingLabels={pendingLabels}
+        canEditItem={canAddItem}
+        onChange={(id, checked) => setPendingChecked((prev) => ({ ...prev, [id]: checked }))}
+        onLabelChange={(id, label) => setPendingLabels((prev) => ({ ...prev, [id]: label }))}
+        onDelete={(id) => setPendingDeleteIds((prev) => new Set(prev).add(id))}
+      />
+      {canAddItem && <ExitChecklistAddItemRow value={newLabel} onChange={setNewLabel} />}
+      {choosingScope && (
+        <AddItemScopeDialog
+          onCancel={() => scopeChoiceRef.current?.(null)}
+          onChoose={(scope) => scopeChoiceRef.current?.(scope)}
+        />
+      )}
+    </EditableSection>
+  );
+}
+
+// Rename permission mirrors add/delete exactly (canEditItem, HR/Superadmin
+// only — see conversation) — everyone else in Edit mode can still toggle
+// checkboxes but sees static label text, never an input. Like every other
+// field in this app (EditableField/PhoneField/etc.), the label just IS an
+// <input> once editing+canEditItem are both true — "click the text to edit
+// it" is simply what focusing a normal text input looks like, no separate
+// static-to-input toggle step, consistent with the rest of the app.
+function ExitChecklistItems({
+  items,
+  pendingChecked,
+  pendingLabels,
+  canEditItem,
+  onChange,
+  onLabelChange,
+  onDelete,
+}: {
+  items: ExitChecklistItem[];
+  pendingChecked: Record<number, boolean>;
+  pendingLabels: Record<number, string>;
+  canEditItem: boolean;
+  onChange: (itemId: number, checked: boolean) => void;
+  onLabelChange: (itemId: number, label: string) => void;
+  onDelete: (itemId: number) => void;
+}) {
+  const editing = useEditMode();
+  return (
+    <ul className="flex flex-col gap-3">
+      {items.map((item) => (
+        <li key={item.id} className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={pendingChecked[item.id] ?? false}
+            disabled={!editing}
+            onChange={(e) => onChange(item.id, e.target.checked)}
+            className="w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
+          />
+          {editing && canEditItem ? (
+            <input
+              type="text"
+              value={pendingLabels[item.id] ?? item.label}
+              onChange={(e) => onLabelChange(item.id, e.target.value)}
+              className="flex-1 min-w-0 text-sm text-[#4b4949] bg-transparent border-0 border-b border-slate-300 px-0 py-0.5 focus:outline-none focus:border-blue-500"
+            />
+          ) : (
+            <span className="text-sm text-[#4b4949] flex-1">{item.label}</span>
+          )}
+          {editing && canEditItem && (
+            <button
+              type="button"
+              onClick={() => onDelete(item.id)}
+              aria-label={`Delete "${item.label}"`}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-600 hover:bg-red-50 text-sm leading-none"
+            >
+              −
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Gated by useEditMode(), same as every other editable field in this app —
+// only shown once Edit is clicked (canAddItem, the HR/Superadmin role gate,
+// is checked by the caller separately). Save is a single accumulate-locally
+// text field now, not its own button — ExitChecklistPanel's own top-right
+// Save reads this value at commit time (see handleSave's `label` there).
+function ExitChecklistAddItemRow({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const editing = useEditMode();
+  if (!editing) return null;
+  return (
+    <div className="mt-4 pt-4 border-t border-black/10">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Add a new checklist item…"
+        className="w-full h-10 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+      />
+    </div>
+  );
+}
+
+export function KnowledgeTransferPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – Knowledge Transfer"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      onToggle={toggleKnowledgeTransferItem}
+      onRename={renameKnowledgeTransferItem}
+      onAdd={addKnowledgeTransferItem}
+      onDelete={deleteKnowledgeTransferItem}
+    />
+  );
+}
+
+export function AssetRecoveryPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – Asset Recovery"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      onToggle={toggleAssetRecoveryItem}
+      onRename={renameAssetRecoveryItem}
+      onAdd={addAssetRecoveryItem}
+      onDelete={deleteAssetRecoveryItem}
+    />
+  );
+}
+
+export function SystemRevocationPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – System Revocation"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      onToggle={toggleSystemRevocationItem}
+      onRename={renameSystemRevocationItem}
+      onAdd={addSystemRevocationItem}
+      onDelete={deleteSystemRevocationItem}
+    />
+  );
+}
+
+export function FinancialSettlementPanel({ userId, data }: { userId: number; data: FinancialSettlementInfo | null }) {
+  const [finalPayDate, setFinalPayDate] = useState(data?.finalPayDate ?? "");
+  const [outstandingLeavePayout, setOutstandingLeavePayout] = useState(data?.outstandingLeavePayout ?? "");
+  const [outstandingClaims, setOutstandingClaims] = useState(data?.outstandingClaims ?? "");
+  const [loanAdvanceDeduction, setLoanAdvanceDeduction] = useState(data?.loanAdvanceDeduction ?? "");
+  const [notes, setNotes] = useState(data?.notes ?? "");
+  const [fileId, setFileId] = useState(data?.settlementLetterFileId ?? null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  function clearFile() {
+    if (pendingFile) setPendingFile(null);
+    else setFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateFinancialSettlement(userId, {
+          finalPayDate,
+          outstandingLeavePayout,
+          outstandingClaims,
+          loanAdvanceDeduction,
+          notes,
+          settlementLetterFileId: fileId,
+          settlementLetterFile: pendingFile,
+        })
+      }
+    >
+      <PanelHeading>Clearance – Financial Settlement</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Final Pay Date" value={finalPayDate} onChange={setFinalPayDate} type="date" />
+        <CurrencyField label="Outstanding Leave Payout" value={outstandingLeavePayout} onChange={setOutstandingLeavePayout} />
+        <CurrencyField label="Outstanding Claims" value={outstandingClaims} onChange={setOutstandingClaims} />
+        <CurrencyField label="Loan / Advance Deduction" value={loanAdvanceDeduction} onChange={setLoanAdvanceDeduction} />
+        <EditableTextArea label="Notes" value={notes} onChange={setNotes} full />
+        <RealFileField label="Settlement Letter" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} full />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
 const GENDER_OPTIONS = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },
@@ -3116,9 +3715,9 @@ export {
   PanelHeading,
   SubsectionHeading,
   FieldGrid,
+  CurrencyField,
   Subsection,
   RecordTable,
-  Checklist,
   FieldDisplay,
   SidebarField,
   EditableField,

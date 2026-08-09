@@ -18,6 +18,7 @@ import {
   computeRealAccountLifecycleOverrides,
   computePreStartDatePassedRows,
   lookupCareerApplicationsByName,
+  lookupBranchStaffPositionGroupByName,
 } from "@/lib/careerApplicationSync";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 
@@ -40,11 +41,12 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
   if (!scope) redirect("/login");
   if (!scope.fullAccess && scope.departmentCode !== code) notFound();
 
-  const [rowsBaseRaw, branches, departments, careerApplications] = await Promise.all([
+  const [rowsBaseRaw, branches, departments, careerApplications, branchStaffPositionGroups] = await Promise.all([
     listEmployeeOverviewRows(),
     listBranches(),
     listDepartments(),
     lookupCareerApplicationsByName(),
+    lookupBranchStaffPositionGroupByName(),
   ]);
   // Onboarding has no Unassigned bucket (see summarizeStageByDepartment) —
   // direct URL access to it 404s like any other nonexistent department code.
@@ -62,7 +64,7 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
   // this page used to run the old, pre-redesign computeOnboardingDualListedRows
   // independently of the summary page's overrides, producing duplicate rows
   // for anyone dual-listed on Probation+Onboarding).
-  const overrides = await computeRealAccountLifecycleOverrides(rowsBaseRaw, careerApplications);
+  const overrides = await computeRealAccountLifecycleOverrides(rowsBaseRaw, careerApplications, branchStaffPositionGroups);
   const rowsBase = rowsBaseRaw.map((r) => {
     const o = overrides.get(r.id);
     return o ? { ...r, stage: o.stage } : r;
@@ -74,7 +76,7 @@ export default async function EmployeeFolderDepartmentNamelistPage({ params }: P
           ...rowsBaseRaw
             .filter((r) => overrides.get(r.id)?.extraStages?.includes("onboarding"))
             .map((r) => ({ ...r, stage: "onboarding" as const })),
-          ...(await computePreStartDatePassedRows()),
+          ...(await computePreStartDatePassedRows(branchStaffPositionGroups)),
         ]
       : rowsBase;
   // Same live BranchStaff fallback as the summary page above it — must be

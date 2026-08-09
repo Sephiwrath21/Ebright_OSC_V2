@@ -13,6 +13,7 @@ import {
   PlaceholderUploadField,
   SalaryRevisionFields,
   EditableField,
+  CurrencyField,
   EditableSelectField,
   SelectWithOtherField,
   EditableTextArea,
@@ -384,7 +385,7 @@ export function PayrollPanel({
     <EditableSection onSave={handleSave}>
       <PanelHeading>Payroll/ Payslip</PanelHeading>
       <Subsection heading="Basic Pay">
-        <EditableField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
+        <CurrencyField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
         <EditableSelectField label="Salary Type" value={type} onChange={setType} options={SALARY_TYPE_OPTIONS} />
       </Subsection>
 
@@ -554,10 +555,7 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
 
   return (
     <EditableSection onSave={handleSave}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
-        <CancelEditLink show={editingId !== null} onClick={() => setEditingId(null)} />
-      </div>
+      <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
       <FieldGrid>
         <EditableField label="Review Period" value={period} onChange={setPeriod} />
         <EditableField label="Review Date" value={reviewDate} onChange={setReviewDate} type="date" />
@@ -573,7 +571,10 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
       </FieldGrid>
 
       <div className="mt-7">
-        <PanelHeading>Performance Review History</PanelHeading>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <PanelHeading>Performance Review History</PanelHeading>
+          <CancelEditLink show={editingId !== null} onClick={() => setEditingId(null)} />
+        </div>
         <RecordTable
           columns={[
             { key: "period", label: "Review Period" },

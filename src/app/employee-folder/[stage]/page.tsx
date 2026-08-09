@@ -17,12 +17,14 @@ import {
 import {
   lookupCareerApplicationsByName,
   lookupBranchStaffLocationByName,
+  lookupBranchStaffPositionGroupByName,
   enrichRowsWithBranchStaffLocation,
   computePreStageRows,
   computePreStartDatePassedRows,
   computeRealAccountLifecycleOverrides,
   normalizeName,
 } from "@/lib/careerApplicationSync";
+import { computeStoppedProbationIds } from "@/lib/probationDecision";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 
@@ -71,11 +73,12 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
     // unscoped rows (it needs every real row, unscoped, to correctly apply
     // its own override check before scope ever enters the picture).
     if (stage === "pre") {
-      const [preRows, branchList, departmentList] = await Promise.all([
-        computePreStageRows(),
+      const [branchStaffPositionGroups, branchList, departmentList] = await Promise.all([
+        lookupBranchStaffPositionGroupByName(),
         listBranches(),
         listDepartments(),
       ]);
+      const preRows = await computePreStageRows(branchStaffPositionGroups);
       const stageRows = scope ? filterRowsByScope(scope, preRows) : [];
       return (
         <AppShell email={userEmail} role={userRole} name={userName}>
@@ -106,12 +109,13 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
       // for anyone this same OR-rule matches and renders the Probation
       // profile template, while visiting that same person from their real
       // stage's own list still shows that stage's own template.
-      const [careerApplications, branchList, departmentList, prePassedRows] = await Promise.all([
+      const [careerApplications, branchStaffPositionGroups, branchList, departmentList] = await Promise.all([
         lookupCareerApplicationsByName(),
+        lookupBranchStaffPositionGroupByName(),
         listBranches(),
         listDepartments(),
-        computePreStartDatePassedRows(),
       ]);
+      const prePassedRows = await computePreStartDatePassedRows(branchStaffPositionGroups);
       branches = branchList;
       departments = departmentList;
       const branchStaffByName = await lookupBranchStaffLocationByName(branchList, departmentList);
@@ -122,7 +126,7 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
       // matchIsProbationPipeline-driven membership entirely for real
       // accounts; career_applications board_stage/rec_stage is no longer
       // consulted for this.
-      const overrides = await computeRealAccountLifecycleOverrides(rows, careerApplications);
+      const overrides = await computeRealAccountLifecycleOverrides(rows, careerApplications, branchStaffPositionGroups);
 
       // Real rows already at raw stage "probation" whose override says
       // otherwise (Confirmed -> active) drop off this list.
@@ -163,6 +167,15 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
         if (!passed.extraStages?.includes("probation")) continue;
         stageRows.push(passed);
       }
+
+      // Status column shows "Stop" instead of this page's own "Probation"
+      // label for a row whose decision is Stopped — see
+      // computeStoppedProbationIds's own comment and StageFlatListView.tsx.
+      // Scoped to stageRows (the final, already-assembled list for this
+      // page) rather than the wider unfiltered `rows`, since that's exactly
+      // who needs the flag.
+      const stoppedIds = await computeStoppedProbationIds(stageRows, careerApplications, branchStaffPositionGroups);
+      stageRows = stageRows.map((r) => (stoppedIds.has(r.id) ? { ...r, probationStopped: true } : r));
     }
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
@@ -212,18 +225,19 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
   const { by } = await searchParams;
   const groupBy = by === "department" ? "department" : "branch";
 
-  const [rowsBaseRaw, branches, departments, careerApplications] = await Promise.all([
+  const [rowsBaseRaw, branches, departments, careerApplications, branchStaffPositionGroups] = await Promise.all([
     listEmployeeOverviewRows(),
     listBranches(),
     listDepartments(),
     lookupCareerApplicationsByName(),
+    lookupBranchStaffPositionGroupByName(),
   ]);
   // Real-account Probation/Onboarding/Active membership — see
   // computeRealAccountLifecycleOverrides's own comment. Replaces
   // excludeOverrideRejectedRows/computeActivePipelineProbationPassedIds/
   // matchIsProbationPipeline/computeOnboardingDualListedRows's role in
   // deciding this for real accounts.
-  const overrides = await computeRealAccountLifecycleOverrides(rowsBaseRaw, careerApplications);
+  const overrides = await computeRealAccountLifecycleOverrides(rowsBaseRaw, careerApplications, branchStaffPositionGroups);
   const rowsBase = rowsBaseRaw.map((r) => {
     const o = overrides.get(r.id);
     return o ? { ...r, stage: o.stage } : r;
@@ -239,7 +253,7 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
           ...rowsBaseRaw
             .filter((r) => overrides.get(r.id)?.extraStages?.includes("onboarding"))
             .map((r) => ({ ...r, stage: "onboarding" as const })),
-          ...(await computePreStartDatePassedRows()),
+          ...(await computePreStartDatePassedRows(branchStaffPositionGroups)),
         ]
       : rowsBase;
   // Same live BranchStaff fallback the Probation list uses — someone whose

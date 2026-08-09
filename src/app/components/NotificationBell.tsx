@@ -24,7 +24,7 @@ export default function NotificationBell({ role }: { role?: string }) {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
-  const [probationCount, setProbationCount] = useState(0);
+  const [probationCandidates, setProbationCandidates] = useState<{ id: number; fullName: string }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,10 +81,11 @@ export default function NotificationBell({ role }: { role?: string }) {
     };
   }, []);
 
-  // Probation reminders — starting 2 weeks before a Full-Time employee's
+  // Probation reminders — starting 3 days before a Full-Time employee's
   // probation end date, per explicit decision (see conversation). Same
   // computeProbationReminderCandidates rule as the Probation summary card's
-  // own red dot.
+  // own red dot. One entry per candidate, not just a count — see this
+  // route's own comment.
   useEffect(() => {
     if (!showProbationDecisions) return;
     let cancelled = false;
@@ -92,8 +93,8 @@ export default function NotificationBell({ role }: { role?: string }) {
       try {
         const res = await fetch("/api/probation/pending-decisions/count", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { count?: number };
-        if (!cancelled && typeof data.count === "number") setProbationCount(data.count);
+        const data = (await res.json()) as { candidates?: { id: number; fullName: string }[] };
+        if (!cancelled && Array.isArray(data.candidates)) setProbationCandidates(data.candidates);
       } catch {
         // network flake — no-op
       }
@@ -122,7 +123,7 @@ export default function NotificationBell({ role }: { role?: string }) {
     };
   }, [open]);
 
-  const totalCount = count + leaveCount + probationCount;
+  const totalCount = count + leaveCount + probationCandidates.length;
   const leaveMessage =
     role === "hr"
       ? leaveCount === 1
@@ -255,7 +256,7 @@ export default function NotificationBell({ role }: { role?: string }) {
                 </div>
               )}
 
-              {probationCount > 0 && (
+              {probationCandidates.length > 0 && (
                 <div className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0 ring-1 ring-inset ring-red-200">
@@ -263,11 +264,15 @@ export default function NotificationBell({ role }: { role?: string }) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900 leading-snug">Probation ending soon</p>
-                      <p className="mt-0.5 text-sm text-slate-500 leading-snug">
-                        {probationCount === 1
-                          ? "1 employee's probation needs a Confirm/Extend/Stop decision."
-                          : `${probationCount} employees' probation needs a Confirm/Extend/Stop decision.`}
-                      </p>
+                      {/* One line per candidate, per explicit decision (see
+                          conversation) — not a merged/pluralized sentence,
+                          so each name is individually legible when 2+ people
+                          are flagged at once. */}
+                      {probationCandidates.map((c) => (
+                        <p key={c.id} className="mt-0.5 text-sm text-slate-500 leading-snug">
+                          {c.fullName}还有三天就结束probation
+                        </p>
+                      ))}
                       <div className="mt-3">
                         <Link
                           href="/employee-folder/probation"

@@ -111,19 +111,20 @@ export async function advanceOnboardingToActive(): Promise<number> {
   return advanced;
 }
 
-// Probation -> next stage (onboarding — same target proceedFromProbation
-// already uses), per the 3-tier priority rule:
+// Probation -> next stage (onboarding), per the 3-tier priority rule:
 //   1. probation_status is "Stopped" or "Extended" -> never auto-advance,
 //      regardless of elapsed time or anything else.
-//   2. (handled by the existing manual "Next" button/proceedFromProbation,
-//      not this sweep — that action already requires probation_status
-//      === "Confirmed" and fires immediately on click.)
+//   2. (handled by the Confirm decision button/decideProbationOutcome, not
+//      this sweep — isEffectivelyConfirmed already treats probation_status
+//      "Confirmed" as Active for display the moment it's set, with no
+//      separate proceed step; the older manual "Next" button that used to
+//      cover this case was removed as redundant, see conversation.)
 //   3. probation_status is empty/unset (null) AND 3 qualifying days have
 //      passed since entering Probation -> auto-advance.
 // Any other non-empty status (e.g. "In Progress", "Confirmed") falls
 // through both this sweep's own check and rule 1's block — per the letter
 // of the spec, only a literally-empty status is eligible for the automatic
-// path; "Confirmed" still requires the manual click.
+// path; "Confirmed" is already handled by rule 2 above.
 export async function advanceProbationToNext(): Promise<number> {
   const rows = await prisma.employment.findMany({
     where: { probation: true, start_date: { not: null } },

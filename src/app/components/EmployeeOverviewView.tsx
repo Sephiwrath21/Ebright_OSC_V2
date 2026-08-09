@@ -18,16 +18,17 @@ interface Props {
   userName?: string | null;
   /** userId -> overdue Task Manager task count, for the red dot next to Name. */
   overdueTaskCounts?: Record<number, number>;
-  /** True when at least one Full-Time employee's probation end date is
-   *  within 2 weeks (or already passed) with no Confirm/Extend/Stop
-   *  decision made yet — see probationDecision.ts's
-   *  computeProbationReminderCandidates. Drives the red dot on the
-   *  Probation summary card, same signal as the NotificationBell's own
-   *  Probation card. */
-  hasProbationReminder?: boolean;
+  /** Full-Time employees whose probation end date is within 3 days (or
+   *  already passed) with no Confirm/Extend/Stop decision made yet — see
+   *  probationDecision.ts's computeProbationReminderCandidates. Drives the
+   *  red dot + tooltip on the Probation summary card, same signal as the
+   *  NotificationBell's own Probation card. One name per line in the
+   *  tooltip when 2+ people are flagged at once, per explicit decision (see
+   *  conversation) — not merged into one sentence. */
+  probationReminderNames?: string[];
 }
 
-export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, hasProbationReminder }: Props) {
+export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, probationReminderNames }: Props) {
   const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
@@ -136,8 +137,11 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                   <span className={`inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
                     {STAGE_LABELS[stage]}
                   </span>
-                  {stage === "probation" && hasProbationReminder && (
-                    <OverdueDot count={1} label="Probation ending soon — needs a Confirm/Extend/Stop decision" />
+                  {stage === "probation" && probationReminderNames && probationReminderNames.length > 0 && (
+                    <OverdueDot
+                      count={probationReminderNames.length}
+                      label={probationReminderNames.map((name) => `${name}还有三天就结束probation`).join("\n")}
+                    />
                   )}
                 </span>
                 <span className="text-4xl font-medium text-slate-900/70">{counts[stage]}</span>

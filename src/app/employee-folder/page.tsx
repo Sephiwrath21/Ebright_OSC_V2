@@ -12,6 +12,7 @@ import {
 import { getCurrentEmployeeScope, filterRowsByScope } from "@/lib/employeeScope";
 import {
   lookupCareerApplicationsByName,
+  lookupBranchStaffPositionGroupByName,
   enrichRowsWithBranchStaffLocation,
   computePreStageRows,
   computePreStartDatePassedRows,
@@ -60,7 +61,15 @@ export default async function EmployeeFolderPage() {
   // careerApplications is still fetched here — computeRealAccountLifecycle
   // Overrides' Confirm check (via isEffectivelyConfirmed) still reads
   // status2, and the Probation reminder card further down still needs it.
-  const careerApplications = await lookupCareerApplicationsByName();
+  // branchStaffPositionGroups is fetched once here and threaded through
+  // every call below that needs it (computePreStageRows/
+  // computePreStartDatePassedRows, computeRealAccountLifecycleOverrides,
+  // computeProbationReminderCandidates) — this page used to trigger that
+  // same unfiltered BranchStaff query up to 5 times independently.
+  const [careerApplications, branchStaffPositionGroups] = await Promise.all([
+    lookupCareerApplicationsByName(),
+    lookupBranchStaffPositionGroupByName(),
+  ]);
   const enrichedRows = enrichedRowsAll;
 
   // Correct Pre-stage membership to match computePreStageRows() — the same
@@ -73,8 +82,8 @@ export default async function EmployeeFolderPage() {
   // (row.stage !== statusFilter) needs no separate copy of this correction —
   // it just reads the already-corrected value.
   const [correctedPreRows, prePassedRows] = await Promise.all([
-    computePreStageRows(),
-    computePreStartDatePassedRows(),
+    computePreStageRows(branchStaffPositionGroups),
+    computePreStartDatePassedRows(branchStaffPositionGroups),
   ]);
   // Real accounts, corrected in place below. onboarding_candidate-only
   // people (negative id, no portal account yet; see isCandidate) are kept
@@ -105,7 +114,7 @@ export default async function EmployeeFolderPage() {
   // computeRealAccountLifecycleOverrides's own comment in
   // careerApplicationSync.ts. Candidate-only rows (passedPreCandidates) are
   // untouched by this, unrelated feature — counted separately below.
-  const overrides = await computeRealAccountLifecycleOverrides(enrichedRows, careerApplications);
+  const overrides = await computeRealAccountLifecycleOverrides(enrichedRows, careerApplications, branchStaffPositionGroups);
 
   let probationCount = 0;
   let onboardingDualListedCount = 0;
@@ -165,7 +174,11 @@ export default async function EmployeeFolderPage() {
   // fed by the same real-account Probation population computeRealAccount
   // LifecycleOverrides above just resolved (Full Time, not yet Confirmed).
   const probationBadgedCandidates = enrichedRows.filter((r) => overrides.get(r.id)?.stage === "probation");
-  const probationReminders = await computeProbationReminderCandidates(probationBadgedCandidates, careerApplications);
+  const probationReminders = await computeProbationReminderCandidates(
+    probationBadgedCandidates,
+    careerApplications,
+    branchStaffPositionGroups,
+  );
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
@@ -178,7 +191,7 @@ export default async function EmployeeFolderPage() {
         counts={counts}
         userName={userName}
         overdueTaskCounts={overdueTaskCounts}
-        hasProbationReminder={probationReminders.length > 0}
+        probationReminderNames={probationReminders.map((r) => r.fullName)}
       />
     </AppShell>
   );
