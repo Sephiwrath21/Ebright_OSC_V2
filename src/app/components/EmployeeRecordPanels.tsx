@@ -16,12 +16,12 @@ import {
   EditableSelectField,
   SelectWithOtherField,
   EditableTextArea,
-  RealFileField,
   RecordTable,
   RealAttachmentLink,
   FilePickerControl,
   PhoneField,
   EmailField,
+  PayslipHistoryPanel,
   type SalaryRevisionHandle,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
@@ -40,6 +40,7 @@ import type {
   GuardianInfoEntry,
   PerformanceReviewEntry,
   PayslipInfo,
+  PayslipHistoryEntry,
   EmployeeTaskRow,
 } from "@/lib/employeeQueries";
 import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
@@ -358,25 +359,20 @@ export function PayrollPanel({
   employeeId,
   salaryRevisions,
   payslip,
+  payslipHistory,
 }: {
   employeeId: number;
   salaryRevisions: SalaryRevisionEntry[];
   payslip: PayslipInfo | null;
+  payslipHistory: PayslipHistoryEntry[];
 }) {
   const salaryRevisionRef = useRef<SalaryRevisionHandle>(null);
   const [basicPay, setBasicPay] = useState(payslip?.basicPay ?? "");
   const [type, setType] = useState(payslip?.type ?? "");
-  const [fileId, setFileId] = useState(payslip?.attachmentFileId ?? null);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-
-  function clearFile() {
-    if (pendingFile) setPendingFile(null);
-    else setFileId(null);
-  }
 
   async function handleSave(): Promise<SaveResult> {
     const [payslipResult, salaryRevisionResult] = await Promise.all([
-      updatePayslip(employeeId, { basicPay, type, attachmentFileId: fileId, attachmentFile: pendingFile }),
+      updatePayslip(employeeId, { basicPay, type }),
       salaryRevisionRef.current?.save() ?? Promise.resolve(undefined),
     ]);
     if (payslipResult && payslipResult.ok === false) return payslipResult;
@@ -392,9 +388,9 @@ export function PayrollPanel({
         <EditableSelectField label="Salary Type" value={type} onChange={setType} options={SALARY_TYPE_OPTIONS} />
       </Subsection>
 
-      <Subsection heading="Payslip">
-        <RealFileField label="Payslip" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} full />
-      </Subsection>
+      <div className="mt-7">
+        <PayslipHistoryPanel userId={employeeId} data={payslipHistory} />
+      </div>
 
       <div className="mt-7">
         <SalaryRevisionFields ref={salaryRevisionRef} userId={employeeId} data={salaryRevisions} />

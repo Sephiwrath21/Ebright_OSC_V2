@@ -1914,11 +1914,16 @@ export async function deletePerformanceReview(userId: number, id: number): Promi
   }
 }
 
+// attachmentFileId/attachmentFile are retired, per explicit decision (see
+// conversation) — the single-upload Payslip widget they backed is replaced
+// by payslip_history (see addPayslipHistory below). basicPay/type are
+// unchanged. Deliberately no attachment handling left here at all (not
+// even a no-op pass-through) — this closes off the write path so
+// payslip.attachment_file_id can't get silently repopulated by a future
+// caller; the column itself stays in the schema, just never written again.
 export interface UpdatePayslipInput {
   basicPay: string;
   type: string;
-  attachmentFileId: string | null;
-  attachmentFile: File | null;
 }
 
 export async function updatePayslip(userId: number, input: UpdatePayslipInput): Promise<ActionResult> {
@@ -1927,26 +1932,61 @@ export async function updatePayslip(userId: number, input: UpdatePayslipInput): 
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
   try {
-    const existing = await prisma.payslip.findUnique({ where: { user_id: userId } });
-
-    let attachmentFileId = input.attachmentFileId;
-    if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "payslip", folderEnvVar: "GOOGLE_DRIVE_PAYSLIP_ID" });
-      attachmentFileId = uploaded.id;
-    }
-    if (existing?.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
-      await deleteFromDrive(existing.attachment_file_id);
-    }
-
     const fields = {
       basic_pay: input.basicPay ? Number.parseFloat(input.basicPay) : null,
       type: input.type || null,
-      attachment_file_id: attachmentFileId,
     };
     await prisma.payslip.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Payslip." };
+  }
+}
+
+// Payslip History — same shape as addAchievement (repeatable, own file per
+// row), except both fields are required: a payslip history entry with no
+// month or no file isn't a meaningful record the way a blank Achievement
+// date/attachment can be. Add + Delete only, per explicit decision (see
+// conversation, "same UI pattern as Training") — Training itself has
+// delete but no in-place edit, and that's the pattern this follows; no
+// updatePayslipHistory exists, so a wrong month/file is corrected by
+// deleting the row and adding a new one, not editing it.
+export interface AddPayslipHistoryInput {
+  month: string; // "YYYY-MM"
+  attachmentFile: File | null;
+}
+
+export async function addPayslipHistory(userId: number, input: AddPayslipHistoryInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  if (!input.month) return { ok: false, error: "Month is required." };
+  if (!input.attachmentFile) return { ok: false, error: "Payslip file is required." };
+  try {
+    const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "payslip", folderEnvVar: "GOOGLE_DRIVE_PAYSLIP_ID" });
+    await prisma.payslip_history.create({
+      data: { user_id: userId, month: input.month, attachment_file_id: uploaded.id },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to save Payslip History." };
+  }
+}
+
+export async function deletePayslipHistory(userId: number, id: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const row = await prisma.payslip_history.findUnique({ where: { payslip_history_id: id } });
+    if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
+    await deleteFromDrive(row.attachment_file_id);
+    await prisma.payslip_history.delete({ where: { payslip_history_id: id } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete Payslip History." };
   }
 }
 

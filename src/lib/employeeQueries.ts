@@ -1631,9 +1631,12 @@ export async function listPerformanceReviews(userId: number): Promise<Performanc
   }));
 }
 
-// Singleton — Finance > Payroll/Payslip's "Basic Pay" + "Payslip"
-// subsections (deliberately separate from the existing payroll table's
-// EPF/SOCSO/EIS/Tax/PCB fields — no overlap).
+// Singleton — Finance > Payroll/Payslip's "Basic Pay" subsection
+// (deliberately separate from the existing payroll table's EPF/SOCSO/EIS/
+// Tax/PCB fields — no overlap). attachmentFileId is retired (see
+// payslip_history below) but still read here for now rather than dropped
+// from the type outright — see payslip.attachment_file_id's own schema
+// comment.
 export interface PayslipInfo {
   basicPay: string | null;
   type: string | null;
@@ -1648,6 +1651,28 @@ export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
     type: row.type,
     attachmentFileId: row.attachment_file_id,
   };
+}
+
+// Real payslip_history table — Finance > Payroll/Payslip's "Payslip"
+// subsection, replacing the old single-upload attachment (see payslip's
+// own schema comment). Repeatable, add + delete only (same as Training) —
+// no in-place edit action exists for this table (see addPayslipHistory/
+// deletePayslipHistory in employeeRecordActions.ts).
+export interface PayslipHistoryEntry {
+  id: number;
+  month: string | null;
+  attachmentFileId: string | null;
+  uploadDate: string | null;
+}
+
+export async function listPayslipHistory(userId: number): Promise<PayslipHistoryEntry[]> {
+  const rows = await prisma.payslip_history.findMany({ where: { user_id: userId }, orderBy: { month: "desc" } });
+  return rows.map((r) => ({
+    id: r.payslip_history_id,
+    month: r.month,
+    attachmentFileId: r.attachment_file_id,
+    uploadDate: r.upload_date ? r.upload_date.toISOString().slice(0, 10) : null,
+  }));
 }
 
 // ─── Employee Record > Task (Pending/Overdue) ───

@@ -28,6 +28,7 @@ import {
   getPaymentInfo,
   listPerformanceReviews,
   getPayslip,
+  listPayslipHistory,
   listBranches,
   listDepartments,
   listEmployeeTasks,
@@ -124,6 +125,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     paymentInfo,
     performanceReview,
     payslip,
+    payslipHistory,
     tasks,
   ] = await Promise.all([
     needsEmployeeDetail ? getEmployeeById(numId) : Promise.resolve(null),
@@ -149,6 +151,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     category === "personal-info" && section === "payment" ? getPaymentInfo(numId) : Promise.resolve(undefined),
     category === "active-employment" && section === "performance-review" ? listPerformanceReviews(numId) : Promise.resolve(undefined),
     category === "finance" && section === "payroll" ? getPayslip(numId) : Promise.resolve(undefined),
+    category === "finance" && section === "payroll" ? listPayslipHistory(numId) : Promise.resolve(undefined),
     category === "task" ? listEmployeeTasks(numId) : Promise.resolve(undefined),
   ]);
 

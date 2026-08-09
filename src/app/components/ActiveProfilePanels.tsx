@@ -31,6 +31,8 @@ import {
   addTraining,
   updateTraining,
   deleteTraining,
+  addPayslipHistory,
+  deletePayslipHistory,
   updateNda,
   updateNonCompete,
   addDomesticInquiry,
@@ -64,6 +66,7 @@ import type {
   PromotionEntry,
   TransferEntry,
   TrainingEntry,
+  PayslipHistoryEntry,
   NdaInfo,
   NonCompeteInfo,
   DomesticInquiryEntry,
@@ -1719,6 +1722,58 @@ export function AchievementPanel({ userId, data }: { userId: number; data: Achie
         onDelete={(id) => deleteAchievement(userId, id)}
       />
     </EditableSection>
+  );
+}
+
+// Past 24 months through 1 ahead — a generous backlog window for logging
+// existing payslips plus the upcoming one, without an unbounded dropdown.
+// Recomputed per render rather than a module-level constant since it's
+// relative to "now" — stays correct across a month boundary without a
+// stale cached list; the list is only ~26 entries, cheap either way.
+function payslipMonthOptions(): { value: string; label: string }[] {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let offset = -24; offset <= 1; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    options.push({ value, label: d.toLocaleString("en-US", { month: "long", year: "numeric" }) });
+  }
+  return options.reverse();
+}
+
+// Replaces the old single-upload Payslip widget (payslip.attachment_file_id
+// — see that table's own schema comment) with a repeatable history, one row
+// per month, per explicit decision (see conversation). Same
+// RepeatableRecordSection pattern as Achievement/Training. Deliberately no
+// EditableSection wrapper of its own here — rendered inside PayrollPanel's
+// existing one (EmployeeRecordPanels.tsx), same as SalaryRevisionFields;
+// its useEditMode() reads that ambient context instead of creating a new
+// one. Add + Delete only, same as Training — no in-place edit.
+export function PayslipHistoryPanel({ userId, data }: { userId: number; data: PayslipHistoryEntry[] }) {
+  const monthOptions = payslipMonthOptions();
+  const monthLabelByValue = new Map(monthOptions.map((o) => [o.value, o.label]));
+  return (
+    <RepeatableRecordSection
+      heading="Payslip"
+      addLabel="+ Add Payslip"
+      fields={[
+        { key: "month", label: "Month", type: "select", options: monthOptions },
+        { key: "attachment", label: "Payslip file", type: "file" },
+      ]}
+      columns={[
+        { key: "month", label: "Month" },
+        { key: "attachment", label: "Payslip file" },
+        { key: "uploadDate", label: "Upload Date" },
+      ]}
+      rows={data.map((r) => ({
+        month: (r.month && monthLabelByValue.get(r.month)) ?? r.month ?? "—",
+        attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
+        uploadDate: r.uploadDate ?? "—",
+      }))}
+      rowIds={data.map((r) => r.id)}
+      onAdd={(values, files) => addPayslipHistory(userId, { month: values.month ?? "", attachmentFile: files.attachment ?? null })}
+      onDelete={(id) => deletePayslipHistory(userId, id)}
+    />
   );
 }
 

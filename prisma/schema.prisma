@@ -505,6 +505,15 @@ model performance_review {
 // Info). type is constrained by a DB-level CHECK constraint
 // (chk_payslip_type, add_payslip.sql) not modeled here — same convention as
 // nda.status.
+// attachment_file_id is retired, per explicit decision (see conversation)
+// — the single-upload Payslip widget it backed is replaced by the
+// payslip_history table below (many rows per user, one per month). Left in
+// place rather than dropped (no code writes to it anymore, and it was
+// already null for every real employee — confirmed 0 real uploads existed
+// at retirement time), same "leave old columns in place" convention as
+// payroll/nda elsewhere in this schema. basic_pay/type are UNCHANGED —
+// still this table's own fields, still backing Finance > Payroll/Payslip's
+// "Basic Pay" subsection exactly as before.
 model payslip {
   payslip_id         Int      @id @default(autoincrement())
   user_id            Int      @unique
@@ -512,6 +521,28 @@ model payslip {
   type               String?  @db.VarChar(20)
   attachment_file_id String?  @db.VarChar(128)
   users              users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payslip_user")
+}
+
+// Payslip History — Finance > Payroll/Payslip's "Payslip" subsection,
+// replacing the old single-upload attachment_file_id above (see its own
+// comment) — repeatable (many rows per user, one per month), following the
+// same shape as achievement/training (own serial PK, user_id NOT unique).
+// month is "YYYY-MM" text (e.g. "2026-08"), not a DATE column — a payslip
+// covers a whole calendar month, not a specific day, and this stays
+// trivially sortable/comparable as plain text without needing a synthetic
+// day-of-month. upload_date is set once at creation (server-side
+// new Date(), not user-entered) and never updated after — add + delete
+// only (same as Training), no in-place edit action exists for it (see
+// addPayslipHistory/deletePayslipHistory in employeeRecordActions.ts).
+model payslip_history {
+  payslip_history_id Int      @id @default(autoincrement())
+  user_id            Int
+  month              String   @db.VarChar(7)
+  attachment_file_id String   @db.VarChar(128)
+  upload_date        DateTime @default(now()) @db.Date
+  users              users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payslip_history_user")
+
+  @@index([user_id], map: "idx_payslip_history_user")
 }
 
 model employment {
@@ -731,6 +762,7 @@ model users {
   payment_info                                   payment_info?
   performance_review                             performance_review[]
   payslip                                        payslip?
+  payslip_history                                payslip_history[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

@@ -65,6 +65,7 @@ import type {
   PaymentInfoData,
   PerformanceReviewEntry,
   PayslipInfo,
+  PayslipHistoryEntry,
   EmployeeTasksSummary,
 } from "@/lib/employeeQueries";
 
@@ -133,6 +134,8 @@ interface Props {
   performanceReview?: PerformanceReviewEntry[];
   /** Real payslip data — only fetched for Finance > Payroll/Payslip. */
   payslip?: PayslipInfo | null;
+  /** Real payslip_history data — only fetched for Finance > Payroll/Payslip. */
+  payslipHistory?: PayslipHistoryEntry[];
   /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
@@ -172,6 +175,7 @@ export default function EmployeeRecordView({
   paymentInfo,
   performanceReview,
   payslip,
+  payslipHistory,
   branches,
   departments,
   tasks,
@@ -333,8 +337,21 @@ export default function EmployeeRecordView({
                 return <DocumentsPanel userId={employeeId} data={documentsInfo} showEmploymentContract={false} />;
               if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
                 return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
-              if (category.key === "finance" && sectionKey === "payroll" && salaryRevisions !== undefined && payslip !== undefined)
-                return <PayrollPanel employeeId={employeeId} salaryRevisions={salaryRevisions} payslip={payslip} />;
+              if (
+                category.key === "finance" &&
+                sectionKey === "payroll" &&
+                salaryRevisions !== undefined &&
+                payslip !== undefined &&
+                payslipHistory !== undefined
+              )
+                return (
+                  <PayrollPanel
+                    employeeId={employeeId}
+                    salaryRevisions={salaryRevisions}
+                    payslip={payslip}
+                    payslipHistory={payslipHistory}
+                  />
+                );
               if (category.key === "hr-info" && sectionKey === "nda-nc" && ndaInfo !== undefined && nonCompeteInfo !== undefined)
                 return <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} />;
               if (category.key === "active-employment" && sectionKey === "cert" && achievements !== undefined)
