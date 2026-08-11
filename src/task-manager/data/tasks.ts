@@ -20,7 +20,7 @@
 // full explanation.
 import { z } from "zod";
 import type { FlowAssignInput } from "../ui/types";
-import { isPastDueDay } from "../ui/types";
+import { isPastDueDay, isFutureDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
@@ -310,11 +310,16 @@ export function uploadFlowTaskProof(
     if (runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
     }
-    // Past-day lock (2026-08-05): same rule as completeBlock's — a Daily
-    // task's day has passed once its dueAt is strictly before today, so
-    // proof can no longer be attached OR replaced for it either.
+    // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
+    // future-day): same rule as completeBlock's — a Daily task's day has
+    // passed once its dueAt is strictly before today, so proof can no
+    // longer be attached OR replaced for it; symmetrically, proof can't
+    // be attached before the task's own due day arrives either.
     if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
+    }
+    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't accept proof until its day arrives");
     }
     // Completion lock (2026-08-09): once marked Complete, the attached
     // photos become the frozen record of what was submitted — no further
@@ -399,8 +404,14 @@ export function removeFlowTaskProof(
     if (proof.runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only remove proof from your own tasks");
     }
+    // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
+    // future-day) — same rule as uploadFlowTaskProof's, applied
+    // symmetrically to removal.
     if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
+    }
+    if (proof.runBlock.cadence === "DAILY" && isFutureDueDay(proof.runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't be changed until its day arrives");
     }
     if (proof.runBlock.status === "DONE") {
       throw new ApiHttpError(400, "This task is already complete and can no longer be changed");
