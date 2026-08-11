@@ -43,12 +43,23 @@
 import * as React from "react";
 import type { ActionResult } from "./types";
 import type {
+  AssignSavedPackagesResult,
   BranchPackageOption,
   BranchPackageScheduleCell,
   BranchPackageScheduleData,
   PackageTableWeekday,
 } from "@/task-manager/data/branch-package-schedule";
 import { useNavigationGuard } from "@/app/components/NavigationBlocker";
+
+/** Server-action-boundary version of AssignSavedPackagesResult (same
+ *  ok/message shape every other action in this codebase returns on
+ *  failure) — the plain data-layer type doesn't carry an ok flag since
+ *  native()/FlowBridgeError handle that at the action-closure layer, same
+ *  split as ActionResult vs. setBranchPackageScheduleCell elsewhere in
+ *  this file. */
+export type AssignSavedPackagesActionResult =
+  | ({ ok: true } & AssignSavedPackagesResult)
+  | { ok: false; message: string };
 
 function cellKey(branch: string, weekday: PackageTableWeekday): string {
   return `${branch}::${weekday}`;
@@ -311,6 +322,7 @@ export function BranchPackageScheduleGrid({
   data,
   canEdit,
   onSetCell,
+  onAssign,
 }: {
   data: BranchPackageScheduleData;
   canEdit: boolean;
@@ -319,6 +331,7 @@ export function BranchPackageScheduleGrid({
     weekday: PackageTableWeekday,
     packageGroupIds: string[],
   ) => Promise<ActionResult>;
+  onAssign: () => Promise<AssignSavedPackagesActionResult>;
 }) {
   const cellAt = React.useMemo(
     () => new Map(data.cells.map((c) => [cellKey(c.branch, c.weekday), c])),
@@ -335,6 +348,8 @@ export function BranchPackageScheduleGrid({
   const [errors, setErrors] = React.useState<Map<string, string>>(new Map());
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [summary, setSummary] = React.useState<string | null>(null);
+  const [assignState, setAssignState] = React.useState<"idle" | "assigning" | "error">("idle");
+  const [assignSummary, setAssignSummary] = React.useState<string | null>(null);
 
   // Column highlight (2026-08-08) — defaults to today so the current day's
   // column is highlighted on first load. Purely presentational: does not
@@ -471,6 +486,31 @@ export function BranchPackageScheduleGrid({
   // every other page, since nothing there ever calls useNavigationGuard.
   useNavigationGuard(dirty, save, discardPending);
 
+  const assign = async () => {
+    if (dirty || assignState === "assigning") return;
+    setAssignState("assigning");
+    setAssignSummary(null);
+    const result = await onAssign();
+    if (!result.ok) {
+      setAssignState("error");
+      setAssignSummary(result.message);
+      return;
+    }
+    setAssignState("idle");
+    if (result.skippedBranches.length === 0) {
+      setAssignSummary(
+        result.assigned === 0
+          ? "Nothing to assign — every saved package is already assigned."
+          : `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"}.`,
+      );
+    } else {
+      const skippedNames = result.skippedBranches.map((b) => b.branch).join(", ");
+      setAssignSummary(
+        `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"} — skipped ${result.skippedBranches.length} branch${result.skippedBranches.length === 1 ? "" : "es"} (${skippedNames}): manager conflict.`,
+      );
+    }
+  };
+
   if (data.branches.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -508,6 +548,11 @@ export function BranchPackageScheduleGrid({
                 {summary}
               </span>
             )}
+            {assignSummary && (
+              <span className={`text-xs ${assignState === "error" ? "text-red-600" : "text-emerald-600"}`}>
+                {assignSummary}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => void save()}
@@ -515,6 +560,19 @@ export function BranchPackageScheduleGrid({
               className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saveState === "saving" ? "Saving…" : "Save"}
+            </button>
+            {/* Disabled while dirty (2026-08-11 Save/Assign split) — Assign
+                only processes what's already saved; forcing a Save first
+                avoids a confusing "assigned the OLD config, not what you
+                just typed" outcome. */}
+            <button
+              type="button"
+              onClick={() => void assign()}
+              disabled={dirty || assignState === "assigning"}
+              title={dirty ? "Save your changes first" : undefined}
+              className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {assignState === "assigning" ? "Assigning…" : "Assign"}
             </button>
           </div>
         )}
