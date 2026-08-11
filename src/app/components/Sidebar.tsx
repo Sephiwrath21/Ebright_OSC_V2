@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useGuardNavigate } from "./NavigationBlocker";
 import type { ComponentType, SVGProps } from "react";
 import {
   Home,
@@ -279,6 +280,7 @@ export default function Sidebar({
   const pathname = usePathname();
   const primaryItems = filterNav(primaryNav, navAccess, taskManagerNavAccess);
   const secondaryItems = filterNav(secondaryNav, navAccess, taskManagerNavAccess);
+  const guardNavigate = useGuardNavigate();
 
   return (
     <aside
@@ -292,6 +294,9 @@ export default function Sidebar({
         className={`flex items-center h-16 border-b border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
           collapsed ? "justify-center px-0" : "px-5"
         }`}
+        onNavigate={(e) => {
+          if (guardNavigate("/home")) e.preventDefault();
+        }}
       >
         {collapsed ? (
           <img
@@ -376,6 +381,10 @@ function NavNode({
   const isActive = isItemActive(item, pathname);
   const hasActiveDescendant = hasChildren && containsActive(children, pathname);
   const [open, setOpen] = useState(hasActiveDescendant);
+  // Guards clicks against a page-registered unsaved-changes block (e.g.
+  // Package Table) — a no-op returning false for every other page, since
+  // nothing is registered there. See NavigationBlocker.tsx.
+  const guardNavigate = useGuardNavigate();
 
   // Auto-expand the branch containing the current page; never auto-collapse
   // so other sections the user opened stay open.
@@ -534,7 +543,15 @@ function NavNode({
             {icon}
           </a>
         ) : (
-          <Link href={target} title={name} aria-current={isActive ? "page" : undefined} className={iconButtonClass}>
+          <Link
+            href={target}
+            title={name}
+            aria-current={isActive ? "page" : undefined}
+            className={iconButtonClass}
+            onNavigate={(e) => {
+              if (guardNavigate(target)) e.preventDefault();
+            }}
+          >
             {icon}
           </Link>
         )}
@@ -679,6 +696,9 @@ function NavNode({
           className={rowClass}
           style={indent}
           onClick={onNavigate}
+          onNavigate={(e) => {
+            if (guardNavigate(href ?? "#")) e.preventDefault();
+          }}
         >
           {inner}
         </Link>

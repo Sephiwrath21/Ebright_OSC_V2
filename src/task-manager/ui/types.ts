@@ -845,3 +845,27 @@ export function isPastDueDay(due: string | Date | null): boolean {
   const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   return diffDays < 0;
 }
+
+/** Locked-future-day check (2026-08-11) — the symmetric counterpart to
+ *  isPastDueDay above: a Daily task's day hasn't arrived yet (diffDays >
+ *  0) can't be marked complete/N-A, have proof attached/removed, or be
+ *  reopened either — same reasoning as the past-day lock, just the other
+ *  temporal direction (a task shouldn't be actionable before its own due
+ *  day arrives, same as it shouldn't be actionable after that day has
+ *  passed). Today stays actionable (diffDays === 0, unchanged) — this and
+ *  isPastDueDay are deliberately two separate functions rather than one
+ *  "outside today" check, so each call site can still tell WHICH
+ *  direction locked it and surface a direction-appropriate message
+ *  ("hasn't arrived yet" vs. "has passed") rather than one generic
+ *  string. Same dual-layer sharing as isPastDueDay: engine/run.ts's
+ *  completeBlock/skipBlock/reopenBlock, data/tasks.ts's
+ *  uploadFlowTaskProof/removeFlowTaskProof, and bits.tsx's client UX
+ *  guard all call this same function so the definition of "future" can
+ *  never drift between them. */
+export function isFutureDueDay(due: string | Date | null): boolean {
+  if (!due) return false;
+  const d = typeof due === "string" ? new Date(due) : due;
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  return diffDays > 0;
+}

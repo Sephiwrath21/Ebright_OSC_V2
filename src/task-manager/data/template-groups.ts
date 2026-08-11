@@ -140,15 +140,22 @@ export interface TemplateGroupDetail {
   tasks: TemplateGroupTask[];
 }
 
-/** Cards data for the /task-manager/template or /task-manager/package dashboard. */
+/** Cards data for the /task-manager/template or /task-manager/package
+ *  dashboard. Global as of 2026-08-11 (was createdById-scoped — each
+ *  Super Admin/Operations account only saw templates/packages THEY
+ *  personally created, which pre-dates the View-tier matrix and left HOD/
+ *  Branch Manager seeing an empty list despite having View access; see
+ *  this file's other query-scoping functions below for the same fix
+ *  applied consistently). requireGroupViewAccess still gates WHO may call
+ *  this at all — this only removes the WHOSE-DATA filter underneath it. */
 export function listTemplateGroups(
   email: string,
   scope: TemplateGroupScope,
 ): Promise<TemplateGroupSummary[]> {
   return native(async () => {
-    const user = await requireGroupViewAccess(email, scope);
+    await requireGroupViewAccess(email, scope);
     const groups = await prisma.taskTemplateGroup.findMany({
-      where: { createdById: user.id, scope, archivedAt: null },
+      where: { scope, archivedAt: null },
       orderBy: { updatedAt: "desc" },
       include: {
         templates: {
@@ -177,7 +184,7 @@ export function getTemplateGroup(
     const user = await requireGroupViewAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { orderBy: { groupPosition: "asc" } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -377,7 +384,7 @@ export function editTemplateGroup(
     const id = z.string().min(1).parse(groupId);
     const body = editGroupSchema.parse(input);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       select: { id: true },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -488,7 +495,7 @@ export function getGroupDeletionImpact(
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -518,7 +525,7 @@ export function deleteTemplateGroup(
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -592,7 +599,7 @@ export function applyTemplateGroup(
       }
     }
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { orderBy: { groupPosition: "asc" } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -637,7 +644,7 @@ export function getGroupAssignees(
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
@@ -675,7 +682,7 @@ export function removeGroupAssignee(
     const id = z.string().min(1).parse(groupId);
     const targetUserId = z.string().min(1).parse(userId);
     const group = await prisma.taskTemplateGroup.findFirst({
-      where: { id, createdById: user.id, scope },
+      where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);

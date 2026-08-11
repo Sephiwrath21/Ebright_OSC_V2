@@ -279,7 +279,8 @@ exports.Prisma.BranchPackageScheduleScalarFieldEnum = {
   packageGroupId: 'packageGroupId',
   createdById: 'createdById',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  assignedAt: 'assignedAt'
 };
 
 exports.Prisma.TaskTemplateScalarFieldEnum = {

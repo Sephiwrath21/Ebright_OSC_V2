@@ -17,7 +17,7 @@ import type {
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
-import { flowBucketTotal, formatDueDate, isPastDueDay } from "./types";
+import { flowBucketTotal, formatDueDate, isPastDueDay, isFutureDueDay } from "./types";
 import {
   compressImageFile,
   drawTimestampWatermark,
@@ -270,15 +270,19 @@ function statusCircleClasses(status: FlowTaskRow["status"]): string {
   return "border-2 border-red-400 bg-white";
 }
 
-/** Past-day lock (2026-08-05): a Daily task's day has passed, so it can no
- *  longer be marked complete or have proof attached/replaced — mirrors the
- *  server-authoritative checks in engine/run.ts's completeBlock and
- *  data/tasks.ts's uploadFlowTaskProof (this is the disabled-UI half, not
- *  the enforcement; a request that somehow reached the server anyway would
+/** Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
+ *  renamed from isLockedPastDay to match): a Daily task is only
+ *  actionable on its OWN due day — not once it's passed, and not before
+ *  it arrives either — so outside that day it can't be marked complete/
+ *  N-A, have proof attached/removed, or be reopened. Mirrors the
+ *  server-authoritative checks in engine/run.ts's completeBlock/
+ *  skipBlock/reopenBlock and data/tasks.ts's uploadFlowTaskProof/
+ *  removeFlowTaskProof (this is the disabled-UI half, not the
+ *  enforcement; a request that somehow reached the server anyway would
  *  still be rejected there). Applies to every role — there's no exception
  *  for elevated viewers completing on someone else's behalf. */
-function isLockedPastDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
-  return task.cadence === "DAILY" && isPastDueDay(task.dueAt);
+function isLockedDueDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
+  return task.cadence === "DAILY" && (isPastDueDay(task.dueAt) || isFutureDueDay(task.dueAt));
 }
 
 /**
@@ -377,7 +381,7 @@ function StatusDropdown({
   // the trigger itself is disabled (can't even open the menu), regardless
   // of the task's current status. Not just canMarkDone/canMarkNA
   // individually gated — a locked task offers no status action at all.
-  const locked = isLockedPastDay(task);
+  const locked = isLockedDueDay(task);
   const isResolved = task.status === "DONE" || task.status === "SKIPPED";
   const canReopen = Boolean(onReopen) && isResolved;
   const canMarkDone = Boolean(onComplete) && task.quickCompletable && task.status !== "DONE" && !locked;
@@ -678,8 +682,8 @@ function isMobileDevice(): boolean {
  *  redundant.
  *
  *  Once `task.status === "DONE"` (Complete), both uploading and removing
- *  are locked — same mechanism as the existing past-due-day lock
- *  (`isLockedPastDay`), just gated on a different condition, and enforced
+ *  are locked — same mechanism as the existing due-day lock
+ *  (`isLockedDueDay`), just gated on a different condition, and enforced
  *  again server-side in uploadFlowTaskProof/removeFlowTaskProof so a stale
  *  tab or direct request can't bypass it. */
 function ProofCell({
@@ -740,12 +744,12 @@ function ProofCell({
   // a different condition. Server-enforced too, see uploadFlowTaskProof.
   const isCompleted = task.status === "DONE";
   const atCap = proofIds.length + pending.length >= MAX_PROOFS_PER_TASK;
-  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedPastDay(task) && !isCompleted;
+  const canUpload = isOwned && Boolean(onUploadProof) && !isLockedDueDay(task) && !isCompleted;
   // Same ownership/past-day/completion guards as upload, applied
   // symmetrically (2026-08-08 design decision #4) — a task whose day has
   // passed, or that's already Complete, shouldn't have its evidence
   // altered either way.
-  const canRemove = isOwned && Boolean(onRemoveProof) && !isLockedPastDay(task) && !isCompleted;
+  const canRemove = isOwned && Boolean(onRemoveProof) && !isLockedDueDay(task) && !isCompleted;
   const canAddMore = canUpload && !atCap && !uploading;
 
   /** Stages one compressed image locally (2026-08-09: explicit-Upload
@@ -1382,7 +1386,7 @@ export function TaskRowLine({
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
-  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedPastDay(task);
+  const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedDueDay(task);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1596,15 +1600,16 @@ function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.Pointe
  * drill-down omits this prop and keeps its existing behavior: every status
  * visible, its own color per status, a text badge). When set: `TaskRowLine`
  * switches every row to the status-dropdown circle and drops the status text
- * badge. Completed (DONE) tasks default to VISIBLE — a single "Show
- * Completed" toggle (local state, resets on reload, defaults ON) lets the
- * viewer hide them for a decluttered Pending/N-A-only view. N/A (SKIPPED)
- * tasks have no toggle of their own — they're always shown, same as any
- * other non-terminal status.
+ * badge. All three status buckets default to VISIBLE — independent "Show
+ * Completed"/"Show Pending"/"Show N/A" toggles (local state, reset on
+ * reload, all default ON) let the viewer decompose down to any combination,
+ * matching the status donut's own three buckets (2026-08-11: Pending/N-A
+ * toggles added alongside the original Show Completed one).
  */
 /** Pill-track toggle switch (gray/off, blue/on, sliding knob) — used by
- *  ResizableTaskList's "Show Completed"/"Show N/A" controls; generic enough
- *  to reuse anywhere else a plain on/off needs this exact visual style. */
+ *  ResizableTaskList's "Show Completed"/"Show Pending"/"Show N/A" controls;
+ *  generic enough to reuse anywhere else a plain on/off needs this exact
+ *  visual style. */
 function ToggleSwitch({
   checked,
   onChange,
@@ -1785,11 +1790,14 @@ export function ResizableTaskList({
   hideRowResizeDivider?: boolean;
 }) {
   const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
-  // Defaults to ON — completed tasks are visible immediately; toggling off
-  // declutters down to Pending/N-A. N/A tasks have no toggle of their own —
-  // they're always shown alongside Pending, same as any other non-terminal
-  // status; only DONE is ever hidden here.
+  // All three default to ON — nothing is hidden until the viewer toggles one
+  // off. Mirrors the status donut's own three buckets (Completed/Pending/
+  // N-A) so "My Tasks" can be decluttered down to any combination of them,
+  // not just Completed (2026-08-11: Pending/N-A toggles added alongside the
+  // original Show Completed one).
   const [showCompleted, setShowCompleted] = React.useState(true);
+  const [showPending, setShowPending] = React.useState(true);
+  const [showNA, setShowNA] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
@@ -1851,8 +1859,19 @@ export function ResizableTaskList({
   const nameWidth = "var(--tm-col-name)";
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
+  const naCount = hideCompleted ? tasks.filter((t) => t.status === "SKIPPED").length : 0;
+  // "Pending" here matches the status donut's own bucket: everything that's
+  // neither DONE nor SKIPPED (PENDING/ACTIVE/OVERDUE/ESCALATED alike) — see
+  // types.ts's flowBucketize.
+  const pendingCount = hideCompleted
+    ? tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED").length
+    : 0;
   const visibleTasks = hideCompleted
-    ? tasks.filter((t) => (t.status === "DONE" ? showCompleted : true))
+    ? tasks.filter((t) => {
+        if (t.status === "DONE") return showCompleted;
+        if (t.status === "SKIPPED") return showNA;
+        return showPending;
+      })
     : tasks;
 
   // Main Task ↔ Subtask tree (2026-07-30, table mode only): group rows
@@ -2058,7 +2077,7 @@ export function ResizableTaskList({
       onRun: () =>
         runBulk(
           onComplete,
-          (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId && !isLockedPastDay(t),
+          (t) => t.quickCompletable && t.status !== "DONE" && t.assigneeId === myUserId && !isLockedDueDay(t),
         ),
     });
   }
@@ -2068,7 +2087,7 @@ export function ResizableTaskList({
       label: "Mark N/A",
       icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
       onRun: () =>
-        runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId && !isLockedPastDay(t)),
+        runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId && !isLockedDueDay(t)),
     });
   }
   // Past-day lock (2026-08-05): the WHOLE bulk-actions control goes inert
@@ -2078,31 +2097,49 @@ export function ResizableTaskList({
   // enabled; the eligible() filters above silently skip the locked ones
   // when it runs, same as any other ineligible row already does.
   const selectedBulkTasks = visibleTasks.filter((t) => selectedIds.has(t.runBlockId));
-  const allSelectedLocked = selectedBulkTasks.length > 0 && selectedBulkTasks.every(isLockedPastDay);
+  const allSelectedLocked = selectedBulkTasks.length > 0 && selectedBulkTasks.every(isLockedDueDay);
 
   // Select-all moved INTO the column header row (2026-07-31) — this slim
   // bar now only appears when it has something to show: the bulk-actions
-  // trigger (rows selected) and/or the Show Completed toggle.
+  // trigger (rows selected) and/or at least one of the three Show
+  // Completed/Pending/N-A toggles (each only rendered when its own bucket
+  // is non-empty, same as Show Completed always was).
   const controlBar = hideCompleted &&
-    ((selectedIds.size > 0 && bulkActions.length > 0) || completedCount > 0) && (
+    ((selectedIds.size > 0 && bulkActions.length > 0) ||
+      completedCount > 0 ||
+      pendingCount > 0 ||
+      naCount > 0) && (
       <div className="flex items-center justify-between gap-3 pb-2">
         <div className="flex items-center gap-3">
           {selectedIds.size > 0 && bulkActions.length > 0 && (
             <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
           )}
         </div>
-        {completedCount > 0 && (
-          <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
-        )}
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <ToggleSwitch checked={showPending} onChange={() => setShowPending((s) => !s)} label="Show Pending" />
+          )}
+          {naCount > 0 && (
+            <ToggleSwitch checked={showNA} onChange={() => setShowNA((s) => !s)} label="Show N/A" />
+          )}
+          {completedCount > 0 && (
+            <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
+          )}
+        </div>
       </div>
     );
 
   if (visibleTasks.length === 0) {
+    // Distinguishes "genuinely nothing assigned" (emptyLabel) from "there
+    // ARE tasks, they're just all hidden by the current Show
+    // Completed/Pending/N-A toggles" — the latter can now happen from any
+    // one of the three, not just Show Completed.
+    const allFilteredOut = tasks.length > 0;
     return (
       <div>
         {controlBar}
         <p className="py-6 text-center text-sm text-gray-400">
-          {completedCount > 0 ? "All caught up." : emptyLabel}
+          {allFilteredOut ? "No tasks match the current filters." : emptyLabel}
         </p>
       </div>
     );
@@ -2604,7 +2641,7 @@ export function EntityDrillModal({
           </span>
         ),
         onRun: () =>
-          runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId && !isLockedPastDay(t)),
+          runBulk(onComplete, (t) => t.quickCompletable && t.assigneeId === myUserId && !isLockedDueDay(t)),
       });
     }
     if (onSkip) {
@@ -2612,7 +2649,7 @@ export function EntityDrillModal({
         key: "na",
         label: "Mark N/A",
         icon: <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />,
-        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
+        onRun: () => runBulk(onSkip, (t) => t.assigneeId === myUserId && !isLockedDueDay(t)),
       });
     }
   } else if (onReopen) {
@@ -2620,13 +2657,13 @@ export function EntityDrillModal({
       key: "reopen",
       label: "Mark Pending",
       icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
-      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedPastDay(t)),
+      onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedDueDay(t)),
     });
   }
   // Past-day lock (2026-08-05) — same trigger-level lock as ResizableTaskList's
   // bulk button; see its comment for the mixed-selection rationale.
   const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
-  const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedPastDay);
+  const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedDueDay);
 
   return (
     <div

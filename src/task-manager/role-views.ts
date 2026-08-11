@@ -213,15 +213,27 @@ export function isElevatedDeptSite(user: {
 }
 
 /** Task Manager sidebar visibility for Template/Package/Package Table
- *  (2026-08-07 permission matrix) — View tier only, separate from edit
- *  capability (see canManageTaskTemplateGroups below). Overview is
- *  deliberately NOT covered here — it stays visible to everyone via
- *  Sidebar's existing unconditional rendering, and its own edit-surface
- *  gating is unchanged, still driven entirely by ROLE_VIEWS/shows() above.
- *  Designed to be consumed by BOTH the sidebar's visibility filter and
- *  template-groups.ts's requireGroupViewAccess (once wired in Task 2/3 of
- *  the RBAC plan), so the two can never drift apart — a role hidden from
- *  the sidebar will always also be rejected server-side, and vice versa. */
+ *  (2026-08-07 permission matrix, revised 2026-08-11) — View tier only,
+ *  separate from edit capability (see canManageTaskTemplateGroups below).
+ *  Overview is deliberately NOT covered here — it stays visible to
+ *  everyone via Sidebar's existing unconditional rendering, and its own
+ *  edit-surface gating is unchanged, still driven entirely by
+ *  ROLE_VIEWS/shows() above. Designed to be consumed by BOTH the
+ *  sidebar's visibility filter and template-groups.ts's
+ *  requireGroupViewAccess, so the two can never drift apart — a role
+ *  hidden from the sidebar will always also be rejected server-side, and
+ *  vice versa.
+ *
+ *  2026-08-11 change: Branch Manager (role BRANCH) now sees Template too,
+ *  same as Package/Package Table already did — HOD and Branch Manager are
+ *  now the same view-only tier across all three pages. Full Time/Intern/
+ *  HQ Exec/Part Time/Regional Manager (role MEMBER, branch null), Coach,
+ *  and Branch Exec (role MEMBER, branch set) get none of the three — this
+ *  was already true before this change (role MEMBER was never in
+ *  `manage`/`orgViewer`/`branchManagerViewer`) and needed no code change,
+ *  confirmed against live data (2026-08-11) rather than assumed. CEO's
+ *  access is unchanged (explicit product decision, 2026-08-11 — the
+ *  revised matrix's table omitted a CEO row, but that wasn't a removal). */
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
@@ -229,20 +241,20 @@ export function taskManagerNavAccess(user: {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
   const branchManagerViewer = user.role === "BRANCH";
-  const packageViewer = manage || orgViewer || branchManagerViewer;
+  const viewer = manage || orgViewer || branchManagerViewer;
   return {
-    template: manage || orgViewer,
-    package: packageViewer,
-    packageTable: packageViewer,
+    template: viewer,
+    package: viewer,
+    packageTable: viewer,
   };
 }
 
 /** Task Manager Template/Package/Package Table EDIT capability
  *  (create/edit/delete/assign) — identical for all three pages under the
- *  2026-08-07 matrix: Super Admin (ADMIN) and the elevated
- *  Operations/Optimisation dept-site accounts only. Everyone else who can
- *  still VIEW (HOD, CEO, and — Package/Package Table only — Branch
- *  Manager, per taskManagerNavAccess above) is read-only. */
+ *  2026-08-07 matrix (unchanged by the 2026-08-11 revision): Super Admin
+ *  (ADMIN) and the elevated Operations/Optimisation dept-site accounts
+ *  only. Everyone else who can still VIEW (HOD, CEO, Branch Manager, per
+ *  taskManagerNavAccess above) is read-only across all three pages. */
 export function canManageTaskTemplateGroups(user: {
   role: string;
   department: string | null;

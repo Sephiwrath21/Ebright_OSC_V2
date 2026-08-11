@@ -1,8 +1,12 @@
 "use client";
 
 // Package Table grid (2026-08-07): Branches (rows) x Wed-Sun (columns), each
-// cell a Package selector. Setting a cell fans out through the recurring
-// task engine server-side (see data/branch-package-schedule.ts).
+// cell a Package selector. Save/Assign split (2026-08-11): Save persists
+// the cell's config only (removals still cancel their real assignment
+// immediately); the separate "Assign" button/action is what fans out
+// through the recurring task engine server-side for whatever's saved but
+// not yet assigned (see data/branch-package-schedule.ts's
+// setBranchPackageScheduleCell/assignSavedPackages).
 //
 // Multi-select (2026-08-08): a cell may now hold MULTIPLE packages (see
 // branch-package-schedule.ts's file header for the design reversal). The
@@ -19,12 +23,19 @@
 // any of them. Pattern (dirty flag + amber "Unsaved changes" chip +
 // beforeunload warning) copied from this codebase's one existing precedent
 // for exactly this shape: src/app/manpower-schedule/plan-new-week/grid/
-// page.tsx. Per the user's explicit choice, only the browser-level
-// beforeunload warning (tab-close/refresh) is implemented — in-app
-// navigation (e.g. clicking another sidebar link while dirty) is NOT
-// intercepted; that would be new, unprecedented App-Router-navigation-guard
-// territory this codebase doesn't otherwise have, and was deliberately
-// scoped out.
+// page.tsx.
+//
+// In-app navigation guard (2026-08-11, reverses the earlier "deliberately
+// scoped out" decision above): clicking a sidebar link while dirty now
+// also shows a custom Save Changes/Discard dialog, via the shared
+// NavigationBlockerProvider (src/app/components/NavigationBlocker.tsx,
+// wraps the whole app in AppShell) and Link's own onNavigate prop
+// (Next.js's documented mechanism for exactly this, added v15.3.0). Still
+// browser-level-only for tab-close/refresh/URL-bar nav (beforeunload can't
+// show a custom dialog) and NOT covering the back/forward button (no
+// supported Next.js mechanism exists for that — explicitly accepted as a
+// narrow, known gap rather than reaching for a fragile pushState/popstate
+// workaround).
 //
 // `pending` now maps cellKey -> Set<string> (the FULL desired set of
 // package ids for that cell), not a single nullable id — every place that
@@ -36,11 +47,23 @@
 import * as React from "react";
 import type { ActionResult } from "./types";
 import type {
+  AssignSavedPackagesResult,
   BranchPackageOption,
   BranchPackageScheduleCell,
   BranchPackageScheduleData,
   PackageTableWeekday,
 } from "@/task-manager/data/branch-package-schedule";
+import { useNavigationGuard } from "@/app/components/NavigationBlocker";
+
+/** Server-action-boundary version of AssignSavedPackagesResult (same
+ *  ok/message shape every other action in this codebase returns on
+ *  failure) — the plain data-layer type doesn't carry an ok flag since
+ *  native()/FlowBridgeError handle that at the action-closure layer, same
+ *  split as ActionResult vs. setBranchPackageScheduleCell elsewhere in
+ *  this file. */
+export type AssignSavedPackagesActionResult =
+  | ({ ok: true } & AssignSavedPackagesResult)
+  | { ok: false; message: string };
 
 function cellKey(branch: string, weekday: PackageTableWeekday): string {
   return `${branch}::${weekday}`;
@@ -303,6 +326,7 @@ export function BranchPackageScheduleGrid({
   data,
   canEdit,
   onSetCell,
+  onAssign,
 }: {
   data: BranchPackageScheduleData;
   canEdit: boolean;
@@ -311,6 +335,7 @@ export function BranchPackageScheduleGrid({
     weekday: PackageTableWeekday,
     packageGroupIds: string[],
   ) => Promise<ActionResult>;
+  onAssign: () => Promise<AssignSavedPackagesActionResult>;
 }) {
   const cellAt = React.useMemo(
     () => new Map(data.cells.map((c) => [cellKey(c.branch, c.weekday), c])),
@@ -327,6 +352,8 @@ export function BranchPackageScheduleGrid({
   const [errors, setErrors] = React.useState<Map<string, string>>(new Map());
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [summary, setSummary] = React.useState<string | null>(null);
+  const [assignState, setAssignState] = React.useState<"idle" | "assigning" | "error">("idle");
+  const [assignSummary, setAssignSummary] = React.useState<string | null>(null);
 
   // Column highlight (2026-08-08) — defaults to today so the current day's
   // column is highlighted on first load. Purely presentational: does not
@@ -403,44 +430,105 @@ export function BranchPackageScheduleGrid({
     setSummary(null);
   };
 
-  const save = () => {
-    if (saveState === "saving" || pending.size === 0) return;
+  // Returns Promise<boolean> (2026-08-11: was fire-and-forget) — true means
+  // every pending cell saved cleanly, so a caller like the navigation-guard
+  // dialog knows it's safe to actually navigate; false (or a no-op return
+  // when already saving/nothing pending) means stay put, same as the
+  // existing Save button's own "still see the error, try again" behavior.
+  const save = async (): Promise<boolean> => {
+    if (saveState === "saving") return false;
+    if (pending.size === 0) return true;
     setSaveState("saving");
     setSummary(null);
     const entries = [...pending.entries()];
-    (async () => {
-      let succeeded = 0;
-      const failedKeys = new Map<string, string>();
-      for (const [key, packageIds] of entries) {
-        const [branch, weekday] = key.split("::") as [string, PackageTableWeekday];
-        // A transient network/session failure must degrade to a normal
-        // per-cell error, not abort the whole batch and wedge saveState
-        // on "saving" forever — the remaining cells still get attempted.
-        let result: ActionResult;
-        try {
-          result = await onSetCell(branch, weekday, [...packageIds]);
-        } catch {
-          result = { ok: false, message: "Network error — try saving again" };
-        }
-        if (result.ok) {
-          succeeded += 1;
-          // Deliberately NOT removed from `pending` here — see the pruning
-          // effect above.
-        } else {
-          failedKeys.set(key, result.message);
-        }
+    let succeeded = 0;
+    const failedKeys = new Map<string, string>();
+    for (const [key, packageIds] of entries) {
+      const [branch, weekday] = key.split("::") as [string, PackageTableWeekday];
+      // A transient network/session failure must degrade to a normal
+      // per-cell error, not abort the whole batch and wedge saveState
+      // on "saving" forever — the remaining cells still get attempted.
+      let result: ActionResult;
+      try {
+        result = await onSetCell(branch, weekday, [...packageIds]);
+      } catch {
+        result = { ok: false, message: "Network error — try saving again" };
       }
-      setErrors(failedKeys);
-      if (failedKeys.size === 0) {
-        setSaveState("idle");
-        setSummary(`Saved ${succeeded} change${succeeded === 1 ? "" : "s"}.`);
+      if (result.ok) {
+        succeeded += 1;
+        // Deliberately NOT removed from `pending` here — see the pruning
+        // effect above.
       } else {
-        setSaveState("error");
-        setSummary(
-          `${succeeded} saved, ${failedKeys.size} failed — fix the highlighted cell${failedKeys.size === 1 ? "" : "s"} below and save again.`,
-        );
+        failedKeys.set(key, result.message);
       }
-    })();
+    }
+    setErrors(failedKeys);
+    if (failedKeys.size === 0) {
+      setSaveState("idle");
+      setSummary(`Saved ${succeeded} change${succeeded === 1 ? "" : "s"}.`);
+      return true;
+    }
+    setSaveState("error");
+    setSummary(
+      `${succeeded} saved, ${failedKeys.size} failed — fix the highlighted cell${failedKeys.size === 1 ? "" : "s"} below and save again.`,
+    );
+    return false;
+  };
+
+  // Discards every pending (unsaved) cell edit outright — the navigation
+  // guard's "Discard" button (2026-08-11). Distinct from the pruning effect
+  // above, which only clears entries that already match the server; this
+  // clears everything regardless, since the user explicitly chose to
+  // abandon it.
+  const discardPending = () => {
+    setPending(new Map());
+    setErrors(new Map());
+    setSummary(null);
+  };
+
+  // Registers with the shared navigation-blocker (2026-08-11) — a no-op on
+  // every other page, since nothing there ever calls useNavigationGuard.
+  useNavigationGuard(dirty, save, discardPending);
+
+  const assign = async () => {
+    if (dirty || assignState === "assigning") return;
+    setAssignState("assigning");
+    setAssignSummary(null);
+    // A transient network/session failure must degrade to a normal error,
+    // not wedge assignState on "assigning" forever with the button
+    // permanently disabled and no way to retry short of a page reload —
+    // same reasoning as save()'s own try/catch around onSetCell above.
+    let result: AssignSavedPackagesActionResult;
+    try {
+      result = await onAssign();
+    } catch {
+      result = { ok: false, message: "Network error — try again" };
+    }
+    if (!result.ok) {
+      setAssignState("error");
+      setAssignSummary(result.message);
+      return;
+    }
+    setAssignState("idle");
+    if (result.skippedBranches.length === 0) {
+      setAssignSummary(
+        result.assigned === 0
+          ? "Nothing to assign — every saved package is already assigned."
+          : `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"}.`,
+      );
+    } else {
+      // Full per-branch reason (2026-08-11 code review), not a generic
+      // "manager conflict" label — assignSavedPackages's skippedBranches
+      // already carries specific, differently-actionable text ("No branch
+      // manager found" vs. "Multiple branch managers found... resolve
+      // this before scheduling"), and collapsing both into one phrase
+      // would make an admin go dig elsewhere to find out which fix
+      // applies to which branch.
+      const skippedDetail = result.skippedBranches.map((b) => `${b.branch} (${b.reason})`).join("; ");
+      setAssignSummary(
+        `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"} — skipped ${result.skippedBranches.length} branch${result.skippedBranches.length === 1 ? "" : "es"}: ${skippedDetail}`,
+      );
+    }
   };
 
   if (data.branches.length === 0) {
@@ -480,13 +568,31 @@ export function BranchPackageScheduleGrid({
                 {summary}
               </span>
             )}
+            {assignSummary && (
+              <span className={`text-xs ${assignState === "error" ? "text-red-600" : "text-emerald-600"}`}>
+                {assignSummary}
+              </span>
+            )}
             <button
               type="button"
-              onClick={save}
+              onClick={() => void save()}
               disabled={!dirty || saveState === "saving"}
               className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saveState === "saving" ? "Saving…" : "Save"}
+            </button>
+            {/* Disabled while dirty (2026-08-11 Save/Assign split) — Assign
+                only processes what's already saved; forcing a Save first
+                avoids a confusing "assigned the OLD config, not what you
+                just typed" outcome. */}
+            <button
+              type="button"
+              onClick={() => void assign()}
+              disabled={dirty || assignState === "assigning"}
+              title={dirty ? "Save your changes first" : undefined}
+              className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {assignState === "assigning" ? "Assigning…" : "Assign"}
             </button>
           </div>
         )}

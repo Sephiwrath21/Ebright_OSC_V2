@@ -20,7 +20,7 @@
 // full explanation.
 import { z } from "zod";
 import type { FlowAssignInput } from "../ui/types";
-import { isPastDueDay } from "../ui/types";
+import { isPastDueDay, isFutureDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
@@ -265,12 +265,12 @@ export function reopenFlowTask(
  *  — Department for HOD/department-side staff, Branch for Branch Manager/
  *  branch-side staff (the exact split role-views.ts uses everywhere else);
  *  "Unassigned" when a staff record has neither (the ~61 unplaced real
- *  staff role-views.ts already documents elsewhere). The filename is built
- *  from the assignee + task title as uploadToDrive's `prefix` — its own
- *  `${prefix}-${Date.now()}-${fileName}` naming already bakes in a
- *  timestamp, so nothing here duplicates one (and, now that multiple
- *  photos accumulate per task, is also how multiple uploads for the same
- *  task never collide on a filename). */
+ *  staff role-views.ts already documents elsewhere). Filename (2026-08-11):
+ *  Date (YYYYMMDD) - Time (HHMM) - Name (assignee) - Task title, passed as
+ *  uploadToDrive's `prefix`; its own `${prefix}-${Date.now()}-${fileName}`
+ *  naming appends a second, millisecond-precision timestamp after that (not
+ *  worth a targeted change to drive.ts to drop it), which is also how
+ *  multiple photos for the same task never collide on a filename. */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 /** Multi-photo cap (2026-08-08 design decision #1): reject the 6th upload
  *  attempt for a task with a clear error rather than silently dropping or
@@ -310,11 +310,16 @@ export function uploadFlowTaskProof(
     if (runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
     }
-    // Past-day lock (2026-08-05): same rule as completeBlock's — a Daily
-    // task's day has passed once its dueAt is strictly before today, so
-    // proof can no longer be attached OR replaced for it either.
+    // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
+    // future-day): same rule as completeBlock's — a Daily task's day has
+    // passed once its dueAt is strictly before today, so proof can no
+    // longer be attached OR replaced for it; symmetrically, proof can't
+    // be attached before the task's own due day arrives either.
     if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
+    }
+    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't accept proof until its day arrives");
     }
     // Completion lock (2026-08-09): once marked Complete, the attached
     // photos become the frozen record of what was submitted — no further
@@ -347,7 +352,15 @@ export function uploadFlowTaskProof(
       String(now.getDate()).padStart(2, "0"),
       orgUnit,
     ];
-    const prefix = sanitizeDriveNamePart(`${user.name}-${runBlock.title}`).slice(0, 150);
+    // Filename (2026-08-11): Date (YYYYMMDD) - Time (HHMM) - Name - Task,
+    // reusing the same `now` as folderPath above so the file's date/time
+    // always matches the dated folder it lands in. uploadToDrive appends
+    // its own `-${Date.now()}-${fileName}` suffix after this prefix (that
+    // call is out of scope to change here), which still doubles as the
+    // multi-photo-per-task collision guard noted below.
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const prefix = sanitizeDriveNamePart(`${datePart}-${timePart}-${user.name}-${runBlock.title}`).slice(0, 150);
 
     const buffer = Buffer.from(img.dataBase64, "base64");
     const file = new File([buffer], `proof${PROOF_IMAGE_EXT[img.mime] ?? ""}`, { type: img.mime });
@@ -399,8 +412,14 @@ export function removeFlowTaskProof(
     if (proof.runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only remove proof from your own tasks");
     }
+    // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
+    // future-day) — same rule as uploadFlowTaskProof's, applied
+    // symmetrically to removal.
     if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
       throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
+    }
+    if (proof.runBlock.cadence === "DAILY" && isFutureDueDay(proof.runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't be changed until its day arrives");
     }
     if (proof.runBlock.status === "DONE") {
       throw new ApiHttpError(400, "This task is already complete and can no longer be changed");

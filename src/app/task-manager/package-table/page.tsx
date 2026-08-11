@@ -34,12 +34,14 @@ import {
   getMyRole,
   listBranchPackageSchedule,
   setBranchPackageScheduleCell,
+  assignSavedPackages,
   FlowBridgeError,
   NoAccountError,
   SetupPendingError,
 } from "@/task-manager/data";
 import type { BranchPackageScheduleData, PackageTableWeekday } from "@/task-manager/data/branch-package-schedule";
 import { BranchPackageScheduleGrid } from "@/task-manager/ui/branch-package-schedule-grid";
+import type { AssignSavedPackagesActionResult } from "@/task-manager/ui/branch-package-schedule-grid";
 import type { ActionResult } from "@/task-manager/ui/types";
 import {
   NoAccountCard,
@@ -105,6 +107,19 @@ export default async function TaskManagerPackageTablePage() {
     }
   }
 
+  async function assignSaved(): Promise<AssignSavedPackagesActionResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const result = await assignSavedPackages(email);
+      revalidatePath("/task-manager/package-table");
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   return (
     <AppShell email={su.email} role={su.role} name={su.name}>
       <div className="mx-auto max-w-[1400px] p-6">
@@ -114,6 +129,7 @@ export default async function TaskManagerPackageTablePage() {
             data={data}
             canEdit={canManageTaskTemplateGroups(role)}
             onSetCell={setCell}
+            onAssign={assignSaved}
           />
         </div>
       </div>
