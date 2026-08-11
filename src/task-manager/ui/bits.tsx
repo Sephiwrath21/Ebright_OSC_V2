@@ -1600,15 +1600,16 @@ function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.Pointe
  * drill-down omits this prop and keeps its existing behavior: every status
  * visible, its own color per status, a text badge). When set: `TaskRowLine`
  * switches every row to the status-dropdown circle and drops the status text
- * badge. Completed (DONE) tasks default to VISIBLE — a single "Show
- * Completed" toggle (local state, resets on reload, defaults ON) lets the
- * viewer hide them for a decluttered Pending/N-A-only view. N/A (SKIPPED)
- * tasks have no toggle of their own — they're always shown, same as any
- * other non-terminal status.
+ * badge. All three status buckets default to VISIBLE — independent "Show
+ * Completed"/"Show Pending"/"Show N/A" toggles (local state, reset on
+ * reload, all default ON) let the viewer decompose down to any combination,
+ * matching the status donut's own three buckets (2026-08-11: Pending/N-A
+ * toggles added alongside the original Show Completed one).
  */
 /** Pill-track toggle switch (gray/off, blue/on, sliding knob) — used by
- *  ResizableTaskList's "Show Completed"/"Show N/A" controls; generic enough
- *  to reuse anywhere else a plain on/off needs this exact visual style. */
+ *  ResizableTaskList's "Show Completed"/"Show Pending"/"Show N/A" controls;
+ *  generic enough to reuse anywhere else a plain on/off needs this exact
+ *  visual style. */
 function ToggleSwitch({
   checked,
   onChange,
@@ -1789,11 +1790,14 @@ export function ResizableTaskList({
   hideRowResizeDivider?: boolean;
 }) {
   const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
-  // Defaults to ON — completed tasks are visible immediately; toggling off
-  // declutters down to Pending/N-A. N/A tasks have no toggle of their own —
-  // they're always shown alongside Pending, same as any other non-terminal
-  // status; only DONE is ever hidden here.
+  // All three default to ON — nothing is hidden until the viewer toggles one
+  // off. Mirrors the status donut's own three buckets (Completed/Pending/
+  // N-A) so "My Tasks" can be decluttered down to any combination of them,
+  // not just Completed (2026-08-11: Pending/N-A toggles added alongside the
+  // original Show Completed one).
   const [showCompleted, setShowCompleted] = React.useState(true);
+  const [showPending, setShowPending] = React.useState(true);
+  const [showNA, setShowNA] = React.useState(true);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
@@ -1855,8 +1859,19 @@ export function ResizableTaskList({
   const nameWidth = "var(--tm-col-name)";
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
+  const naCount = hideCompleted ? tasks.filter((t) => t.status === "SKIPPED").length : 0;
+  // "Pending" here matches the status donut's own bucket: everything that's
+  // neither DONE nor SKIPPED (PENDING/ACTIVE/OVERDUE/ESCALATED alike) — see
+  // types.ts's flowBucketize.
+  const pendingCount = hideCompleted
+    ? tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED").length
+    : 0;
   const visibleTasks = hideCompleted
-    ? tasks.filter((t) => (t.status === "DONE" ? showCompleted : true))
+    ? tasks.filter((t) => {
+        if (t.status === "DONE") return showCompleted;
+        if (t.status === "SKIPPED") return showNA;
+        return showPending;
+      })
     : tasks;
 
   // Main Task ↔ Subtask tree (2026-07-30, table mode only): group rows
@@ -2086,27 +2101,45 @@ export function ResizableTaskList({
 
   // Select-all moved INTO the column header row (2026-07-31) — this slim
   // bar now only appears when it has something to show: the bulk-actions
-  // trigger (rows selected) and/or the Show Completed toggle.
+  // trigger (rows selected) and/or at least one of the three Show
+  // Completed/Pending/N-A toggles (each only rendered when its own bucket
+  // is non-empty, same as Show Completed always was).
   const controlBar = hideCompleted &&
-    ((selectedIds.size > 0 && bulkActions.length > 0) || completedCount > 0) && (
+    ((selectedIds.size > 0 && bulkActions.length > 0) ||
+      completedCount > 0 ||
+      pendingCount > 0 ||
+      naCount > 0) && (
       <div className="flex items-center justify-between gap-3 pb-2">
         <div className="flex items-center gap-3">
           {selectedIds.size > 0 && bulkActions.length > 0 && (
             <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
           )}
         </div>
-        {completedCount > 0 && (
-          <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
-        )}
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <ToggleSwitch checked={showPending} onChange={() => setShowPending((s) => !s)} label="Show Pending" />
+          )}
+          {naCount > 0 && (
+            <ToggleSwitch checked={showNA} onChange={() => setShowNA((s) => !s)} label="Show N/A" />
+          )}
+          {completedCount > 0 && (
+            <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
+          )}
+        </div>
       </div>
     );
 
   if (visibleTasks.length === 0) {
+    // Distinguishes "genuinely nothing assigned" (emptyLabel) from "there
+    // ARE tasks, they're just all hidden by the current Show
+    // Completed/Pending/N-A toggles" — the latter can now happen from any
+    // one of the three, not just Show Completed.
+    const allFilteredOut = tasks.length > 0;
     return (
       <div>
         {controlBar}
         <p className="py-6 text-center text-sm text-gray-400">
-          {completedCount > 0 ? "All caught up." : emptyLabel}
+          {allFilteredOut ? "No tasks match the current filters." : emptyLabel}
         </p>
       </div>
     );
