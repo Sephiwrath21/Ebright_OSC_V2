@@ -19,12 +19,19 @@
 // any of them. Pattern (dirty flag + amber "Unsaved changes" chip +
 // beforeunload warning) copied from this codebase's one existing precedent
 // for exactly this shape: src/app/manpower-schedule/plan-new-week/grid/
-// page.tsx. Per the user's explicit choice, only the browser-level
-// beforeunload warning (tab-close/refresh) is implemented — in-app
-// navigation (e.g. clicking another sidebar link while dirty) is NOT
-// intercepted; that would be new, unprecedented App-Router-navigation-guard
-// territory this codebase doesn't otherwise have, and was deliberately
-// scoped out.
+// page.tsx.
+//
+// In-app navigation guard (2026-08-11, reverses the earlier "deliberately
+// scoped out" decision above): clicking a sidebar link while dirty now
+// also shows a custom Save Changes/Discard dialog, via the shared
+// NavigationBlockerProvider (src/app/components/NavigationBlocker.tsx,
+// wraps the whole app in AppShell) and Link's own onNavigate prop
+// (Next.js's documented mechanism for exactly this, added v15.3.0). Still
+// browser-level-only for tab-close/refresh/URL-bar nav (beforeunload can't
+// show a custom dialog) and NOT covering the back/forward button (no
+// supported Next.js mechanism exists for that — explicitly accepted as a
+// narrow, known gap rather than reaching for a fragile pushState/popstate
+// workaround).
 //
 // `pending` now maps cellKey -> Set<string> (the FULL desired set of
 // package ids for that cell), not a single nullable id — every place that
@@ -41,6 +48,7 @@ import type {
   BranchPackageScheduleData,
   PackageTableWeekday,
 } from "@/task-manager/data/branch-package-schedule";
+import { useNavigationGuard } from "@/app/components/NavigationBlocker";
 
 function cellKey(branch: string, weekday: PackageTableWeekday): string {
   return `${branch}::${weekday}`;
@@ -403,45 +411,65 @@ export function BranchPackageScheduleGrid({
     setSummary(null);
   };
 
-  const save = () => {
-    if (saveState === "saving" || pending.size === 0) return;
+  // Returns Promise<boolean> (2026-08-11: was fire-and-forget) — true means
+  // every pending cell saved cleanly, so a caller like the navigation-guard
+  // dialog knows it's safe to actually navigate; false (or a no-op return
+  // when already saving/nothing pending) means stay put, same as the
+  // existing Save button's own "still see the error, try again" behavior.
+  const save = async (): Promise<boolean> => {
+    if (saveState === "saving") return false;
+    if (pending.size === 0) return true;
     setSaveState("saving");
     setSummary(null);
     const entries = [...pending.entries()];
-    (async () => {
-      let succeeded = 0;
-      const failedKeys = new Map<string, string>();
-      for (const [key, packageIds] of entries) {
-        const [branch, weekday] = key.split("::") as [string, PackageTableWeekday];
-        // A transient network/session failure must degrade to a normal
-        // per-cell error, not abort the whole batch and wedge saveState
-        // on "saving" forever — the remaining cells still get attempted.
-        let result: ActionResult;
-        try {
-          result = await onSetCell(branch, weekday, [...packageIds]);
-        } catch {
-          result = { ok: false, message: "Network error — try saving again" };
-        }
-        if (result.ok) {
-          succeeded += 1;
-          // Deliberately NOT removed from `pending` here — see the pruning
-          // effect above.
-        } else {
-          failedKeys.set(key, result.message);
-        }
+    let succeeded = 0;
+    const failedKeys = new Map<string, string>();
+    for (const [key, packageIds] of entries) {
+      const [branch, weekday] = key.split("::") as [string, PackageTableWeekday];
+      // A transient network/session failure must degrade to a normal
+      // per-cell error, not abort the whole batch and wedge saveState
+      // on "saving" forever — the remaining cells still get attempted.
+      let result: ActionResult;
+      try {
+        result = await onSetCell(branch, weekday, [...packageIds]);
+      } catch {
+        result = { ok: false, message: "Network error — try saving again" };
       }
-      setErrors(failedKeys);
-      if (failedKeys.size === 0) {
-        setSaveState("idle");
-        setSummary(`Saved ${succeeded} change${succeeded === 1 ? "" : "s"}.`);
+      if (result.ok) {
+        succeeded += 1;
+        // Deliberately NOT removed from `pending` here — see the pruning
+        // effect above.
       } else {
-        setSaveState("error");
-        setSummary(
-          `${succeeded} saved, ${failedKeys.size} failed — fix the highlighted cell${failedKeys.size === 1 ? "" : "s"} below and save again.`,
-        );
+        failedKeys.set(key, result.message);
       }
-    })();
+    }
+    setErrors(failedKeys);
+    if (failedKeys.size === 0) {
+      setSaveState("idle");
+      setSummary(`Saved ${succeeded} change${succeeded === 1 ? "" : "s"}.`);
+      return true;
+    }
+    setSaveState("error");
+    setSummary(
+      `${succeeded} saved, ${failedKeys.size} failed — fix the highlighted cell${failedKeys.size === 1 ? "" : "s"} below and save again.`,
+    );
+    return false;
   };
+
+  // Discards every pending (unsaved) cell edit outright — the navigation
+  // guard's "Discard" button (2026-08-11). Distinct from the pruning effect
+  // above, which only clears entries that already match the server; this
+  // clears everything regardless, since the user explicitly chose to
+  // abandon it.
+  const discardPending = () => {
+    setPending(new Map());
+    setErrors(new Map());
+    setSummary(null);
+  };
+
+  // Registers with the shared navigation-blocker (2026-08-11) — a no-op on
+  // every other page, since nothing there ever calls useNavigationGuard.
+  useNavigationGuard(dirty, save, discardPending);
 
   if (data.branches.length === 0) {
     return (
@@ -482,7 +510,7 @@ export function BranchPackageScheduleGrid({
             )}
             <button
               type="button"
-              onClick={save}
+              onClick={() => void save()}
               disabled={!dirty || saveState === "saving"}
               className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >

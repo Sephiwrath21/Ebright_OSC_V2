@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import { BreadcrumbProvider } from "./BreadcrumbContext";
+import { NavigationBlockerProvider } from "./NavigationBlocker";
 import { getNavAccess } from "./navAccess.actions";
 import type { NavAccess } from "./navAccess.types";
 import { getTaskManagerNavAccess } from "@/task-manager/nav-access.actions";
@@ -119,43 +120,45 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
 
   return (
     <BreadcrumbProvider>
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
-        {/* Desktop sidebar rail (inline, collapsible). */}
-        <div className="hidden lg:flex">
-          <Sidebar collapsed={collapsed} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
-        </div>
+      <NavigationBlockerProvider>
+        <div className="flex h-screen bg-slate-50 overflow-hidden">
+          {/* Desktop sidebar rail (inline, collapsible). */}
+          <div className="hidden lg:flex">
+            <Sidebar collapsed={collapsed} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
+          </div>
 
-        {/* Mobile off-canvas drawer + backdrop. */}
-        <div
-          className={`fixed inset-0 z-40 lg:hidden ${mobileOpen ? "" : "pointer-events-none"}`}
-          aria-hidden={!mobileOpen}
-        >
+          {/* Mobile off-canvas drawer + backdrop. */}
           <div
-            onClick={() => setMobileOpen(false)}
-            className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-200 ${
-              mobileOpen ? "opacity-100" : "opacity-0"
-            }`}
-          />
-          <div
-            className={`absolute inset-y-0 left-0 flex shadow-xl transition-transform duration-200 ease-out ${
-              mobileOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
+            className={`fixed inset-0 z-40 lg:hidden ${mobileOpen ? "" : "pointer-events-none"}`}
+            aria-hidden={!mobileOpen}
           >
-            <Sidebar collapsed={false} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
+            <div
+              onClick={() => setMobileOpen(false)}
+              className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-200 ${
+                mobileOpen ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <div
+              className={`absolute inset-y-0 left-0 flex shadow-xl transition-transform duration-200 ease-out ${
+                mobileOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <Sidebar collapsed={false} navAccess={navAccess} taskManagerNavAccess={taskManagerNavAccess} />
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col min-w-0 h-screen">
+            <TopBar
+              onToggleSidebar={handleToggle}
+              sidebarCollapsed={collapsed}
+              email={email}
+              role={role}
+              name={name}
+            />
+            <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
           </div>
         </div>
-
-        <div className="flex-1 flex flex-col min-w-0 h-screen">
-          <TopBar
-            onToggleSidebar={handleToggle}
-            sidebarCollapsed={collapsed}
-            email={email}
-            role={role}
-            name={name}
-          />
-          <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
-        </div>
-      </div>
+      </NavigationBlockerProvider>
     </BreadcrumbProvider>
   );
 }
