@@ -432,6 +432,14 @@ model BranchPackageSchedule {
   createdById    String
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
+  /// null = configured (via Save) but not yet processed into a real
+  /// recurring task assignment; non-null = the "Assign" action has already
+  /// created the real assignment for this row (2026-08-11 Save/Assign
+  /// split — see branch-package-schedule.ts's file header). Reset to null
+  /// only by deleting and recreating the row (i.e. removing then
+  /// re-adding the same package via Save) — never mutated back to null
+  /// in place.
+  assignedAt     DateTime?
 
   @@unique([branch, weekday, packageGroupId])
   @@index([branch, weekday])

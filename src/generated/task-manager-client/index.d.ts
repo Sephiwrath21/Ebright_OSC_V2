@@ -18760,6 +18760,7 @@ export namespace Prisma {
     createdById: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    assignedAt: Date | null
   }
 
   export type BranchPackageScheduleMaxAggregateOutputType = {
@@ -18770,6 +18771,7 @@ export namespace Prisma {
     createdById: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    assignedAt: Date | null
   }
 
   export type BranchPackageScheduleCountAggregateOutputType = {
@@ -18780,6 +18782,7 @@ export namespace Prisma {
     createdById: number
     createdAt: number
     updatedAt: number
+    assignedAt: number
     _all: number
   }
 
@@ -18792,6 +18795,7 @@ export namespace Prisma {
     createdById?: true
     createdAt?: true
     updatedAt?: true
+    assignedAt?: true
   }
 
   export type BranchPackageScheduleMaxAggregateInputType = {
@@ -18802,6 +18806,7 @@ export namespace Prisma {
     createdById?: true
     createdAt?: true
     updatedAt?: true
+    assignedAt?: true
   }
 
   export type BranchPackageScheduleCountAggregateInputType = {
@@ -18812,6 +18817,7 @@ export namespace Prisma {
     createdById?: true
     createdAt?: true
     updatedAt?: true
+    assignedAt?: true
     _all?: true
   }
 
@@ -18895,6 +18901,7 @@ export namespace Prisma {
     createdById: string
     createdAt: Date
     updatedAt: Date
+    assignedAt: Date | null
     _count: BranchPackageScheduleCountAggregateOutputType | null
     _min: BranchPackageScheduleMinAggregateOutputType | null
     _max: BranchPackageScheduleMaxAggregateOutputType | null
@@ -18922,6 +18929,7 @@ export namespace Prisma {
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    assignedAt?: boolean
     packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["branchPackageSchedule"]>
 
@@ -18933,6 +18941,7 @@ export namespace Prisma {
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    assignedAt?: boolean
     packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["branchPackageSchedule"]>
 
@@ -18944,6 +18953,7 @@ export namespace Prisma {
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    assignedAt?: boolean
     packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["branchPackageSchedule"]>
 
@@ -18955,9 +18965,10 @@ export namespace Prisma {
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    assignedAt?: boolean
   }
 
-  export type BranchPackageScheduleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "branch" | "weekday" | "packageGroupId" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["branchPackageSchedule"]>
+  export type BranchPackageScheduleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "branch" | "weekday" | "packageGroupId" | "createdById" | "createdAt" | "updatedAt" | "assignedAt", ExtArgs["result"]["branchPackageSchedule"]>
   export type BranchPackageScheduleInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     packageGroup?: boolean | TaskTemplateGroupDefaultArgs<ExtArgs>
   }
@@ -18981,6 +18992,16 @@ export namespace Prisma {
       createdById: string
       createdAt: Date
       updatedAt: Date
+      /**
+       * null = configured (via Save) but not yet processed into a real
+       * recurring task assignment; non-null = the "Assign" action has already
+       * created the real assignment for this row (2026-08-11 Save/Assign
+       * split — see branch-package-schedule.ts's file header). Reset to null
+       * only by deleting and recreating the row (i.e. removing then
+       * re-adding the same package via Save) — never mutated back to null
+       * in place.
+       */
+      assignedAt: Date | null
     }, ExtArgs["result"]["branchPackageSchedule"]>
     composites: {}
   }
@@ -19412,6 +19433,7 @@ export namespace Prisma {
     readonly createdById: FieldRef<"BranchPackageSchedule", 'String'>
     readonly createdAt: FieldRef<"BranchPackageSchedule", 'DateTime'>
     readonly updatedAt: FieldRef<"BranchPackageSchedule", 'DateTime'>
+    readonly assignedAt: FieldRef<"BranchPackageSchedule", 'DateTime'>
   }
     
 
@@ -30830,7 +30852,8 @@ export namespace Prisma {
     packageGroupId: 'packageGroupId',
     createdById: 'createdById',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    assignedAt: 'assignedAt'
   };
 
   export type BranchPackageScheduleScalarFieldEnum = (typeof BranchPackageScheduleScalarFieldEnum)[keyof typeof BranchPackageScheduleScalarFieldEnum]
@@ -32294,6 +32317,7 @@ export namespace Prisma {
     createdById?: StringFilter<"BranchPackageSchedule"> | string
     createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
     updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    assignedAt?: DateTimeNullableFilter<"BranchPackageSchedule"> | Date | string | null
     packageGroup?: XOR<TaskTemplateGroupScalarRelationFilter, TaskTemplateGroupWhereInput>
   }
 
@@ -32305,6 +32329,7 @@ export namespace Prisma {
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    assignedAt?: SortOrderInput | SortOrder
     packageGroup?: TaskTemplateGroupOrderByWithRelationInput
   }
 
@@ -32320,6 +32345,7 @@ export namespace Prisma {
     createdById?: StringFilter<"BranchPackageSchedule"> | string
     createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
     updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    assignedAt?: DateTimeNullableFilter<"BranchPackageSchedule"> | Date | string | null
     packageGroup?: XOR<TaskTemplateGroupScalarRelationFilter, TaskTemplateGroupWhereInput>
   }, "id" | "branch_weekday_packageGroupId">
 
@@ -32331,6 +32357,7 @@ export namespace Prisma {
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    assignedAt?: SortOrderInput | SortOrder
     _count?: BranchPackageScheduleCountOrderByAggregateInput
     _max?: BranchPackageScheduleMaxOrderByAggregateInput
     _min?: BranchPackageScheduleMinOrderByAggregateInput
@@ -32347,6 +32374,7 @@ export namespace Prisma {
     createdById?: StringWithAggregatesFilter<"BranchPackageSchedule"> | string
     createdAt?: DateTimeWithAggregatesFilter<"BranchPackageSchedule"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"BranchPackageSchedule"> | Date | string
+    assignedAt?: DateTimeNullableWithAggregatesFilter<"BranchPackageSchedule"> | Date | string | null
   }
 
   export type TaskTemplateWhereInput = {
@@ -34151,6 +34179,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
     packageGroup: TaskTemplateGroupCreateNestedOneWithoutBranchSchedulesInput
   }
 
@@ -34162,6 +34191,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
   }
 
   export type BranchPackageScheduleUpdateInput = {
@@ -34171,6 +34201,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     packageGroup?: TaskTemplateGroupUpdateOneRequiredWithoutBranchSchedulesNestedInput
   }
 
@@ -34182,6 +34213,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type BranchPackageScheduleCreateManyInput = {
@@ -34192,6 +34224,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
   }
 
   export type BranchPackageScheduleUpdateManyMutationInput = {
@@ -34201,6 +34234,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type BranchPackageScheduleUncheckedUpdateManyInput = {
@@ -34211,6 +34245,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type TaskTemplateCreateInput = {
@@ -36087,6 +36122,7 @@ export namespace Prisma {
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    assignedAt?: SortOrder
   }
 
   export type BranchPackageScheduleMaxOrderByAggregateInput = {
@@ -36097,6 +36133,7 @@ export namespace Prisma {
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    assignedAt?: SortOrder
   }
 
   export type BranchPackageScheduleMinOrderByAggregateInput = {
@@ -36107,6 +36144,7 @@ export namespace Prisma {
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    assignedAt?: SortOrder
   }
 
   export type EnumPackageScheduleWeekdayWithAggregatesFilter<$PrismaModel = never> = {
@@ -40214,6 +40252,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
   }
 
   export type BranchPackageScheduleUncheckedCreateWithoutPackageGroupInput = {
@@ -40223,6 +40262,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
   }
 
   export type BranchPackageScheduleCreateOrConnectWithoutPackageGroupInput = {
@@ -40298,6 +40338,7 @@ export namespace Prisma {
     createdById?: StringFilter<"BranchPackageSchedule"> | string
     createdAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
     updatedAt?: DateTimeFilter<"BranchPackageSchedule"> | Date | string
+    assignedAt?: DateTimeNullableFilter<"BranchPackageSchedule"> | Date | string | null
   }
 
   export type TaskTemplateGroupCreateWithoutBranchSchedulesInput = {
@@ -41604,6 +41645,7 @@ export namespace Prisma {
     createdById: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    assignedAt?: Date | string | null
   }
 
   export type TaskTemplateUpdateWithoutGroupInput = {
@@ -41661,6 +41703,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type BranchPackageScheduleUncheckedUpdateWithoutPackageGroupInput = {
@@ -41670,6 +41713,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupInput = {
@@ -41679,6 +41723,7 @@ export namespace Prisma {
     createdById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ScheduleSlotCreateManyScheduleInput = {
