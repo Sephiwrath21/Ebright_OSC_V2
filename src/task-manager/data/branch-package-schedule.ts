@@ -1,7 +1,13 @@
 // Branch Package Schedule (2026-08-07): the Package Table page's data
-// layer — a durable (branch, weekday) → Package config, backed by
-// automatic recurring task assignment via the existing engine. See
-// BranchPackageSchedule's schema comment for the model. Deliberately
+// layer — a durable (branch, weekday) → Package config. Save/Assign split
+// (2026-08-11): setBranchPackageScheduleCell only writes/removes this
+// config now (removals still cancel their real assignment immediately —
+// see that function's own doc comment); assignSavedPackages (below) is
+// the separate, explicit step that actually creates the real recurring
+// task assignment via the existing engine, for whatever's been saved but
+// not yet assigned. See BranchPackageSchedule's schema comment for the
+// model, and setBranchPackageScheduleCell/assignSavedPackages's own doc
+// comments for the split's full rationale. Deliberately
 // separate from template-groups.ts's applyTemplateGroup/listTemplateGroups
 // (which are per-creator-owned, createdById-scoped) — packages are
 // org-wide-visible here by design (confirmed 2026-08-07), so this file's
@@ -376,19 +382,32 @@ export interface AssignSavedPackagesResult {
  *  (manager conflicts, same as Save already handles) degrade gracefully,
  *  not to paper over arbitrary mid-batch failures.
  *
- *  Retry-safety: re-calling this after a full or partial success is safe
- *  and does NOT create duplicates for rows that already got assigned —
- *  the `assignedAt IS NULL` filter means an already-stamped row is never
- *  reprocessed. A row that failed mid-branch (the whole-branch abort case
- *  above) keeps `assignedAt` null and IS correctly retried on the next
- *  call — but if THAT retry hits the exact same "assignWeekday succeeded,
- *  the following stamp-update never ran" gap `setBranchPackageScheduleCell`'s
- *  own doc comment warns about for its add path, it carries the same
- *  duplicate-assignment risk. This is accepted for the same reason it's
- *  accepted there: making it fully safe requires a live RunBlock-existence
- *  check this codebase doesn't have yet (see that comment's closing
- *  paragraph), and this function is a low-frequency, explicit user action
- *  (not an automatic retry loop), not a background job. */
+ *  Retry-safety, sequential AND concurrent (2026-08-11, tightened after the
+ *  final holistic review reproduced two simultaneous calls duplicating
+ *  every pending row — both read the same assignedAt-IS-NULL snapshot
+ *  before either had claimed anything). Each row is claimed via a
+ *  conditional `updateMany({where: {id, assignedAt: null}, ...})`
+ *  BEFORE `assignWeekday` runs, not stamped after — that WHERE clause is
+ *  atomic per-row at the database level regardless of which pooled
+ *  connection executes it, so a concurrent call's claim on the same row
+ *  fails with `count: 0` and is skipped, not duplicated. Re-calling this
+ *  after a full or partial success — sequentially OR while a previous
+ *  call is still running — is safe and does NOT create duplicates for
+ *  rows any call has already claimed.
+ *
+ *  One narrower, accepted gap remains: if `assignWeekday` throws AFTER a
+ *  successful claim (the row is already stamped, but the real task
+ *  wasn't fully created), the row is NOT auto-reverted back to
+ *  `assignedAt: null` for an automatic retry to pick back up — a revert-
+ *  then-retry could re-run `assignFlowTaskCore` for whichever of the
+ *  package's templates already succeeded before the failure, since
+ *  `assignWeekday`'s own loop over a package's templates has no internal
+ *  atomicity, recreating exactly the duplicate this fix exists to
+ *  prevent. This is the same "a thrown error means re-fetch and re-check,
+ *  not blindly retry" trade-off `setBranchPackageScheduleCell`'s own doc
+ *  comment already accepts elsewhere in this file — a human noticing a
+ *  claimed-but-incomplete row should verify and fix it directly, not
+ *  re-click Assign expecting it to self-heal. */
 export function assignSavedPackages(email: string): Promise<AssignSavedPackagesResult> {
   return native(async () => {
     const actor = await requireEditAccess(email);
@@ -429,11 +448,33 @@ export function assignSavedPackages(email: string): Promise<AssignSavedPackagesR
       }
       for (const row of branchRows) {
         const weekday = PRISMA_TO_WEEKDAY[row.weekday];
-        await assignWeekday(actor, row.packageGroupId, manager.id, weekday);
-        await prisma.branchPackageSchedule.update({
-          where: { id: row.id },
+        // Claim the row BEFORE assigning, not after (2026-08-11 concurrency
+        // fix — final holistic review reproduced two concurrent
+        // assignSavedPackages calls duplicating every pending row: both
+        // read the same assignedAt-IS-NULL snapshot before either had
+        // stamped anything, so both called assignWeekday for every row).
+        // A plain conditional UPDATE ... WHERE assignedAt IS NULL is
+        // atomic per-row regardless of which pooled connection executes
+        // it — unlike a session-scoped Postgres advisory lock, which the
+        // adapter's connection pool (src/task-manager/prisma.ts, max:10)
+        // could silently orphan across calls, this needs no lock/unlock
+        // pairing to get right. If a concurrent call already claimed this
+        // row, `count` is 0 and we skip it. If assignWeekday throws AFTER
+        // a successful claim, the row stays stamped even though the real
+        // task may be incomplete — deliberately NOT auto-reverted, because
+        // assignWeekday loops over a package's templates without its own
+        // internal atomicity, so a revert-then-retry could re-run
+        // assignFlowTaskCore for templates that already succeeded before
+        // the failure, recreating the exact duplicate this fix exists to
+        // prevent. This is the same "thrown error means re-fetch and
+        // re-check, not blindly retry" trade-off setBranchPackageScheduleCell's
+        // own doc comment already accepts for this codebase.
+        const claim = await prisma.branchPackageSchedule.updateMany({
+          where: { id: row.id, assignedAt: null },
           data: { assignedAt: new Date() },
         });
+        if (claim.count === 0) continue;
+        await assignWeekday(actor, row.packageGroupId, manager.id, weekday);
         assigned += 1;
       }
     }

@@ -1,8 +1,12 @@
 "use client";
 
 // Package Table grid (2026-08-07): Branches (rows) x Wed-Sun (columns), each
-// cell a Package selector. Setting a cell fans out through the recurring
-// task engine server-side (see data/branch-package-schedule.ts).
+// cell a Package selector. Save/Assign split (2026-08-11): Save persists
+// the cell's config only (removals still cancel their real assignment
+// immediately); the separate "Assign" button/action is what fans out
+// through the recurring task engine server-side for whatever's saved but
+// not yet assigned (see data/branch-package-schedule.ts's
+// setBranchPackageScheduleCell/assignSavedPackages).
 //
 // Multi-select (2026-08-08): a cell may now hold MULTIPLE packages (see
 // branch-package-schedule.ts's file header for the design reversal). The

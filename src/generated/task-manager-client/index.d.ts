@@ -98,10 +98,13 @@ export type TaskTemplateGroup = $Result.DefaultSelection<Prisma.$TaskTemplateGro
  * running the same weekday, so a given (branch, weekday) cell may be
  * backed by more than one row, one per configured package. Together
  * these rows are the standing source of truth the grid reads/writes.
- * Setting a cell ALSO creates a real recurring cadence:"daily" assignment
- * per package via the existing engine
- * (src/task-manager/data/branch-package-schedule.ts);
- * this row is the durable "what's configured" record, separate from the
+ * Setting a cell creates this config row; the real recurring
+ * cadence:"daily" assignment per package via the existing engine
+ * (src/task-manager/data/branch-package-schedule.ts) is a SEPARATE step
+ * as of 2026-08-11 (Save/Assign split, see assignedAt below) — Save no
+ * longer creates it automatically for additions, only the explicit
+ * "Assign" action does (removals are the one exception and still cancel
+ * immediately). This row is the durable "what's configured" record, separate from the
  * FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
  * get replaced/cloned forward every week, this row does not). Note:
  * PackageScheduleWeekday (WED/THU/FRI/SAT/SUN, 5 values) is NOT the same
