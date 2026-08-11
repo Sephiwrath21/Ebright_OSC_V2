@@ -29,6 +29,13 @@ const WEEKDAY_TO_PRISMA: Record<PackageTableWeekday, "WED" | "THU" | "FRI" | "SA
   Sat: "SAT",
   Sun: "SUN",
 };
+const PRISMA_TO_WEEKDAY: Record<"WED" | "THU" | "FRI" | "SAT" | "SUN", PackageTableWeekday> = {
+  WED: "Wed",
+  THU: "Thu",
+  FRI: "Fri",
+  SAT: "Sat",
+  SUN: "Sun",
+};
 // JS Date.getDay() values, matching tasks-internal.ts's DAY_INDEX.
 const WEEKDAY_TO_JS_DAY: Record<PackageTableWeekday, number> = {
   Sun: 0,
@@ -229,7 +236,21 @@ async function assignWeekday(
 
 /** Set one grid cell to the FULL desired set of packages
  *  (`packageGroupIds` — an empty array clears the cell entirely, never
- *  `null`). This is a DIFF against what's currently configured for this
+ *  `null`). CONFIG ONLY as of 2026-08-11 (Save/Assign split) for
+ *  ADDITIONS — a newly-added package's `BranchPackageSchedule` row is
+ *  created with `assignedAt` left null; the real recurring task isn't
+ *  created until the separate `assignSavedPackages` action runs. REMOVALS
+ *  are the one asymmetric exception and are UNCHANGED — a removed
+ *  package's real assignment is still cancelled immediately below, same
+ *  as before the split (an already-configured-then-unwanted recurring
+ *  task should stop right away, not wait for someone to remember to
+ *  re-run Assign). The rest of this comment (diffing, retry-safety
+ *  asymmetry between add/remove) still describes the REMOVAL path
+ *  accurately; for the ADDITION path, see assignSavedPackages below,
+ *  which now owns the assignWeekday-retry-duplication risk this comment
+ *  used to describe for this function.
+ *
+ *  This is a DIFF against what's currently configured for this
  *  (branch, weekday), not a wholesale replace: resolves the branch's
  *  single Branch Manager, fetches the CURRENTLY-configured rows fresh
  *  from the DB, and computes `toRemove`/`toAdd` against the caller's
@@ -312,7 +333,11 @@ export function setBranchPackageScheduleCell(
     }
 
     for (const id of toAdd) {
-      await assignWeekday(actor, id, manager.id, body.weekday);
+      // 2026-08-11 Save/Assign split: Save no longer calls assignWeekday
+      // here — the config row is created with assignedAt left null (the
+      // column's default), and the separate "Assign" action (see
+      // assignSavedPackages below) is what actually creates the real
+      // recurring task, once the user explicitly clicks it.
       await prisma.branchPackageSchedule.create({
         data: { branch: body.branch, weekday: prismaWeekday, packageGroupId: id, createdById: actor.id },
       });
@@ -320,4 +345,91 @@ export function setBranchPackageScheduleCell(
 
     return { ok: true };
   }, "setBranchPackageScheduleCell");
+}
+
+export interface AssignSavedPackagesResult {
+  assigned: number;
+  skippedBranches: { branch: string; reason: string }[];
+}
+
+/** Processes every `BranchPackageSchedule` row where `assignedAt IS NULL`
+ *  (i.e. configured via Save but not yet really-assigned) into a real
+ *  recurring task assignment, then stamps `assignedAt`. 2026-08-11
+ *  Save/Assign split — see setBranchPackageScheduleCell's doc comment and
+ *  this module's file header.
+ *
+ *  Per-branch partial success, not all-or-nothing: resolves each distinct
+ *  branch's single Branch Manager once (same `requireSingleBranchManager`
+ *  check Save already uses); a branch with zero or 2+ managers has ALL of
+ *  its currently-unassigned rows skipped and reported back, but every
+ *  OTHER branch in the same call still gets processed. A caller cannot
+ *  tell from the return value alone which SPECIFIC rows within a
+ *  successfully-resolved branch failed at the `assignWeekday` step itself
+ *  (that would require the same kind of per-package try/catch
+ *  `setBranchPackageScheduleCell` deliberately does NOT have, for the
+ *  same accepted "partial application, re-fetch and retry" trade-off
+ *  documented there) — an error thrown by `assignWeekday` for one row
+ *  inside an otherwise-healthy branch propagates and aborts the WHOLE
+ *  call, same as any other unhandled error in this codebase's `native()`
+ *  wrapper. This is a deliberate, narrower partial-success boundary than
+ *  per-row: it exists specifically to let the KNOWN, EXPECTED failure mode
+ *  (manager conflicts, same as Save already handles) degrade gracefully,
+ *  not to paper over arbitrary mid-batch failures.
+ *
+ *  Retry-safety: re-calling this after a full or partial success is safe
+ *  and does NOT create duplicates for rows that already got assigned —
+ *  the `assignedAt IS NULL` filter means an already-stamped row is never
+ *  reprocessed. A row that failed mid-branch (the whole-branch abort case
+ *  above) keeps `assignedAt` null and IS correctly retried on the next
+ *  call — but if THAT retry hits the exact same "assignWeekday succeeded,
+ *  the following stamp-update never ran" gap `setBranchPackageScheduleCell`'s
+ *  own doc comment warns about for its add path, it carries the same
+ *  duplicate-assignment risk. This is accepted for the same reason it's
+ *  accepted there: making it fully safe requires a live RunBlock-existence
+ *  check this codebase doesn't have yet (see that comment's closing
+ *  paragraph), and this function is a low-frequency, explicit user action
+ *  (not an automatic retry loop), not a background job. */
+export function assignSavedPackages(email: string): Promise<AssignSavedPackagesResult> {
+  return native(async () => {
+    const actor = await requireEditAccess(email);
+
+    const rows = await prisma.branchPackageSchedule.findMany({
+      where: { assignedAt: null },
+      orderBy: [{ branch: "asc" }, { weekday: "asc" }],
+    });
+
+    const byBranch = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = byBranch.get(row.branch);
+      if (list) list.push(row);
+      else byBranch.set(row.branch, [row]);
+    }
+
+    let assigned = 0;
+    const skippedBranches: { branch: string; reason: string }[] = [];
+
+    for (const [branch, branchRows] of byBranch) {
+      let manager: { id: string; name: string };
+      try {
+        manager = await requireSingleBranchManager(branch);
+      } catch (err) {
+        skippedBranches.push({
+          branch,
+          reason: err instanceof ApiHttpError ? err.message : "Could not resolve a branch manager",
+        });
+        continue;
+      }
+      for (const row of branchRows) {
+        const weekday = PRISMA_TO_WEEKDAY[row.weekday];
+        await assignWeekday(actor, row.packageGroupId, manager.id, weekday);
+        await prisma.branchPackageSchedule.update({
+          where: { id: row.id },
+          data: { assignedAt: new Date() },
+        });
+        assigned += 1;
+      }
+    }
+
+    return { assigned, skippedBranches };
+  }, "assignSavedPackages");
 }
