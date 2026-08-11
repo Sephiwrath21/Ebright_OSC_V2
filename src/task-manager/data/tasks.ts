@@ -265,12 +265,12 @@ export function reopenFlowTask(
  *  — Department for HOD/department-side staff, Branch for Branch Manager/
  *  branch-side staff (the exact split role-views.ts uses everywhere else);
  *  "Unassigned" when a staff record has neither (the ~61 unplaced real
- *  staff role-views.ts already documents elsewhere). The filename is built
- *  from the assignee + task title as uploadToDrive's `prefix` — its own
- *  `${prefix}-${Date.now()}-${fileName}` naming already bakes in a
- *  timestamp, so nothing here duplicates one (and, now that multiple
- *  photos accumulate per task, is also how multiple uploads for the same
- *  task never collide on a filename). */
+ *  staff role-views.ts already documents elsewhere). Filename (2026-08-11):
+ *  Date (YYYYMMDD) - Time (HHMM) - Name (assignee) - Task title, passed as
+ *  uploadToDrive's `prefix`; its own `${prefix}-${Date.now()}-${fileName}`
+ *  naming appends a second, millisecond-precision timestamp after that (not
+ *  worth a targeted change to drive.ts to drop it), which is also how
+ *  multiple photos for the same task never collide on a filename. */
 const PROOF_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 /** Multi-photo cap (2026-08-08 design decision #1): reject the 6th upload
  *  attempt for a task with a clear error rather than silently dropping or
@@ -352,7 +352,15 @@ export function uploadFlowTaskProof(
       String(now.getDate()).padStart(2, "0"),
       orgUnit,
     ];
-    const prefix = sanitizeDriveNamePart(`${user.name}-${runBlock.title}`).slice(0, 150);
+    // Filename (2026-08-11): Date (YYYYMMDD) - Time (HHMM) - Name - Task,
+    // reusing the same `now` as folderPath above so the file's date/time
+    // always matches the dated folder it lands in. uploadToDrive appends
+    // its own `-${Date.now()}-${fileName}` suffix after this prefix (that
+    // call is out of scope to change here), which still doubles as the
+    // multi-photo-per-task collision guard noted below.
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const prefix = sanitizeDriveNamePart(`${datePart}-${timePart}-${user.name}-${runBlock.title}`).slice(0, 150);
 
     const buffer = Buffer.from(img.dataBase64, "base64");
     const file = new File([buffer], `proof${PROOF_IMAGE_EXT[img.mime] ?? ""}`, { type: img.mime });
