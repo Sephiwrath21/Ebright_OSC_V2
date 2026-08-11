@@ -490,7 +490,16 @@ export function BranchPackageScheduleGrid({
     if (dirty || assignState === "assigning") return;
     setAssignState("assigning");
     setAssignSummary(null);
-    const result = await onAssign();
+    // A transient network/session failure must degrade to a normal error,
+    // not wedge assignState on "assigning" forever with the button
+    // permanently disabled and no way to retry short of a page reload —
+    // same reasoning as save()'s own try/catch around onSetCell above.
+    let result: AssignSavedPackagesActionResult;
+    try {
+      result = await onAssign();
+    } catch {
+      result = { ok: false, message: "Network error — try again" };
+    }
     if (!result.ok) {
       setAssignState("error");
       setAssignSummary(result.message);
@@ -504,9 +513,16 @@ export function BranchPackageScheduleGrid({
           : `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"}.`,
       );
     } else {
-      const skippedNames = result.skippedBranches.map((b) => b.branch).join(", ");
+      // Full per-branch reason (2026-08-11 code review), not a generic
+      // "manager conflict" label — assignSavedPackages's skippedBranches
+      // already carries specific, differently-actionable text ("No branch
+      // manager found" vs. "Multiple branch managers found... resolve
+      // this before scheduling"), and collapsing both into one phrase
+      // would make an admin go dig elsewhere to find out which fix
+      // applies to which branch.
+      const skippedDetail = result.skippedBranches.map((b) => `${b.branch} (${b.reason})`).join("; ");
       setAssignSummary(
-        `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"} — skipped ${result.skippedBranches.length} branch${result.skippedBranches.length === 1 ? "" : "es"} (${skippedNames}): manager conflict.`,
+        `Assigned ${result.assigned} package${result.assigned === 1 ? "" : "s"} — skipped ${result.skippedBranches.length} branch${result.skippedBranches.length === 1 ? "" : "es"}: ${skippedDetail}`,
       );
     }
   };
