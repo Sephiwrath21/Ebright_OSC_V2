@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
@@ -2399,10 +2400,28 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
     if (input.branchCode && !branch) return { ok: false, error: "Unknown branch." };
     if (input.departmentCode && !department) return { ok: false, error: "Unknown department." };
 
-    // No login is being set up here (password stays null) — just placeholder
-    // enough to satisfy users.email's UNIQUE NOT NULL constraint. HR replaces
-    // this with the employee's real email once they actually onboard.
-    const placeholderEmail = `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@placeholder.ebright.my`;
+    // No login is being set up here (password stays null) — just enough to
+    // satisfy users.email's UNIQUE NOT NULL constraint (true blank/null
+    // isn't possible without making the login-identifier column nullable
+    // app-wide — out of scope here, see conversation). The form itself has
+    // no email field at all (AddPreStageEmployeeModal.tsx), so this is
+    // never shown to HR either way; the format only matters for how it
+    // reads later, e.g. when investigating live data. HR replaces this with
+    // the employee's real email once they actually onboard.
+    //
+    // Deliberately NOT the pre-<ms>-<rand>@placeholder.ebright.my shape
+    // used previously — per explicit decision (see conversation),
+    // syncCareerApplicationsToPreStage()'s own create branch (still active
+    // on production) turned out to generate that exact same pattern as ITS
+    // fallback too, making a synced ghost indistinguishable from a genuine
+    // manual add by email alone (see computePreEligibleRows's own comment
+    // in careerApplicationSync.ts — start_date is what actually
+    // distinguishes them now, not email). This format shares no component
+    // (prefix, domain, or Date.now()/Math.random() generation) with that
+    // one, and uses the .invalid TLD (RFC 2606 — reserved specifically for
+    // addresses that must never resolve as real) so it also reads
+    // unambiguously as a placeholder rather than an obfuscated real address.
+    const placeholderEmail = `no-email-${randomUUID()}@unset.invalid`;
 
     const user = await prisma.users.create({
       data: {

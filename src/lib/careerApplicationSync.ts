@@ -936,7 +936,21 @@ export async function syncCareerApplicationsToPreStage(): Promise<CareerApplicat
 // ALL" (any date, not just future), not "not currently eligible" — a real
 // account whose name DOES match a stale/past-dated onboarding_candidate row
 // keeps going through the OR-rule above unaffected; this only picks up
-// names onboarding_candidate has never heard of. Still no
+// names onboarding_candidate has never heard of.
+//
+// Narrowed further, per explicit decision (see conversation): this fallback
+// used to admit ANY such real-no-match account, which unintentionally also
+// let still-interviewing career_applications applicants leak onto Pre
+// whenever production's still-undeployed sync-disable fix
+// (CAREER_APPLICATION_SYNC_ENABLED, instrumentation.ts) created a real row
+// for one directly in the shared database — identical shape to a
+// legitimate manual add. An email-pattern filter was tried first and
+// rejected (see conversation) — syncCareerApplicationsToPreStage()'s own
+// create branch turned out to generate the exact same
+// `pre-<ms>-<rand>@placeholder.ebright.my` format as its own fallback,
+// making a ghost indistinguishable from a real manual add by email alone.
+// Now restricted to accounts with a real start_date instead — see
+// computePreEligibleRows's own comment on this exact filter below. Still no
 // career_applications/rec_recruit involvement of any kind.
 
 // One-off known-bad-data exception to the "real employment wins" override
@@ -1073,14 +1087,36 @@ async function computePreEligibleRows(
 
   // Real accounts genuinely at Pre with no onboarding_candidate row at all —
   // see this function's own doc comment above for the full rationale
-  // (addPreStageEmployee's manual "+ Add" rows land here). Their own real
-  // data is already authoritative (no stale/synced row to prefer over), so
-  // this just carries it straight through, unlike the onboarding_candidate
+  // (addPreStageEmployee's manual "+ Add" rows land here). Restricted to
+  // rows with a real start_date — per explicit decision (see conversation,
+  // correcting an earlier version of this filter that checked the
+  // placeholder EMAIL pattern instead): that turned out to be no signal at
+  // all, since syncCareerApplicationsToPreStage()'s own create branch
+  // (still actively running on production — CAREER_APPLICATION_SYNC_ENABLED,
+  // instrumentation.ts) generates the exact same
+  // `pre-<ms>-<rand>@placeholder.ebright.my` format as its OWN fallback
+  // whenever an applicant has no email on file, making a still-interviewing
+  // ghost indistinguishable from a real manual add by email alone (11 such
+  // ghosts found live this way). start_date is the real discriminator:
+  // addPreStageEmployee() hard-validates a real, future start_date on every
+  // submission (see its own "Date is required" check) — no code path lets
+  // that be null — while the sync's create branch leaves it null for
+  // anyone with no confirmed start yet (i.e., still interviewing), which is
+  // exactly the case for every ghost found. EmployeeOverviewRow.date for a
+  // "pre" row is already the raw, un-backfilled employment.start_date (see
+  // dateSourceFor in employeeQueries.ts — deliberately never falls back to
+  // created_at for Pre), so a plain null check here is exact, no extra
+  // query needed. A name-based cross-check against career_applications was
+  // deliberately avoided (a coincidental name collision could wrongly
+  // exclude a real manual add). Once admitted, a row's own real data is
+  // already authoritative (no stale/synced row to prefer over), so this
+  // just carries it straight through, unlike the onboarding_candidate
   // branch above which has to choose between two possible sources per field.
   const candidateNames = new Set(candidates.map((c) => normalizeName(c.name)));
   for (const real of realRows) {
     if (real.stage !== "pre") continue;
     if (candidateNames.has(normalizeName(real.fullName))) continue;
+    if (!real.date) continue;
     rows.push({
       row: {
         ...real,
