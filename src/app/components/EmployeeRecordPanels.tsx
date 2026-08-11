@@ -162,7 +162,15 @@ const GUARDIAN_RELATIONSHIP_OPTIONS = [
 // guardian_info row for each blank draft added via "Add Another" this
 // session (skipping any draft left completely empty, so clicking Save
 // without filling in a freshly-added block doesn't create a junk row).
-export function GuardianInfoPanel({ userId, data }: { userId: number; data: GuardianInfoEntry[] }) {
+export function GuardianInfoPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: GuardianInfoEntry[];
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [guardians, setGuardians] = useState<GuardianDraft[]>(() => toDrafts(data));
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
@@ -251,7 +259,7 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Guardian Info</PanelHeading>
       {guardians.map((g, i) => (
         <div key={g.id ?? `new-${i}`} className="mb-7 last:mb-0">
@@ -307,9 +315,9 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
 // in EmployeeRecordView's resolvePanel instead of living in the static-panel
 // lookup below since they need real userId/data props the others don't take. ───
 
-export function OfferLetterPanel() {
+export function OfferLetterPanel({ canEdit = true }: { canEdit?: boolean }) {
   return (
-    <EditableSection hasRealBacking={false}>
+    <EditableSection hasRealBacking={false} canEdit={canEdit}>
       <PanelHeading>Offer Letter</PanelHeading>
       <FieldGrid>
         <PlaceholderUploadField label="Offer Letter" />
@@ -318,9 +326,9 @@ export function OfferLetterPanel() {
   );
 }
 
-export function HiringNotesPanel() {
+export function HiringNotesPanel({ canEdit = true }: { canEdit?: boolean }) {
   return (
-    <EditableSection hasRealBacking={false}>
+    <EditableSection hasRealBacking={false} canEdit={canEdit}>
       <PanelHeading>Hiring Notes</PanelHeading>
       <FieldGrid>
         <PlaceholderField label="Interview Date" type="date" />
@@ -361,11 +369,13 @@ export function PayrollPanel({
   salaryRevisions,
   payslip,
   payslipHistory,
+  canEdit = true,
 }: {
   employeeId: number;
   salaryRevisions: SalaryRevisionEntry[];
   payslip: PayslipInfo | null;
   payslipHistory: PayslipHistoryEntry[];
+  canEdit?: boolean;
 }) {
   const salaryRevisionRef = useRef<SalaryRevisionHandle>(null);
   const [basicPay, setBasicPay] = useState(payslip?.basicPay ?? "");
@@ -382,7 +392,7 @@ export function PayrollPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Payroll/ Payslip</PanelHeading>
       <Subsection heading="Basic Pay">
         <CurrencyField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
@@ -475,7 +485,15 @@ function CancelEditLink({ show, onClick }: { show: boolean; onClick: () => void 
 // doesn't create a spurious duplicate. Clicking a history row while in edit
 // mode instead loads that row into the form and Save corrects it in place
 // (updatePerformanceReview) rather than appending.
-export function PerformanceReviewPanel({ userId, data }: { userId: number; data: PerformanceReviewEntry[] }) {
+export function PerformanceReviewPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: PerformanceReviewEntry[];
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const latest = data[0] ?? null;
 
@@ -554,7 +572,7 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
       <FieldGrid>
         <EditableField label="Review Period" value={period} onChange={setPeriod} />
@@ -760,7 +778,7 @@ export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
 // props the rest of this dictionary doesn't take, so they're special-cased
 // in EmployeeRecordView's resolvePanel instead (same convention as Training/
 // Promotion/Transfer/Cert.-Achievement/the 4 Disciplinary sub-tabs).
-export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, () => ReactNode> = {
+export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, (props: { canEdit?: boolean }) => ReactNode> = {
   "hr-info/offer-letter": OfferLetterPanel,
   "hr-info/hiring-notes": HiringNotesPanel,
 };

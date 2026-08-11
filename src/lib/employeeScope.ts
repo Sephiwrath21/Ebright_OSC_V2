@@ -51,6 +51,7 @@ export interface ScopableRow {
 }
 
 const FULL_ACCESS_ROLE_TYPES = new Set(["hr", "superadmin"]);
+const CEO_ROLE_TYPE = "ceo";
 const STAFF_ROLE_TYPE = "staff";
 
 /** Resolves the current session's own scope. Returns null if there is no
@@ -80,6 +81,19 @@ export async function getEmployeeScopeForEmail(email: string): Promise<EmployeeS
   if (!me) return null;
 
   if (me.is_full_access || FULL_ACCESS_ROLE_TYPES.has(me.role.role_type.toLowerCase())) {
+    return { fullAccess: true, ownUserId: null, departmentCode: null, branchCode: null };
+  }
+
+  // CEO gets the same full VIEW scope as HR/Superadmin, per explicit
+  // decision (see conversation, 2026-08-11) — sees every employee across
+  // every department/branch, not just their own "CEO" department (the
+  // pre-existing behavior before this branch existed). Kept separate from
+  // FULL_ACCESS_ROLE_TYPES above rather than joining that set, so its name
+  // keeps meaning "full access" without implying edit rights: this flag
+  // alone grants no write capability — CEO write restriction (own profile
+  // only) is enforced independently by requireNotCeoUnlessOwnProfile() in
+  // employeeRecordActions.ts, regardless of this scope's fullAccess value.
+  if (me.role.role_type.toLowerCase() === CEO_ROLE_TYPE) {
     return { fullAccess: true, ownUserId: null, departmentCode: null, branchCode: null };
   }
 

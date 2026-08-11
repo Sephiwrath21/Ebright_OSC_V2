@@ -163,11 +163,13 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <EmployeeRecordView
         employeeId={employee.id}
+        canEdit={canEdit}
         employeeName={employee.fullName}
         category={cat}
         sectionKey={section}

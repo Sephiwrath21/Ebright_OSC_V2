@@ -701,10 +701,12 @@ export function ResumePanel({
   userId,
   resumeFileId: initialResumeFileId,
   cvFileId: initialCvFileId,
+  canEdit = true,
 }: {
   userId: number;
   resumeFileId: string | null;
   cvFileId: string | null;
+  canEdit?: boolean;
 }) {
   const [resumeFileId, setResumeFileId] = useState(initialResumeFileId);
   const [resumePending, setResumePending] = useState<File | null>(null);
@@ -725,6 +727,7 @@ export function ResumePanel({
       onSave={() =>
         updateResume(userId, { resumeFileId, resumeFile: resumePending, cvFileId, cvFile: cvPending })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Resume/CV</PanelHeading>
       <FieldGrid>
@@ -759,9 +762,11 @@ const RECOMMENDATION_OPTIONS = [
 export function InterviewAssessmentPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: InterviewAssessmentInfo | null;
+  canEdit?: boolean;
 }) {
   const [intDate, setIntDate] = useState(data?.intDate ?? "");
   const [overallRate, setOverallRate] = useState(data?.overallRate != null ? String(data.overallRate) : "");
@@ -775,6 +780,7 @@ export function InterviewAssessmentPanel({
       onSave={() =>
         updateInterviewAssessment(userId, { intDate, overallRate, recommendation, strength, weakness, hiringNote })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Interview Assessment</PanelHeading>
       <FieldGrid>
@@ -795,9 +801,11 @@ export function InterviewAssessmentPanel({
 export function ReferenceCheckPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: ReferenceCheckInfo | null;
+  canEdit?: boolean;
 }) {
   const [refName, setRefName] = useState(data?.refName ?? "");
   const [company, setCompany] = useState(data?.company ?? "");
@@ -817,7 +825,7 @@ export function ReferenceCheckPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Reference Check</PanelHeading>
       <FieldGrid>
         <EditableField label="Reference Name" value={refName} onChange={setRefName} full />
@@ -846,9 +854,11 @@ const MEDICAL_RESULT_OPTIONS = [
 export function MedicalCheckPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: MedicalCheckInfo | null;
+  canEdit?: boolean;
 }) {
   const [fileId, setFileId] = useState(data?.medicalReportFileId ?? null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -862,6 +872,7 @@ export function MedicalCheckPanel({
   return (
     <EditableSection
       onSave={() => updateMedicalCheck(userId, { medicalReportFileId: fileId, medicalReportFile: pendingFile, result })}
+      canEdit={canEdit}
     >
       <PanelHeading>Medical Check</PanelHeading>
       <FieldGrid>
@@ -982,11 +993,13 @@ export function ProbationPanel({
   data,
   display,
   canDecide,
+  canEdit = true,
 }: {
   userId: number;
   data: ProbationInfo | null;
   display: ProbationDisplayInfo;
   canDecide: boolean;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [confirmDate, setConfirmDate] = useState(data?.confirmDate ?? "");
@@ -1072,6 +1085,7 @@ export function ProbationPanel({
           if (!result || result.ok !== false) router.refresh();
           return result;
         }}
+        canEdit={canEdit}
       >
         <PanelHeading>Probation</PanelHeading>
         <FieldGrid>
@@ -1145,10 +1159,12 @@ export function DocumentsPanel({
   userId,
   data,
   showEmploymentContract = true,
+  canEdit = true,
 }: {
   userId: number;
   data: DocumentsInfo | null;
   showEmploymentContract?: boolean;
+  canEdit?: boolean;
 }) {
   const [contractFileId, setContractFileId] = useState(data?.employmentContractFileId ?? null);
   const [contractPending, setContractPending] = useState<File | null>(null);
@@ -1174,6 +1190,7 @@ export function DocumentsPanel({
           employeeHandbookFile: handbookPending,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>{showEmploymentContract ? "Documents" : "Employee Handbook"}</PanelHeading>
       <FieldGrid>
@@ -1228,12 +1245,14 @@ export function OnboardingPayrollPanel({
   employeeDetail,
   heading = "Payroll",
   showBankDetails = true,
+  canEdit = true,
 }: {
   userId: number;
   data: PayrollInfo | null;
   employeeDetail: EmployeeDetailFull;
   heading?: string;
   showBankDetails?: boolean;
+  canEdit?: boolean;
 }) {
   const [epfNumber, setEpfNumber] = useState(data?.epfNumber ?? "");
   const [socsoNumber, setSocsoNumber] = useState(data?.socsoNumber ?? "");
@@ -1270,6 +1289,7 @@ export function OnboardingPayrollPanel({
         if (!bankResult.ok) return bankResult;
         return { ok: true };
       }}
+      canEdit={canEdit}
     >
       <PanelHeading>{heading}</PanelHeading>
       <Subsection heading="Statutory Information">
@@ -1935,9 +1955,9 @@ export function RepeatableRecordSection({
   );
 }
 
-export function AchievementPanel({ userId, data }: { userId: number; data: AchievementEntry[] }) {
+export function AchievementPanel({ userId, data, canEdit = true }: { userId: number; data: AchievementEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Achievement"
         addLabel="+ Add certificate or achievement"
@@ -2334,10 +2354,18 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
 // SalaryRevisionFields under its own single outer EditableSection instead
 // (see EmployeeRecordPanels.tsx's PayrollPanel) so the whole tab shares one
 // button rather than having two.
-export function SalaryRevisionPanel({ userId, data }: { userId: number; data: SalaryRevisionEntry[] }) {
+export function SalaryRevisionPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: SalaryRevisionEntry[];
+  canEdit?: boolean;
+}) {
   const ref = useRef<SalaryRevisionHandle>(null);
   return (
-    <EditableSection onSave={() => ref.current?.save()}>
+    <EditableSection onSave={() => ref.current?.save()} canEdit={canEdit}>
       <SalaryRevisionFields ref={ref} userId={userId} data={data} />
     </EditableSection>
   );
@@ -2347,15 +2375,17 @@ export function PromotionPanel({
   userId,
   data,
   currentPosition,
+  canEdit = true,
 }: {
   userId: number;
   data: PromotionEntry[];
   /** Employee's actual current position (employment.position) — pre-fills
    *  "Current Position" so it doesn't need manual re-entry every time. */
   currentPosition?: string | null;
+  canEdit?: boolean;
 }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Promotion"
         addLabel="+ Add promotion record"
@@ -2443,6 +2473,7 @@ export function TransferPanel({
   branches,
   departments,
   currentLocation,
+  canEdit = true,
 }: {
   userId: number;
   data: TransferEntry[];
@@ -2453,6 +2484,7 @@ export function TransferPanel({
   /** Employee's current Branch/Department (department-priority display) —
    *  pre-fills "From" so it doesn't need manual re-entry every time. */
   currentLocation?: string | null;
+  canEdit?: boolean;
 }) {
   const locationOptionGroups = [
     { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) },
@@ -2462,7 +2494,7 @@ export function TransferPanel({
     },
   ];
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Transfer"
         addLabel="+ Add transfer record"
@@ -2557,9 +2589,9 @@ const TRAINING_STATUS_OPTIONS = [
   { value: "Others", label: "Others" },
 ];
 
-export function TrainingPanel({ userId, data }: { userId: number; data: TrainingEntry[] }) {
+export function TrainingPanel({ userId, data, canEdit = true }: { userId: number; data: TrainingEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Training"
         addLabel="+ Add training record"
@@ -2617,7 +2649,7 @@ const NDA_STATUS_OPTIONS = [
 
 // Stage-flow's Active > NDA tab shows NDA fields only (active_nda.html) —
 // unlike Employee Record's combined "NDA/ NC" tab (NdaNcPanel below).
-export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | null }) {
+export function NdaPanel({ userId, data, canEdit = true }: { userId: number; data: NdaInfo | null; canEdit?: boolean }) {
   const [signDate, setSignDate] = useState(data?.signDate ?? "");
   const [effectiveDate, setEffectiveDate] = useState(data?.effectiveDate ?? "");
   const [status, setStatus] = useState(data?.status ?? "");
@@ -2632,6 +2664,7 @@ export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | nul
   return (
     <EditableSection
       onSave={() => updateNda(userId, { signDate, effectiveDate, status, attachmentFileId: fileId, attachmentFile: pendingFile })}
+      canEdit={canEdit}
     >
       <PanelHeading>NDA</PanelHeading>
       <FieldGrid>
@@ -2646,7 +2679,7 @@ export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | nul
 
 // Stage-flow's Active > Non-Compete tab shows NC fields only
 // (active_nonCompete.html) — unlike Employee Record's combined tab below.
-export function NonCompetePanel({ userId, data }: { userId: number; data: NonCompeteInfo | null }) {
+export function NonCompetePanel({ userId, data, canEdit = true }: { userId: number; data: NonCompeteInfo | null; canEdit?: boolean }) {
   const [signDate, setSignDate] = useState(data?.signDate ?? "");
   const [expiryDate, setExpiryDate] = useState(data?.expiryDate ?? "");
   const [duration, setDuration] = useState(data?.duration ?? "");
@@ -2661,6 +2694,7 @@ export function NonCompetePanel({ userId, data }: { userId: number; data: NonCom
   return (
     <EditableSection
       onSave={() => updateNonCompete(userId, { signDate, expiryDate, duration, attachmentFileId: fileId, attachmentFile: pendingFile })}
+      canEdit={canEdit}
     >
       <PanelHeading>Non-Compete</PanelHeading>
       <FieldGrid>
@@ -2681,10 +2715,12 @@ export function NdaNcPanel({
   userId,
   ndaData,
   nonCompeteData,
+  canEdit = true,
 }: {
   userId: number;
   ndaData: NdaInfo | null;
   nonCompeteData: NonCompeteInfo | null;
+  canEdit?: boolean;
 }) {
   const [ndaSignDate, setNdaSignDate] = useState(ndaData?.signDate ?? "");
   const [ndaEffectiveDate, setNdaEffectiveDate] = useState(ndaData?.effectiveDate ?? "");
@@ -2709,6 +2745,7 @@ export function NdaNcPanel({
 
   return (
     <EditableSection
+      canEdit={canEdit}
       onSave={async () => {
         const [ndaResult, ncResult] = await Promise.all([
           updateNda(userId, {
@@ -2785,9 +2822,17 @@ const DOMESTIC_INQUIRY_DECISION_OPTIONS = [
   { value: "Pending", label: "Pending" },
 ];
 
-export function DomesticInquiryPanel({ userId, data }: { userId: number; data: DomesticInquiryEntry[] }) {
+export function DomesticInquiryPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: DomesticInquiryEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Domestic Inquiry"
         addLabel="+ Add a domestic inquiry record"
@@ -2851,9 +2896,17 @@ const SUSPENSION_TYPE_OPTIONS = [
   { value: "Unpaid Suspension", label: "Unpaid Suspension" },
 ];
 
-export function SuspensionPanel({ userId, data }: { userId: number; data: SuspensionLetterEntry[] }) {
+export function SuspensionPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: SuspensionLetterEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Suspension Letter"
         addLabel="+ Add a suspension letter record"
@@ -2927,9 +2980,17 @@ const SHOWCAUSE_CASE_TYPE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-export function ShowcausePanel({ userId, data }: { userId: number; data: ShowcauseWarningLetterEntry[] }) {
+export function ShowcausePanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ShowcauseWarningLetterEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Showcause/ Warning Letter"
         addLabel="+ Add a showcause/warning letter record"
@@ -3014,9 +3075,9 @@ const PIP_REVIEW_RESULT_OPTIONS = [
   { value: "Terminated", label: "Terminated" },
 ];
 
-export function PipPanel({ userId, data }: { userId: number; data: PipEntry[] }) {
+export function PipPanel({ userId, data, canEdit = true }: { userId: number; data: PipEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Performance Improvement Plan"
         addLabel="+ Add a PIP record"
@@ -3089,7 +3150,7 @@ const EXIT_TYPE_OPTIONS = [
   { value: "Termination/Dismissal", label: "Termination/Dismissal" },
 ];
 
-export function ResignationPanel({ userId, data }: { userId: number; data: ResignationInfo | null }) {
+export function ResignationPanel({ userId, data, canEdit = true }: { userId: number; data: ResignationInfo | null; canEdit?: boolean }) {
   const [submissionDate, setSubmissionDate] = useState(data?.submissionDate ?? "");
   const [lastWorkingDate, setLastWorkingDate] = useState(data?.lastWorkingDate ?? "");
   const [reason, setReason] = useState(data?.reason ?? "");
@@ -3122,6 +3183,7 @@ export function ResignationPanel({ userId, data }: { userId: number; data: Resig
           exitType,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Resignation</PanelHeading>
       <FieldGrid>
@@ -3154,7 +3216,15 @@ const REFERENCE_LETTER_TYPE_OPTIONS = [
   { value: "service", label: "Service / Experience Letter" },
 ];
 
-export function ReferenceLetterPanel({ userId, data }: { userId: number; data: ReferenceLetterInfo | null }) {
+export function ReferenceLetterPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ReferenceLetterInfo | null;
+  canEdit?: boolean;
+}) {
   const [requestDate, setRequestDate] = useState(data?.requestDate ?? "");
   const [type, setType] = useState(data?.type ?? "");
   const [issuedDate, setIssuedDate] = useState(data?.issuedDate ?? "");
@@ -3181,6 +3251,7 @@ export function ReferenceLetterPanel({ userId, data }: { userId: number; data: R
           issuedLetterFile: pendingFile,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Reference Letter</PanelHeading>
       <FieldGrid>
@@ -3203,14 +3274,22 @@ const EXIT_REASON_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function ExitInterviewNotesPanel({ userId, data }: { userId: number; data: ExitInterviewNoteInfo | null }) {
+export function ExitInterviewNotesPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ExitInterviewNoteInfo | null;
+  canEdit?: boolean;
+}) {
   const [date, setDate] = useState(data?.date ?? "");
   const [interviewer, setInterviewer] = useState(data?.interviewer ?? "");
   const [reason, setReason] = useState(data?.reason ?? "");
   const [note, setNote] = useState(data?.note ?? "");
 
   return (
-    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })}>
+    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })} canEdit={canEdit}>
       <PanelHeading>Exit Interview Notes</PanelHeading>
       <FieldGrid>
         <EditableField label="Interview Date" value={date} onChange={setDate} type="date" />
@@ -3272,6 +3351,7 @@ function ExitChecklistPanel({
   userId,
   items,
   canAddItem,
+  canEdit = true,
   onToggle,
   onRename,
   onAdd,
@@ -3281,6 +3361,7 @@ function ExitChecklistPanel({
   userId: number;
   items: ExitChecklistItem[];
   canAddItem: boolean;
+  canEdit?: boolean;
   onToggle: (userId: number, itemId: number, checked: boolean) => Promise<ActionResult>;
   onRename: (userId: number, itemId: number, label: string) => Promise<ActionResult>;
   onAdd: (userId: number, input: AddExitChecklistItemInput) => Promise<ActionResult>;
@@ -3345,7 +3426,7 @@ function ExitChecklistPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>{heading}</PanelHeading>
       <ExitChecklistItems
         items={items.filter((item) => !pendingDeleteIds.has(item.id))}
@@ -3450,13 +3531,24 @@ function ExitChecklistAddItemRow({ value, onChange }: { value: string; onChange:
   );
 }
 
-export function KnowledgeTransferPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+export function KnowledgeTransferPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
   return (
     <ExitChecklistPanel
       heading="Clearance – Knowledge Transfer"
       userId={userId}
       items={items}
       canAddItem={canAddItem}
+      canEdit={canEdit}
       onToggle={toggleKnowledgeTransferItem}
       onRename={renameKnowledgeTransferItem}
       onAdd={addKnowledgeTransferItem}
@@ -3465,13 +3557,24 @@ export function KnowledgeTransferPanel({ userId, items, canAddItem }: { userId: 
   );
 }
 
-export function AssetRecoveryPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+export function AssetRecoveryPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
   return (
     <ExitChecklistPanel
       heading="Clearance – Asset Recovery"
       userId={userId}
       items={items}
       canAddItem={canAddItem}
+      canEdit={canEdit}
       onToggle={toggleAssetRecoveryItem}
       onRename={renameAssetRecoveryItem}
       onAdd={addAssetRecoveryItem}
@@ -3480,13 +3583,24 @@ export function AssetRecoveryPanel({ userId, items, canAddItem }: { userId: numb
   );
 }
 
-export function SystemRevocationPanel({ userId, items, canAddItem }: { userId: number; items: ExitChecklistItem[]; canAddItem: boolean }) {
+export function SystemRevocationPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
   return (
     <ExitChecklistPanel
       heading="Clearance – System Revocation"
       userId={userId}
       items={items}
       canAddItem={canAddItem}
+      canEdit={canEdit}
       onToggle={toggleSystemRevocationItem}
       onRename={renameSystemRevocationItem}
       onAdd={addSystemRevocationItem}
@@ -3495,7 +3609,15 @@ export function SystemRevocationPanel({ userId, items, canAddItem }: { userId: n
   );
 }
 
-export function FinancialSettlementPanel({ userId, data }: { userId: number; data: FinancialSettlementInfo | null }) {
+export function FinancialSettlementPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: FinancialSettlementInfo | null;
+  canEdit?: boolean;
+}) {
   const [finalPayDate, setFinalPayDate] = useState(data?.finalPayDate ?? "");
   const [outstandingLeavePayout, setOutstandingLeavePayout] = useState(data?.outstandingLeavePayout ?? "");
   const [outstandingClaims, setOutstandingClaims] = useState(data?.outstandingClaims ?? "");
@@ -3522,6 +3644,7 @@ export function FinancialSettlementPanel({ userId, data }: { userId: number; dat
           settlementLetterFile: pendingFile,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Clearance – Financial Settlement</PanelHeading>
       <FieldGrid>
@@ -3563,10 +3686,12 @@ export function PersonalInfoPanel({
   employee,
   employeeId,
   showOfferLetter = false,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   employeeId: number;
   showOfferLetter?: boolean;
+  canEdit?: boolean;
 }) {
   const [fullName, setFullName] = useState(employee.fullName ?? "");
   const [email, setEmail] = useState(employee.email ?? "");
@@ -3607,7 +3732,7 @@ export function PersonalInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Personal Info</PanelHeading>
       <FieldGrid>
         <EditableField label="Full Name" value={fullName} onChange={setFullName} />
@@ -3653,6 +3778,7 @@ const EMERGENCY_RELATIONSHIP_OPTIONS = [
 export function EmergencyContactPanel({
   employee,
   onSave,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   onSave: (data: {
@@ -3662,6 +3788,7 @@ export function EmergencyContactPanel({
     email: string;
     address: string;
   }) => Promise<{ ok: boolean; error?: string } | void>;
+  canEdit?: boolean;
 }) {
   const [name, setName] = useState(employee.emergencyName ?? "");
   const [phone, setPhone] = useState(employee.emergencyPhone ?? "");
@@ -3690,7 +3817,7 @@ export function EmergencyContactPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Emergency Contact</PanelHeading>
       <FieldGrid>
         <EditableField label="Contact Name" value={name} onChange={setName} />

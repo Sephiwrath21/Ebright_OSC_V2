@@ -110,6 +110,12 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
   const canDecideProbation = ["hr", "superadmin"].includes(userRole.toLowerCase());
+  // A CEO account can only edit their OWN employee profile — enforced
+  // server-side in employeeRecordActions.ts via requireNotCeoUnlessOwnProfile
+  // (see requireEmployeeInScope). This is the cosmetic mirror: hide every
+  // panel's Edit/Save toggle when a CEO is looking at someone else's
+  // profile, so they don't see a button that would only ever 403.
+  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -126,6 +132,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
         probationInfo={probationInfo}
         probationDisplay={probationDisplay}
         canDecideProbation={canDecideProbation}
+        canEdit={canEdit}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

@@ -30,8 +30,12 @@ function makePool(): Pool {
     connectionString,
     // HR Dashboard fires ~12 parallel queries (6 cards × 1-3 queries each),
     // and the Summary/Report make 3-5 more — bumped from 5 to 20 so they
-    // don't queue past the connect timeout.
-    max: 20,
+    // don't queue past the connect timeout. Bumped again to 30 (2026-08-11):
+    // Employee Folder branch/department namelist clicks add several more
+    // concurrent BranchStaff-touching queries on top of the HR Dashboard's
+    // own load; shared Postgres server confirmed to have headroom
+    // (max_connections=200, ~110 in use across all apps at time of writing).
+    max: 30,
     idleTimeoutMillis: 30000,
     // Bumped from 5s — the MedicalLeave LEFT JOIN subquery is heavier than
     // a plain leave fetch and was hitting the 5s pool-wait window on the

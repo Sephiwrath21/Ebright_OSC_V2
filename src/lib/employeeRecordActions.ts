@@ -21,6 +21,24 @@ async function requireSession(): Promise<ActionResult | null> {
   return null;
 }
 
+// CEO is view-only across the whole system except their own profile, per
+// explicit decision (see conversation, 2026-08-11) — matched by user_id,
+// never name/role, to avoid ambiguity. userId omitted entirely (the
+// create-a-new-employee case, addPreStageEmployee below) always blocks CEO,
+// since there's no existing row that could be "their own". Non-CEO accounts
+// pass through immediately without any behavior change.
+async function requireNotCeoUnlessOwnProfile(userId?: number): Promise<ActionResult | null> {
+  const session = await auth();
+  if (!session?.user?.email) return { ok: false, error: "Not signed in." };
+  const me = await prisma.users.findUnique({
+    where: { email: session.user.email },
+    select: { user_id: true, role: { select: { role_type: true } } },
+  });
+  if (me?.role?.role_type?.toLowerCase() !== "ceo") return null;
+  if (userId != null && me.user_id === userId) return null;
+  return { ok: false, error: "CEO accounts can only edit their own profile." };
+}
+
 // Every mutation below targets a specific employee (userId, always the first
 // parameter) — this blocks a department/branch-scoped account from writing
 // to an out-of-scope employee's record via a direct action call, not just
@@ -29,6 +47,13 @@ async function requireSession(): Promise<ActionResult | null> {
 async function requireEmployeeInScope(userId: number): Promise<ActionResult | null> {
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
+
+  // Checked before the fullAccess/department/branch logic below — CEO now
+  // has fullAccess: true for VIEWING (see employeeScope.ts), so without
+  // this, the fullAccess shortcut a few lines down would let a CEO write to
+  // any employee's record. This blocks that regardless of scope.
+  const ceoError = await requireNotCeoUnlessOwnProfile(userId);
+  if (ceoError) return ceoError;
 
   const target = await prisma.users.findUnique({
     where: { user_id: userId },
@@ -2361,6 +2386,10 @@ export interface AddPreStageEmployeeInput {
 export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Promise<ActionResult & { id?: number }> {
   const authError = await requireSession();
   if (authError) return authError;
+  // No existing userId here (this creates a brand-new employee) — always
+  // blocks CEO, since there's no row that could be "their own profile".
+  const ceoError = await requireNotCeoUnlessOwnProfile();
+  if (ceoError) return ceoError;
 
   const fullName = input.fullName.trim();
   if (!fullName) return { ok: false, error: "Full Name is required." };

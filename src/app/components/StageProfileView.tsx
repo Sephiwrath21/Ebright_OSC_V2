@@ -104,6 +104,12 @@ interface Props {
    *  the Confirm/Extend/Stop buttons; decideProbationOutcome re-checks this
    *  server-side regardless. */
   canDecideProbation?: boolean;
+  /** false when the viewer is a CEO looking at someone else's profile —
+   *  hides every panel's Edit/Save toggle (server-side already blocks the
+   *  write regardless, via requireNotCeoUnlessOwnProfile in
+   *  employeeRecordActions.ts; this just avoids a dead button). Defaults
+   *  true so every other caller keeps its current behavior unchanged. */
+  canEdit?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -161,6 +167,7 @@ export default function StageProfileView({
   probationInfo,
   probationDisplay,
   canDecideProbation,
+  canEdit,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -660,6 +667,7 @@ export default function StageProfileView({
                 probationInfo,
                 probationDisplay,
                 canDecideProbation,
+                canEdit,
                 documentsInfo,
                 payrollInfo,
                 achievements,
@@ -774,6 +782,7 @@ function resolvePanel({
   probationInfo,
   probationDisplay,
   canDecideProbation,
+  canEdit,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -807,6 +816,7 @@ function resolvePanel({
   probationInfo?: ProbationInfo | null;
   probationDisplay?: ProbationDisplayInfo;
   canDecideProbation?: boolean;
+  canEdit?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -833,47 +843,68 @@ function resolvePanel({
     return <LeaveHistoryPanel rows={leaveHistory} />;
   }
   if (originStage === "onboarding" && section.key === "emergency-contact" && employeeDetail) {
-    return <EmergencyContactPanel employee={employeeDetail} onSave={(data) => updateEmergencyContact(employeeId, data)} />;
+    return (
+      <EmergencyContactPanel
+        employee={employeeDetail}
+        onSave={(data) => updateEmergencyContact(employeeId, data)}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
   // same populated data instead of a placeholder "-".
   if (section.key === "personal-info" && employeeDetail) {
-    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter />;
+    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />;
   }
   // Real resume table — same as above, shared with Employee Record's HR Info
   // > Resume/CV tab.
   if (section.key === "resume" && resumeInfo) {
-    return <ResumePanel userId={employeeId} resumeFileId={resumeInfo.resumeFileId} cvFileId={resumeInfo.cvFileId} />;
+    return (
+      <ResumePanel
+        userId={employeeId}
+        resumeFileId={resumeInfo.resumeFileId}
+        cvFileId={resumeInfo.cvFileId}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real interview_assessment table — Pre stage's own Interview Assessment
   // tab. interviewAssessment can validly be null (no row saved yet), so this
   // must gate on !== undefined rather than truthiness — an empty real panel
   // still beats falling through to a placeholder.
   if (section.key === "interview" && interviewAssessment !== undefined) {
-    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} />;
+    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} canEdit={canEdit} />;
   }
   // Real reference_check/medical_check/probation tables — same !== undefined
   // gating as interview_assessment above (a valid "no row saved yet" null
   // still renders the real empty panel, not a placeholder).
   if (section.key === "reference" && referenceCheck !== undefined) {
-    return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} />;
+    return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />;
   }
   if (section.key === "medical" && medicalCheck !== undefined) {
-    return <MedicalCheckPanel userId={employeeId} data={medicalCheck} />;
+    return <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />;
   }
   if (section.key === "probation" && probationInfo !== undefined && probationDisplay) {
-    return <ProbationPanel userId={employeeId} data={probationInfo} display={probationDisplay} canDecide={canDecideProbation ?? false} />;
+    return (
+      <ProbationPanel
+        userId={employeeId}
+        data={probationInfo}
+        display={probationDisplay}
+        canDecide={canDecideProbation ?? false}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real documents table — shared with Employee Record's HR Info > Handbook tab.
   if (section.key === "documents" && documentsInfo !== undefined) {
-    return <DocumentsPanel userId={employeeId} data={documentsInfo} />;
+    return <DocumentsPanel userId={employeeId} data={documentsInfo} canEdit={canEdit} />;
   }
   // Real payroll table (+ reused bank_details for the Bank Details
   // subsection) — shared with Employee Record's Finance > Tax Info tab.
   if (section.key === "payroll" && payrollInfo !== undefined && employeeDetail) {
-    return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
+    return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} canEdit={canEdit} />;
   }
   // Active stage's 7 remaining real tabs — achievement/salary_revision/
   // promotion/transfer/training are repeatable (list + "add new" modal, via
@@ -881,13 +912,13 @@ function resolvePanel({
   // singleton; disciplinary is a read-only combined summary of the 4
   // Employee Record Disciplinary sub-tables.
   if (section.key === "achievement" && achievements !== undefined) {
-    return <AchievementPanel userId={employeeId} data={achievements} />;
+    return <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />;
   }
   if (section.key === "salary-revision" && salaryRevisions !== undefined) {
-    return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} />;
+    return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} canEdit={canEdit} />;
   }
   if (section.key === "promotion" && promotions !== undefined) {
-    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} />;
+    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} canEdit={canEdit} />;
   }
   if (section.key === "transfer" && transfers !== undefined) {
     return (
@@ -897,17 +928,18 @@ function resolvePanel({
         branches={branches ?? []}
         departments={departments ?? []}
         currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+        canEdit={canEdit}
       />
     );
   }
   if (section.key === "training" && trainings !== undefined) {
-    return <TrainingPanel userId={employeeId} data={trainings} />;
+    return <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />;
   }
   if (section.key === "nda" && ndaInfo !== undefined) {
-    return <NdaPanel userId={employeeId} data={ndaInfo} />;
+    return <NdaPanel userId={employeeId} data={ndaInfo} canEdit={canEdit} />;
   }
   if (section.key === "non-compete" && nonCompeteInfo !== undefined) {
-    return <NonCompetePanel userId={employeeId} data={nonCompeteInfo} />;
+    return <NonCompetePanel userId={employeeId} data={nonCompeteInfo} canEdit={canEdit} />;
   }
   if (section.key === "disciplinary" && disciplinarySummary !== undefined) {
     return <DisciplinarySummaryPanel data={disciplinarySummary} />;
@@ -917,25 +949,46 @@ function resolvePanel({
   // ActiveProfilePanels.KnowledgeTransferPanel/AssetRecoveryPanel/
   // SystemRevocationPanel/FinancialSettlementPanel).
   if (section.key === "resignation" && resignationInfo !== undefined) {
-    return <ResignationPanel userId={employeeId} data={resignationInfo} />;
+    return <ResignationPanel userId={employeeId} data={resignationInfo} canEdit={canEdit} />;
   }
   if (section.key === "reference-letter" && referenceLetterInfo !== undefined) {
-    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} />;
+    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} canEdit={canEdit} />;
   }
   if (section.key === "exit-interview-notes" && exitInterviewNoteInfo !== undefined) {
-    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} />;
+    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} canEdit={canEdit} />;
   }
   if (section.key === "knowledge-transfer" && knowledgeTransferChecklist !== undefined) {
-    return <KnowledgeTransferPanel userId={employeeId} items={knowledgeTransferChecklist} canAddItem={canAddChecklistItem ?? false} />;
+    return (
+      <KnowledgeTransferPanel
+        userId={employeeId}
+        items={knowledgeTransferChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
   }
   if (section.key === "asset-recovery" && assetRecoveryChecklist !== undefined) {
-    return <AssetRecoveryPanel userId={employeeId} items={assetRecoveryChecklist} canAddItem={canAddChecklistItem ?? false} />;
+    return (
+      <AssetRecoveryPanel
+        userId={employeeId}
+        items={assetRecoveryChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
   }
   if (section.key === "system-revocation" && systemRevocationChecklist !== undefined) {
-    return <SystemRevocationPanel userId={employeeId} items={systemRevocationChecklist} canAddItem={canAddChecklistItem ?? false} />;
+    return (
+      <SystemRevocationPanel
+        userId={employeeId}
+        items={systemRevocationChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
   }
   if (section.key === "financial-settlement" && financialSettlement !== undefined) {
-    return <FinancialSettlementPanel userId={employeeId} data={financialSettlement} />;
+    return <FinancialSettlementPanel userId={employeeId} data={financialSettlement} canEdit={canEdit} />;
   }
   if (STAGE_CONTENT_PANELS[section.key]) {
     const ContentPanel = STAGE_CONTENT_PANELS[section.key];

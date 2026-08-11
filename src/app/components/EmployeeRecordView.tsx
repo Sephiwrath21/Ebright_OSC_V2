@@ -141,6 +141,10 @@ interface Props {
   departments?: DepartmentOpt[];
   /** Real Task Manager data (separate database) — only fetched for the Task category. */
   tasks?: EmployeeTasksSummary;
+  /** false hides every panel's Edit/Save toggle (view-only) — e.g. a CEO viewing
+   *  someone else's record, where the server-side guard already blocks the save.
+   *  Defaults true so this stays a no-op unless a caller opts in. */
+  canEdit?: boolean;
 }
 
 export default function EmployeeRecordView({
@@ -179,6 +183,7 @@ export default function EmployeeRecordView({
   branches,
   departments,
   tasks,
+  canEdit = true,
 }: Props) {
   const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
 
@@ -317,24 +322,44 @@ export default function EmployeeRecordView({
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
               if (sectionKey === "personal-info" && employeeDetail)
-                return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} />;
+                return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />;
               if (sectionKey === "guardian-info" && guardianInfo !== undefined)
-                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} />;
+                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />;
               if (sectionKey === "payment" && employeeDetail && paymentInfo !== undefined)
-                return <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} />;
+                return (
+                  <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
+                );
               if (sectionKey === "emergency-contact" && employeeDetail)
                 return (
-                  <EmergencyContactPanel employee={employeeDetail} onSave={(data) => updateEmergencyContact(employeeId, data)} />
+                  <EmergencyContactPanel
+                    employee={employeeDetail}
+                    onSave={(data) => updateEmergencyContact(employeeId, data)}
+                    canEdit={canEdit}
+                  />
                 );
               if (sectionKey === "leave" && leaveHistory) return <LeavePanel rows={leaveHistory} />;
               if (category.key === "hr-info" && sectionKey === "resume" && resumeInfo)
-                return <ResumePanel userId={employeeId} resumeFileId={resumeInfo.resumeFileId} cvFileId={resumeInfo.cvFileId} />;
+                return (
+                  <ResumePanel
+                    userId={employeeId}
+                    resumeFileId={resumeInfo.resumeFileId}
+                    cvFileId={resumeInfo.cvFileId}
+                    canEdit={canEdit}
+                  />
+                );
               if (category.key === "hr-info" && sectionKey === "reference" && referenceCheck !== undefined)
-                return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} />;
+                return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />;
               if (category.key === "hr-info" && sectionKey === "medical-check" && medicalCheck !== undefined)
-                return <MedicalCheckPanel userId={employeeId} data={medicalCheck} />;
+                return <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />;
               if (category.key === "hr-info" && sectionKey === "handbook" && documentsInfo !== undefined)
-                return <DocumentsPanel userId={employeeId} data={documentsInfo} showEmploymentContract={false} />;
+                return (
+                  <DocumentsPanel
+                    userId={employeeId}
+                    data={documentsInfo}
+                    showEmploymentContract={false}
+                    canEdit={canEdit}
+                  />
+                );
               if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
                 return (
                   <OnboardingPayrollPanel
@@ -343,6 +368,7 @@ export default function EmployeeRecordView({
                     employeeDetail={employeeDetail}
                     heading="Tax Info"
                     showBankDetails={false}
+                    canEdit={canEdit}
                   />
                 );
               if (
@@ -358,16 +384,21 @@ export default function EmployeeRecordView({
                     salaryRevisions={salaryRevisions}
                     payslip={payslip}
                     payslipHistory={payslipHistory}
+                    canEdit={canEdit}
                   />
                 );
               if (category.key === "hr-info" && sectionKey === "nda-nc" && ndaInfo !== undefined && nonCompeteInfo !== undefined)
-                return <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} />;
+                return (
+                  <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                );
               if (category.key === "active-employment" && sectionKey === "cert" && achievements !== undefined)
-                return <AchievementPanel userId={employeeId} data={achievements} />;
+                return <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />;
               if (category.key === "active-employment" && sectionKey === "performance-review" && performanceReview !== undefined)
-                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} />;
+                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />;
               if (category.key === "active-employment" && sectionKey === "promotion" && promotions !== undefined)
-                return <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} />;
+                return (
+                  <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
+                );
               if (category.key === "active-employment" && sectionKey === "transfer" && transfers !== undefined)
                 return (
                   <TransferPanel
@@ -376,23 +407,24 @@ export default function EmployeeRecordView({
                     branches={branches ?? []}
                     departments={departments ?? []}
                     currentLocation={departmentName ?? branchName}
+                    canEdit={canEdit}
                   />
                 );
               if (category.key === "active-employment" && sectionKey === "training" && trainings !== undefined)
-                return <TrainingPanel userId={employeeId} data={trainings} />;
+                return <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "domestic-inquiry" && domesticInquiries !== undefined)
-                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} />;
+                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "suspension" && suspensionLetters !== undefined)
-                return <SuspensionPanel userId={employeeId} data={suspensionLetters} />;
+                return <SuspensionPanel userId={employeeId} data={suspensionLetters} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "showcause" && showcauseWarningLetters !== undefined)
-                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} />;
+                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "pip" && pips !== undefined)
-                return <PipPanel userId={employeeId} data={pips} />;
+                return <PipPanel userId={employeeId} data={pips} canEdit={canEdit} />;
               if (category.key === "task" && sectionKey === "pending" && tasks !== undefined)
                 return <TaskPendingPanel tasks={tasks.pending} />;
               if (category.key === "task" && sectionKey === "overdue" && tasks !== undefined)
                 return <TaskOverduePanel tasks={tasks.overdue} />;
-              if (StaticPanel) return <StaticPanel />;
+              if (StaticPanel) return <StaticPanel canEdit={canEdit} />;
               return (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
                   <p className="text-base font-semibold text-slate-800">
@@ -464,10 +496,12 @@ function PaymentInfoPanel({
   employee,
   employeeId,
   data,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   employeeId: number;
   data: PaymentInfoData | null;
+  canEdit?: boolean;
 }) {
   const [bankName, setBankName] = useState(employee.bankName ?? "");
   const [accountName, setAccountName] = useState(employee.accountName ?? "");
@@ -488,7 +522,7 @@ function PaymentInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Payment &amp; Bank Info</PanelHeading>
       <Subsection heading="Bank Details">
         <EditableField label="Bank Name" value={bankName} onChange={setBankName} />

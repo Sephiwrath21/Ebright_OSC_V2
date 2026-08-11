@@ -19,10 +19,16 @@ interface Props {
   onSave?: () => Promise<SaveResult> | SaveResult;
   /** false when some/all fields in this section have no matching DB column yet. */
   hasRealBacking?: boolean;
+  /** false hides the Edit/Save toggle entirely (view-only) — e.g. a CEO
+   *  viewing someone else's profile in Employee Folder, where the
+   *  server-side guard in employeeRecordActions.ts already blocks the save;
+   *  this just avoids showing a button that would only ever 403. Defaults
+   *  true so every existing caller keeps its current behavior unchanged. */
+  canEdit?: boolean;
   children: ReactNode;
 }
 
-export function EditableSection({ onSave, hasRealBacking = true, children }: Props) {
+export function EditableSection({ onSave, hasRealBacking = true, canEdit = true, children }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,14 +62,16 @@ export function EditableSection({ onSave, hasRealBacking = true, children }: Pro
   return (
     <EditModeContext.Provider value={editing}>
       <div className="relative">
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={saving}
-          className="absolute top-0 right-0 z-10 min-h-11 rounded-full border-2 border-[#4a90e2] bg-white px-5 py-2 text-sm font-medium text-[#4a90e2] hover:bg-[#eef4fd] disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-        >
-          {saving ? "Saving…" : editing ? "Save" : "Edit"}
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={saving}
+            className="absolute top-0 right-0 z-10 min-h-11 rounded-full border-2 border-[#4a90e2] bg-white px-5 py-2 text-sm font-medium text-[#4a90e2] hover:bg-[#eef4fd] disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {saving ? "Saving…" : editing ? "Save" : "Edit"}
+          </button>
+        )}
         {notice && (
           <div
             role="status"
