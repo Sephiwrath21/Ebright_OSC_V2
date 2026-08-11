@@ -413,10 +413,18 @@ export function assignSavedPackages(email: string): Promise<AssignSavedPackagesR
       try {
         manager = await requireSingleBranchManager(branch);
       } catch (err) {
-        skippedBranches.push({
-          branch,
-          reason: err instanceof ApiHttpError ? err.message : "Could not resolve a branch manager",
-        });
+        // Only a genuine manager-count problem (0 or 2+ managers) degrades
+        // to a per-branch skip — that's the KNOWN, EXPECTED failure mode
+        // this partial-success boundary exists for (code review, 2026-08-11:
+        // originally this caught anything and mislabeled it "Could not
+        // resolve a branch manager", which would silently mask a real
+        // infra failure — e.g. a DB connection drop mid-loop — as if it
+        // were an org-chart data problem, with no signal to the caller
+        // that anything is actually wrong). Anything else re-throws and
+        // aborts the whole call, same as any other unexpected error in
+        // this codebase's native() wrapper.
+        if (!(err instanceof ApiHttpError)) throw err;
+        skippedBranches.push({ branch, reason: err.message });
         continue;
       }
       for (const row of branchRows) {
