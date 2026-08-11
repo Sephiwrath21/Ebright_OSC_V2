@@ -227,9 +227,9 @@ describe("taskManagerNavAccess", () => {
       packageTable: true,
     });
   });
-  it("Branch Manager (BRANCH): template false, package/packageTable true", () => {
+  it("Branch Manager (BRANCH): all three true (2026-08-11 — Template added, same tier as HOD)", () => {
     expect(taskManagerNavAccess({ role: "BRANCH", department: null })).toEqual({
-      template: false,
+      template: true,
       package: true,
       packageTable: true,
     });
