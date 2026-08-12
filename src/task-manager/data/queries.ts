@@ -312,7 +312,17 @@ export function getDepartmentDetail(
     await advanceRecurringBlocks();
     const q = departmentQuerySchema.parse({ department, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    if (!canViewEntity(user, "department", q.department)) {
+    // Stacked-sections redesign (2026-08-12): plain department-side staff
+    // (role MEMBER) may view their OWN department's whole-roster DAILY
+    // detail — the new page-wide Daily section's confirmed visibility rule
+    // — but NOT Monthly (unchanged, still self-only for MEMBER). Scoped
+    // locally to this function (not canViewEntity itself, which has no
+    // period and also gates getBranchDetail/the HOD/CEO-assigned queries —
+    // widening it there would silently unlock Monthly whole-department
+    // detail too, which must stay unchanged).
+    const ownDailyView =
+      user.role === "MEMBER" && q.period === "daily" && q.department === (user.department ?? UNASSIGNED);
+    if (!canViewEntity(user, "department", q.department) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own department");
     }
     const payload = await getEntityPayload("department", q.department, q.period, q.date);
@@ -378,7 +388,12 @@ export function getBranchDetail(
     await advanceRecurringBlocks();
     const q = branchQuerySchema.parse({ branch, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    if (!canViewEntity(user, "branch", q.branch)) {
+    // Same rule as getDepartmentDetail above — plain branch-side staff
+    // (role MEMBER, e.g. Branch Exec/Coach) may view their own branch's
+    // whole-roster DAILY detail only; Monthly stays self-only.
+    const ownDailyView =
+      user.role === "MEMBER" && q.period === "daily" && q.branch === (user.branch ?? UNASSIGNED);
+    if (!canViewEntity(user, "branch", q.branch) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own branch");
     }
     const payload = await getEntityPayload("branch", q.branch, q.period, q.date);
