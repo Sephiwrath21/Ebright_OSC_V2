@@ -301,7 +301,9 @@ const departmentQuerySchema = analyticsQuerySchema.extend({
   department: z.string().min(1).max(200),
 });
 
-/** Full detail for ONE department by name (org roles any; HOD/DEPT_SITE own only). */
+/** Full detail for ONE department by name (org roles any; HOD/DEPT_SITE own
+ *  only; MEMBER additionally sees own department's Daily only (see
+ *  ownDailyView below)). */
 export function getDepartmentDetail(
   email: string,
   department: string,
@@ -377,7 +379,9 @@ const branchQuerySchema = analyticsQuerySchema.extend({
 });
 
 /** Full detail for ONE branch by name (org roles any; BRANCH/BRANCH_SITE own
- *  only — elevated department sites deliberately have NO branch access). */
+ *  only — elevated department sites deliberately have NO branch access;
+ *  MEMBER additionally sees own branch's Daily only (see ownDailyView
+ *  below)). */
 export function getBranchDetail(
   email: string,
   branch: string,
