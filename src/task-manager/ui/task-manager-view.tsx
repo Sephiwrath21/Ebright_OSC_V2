@@ -587,7 +587,7 @@ export function TaskManagerView({
             hodAssigned={hodAssignedDepartment?.department ?? monthly.department}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            dateControl={departmentDailyControl}
+            dailyDateControl={departmentDailyControl}
           />
         </>
       )}
@@ -608,7 +608,8 @@ export function TaskManagerView({
             hodAssigned={hodAssignedBranch?.branch ?? monthly.branch}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            dateControl={personalDailyControl}
+            dailyDateControl={personalDailyControl}
+            monthlyDateControl={personalMonthlyControl}
           />
           {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
               Manager only, not the view-only BRANCH_SITE login. The

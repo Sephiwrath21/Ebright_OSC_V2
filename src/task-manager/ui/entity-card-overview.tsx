@@ -46,7 +46,8 @@ export function EntityCardOverview({
   hodAssigned,
   categories,
   myUserId,
-  dateControl,
+  dailyDateControl,
+  monthlyDateControl,
 }: {
   entityName: string;
   daily: FlowEntityDetail;
@@ -55,10 +56,15 @@ export function EntityCardOverview({
   categories: FlowCategoryOption[];
   /** The viewer's own id — drives "Only Me". */
   myUserId: string;
-  /** The existing Date filter control (unchanged) — rendered next to
-   *  Filter, hidden when filterMode is "hodAssigned" (that mode is
-   *  all-time, the date control has nothing to apply to). */
-  dateControl?: React.ReactNode;
+  /** The existing Daily-period date filter control (unchanged) — shown
+   *  when filterMode is "daily". */
+  dailyDateControl?: React.ReactNode;
+  /** The existing Monthly-period date/range control (unchanged) — shown
+   *  when filterMode is "monthly". Omit if this entity never had a
+   *  Monthly date filter (e.g. Department Overview never did before this
+   *  redesign) — no control renders for Monthly in that case, matching
+   *  prior behavior exactly. */
+  monthlyDateControl?: React.ReactNode;
 }) {
   const [filterMode, setFilterMode] = React.useState<FilterMode>("daily");
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
@@ -86,7 +92,8 @@ export function EntityCardOverview({
             <option value="monthly">Monthly</option>
             <option value="hodAssigned">HOD Assigned Task</option>
           </select>
-          {filterMode !== "hodAssigned" && dateControl}
+          {filterMode === "daily" && dailyDateControl}
+          {filterMode === "monthly" && monthlyDateControl}
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}

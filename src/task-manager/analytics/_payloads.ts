@@ -197,7 +197,20 @@ async function buildEntityPayload(
   window: PeriodWindow | null,
   opts: { strictWindow?: boolean; assignerRole?: string } = {},
 ): Promise<EntityPayload> {
-  const all = await fetchPeriodBlocks(window, { strictWindow: opts.strictWindow ?? false });
+  let assigneeIdIn: string[] | undefined;
+  if (window === null) {
+    const rosterIds = await prisma.user.findMany({
+      where: {
+        ...(type === "branch"
+          ? { branch: name === UNASSIGNED ? null : name }
+          : { department: name === UNASSIGNED ? null : name }),
+        role: { notIn: ["DEPT_SITE", "BRANCH_SITE"] },
+      },
+      select: { id: true },
+    });
+    assigneeIdIn = rosterIds.map((u) => u.id);
+  }
+  const all = await fetchPeriodBlocks(window, { strictWindow: opts.strictWindow ?? false, assigneeIdIn });
   const users = await getAssigneeMap(all);
 
   // Scope to this entity via the assignee's branch/department (null → Unassigned).

@@ -617,6 +617,10 @@ export interface PeriodBlockFilter {
   startedById?: string;
   /** Drop blocks assigned to this user (delegated view excludes self-work). */
   excludeAssigneeId?: string;
+  /** Scope to a SET of assignees (entity-roster bound for the all-time
+   *  HOD-Assigned payload, 2026-08-12) — distinct from the single-id
+   *  `assigneeId` above. */
+  assigneeIdIn?: string[];
   /** Cadence-TAGGED blocks normally belong to their period UNCONDITIONALLY
    *  (the personal "My Tasks — Daily" weekday tabs need the whole week's
    *  DAILY tasks at once). Date-filtered surfaces (the entity overviews'
@@ -644,6 +648,7 @@ export async function fetchPeriodBlocks(
     where: {
       ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
       ...(filter.excludeAssigneeId ? { assigneeId: { not: filter.excludeAssigneeId } } : {}),
+      ...(filter.assigneeIdIn ? { assigneeId: { in: filter.assigneeIdIn } } : {}),
       run: {
         status: { not: "CANCELLED" },
         // Archived runs (2026-07-31) are hidden from EVERY active view —

@@ -872,7 +872,7 @@ export default async function TaskManagerPage({
       daily.branch
         ? getBranchHodAssigned(email, daily.branch.name).catch(() => null)
         : Promise.resolve(null),
-      listActiveTaskCategories(email),
+      listActiveTaskCategories(email).catch(() => []),
     ]);
 
     // Personal date filters (2026-07-28): one control per period, mounted by
