@@ -284,7 +284,7 @@ export default function LeaveRequestsView({
           }}
         >
           {/* Donut chart */}
-          <div className="bg-white border border-slate-200 rounded-2xl px-6 py-5 flex items-center gap-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-5 flex items-center gap-6">
             <StatusDonut counts={displayCounts} />
             <ul className="space-y-2 min-w-0">
               {DONUT_SEGMENTS.map((s) => (
@@ -294,10 +294,10 @@ export default function LeaveRequestsView({
                     style={{ backgroundColor: s.color }}
                     aria-hidden="true"
                   />
-                  <span className="text-slate-600">
+                  <span className="text-slate-600 dark:text-slate-300">
                     {s.key === "hod_approved" ? hodApprovedLabel : s.label}
                   </span>
-                  <span className="ml-auto font-semibold text-slate-900 tabular-nums">
+                  <span className="ml-auto font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
                     {displayCounts[s.key]}
                   </span>
                 </li>
@@ -320,11 +320,11 @@ export default function LeaveRequestsView({
                 return (
                   <div
                     key={card.key}
-                    className={`bg-white border border-slate-200 rounded-2xl px-5 py-4 ${card.ring}`}
+                    className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 ${card.ring}`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${card.dot}`} aria-hidden="true" />
-                      <p className="text-[11px] font-semibold tracking-widest text-slate-500">
+                      <p className="text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400">
                         {card.key === "hod_approved"
                           ? hodApprovedLabel.toUpperCase()
                           : card.label}
@@ -349,7 +349,7 @@ export default function LeaveRequestsView({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by ID, type, or reason…"
-              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 dark:text-slate-100 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
           </div>
 
@@ -357,7 +357,7 @@ export default function LeaveRequestsView({
             aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-36"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-36"
           >
             <option value="">All Status</option>
             {STATUS_OPTIONS.map((s) => (
@@ -371,7 +371,7 @@ export default function LeaveRequestsView({
             aria-label="Filter by leave type"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-40"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-40"
           >
             <option value="">All Types</option>
             {typeOptions.map((t) => (
@@ -385,7 +385,7 @@ export default function LeaveRequestsView({
             aria-label="Filter by month"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-36"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-36"
           >
             <option value="">All Months</option>
             {monthOptions.map((m) => (
@@ -400,22 +400,22 @@ export default function LeaveRequestsView({
         </section>
 
         {/* Leave table */}
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Umbrella className="w-4 h-4 text-slate-500" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-slate-900">
+              <Umbrella className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {viewOnly ? "All Leave Requests" : "My Leave Requests"}
               </h2>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {filtered.length} {filtered.length === 1 ? "record" : "records"}
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
                 <tr>
                   <th className="text-left px-6 py-3">ID</th>
                   {viewOnly && <th className="text-left px-6 py-3">Employee</th>}
@@ -434,18 +434,18 @@ export default function LeaveRequestsView({
                   <tr>
                     <td colSpan={viewOnly ? 10 : 9} className="px-6 py-20">
                       <div className="flex flex-col items-center gap-3 text-center">
-                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                           <Inbox className="w-6 h-6 text-slate-400" aria-hidden="true" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-700">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             {rows.length === 0
                               ? viewOnly
                                 ? "No leave requests in the system yet"
                                 : "No leave requests yet"
                               : "No requests match your filters"}
                           </p>
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             {rows.length === 0
                               ? viewOnly
                                 ? "Submitted requests will appear here."
@@ -468,9 +468,9 @@ export default function LeaveRequestsView({
                 ) : (
                   filtered.map((r) => {
                     const baseBadge = STATUS_BADGE[r.status] ?? {
-                      bg: "#F1F5F9",
-                      text: "#334155",
-                      dot: "#64748B",
+                      bg: "var(--status-neutral-bg)",
+                      text: "var(--text-strong)",
+                      dot: "var(--text-muted-strong)",
                       label: r.status,
                     };
                     const badge =
@@ -480,32 +480,32 @@ export default function LeaveRequestsView({
                     return (
                       <tr
                         key={r.leaveId}
-                        className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors"
+                        className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors"
                       >
-                        <td className="px-6 py-4 font-semibold text-emerald-700">
+                        <td className="px-6 py-4 font-semibold text-emerald-700 dark:text-emerald-300">
                           {r.displayId}
                         </td>
                         {viewOnly && (
-                          <td className="px-6 py-4 text-slate-700 truncate max-w-[200px]" title={r.employeeName ?? ""}>
+                          <td className="px-6 py-4 text-slate-700 dark:text-slate-300 truncate max-w-[200px]" title={r.employeeName ?? ""}>
                             {r.employeeName ?? <span className="text-slate-400">—</span>}
                           </td>
                         )}
-                        <td className="px-6 py-4 text-slate-700 font-medium tabular-nums" title={r.leaveTypeName}>
+                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium tabular-nums" title={r.leaveTypeName}>
                           {r.leaveTypeCode.toUpperCase()}
                         </td>
-                        <td className="px-6 py-4 text-slate-600 tabular-nums">
+                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300 tabular-nums">
                           {new Date(r.startDate).toLocaleDateString("en-GB")}
                         </td>
-                        <td className="px-6 py-4 text-slate-600 tabular-nums">
+                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300 tabular-nums">
                           {new Date(r.endDate).toLocaleDateString("en-GB")}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-slate-900 tabular-nums">
+                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
                           {r.totalDays}
                         </td>
-                        <td className="px-6 py-4 text-slate-600 max-w-[240px] truncate" title={r.reason ?? ""}>
+                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300 max-w-[240px] truncate" title={r.reason ?? ""}>
                           {r.reason ?? <span className="text-slate-400">—</span>}
                         </td>
-                        <td className="px-6 py-4 text-slate-500 tabular-nums">
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400 tabular-nums">
                           {new Date(r.appliedAt).toLocaleDateString("en-GB")}
                         </td>
                         <td className="px-6 py-4">

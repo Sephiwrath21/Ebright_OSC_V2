@@ -767,7 +767,7 @@ function ToggleRow({
       >
         <span
           aria-hidden="true"
-          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-white shadow transition-transform ${
             checked ? "translate-x-5" : "translate-x-0.5"
           }`}
         />

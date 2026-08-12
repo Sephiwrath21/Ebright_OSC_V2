@@ -452,7 +452,7 @@ export default function PCMAttendanceClient() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100">
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
                           <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-8">#</th>
                           <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
                           <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Branch</th>
@@ -464,10 +464,10 @@ export default function PCMAttendanceClient() {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {sessionRecords.map((r, i) => (
-                          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                          <tr key={r.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/70 transition-colors">
                             <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                             <td className="px-4 py-3">
-                              <div className="font-medium text-slate-900">{r.studentName}</div>
+                              <div className="font-medium text-slate-900 dark:text-slate-100">{r.studentName}</div>
                               <div className="text-xs text-slate-400 font-mono">{r.studentId}</div>
                             </td>
                             <td className="px-4 py-3">
@@ -475,7 +475,7 @@ export default function PCMAttendanceClient() {
                                 {r.branch}
                               </span>
                             </td>
-                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{gradeLabel(r.grade)}</td>
+                            <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300">{gradeLabel(r.grade)}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${
                                 r.inviteType === "progress"
@@ -490,7 +490,7 @@ export default function PCMAttendanceClient() {
                                 {STATUS_LABELS[r.status]}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{r.coachName}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{r.coachName}</td>
                           </tr>
                         ))}
                       </tbody>
