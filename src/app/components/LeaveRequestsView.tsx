@@ -48,20 +48,20 @@ const STATUS_OPTIONS = [
 ] as const;
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
-  hod_approved: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", label: "HOD Approved" },
-  approved: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Approved" },
-  rejected: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Rejected" },
-  cancelled: { bg: "#F1F5F9", text: "#475569", dot: "#94A3B8", label: "Cancelled" },
+  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
+  hod_approved: { bg: "var(--tint-blue)", text: "var(--status-blue-fg)", dot: "var(--accent-blue)", label: "HOD Approved" },
+  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
+  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
+  cancelled: { bg: "var(--status-neutral-bg)", text: "var(--status-neutral-fg-strong)", dot: "var(--status-neutral-fg)", label: "Cancelled" },
 };
 
 const statCards = [
-  { key: "total", label: "TOTAL", dot: "bg-blue-500", text: "text-blue-600", ring: "ring-blue-200 bg-blue-50/40" },
-  { key: "pending", label: "PENDING", dot: "bg-amber-500", text: "text-amber-600", ring: "" },
-  { key: "hod_approved", label: "HOD APPROVED", dot: "bg-blue-500", text: "text-blue-600", ring: "" },
-  { key: "approved", label: "APPROVED", dot: "bg-emerald-500", text: "text-emerald-600", ring: "" },
-  { key: "rejected", label: "REJECTED", dot: "bg-red-500", text: "text-red-600", ring: "" },
-  { key: "cancelled", label: "CANCELLED", dot: "bg-slate-400", text: "text-slate-600", ring: "" },
+  { key: "total", label: "TOTAL", dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-200 bg-blue-50/40 dark:ring-blue-800 dark:bg-blue-900/40" },
+  { key: "pending", label: "PENDING", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", ring: "" },
+  { key: "hod_approved", label: "HOD APPROVED", dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", ring: "" },
+  { key: "approved", label: "APPROVED", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", ring: "" },
+  { key: "rejected", label: "REJECTED", dot: "bg-red-500", text: "text-red-600 dark:text-red-400", ring: "" },
+  { key: "cancelled", label: "CANCELLED", dot: "bg-slate-400", text: "text-slate-600 dark:text-slate-300", ring: "" },
 ] as const;
 
 // Segments shown in the donut (total is rendered in the center, not as a slice).
@@ -84,7 +84,7 @@ function StatusDonut({ counts }: { counts: Record<string, number> }) {
     <div className="relative w-40 h-40 shrink-0">
       <svg viewBox="0 0 160 160" className="w-40 h-40 -rotate-90">
         {/* Track */}
-        <circle cx="80" cy="80" r={radius} fill="none" stroke="#F1F5F9" strokeWidth="20" />
+        <circle cx="80" cy="80" r={radius} fill="none" stroke="var(--status-neutral-bg)" strokeWidth="20" />
         {sum > 0 &&
           DONUT_SEGMENTS.map((s) => {
             const value = counts[s.key] ?? 0;
@@ -108,7 +108,7 @@ function StatusDonut({ counts }: { counts: Record<string, number> }) {
           })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-slate-900">{counts.total ?? 0}</span>
+        <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">{counts.total ?? 0}</span>
         <span className="text-[11px] font-semibold tracking-widest text-slate-400">TOTAL</span>
       </div>
     </div>
@@ -183,31 +183,31 @@ export default function LeaveRequestsView({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10 space-y-6">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/attendance" className="hover:text-slate-900 transition-colors">Attendance</Link>
+          <Link href="/attendance" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Attendance</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Leave</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Leave</span>
         </nav>
 
         {/* Unified header: title + CTA in one row */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               {tab === "approve" && canApprove
                 ? "Leave Approvals"
                 : viewOnly ? "All Leave Requests" : "Leave Requests"}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {tab === "approve" && canApprove
                 ? "Review and respond to leave requests from your team."
                 : viewOnly
@@ -230,12 +230,12 @@ export default function LeaveRequestsView({
 
         {canApprove && (
           <div className="flex justify-end">
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-sm font-medium">
+            <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 text-sm font-medium">
             <button
               type="button"
               onClick={() => setTab("mine")}
               className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
-                tab === "mine" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
+                tab === "mine" ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               <User className="w-4 h-4" aria-hidden="true" />
@@ -245,7 +245,7 @@ export default function LeaveRequestsView({
               type="button"
               onClick={() => setTab("approve")}
               className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors ${
-                tab === "approve" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"
+                tab === "approve" ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               <Users className="w-4 h-4" aria-hidden="true" />
@@ -256,8 +256,8 @@ export default function LeaveRequestsView({
         )}
 
         {canApprove && approvalItems.length > 0 && tab !== "approve" && (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <Hourglass className="w-4 h-4 shrink-0 text-amber-600" aria-hidden="true" />
+          <div className="flex items-center gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+            <Hourglass className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
             <span className="flex-1">
               {approvalItems.length === 1
                 ? "There is 1 pending leave request awaiting your approval."
