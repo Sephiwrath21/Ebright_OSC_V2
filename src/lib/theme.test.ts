@@ -14,6 +14,10 @@ describe("parseTheme", () => {
     expect(parseTheme(undefined)).toBe("light");
   });
 
+  it("defaults to light for a null value", () => {
+    expect(parseTheme(null)).toBe("light");
+  });
+
   it("defaults to light when the cookie is empty", () => {
     expect(parseTheme("")).toBe("light");
   });
