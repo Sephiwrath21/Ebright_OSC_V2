@@ -164,7 +164,7 @@ export default function UserHeader({ email = "", role = "", name = null }: UserH
           {activeDisplayName}
         </span>
         {isImpersonating && (
-          <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md px-1.5 py-0.5">
+          <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-800 rounded-md px-1.5 py-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             Viewing
           </span>
@@ -261,7 +261,7 @@ export default function UserHeader({ email = "", role = "", name = null }: UserH
               <div className="border-t border-slate-100 dark:border-slate-800 py-1.5">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 transition-colors font-medium"
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 dark:hover:text-red-300 transition-colors font-medium"
                 >
                   <LogOut className="w-4 h-4" aria-hidden="true" />
                   <span>Log out</span>
@@ -295,7 +295,7 @@ export default function UserHeader({ email = "", role = "", name = null }: UserH
                     placeholder="Search users…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full text-sm pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                    className="w-full text-sm pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
                     autoFocus
                   />
                 </div>
