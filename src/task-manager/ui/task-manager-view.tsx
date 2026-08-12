@@ -29,6 +29,7 @@ import type {
   AssignActionResult,
   FlowAssignInput,
   FlowBucketTotals,
+  FlowCategoryOption,
   FlowDetailResponse,
   FlowDrillTask,
   FlowEntityDetail,
@@ -45,7 +46,7 @@ import {
 import { resolveViewRole, shows } from "../role-views";
 import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
-import { EntityOverviewSection } from "./department-overview";
+import { EntityCardOverview } from "./entity-card-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
   PageSectionHeading,
@@ -74,6 +75,9 @@ export function TaskManagerView({
   hodKanban,
   departmentDaily,
   departmentDailyControl,
+  hodAssignedDepartment,
+  hodAssignedBranch,
+  categoryList,
   personalDailyControl,
   personalMonthlyControl,
   personalMonthlyMonthControl,
@@ -119,6 +123,16 @@ export function TaskManagerView({
   departmentDaily?: FlowEntityDetail;
   /** The Daily date filter, rendered on that section's heading row. */
   departmentDailyControl?: React.ReactNode;
+  /** EntityCardOverview's "HOD Assigned Task" filter mode (Overview card
+   *  redesign, 2026-08-12) — all-time, HOD-assigned-only entity payload,
+   *  fetched server-side alongside daily/monthly. Null when the viewer has
+   *  no department/branch to fetch it for, or the fetch failed; the card
+   *  falls back to `monthly.department`/`monthly.branch` in that case (see
+   *  the fallback below) rather than crashing on undefined. */
+  hodAssignedDepartment?: { department: FlowEntityDetail } | null;
+  hodAssignedBranch?: { branch: FlowEntityDetail } | null;
+  /** Active task categories — feeds EntityCardOverview's "Sort: Type" mode. */
+  categoryList?: FlowCategoryOption[];
   /** Personal date filters (2026-07-28, ?date=/?mdate=): each is mounted on
    *  BOTH its period's personal surfaces — the top Daily/Monthly donut card
    *  and the matching "My Tasks" heading — so one selection drives the donut
@@ -274,9 +288,9 @@ export function TaskManagerView({
     />
   );
 
-  // Rosters render inside EntityOverviewSection for BOTH scopes since
-  // 2026-07-29 (branch adopted the Department Overview pattern) — no
-  // separately-styled roster cards remain.
+  // Rosters render inside EntityCardOverview for BOTH scopes (2026-08-12
+  // redesign, replacing EntityOverviewSection) — no separately-styled
+  // roster cards remain.
 
   return (
     <div className="flex flex-col gap-5">
@@ -566,44 +580,35 @@ export function TaskManagerView({
         monthly.department && (
         <>
           <PageSectionHeading>Department Overview</PageSectionHeading>
-          <EntityOverviewSection
-            label="Daily"
-            entity={departmentDaily ?? daily.department}
-            kind="department"
-            reassign={reassign}
-            headerControl={departmentDailyControl}
-          />
-          <EntityOverviewSection
-            label="Monthly"
-            entity={monthly.department}
-            kind="department"
-            reassign={reassign}
+          <EntityCardOverview
+            entityName={daily.department.name}
+            daily={departmentDaily ?? daily.department}
+            monthly={monthly.department}
+            hodAssigned={hodAssignedDepartment?.department ?? monthly.department}
+            categories={categoryList ?? []}
+            myUserId={me.me.userId}
+            dateControl={departmentDailyControl}
           />
         </>
       )}
 
       {/* ---- Branch Overview (branch kind) — below My Tasks since the
           2026-07-29 personal-first reorder. SAME component as Department
-          Overview (EntityOverviewSection, 2026-07-29 request): "{branch} —
-          Daily/Monthly" heading + date filter, stat chips, donut, and the
-          integrated click-through member roster (Manager → Branch Exec →
+          Overview (EntityCardOverview, 2026-08-12 redesign): "{branch} —
+          Overview" heading + Filter/Date/Sort/View controls, and
+          person/type-grouped task cards (Manager → Branch Exec →
           FT Coach → PT Coach sort, applied by the data layer). ---- */}
       {shows(view, "taskManager", "branchOverview") && daily.branch && monthly.branch && (
         <>
           <PageSectionHeading>Branch Overview</PageSectionHeading>
-          <EntityOverviewSection
-            label="Daily"
-            entity={daily.branch}
-            kind="branch"
-            reassign={reassign}
-            headerControl={personalDailyControl}
-          />
-          <EntityOverviewSection
-            label="Monthly"
-            entity={monthly.branch}
-            kind="branch"
-            reassign={reassign}
-            headerControl={personalMonthlyControl}
+          <EntityCardOverview
+            entityName={daily.branch.name}
+            daily={daily.branch}
+            monthly={monthly.branch}
+            hodAssigned={hodAssignedBranch?.branch ?? monthly.branch}
+            categories={categoryList ?? []}
+            myUserId={me.me.userId}
+            dateControl={personalDailyControl}
           />
           {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
               Manager only, not the view-only BRANCH_SITE login. The

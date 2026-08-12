@@ -26,8 +26,10 @@ import {
   deleteKanbanCard,
   deleteKanbanColumn,
   getBranchDetail,
+  getBranchHodAssigned,
   getCeoDashboardConfig,
   getDepartmentDetail,
+  getDepartmentHodAssigned,
   getFlowDetail,
   getFlowStaff,
   getHodKanban,
@@ -854,6 +856,25 @@ export default async function TaskManagerPage({
       );
     }
 
+    // EntityCardOverview's "HOD Assigned Task" filter + category grouping
+    // (Overview card redesign, 2026-08-12) — only meaningful for the roles
+    // that actually render Department/Branch Overview below (HOD/DEPT_SITE,
+    // BRANCH/BRANCH_SITE), so gated on the SAME daily.department/daily.branch
+    // presence the render guards use, mirroring getFlowDetail's own
+    // kind-based conditionality rather than introducing a new pattern. A
+    // viewer without access to that specific entity (or any other failure)
+    // shouldn't fail the whole page load, so each is caught individually —
+    // same defensive shape as the rest of this page's optional fetches.
+    const [hodAssignedDepartment, hodAssignedBranch, categoryList] = await Promise.all([
+      daily.department
+        ? getDepartmentHodAssigned(email, daily.department.name).catch(() => null)
+        : Promise.resolve(null),
+      daily.branch
+        ? getBranchHodAssigned(email, daily.branch.name).catch(() => null)
+        : Promise.resolve(null),
+      listActiveTaskCategories(email),
+    ]);
+
     // Personal date filters (2026-07-28): one control per period, mounted by
     // the view on BOTH that period's personal surfaces (donut card + "My
     // Tasks" heading) — a single ?date=/?mdate= selection drives donut and
@@ -1009,6 +1030,9 @@ export default async function TaskManagerPage({
         hodKanban={hodKanban}
         departmentDaily={departmentDaily}
         departmentDailyControl={departmentDailyControl}
+        hodAssignedDepartment={hodAssignedDepartment}
+        hodAssignedBranch={hodAssignedBranch}
+        categoryList={categoryList}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
         personalMonthlyMonthControl={personalMonthlyMonthControl}
