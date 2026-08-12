@@ -311,6 +311,17 @@ export async function getEntityHodAssignedPayload(
   return buildEntityPayload(type, name, null, { assignerRole: "HOD" });
 }
 
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign):
+ *  every task in this entity whose assigner is the CEO, ALL-TIME — same
+ *  shape and convention as getEntityHodAssignedPayload above, just a
+ *  different assignerRole. */
+export async function getEntityCeoAssignedPayload(
+  type: "branch" | "department",
+  name: string,
+): Promise<EntityPayload> {
+  return buildEntityPayload(type, name, null, { assignerRole: "CEO" });
+}
+
 /**
  * "Ad hoc tasks" overview (ALL-TIME, un-periodized): blocks from runs started
  * by a Branch Manager (role BRANCH) — reserved EXCLUSIVELY for Manager/
