@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* Tailwind v4 resolves `dark:` against prefers-color-scheme by default. This
+   switches it to the class strategy so the server-rendered `dark` class on
+   <html> is what decides the theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc; /* slate-50 — matches AppShell so no white bleed-through */
   --foreground: #171717;
+}
+
+.dark {
+  --background: #020617; /* slate-950 — matches the dark shell */
+  --foreground: #f1f5f9; /* slate-100 */
 }
 
 @theme inline {
