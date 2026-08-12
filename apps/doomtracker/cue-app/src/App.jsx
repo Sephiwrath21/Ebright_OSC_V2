@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   LayoutDashboard, GitBranch, ListChecks, Users, Calendar, CalendarDays, Plus, Mail,
   Circle, CheckCircle2, AlertTriangle, Clock, ChevronRight, ChevronLeft, X, Trash2,
-  Send, Sparkles, BookOpen, Play, CheckSquare, BarChart2, GripVertical, ListTodo, Braces, Paperclip, Grid, GitMerge, Link, Square, Type, Minus, MousePointer, Diamond, Undo2, Redo2, LogOut, Folder, ChevronDown, Pencil, Maximize, Lock, Upload, Eye, Download, ClipboardList, Copy, ExternalLink, Kanban, Filter, ArrowUpDown, Check
+  Send, Sparkles, BookOpen, Play, CheckSquare, BarChart2, GripVertical, ListTodo, Braces, Paperclip, Grid, GitMerge, Link, Square, Type, Minus, MousePointer, Diamond, Undo2, Redo2, LogOut, Folder, ChevronDown, Pencil, Maximize, Lock, Upload, Eye, Download, ClipboardList, Copy, ExternalLink, Kanban, Filter, ArrowUpDown, Check, Table2, GanttChart
 } from "lucide-react";
 import { storage, login, logout, ssoLogin, getCurrentUser, sendNotification, setAuthExpiredHandler, setSaveErrorHandler, listUsers, createUser, updateUser, getDepartmentsOverview, listPeople } from "./storage";
 
@@ -4317,6 +4317,14 @@ const FC_SHAPES = [
 ];
 const FC_META = Object.fromEntries(FC_SHAPES.map((s) => [s.type, s]));
 
+// Shared status→color tokens for Entry's status pill and Gantt's bars, so the same
+// status always reads as the same color across both views.
+const FC_STATUS_COLOR = {
+  not_started: { bg: "#EAB308", text: "#1A1A1A", dot: "#EAB308" },
+  in_progress: { bg: "#2F6FE4", text: "#FFFFFF", dot: "#2F6FE4" },
+  done:        { bg: "#2E9E5B", text: "#FFFFFF", dot: "#2E9E5B" },
+};
+
 // Every node is auto-numbered "1.0", "2.0", … in FLOW ORDER — walking the arrows from
 // the Start shape, depth-first (follow one path to its ending, then the next branch).
 // Where a node forks, its branches are taken top-to-bottom / left-to-right by position
@@ -4661,6 +4669,93 @@ function fcDueMeta(due, done) {
   if (days === 0) return { label: "Due today", color: "#B23A2E", bg: "#FBEAE8" };
   if (days === 1) return { label: "Due tomorrow", color: "#B7791F", bg: "#FBF3E0" };
   return { label: `Due ${fcFmtDate(due)}`, color: C.slate, bg: C.paperDim };
+}
+
+// --- Entry / Gantt date helpers ---------------------------------------------
+// Plain UTC date math (avoids local-timezone drift on day-boundary calcs).
+function fcParseISO(s) {
+  if (!s) return null;
+  const d = new Date(s + "T00:00:00Z");
+  return isNaN(d) ? null : d;
+}
+function fcISO(date) { return date.toISOString().slice(0, 10); }
+function fcDayDiffInclusive(startISO, endISO) {
+  const a = fcParseISO(startISO), b = fcParseISO(endISO);
+  if (!a || !b) return null;
+  return Math.round((b - a) / 86400000) + 1;
+}
+function fcAddDays(iso, days) {
+  const d = fcParseISO(iso); if (!d) return "";
+  d.setUTCDate(d.getUTCDate() + (days - 1));
+  return fcISO(d);
+}
+
+// Keeps start/end/duration mutually consistent when one of the three is edited.
+// End is treated as inclusive (a 1-day task has start === end). End-before-start
+// collapses to a 1-day task anchored on the newly-typed end date rather than
+// producing a negative duration (which would break Gantt bar-width math).
+function fcDeriveDates(edited, value, { start_date, end_date, duration_days }) {
+  const next = { start_date, end_date, duration_days, [edited]: value };
+  const s = next.start_date, e = next.end_date, dur = next.duration_days;
+  if (edited === "start_date") {
+    if (s && dur > 0) next.end_date = fcAddDays(s, dur);
+    else if (s && e) {
+      const d = fcDayDiffInclusive(s, e);
+      if (d != null) { if (d >= 1) next.duration_days = d; else { next.end_date = s; next.duration_days = 1; } }
+    }
+  } else if (edited === "end_date") {
+    if (e && s) {
+      const d = fcDayDiffInclusive(s, e);
+      if (d != null && d >= 1) next.duration_days = d;
+      else { next.start_date = e; next.duration_days = 1; }
+    } else if (e && dur > 0) next.start_date = fcAddDays(e, -(dur - 1));
+  } else if (edited === "duration_days") {
+    const d = Number(value);
+    next.duration_days = (Number.isFinite(d) && d > 0) ? Math.round(d) : undefined;
+    if (s && next.duration_days) next.end_date = fcAddDays(s, next.duration_days);
+    else if (e && next.duration_days) next.start_date = fcAddDays(e, -(next.duration_days - 1));
+  }
+  return { start_date: next.start_date, end_date: next.end_date, duration_days: next.duration_days };
+}
+
+// --- Gantt geometry (pure functions: ISO dates -> pixel offsets) ------------
+const FC_PX_PER_DAY = { day: 36, week: 14, month: 5 };
+function fcTimelineRange(tasks) {
+  const dated = tasks.filter((n) => n.start_date && n.end_date);
+  if (!dated.length) return null;
+  let min = dated[0].start_date, max = dated[0].end_date;
+  dated.forEach((n) => { if (n.start_date < min) min = n.start_date; if (n.end_date > max) max = n.end_date; });
+  return { min, max };
+}
+function fcDayOffset(iso, rangeMinISO) { return fcDayDiffInclusive(rangeMinISO, iso) - 1; }
+function fcBarMetrics(startISO, endISO, rangeMinISO, pxPerDay) {
+  return { left: fcDayOffset(startISO, rangeMinISO) * pxPerDay, width: Math.max(1, fcDayDiffInclusive(startISO, endISO)) * pxPerDay };
+}
+function fcChartWidth(range, pxPerDay) { return range ? fcDayDiffInclusive(range.min, range.max) * pxPerDay : 0; }
+function fcTodayLineLeft(range, pxPerDay) {
+  if (!range) return null;
+  const t = fcISO(new Date());
+  return (t < range.min || t > range.max) ? null : fcDayOffset(t, range.min) * pxPerDay;
+}
+// Tick labels: day -> every day; week -> every Monday (+ the range start); month -> the 1st of each month (+ the range start).
+function fcAxisTicks(range, zoom, pxPerDay) {
+  if (!range) return [];
+  const start = fcParseISO(range.min), end = fcParseISO(range.max);
+  const ticks = [];
+  const cur = new Date(start);
+  let first = true;
+  while (cur <= end) {
+    const iso = fcISO(cur);
+    const dow = cur.getUTCDay(), dom = cur.getUTCDate();
+    let show = false;
+    if (zoom === "day") show = true;
+    else if (zoom === "week") show = first || dow === 1;
+    else show = first || dom === 1;
+    if (show) ticks.push({ iso, left: fcDayOffset(iso, range.min) * pxPerDay, label: fcFmtDate(iso) });
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    first = false;
+  }
+  return ticks;
 }
 
 // Per-step locks the HOD can set on a task: "wait for the previous step" (sequential)
@@ -5430,6 +5525,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   // While a flow is chosen, the Editor/Kanban show only its tasks; this reveals the
   // off-branch ones again so the HOD can pull one in ("include anyway").
   const [showOffBranch, setShowOffBranch] = useState(false);
+  const [ganttZoom, setGanttZoom] = useState("week");  // Gantt-stage zoom level (day/week/month)
   const [confirmFlow, setConfirmFlow] = useState(null);  // route pending double-confirm: { end, route }
   const [selNodes, setSelNodes] = useState([]);   // multi-selection of shape ids
   const setSelNode = (id) => setSelNodes(id == null ? [] : [id]);
@@ -5593,10 +5689,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
 
   const errors = validateFlowchart(nodes, edges);
   const valid = errors.length === 0;
-  // The Editor (assignment) view is locked until the flowchart is built and passes
-  // every rule — the HOD must finish & check the workflow before assigning people.
+  // Entry, Gantt, Editor and Kanban are all locked until the flowchart is built and
+  // passes every rule — the HOD must finish & check the workflow before scheduling
+  // or assigning anything downstream.
   const hasTasks = nodes.some(fcIsTask);
-  const canEnterEditor = valid && hasTasks;
+  const canEnterDownstream = valid && hasTasks;
   // Same bar as the Editor: a half-built chart isn't worth previewing, and the
   // arrows a preview would draw are exactly what the rules check are there.
   const canPreview = valid && hasTasks;
@@ -5633,8 +5730,8 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
 
   // If the flowchart stops being valid (edited via undo, etc.), fall back to the chart.
   useEffect(() => {
-    if ((fcMode === "editor" || fcMode === "kanban") && !canEnterEditor) setFcMode("flowchart");
-  }, [fcMode, canEnterEditor]);
+    if (["entry", "gantt", "editor", "kanban"].includes(fcMode) && !canEnterDownstream) setFcMode("flowchart");
+  }, [fcMode, canEnterDownstream]);
 
   // --- Trace one route -----------------------------------------------------
   // A chart with several endings draws every branch at once, so no single outcome
@@ -5905,6 +6002,14 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
   const setAssignee = (id, field, value) => patchNode(id, { assignee: { name: "", email: "", ...(nodes.find((n) => n.id === id)?.assignee), [field]: value } });
   const setDue = (id, due) => patchNode(id, { due });
+  // Entry-stage status is independent of the Editor/Kanban `done` flag (fcNodeDone
+  // and its call sites are untouched), but setting it to "done" here also flips
+  // `done`/`completedAt` so Editor/Kanban immediately reflect it. The reverse sync
+  // (marking done in Editor updating `status`) is intentionally not implemented.
+  const setEntryStatus = (id, status) => {
+    if (status === "done") patchNode(id, { status, done: true, completedAt: new Date().toISOString() });
+    else patchNode(id, { status, done: false, completedAt: null });
+  };
   const setInstructions = (id, instructions) => patchNode(id, { instructions });
   // Approver (HOD picks who signs off this step / decision — emailed on demand).
   const setApprover = (id, field, value) => patchNode(id, { approver: { name: "", email: "", ...(nodes.find((n) => n.id === id)?.approver), [field]: value } });
@@ -6062,25 +6167,41 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
           ) : (
             <h1 onDoubleClick={() => { setNameDraft(template.name); setEditingName(true); }} title="Double-click to rename" style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: C.ink, margin: 0, cursor: "text", display: "inline-block" }}>{template.name}</h1>
           )}
-          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "2px 0 0" }}>{template.module} · {fcMode === "flowchart" ? "workflow flowchart" : fcMode === "kanban" ? "task board" : "task editor"}</p>
+          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "2px 0 0" }}>{template.module} · {{ flowchart: "workflow flowchart", entry: "task scheduling", gantt: "timeline", kanban: "task board", editor: "task editor" }[fcMode]}</p>
         </div>
         <div style={{ display: "flex", background: C.paperDim, borderRadius: 10, padding: 3, flexShrink: 0 }}>
           <button onClick={() => setFcMode("flowchart")} style={toggleBtn(fcMode === "flowchart")}><GitMerge size={15} /> Flowchart</button>
           <button
-            onClick={() => canEnterEditor && setFcMode("editor")}
-            disabled={!canEnterEditor}
-            title={canEnterEditor ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can assign tasks.")}
-            style={{ ...toggleBtn(fcMode === "editor"), opacity: canEnterEditor ? 1 : 0.4, cursor: canEnterEditor ? "pointer" : "not-allowed" }}
+            onClick={() => canEnterDownstream && setFcMode("entry")}
+            disabled={!canEnterDownstream}
+            title={canEnterDownstream ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can schedule tasks.")}
+            style={{ ...toggleBtn(fcMode === "entry"), opacity: canEnterDownstream ? 1 : 0.4, cursor: canEnterDownstream ? "pointer" : "not-allowed" }}
           >
-            {canEnterEditor ? <ListChecks size={15} /> : <Lock size={14} />} Editor
+            {canEnterDownstream ? <Table2 size={15} /> : <Lock size={14} />} Entry
           </button>
           <button
-            onClick={() => canEnterEditor && setFcMode("kanban")}
-            disabled={!canEnterEditor}
-            title={canEnterEditor ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can view the board.")}
-            style={{ ...toggleBtn(fcMode === "kanban"), opacity: canEnterEditor ? 1 : 0.4, cursor: canEnterEditor ? "pointer" : "not-allowed" }}
+            onClick={() => canEnterDownstream && setFcMode("gantt")}
+            disabled={!canEnterDownstream}
+            title={canEnterDownstream ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can view the timeline.")}
+            style={{ ...toggleBtn(fcMode === "gantt"), opacity: canEnterDownstream ? 1 : 0.4, cursor: canEnterDownstream ? "pointer" : "not-allowed" }}
           >
-            {canEnterEditor ? <Kanban size={15} /> : <Lock size={14} />} Kanban
+            {canEnterDownstream ? <GanttChart size={15} /> : <Lock size={14} />} Gantt
+          </button>
+          <button
+            onClick={() => canEnterDownstream && setFcMode("editor")}
+            disabled={!canEnterDownstream}
+            title={canEnterDownstream ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can assign tasks.")}
+            style={{ ...toggleBtn(fcMode === "editor"), opacity: canEnterDownstream ? 1 : 0.4, cursor: canEnterDownstream ? "pointer" : "not-allowed" }}
+          >
+            {canEnterDownstream ? <ListChecks size={15} /> : <Lock size={14} />} Editor
+          </button>
+          <button
+            onClick={() => canEnterDownstream && setFcMode("kanban")}
+            disabled={!canEnterDownstream}
+            title={canEnterDownstream ? "" : (!hasTasks ? "Add at least one task to the flowchart first." : "Fix every workflow issue first — the flowchart must be valid before you can view the board.")}
+            style={{ ...toggleBtn(fcMode === "kanban"), opacity: canEnterDownstream ? 1 : 0.4, cursor: canEnterDownstream ? "pointer" : "not-allowed" }}
+          >
+            {canEnterDownstream ? <Kanban size={15} /> : <Lock size={14} />} Kanban
           </button>
         </div>
         {fcMode === "flowchart" && (<>
@@ -6612,9 +6733,10 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
       </div>
       )}
 
-      {/* Chosen-flow banner — shows in Editor & Kanban once a flow is committed. Lets the
-          HOD change the flow, reveal off-branch tasks, or spin the other endings off. */}
-      {(fcMode === "editor" || fcMode === "kanban") && chosenEnd && (() => {
+      {/* Chosen-flow banner — shows in Entry, Gantt, Editor & Kanban once a flow is
+          committed. Lets the HOD change the flow, reveal off-branch tasks, or spin the
+          other endings off. */}
+      {["entry", "gantt", "editor", "kanban"].includes(fcMode) && chosenEnd && (() => {
         const endNode = nodes.find((n) => n.id === chosenEnd);
         const endLabel = `${fcNodeNums[chosenEnd] ? fcNodeNums[chosenEnd] + " " : ""}${endNode?.label || "End"}`;
         return (
@@ -6631,6 +6753,154 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
               <button onClick={onDuplicate} title="Copy this flowchart into a new workflow for the other endings" style={{ ...fcBarBtn, flexShrink: 0, background: C.paper }}><Copy size={13} /> New workflow for other endings</button>
             )}
             <button onClick={clearFlow} title="Un-choose this flow and edit the whole chart again" style={{ ...fcBarBtn, flexShrink: 0, background: C.paper }}><X size={13} /> Change flow</button>
+          </div>
+        );
+      })()}
+
+      {/* Entry mode — schedule every main task: duration, start, end and status */}
+      {fcMode === "entry" && (
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        {(() => {
+          const tasks = nodes.filter(fcIsTask).slice().sort(
+            (a, b) => (parseInt(fcNodeNums[a.id]) || 0) - (parseInt(fcNodeNums[b.id]) || 0) || (a.y - b.y) || (a.x - b.x)
+          );
+          const activeStatus = fcActiveSet(nodes, edges);
+          const shownTasks = (chosenEnd && !showOffBranch) ? tasks.filter((n) => activeStatus[n.id] === "active") : tasks;
+          if (!tasks.length) return (
+            <div style={{ ...panelCard, textAlign: "center", padding: "44px 24px", maxWidth: 520, margin: "0 auto" }}>
+              <Table2 size={26} color={C.slateLight} />
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, margin: "12px 0 6px" }}>No tasks yet</h3>
+              <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 16px", lineHeight: 1.55 }}>
+                Build your workflow in the <b>Flowchart</b> first. Each task box becomes a row here where you set its schedule.
+              </p>
+              <button onClick={() => setFcMode("flowchart")} style={{ ...fcBarBtn, display: "inline-flex", margin: "0 auto" }}><GitMerge size={14} /> Go to flowchart</button>
+            </div>
+          );
+          return (
+            <div style={{ ...panelCard, padding: 0, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Work Sans', sans-serif", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: C.ink }}>
+                    {["#", "Task", "Duration (days)", "Start", "End", "Status"].map((h) => (
+                      <th key={h} style={{ ...labelStyle, color: "#FFFFFF", textAlign: "left", padding: "9px 12px", borderBottom: `1px solid ${C.ink}` }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {shownTasks.map((n, i) => {
+                    const typeColor = FC_META[n.type].border;
+                    const statusColor = FC_STATUS_COLOR[n.status || "not_started"];
+                    const fieldStyle = { ...inputStyle, marginTop: 0, background: "#FFFFFF", border: `1px solid ${C.line}`, boxShadow: "0 1px 3px rgba(0,0,0,0.45)" };
+                    return (
+                    <tr key={n.id} style={{ background: C.ink, borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
+                      <td style={{ padding: "8px 12px", borderLeft: `3px solid ${typeColor}`, fontFamily: "'JetBrains Mono', monospace", color: typeColor, fontWeight: 600, whiteSpace: "nowrap" }}>{fcNodeNums[n.id] || i + 1}</td>
+                      <td style={{ padding: "8px 12px", minWidth: 180 }}>
+                        <input value={n.label} onFocus={record} onChange={(e) => setNodeLabel(n.id, e.target.value)} placeholder={FC_META[n.type].name} style={fieldStyle} />
+                      </td>
+                      <td style={{ padding: "8px 12px", width: 130 }}>
+                        <input type="number" min={1} value={n.duration_days ?? ""} onFocus={record}
+                          onChange={(e) => patchNode(n.id, fcDeriveDates("duration_days", e.target.value, n))}
+                          style={fieldStyle} />
+                      </td>
+                      <td style={{ padding: "8px 12px", width: 160 }}>
+                        <input type="date" value={n.start_date || ""} onFocus={record}
+                          onChange={(e) => patchNode(n.id, fcDeriveDates("start_date", e.target.value, n))}
+                          style={{ ...fieldStyle, accentColor: C.spotlight }} />
+                      </td>
+                      <td style={{ padding: "8px 12px", width: 160 }}>
+                        <input type="date" value={n.end_date || ""} onFocus={record}
+                          onChange={(e) => patchNode(n.id, fcDeriveDates("end_date", e.target.value, n))}
+                          style={{ ...fieldStyle, accentColor: C.spotlight }} />
+                      </td>
+                      <td style={{ padding: "8px 12px", width: 150 }}>
+                        <select value={n.status || "not_started"} onFocus={record} onChange={(e) => setEntryStatus(n.id, e.target.value)}
+                          style={{ ...fieldStyle, background: statusColor.bg, color: statusColor.text, fontWeight: 700, border: `1px solid ${statusColor.bg}` }}>
+                          <option value="not_started" style={{ background: FC_STATUS_COLOR.not_started.bg, color: FC_STATUS_COLOR.not_started.text }}>Not started</option>
+                          <option value="in_progress" style={{ background: FC_STATUS_COLOR.in_progress.bg, color: FC_STATUS_COLOR.in_progress.text }}>In progress</option>
+                          <option value="done" style={{ background: FC_STATUS_COLOR.done.bg, color: FC_STATUS_COLOR.done.text }}>Done</option>
+                        </select>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+      </div>
+      )}
+
+      {/* Gantt mode — read-only timeline built from each task's schedule set in Entry */}
+      {fcMode === "gantt" && (() => {
+        const tasks = nodes.filter(fcIsTask).slice().sort(
+          (a, b) => (parseInt(fcNodeNums[a.id]) || 0) - (parseInt(fcNodeNums[b.id]) || 0) || (a.y - b.y) || (a.x - b.x)
+        );
+        const activeStatus = fcActiveSet(nodes, edges);
+        const shownTasks = (chosenEnd && !showOffBranch) ? tasks.filter((n) => activeStatus[n.id] === "active") : tasks;
+        const scheduled = shownTasks.filter((n) => n.start_date && n.end_date);
+        const unscheduled = shownTasks.filter((n) => !(n.start_date && n.end_date));
+        const range = fcTimelineRange(shownTasks);
+        const pxPerDay = FC_PX_PER_DAY[ganttZoom];
+        const chartWidth = fcChartWidth(range, pxPerDay);
+        const todayLeft = fcTodayLineLeft(range, pxPerDay);
+        const ticks = fcAxisTicks(range, ganttZoom, pxPerDay);
+        const LABEL_W = 220;
+        if (!tasks.length) return (
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            <div style={{ ...panelCard, textAlign: "center", padding: "44px 24px", maxWidth: 520, margin: "0 auto" }}>
+              <GanttChart size={26} color={C.slateLight} />
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, margin: "12px 0 6px" }}>No tasks yet</h3>
+              <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 16px", lineHeight: 1.55 }}>
+                Build your workflow in the <b>Flowchart</b> first, then set dates in <b>Entry</b>.
+              </p>
+              <button onClick={() => setFcMode("flowchart")} style={{ ...fcBarBtn, display: "inline-flex", margin: "0 auto" }}><GitMerge size={14} /> Go to flowchart</button>
+            </div>
+          </div>
+        );
+        return (
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+              {["day", "week", "month"].map((z) => (
+                <button key={z} onClick={() => setGanttZoom(z)} style={toggleBtn(ganttZoom === z)}>{z[0].toUpperCase() + z.slice(1)}</button>
+              ))}
+            </div>
+            {!range ? (
+              <div style={{ ...panelCard, textAlign: "center", padding: "40px 24px" }}>
+                <CalendarDays size={26} color={C.slateLight} />
+                <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "10px 0 0" }}>No tasks have both a start and end date yet — set them in Entry first.</p>
+              </div>
+            ) : (
+              <div style={{ position: "relative", width: chartWidth + LABEL_W, minWidth: "100%", boxSizing: "border-box" }}>
+                <div style={{ position: "relative", height: 26, marginLeft: LABEL_W, borderBottom: `1px solid ${C.line}` }}>
+                  {ticks.map((t) => (
+                    <div key={t.iso} style={{ position: "absolute", left: t.left, fontSize: 11, color: C.slate, whiteSpace: "nowrap" }}>{t.label}</div>
+                  ))}
+                </div>
+                <div style={{ position: "relative" }}>
+                  {todayLeft != null && (
+                    <div style={{ position: "absolute", left: LABEL_W + todayLeft, top: 0, bottom: 0, width: 1, background: C.spotlight, zIndex: 2 }} title="Today" />
+                  )}
+                  {scheduled.map((n) => {
+                    const { left, width } = fcBarMetrics(n.start_date, n.end_date, range.min, pxPerDay);
+                    const color = FC_STATUS_COLOR[n.status || "not_started"].dot;
+                    return (
+                      <div key={n.id} style={{ display: "flex", alignItems: "center", height: 34 }}>
+                        <div style={{ width: LABEL_W, flexShrink: 0, fontSize: 12.5, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 8, boxSizing: "border-box" }}>{n.label || FC_META[n.type].name}</div>
+                        <div style={{ position: "relative", flex: 1, height: "100%" }}>
+                          <div title={`${n.label || FC_META[n.type].name} · ${n.start_date} → ${n.end_date}`} style={{ position: "absolute", left, width, top: 7, height: 20, borderRadius: 5, background: color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {unscheduled.length > 0 && (
+                  <div style={{ marginTop: 12, marginLeft: LABEL_W, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slateLight }}>
+                    {unscheduled.length} unscheduled task{unscheduled.length === 1 ? "" : "s"} — set dates in Entry to see {unscheduled.length === 1 ? "it" : "them"} here.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -8522,7 +8792,7 @@ function DeptOverview() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, fontFamily: "'Work Sans', sans-serif" }}>
+    <div style={{ maxWidth: 1160, fontFamily: "'Work Sans', sans-serif" }}>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: C.ink, margin: "0 0 4px" }}>Company overview</h1>
       <p style={{ color: C.slate, fontSize: 14, margin: "0 0 24px" }}>
         Every department's templates, runsheets and progress in one place. This view is read-only.
@@ -8534,7 +8804,7 @@ function DeptOverview() {
       )}
 
       {/* Summary cards — one per department */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 16, marginBottom: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16, marginBottom: 32 }}>
         {depts.map((d) => (
           <div key={d.department} style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
@@ -8542,9 +8812,10 @@ function DeptOverview() {
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 500, color: C.ink }}>{d.prog.pct}%</span>
             </div>
             <ProgressBar pct={d.prog.pct} />
-            <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 13, color: C.slate }}>
-              <span>{(d.templates || []).length} templates</span>
-              <span>{(d.runsheets || []).length} runsheets</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14, marginTop: 14, fontSize: 13, color: C.slate }}>
+              <div><div style={{ fontWeight: 600, color: C.ink }}>{d.employees ?? 0}</div>employees</div>
+              <div><div style={{ fontWeight: 600, color: C.ink }}>{(d.templates || []).length}</div>templates</div>
+              <div><div style={{ fontWeight: 600, color: C.ink }}>{(d.runsheets || []).length}</div>runsheets</div>
             </div>
             <div style={{ marginTop: 6, fontSize: 13, color: C.slate }}>
               {d.prog.done}/{d.prog.total} cues delivered · {d.running} running
@@ -8661,33 +8932,6 @@ function LoginPage({ onSignIn, notice }) {
   );
 }
 
-function DoomTransition() {
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999, background: "#000000",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 40,
-      animation: "doomFade 1.4s ease-in-out forwards", pointerEvents: "none",
-    }}>
-      <style>{`
-        @keyframes doomFade {
-          0% { opacity: 0; }
-          28.57% { opacity: 1; }
-          71.43% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-      `}</style>
-      <div style={{
-        width: 70, height: 40, borderRadius: "50%", background: "#E62427",
-        boxShadow: "0 0 30px 12px rgba(230,36,39,0.85), 0 0 60px 24px rgba(230,36,39,0.5)",
-      }} />
-      <div style={{
-        width: 70, height: 40, borderRadius: "50%", background: "#E62427",
-        boxShadow: "0 0 30px 12px rgba(230,36,39,0.85), 0 0 60px 24px rgba(230,36,39,0.5)",
-      }} />
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------
    MAIN APP
 --------------------------------------------------------------- */
@@ -8713,7 +8957,6 @@ export default function App() {
   const [publicFormToken] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("form"); } catch { return null; }
   });
-  const [showTransition, setShowTransition] = useState(false);
   const [tab, setTab] = useState("dashboard");
   // Collapse the left nav to hand the whole width to the canvas. Persisted so the
   // choice survives a reload — someone who works in the flowchart all day sets it once.
@@ -9169,15 +9412,8 @@ export default function App() {
   const openRunsheet = (id) => { setSelectedId(id); setTab("detail"); };
   const selected = runsheets.find((rs) => rs.id === selectedId);
 
-  useEffect(() => {
-    if (!showTransition) return;
-    const t = setTimeout(() => setShowTransition(false), 1400);
-    return () => clearTimeout(t);
-  }, [showTransition]);
-
   const handleTabChange = (newTab) => {
-    setShowTransition(true);
-    setTimeout(() => setTab(newTab), 700);
+    setTab(newTab);
   };
 
   // External person following a shared form link — no login, no app chrome.
@@ -9233,7 +9469,6 @@ export default function App() {
   return (
     <div style={{ position: "relative", display: "flex", height: "100%", background: C.paper, borderRadius: 18, overflow: "hidden", fontFamily: "'Work Sans', sans-serif" }}>
       <style>{FONTS}</style>
-      {showTransition && <DoomTransition />}
       {saveFailed && (
         <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 10000, display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 10, background: C.ink, color: C.paper, fontFamily: "'Work Sans', sans-serif", fontSize: 13, boxShadow: "0 6px 24px rgba(0,0,0,0.25)" }}>
           <span>Couldn't reach the server — recent changes may not be saved.</span>
