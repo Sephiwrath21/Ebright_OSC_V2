@@ -29,7 +29,7 @@ const NO_ACCESS: TaskManagerNavAccess = {
 };
 
 /** Fail-closed: any error (no Task Manager account, DB not configured,
- *  etc.) hides all three gated sidebar items rather than leaking access
+ *  etc.) hides all gated sidebar items rather than leaking access
  *  or throwing and breaking the whole sidebar. `NoAccountError` is the
  *  expected/normal case (most portal users have no Task Manager row) and
  *  stays silent; anything else (DB not configured, a real bug, etc.) is
