@@ -104,21 +104,21 @@ export default async function ProfilePage({
           </nav>
 
           {justChanged && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 text-sm text-emerald-800 dark:text-emerald-200">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Password changed successfully.</span>
             </div>
           )}
 
           {emailChanged && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 text-sm text-emerald-800 dark:text-emerald-200">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Email updated. Sign out and sign in again with your new email to refresh your session.</span>
             </div>
           )}
 
           {profileUpdated && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 text-sm text-emerald-800 dark:text-emerald-200">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Profile updated.</span>
             </div>
