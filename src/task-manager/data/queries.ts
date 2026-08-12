@@ -24,6 +24,7 @@ import {
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
+  getEntityCeoAssignedPayload,
   getEntityHodAssignedPayload,
   getEntityPayload,
   getMePayload,
@@ -342,6 +343,25 @@ export function getDepartmentHodAssigned(
   }, "getDepartmentHodAssigned");
 }
 
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign) —
+ *  all-time, no period/date param (mirrors getDepartmentHodAssigned, a
+ *  different payload source/assignerRole). */
+export function getDepartmentCeoAssigned(
+  email: string,
+  department: string,
+): Promise<{ department: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ department: z.string().min(1).max(200) }).parse({ department });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "department", q.department)) {
+      throw new ApiHttpError(403, "You can only view your own department");
+    }
+    const payload = await getEntityCeoAssignedPayload("department", q.department);
+    return { department: { name: q.department, ...payload } };
+  }, "getDepartmentCeoAssigned");
+}
+
 const branchQuerySchema = analyticsQuerySchema.extend({
   branch: z.string().min(1).max(200),
 });
@@ -386,4 +406,22 @@ export function getBranchHodAssigned(
     const payload = await getEntityHodAssignedPayload("branch", q.branch);
     return { branch: { name: q.branch, ...payload } };
   }, "getBranchHodAssigned");
+}
+
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign) —
+ *  all-time, no period/date param. */
+export function getBranchCeoAssigned(
+  email: string,
+  branch: string,
+): Promise<{ branch: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ branch: z.string().min(1).max(200) }).parse({ branch });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityCeoAssignedPayload("branch", q.branch);
+    return { branch: { name: q.branch, ...payload } };
+  }, "getBranchCeoAssigned");
 }
