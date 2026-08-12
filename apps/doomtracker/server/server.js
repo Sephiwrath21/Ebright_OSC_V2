@@ -58,6 +58,35 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
+// Read-only pool into the HR system's `hrfs` database — the real source of
+// truth for which departments exist and who's in them. Flowghan's own
+// `department` field is free text typed by whoever creates an account (see
+// /api/register), which is how test values like "Sales" ended up on the
+// Company Overview page. This pool is only ever SELECTed from.
+const hrfsPool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.HRFS_DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+// HRFS's canonical department names don't always match the strings Flowghan
+// accounts/settings were actually filed under (Flowghan's own DEPARTMENTS
+// list in App.jsx uses fuller/older names). This maps each HRFS name to the
+// Flowghan-side department string, so existing templates/runsheets still
+// surface under the real department instead of looking like "no activity".
+const HRFS_TO_FLOWGHAN_DEPT = {
+  'CEO': 'MD Office',
+  'Optimisation': 'Optimisation',
+  'Academy': 'Academy',
+  'Marketing': 'Marketing',
+  'Operation': 'Operations',
+  'IOP': 'Industrial-Organisational Psychology',
+  'Finance': 'Finance',
+  'Human Resource': 'Human Resources & Legal',
+};
+
 // Auth middleware
 const auth = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -167,29 +196,54 @@ app.patch('/api/users/:id', auth, adminOnly, async (req, res) => {
   }
 });
 
-// Company-wide overview (admin-only, READ-ONLY): every department's templates and
-// runsheets so an admin can watch all departments' progress from one screen. Normal
-// /api/settings is department-scoped; this deliberately reaches across departments,
-// which is why it's gated to admins. It never writes anything.
+// Company-wide overview (admin-only, READ-ONLY): every REAL department (from
+// HRFS, not Flowghan's own free-text field) with its employee count and
+// whatever Flowghan templates/runsheets it has, so an admin can watch every
+// department's progress from one screen — including ones that haven't used
+// Flowghan yet. Normal /api/settings is department-scoped; this deliberately
+// reaches across departments, which is why it's gated to admins. It never
+// writes anything.
 app.get('/api/admin/overview', auth, adminOnly, async (req, res) => {
   try {
-    const r = await pool.query(
-      `SELECT department, key, value FROM doomtracker.settings
-       WHERE key IN ('ebright-templates', 'ebright-runsheets')
-         AND department IS NOT NULL AND department <> '' AND department <> '__global__'
-       ORDER BY department`
-    );
-    // Group rows into one object per department: { department, templates, runsheets }.
-    const byDept = {};
-    for (const row of r.rows) {
+    const [deptRes, settingsRes] = await Promise.all([
+      hrfsPool.query(
+        `SELECT d.department_name,
+                count(*) FILTER (WHERE e.status = 'active') AS employees
+         FROM department d
+         LEFT JOIN employment e ON e.department_id = d.department_id
+         GROUP BY d.department_name
+         ORDER BY d.department_name`
+      ),
+      pool.query(
+        `SELECT department, key, value FROM doomtracker.settings
+         WHERE key IN ('ebright-templates', 'ebright-runsheets')
+           AND department IS NOT NULL AND department <> '' AND department <> '__global__'`
+      ),
+    ]);
+
+    // Flowghan activity, keyed by whatever department string it's actually filed under.
+    const activityByDept = {};
+    for (const row of settingsRes.rows) {
       const d = row.department;
-      if (!byDept[d]) byDept[d] = { department: d, templates: [], runsheets: [] };
+      if (!activityByDept[d]) activityByDept[d] = { templates: [], runsheets: [] };
       let parsed = [];
       try { parsed = JSON.parse(row.value); } catch { parsed = []; }
-      if (row.key === 'ebright-templates') byDept[d].templates = Array.isArray(parsed) ? parsed : [];
-      else if (row.key === 'ebright-runsheets') byDept[d].runsheets = Array.isArray(parsed) ? parsed : [];
+      if (row.key === 'ebright-templates') activityByDept[d].templates = Array.isArray(parsed) ? parsed : [];
+      else if (row.key === 'ebright-runsheets') activityByDept[d].runsheets = Array.isArray(parsed) ? parsed : [];
     }
-    res.json(Object.values(byDept).sort((a, b) => a.department.localeCompare(b.department)));
+
+    const overview = deptRes.rows.map((d) => {
+      const flowghanName = HRFS_TO_FLOWGHAN_DEPT[d.department_name] || d.department_name;
+      const activity = activityByDept[flowghanName] || { templates: [], runsheets: [] };
+      return {
+        department: d.department_name,
+        employees: Number(d.employees) || 0,
+        templates: activity.templates,
+        runsheets: activity.runsheets,
+      };
+    });
+
+    res.json(overview);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
