@@ -1031,3 +1031,22 @@ git status --short
 ```
 
 Confirm only the intended files from Tasks 1–7 are committed and `_tmp-verify-categories.ts` is gone (not tracked). No further commit needed here if Task 7's commit already covers everything — this step is a verification checkpoint, not necessarily a new commit.
+
+---
+
+## Addendum (2026-08-12): Inline "+ Add new type" in the assign form
+
+Added after this plan was fully implemented, reviewed, and merged (Tasks 1–7 above shipped as originally written). Documented here for traceability rather than folded into the tasks above, since those are already closed out.
+
+**Request:** the "+Task" assign form's Category dropdown (Task 6, `assign-task-form.tsx`) should let the user create a new category inline — a "+ Add new type" option at the bottom of the dropdown — instead of requiring a trip to `/task-manager/categories` first.
+
+**Permission scope (confirmed with the user):** restricted to the same accounts that can manage categories elsewhere — `canManageTaskTemplateGroups` (Super Admin + elevated Operations/Optimisation dept-sites), the exact gate already used by the `/task-manager/categories` admin page and by `createTaskCategory` itself. Every other assign-capable role sees a plain dropdown of existing active categories with no "+ Add new type" option — no new permission surface, no drift risk from a second hand-copied role list.
+
+**Design:**
+- `createTaskCategory` (data layer) already re-enforces `canManageTaskTemplateGroups` server-side and needed no changes — the new capability is pure UI + one new server-action wrapper, gated by presence, not a separate boolean.
+- `src/task-manager/ui/types.ts`: new `CreateCategoryResult = { ok: true; id: string; name: string } | { ok: false; message: string }` — unlike `CategoryManager`'s own create action (which only returns `{ok, message}` and has to fake a placeholder id, see its header comment), this one returns the real server-assigned id/name so the assign form can select the new category immediately with no placeholder-id gap.
+- `src/task-manager/ui/assign-task-form.tsx`: new optional prop `onCreateCategory?: (name: string) => Promise<CreateCategoryResult>`. When provided, the Category `<select>` gets a trailing `+ Add new type` option; picking it swaps the select for an inline name input + Add/Cancel, mirroring `CategoryManager`'s own create UX. On success the new category is appended to local state (seeded from the `categories` prop, then grown locally) and auto-selected — no page refresh needed to use a category just created. Omitting the prop hides the option entirely; the Category block itself now also renders when there are zero categories yet but `onCreateCategory` is provided (so an allowed viewer isn't blocked from creating the very first category from within the form).
+- `src/task-manager/ui/add-task-button.tsx`: `onCreateCategory` threaded straight through to `AssignTaskForm`, same pass-through pattern as `categories`/`templates`.
+- `src/app/task-manager/page.tsx`: new server action `createCategory(name)` (same `requireLiveSession` / `FlowBridgeError`-mapping shape as every other action here) wrapping `createTaskCategory(email, {name})`, revalidating both `/task-manager` and `/task-manager/categories`. A new `canManageCategories` const (`canManageTaskTemplateGroups({role, department: daily.me.me.department ?? null})`, reusing the same `role`/`elevatedDeptSite` already computed for `canReassign`) decides whether `<AddTaskButton>` receives the action at all: `onCreateCategory={canManageCategories ? createCategory : undefined}`.
+
+**Verification:** `npx tsc --noEmit` clean (no new errors — only pre-existing, unrelated ones in `branch/dashboard/route.ts` and `ClickUpPieChart.tsx`); full Vitest suite (314/314) passing. No new unit tests were added for the UI form components themselves, matching this codebase's existing convention — `assign-task-form.tsx`, `add-task-button.tsx`, and `category-manager.tsx` have no dedicated component test files; this change follows that same pattern. Manual verification (as Super Admin/Operations, and separately as a non-elevated assign-capable role) still pending in the browser.
