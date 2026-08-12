@@ -18,9 +18,15 @@ export interface TaskManagerNavAccess {
   template: boolean;
   package: boolean;
   packageTable: boolean;
+  categories: boolean;
 }
 
-const NO_ACCESS: TaskManagerNavAccess = { template: false, package: false, packageTable: false };
+const NO_ACCESS: TaskManagerNavAccess = {
+  template: false,
+  package: false,
+  packageTable: false,
+  categories: false,
+};
 
 /** Fail-closed: any error (no Task Manager account, DB not configured,
  *  etc.) hides all three gated sidebar items rather than leaking access

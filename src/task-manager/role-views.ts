@@ -233,11 +233,16 @@ export function isElevatedDeptSite(user: {
  *  `manage`/`orgViewer`/`branchManagerViewer`) and needed no code change,
  *  confirmed against live data (2026-08-11) rather than assumed. CEO's
  *  access is unchanged (explicit product decision, 2026-08-11 — the
- *  revised matrix's table omitted a CEO row, but that wasn't a removal). */
+ *  revised matrix's table omitted a CEO row, but that wasn't a removal).
+ *
+ *  2026-08-12 addition: also returns `categories`, the sidebar gate for
+ *  /task-manager/categories — deliberately NOT part of the `viewer` set
+ *  above, since (unlike Template/Package/Package Table) there is no
+ *  separate View tier for category management; it's manage-tier only. */
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
-}): { template: boolean; package: boolean; packageTable: boolean } {
+}): { template: boolean; package: boolean; packageTable: boolean; categories: boolean } {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
   const branchManagerViewer = user.role === "BRANCH";
@@ -246,6 +251,11 @@ export function taskManagerNavAccess(user: {
     template: viewer,
     package: viewer,
     packageTable: viewer,
+    // Categories (2026-08-12): unlike Template/Package/Package Table, there
+    // is no separate View tier for this admin-only surface — same gate as
+    // the create/rename/archive actions themselves (canManageTaskTemplate
+    // Groups), not the broader `viewer` set above.
+    categories: manage,
   };
 }
 

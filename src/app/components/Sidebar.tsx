@@ -49,7 +49,7 @@ interface NavItem {
    *  Branch Manager, Coach, etc. — doesn't exist in that system). Omit for
    *  items that don't need Task-Manager-specific gating (e.g. "Overview",
    *  which stays unconditionally visible). */
-  taskManagerKey?: "template" | "package" | "packageTable";
+  taskManagerKey?: "template" | "package" | "packageTable" | "categories";
   children?: NavItem[];
 }
 
@@ -167,6 +167,7 @@ const primaryNav: NavItem[] = [
       { name: "Template", href: "/task-manager/template", taskManagerKey: "template" },
       { name: "Package", href: "/task-manager/package", taskManagerKey: "package" },
       { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
+      { name: "Categories", href: "/task-manager/categories", taskManagerKey: "categories" },
     ],
   },
 ];
