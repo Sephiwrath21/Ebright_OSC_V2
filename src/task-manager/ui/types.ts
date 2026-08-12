@@ -327,6 +327,13 @@ export interface FlowAssignInput {
   cadence: CadenceOption;
 }
 
+/** Assign form's flat Category picker option (2026-08-12) — active
+ *  categories only, see data/task-categories.ts's listActiveTaskCategories. */
+export interface FlowCategoryOption {
+  id: string;
+  name: string;
+}
+
 export type CadenceOption = FlowPeriod | "adhoc";
 
 // ---- Task Templates (2026-07-31) ----------------------------------------
@@ -349,6 +356,7 @@ export interface FlowTemplateDetail {
   title: string;
   subtasks: string[];
   cadence: CadenceOption | null;
+  categoryId: string | null;
   guidelineUrl: string | null;
   guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
 }

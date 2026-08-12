@@ -57,6 +57,7 @@ export interface TaskTemplateDetail {
   title: string;
   subtasks: string[];
   cadence: "daily" | "monthly" | "adhoc" | null;
+  categoryId: string | null;
   guidelineUrl: string | null;
   guidelineImage: { mime: string; dataBase64: string } | null;
 }
@@ -132,6 +133,7 @@ export function getTaskTemplate(email: string, templateId: string): Promise<Task
       title: row.title,
       subtasks: Array.isArray(row.subtasks) ? (row.subtasks as string[]) : [],
       cadence: row.cadence ? CADENCE_OPTION_OF[row.cadence] : null,
+      categoryId: row.categoryId,
       guidelineUrl: row.guidelineUrl,
       guidelineImage:
         row.guidelineMime && row.guidelineImage

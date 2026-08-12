@@ -18,6 +18,7 @@ import {
   type AssignActionResult,
   type CadenceOption,
   type FlowAssignInput,
+  type FlowCategoryOption,
   type FlowGroup,
   type FlowStaffMember,
   type FlowTemplateControl,
@@ -48,6 +49,7 @@ export function AssignTaskForm({
   quickSelfId,
   hideCadence = false,
   templates,
+  categories,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -74,6 +76,10 @@ export function AssignTaskForm({
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
   templates?: FlowTemplateControl;
+  /** Task Categories ("Type", 2026-08-12): active categories for the new
+   *  Category dropdown. Omit or pass an empty array to hide the dropdown
+   *  entirely — e.g. before any category has ever been created. */
+  categories?: FlowCategoryOption[];
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -105,6 +111,7 @@ export function AssignTaskForm({
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   // Task Templates (2026-07-31)
   const [templateId, setTemplateId] = React.useState("");
+  const [categoryId, setCategoryId] = React.useState("");
   const [templateBusy, setTemplateBusy] = React.useState(false);
   const [saveTemplate, setSaveTemplate] = React.useState(false);
   const [templateName, setTemplateName] = React.useState("");
@@ -128,6 +135,7 @@ export function AssignTaskForm({
     setSubtasks(t.subtasks);
     setSubtaskEditorKey((k) => k + 1);
     setCadence(hideCadence ? "daily" : t.cadence);
+    setCategoryId(t.categoryId ?? "");
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
       setGuidelineImage({
@@ -232,6 +240,7 @@ export function AssignTaskForm({
           ? { name: templateName.trim() || title.trim() }
           : undefined,
         fromTemplateId: templateId || undefined,
+        categoryId: categoryId || undefined,
       });
       if (result.ok) {
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
@@ -245,6 +254,7 @@ export function AssignTaskForm({
         setSubtasks([]);
         setSubtaskEditorKey((k) => k + 1);
         setTemplateId("");
+        setCategoryId("");
         setSaveTemplate(false);
         setTemplateName("");
       } else {
@@ -290,6 +300,24 @@ export function AssignTaskForm({
             </select>
             {templateBusy && <p className="mt-1.5 text-xs text-gray-400">Loading template…</p>}
           </div>
+        )}
+
+        {categories && categories.length > 0 && (
+          <label className="max-w-xl text-sm text-gray-600">
+            Category
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className={`mt-1 ${selectClass}`}
+            >
+              <option value="">Uncategorized</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         <label className="max-w-xl text-sm text-gray-600">
