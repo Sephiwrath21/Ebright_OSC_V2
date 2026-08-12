@@ -48,6 +48,7 @@ export function groupTasksByCategory(
   onlyMe?: string,
 ): CategoryCard[] {
   const scopedTasks = onlyMe ? tasks.filter((t) => t.assigneeId === onlyMe) : tasks;
+  const knownIds = new Set(categories.map((c) => c.id));
   const categoryCards = categories.map((c) => ({
     id: c.id,
     name: c.name,
@@ -56,7 +57,13 @@ export function groupTasksByCategory(
   const uncategorized = {
     id: UNCATEGORIZED_CARD_ID,
     name: "Uncategorized",
-    tasks: scopedTasks.filter((t) => t.categoryId === null),
+    // Catches genuinely-uncategorized tasks AND tasks whose categoryId
+    // points at an archived category (archiveTaskCategory only excludes
+    // the category from the active list; it never touches the FK on
+    // tasks already assigned to it) — without this, such a task matches
+    // no categoryCards entry and isn't `=== null`, so it would silently
+    // disappear from every card.
+    tasks: scopedTasks.filter((t) => t.categoryId === null || !knownIds.has(t.categoryId)),
   };
   return [...categoryCards, uncategorized];
 }

@@ -86,4 +86,16 @@ describe("groupTasksByCategory", () => {
     const result = groupTasksByCategory(categories, tasks, "u1");
     expect(result.find((r) => r.id === "c1")?.tasks).toHaveLength(1);
   });
+
+  it("routes a task with an unknown/archived categoryId into Uncategorized instead of dropping it", () => {
+    const categories = [{ id: "c1", name: "Flowghan" }];
+    const tasks = [
+      task({ categoryId: "c1", categoryName: "Flowghan" }),
+      task({ categoryId: "archived-c2", categoryName: "CNS" }),
+    ];
+    const result = groupTasksByCategory(categories, tasks);
+    expect(result.find((r) => r.id === "c1")?.tasks).toHaveLength(1);
+    expect(result.find((r) => r.id === "uncategorized")?.tasks).toHaveLength(1);
+    expect(result.find((r) => r.id === "uncategorized")?.tasks[0].categoryId).toBe("archived-c2");
+  });
 });
