@@ -114,11 +114,11 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
   const accessibleCount = dashboards.filter((d) => !isLocked(d.id)).length;
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <header className="mb-10">
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">Welcome</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">Welcome</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {accessibleCount} accessible dashboard{accessibleCount !== 1 ? "s" : ""}
           </p>
         </header>
@@ -132,7 +132,7 @@ export default function DashboardHome({ userRole }: { userRole?: string; userEma
             return (
               <Link key={dashboard.id} href={href} aria-disabled={isDisabled} className={isDisabled ? "pointer-events-none" : ""}>
                 <div className={`p-3 rounded-lg flex items-center justify-center gap-3 aspect-square transition-all duration-300
-                  ${isDisabled ? "bg-slate-300 text-slate-500 opacity-60 grayscale" : `${dashboard.color} text-white hover:shadow-lg hover:scale-105`}
+                  ${isDisabled ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 opacity-60 grayscale" : `${dashboard.color} text-white hover:shadow-lg hover:scale-105`}
                 `}>
                   <div className="text-center">
                     <span className="text-2xl block mb-1">{dashboard.icon}</span>

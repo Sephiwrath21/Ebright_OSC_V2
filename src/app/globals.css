@@ -17,6 +17,47 @@
   --foreground: #f1f5f9; /* slate-100 */
 }
 
+/* Dashboard status tokens. Inline styles in the dashboards read these, so they
+   cannot use Tailwind `dark:` variants — the theme switch happens here instead.
+   Light values are exactly the hexes these replaced, so light mode is unchanged. */
+:root {
+  --status-green-fg: #1D9E75;
+  --status-green-bg: #E8F7F0;
+  --status-amber-fg: #EF9F27;
+  --status-amber-bg: #FFF8EC;
+  --status-amber-bg-strong: #FFF1D6;
+  --status-blue-fg: #378ADD;
+  --status-blue-bg: #E8F0FB;
+  --status-red-fg: #DC2626;
+  --status-red-bg: #FEE7E7;
+  --status-violet-fg: #7C3AED;
+  --status-violet-bg: #EDE9FE;
+  --status-neutral-fg: #94A3B8;
+  --status-neutral-bg: #F1F5F9;
+  --status-neutral-fg-strong: #475569;
+  --status-track: #E5E7EB;
+  --status-border-idle: #CBD5E1;
+}
+
+.dark {
+  --status-green-fg: #6EE7B7;
+  --status-green-bg: #064E3B;
+  --status-amber-fg: #FCD34D;
+  --status-amber-bg: #78350F;
+  --status-amber-bg-strong: #92400E;
+  --status-blue-fg: #93C5FD;
+  --status-blue-bg: #1E3A8A;
+  --status-red-fg: #FCA5A5;
+  --status-red-bg: #7F1D1D;
+  --status-violet-fg: #C4B5FD;
+  --status-violet-bg: #4C1D95;
+  --status-neutral-fg: #94A3B8;
+  --status-neutral-bg: #1E293B;
+  --status-neutral-fg-strong: #CBD5E1;
+  --status-track: #334155;
+  --status-border-idle: #475569;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
