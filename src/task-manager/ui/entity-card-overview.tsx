@@ -1,7 +1,9 @@
 "use client";
 
 // Overview page card redesign (2026-08-12) — replaces EntityOverviewSection
-// (department-overview.tsx) entirely at both its call sites. Always-visible
+// (formerly department-overview.tsx, now deleted) at all of its call sites,
+// including the dropdown-driven entity overview in page.tsx's
+// buildEntityOverview() (migrated in a follow-up pass the same day). Always-visible
 // card grid, two switchable layouts (Person/Type), driven by four controls:
 // Filter (Daily/Monthly/HOD Assigned Task), Date filter (existing control,
 // passed in as headerControl — hidden for HOD Assigned Task since that mode

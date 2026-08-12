@@ -8,6 +8,13 @@ export type FlowPeriod = "daily" | "monthly";
  *  Next.js masks thrown action error messages in production. */
 export type ActionResult = { ok: true } | { ok: false; message: string };
 export type AssignActionResult = { ok: true; created: number } | { ok: false; message: string };
+/** The assign form's inline "+ Add new type" action (2026-08-12) — returns
+ *  the newly created category's real id/name (unlike CategoryManager's own
+ *  create action, which only confirms ok/message) so the form can select it
+ *  immediately without a placeholder id. */
+export type CreateCategoryResult =
+  | { ok: true; id: string; name: string }
+  | { ok: false; message: string };
 /** The Proof column's upload action (2026-07-30): returns the (possibly
  *  new) Proof id so the row can show the 📎 immediately, without waiting
  *  for the server payload to refresh. */

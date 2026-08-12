@@ -41,6 +41,7 @@ import {
   renameKanbanColumn,
   reopenFlowTask,
   archiveTemplateTasks,
+  createTaskCategory,
   deleteTaskTemplate,
   editTaskTemplate,
   getTaskTemplate,
@@ -63,6 +64,7 @@ import {
 } from "@/task-manager/data";
 import { formatLocalDate, isElevatedDeptSite, resolveWindow } from "@/task-manager/analytics/_lib";
 import {
+  canManageTaskTemplateGroups,
   resolveViewRole,
   shows,
   showsAddTaskHeader,
@@ -71,7 +73,7 @@ import {
 import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { PageSectionHeading } from "@/task-manager/ui/bits";
-import { EntityOverviewSection } from "@/task-manager/ui/department-overview";
+import { EntityCardOverview } from "@/task-manager/ui/entity-card-overview";
 import {
   DailyDatePicker,
   EntityPicker,
@@ -444,6 +446,26 @@ export default async function TaskManagerPage({
     }
   }
 
+  // Inline "+ Add new type" (2026-08-12) — the assign form's Category
+  // dropdown. Only ever passed to the client when canManageCategories is
+  // true (below); createTaskCategory re-enforces the same
+  // canManageTaskTemplateGroups gate server-side regardless.
+  async function createCategory(
+    name: string,
+  ): Promise<import("@/task-manager/ui/types").CreateCategoryResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const { id } = await createTaskCategory(email, { name });
+      revalidatePath("/task-manager");
+      revalidatePath("/task-manager/categories");
+      return { ok: true, id, name };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   async function reassignTask(runBlockId: string, newAssigneeId: string): Promise<ActionResult> {
     "use server";
     const stale = await requireLiveSession(email);
@@ -629,20 +651,34 @@ export default async function TaskManagerPage({
     // re-checks (incl. HOD's own-department scoping) on every call.
     const canReassign = role === "ADMIN" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
+    // Same gate as the /task-manager/categories admin page and
+    // createTaskCategory's own server-side check — only these viewers get
+    // the assign form's inline "+ Add new type" option (2026-08-12).
+    const canManageCategories = canManageTaskTemplateGroups({
+      role,
+      department: daily.me.me.department ?? null,
+    });
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
     // role per the config — layout reshuffles below the header can never
     // move it. Templates (2026-07-31) ride along: the saved list + its
     // load/rename/delete actions feed the form's "Start from a template"
     // picker and Manage panel.
+    // Active categories — feeds AddTaskButton's picker AND, since the
+    // 2026-08-12 entityDropdowns migration, EntityCardOverview's "Sort:
+    // Type" mode in buildEntityOverview() below. Fetched once, unconditionally
+    // (previously two separate fetches at different scopes); defensive
+    // (empty on failure) since neither consumer should fail the whole page.
+    const categoryList = await listActiveTaskCategories(email).catch(() => []);
+
     if (showsAddTaskHeader(viewRole)) {
       const templateList = await listTaskTemplates(email);
-      const categoryList = await listActiveTaskCategories(email);
       headerAction = (
         <AddTaskButton
           staff={staff}
           action={assign}
           categories={categoryList}
+          onCreateCategory={canManageCategories ? createCategory : undefined}
           // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the
           // picker restricts, and assignFlowTask re-enforces server-side.
           // quickSelfId adds the CEO's own "Myself" chip, since the CEO
@@ -694,9 +730,10 @@ export default async function TaskManagerPage({
           sp.department && (FLOW_DEPARTMENTS as readonly string[]).includes(sp.department)
             ? sp.department
             : fallback;
-        const [dailyDetail, monthlyDetail] = await Promise.all([
+        const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
           getDepartmentDetail(email, department, "daily", dailyDate),
           getDepartmentDetail(email, department, "monthly"),
+          getDepartmentHodAssigned(email, department).catch(() => null),
         ]);
         overview = (
           <>
@@ -708,12 +745,14 @@ export default async function TaskManagerPage({
               basePath="/task-manager"
               extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
             />
-            <EntityOverviewSection
-              label="Daily"
-              entity={dailyDetail.department}
-              kind="department"
-              reassign={reassign}
-              headerControl={
+            <EntityCardOverview
+              entityName={department}
+              daily={dailyDetail.department}
+              monthly={monthlyDetail.department}
+              hodAssigned={hodAssignedDetail?.department ?? monthlyDetail.department}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              dailyDateControl={
                 <DailyDatePicker
                   key="admin-dept-daily-picker"
                   value={dailyDetail.date}
@@ -722,20 +761,15 @@ export default async function TaskManagerPage({
                 />
               }
             />
-            <EntityOverviewSection
-              label="Monthly"
-              entity={monthlyDetail.department}
-              kind="department"
-              reassign={reassign}
-            />
           </>
         );
       } else {
         const branch =
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
-        const [dailyDetail, monthlyDetail] = await Promise.all([
+        const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
           getBranchDetail(email, branch, "daily", dailyDate),
           getBranchDetail(email, branch, "monthly"),
+          getBranchHodAssigned(email, branch).catch(() => null),
         ]);
         overview = (
           <>
@@ -750,12 +784,14 @@ export default async function TaskManagerPage({
               basePath="/task-manager"
               extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
             />
-            <EntityOverviewSection
-              label="Daily"
-              entity={dailyDetail.branch}
-              kind="branch"
-              reassign={reassign}
-              headerControl={
+            <EntityCardOverview
+              entityName={branch}
+              daily={dailyDetail.branch}
+              monthly={monthlyDetail.branch}
+              hodAssigned={hodAssignedDetail?.branch ?? monthlyDetail.branch}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              dailyDateControl={
                 <DailyDatePicker
                   key="admin-branch-daily-picker"
                   value={dailyDetail.date}
@@ -763,12 +799,6 @@ export default async function TaskManagerPage({
                   extraParams={{ view: "branch", branch }}
                 />
               }
-            />
-            <EntityOverviewSection
-              label="Monthly"
-              entity={monthlyDetail.branch}
-              kind="branch"
-              reassign={reassign}
             />
           </>
         );
@@ -856,23 +886,23 @@ export default async function TaskManagerPage({
       );
     }
 
-    // EntityCardOverview's "HOD Assigned Task" filter + category grouping
-    // (Overview card redesign, 2026-08-12) — only meaningful for the roles
-    // that actually render Department/Branch Overview below (HOD/DEPT_SITE,
-    // BRANCH/BRANCH_SITE), so gated on the SAME daily.department/daily.branch
-    // presence the render guards use, mirroring getFlowDetail's own
-    // kind-based conditionality rather than introducing a new pattern. A
-    // viewer without access to that specific entity (or any other failure)
-    // shouldn't fail the whole page load, so each is caught individually —
-    // same defensive shape as the rest of this page's optional fetches.
-    const [hodAssignedDepartment, hodAssignedBranch, categoryList] = await Promise.all([
+    // EntityCardOverview's "HOD Assigned Task" filter (Overview card redesign,
+    // 2026-08-12) — only meaningful for the roles that actually render
+    // Department/Branch Overview below (HOD/DEPT_SITE, BRANCH/BRANCH_SITE),
+    // so gated on the SAME daily.department/daily.branch presence the render
+    // guards use, mirroring getFlowDetail's own kind-based conditionality
+    // rather than introducing a new pattern. A viewer without access to that
+    // specific entity (or any other failure) shouldn't fail the whole page
+    // load, so each is caught individually — same defensive shape as the
+    // rest of this page's optional fetches. (categoryList is fetched once,
+    // higher up, and reused here.)
+    const [hodAssignedDepartment, hodAssignedBranch] = await Promise.all([
       daily.department
         ? getDepartmentHodAssigned(email, daily.department.name).catch(() => null)
         : Promise.resolve(null),
       daily.branch
         ? getBranchHodAssigned(email, daily.branch.name).catch(() => null)
         : Promise.resolve(null),
-      listActiveTaskCategories(email).catch(() => []),
     ]);
 
     // Personal date filters (2026-07-28): one control per period, mounted by

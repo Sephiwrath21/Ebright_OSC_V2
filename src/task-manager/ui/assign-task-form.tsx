@@ -17,6 +17,7 @@ import {
   visibleCadenceOptions,
   type AssignActionResult,
   type CadenceOption,
+  type CreateCategoryResult,
   type FlowAssignInput,
   type FlowCategoryOption,
   type FlowGroup,
@@ -50,6 +51,7 @@ export function AssignTaskForm({
   hideCadence = false,
   templates,
   categories,
+  onCreateCategory,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -80,6 +82,14 @@ export function AssignTaskForm({
    *  Category dropdown. Omit or pass an empty array to hide the dropdown
    *  entirely — e.g. before any category has ever been created. */
   categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12): creates a category without
+   *  leaving the assign form. Omit to hide the option entirely — the
+   *  caller only passes this for viewers who pass
+   *  canManageTaskTemplateGroups (Super Admin + elevated Operations/
+   *  Optimisation dept-sites), the same gate as the /task-manager/categories
+   *  admin page; everyone else sees a plain dropdown of existing active
+   *  categories. The server re-enforces the same gate regardless. */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -115,6 +125,31 @@ export function AssignTaskForm({
   const [templateBusy, setTemplateBusy] = React.useState(false);
   const [saveTemplate, setSaveTemplate] = React.useState(false);
   const [templateName, setTemplateName] = React.useState("");
+  // Inline "+ Add new type" (2026-08-12): categories start from the prop,
+  // then grow locally as this session creates new ones — no page refresh
+  // needed to pick a category you just added.
+  const [localCategories, setLocalCategories] = React.useState(categories ?? []);
+  const [addingCategory, setAddingCategory] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState("");
+  const [categoryBusy, setCategoryBusy] = React.useState(false);
+  const [categoryError, setCategoryError] = React.useState<string | null>(null);
+
+  const submitNewCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name || !onCreateCategory) return;
+    setCategoryBusy(true);
+    setCategoryError(null);
+    const result = await onCreateCategory(name);
+    setCategoryBusy(false);
+    if (!result.ok) {
+      setCategoryError(result.message);
+      return;
+    }
+    setLocalCategories((prev) => [...prev, { id: result.id, name: result.name }]);
+    setCategoryId(result.id);
+    setAddingCategory(false);
+    setNewCategoryName("");
+  };
 
   /** "Start from a template": load the full template and pre-fill the
    *  structure fields. Recipients/days/due date are untouched (they're
@@ -302,22 +337,68 @@ export function AssignTaskForm({
           </div>
         )}
 
-        {categories && categories.length > 0 && (
-          <label className="max-w-xl text-sm text-gray-600">
-            Category
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className={`mt-1 ${selectClass}`}
-            >
-              <option value="">Uncategorized</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        {(localCategories.length > 0 || onCreateCategory) && (
+          <div className="max-w-xl">
+            {addingCategory ? (
+              <div className="text-sm text-gray-600">
+                New type name
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g. Flowghan"
+                    maxLength={100}
+                    disabled={categoryBusy}
+                    className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void submitNewCategory()}
+                    disabled={categoryBusy || !newCategoryName.trim()}
+                    className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingCategory(false);
+                      setNewCategoryName("");
+                      setCategoryError(null);
+                    }}
+                    disabled={categoryBusy}
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {categoryError && <p className="mt-1.5 text-xs text-red-600">{categoryError}</p>}
+              </div>
+            ) : (
+              <label className="text-sm text-gray-600">
+                Category
+                <select
+                  value={categoryId}
+                  onChange={(e) => {
+                    if (e.target.value === "__add_new__") {
+                      setAddingCategory(true);
+                      return;
+                    }
+                    setCategoryId(e.target.value);
+                  }}
+                  className={`mt-1 ${selectClass}`}
+                >
+                  <option value="">Uncategorized</option>
+                  {localCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {onCreateCategory && <option value="__add_new__">+ Add new type</option>}
+                </select>
+              </label>
+            )}
+          </div>
         )}
 
         <label className="max-w-xl text-sm text-gray-600">
