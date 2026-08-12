@@ -122,6 +122,17 @@ if (process.env.NODE_ENV === "production" && process.env.SMTP_HOST) {
       }
     },
   );
+} else if (process.env.NODE_ENV === "production") {
+  // No SMTP_HOST in production is a misconfigured host, not a design choice:
+  // .env is git-ignored and never travels with a deploy, so a server that was
+  // never configured by hand silently has no mail at all. Say so when the module
+  // loads rather than leaving the first user to discover it as "Failed to send
+  // reset link. Please contact support."
+  console.error(
+    "[mailer] SMTP_HOST is not set — SMTP delivery is disabled on this host. " +
+    "Password reset falls back to Resend if CRM_RESEND_API_KEY / RESEND_API_KEY " +
+    "is set, and fails outright otherwise. See .env.example.",
+  );
 }
 
 /**
