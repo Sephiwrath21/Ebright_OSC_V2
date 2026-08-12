@@ -31,7 +31,14 @@
 // has that — cut deliberately for the first pass. Reassign from the
 // viewer's own delegated/ad hoc tasks still works elsewhere on this page.
 import * as React from "react";
-import type { FlowCategoryOption, FlowEntityDetail, FlowTaskRow } from "./types";
+import type {
+  ActionResult,
+  FlowCategoryOption,
+  FlowEntityDetail,
+  FlowTaskRow,
+  ProofRemoveHandler,
+  ProofUploadHandler,
+} from "./types";
 import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
 import { TaskRowLine } from "./bits";
 
@@ -84,11 +91,11 @@ export function EntityCardOverview({
    *  task that isn't the viewer's own (TaskRowLine/StatusDropdown/ProofCell
    *  already enforce this via task.assigneeId === myUserId). Omit any of
    *  these to disable that specific action everywhere in this section. */
-  onComplete?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onSkip?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onUploadProof?: import("./types").ProofUploadHandler;
-  onRemoveProof?: import("./types").ProofRemoveHandler;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  onUploadProof?: ProofUploadHandler;
+  onRemoveProof?: ProofRemoveHandler;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   const [onlyMe, setOnlyMe] = React.useState(false);
@@ -135,30 +142,33 @@ export function EntityCardOverview({
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No one to show.</p>
           ) : (
-            personCards.map((card) => (
-              <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
-                <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
-                <div className="px-3 py-1">
-                  {card.tasks.length === 0 ? (
-                    <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
-                  ) : (
-                    card.tasks.map((t: FlowTaskRow) => (
-                      <TaskRowLine
-                        key={t.runBlockId}
-                        task={t}
-                        myUserId={myUserId}
-                        onComplete={onComplete}
-                        onSkip={onSkip}
-                        onReopen={onReopen}
-                        onUploadProof={onUploadProof}
-                        onRemoveProof={onRemoveProof}
-                        hideCompleted
-                      />
-                    ))
-                  )}
+            personCards.map((card) => {
+              const isOwnCard = card.userId === myUserId;
+              return (
+                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
+                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
+                  <div className="px-3 py-1">
+                    {card.tasks.length === 0 ? (
+                      <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                    ) : (
+                      card.tasks.map((t: FlowTaskRow) => (
+                        <TaskRowLine
+                          key={t.runBlockId}
+                          task={t}
+                          myUserId={myUserId}
+                          onComplete={onComplete}
+                          onSkip={onSkip}
+                          onReopen={onReopen}
+                          onUploadProof={onUploadProof}
+                          onRemoveProof={onRemoveProof}
+                          hideCompleted={isOwnCard}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       ) : (
