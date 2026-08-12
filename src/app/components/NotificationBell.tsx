@@ -111,16 +111,16 @@ export default function NotificationBell({ role }: { role?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={totalCount > 0 ? `Notifications: ${totalCount} pending` : "Notifications"}
-        className={`relative inline-flex items-center justify-center w-10 h-10 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
-          open ? "bg-slate-100" : "hover:bg-slate-100"
+        className={`relative inline-flex items-center justify-center w-10 h-10 rounded-full text-slate-800 dark:text-slate-300 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+          open ? "bg-slate-100 dark:bg-slate-800" : "hover:bg-slate-100 dark:hover:bg-slate-800"
         }`}
-        style={{ color: "#1e293b" }}
       >
         <span className="relative inline-flex">
           <Bell className="w-6 h-6" fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
           {totalCount > 0 && (
             <span
               aria-hidden="true"
+              className="ring-2 ring-white dark:ring-slate-900"
               style={{
                 position: "absolute",
                 top: "-6px",
@@ -137,7 +137,6 @@ export default function NotificationBell({ role }: { role?: string }) {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 0 0 2px #ffffff",
                 pointerEvents: "none",
               }}
             >

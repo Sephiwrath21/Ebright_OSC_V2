@@ -79,7 +79,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
         >
           <div
             onClick={() => setMobileOpen(false)}
-            className={`absolute inset-0 bg-slate-900/50 dark:bg-slate-950/70 transition-opacity duration-200 ${
+            className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-200 ${
               mobileOpen ? "opacity-100" : "opacity-0"
             }`}
           />
