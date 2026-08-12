@@ -44,6 +44,7 @@ import {
   getTaskTemplate,
   getTemplateAssignees,
   getTemplateDeletionImpact,
+  listActiveTaskCategories,
   listArchivedItems,
   listTaskTemplates,
   reassignTemplateTasks,
@@ -634,10 +635,12 @@ export default async function TaskManagerPage({
     // picker and Manage panel.
     if (showsAddTaskHeader(viewRole)) {
       const templateList = await listTaskTemplates(email);
+      const categoryList = await listActiveTaskCategories(email);
       headerAction = (
         <AddTaskButton
           staff={staff}
           action={assign}
+          categories={categoryList}
           // The CEO assigns to HODs ONLY (2026-08-01 rule restored) — the
           // picker restricts, and assignFlowTask re-enforces server-side.
           // quickSelfId adds the CEO's own "Myself" chip, since the CEO
