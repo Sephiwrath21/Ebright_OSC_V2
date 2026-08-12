@@ -3,6 +3,7 @@
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import UserHeader from "./UserHeader";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 
 interface TopBarProps {
   onToggleSidebar: () => void;
@@ -35,6 +36,7 @@ export default function TopBar({ onToggleSidebar, sidebarCollapsed, email, role,
 
         {/* Right: notification + profile */}
         <div className="shrink-0 flex items-center gap-1">
+          <ThemeToggle />
           <NotificationBell role={role} />
           <UserHeader email={email} role={role} name={name} />
         </div>
