@@ -24,11 +24,13 @@ import {
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
+  getEntityHodAssignedPayload,
   getEntityPayload,
   getMePayload,
   getOrgPayload,
   resolvedDate,
 } from "../analytics/_payloads";
+import type { EntityPayload } from "../analytics/_payloads";
 import { advanceRecurringBlocks } from "../engine/recurrence";
 import { native, requireUserByEmail } from "./core";
 
@@ -321,6 +323,25 @@ export function getDepartmentDetail(
   }, "getDepartmentDetail");
 }
 
+/** "HOD Assigned Task" filter mode for the Overview card redesign
+ *  (2026-08-12) — all-time, no period/date param (mirrors
+ *  getDepartmentDetail's auth check, different payload source). */
+export function getDepartmentHodAssigned(
+  email: string,
+  department: string,
+): Promise<{ department: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ department: z.string().min(1).max(200) }).parse({ department });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "department", q.department)) {
+      throw new ApiHttpError(403, "You can only view your own department");
+    }
+    const payload = await getEntityHodAssignedPayload("department", q.department);
+    return { department: { name: q.department, ...payload } };
+  }, "getDepartmentHodAssigned");
+}
+
 const branchQuerySchema = analyticsQuerySchema.extend({
   branch: z.string().min(1).max(200),
 });
@@ -347,4 +368,22 @@ export function getBranchDetail(
       branch: { name: q.branch, ...payload },
     } as FlowBranchDetailResponse;
   }, "getBranchDetail");
+}
+
+/** "HOD Assigned Task" filter mode for the Overview card redesign
+ *  (2026-08-12) — all-time, no period/date param. */
+export function getBranchHodAssigned(
+  email: string,
+  branch: string,
+): Promise<{ branch: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ branch: z.string().min(1).max(200) }).parse({ branch });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityHodAssignedPayload("branch", q.branch);
+    return { branch: { name: q.branch, ...payload } };
+  }, "getBranchHodAssigned");
 }
