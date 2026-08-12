@@ -67,7 +67,7 @@ export default function GreetingHeader({
           alignItems: "center",
           gap: 8,
           padding: "6px 12px",
-          border: "1px solid #E5E7EB",
+          border: "1px solid var(--status-track)",
           borderRadius: 8,
           background: "#FFFFFF",
           fontSize: 14,
