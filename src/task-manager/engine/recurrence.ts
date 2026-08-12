@@ -113,6 +113,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           // reaching next week's occurrences.
           guidelineId: block.guidelineId,
           templateId: block.templateId,
+          categoryId: block.categoryId,
           runItems: {
             create: block.runItems.map((it) => ({
               itemId: it.itemId,
@@ -205,6 +206,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
           parentId: newParentId,
           guidelineId: sub.guidelineId,
           templateId: sub.templateId,
+          categoryId: sub.categoryId,
           subtaskOrder: sub.subtaskOrder,
           runItems: {
             create: sub.runItems.map((it) => ({
