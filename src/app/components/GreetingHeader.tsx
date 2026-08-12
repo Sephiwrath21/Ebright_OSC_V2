@@ -52,7 +52,7 @@ export default function GreetingHeader({
         style={{
           fontSize: 30,
           fontWeight: 600,
-          color: "#0F172A",
+          color: "var(--text-primary)",
           letterSpacing: "-0.02em",
           margin: 0,
           lineHeight: 1.15,
@@ -69,10 +69,10 @@ export default function GreetingHeader({
           padding: "6px 12px",
           border: "1px solid var(--status-track)",
           borderRadius: 8,
-          background: "#FFFFFF",
+          background: "var(--surface)",
           fontSize: 14,
           fontWeight: 500,
-          color: "#374151",
+          color: "var(--text-secondary)",
           whiteSpace: "nowrap",
         }}
       >
@@ -81,7 +81,7 @@ export default function GreetingHeader({
           height="15"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#9CA3AF"
+          stroke="var(--text-muted)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

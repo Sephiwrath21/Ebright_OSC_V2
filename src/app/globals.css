@@ -37,6 +37,10 @@
   --status-neutral-fg-strong: #475569;
   --status-track: #E5E7EB;
   --status-border-idle: #CBD5E1;
+  --surface: #FFFFFF;
+  --text-primary: #0F172A;
+  --text-secondary: #374151;
+  --text-muted: #9CA3AF;
 }
 
 .dark {
@@ -56,6 +60,10 @@
   --status-neutral-fg-strong: #CBD5E1;
   --status-track: #334155;
   --status-border-idle: #475569;
+  --surface: #0F172A;        /* slate-900 — matches converted card surfaces */
+  --text-primary: #F1F5F9;   /* slate-100 */
+  --text-secondary: #CBD5E1; /* slate-300 */
+  --text-muted: #94A3B8;     /* slate-400 */
 }
 
 @theme inline {
