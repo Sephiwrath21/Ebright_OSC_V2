@@ -251,7 +251,8 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   guidelineId: 'guidelineId',
   parentId: 'parentId',
   subtaskOrder: 'subtaskOrder',
-  templateId: 'templateId'
+  templateId: 'templateId',
+  categoryId: 'categoryId'
 };
 
 exports.Prisma.GuidelineScalarFieldEnum = {
@@ -260,6 +261,16 @@ exports.Prisma.GuidelineScalarFieldEnum = {
   imageMime: 'imageMime',
   imageData: 'imageData',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.TaskCategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  order: 'order',
+  archivedAt: 'archivedAt',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
@@ -296,6 +307,7 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
   archivedAt: 'archivedAt',
   templateGroupId: 'templateGroupId',
   groupPosition: 'groupPosition',
+  categoryId: 'categoryId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -506,6 +518,7 @@ exports.Prisma.ModelName = {
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
   Guideline: 'Guideline',
+  TaskCategory: 'TaskCategory',
   TaskTemplateGroup: 'TaskTemplateGroup',
   BranchPackageSchedule: 'BranchPackageSchedule',
   TaskTemplate: 'TaskTemplate',
