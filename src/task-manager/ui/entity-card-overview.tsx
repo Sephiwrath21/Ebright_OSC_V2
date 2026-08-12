@@ -11,7 +11,7 @@
 // Monthly toggle) — switching Filter/Sort/Scope is pure client state, no
 // refetch.
 import * as React from "react";
-import type { FlowCategoryOption, FlowEntityDetail } from "./types";
+import type { FlowCategoryOption, FlowEntityDetail, FlowTaskRow } from "./types";
 import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
 
 type FilterMode = "daily" | "monthly" | "hodAssigned";
@@ -21,16 +21,22 @@ function flattenTasks(entity: FlowEntityDetail) {
   return [...entity.tasks.completed, ...entity.tasks.pending, ...entity.tasks.na];
 }
 
-function StatusDot({ status }: { status: string }) {
+function StatusDot({ status }: { status: FlowTaskRow["status"] }) {
   if (status === "DONE") {
     return (
-      <span className="flex size-3 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-emerald-500">
+      <span
+        role="img"
+        aria-label="Completed"
+        className="flex size-3 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-emerald-500"
+      >
         ✓
       </span>
     );
   }
-  if (status === "SKIPPED") return <span className="size-3 shrink-0 rounded-full bg-amber-400" />;
-  return <span className="size-3 shrink-0 rounded-full border-2 border-red-400 bg-white" />;
+  if (status === "SKIPPED") {
+    return <span role="img" aria-label="N/A" className="size-3 shrink-0 rounded-full bg-amber-400" />;
+  }
+  return <span role="img" aria-label="Pending" className="size-3 shrink-0 rounded-full border-2 border-red-400 bg-white" />;
 }
 
 export function EntityCardOverview({
@@ -73,6 +79,7 @@ export function EntityCardOverview({
           <select
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value as FilterMode)}
+            aria-label="Filter"
             className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
           >
             <option value="daily">Daily</option>
@@ -83,6 +90,7 @@ export function EntityCardOverview({
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
+            aria-label="Sort"
             className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
           >
             <option value="person">Sort: Person</option>
@@ -91,6 +99,7 @@ export function EntityCardOverview({
           <select
             value={onlyMe ? "onlyMe" : "all"}
             onChange={(e) => setOnlyMe(e.target.value === "onlyMe")}
+            aria-label="View"
             className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
           >
             <option value="all">View All</option>
