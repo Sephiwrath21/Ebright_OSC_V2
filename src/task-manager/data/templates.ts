@@ -57,7 +57,6 @@ export interface TaskTemplateDetail {
   title: string;
   subtasks: string[];
   cadence: "daily" | "monthly" | "adhoc" | null;
-  categoryId: string | null;
   guidelineUrl: string | null;
   guidelineImage: { mime: string; dataBase64: string } | null;
 }
