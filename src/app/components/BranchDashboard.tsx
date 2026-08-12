@@ -20,8 +20,8 @@ const fontStack =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 const card: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "0.5px solid #E5E7EB",
+  background: "var(--surface)",
+  border: "0.5px solid var(--status-track)",
   borderRadius: 12,
   boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
 };
@@ -70,10 +70,10 @@ function Panel({
           alignItems: "center",
           gap: 8,
           padding: "10px 14px",
-          borderBottom: "0.5px solid #F1F1F1",
+          borderBottom: "0.5px solid var(--border-subtle)",
         }}
       >
-        {icon && <span style={{ color: "#6B7280", display: "inline-flex" }}>{icon}</span>}
+        {icon && <span style={{ color: "var(--text-muted-strong)", display: "inline-flex" }}>{icon}</span>}
         <h2
           style={{
             margin: 0,
@@ -81,7 +81,7 @@ function Panel({
             fontWeight: 700,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
-            color: "#374151",
+            color: "var(--text-secondary)",
           }}
         >
           {title}
@@ -113,12 +113,12 @@ function MetricRow({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#F8FAFC",
-          border: "0.5px solid #EEF1F4",
+          background: "var(--surface-sunken)",
+          border: "0.5px solid var(--border-subtle)",
           borderRadius: 8,
           fontSize: 13,
           fontWeight: 700,
-          color: "#334155",
+          color: "var(--text-strong)",
         }}
       >
         {rowLabel}
@@ -130,7 +130,7 @@ function MetricRow({
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: "0.03em",
-              color: "#94A3B8",
+              color: "var(--status-neutral-fg)",
             }}
           >
             {m.key}
@@ -178,7 +178,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={50}
           textAnchor="middle"
-          style={{ fontSize: 20, fontWeight: 700, fill: "#111827" }}
+          style={{ fontSize: 20, fontWeight: 700, fill: "var(--text-primary)" }}
         >
           {total}
         </text>
@@ -186,7 +186,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={66}
           textAnchor="middle"
-          style={{ fontSize: 9, fill: "#94A3B8", letterSpacing: "0.05em" }}
+          style={{ fontSize: 9, fill: "var(--status-neutral-fg)", letterSpacing: "0.05em" }}
         >
           TASKS
         </text>
@@ -203,8 +203,8 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontSize: 12, color: "#475569" }}>{d.label}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginLeft: "auto" }}>
+            <span style={{ fontSize: 12, color: "var(--status-neutral-fg-strong)" }}>{d.label}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", marginLeft: "auto" }}>
               {d.value}
             </span>
           </div>
@@ -407,9 +407,9 @@ export default function BranchDashboard({
     <div
       style={{
         minHeight: "100%",
-        background: "#F3F4F6",
+        background: "var(--surface-sunken)",
         fontFamily: fontStack,
-        color: "#111827",
+        color: "var(--text-primary)",
       }}
     >
       <div
@@ -427,7 +427,7 @@ export default function BranchDashboard({
           <GreetingHeader name={greetName} style={{ padding: "4px 0 0" }} />
           {loading && (
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", background: "#E2E8F0", padding: "3px 6px", borderRadius: 4, letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--status-neutral-fg)", background: "var(--border-subtle)", padding: "3px 6px", borderRadius: 4, letterSpacing: "0.05em" }}>
                 SYNCING BRANCH DATABASE...
               </span>
             </div>
@@ -453,36 +453,36 @@ export default function BranchDashboard({
               }}
             >
               {attendance.map((a) => {
-                let bg = "#EFF6FF";
-                let border = "1px solid #DBEAFE";
-                let iconBg = "#3B82F6";
-                let iconColor = "#FFFFFF";
-                let labelColor = "#2563EB";
+                let bg = "var(--tint-blue)";
+                let border = "1px solid var(--status-blue-bg)";
+                let iconBg = "var(--accent-blue)";
+                let iconColor = "var(--surface)";
+                let labelColor = "var(--accent-blue)";
                 let IconComponent = UserCheck;
 
                 if (a.label === "Present") {
-                  bg = "#ECFDF5";
-                  border = "1px solid #D1FAE5";
-                  iconBg = "#10B981";
-                  labelColor = "#047857";
+                  bg = "var(--tint-green)";
+                  border = "1px solid var(--status-green-bg)";
+                  iconBg = "var(--accent-green)";
+                  labelColor = "var(--accent-green-strong)";
                   IconComponent = UserCheck;
                 } else if (a.label === "Absent") {
-                  bg = "#FEF2F2";
-                  border = "1px solid #FECACA";
-                  iconBg = "#EF4444";
-                  labelColor = "#B91C1C";
+                  bg = "var(--tint-red)";
+                  border = "1px solid var(--tint-red-strong)";
+                  iconBg = "var(--accent-red)";
+                  labelColor = "var(--accent-red-strong)";
                   IconComponent = UserX;
                 } else if (a.label === "MC") {
-                  bg = "#FFFBEB";
-                  border = "1px solid #FDE68A";
-                  iconBg = "#F59E0B";
-                  labelColor = "#B45309";
+                  bg = "var(--tint-amber)";
+                  border = "1px solid var(--status-amber-bg-strong)";
+                  iconBg = "var(--accent-amber)";
+                  labelColor = "var(--accent-amber-strong)";
                   IconComponent = Activity;
                 } else if (a.label === "Annual Leave") {
-                  bg = "#EFF6FF";
-                  border = "1px solid #DBEAFE";
-                  iconBg = "#3B82F6";
-                  labelColor = "#1D4ED8";
+                  bg = "var(--tint-blue)";
+                  border = "1px solid var(--status-blue-bg)";
+                  iconBg = "var(--accent-blue)";
+                  labelColor = "var(--accent-blue)";
                   IconComponent = Calendar;
                 }
 
@@ -532,7 +532,7 @@ export default function BranchDashboard({
                           margin: "2px 0 0",
                           fontSize: 20,
                           fontWeight: 700,
-                          color: "#1E293B",
+                          color: "var(--text-primary)",
                           lineHeight: 1.1,
                         }}
                       >
@@ -551,7 +551,7 @@ export default function BranchDashboard({
             bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
           >
             <MetricRow rowLabel="CRM" metrics={crmMetrics} />
-            <div style={{ height: 0.5, background: "#EEF1F4" }} />
+            <div style={{ height: 0.5, background: "var(--border-subtle)" }} />
             <MetricRow rowLabel="SMS" metrics={smsMetrics} />
           </Panel>
 
@@ -582,7 +582,7 @@ export default function BranchDashboard({
                       gap: 6,
                     }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#475569", letterSpacing: "0.05em" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "var(--status-neutral-fg-strong)", letterSpacing: "0.05em" }}>
                       {currentBranchCode.toUpperCase()}
                     </span>
 
@@ -591,13 +591,13 @@ export default function BranchDashboard({
                       <div style={{ position: "relative", width: 50, height: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
                           {/* Ribbon */}
-                          <polygon points="35,50 15,95 38,95 50,75" fill="#EF4444" />
-                          <polygon points="65,50 85,95 62,95 50,75" fill="#DC2626" />
+                          <polygon points="35,50 15,95 38,95 50,75" fill="var(--accent-red)" />
+                          <polygon points="65,50 85,95 62,95 50,75" fill="var(--status-red-fg)" />
                           {/* Medal body */}
                           <circle cx="50" cy="50" r="34" fill="#FBBF24" stroke="#D97706" strokeWidth="4" />
                           <circle cx="50" cy="50" r="28" fill="#FCD34D" />
                         </svg>
-                        <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 16, fontWeight: 800, color: "#92400E" }}>
+                        <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 16, fontWeight: 800, color: "var(--accent-amber-strong)" }}>
                           {rankVal}
                         </span>
                       </div>
@@ -606,8 +606,8 @@ export default function BranchDashboard({
                         style={{
                           fontSize: 20,
                           fontWeight: 800,
-                          color: "#64748B",
-                          background: "#E2E8F0",
+                          color: "var(--text-muted-strong)",
+                          background: "var(--border-subtle)",
                           borderRadius: 8,
                           padding: "4px 10px",
                           letterSpacing: "-0.02em",
@@ -622,7 +622,7 @@ export default function BranchDashboard({
                   <div
                     style={{
                       width: "100%",
-                      borderTop: "0.5px solid #EEF1F4",
+                      borderTop: "0.5px solid var(--border-subtle)",
                       paddingTop: 10,
                       marginTop: 4,
                       display: "flex",
@@ -632,22 +632,22 @@ export default function BranchDashboard({
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Revenue:</span>
-                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(revVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Revenue:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>{formatRM(revVal)}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Expense:</span>
-                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(expenseVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Expense:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>{formatRM(expenseVal)}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Profit:</span>
-                      <span style={{ color: "#0F6E56", fontWeight: 700 }}>{formatRM(profitVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Profit:</span>
+                      <span style={{ color: "var(--accent-green-strong)", fontWeight: 700 }}>{formatRM(profitVal)}</span>
                     </div>
                   </div>
                 </div>
               );
             })() : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "#94A3B8", fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "var(--status-neutral-fg)", fontSize: 13 }}>
                 No ranking data available
               </div>
             )}
@@ -680,7 +680,7 @@ export default function BranchDashboard({
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 style={{
                   flex: 1,
-                  border: "1px solid #E2E8F0",
+                  border: "1px solid var(--border-subtle)",
                   borderRadius: 6,
                   padding: "4px 8px",
                   fontSize: 12,
@@ -724,7 +724,7 @@ export default function BranchDashboard({
                   <span
                     style={{
                       fontSize: 12,
-                      color: t.done ? "#9CA3AF" : "#1F2937",
+                      color: t.done ? "var(--text-muted)" : "var(--text-primary)",
                       textDecoration: t.done ? "line-through" : "none",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -757,7 +757,7 @@ export default function BranchDashboard({
                 fontFamily: fontStack,
                 fontSize: 13,
                 lineHeight: 1.5,
-                color: "#1F2937",
+                color: "var(--text-primary)",
               }}
             />
           </Panel>
@@ -771,7 +771,7 @@ export default function BranchDashboard({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: "#94A3B8",
+                  color: "var(--status-neutral-fg)",
                   letterSpacing: "0.04em",
                   marginBottom: 8,
                 }}
@@ -788,7 +788,7 @@ export default function BranchDashboard({
                   onChange={(e) => setNewEventName(e.target.value)}
                   style={{
                     flex: 1,
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid var(--border-subtle)",
                     borderRadius: 8,
                     padding: "5px 10px",
                     fontSize: 12,
@@ -799,12 +799,12 @@ export default function BranchDashboard({
                   value={newEventStatus}
                   onChange={(e) => setNewEventStatus(e.target.value as "upcoming" | "ongoing" | "completed")}
                   style={{
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid var(--border-subtle)",
                     borderRadius: 8,
                     padding: "5px 6px",
                     fontSize: 11,
                     outline: "none",
-                    background: "#FFFFFF",
+                    background: "var(--surface)",
                   }}
                 >
                   <option value="upcoming">Upcoming</option>
@@ -836,9 +836,9 @@ export default function BranchDashboard({
                 {(["upcoming", "ongoing", "completed"] as const).map((col) => {
                   const filtered = events.filter((ev) => ev.status === col);
                   const title = col === "upcoming" ? "Upcoming" : col === "ongoing" ? "Ongoing" : "Completed";
-                  const borderCol = col === "upcoming" ? "0.5px solid #E2E8F0" : col === "ongoing" ? "0.5px solid #FDE68A" : "0.5px solid #A7F3D0";
-                  const bgCol = col === "upcoming" ? "#F8FAFC" : col === "ongoing" ? "#FFFBEB" : "#ECFDF5";
-                  const textCol = col === "upcoming" ? "#475569" : col === "ongoing" ? "#B45309" : "#047857";
+                  const borderCol = col === "upcoming" ? "0.5px solid var(--border-subtle)" : col === "ongoing" ? "0.5px solid var(--status-amber-bg-strong)" : "0.5px solid var(--status-green-bg)";
+                  const bgCol = col === "upcoming" ? "var(--surface-sunken)" : col === "ongoing" ? "var(--tint-amber)" : "var(--tint-green)";
+                  const textCol = col === "upcoming" ? "var(--status-neutral-fg-strong)" : col === "ongoing" ? "var(--accent-amber-strong)" : "var(--accent-green-strong)";
 
                   return (
                     <div key={col} style={{ border: borderCol, background: bgCol, borderRadius: 10, padding: 8 }}>
@@ -847,22 +847,22 @@ export default function BranchDashboard({
                       </p>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", paddingRight: 2 }}>
                         {filtered.map((ev) => (
-                          <div key={ev.id} style={{ padding: 8, background: "#FFFFFF", border: "0.5px solid #E2E8F0", borderRadius: 8, fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-                            <span style={{ fontWeight: 600, color: "#334155", wordBreak: "break-all", lineHeight: 1.25 }}>{ev.name}</span>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #F1F5F9", paddingTop: 6, marginTop: 2 }}>
+                          <div key={ev.id} style={{ padding: 8, background: "var(--surface)", border: "0.5px solid var(--border-subtle)", borderRadius: 8, fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: "var(--text-strong)", wordBreak: "break-all", lineHeight: 1.25 }}>{ev.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid var(--status-neutral-bg)", paddingTop: 6, marginTop: 2 }}>
                               {col !== "completed" ? (
                                 <button
                                   onClick={() => moveEvent(ev.id, col === "upcoming" ? "ongoing" : "completed")}
-                                  style={{ background: "none", border: "none", color: "#2563EB", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                                  style={{ background: "none", border: "none", color: "var(--accent-blue)", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}
                                 >
                                   Move ➔
                                 </button>
                               ) : (
-                                <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700 }}>Done</span>
+                                <span style={{ fontSize: 9, color: "var(--status-neutral-fg)", fontWeight: 700 }}>Done</span>
                               )}
                               <button
                                 onClick={() => deleteEvent(ev.id)}
-                                style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                                style={{ background: "none", border: "none", color: "var(--status-neutral-fg)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
                               >
                                 <Trash2 style={{ width: 13, height: 13 }} />
                               </button>
@@ -880,7 +880,7 @@ export default function BranchDashboard({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: "#94A3B8",
+                  color: "var(--status-neutral-fg)",
                   letterSpacing: "0.04em",
                   marginBottom: 8,
                 }}
@@ -896,13 +896,13 @@ export default function BranchDashboard({
                       alignItems: "start",
                       gap: 8,
                       padding: "8px 10px",
-                      background: "#EFF6FF",
-                      border: "0.5px solid #BFDBFE",
+                      background: "var(--tint-blue)",
+                      border: "0.5px solid var(--status-blue-bg)",
                       borderRadius: 8,
                     }}
                   >
-                    <Megaphone style={{ width: 13, height: 13, color: "#1D4ED8", marginTop: 2, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.4 }}>
+                    <Megaphone style={{ width: 13, height: 13, color: "var(--accent-blue)", marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--accent-blue)", lineHeight: 1.4 }}>
                       {a}
                     </span>
                   </div>
