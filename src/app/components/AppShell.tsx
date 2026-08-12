@@ -66,7 +66,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
 
   return (
     <BreadcrumbProvider>
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
+      <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
         {/* Desktop sidebar rail (inline, collapsible). */}
         <div className="hidden lg:flex">
           <Sidebar collapsed={collapsed} />
@@ -79,7 +79,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
         >
           <div
             onClick={() => setMobileOpen(false)}
-            className={`absolute inset-0 bg-slate-900/50 transition-opacity duration-200 ${
+            className={`absolute inset-0 bg-slate-900/50 dark:bg-slate-950/70 transition-opacity duration-200 ${
               mobileOpen ? "opacity-100" : "opacity-0"
             }`}
           />
@@ -100,7 +100,7 @@ export default function AppShell({ children, email, role, name }: AppShellProps)
             role={role}
             name={name}
           />
-          <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">{children}</main>
         </div>
       </div>
     </BreadcrumbProvider>
