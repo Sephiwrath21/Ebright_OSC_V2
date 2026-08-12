@@ -10,6 +10,17 @@
 // pre-fetched server-side (same pattern as TaskProgressCard's own Daily/
 // Monthly toggle) — switching Filter/Sort/Scope is pure client state, no
 // refetch.
+//
+// Known, accepted gap (2026-08-12): the old EntityOverviewSection roster
+// had an "Assign to Others" reassign action on every pending row (HOD/
+// Branch Manager could reassign a task belonging to ANY team member
+// directly from this list). This card grid has no reassign UI — cut
+// deliberately for this first pass rather than lost by oversight (it
+// wasn't in the original mockup either). Reassign from the viewer's own
+// delegated/ad hoc tasks still works elsewhere on this page (the "Task
+// Assignment" and "Ad hoc Tasks" cards) — only reassigning an arbitrary
+// OTHER team member's pending task from the full roster view is gone.
+// Add it back here as a follow-up if it's missed in practice.
 import * as React from "react";
 import type { FlowCategoryOption, FlowEntityDetail, FlowTaskRow } from "./types";
 import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
