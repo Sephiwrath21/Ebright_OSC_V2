@@ -47,6 +47,20 @@ export function CategoryManager({
     // Optimistic id is unknown (server-assigned) — the caller re-fetches
     // the page's server-rendered list on next navigation; for immediate
     // feedback here, append a placeholder that a hard refresh reconciles.
+    //
+    // Accepted trade-off (2026-08-12, code review): the server has no row
+    // with this `pending-<timestamp>` id yet, and there's no client-side
+    // reconciliation of a fresh `initialCategories` prop mid-session. If an
+    // admin Renames/Archives THIS row before a page refresh, the action
+    // hits the server with the fake id and fails with "Category not
+    // found" — the row itself is fine (create succeeded), but the
+    // immediate follow-up action isn't. This is a low-frequency, low-
+    // severity gap on a first-cut admin tool (see this file's header —
+    // no drag-reorder yet either), documented rather than fixed here,
+    // matching this codebase's established precedent for this class of
+    // trade-off (see commit 2f1e99e, the 5-photo-cap TOCTOU race). A
+    // future pass could fix it by having `onCreate` return the real id, or
+    // by re-syncing `categories` from a fresh `initialCategories` prop.
     setCategories((prev) => [...prev, { id: `pending-${Date.now()}`, name, order: prev.length, archivedAt: null }]);
   };
 
@@ -123,10 +137,20 @@ export function CategoryManager({
                     maxLength={100}
                     className="flex-1 rounded-full border border-gray-300 px-3 py-1 text-sm"
                   />
-                  <button type="button" onClick={() => void runRename(c.id)} className="text-xs font-medium text-blue-600">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void runRename(c.id)}
+                    className="text-xs font-medium text-blue-600 disabled:opacity-50"
+                  >
                     Save
                   </button>
-                  <button type="button" onClick={() => setEditingId(null)} className="text-xs font-medium text-gray-400">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setEditingId(null)}
+                    className="text-xs font-medium text-gray-400 disabled:opacity-50"
+                  >
                     Cancel
                   </button>
                 </>

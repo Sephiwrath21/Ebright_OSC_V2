@@ -10,10 +10,18 @@ import {
   FlowBridgeError,
   getMyRole,
   listTaskCategories,
+  NoAccountError,
   renameTaskCategory,
+  SetupPendingError,
   unarchiveTaskCategory,
+  type TaskCategorySummary,
 } from "@/task-manager/data";
 import { CategoryManager } from "@/task-manager/ui/category-manager";
+import {
+  NoAccountCard,
+  SetupPendingCard,
+  TaskManagerErrorCard,
+} from "@/task-manager/ui/status-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +33,47 @@ export default async function TaskCategoriesPage() {
   const su = session.user as { email: string; name?: string | null; role?: string };
   const email = su.email;
 
-  const role = await getMyRole(email);
+  // Same three-way SetupPendingError -> SetupPendingCard, NoAccountError ->
+  // NoAccountCard, any other error -> TaskManagerErrorCard mapping as
+  // template/package/package-table's page.tsx. Unlike those pages, the
+  // access gate here is a single explicit redirect (no View/Edit two-tier
+  // split for Categories, see this page's own plan doc) rather than a
+  // caught 403, so it has to run BETWEEN the two fetches and outside any
+  // try/catch — catching next/navigation's redirect() would swallow it
+  // instead of letting it propagate. Two small try/catches (one per fetch)
+  // share this card-building helper rather than duplicating the mapping.
+  const errorPage = (err: unknown) => {
+    let card;
+    if (err instanceof SetupPendingError) {
+      card = <SetupPendingCard />;
+    } else if (err instanceof NoAccountError) {
+      card = <NoAccountCard email={email} />;
+    } else {
+      card = (
+        <TaskManagerErrorCard message={err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE} />
+      );
+    }
+    return (
+      <AppShell email={su.email} role={su.role} name={su.name}>
+        <div className="mx-auto max-w-[1400px] p-6">{card}</div>
+      </AppShell>
+    );
+  };
+
+  let role: { role: string; department: string | null };
+  try {
+    role = await getMyRole(email);
+  } catch (err) {
+    return errorPage(err);
+  }
   if (!canManageTaskTemplateGroups(role)) redirect("/task-manager");
 
-  const categories = await listTaskCategories(email);
+  let categories: TaskCategorySummary[];
+  try {
+    categories = await listTaskCategories(email);
+  } catch (err) {
+    return errorPage(err);
+  }
 
   async function create(name: string) {
     "use server";
