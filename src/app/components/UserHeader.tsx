@@ -193,19 +193,19 @@ export default function UserHeader({ email = "", role = "", name = null }: UserH
 
               {/* ── Impersonation active card ── */}
               {isImpersonating && (
-                <div className="mx-3 mt-2.5 mb-1 border-l-2 border-amber-400 bg-amber-50 rounded-r-lg px-3 py-2.5">
+                <div className="mx-3 mt-2.5 mb-1 border-l-2 border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900 rounded-r-lg px-3 py-2.5">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="w-6 h-6 shrink-0 bg-amber-400 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
                       {activeInitials}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{activeDisplayName}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{activeEmail}</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-amber-100 truncate">{activeDisplayName}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-amber-200 truncate">{activeEmail}</p>
                     </div>
                   </div>
                   <button
                     onClick={handleStopImpersonating}
-                    className="flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors"
+                    className="flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-50 transition-colors"
                   >
                     <ChevronLeft className="w-3 h-3" />
                     Return to {originalUserName ?? "your account"}
