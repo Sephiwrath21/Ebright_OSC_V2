@@ -37,7 +37,7 @@ export default function ProfileOrgUnit({
 
       <form action={formAction} className="p-6 space-y-4">
         {state?.error && (
-          <div role="alert" className="flex items-start gap-2 p-3 rounded-md border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 text-sm text-red-800 dark:text-red-200">
+          <div role="alert" className="flex items-start gap-2 p-3 rounded-md border border-red-200 dark:border-red-600 bg-red-50 dark:bg-red-900 text-sm text-red-800 dark:text-red-200">
             <CircleAlert className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
             <span>{state.error}</span>
           </div>

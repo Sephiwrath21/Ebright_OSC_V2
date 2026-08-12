@@ -6,11 +6,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
   --background: #f8fafc; /* slate-50 — matches AppShell so no white bleed-through */
   --foreground: #171717;
 }
 
 .dark {
+  color-scheme: dark; /* native scrollbars, <select> popups and form chrome follow the theme */
   --background: #020617; /* slate-950 — matches the dark shell */
   --foreground: #f1f5f9; /* slate-100 */
 }
