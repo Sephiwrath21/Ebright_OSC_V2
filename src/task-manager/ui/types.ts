@@ -58,6 +58,9 @@ export interface FlowTaskRow {
   /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
    *  viewer; image served by /api/task-manager/guideline-image/[id]. */
   guideline?: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  categoryId: string | null;
+  categoryName: string | null;
   /** Who assigned the task — the "Assigned by" column in the personal My
    *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
    *  undefined elsewhere (column shows a dash). */

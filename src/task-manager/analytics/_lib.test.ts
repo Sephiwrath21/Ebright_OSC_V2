@@ -294,6 +294,8 @@ describe("sortTaskRows", () => {
     status: "ACTIVE",
     fromSchedule: false,
     guideline: null,
+    categoryId: null,
+    categoryName: null,
     assignerId: "u-assigner",
     proofIds: [],
     parentId: null,
