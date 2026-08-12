@@ -310,6 +310,12 @@ export interface FlowAssignInput {
    *  the created tasks to that template (template deletion cancels its
    *  still-pending assignments). */
   fromTemplateId?: string;
+  /** Task Category ("Type", 2026-08-12) — set ONCE at assignment time,
+   *  never editable afterward. Omit/undefined = Uncategorized. Every
+   *  RunBlock this assignment creates (all recipients × days, and every
+   *  subtask) gets this SAME categoryId — same fan-out shape as
+   *  guidelineId. */
+  categoryId?: string;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD

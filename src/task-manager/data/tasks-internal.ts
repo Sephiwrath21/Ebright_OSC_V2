@@ -95,6 +95,9 @@ export const assignInputSchema = z.object({
   // every created block with the template's id so template deletion can
   // find (and cancel) its pending assignments.
   fromTemplateId: z.string().min(1).optional(),
+  // Task Category (2026-08-12): validated against a real, non-archived
+  // TaskCategory below (assignFlowTaskCore) — omit/undefined = Uncategorized.
+  categoryId: z.string().min(1).optional(),
 });
 
 const ADHOC_FLOW_ID = "flow-adhoc";
@@ -149,6 +152,16 @@ export async function assignFlowTaskCore(
       400,
       `${allowedCadences.join("/")} ${allowedCadences.length > 1 ? "are" : "is"} the only cadence option${allowedCadences.length > 1 ? "s" : ""} for this recipient selection`,
     );
+  }
+
+  let categoryId: string | null = null;
+  if (body.categoryId) {
+    const category = await prisma.taskCategory.findFirst({
+      where: { id: body.categoryId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!category) throw new ApiHttpError(400, "That category no longer exists or is archived");
+    categoryId = category.id;
   }
 
   const flowId =
@@ -217,6 +230,7 @@ export async function assignFlowTaskCore(
       title: body.title,
       subtasks: body.subtasks as unknown as Prisma.InputJsonValue,
       cadence,
+      categoryId,
       guidelineUrl: body.guidelineUrl ?? null,
       guidelineMime: body.guidelineImage?.mime ?? null,
       guidelineImage: body.guidelineImage
@@ -267,6 +281,7 @@ export async function assignFlowTaskCore(
           cadence,
           guidelineId,
           templateId,
+          categoryId,
           runItems: {
             create: block.items.map((it) => ({
               itemId: it.id,
@@ -310,6 +325,7 @@ export async function assignFlowTaskCore(
             cadence,
             parentId: parentBlock.id,
             templateId,
+            categoryId,
             subtaskOrder: subtaskIndex,
             runItems: {
               create: block.items.map((it) => ({
