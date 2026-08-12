@@ -115,7 +115,7 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
         listBranches(),
         listDepartments(),
       ]);
-      const prePassedRows = await computePreStartDatePassedRows(branchStaffPositionGroups);
+      const prePassedRows = await computePreStartDatePassedRows(branchStaffPositionGroups, careerApplications);
       branches = branchList;
       departments = departmentList;
       const branchStaffByName = await lookupBranchStaffLocationByName(branchList, departmentList);
@@ -253,7 +253,7 @@ export default async function EmployeeFolderStagePage({ params, searchParams }: 
           ...rowsBaseRaw
             .filter((r) => overrides.get(r.id)?.extraStages?.includes("onboarding"))
             .map((r) => ({ ...r, stage: "onboarding" as const })),
-          ...(await computePreStartDatePassedRows(branchStaffPositionGroups)),
+          ...(await computePreStartDatePassedRows(branchStaffPositionGroups, careerApplications)),
         ]
       : rowsBase;
   // Same live BranchStaff fallback the Probation list uses — someone whose

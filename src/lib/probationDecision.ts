@@ -76,9 +76,22 @@ export function computeProbationDisplayStatus(
 // Active. True whether the confirmation came from ebright_hrfs (status2)
 // or from HR's own local decision — but never true if HR already recorded
 // Stopped/Extended locally, even if status2 later reads Accept.
-export function isEffectivelyConfirmed(localProbationStatus: string | null, status2: string | null): boolean {
+//
+// status2 comparison fixed (2026-08-12) — the live distinct values in
+// ebright_hrfs.career_applications.status2 are lowercase ('accept'/
+// 'reject'), confirmed by direct query; the previous `=== "Accept"` check
+// never matched anything in real data. Now case-insensitive, and requires
+// feedback2 to also be non-null — per explicit decision (see conversation),
+// tightening the status2 branch specifically so a bare status2 value with
+// no actual feedback recorded isn't treated as a real confirmation.
+export function isEffectivelyConfirmed(
+  localProbationStatus: string | null,
+  status2: string | null,
+  feedback2: string | null,
+): boolean {
   if (localProbationStatus === "Stopped" || localProbationStatus === "Extended") return false;
-  return localProbationStatus === "Confirmed" || status2 === "Accept";
+  const status2Confirmed = (status2?.trim().toLowerCase() ?? "") === "accept" && feedback2 !== null;
+  return localProbationStatus === "Confirmed" || status2Confirmed;
 }
 
 // Display-only ("Stop" instead of "In Progress") — per explicit decision
@@ -223,8 +236,10 @@ export async function computeAutoConfirmedProbationIds<
 
   const result = new Set<number>();
   for (const row of eligible) {
-    const status2 = careerApplications.get(normalizeName(row.fullName))?.status2 ?? null;
-    if (isEffectivelyConfirmed(localStatusById.get(row.id) ?? null, status2)) result.add(row.id);
+    const match = careerApplications.get(normalizeName(row.fullName));
+    if (isEffectivelyConfirmed(localStatusById.get(row.id) ?? null, match?.status2 ?? null, match?.feedback2 ?? null)) {
+      result.add(row.id);
+    }
   }
   return result;
 }
@@ -393,7 +408,7 @@ export async function getProbationDisplayInfo(userId: number, fullName: string):
     feedback2,
     hasCareerApplicationMatch: careerMatch != null,
     displayStatus: computeProbationDisplayStatus(localProbationStatus, status2),
-    effectivelyConfirmed: isEffectivelyConfirmed(localProbationStatus, status2),
+    effectivelyConfirmed: isEffectivelyConfirmed(localProbationStatus, status2, feedback2),
     effectivelyStopped: isEffectivelyStopped(localProbationStatus, status2),
     localProbationStatus,
     decidedByName: localRow?.decided_by_user?.user_profile?.full_name

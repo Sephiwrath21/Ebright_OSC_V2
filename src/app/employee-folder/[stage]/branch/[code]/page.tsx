@@ -79,7 +79,7 @@ export default async function EmployeeFolderBranchNamelistPage({ params }: Props
           ...rowsBaseRaw
             .filter((r) => overrides.get(r.id)?.extraStages?.includes("onboarding"))
             .map((r) => ({ ...r, stage: "onboarding" as const })),
-          ...(await computePreStartDatePassedRows(branchStaffPositionGroups)),
+          ...(await computePreStartDatePassedRows(branchStaffPositionGroups, careerApplications)),
         ]
       : rowsBase;
   // Same live BranchStaff fallback as the summary page above it — must be

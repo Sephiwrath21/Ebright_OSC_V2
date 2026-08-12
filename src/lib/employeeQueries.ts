@@ -43,6 +43,17 @@ export const STAFF_ROLE_ID = 6;
 // the lifecycle stages.
 const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 2, 7, 8];
 
+// Sentinel-id offset for confirmed-hire candidates sourced from
+// ebright_hrfs.career_applications (see computeConfirmedHireCandidateRows in
+// careerApplicationSync.ts) — their EmployeeOverviewRow.id is
+// -(CONFIRMED_HIRE_ID_OFFSET + career_applications.id). onboarding_candidate-
+// sourced candidates use -BranchStaff.id (career_applications.source_id IS
+// BranchStaff.id — see getOnboardingCandidateDetail below), a completely
+// different table's primary key that could realistically collide with a
+// small career_applications.id. The offset is large enough that no real row
+// from either table will ever cross into the other's range.
+export const CONFIRMED_HIRE_ID_OFFSET = 1_000_000;
+
 export interface EmployeeRow {
   id: number;
   email: string;
@@ -232,6 +243,17 @@ export interface EmployeeOverviewRow {
    *  namelist's Status column shows "Stop" instead of the page's own
    *  "Probation" label for just this row. Undefined everywhere else. */
   probationStopped?: boolean;
+  /** Candidate-only rows past their start_date (see
+   *  computePreStartDatePassedRows in careerApplicationSync.ts) — true once
+   *  they've crossed the threshold to become a real account (Part Timer/
+   *  Intern: 3 days since start; Full Time: status2/feedback2 confirmed —
+   *  see isEffectivelyConfirmed in probationDecision.ts) but no real portal
+   *  account exists yet for computeRealAccountLifecycleOverrides to take
+   *  over. Never promotes stage to "active" on its own — purely a signal
+   *  that HR should create the real account now. Undefined everywhere else
+   *  (including for real accounts, which use their own employment.status
+   *  instead). */
+  readyForRealAccount?: boolean;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
@@ -597,6 +619,17 @@ export async function listUpcomingOnboardingCandidates(existingRows: EmployeeOve
 // source_id (positive) — callers pass `-row.id` since candidate rows use
 // `-source_id` as their EmployeeOverviewRow.id sentinel.
 export async function getOnboardingCandidateDetail(sourceId: number): Promise<EmployeeDetailFull | null> {
+  // A confirmed-hire candidate (see CONFIRMED_HIRE_ID_OFFSET above) — routed
+  // to its own lookup in careerApplicationSync.ts, which owns the
+  // career_applications query and the BranchStaff name-match this candidate
+  // type is built on. Dynamic import to avoid a circular dependency
+  // (careerApplicationSync.ts already imports several things from this
+  // file), same pattern already used elsewhere in this file.
+  if (sourceId >= CONFIRMED_HIRE_ID_OFFSET) {
+    const { getConfirmedHireCandidateDetail } = await import("@/lib/careerApplicationSync");
+    return getConfirmedHireCandidateDetail(sourceId - CONFIRMED_HIRE_ID_OFFSET);
+  }
+
   const [candidate, departments, branches] = await Promise.all([
     prisma.onboarding_candidate.findUnique({ where: { source_id: sourceId } }),
     listDepartments(),

@@ -11,6 +11,7 @@ import Pagination from "@/app/components/Pagination";
 import RowActionMenu from "@/app/components/RowActionMenu";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import AddPreStageEmployeeModal from "@/app/components/AddPreStageEmployeeModal";
+import OverdueDot from "@/app/components/OverdueDot";
 
 const MONTHS = [
   { value: "01", label: "January" }, { value: "02", label: "February" }, { value: "03", label: "March" },
@@ -156,7 +157,7 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                   <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
                   <span className="text-sm font-medium text-slate-600 truncate">{row.departmentName ?? row.branchName ?? "—"}</span>
                   <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                  <span>
+                  <span className="flex items-center gap-2">
                     {stage === "pre" ? (
                       row.resolvedPositionType ? (
                         <span
@@ -194,6 +195,16 @@ export default function StageFlatListView({ stage, rows, branches, departments }
                       <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[stage]}`}>
                         {STAGE_LABELS[stage]}
                       </span>
+                    )}
+                    {row.readyForRealAccount && (
+                      // Candidate-only (see computePreStartDatePassedRows) —
+                      // signals HR that this person has crossed the
+                      // threshold (3 days since start for Part Timer/Intern,
+                      // status2/feedback2 confirmed for Full Time) and is
+                      // ready for a real portal account to be created, without
+                      // changing the stage label itself (they're still
+                      // genuinely Onboarding/Probation until that happens).
+                      <OverdueDot count={1} label="Ready — create their real account to move them to Active" />
                     )}
                   </span>
                   <div className="flex justify-center">

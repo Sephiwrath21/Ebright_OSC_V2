@@ -83,7 +83,7 @@ export default async function EmployeeFolderPage() {
   // it just reads the already-corrected value.
   const [correctedPreRows, prePassedRows] = await Promise.all([
     computePreStageRows(branchStaffPositionGroups),
-    computePreStartDatePassedRows(branchStaffPositionGroups),
+    computePreStartDatePassedRows(branchStaffPositionGroups, careerApplications),
   ]);
   // Real accounts, corrected in place below. onboarding_candidate-only
   // people (negative id, no portal account yet; see isCandidate) are kept
