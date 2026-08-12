@@ -67,7 +67,10 @@ jobs:
           # causing the SSH session to be killed and the job to report a FALSE
           # failure even though the build finished and the container came up.
           # Give it generous headroom so a slow-but-successful deploy is green.
-          command_timeout: 20m
+          # 2026-08-11: raised 20m -> 40m — production's FIRST build of the
+          # CRM-era image (new deps + 3 prisma generates + bigger next build)
+          # has no layer cache and exceeded 20m ("Run Command Timeout").
+          command_timeout: 40m
           script_stop: true
           script: |
             set -euo pipefail
