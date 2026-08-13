@@ -29,7 +29,7 @@ import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-interface NavItem {
+export interface NavItem {
   name: string;
   /** Leaf items navigate; items with `children` toggle instead. */
   href?: string;
@@ -54,7 +54,7 @@ interface NavItem {
   children?: NavItem[];
 }
 
-const primaryNav: NavItem[] = [
+export const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
   { name: "ClickUp Task", href: "/clickup-task", Icon: ClipboardList },
   {
@@ -125,13 +125,9 @@ const primaryNav: NavItem[] = [
   },
   {
     name: "SMS",
-    href: "/dashboards/sms",
+    href: "https://staging-sms.ebright.my/",
     Icon: BookUser,
-    children: [
-      { name: "Student", href: "/dashboards/sms/student", feature: "sms_student" },
-      { name: "Package", href: "/dashboards/sms/package", feature: "sms_package" },
-      { name: "Age Group", href: "/dashboards/sms/age-group", feature: "sms_age_group" },
-    ],
+    external: true,
   },
   {
     name: "Inventory",
@@ -182,7 +178,7 @@ const primaryNav: NavItem[] = [
   { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan" },
 ];
 
-const secondaryNav: NavItem[] = [
+export const secondaryNav: NavItem[] = [
   { name: "Attendance", href: "/attendance", Icon: CalendarCheck, feature: "attendance_overview" },
   { name: "Account Management", href: "/account-management", Icon: ShieldCheck, privileged: true },
   {
