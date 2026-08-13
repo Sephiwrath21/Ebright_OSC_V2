@@ -1,23 +1,49 @@
 "use client";
 
-// OSC integration package — the "ClickUp Tasks" page body. The top of the page
-// is a row of OVERVIEW DONUTS whose composition follows the mockup sites:
-//   Staff (MEMBER):  My Status Daily · My Status Monthly · {HOD/CEO/…} Assigned
-//   HOD:             My Daily · My Monthly · CEO Assigned · inline full
-//                    department detail (chips/donut/roster — the folded-in
-//                    Department Overview page) · Kanban
-//   BRANCH:          Branch Status Daily · Monthly · Ad hoc tasks
-//   CEO:             CEO Tasks (assigned by me) · pinned-department boards
-//   OPS:             own Daily/Monthly + assign form (no org grids)
-//   ADMIN:           assign form only — the org-wide overview grids
-//                    (all-departments + branch-by-region, overview-grids.tsx)
-//                    render on the OSC Home page instead (home-overview.tsx)
-// No role has a Daily/Monthly toggle anywhere on this page — every donut,
-// list, and roster shows BOTH periods simultaneously, side by side (or
-// stacked, for the longer list-style sections). Every drillable donut opens
-// its bucket's task list in a modal (EntityDrillModal, via StatusOverviewCard).
-// Below the overview: My Tasks and the member roster (dept/branch), also
-// always both periods.
+// OSC integration package — the "ClickUp Tasks" page body. Per-role layout,
+// current as of the 2026-08-12 stacked-sections redesign (Tasks 1-11): the
+// old personal donut row (Daily/Monthly/ceoAssigned/hodAssigned donuts),
+// "My Tasks — Daily/Monthly" lists, HOD's "assignedByMeList", and the CEO's
+// ceoTaskTable/ceoDashboard were all retired — each subsumed into
+// TaskOverviewStack, a shared component that stacks up to four
+// EntityCardOverview sections (Daily · Monthly · HOD Assigned Task · CEO
+// Assigned Task) for a given entity, with the viewer's own row actionable
+// and everyone else's read-only:
+//   Staff (DEPT_MEMBER/BRANCH_MEMBER/COACH): myOverview — a self-scoped
+//                    TaskOverviewStack with no HOD/CEO Assigned sections.
+//                    DEPT_MEMBER/BRANCH_MEMBER see their WHOLE department/
+//                    branch's Daily roster (own row actionable); Monthly
+//                    (DEPT_MEMBER only) stays self-only. BRANCH_MEMBER/COACH
+//                    are Daily-only.
+//   HOD/DEPT_SITE:   myBoard (HOD's own freeform Kanban, HOD only) ·
+//                    departmentOverview — a TaskOverviewStack for the HOD's
+//                    own department (Daily/Monthly/HOD Assigned/CEO
+//                    Assigned), inline (the folded-in Department Overview
+//                    page).
+//   BRANCH_MANAGER:  personalAdhoc (own ad hoc donut, all-time, no date
+//                    filter) · myTasksAdhoc (own ad hoc list) ·
+//                    branchOverview — a TaskOverviewStack for the branch ·
+//                    adhocOversight (branch-wide ad hoc card) ·
+//                    manpowerLink.
+//   BRANCH_SITE:     branchOverview · adhocOversight (same as
+//                    BRANCH_MANAGER, view-only — no personal/manpower cards).
+//   CEO:             myOverview (self-scoped Daily/Monthly stack, no HOD/CEO
+//                    Assigned) · entityDropdowns (the Department|Branch
+//                    dropdown TaskOverviewStack, appended below own
+//                    sections).
+//   OPS:             myOverview (self-scoped Daily/Monthly) ·
+//                    assignerStreams (generic incoming-assigner cards; no
+//                    org grids).
+//   ADMIN/ELEVATED_DEPT_SITE: entityDropdowns only — the Department|Branch
+//                    dropdown overview IS the whole page. The org-wide
+//                    overview grids (all-departments + branch-by-region,
+//                    overview-grids.tsx) render on the OSC Home page instead
+//                    (home-overview.tsx).
+// No role has a Daily/Monthly toggle anywhere on this page — every
+// TaskOverviewStack shows BOTH periods simultaneously, stacked top to
+// bottom. Every drillable card opens its bucket's task list in a modal
+// (EntityDrillModal, via TaskRowLine/StatusDropdown inside
+// EntityCardOverview).
 //
 // Callers fetch BOTH periods (getFlowDetail ×2) so every Daily/Monthly pair
 // can render together. `period`/`dailyHref`/`monthlyHref` are accepted but no
