@@ -1,0 +1,78 @@
+"use client";
+
+// Stacked-sections redesign (2026-08-12) — renders up to four
+// EntityCardOverview instances top to bottom: Daily, Monthly, HOD Assigned
+// Task, CEO Assigned Task. Each section is entirely optional — omit a
+// prop to omit that section (BRANCH_MEMBER/COACH have no Monthly; OPS/the
+// CEO's own page have no HOD/CEO Assigned Task; see role-views.ts's
+// taskManager arrays and the design doc's per-role table for exactly which
+// roles get which sections).
+import * as React from "react";
+import type { FlowCategoryOption, FlowEntityDetail } from "./types";
+import { EntityCardOverview } from "./entity-card-overview";
+
+interface SectionData {
+  entity: FlowEntityDetail;
+  dateControl?: React.ReactNode;
+  showViewToggle: boolean;
+}
+
+export function TaskOverviewStack({
+  entityName,
+  categories,
+  myUserId,
+  daily,
+  monthly,
+  hodAssigned,
+  ceoAssigned,
+  onComplete,
+  onSkip,
+  onReopen,
+  onUploadProof,
+  onRemoveProof,
+}: {
+  entityName: string;
+  categories: FlowCategoryOption[];
+  myUserId: string;
+  daily?: SectionData;
+  monthly?: SectionData;
+  hodAssigned?: SectionData;
+  ceoAssigned?: SectionData;
+  onComplete?: (runBlockId: string) => Promise<import("./types").ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<import("./types").ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
+  onUploadProof?: import("./types").ProofUploadHandler;
+  onRemoveProof?: import("./types").ProofRemoveHandler;
+}) {
+  const sections: { key: string; label: string; data?: SectionData }[] = [
+    { key: "daily", label: "Daily", data: daily },
+    { key: "monthly", label: "Monthly", data: monthly },
+    { key: "hodAssigned", label: "HOD Assigned Task", data: hodAssigned },
+    { key: "ceoAssigned", label: "CEO Assigned Task", data: ceoAssigned },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {sections.map(
+        ({ key, label, data }) =>
+          data && (
+            <EntityCardOverview
+              key={key}
+              sectionLabel={label}
+              entityName={entityName}
+              entity={data.entity}
+              categories={categories}
+              myUserId={myUserId}
+              dateControl={data.dateControl}
+              showViewToggle={data.showViewToggle}
+              onComplete={onComplete}
+              onSkip={onSkip}
+              onReopen={onReopen}
+              onUploadProof={onUploadProof}
+              onRemoveProof={onRemoveProof}
+            />
+          ),
+      )}
+    </div>
+  );
+}
