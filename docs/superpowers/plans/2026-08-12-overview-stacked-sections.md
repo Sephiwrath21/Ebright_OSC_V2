@@ -323,7 +323,14 @@ This replaces the current internal Filter (Daily/Monthly/HOD Assigned Task) swit
 // has that — cut deliberately for the first pass. Reassign from the
 // viewer's own delegated/ad hoc tasks still works elsewhere on this page.
 import * as React from "react";
-import type { FlowCategoryOption, FlowEntityDetail, FlowTaskRow } from "./types";
+import type {
+  ActionResult,
+  FlowCategoryOption,
+  FlowEntityDetail,
+  FlowTaskRow,
+  ProofRemoveHandler,
+  ProofUploadHandler,
+} from "./types";
 import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
 import { TaskRowLine } from "./bits";
 
@@ -376,11 +383,11 @@ export function EntityCardOverview({
    *  task that isn't the viewer's own (TaskRowLine/StatusDropdown/ProofCell
    *  already enforce this via task.assigneeId === myUserId). Omit any of
    *  these to disable that specific action everywhere in this section. */
-  onComplete?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onSkip?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
-  onUploadProof?: import("./types").ProofUploadHandler;
-  onRemoveProof?: import("./types").ProofRemoveHandler;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
+  onUploadProof?: ProofUploadHandler;
+  onRemoveProof?: ProofRemoveHandler;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   const [onlyMe, setOnlyMe] = React.useState(false);
@@ -427,30 +434,43 @@ export function EntityCardOverview({
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No one to show.</p>
           ) : (
-            personCards.map((card) => (
-              <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
-                <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
-                <div className="px-3 py-1">
-                  {card.tasks.length === 0 ? (
-                    <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
-                  ) : (
-                    card.tasks.map((t: FlowTaskRow) => (
-                      <TaskRowLine
-                        key={t.runBlockId}
-                        task={t}
-                        myUserId={myUserId}
-                        onComplete={onComplete}
-                        onSkip={onSkip}
-                        onReopen={onReopen}
-                        onUploadProof={onUploadProof}
-                        onRemoveProof={onRemoveProof}
-                        hideCompleted
-                      />
-                    ))
-                  )}
+            personCards.map((card) => {
+              // hideCompleted is per-CARD, not per-row (2026-08-12, code
+              // review fix): groupTasksByPerson puts only one person's
+              // tasks in each card, so every row in a card shares the same
+              // ownership — the viewer's own card gets the full "My Tasks"
+              // treatment (StatusDropdown/ProofCell/complete-skip-reopen),
+              // every other person's card stays the plain roster/oversight
+              // mode (matching bits.tsx's own documented convention for
+              // "read-only oversight of OTHER people's work") instead of
+              // forcing in a Proof/Assignee/fixed-Due-Date column that mode
+              // always assumes a wide table has room for.
+              const isOwnCard = card.userId === myUserId;
+              return (
+                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
+                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
+                  <div className="px-3 py-1">
+                    {card.tasks.length === 0 ? (
+                      <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                    ) : (
+                      card.tasks.map((t: FlowTaskRow) => (
+                        <TaskRowLine
+                          key={t.runBlockId}
+                          task={t}
+                          myUserId={myUserId}
+                          onComplete={onComplete}
+                          onSkip={onSkip}
+                          onReopen={onReopen}
+                          onUploadProof={onUploadProof}
+                          onRemoveProof={onRemoveProof}
+                          hideCompleted={isOwnCard}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       ) : (
@@ -1016,6 +1036,37 @@ Replace with:
   });
 ```
 
+- [ ] **Step 10.5: Fix the now-vacuous "a My Tasks list implies its personal card" test (code review fix, 2026-08-12)**
+
+Find:
+
+```typescript
+  it("a My Tasks list implies its personal card (and vice versa for Daily)", () => {
+    for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
+      // CEO exception (2026-08-01 redesign): Home shows the ONE combined
+      // "My Tasks" card (ceoCombinedList) while Task Manager shows the
+      // standard Daily table WITHOUT a separate personal donut card.
+      if (shows(v, "home", "ceoCombinedList") || shows(v, "taskManager", "ceoCombinedList")) continue;
+      expect(shows(v, "taskManager", "myTasksDaily")).toBe(shows(v, "taskManager", "personalDaily"));
+      // Monthly list implies the Monthly card (not necessarily the reverse).
+      if (shows(v, "taskManager", "myTasksMonthly")) {
+        expect(shows(v, "taskManager", "personalMonthly")).toBe(true);
+      }
+    }
+  });
+```
+
+This test is now vacuous — after Steps 2-7 above, no role's `taskManager` array contains `myTasksDaily`, `personalDaily`, `myTasksMonthly`, or `personalMonthly` anymore, so every comparison degenerates to `false === false` and the test passes while protecting nothing. Replace it with:
+
+```typescript
+  it("myTasksDaily/myTasksMonthly no longer appear in any taskManager array (2026-08-12: subsumed into myOverview/departmentOverview/branchOverview — this invariant used to be checked implicitly via the old personalDaily/myTasksDaily pairing test, which became vacuous once neither key remained)", () => {
+    for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
+      expect(shows(v, "taskManager", "myTasksDaily"), `${v} should not show myTasksDaily on Task Manager`).toBe(false);
+      expect(shows(v, "taskManager", "myTasksMonthly"), `${v} should not show myTasksMonthly on Task Manager`).toBe(false);
+    }
+  });
+```
+
 - [ ] **Step 11: Run the full role-views test file**
 
 Run: `npx vitest run src/task-manager/role-views.test.ts`
@@ -1153,26 +1204,34 @@ Find the `carryTM` helper definition (around line 194-197, near the top of the c
   // assigneeName already (see types.ts's comment on FlowPersonal.tasks).
   function toSelfEntityDetail(
     me: { userId: string; name: string },
-    personal: { totals: import("@/task-manager/ui/types").FlowBucketTotals; tasks: import("@/task-manager/ui/types").FlowDrillTask[] },
-  ): import("@/task-manager/ui/types").FlowEntityDetail {
-    const buckets: { completed: import("@/task-manager/ui/types").FlowDrillTask[]; pending: import("@/task-manager/ui/types").FlowDrillTask[]; na: import("@/task-manager/ui/types").FlowDrillTask[] } = {
-      completed: [],
-      pending: [],
-      na: [],
-    };
-    for (const t of personal.tasks) {
-      if (t.status === "DONE") buckets.completed.push(t);
-      else if (t.status === "SKIPPED") buckets.na.push(t);
-      else buckets.pending.push(t);
-    }
+    personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+  ): FlowEntityDetail {
     return {
       name: me.name,
       totals: personal.totals,
-      tasks: buckets,
-      members: [{ userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 }],
+      // Reuses flowBucketize (already imported, already used elsewhere in
+      // this file) instead of hand-rolling the same DONE/SKIPPED/else
+      // mapping a second time (2026-08-12, code review fix).
+      tasks: flowBucketize(personal.tasks),
+      members: [
+        {
+          userId: me.userId,
+          name: me.name,
+          employmentType: null,
+          department: null,
+          branch: null,
+          // Unused placeholders — no current consumer (groupTasksByPerson,
+          // EntityCardOverview) reads a person card's done/notDone; only
+          // userId/name matter for this synthetic single-member roster.
+          done: 0,
+          notDone: 0,
+        },
+      ],
     };
   }
 ```
+
+`FlowBucketTotals`, `FlowDrillTask`, `FlowEntityDetail` join the existing top-level `import { ... } from "@/task-manager/ui/types"` block near the top of the file (which already imports `flowBucketize`) — add the three names there rather than referencing them via inline `import("@/task-manager/ui/types").X`.
 
 - [ ] **Step 2: Fetch whole-entity Daily data for MEMBER-role viewers who own no entity but belong to one**
 
@@ -1188,15 +1247,21 @@ Find the block from Task 7 Step 2 (the `hodAssignedDepartment`/`hodAssignedBranc
     // getBranchDetail MEMBER-daily exception checks server-side. Uses the
     // SAME getDepartmentDetail/getBranchDetail functions HOD's own
     // department Daily section already uses — just a different caller
-    // identity, newly permitted by Task 3's exception.
+    // identity, newly permitted by Task 3's exception. Parallelized (not
+    // sequential awaits) to match the adjacent hodAssignedDepartment/
+    // Branch/ceoAssignedDepartment/Branch block's own established shape
+    // for this exact "two mutually-exclusive optional entity fetches"
+    // pattern (2026-08-12, code review fix).
     const memberOwnDepartment = daily.me.me.role === "MEMBER" ? daily.me.me.department : null;
     const memberOwnBranch = daily.me.me.role === "MEMBER" ? daily.me.me.branch : null;
-    const memberWholeDepartmentDaily = memberOwnDepartment
-      ? await getDepartmentDetail(email, memberOwnDepartment, "daily", dailyDate).catch(() => null)
-      : null;
-    const memberWholeBranchDaily = memberOwnBranch
-      ? await getBranchDetail(email, memberOwnBranch, "daily", dailyDate).catch(() => null)
-      : null;
+    const [memberWholeDepartmentDaily, memberWholeBranchDaily] = await Promise.all([
+      memberOwnDepartment
+        ? getDepartmentDetail(email, memberOwnDepartment, "daily", dailyDate).catch(() => null)
+        : Promise.resolve(null),
+      memberOwnBranch
+        ? getBranchDetail(email, memberOwnBranch, "daily", dailyDate).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 ```
 
 - [ ] **Step 3: Typecheck**
@@ -1232,10 +1297,10 @@ In `task-manager-view.tsx`, find the props destructuring/type block (starts arou
    *  BRANCH_MEMBER/COACH, no hodAssigned/ceoAssigned for OPS/CEO). */
   myOverview?: {
     entityName: string;
-    daily?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
-    monthly?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
-    hodAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
-    ceoAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
+    daily?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
+    ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
 ```
 
@@ -1280,14 +1345,13 @@ Then pass to `<TaskManagerView>`, immediately after `categoryList={categoryList}
         myOverview={{
           entityName: myOverviewData.entityName,
           daily: myOverviewData.daily,
-          // BRANCH_MEMBER/COACH are Daily-only — role-views.ts's weekdayRange
-          // already distinguishes them from DEPT_MEMBER, but myOverview
-          // itself has no role awareness; the simplest correct signal
-          // available here is: does this viewer's weekday range mark them
-          // Daily-only? Reuse weekdayRangeOf(viewRole) already computed
-          // above for the weekday sidebar, rather than re-deriving role
-          // logic a second time.
-          monthly: weekdayRangeOf(viewRole) === "tue-sun" || weekdayRangeOf(viewRole) === "wed-sun" ? undefined : myOverviewData.monthly,
+          // BRANCH_MEMBER/COACH are Daily-only (role-views.ts) — checked
+          // directly by role rather than inferring it from their weekday
+          // range (2026-08-12, code review fix): WeekdayRange exists to
+          // pick sidebar days, a different purpose, and isn't guaranteed to
+          // stay coupled to Daily-only-ness the way weekdayRangeOf(viewRole)
+          // === "tue-sun"/"wed-sun" implicitly assumed.
+          monthly: viewRole === "BRANCH_MEMBER" || viewRole === "COACH" ? undefined : myOverviewData.monthly,
         }}
 ```
 
@@ -1554,6 +1618,128 @@ Remove `personalCeo`, `ceoDashboard`, `personalDailyDaySidebar`, `personalMonthl
 In `page.tsx`, remove: the `ceoDashboard` construction block (`let ceoDashboard: ...` and its `if (shows(viewRole, "taskManager", "ceoKanban"))` body — `ceoKanban` was never reachable for CEO to begin with per Step 5's finding, and the prop is now gone from `TaskManagerView` entirely), the `personalCeo`/`personalHod` construction (`dayWindowedStream` calls and the `ceoDate`/`hdate` searchParams/`sp.cdate`/`sp.hdate` handling that fed them — remove `dayWindowedStream`, `personalCeo`, `personalHod`, `ceoDate`, `hodDate` entirely; keep `carryTM`/`rawParams` but drop their `cdate`/`hdate` entries), `personalDailyDaySidebar`/`personalMonthlySidebar`/`personalMonthlyMonthControl` construction, and their corresponding `<TaskManagerView>` prop passes. Also remove the `getCeoDashboardConfig`/`saveCeoDashboardConfig`/`getHodKanban` server actions' CEO-dashboard-specific ones (`makeCeoActions`, `ceoDailyActions`, `ceoMonthlyActions`) IF `getCeoDashboardConfig`/`saveCeoDashboardConfig` are not used anywhere else in this file after this removal (grep to confirm before deleting the actions — `getHodKanban`/`hodKanban` stays, that's My Board, unaffected).
 
 Also remove the `?cdate=`/`?hdate=` searchParams type entries (`cdate?: string; hdate?: string;`) from the `searchParams` Promise type at the top of the file, since nothing reads them anymore.
+
+- [ ] **Step 7.5: Swap `buildEntityOverview()`'s two `EntityCardOverview` calls to `TaskOverviewStack` (plan correction — this was mistakenly left unassigned to any task; Task 7's own note incorrectly claimed Task 11 would cover it, but no step originally did until now)**
+
+`buildEntityOverview()` (the dropdown-driven Department|Branch overview — ADMIN/ELEVATED_DEPT_SITE's whole page, and appended below the CEO's own sections) still calls the OLD `EntityCardOverview` with its retired flat-prop shape (`daily`, `monthly`, `hodAssigned`, `dailyDateControl` directly) — `EntityCardOverview` no longer accepts those props as of the earlier refactor task, so this function is currently broken (it would fail to typecheck/render correctly) unless this step is applied.
+
+First, swap the import at the top of the file:
+
+```typescript
+import { EntityCardOverview } from "@/task-manager/ui/entity-card-overview";
+```
+
+to:
+
+```typescript
+import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
+```
+
+(Confirm `EntityCardOverview` isn't imported/used anywhere else in `page.tsx` before removing it — it shouldn't be, since `buildEntityOverview()`'s two call sites are its only uses in this file.)
+
+Then, inside `buildEntityOverview()`'s department branch, find:
+
+```tsx
+            <EntityCardOverview
+              entityName={department}
+              daily={dailyDetail.department}
+              monthly={monthlyDetail.department}
+              hodAssigned={hodAssignedDetail?.department ?? monthlyDetail.department}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              dailyDateControl={
+                <DailyDatePicker
+                  key="admin-dept-daily-picker"
+                  value={dailyDetail.date}
+                  basePath="/task-manager"
+                  extraParams={{ view: "department", department }}
+                />
+              }
+            />
+```
+
+Replace with:
+
+```tsx
+            <TaskOverviewStack
+              entityName={department}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              daily={{
+                entity: dailyDetail.department,
+                dateControl: (
+                  <DailyDatePicker
+                    key="admin-dept-daily-picker"
+                    value={dailyDetail.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "department", department }}
+                  />
+                ),
+                showViewToggle: true,
+              }}
+              monthly={{ entity: monthlyDetail.department, showViewToggle: true }}
+              hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.department, showViewToggle: true } : undefined}
+              ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.department, showViewToggle: true } : undefined}
+              onComplete={completeTask}
+              onSkip={skipTask}
+              onReopen={reopenTask}
+              onUploadProof={uploadProof}
+              onRemoveProof={removeProof}
+            />
+```
+
+Then, inside the branch branch, find:
+
+```tsx
+            <EntityCardOverview
+              entityName={branch}
+              daily={dailyDetail.branch}
+              monthly={monthlyDetail.branch}
+              hodAssigned={hodAssignedDetail?.branch ?? monthlyDetail.branch}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              dailyDateControl={
+                <DailyDatePicker
+                  key="admin-branch-daily-picker"
+                  value={dailyDetail.date}
+                  basePath="/task-manager"
+                  extraParams={{ view: "branch", branch }}
+                />
+              }
+            />
+```
+
+Replace with:
+
+```tsx
+            <TaskOverviewStack
+              entityName={branch}
+              categories={categoryList}
+              myUserId={daily.me.me.userId}
+              daily={{
+                entity: dailyDetail.branch,
+                dateControl: (
+                  <DailyDatePicker
+                    key="admin-branch-daily-picker"
+                    value={dailyDetail.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "branch", branch }}
+                  />
+                ),
+                showViewToggle: true,
+              }}
+              monthly={{ entity: monthlyDetail.branch, showViewToggle: true }}
+              hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.branch, showViewToggle: true } : undefined}
+              ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.branch, showViewToggle: true } : undefined}
+              onComplete={completeTask}
+              onSkip={skipTask}
+              onReopen={reopenTask}
+              onUploadProof={uploadProof}
+              onRemoveProof={removeProof}
+            />
+```
+
+Note this uses `page.tsx`'s OWN server actions (`completeTask`/`skipTask`/`reopenTask`/`uploadProof`/`removeProof` — already defined in this file, confirmed to exist at their current line numbers via grep before editing), NOT `task-manager-view.tsx`'s differently-named props (`completeTaskAction` etc. from Task 10) — `buildEntityOverview()` lives in `page.tsx`, a different component entirely, with direct access to the server actions themselves.
 
 - [ ] **Step 8: Typecheck the whole project**
 
