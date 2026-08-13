@@ -464,34 +464,34 @@ function ManpowerCostReportContent() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500 mb-6"
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6"
         >
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <HomeIcon className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             HRMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Manpower Cost Report</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Manpower Cost Report</span>
         </nav>
 
         {/* Page heading */}
         <header className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {isEmployeeView ? "My Manpower Report" : "Manpower Cost Report"}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5 max-w-lg">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 max-w-lg">
             {isEmployeeView
               ? `Your hours and pay for ${monthLabel}.${viewer?.position ? ` Position: ${viewer.position}.` : ""}`
               : "Breakdown of labor costs across branches, with per-staff hours and pay."}
@@ -500,13 +500,13 @@ function ManpowerCostReportContent() {
 
         {isEmployeeView ? (
           loading ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+            <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center dark:bg-slate-900 dark:border-slate-800">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">Loading your manpower data...</p>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">Loading your manpower data...</p>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-              <p className="text-red-600 font-medium">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center dark:bg-red-900 dark:border-red-700">
+              <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
             </div>
           ) : (
             <EmployeeBreakdown
@@ -527,47 +527,47 @@ function ManpowerCostReportContent() {
           <>
             {/* KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Staff</p>
-            <p className="text-2xl font-black text-slate-700">{totals.totalStaff}</p>
+            <p className="text-2xl font-black text-slate-700 dark:text-slate-300">{totals.totalStaff}</p>
             <p className="text-[10px] text-slate-400 mt-0.5">PT: {totals.ptCount} | FT: {totals.ftCount}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
-            <p className="text-xl font-black text-blue-600">{fmtHrs(totals.totalHrs)}</p>
+            <p className="text-xl font-black text-blue-600 dark:text-blue-400">{fmtHrs(totals.totalHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200">
-            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1">Coach Hours</p>
-            <p className="text-xl font-black text-orange-600">{fmtHrs(totals.totalCoachHrs)}</p>
+          <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200 dark:bg-orange-900 dark:border-orange-700">
+            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1 dark:text-orange-300">Coach Hours</p>
+            <p className="text-xl font-black text-orange-600 dark:text-orange-400">{fmtHrs(totals.totalCoachHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200">
-            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Exec Hours</p>
-            <p className="text-xl font-black text-indigo-600">{fmtHrs(totals.totalExecHrs)}</p>
+          <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200 dark:bg-indigo-900 dark:border-indigo-700">
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 dark:text-indigo-300">Exec Hours</p>
+            <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmtHrs(totals.totalExecHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-green-50 border border-green-200">
-            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">PT Cost</p>
-            <p className="text-xl font-black text-green-600">
+          <div className="rounded-2xl p-4 bg-green-50 border border-green-200 dark:bg-green-900 dark:border-green-700">
+            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1 dark:text-green-300">PT Cost</p>
+            <p className="text-xl font-black text-green-600 dark:text-green-400">
               RM {totals.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded-2xl p-4 bg-white border border-slate-200">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg / PT</p>
-            <p className="text-xl font-black text-slate-600">
+            <p className="text-xl font-black text-slate-600 dark:text-slate-300">
               RM {totals.ptCount > 0 ? (totals.totalPay / totals.ptCount).toFixed(0) : "0"}
             </p>
           </div>
         </div>
 
         {/* Rate info bar + PDF */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-slate-500">
-            <span className="font-bold text-slate-700">Exec Rate:</span> RM {execRate}/hr (fixed)
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">Coach Rate:</span> per employee profile (PT only)
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">Period:</span> {monthLabel}
-            <span className="mx-3 text-slate-300">|</span>
-            <span className="font-bold text-slate-700">FT:</span> hours only (fixed salary)
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2 dark:bg-slate-900 dark:border-slate-800">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-bold text-slate-700 dark:text-slate-300">Exec Rate:</span> RM {execRate}/hr (fixed)
+            <span className="mx-3 text-slate-300 dark:text-slate-600">|</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">Coach Rate:</span> per employee profile (PT only)
+            <span className="mx-3 text-slate-300 dark:text-slate-600">|</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">Period:</span> {monthLabel}
+            <span className="mx-3 text-slate-300 dark:text-slate-600">|</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">FT:</span> hours only (fixed salary)
           </p>
           <button
             type="button"
@@ -589,7 +589,7 @@ function ManpowerCostReportContent() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search name..."
-                className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all w-[180px]"
+                className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all w-[180px] dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               />
             </div>
 
@@ -655,7 +655,7 @@ function ManpowerCostReportContent() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="px-4 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all"
+                className="px-4 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all dark:bg-red-900 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-800"
               >
                 Clear
               </button>
@@ -664,46 +664,46 @@ function ManpowerCostReportContent() {
         )}
 
         {/* Staff table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Type</th>
-                  <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center">Coach Hrs</th>
-                  <th className="px-5 py-4 text-xs font-bold text-pink-500 uppercase tracking-wider text-center">Class</th>
-                  <th className="px-5 py-4 text-xs font-bold text-indigo-500 uppercase tracking-wider text-center">Exec Hrs</th>
-                  <th className="px-5 py-4 text-xs font-bold text-blue-500 uppercase tracking-wider text-center">Total Hrs</th>
+                <tr className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Name</th>
+                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Branch</th>
+                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center dark:text-slate-400">Type</th>
+                  <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center dark:text-orange-400">Coach Hrs</th>
+                  <th className="px-5 py-4 text-xs font-bold text-pink-500 uppercase tracking-wider text-center dark:text-pink-400">Class</th>
+                  <th className="px-5 py-4 text-xs font-bold text-indigo-500 uppercase tracking-wider text-center dark:text-indigo-400">Exec Hrs</th>
+                  <th className="px-5 py-4 text-xs font-bold text-blue-500 uppercase tracking-wider text-center dark:text-blue-400">Total Hrs</th>
                   {viewTab !== "ft" && (
                     <>
-                      <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center">Rate</th>
-                      <th className="px-5 py-4 text-xs font-bold text-green-600 uppercase tracking-wider text-right">Total Pay</th>
+                      <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center dark:text-orange-400">Rate</th>
+                      <th className="px-5 py-4 text-xs font-bold text-green-600 uppercase tracking-wider text-right dark:text-green-400">Total Pay</th>
                     </>
                   )}
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-12" />
+                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-12 dark:text-slate-400" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center">
                       <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                      <p className="text-slate-500 font-medium">Loading manpower cost data...</p>
+                      <p className="text-slate-500 dark:text-slate-400 font-medium">Loading manpower cost data...</p>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center">
-                      <p className="text-red-600 font-medium">{error}</p>
+                      <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
                     </td>
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center">
                       <p className="text-slate-400 font-medium">No staff data found for {monthLabel}.</p>
-                      <p className="text-slate-300 text-sm mt-1">Make sure schedules are finalized for this month.</p>
+                      <p className="text-slate-300 dark:text-slate-600 text-sm mt-1">Make sure schedules are finalized for this month.</p>
                     </td>
                   </tr>
                 ) : (
@@ -791,29 +791,29 @@ function EmployeeBreakdown({
   return (
     <>
       {/* Profile card */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 dark:bg-slate-900 dark:border-slate-800">
         <div className="flex items-center gap-5 flex-wrap">
           <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center text-lg font-black text-white shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-black text-slate-800">{s.name}</h2>
+            <h2 className="text-xl font-black text-slate-800 dark:text-slate-200">{s.name}</h2>
             <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="text-sm text-slate-500 font-medium">{s.branch}</span>
-              <span className="text-slate-300">|</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">{s.branch}</span>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                 s.isPT
-                  ? "bg-purple-100 text-purple-700 border border-purple-200"
-                  : "bg-blue-100 text-blue-700 border border-blue-200"
+                  ? "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700"
+                  : "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700"
               }`}>
                 {s.isPT ? "Part-Time" : "Full-Time"}
               </span>
               {s.isPT && s.rate && (
                 <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-sm font-bold text-orange-600">Coach Rate: RM {s.rate}/hr</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-sm font-bold text-indigo-600">Exec Rate: RM {execRate}/hr</span>
+                  <span className="text-slate-300 dark:text-slate-600">|</span>
+                  <span className="text-sm font-bold text-orange-600 dark:text-orange-400">Coach Rate: RM {s.rate}/hr</span>
+                  <span className="text-slate-300 dark:text-slate-600">|</span>
+                  <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">Exec Rate: RM {execRate}/hr</span>
                 </>
               )}
             </div>
@@ -861,22 +861,22 @@ function EmployeeBreakdown({
 
       {/* KPI cards (3 for FT, 4 for PT) */}
       <div className={`grid grid-cols-2 ${s.isPT ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-6`}>
-        <div className="rounded-2xl p-4 bg-white border border-slate-200">
+        <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
-          <p className="text-xl font-black text-blue-600">{fmtHrs(s.totalHrs)}</p>
+          <p className="text-xl font-black text-blue-600 dark:text-blue-400">{fmtHrs(s.totalHrs)}</p>
         </div>
-        <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200">
-          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1">Coach Hours</p>
-          <p className="text-xl font-black text-orange-600">{fmtHrs(s.coachHrs)}</p>
+        <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200 dark:bg-orange-900 dark:border-orange-700">
+          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1 dark:text-orange-300">Coach Hours</p>
+          <p className="text-xl font-black text-orange-600 dark:text-orange-400">{fmtHrs(s.coachHrs)}</p>
         </div>
-        <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200">
-          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Exec Hours</p>
-          <p className="text-xl font-black text-indigo-600">{fmtHrs(s.execHrs)}</p>
+        <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200 dark:bg-indigo-900 dark:border-indigo-700">
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 dark:text-indigo-300">Exec Hours</p>
+          <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmtHrs(s.execHrs)}</p>
         </div>
         {s.isPT && (
-          <div className="rounded-2xl p-4 bg-green-50 border border-green-200">
-            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">Total Pay</p>
-            <p className="text-xl font-black text-green-600">
+          <div className="rounded-2xl p-4 bg-green-50 border border-green-200 dark:bg-green-900 dark:border-green-700">
+            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1 dark:text-green-300">Total Pay</p>
+            <p className="text-xl font-black text-green-600 dark:text-green-400">
               RM {s.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
             </p>
           </div>
@@ -884,12 +884,12 @@ function EmployeeBreakdown({
       </div>
 
       {/* Daily Breakdown (shown directly, no expand) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200">
-          <p className="text-sm font-bold text-slate-700">
-            Daily Breakdown — <span className="text-blue-600">{weekFilter ? `${weekStart} to ${weekEnd}` : monthLabel}</span>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+        <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+            Daily Breakdown — <span className="text-blue-600 dark:text-blue-400">{weekFilter ? `${weekStart} to ${weekEnd}` : monthLabel}</span>
           </p>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             {s.days.length} day{s.days.length !== 1 ? "s" : ""} worked
           </p>
         </div>
@@ -897,30 +897,30 @@ function EmployeeBreakdown({
           <table className="w-full text-left">
             <thead>
               {s.isPT ? (
-                <tr className="text-[10px] font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+                <tr className="text-[10px] font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <th className="px-3 py-3 text-slate-400 w-10">No.</th>
                   <th className="px-3 py-3 text-slate-400">Day</th>
                   <th className="px-3 py-3 text-slate-400">Date</th>
-                  <th className="px-3 py-3 text-orange-400 text-center">Coach Hr</th>
-                  <th className="px-3 py-3 text-orange-400 text-center">Rate</th>
-                  <th className="px-3 py-3 text-orange-500 text-center">Total</th>
-                  <th className="px-3 py-3 text-indigo-400 text-center">Exec Hr</th>
-                  <th className="px-3 py-3 text-indigo-400 text-center">Rate</th>
-                  <th className="px-3 py-3 text-indigo-500 text-center">Total</th>
-                  <th className="px-3 py-3 text-green-600 text-right">Total Pay</th>
+                  <th className="px-3 py-3 text-orange-400 text-center dark:text-orange-300">Coach Hr</th>
+                  <th className="px-3 py-3 text-orange-400 text-center dark:text-orange-300">Rate</th>
+                  <th className="px-3 py-3 text-orange-500 text-center dark:text-orange-400">Total</th>
+                  <th className="px-3 py-3 text-indigo-400 text-center dark:text-indigo-300">Exec Hr</th>
+                  <th className="px-3 py-3 text-indigo-400 text-center dark:text-indigo-300">Rate</th>
+                  <th className="px-3 py-3 text-indigo-500 text-center dark:text-indigo-400">Total</th>
+                  <th className="px-3 py-3 text-green-600 text-right dark:text-green-400">Total Pay</th>
                 </tr>
               ) : (
-                <tr className="text-xs font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+                <tr className="text-xs font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <th className="px-4 py-3 text-slate-400 w-12">No.</th>
                   <th className="px-4 py-3 text-slate-400">Day</th>
                   <th className="px-4 py-3 text-slate-400">Date</th>
-                  <th className="px-4 py-3 text-orange-400 text-center">Coach Hr</th>
-                  <th className="px-4 py-3 text-indigo-400 text-center">Exec Hr</th>
-                  <th className="px-4 py-3 text-blue-400 text-center">Total Hr</th>
+                  <th className="px-4 py-3 text-orange-400 text-center dark:text-orange-300">Coach Hr</th>
+                  <th className="px-4 py-3 text-indigo-400 text-center dark:text-indigo-300">Exec Hr</th>
+                  <th className="px-4 py-3 text-blue-400 text-center dark:text-blue-300">Total Hr</th>
                 </tr>
               )}
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {displayDays.map(row => {
                 const entry = workedMap[row.date];
                 const isWeekend = row.day === "Saturday" || row.day === "Sunday";
@@ -930,30 +930,30 @@ function EmployeeBreakdown({
                 const dayPay = coachPayDay + execPayDay;
                 const isReplacement = worked && entry.scheduleBranch;
                 const rowCls = `transition-colors ${
-                  !worked ? "bg-slate-50/50 text-slate-300"
-                  : isReplacement ? "bg-amber-50/50 hover:bg-amber-50/80"
-                  : isWeekend ? "bg-blue-50/30 hover:bg-blue-50/50"
-                  : "hover:bg-slate-50/50"
+                  !worked ? "bg-slate-50/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-600"
+                  : isReplacement ? "bg-amber-50/50 hover:bg-amber-50/80 dark:bg-amber-900/30 dark:hover:bg-amber-900/50"
+                  : isWeekend ? "bg-blue-50/30 hover:bg-blue-50/50 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
+                  : "hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                 }`;
 
                 return s.isPT ? (
                   <tr key={row.date} className={rowCls}>
                     <td className="px-3 py-2 text-xs font-medium text-slate-400">{row.dayNum}</td>
                     <td className="px-3 py-2">
-                      <span className={`text-xs font-bold ${!worked ? "text-slate-300" : isWeekend ? "text-blue-600" : "text-slate-600"}`}>
+                      <span className={`text-xs font-bold ${!worked ? "text-slate-300 dark:text-slate-600" : isWeekend ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-300"}`}>
                         {row.day.slice(0, 3)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">
+                    <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
                       {row.date}
                       {isReplacement && (
-                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded dark:text-amber-300 dark:bg-amber-900">
                           @ {entry.scheduleBranch}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked ? "text-orange-600" : "text-slate-300"}>
+                      <span className={worked ? "text-orange-600 dark:text-orange-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? fmtHrs(entry.coachHrs) : "-"}
                       </span>
                     </td>
@@ -961,12 +961,12 @@ function EmployeeBreakdown({
                       {worked && entry.coachHrs > 0 ? `RM${s.rate}` : "-"}
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked && coachPayDay > 0 ? "text-orange-700" : "text-slate-300"}>
+                      <span className={worked && coachPayDay > 0 ? "text-orange-700 dark:text-orange-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked && coachPayDay > 0 ? `RM ${coachPayDay.toFixed(2)}` : "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked ? "text-indigo-600" : "text-slate-300"}>
+                      <span className={worked ? "text-indigo-600 dark:text-indigo-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? fmtHrs(entry.execHrs) : "-"}
                       </span>
                     </td>
@@ -974,12 +974,12 @@ function EmployeeBreakdown({
                       {worked && entry.execHrs > 0 ? `RM${execRate}` : "-"}
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked && execPayDay > 0 ? "text-indigo-700" : "text-slate-300"}>
+                      <span className={worked && execPayDay > 0 ? "text-indigo-700 dark:text-indigo-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked && execPayDay > 0 ? `RM ${execPayDay.toFixed(2)}` : "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right text-xs font-black">
-                      <span className={worked ? "text-green-600" : "text-slate-300"}>
+                      <span className={worked ? "text-green-600 dark:text-green-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? `RM ${dayPay.toFixed(2)}` : "-"}
                       </span>
                     </td>
@@ -988,30 +988,30 @@ function EmployeeBreakdown({
                   <tr key={row.date} className={rowCls}>
                     <td className="px-4 py-2 text-xs font-medium text-slate-400">{row.dayNum}</td>
                     <td className="px-4 py-2">
-                      <span className={`text-xs font-bold ${!worked ? "text-slate-300" : isWeekend ? "text-blue-600" : "text-slate-600"}`}>
+                      <span className={`text-xs font-bold ${!worked ? "text-slate-300 dark:text-slate-600" : isWeekend ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-300"}`}>
                         {row.day.slice(0, 3)}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-xs text-slate-500">
+                    <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
                       {row.date}
                       {isReplacement && (
-                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded dark:text-amber-300 dark:bg-amber-900">
                           @ {entry.scheduleBranch}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-center text-xs font-bold">
-                      <span className={worked ? "text-orange-600" : "text-slate-300"}>
+                      <span className={worked ? "text-orange-600 dark:text-orange-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? fmtHrs(entry.coachHrs) : "-"}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-center text-xs font-bold">
-                      <span className={worked ? "text-indigo-600" : "text-slate-300"}>
+                      <span className={worked ? "text-indigo-600 dark:text-indigo-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? fmtHrs(entry.execHrs) : "-"}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-center text-xs font-black">
-                      <span className={worked ? "text-blue-600" : "text-slate-300"}>
+                      <span className={worked ? "text-blue-600 dark:text-blue-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked ? fmtHrs(entry.totalHrs) : "-"}
                       </span>
                     </td>
@@ -1071,48 +1071,48 @@ function Row({
 
   return (
     <>
-      <tr className="hover:bg-slate-50/50 transition-colors">
+      <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
         <td className="px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {initials}
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800">{s.name}</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{s.name}</p>
               <p className="text-[10px] text-slate-400">{s.employeeId}</p>
             </div>
           </div>
         </td>
-        <td className="px-5 py-4 text-sm text-slate-600 font-medium">{s.branch}</td>
+        <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300 font-medium">{s.branch}</td>
         <td className="px-5 py-4 text-center">
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
               s.isPT
-                ? "bg-purple-100 text-purple-700 border border-purple-200"
-                : "bg-blue-100 text-blue-700 border border-blue-200"
+                ? "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700"
+                : "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700"
             }`}
           >
             {s.isPT ? "PT" : "FT"}
           </span>
         </td>
-        <td className="px-5 py-4 text-center text-sm font-bold text-orange-600">{fmtHrs(s.coachHrs)}</td>
+        <td className="px-5 py-4 text-center text-sm font-bold text-orange-600 dark:text-orange-400">{fmtHrs(s.coachHrs)}</td>
         <td className="px-5 py-4 text-center">
           {s.coachHrs > 0 ? (
-            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-50 text-pink-600 border border-pink-200">
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-50 text-pink-600 border border-pink-200 dark:bg-pink-900 dark:text-pink-300 dark:border-pink-700">
               {Math.round(s.coachHrs / 1.25)}
             </span>
           ) : (
-            <span className="text-slate-300">—</span>
+            <span className="text-slate-300 dark:text-slate-600">—</span>
           )}
         </td>
-        <td className="px-5 py-4 text-center text-sm font-bold text-indigo-600">{fmtHrs(s.execHrs)}</td>
-        <td className="px-5 py-4 text-center text-sm font-black text-blue-600">{fmtHrs(s.totalHrs)}</td>
+        <td className="px-5 py-4 text-center text-sm font-bold text-indigo-600 dark:text-indigo-400">{fmtHrs(s.execHrs)}</td>
+        <td className="px-5 py-4 text-center text-sm font-black text-blue-600 dark:text-blue-400">{fmtHrs(s.totalHrs)}</td>
         {showPay && (
           <>
-            <td className="px-5 py-4 text-center text-sm text-slate-500">
+            <td className="px-5 py-4 text-center text-sm text-slate-500 dark:text-slate-400">
               {s.isPT && s.rate ? `RM${s.rate}` : "-"}
             </td>
-            <td className="px-5 py-4 text-right text-sm font-black text-green-600">
+            <td className="px-5 py-4 text-right text-sm font-black text-green-600 dark:text-green-400">
               {s.isPT ? `RM ${s.totalPay.toFixed(2)}` : "-"}
             </td>
           </>
@@ -1120,7 +1120,7 @@ function Row({
         <td className="px-5 py-4 text-center">
           <button
             onClick={onView}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all dark:hover:text-blue-400 dark:hover:bg-blue-900"
             title="View Daily Breakdown"
           >
             <Eye className="w-4 h-4" />
@@ -1152,7 +1152,7 @@ function ToolbarSelect({ value, onChange, options, icon }: ToolbarSelectProps) {
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className={`appearance-none ${icon ? "pl-9" : "pl-4"} pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all cursor-pointer`}
+        className={`appearance-none ${icon ? "pl-9" : "pl-4"} pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all cursor-pointer dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100`}
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
           backgroundRepeat: "no-repeat",
@@ -1180,7 +1180,7 @@ export default function ManpowerCostReportPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-blue-600 dark:text-blue-400 font-semibold text-lg">
           Loading...
         </div>
       </AppShell>
@@ -1272,16 +1272,16 @@ function DailyBreakdownModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-slate-200">
-        <div className="flex items-start justify-between p-5 border-b border-slate-200 gap-4 shrink-0">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+        <div className="flex items-start justify-between p-5 border-b border-slate-200 gap-4 shrink-0 dark:border-slate-800">
           <div>
-            <h2 className="text-sm font-bold text-slate-800">
-              Daily Breakdown: <span className="text-blue-600 uppercase">{s.name}</span>
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Daily Breakdown: <span className="text-blue-600 dark:text-blue-400 uppercase">{s.name}</span>
               <span className="text-slate-400 font-normal ml-2 text-xs">
                 ({s.branch} | Coach {s.isPT && s.rate ? `RM${s.rate}/hr` : "N/A"}, Exec RM{execRate}/hr)
               </span>
             </h2>
-            <p className="text-xs font-medium text-slate-500 mt-1">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
               {s.days.length} day{s.days.length === 1 ? "" : "s"} worked
             </p>
           </div>
@@ -1294,7 +1294,7 @@ function DailyBreakdownModal({
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors dark:hover:text-slate-300 dark:hover:bg-slate-800"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1303,19 +1303,19 @@ function DailyBreakdownModal({
 
         <div className="overflow-y-auto p-0">
           <table className="w-full text-xs border-collapse">
-            <thead className="bg-white sticky top-0 shadow-sm z-10 border-b border-slate-100">
+            <thead className="bg-white sticky top-0 shadow-sm z-10 border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">No.</th>
                 <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Day</th>
                 <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-center font-bold text-orange-500 uppercase tracking-wider">Coach Hr</th>
-                <th className="px-4 py-3 text-center font-bold text-pink-500 uppercase tracking-wider">Class</th>
-                <th className="px-4 py-3 text-center font-bold text-indigo-400 uppercase tracking-wider">Exec Hr</th>
-                <th className="px-4 py-3 text-center font-bold text-blue-500 uppercase tracking-wider">Total Hr</th>
-                <th className="px-4 py-3 text-right font-bold text-green-600 uppercase tracking-wider">Pay (RM)</th>
+                <th className="px-4 py-3 text-center font-bold text-orange-500 uppercase tracking-wider dark:text-orange-400">Coach Hr</th>
+                <th className="px-4 py-3 text-center font-bold text-pink-500 uppercase tracking-wider dark:text-pink-400">Class</th>
+                <th className="px-4 py-3 text-center font-bold text-indigo-400 uppercase tracking-wider dark:text-indigo-300">Exec Hr</th>
+                <th className="px-4 py-3 text-center font-bold text-blue-500 uppercase tracking-wider dark:text-blue-400">Total Hr</th>
+                <th className="px-4 py-3 text-right font-bold text-green-600 uppercase tracking-wider dark:text-green-400">Pay (RM)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
               {allDays.map(row => {
                 const entry = workedMap[row.date];
                 const isWeekend = row.day === "Saturday" || row.day === "Sunday";
@@ -1324,34 +1324,34 @@ function DailyBreakdownModal({
                 const execPayDay = worked ? entry.execHrs * execRate : 0;
                 const dayPay = coachPayDay + execPayDay;
                 const classes = worked ? Math.round(entry.coachHrs / 1.25) : 0;
-                
+
                 return (
-                  <tr key={row.date} className={`hover:bg-slate-50/50 transition-colors ${!worked ? "text-slate-300" : ""}`}>
+                  <tr key={row.date} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${!worked ? "text-slate-300 dark:text-slate-600" : ""}`}>
                     <td className="px-4 py-2 font-medium text-slate-400">{row.dayNum}</td>
-                    <td className={`px-4 py-2 font-bold ${!worked ? "text-slate-300" : isWeekend ? "text-blue-500" : "text-slate-500"}`}>
+                    <td className={`px-4 py-2 font-bold ${!worked ? "text-slate-300 dark:text-slate-600" : isWeekend ? "text-blue-500 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"}`}>
                       {row.day.slice(0, 3)}
                     </td>
-                    <td className={`px-4 py-2 ${!worked ? "text-slate-300" : "text-slate-600"}`}>
+                    <td className={`px-4 py-2 ${!worked ? "text-slate-300 dark:text-slate-600" : "text-slate-600 dark:text-slate-300"}`}>
                       {row.date}
                       {worked && entry.scheduleBranch && (
-                        <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider">
+                        <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider dark:text-amber-300 dark:bg-amber-900 dark:border-amber-700">
                           Training / Replacement
                         </span>
                       )}
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-orange-500" : "text-slate-200"}`}>
+                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-orange-500 dark:text-orange-400" : "text-slate-200 dark:text-slate-700"}`}>
                       {worked ? fmtHrs(entry.coachHrs) : "-"}
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked && classes > 0 ? "text-pink-500" : "text-slate-200"}`}>
+                    <td className={`px-4 py-2 text-center font-bold ${worked && classes > 0 ? "text-pink-500 dark:text-pink-400" : "text-slate-200 dark:text-slate-700"}`}>
                       {worked && classes > 0 ? classes : "-"}
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-indigo-500" : "text-slate-200"}`}>
+                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-indigo-500 dark:text-indigo-400" : "text-slate-200 dark:text-slate-700"}`}>
                       {worked ? fmtHrs(entry.execHrs) : "-"}
                     </td>
-                    <td className={`px-4 py-2 text-center font-black ${worked ? "text-blue-600" : "text-slate-200"}`}>
+                    <td className={`px-4 py-2 text-center font-black ${worked ? "text-blue-600 dark:text-blue-400" : "text-slate-200 dark:text-slate-700"}`}>
                       {worked ? fmtHrs(entry.totalHrs) : "-"}
                     </td>
-                    <td className={`px-4 py-2 text-right font-black ${worked && dayPay > 0 ? "text-green-600" : "text-slate-200"}`}>
+                    <td className={`px-4 py-2 text-right font-black ${worked && dayPay > 0 ? "text-green-600 dark:text-green-400" : "text-slate-200 dark:text-slate-700"}`}>
                       {worked && s.isPT ? `RM ${dayPay.toFixed(2)}` : "-"}
                     </td>
                   </tr>
