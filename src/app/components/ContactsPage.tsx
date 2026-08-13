@@ -61,15 +61,15 @@ const TAGS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const AVATAR_PALETTE = [
-  "bg-sky-100 text-sky-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-teal-100 text-teal-700",
-  "bg-fuchsia-100 text-fuchsia-700",
-  "bg-orange-100 text-orange-700",
-  "bg-indigo-100 text-indigo-700",
+  "bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300",
+  "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300",
+  "bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300",
+  "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",
+  "bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300",
+  "bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300",
+  "bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-700 dark:text-fuchsia-300",
+  "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300",
+  "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300",
 ];
 
 function avatarColor(seed: string): string {
@@ -87,20 +87,20 @@ function initials(firstName: string, lastName: string | null): string {
 // Soft gradient pill styles per canonical colour (full literal strings so
 // Tailwind keeps them — no dynamic interpolation).
 const BADGE_STYLE: Record<string, string> = {
-  blue:    "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 ring-1 ring-inset ring-blue-200/70",
-  violet:  "bg-gradient-to-br from-violet-50 to-violet-100 text-violet-700 ring-1 ring-inset ring-violet-200/70",
-  purple:  "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 ring-1 ring-inset ring-purple-200/70",
-  amber:   "bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200/70",
-  yellow:  "bg-gradient-to-br from-yellow-50 to-yellow-100 text-yellow-700 ring-1 ring-inset ring-yellow-200/70",
-  orange:  "bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 ring-1 ring-inset ring-orange-200/70",
-  emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
-  green:   "bg-gradient-to-br from-green-50 to-green-100 text-green-700 ring-1 ring-inset ring-green-200/70",
-  cyan:    "bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 ring-1 ring-inset ring-cyan-200/70",
-  sky:     "bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70",
-  indigo:  "bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200/70",
-  rose:    "bg-gradient-to-br from-rose-50 to-rose-100 text-rose-700 ring-1 ring-inset ring-rose-200/70",
-  red:     "bg-gradient-to-br from-red-50 to-red-100 text-red-700 ring-1 ring-inset ring-red-200/70",
-  slate:   "bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/70",
+  blue:    "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200/70 dark:ring-blue-700/70",
+  violet:  "bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900 dark:to-violet-800 text-violet-700 dark:text-violet-300 ring-1 ring-inset ring-violet-200/70 dark:ring-violet-700/70",
+  purple:  "bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 text-purple-700 dark:text-purple-300 ring-1 ring-inset ring-purple-200/70 dark:ring-purple-700/70",
+  amber:   "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900 dark:to-amber-800 text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200/70 dark:ring-amber-700/70",
+  yellow:  "bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800 text-yellow-700 dark:text-yellow-300 ring-1 ring-inset ring-yellow-200/70 dark:ring-yellow-700/70",
+  orange:  "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900 dark:to-orange-800 text-orange-700 dark:text-orange-300 ring-1 ring-inset ring-orange-200/70 dark:ring-orange-700/70",
+  emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-200/70 dark:ring-emerald-700/70",
+  green:   "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 text-green-700 dark:text-green-300 ring-1 ring-inset ring-green-200/70 dark:ring-green-700/70",
+  cyan:    "bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900 dark:to-cyan-800 text-cyan-700 dark:text-cyan-300 ring-1 ring-inset ring-cyan-200/70 dark:ring-cyan-700/70",
+  sky:     "bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900 dark:to-sky-800 text-sky-700 dark:text-sky-300 ring-1 ring-inset ring-sky-200/70 dark:ring-sky-700/70",
+  indigo:  "bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900 dark:to-indigo-800 text-indigo-700 dark:text-indigo-300 ring-1 ring-inset ring-indigo-200/70 dark:ring-indigo-700/70",
+  rose:    "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900 dark:to-rose-800 text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200/70 dark:ring-rose-700/70",
+  red:     "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800 text-red-700 dark:text-red-300 ring-1 ring-inset ring-red-200/70 dark:ring-red-700/70",
+  slate:   "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-600/70",
 };
 
 // Stage → colour keyed by shortCode (branch-independent) so every "New Lead" is
@@ -171,23 +171,23 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">New Contact</h2>
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">New Contact</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-0 border-b border-slate-200 px-5">
+        <div className="flex gap-0 border-b border-slate-200 dark:border-slate-800 px-5">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -196,8 +196,8 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
               className={[
                 "px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
                 tab === t.id
-                  ? "border-blue-600 text-blue-700"
-                  : "border-transparent text-slate-500 hover:text-slate-700",
+                  ? "border-blue-600 dark:border-blue-500 text-blue-700 dark:text-blue-400"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300",
               ].join(" ")}
             >
               {t.label}
@@ -240,7 +240,7 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
               </Field>
               <Field label="Phone">
                 <div className="flex">
-                  <span className="inline-flex items-center rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">
+                  <span className="inline-flex items-center rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-500 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-500 dark:text-slate-400">
                     +60
                   </span>
                   <input
@@ -334,7 +334,7 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
 
           {tab === "tags" && (
             <div>
-              <p className="mb-3 text-xs text-slate-500">
+              <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
                 Click tags to add or remove.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -355,7 +355,7 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
                       style={
                         active
                           ? { backgroundColor: tag.color, borderColor: tag.color, color: "#fff" }
-                          : { backgroundColor: "#f8fafc", borderColor: "#e2e8f0", color: "#64748b" }
+                          : { backgroundColor: "var(--surface-sunken)", borderColor: "var(--border-subtle)", color: "var(--text-muted-strong)" }
                       }
                     >
                       {active && <Check className="h-3 w-3" />}
@@ -369,11 +369,11 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800 px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
@@ -391,12 +391,12 @@ function NewContactModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 const input =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+  "w-full rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-slate-600">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{label}</label>
       {children}
     </div>
   );
@@ -424,20 +424,20 @@ function ColsDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
       >
         <Columns className="h-4 w-4" />
         Columns
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-1 shadow-lg dark:ring-1 dark:ring-white/10">
           <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             Toggle columns
           </p>
           {ALL_COLS.map((c) => (
             <label
               key={c.id}
-              className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               <input
                 type="checkbox"
@@ -607,14 +607,14 @@ export default function ContactsPage() {
 
   return (
     <>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
         <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
 
           {/* ── Page heading ───────────────────────────────────────────────── */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Contacts</h1>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Contacts</h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 {loading ? "Loading…" : `${total.toLocaleString()} contact${total !== 1 ? "s" : ""}`}
               </p>
             </div>
@@ -638,7 +638,7 @@ export default function ContactsPage() {
                 value={search}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Search contacts…"
-                className="h-9 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -684,7 +684,7 @@ export default function ContactsPage() {
                 type="button"
                 onClick={exportCsv}
                 disabled={paginated.length === 0}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 <Download className="h-4 w-4" />
                 Export
@@ -694,15 +694,15 @@ export default function ContactsPage() {
 
           {/* ── Bulk action bar ─────────────────────────────────────────────── */}
           {selectedIds.length > 0 && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
-              <span className="text-sm font-medium text-blue-700">
+            <div className="flex items-center gap-3 rounded-xl border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900 px-4 py-2.5">
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                 {selectedIds.length} selected
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAssign(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 dark:border-blue-600 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/60 transition-colors"
                 >
                   <UserPlus className="h-4 w-4" />
                   Assign to…
@@ -721,12 +721,12 @@ export default function ContactsPage() {
 
           {/* ── Error banner ────────────────────────────────────────────────── */}
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-300">
               Couldn&apos;t load contacts: {error}
               <button
                 type="button"
                 onClick={() => void load()}
-                className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                className="ml-3 rounded-md border border-red-300 dark:border-red-600 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60"
               >
                 Retry
               </button>
@@ -734,10 +734,10 @@ export default function ContactsPage() {
           )}
 
           {/* ── Table ──────────────────────────────────────────────────────── */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50">
+                <thead className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                   <tr>
                     {/* Checkbox */}
                     <th className="w-10 px-4 py-3">
@@ -754,39 +754,39 @@ export default function ContactsPage() {
                       <button
                         type="button"
                         onClick={() => toggleSort("name")}
-                        className="inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+                        className="inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                       >
                         Contact name
                         <SortIcon col="name" />
                       </button>
                     </th>
                     {visibleCols.has("phone") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Phone
                       </th>
                     )}
                     {visibleCols.has("email") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Email
                       </th>
                     )}
                     {visibleCols.has("stage") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Stage
                       </th>
                     )}
                     {visibleCols.has("leadSource") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Lead Source
                       </th>
                     )}
                     {visibleCols.has("assignedBM") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Assigned BM
                       </th>
                     )}
                     {visibleCols.has("tags") && (
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Tags
                       </th>
                     )}
@@ -795,7 +795,7 @@ export default function ContactsPage() {
                       <button
                         type="button"
                         onClick={() => toggleSort("createdAt")}
-                        className="inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+                        className="inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                       >
                         Created
                         <SortIcon col="createdAt" />
@@ -804,13 +804,13 @@ export default function ContactsPage() {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loading ? (
                     <tr>
                       <td colSpan={20} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-3">
-                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
-                          <p className="text-xs text-slate-500">Loading contacts…</p>
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-700 border-t-blue-600" />
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Loading contacts…</p>
                         </div>
                       </td>
                     </tr>
@@ -818,12 +818,12 @@ export default function ContactsPage() {
                     <tr>
                       <td colSpan={20} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-3">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                             <Users className="h-7 w-7 text-slate-400" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-700">No contacts found</p>
-                            <p className="mt-0.5 text-xs text-slate-500">
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No contacts found</p>
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                               Try adjusting your search or filters.
                             </p>
                           </div>
@@ -843,8 +843,8 @@ export default function ContactsPage() {
                         <tr
                           key={c.id}
                           className={[
-                            "transition-colors hover:bg-slate-50",
-                            isSelected && "bg-blue-50",
+                            "transition-colors hover:bg-slate-50 dark:hover:bg-slate-800",
+                            isSelected && "bg-blue-50 dark:bg-blue-900/40",
                           ].filter(Boolean).join(" ")}
                         >
                           {/* Checkbox */}
@@ -867,7 +867,7 @@ export default function ContactsPage() {
                               </span>
                               <Link
                                 href={`/crm/contacts/${c.id}`}
-                                className="truncate font-semibold text-blue-700 hover:underline"
+                                className="truncate font-semibold text-blue-700 dark:text-blue-400 hover:underline"
                               >
                                 {fullName}
                               </Link>
@@ -878,12 +878,12 @@ export default function ContactsPage() {
                           {visibleCols.has("phone") && (
                             <td className="px-4 py-3">
                               {c.phone ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                                <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                                   <Phone className="h-3 w-3 text-slate-400" />
                                   <span className="font-mono">{c.phone}</span>
                                 </span>
                               ) : (
-                                <span className="text-xs text-slate-300">—</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                               )}
                             </td>
                           )}
@@ -892,12 +892,12 @@ export default function ContactsPage() {
                           {visibleCols.has("email") && (
                             <td className="px-4 py-3">
                               {c.email ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                                <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                                   <Mail className="h-3 w-3 shrink-0 text-slate-400" />
                                   <span className="max-w-44 truncate">{c.email}</span>
                                 </span>
                               ) : (
-                                <span className="text-xs text-slate-300">—</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                               )}
                             </td>
                           )}
@@ -912,7 +912,7 @@ export default function ContactsPage() {
                                   {stage.name}
                                 </span>
                               ) : (
-                                <span className="text-xs text-slate-300">—</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                               )}
                             </td>
                           )}
@@ -920,7 +920,7 @@ export default function ContactsPage() {
                           {/* Lead source */}
                           {visibleCols.has("leadSource") && (
                             <td className="px-4 py-3">
-                              <span className="text-xs text-slate-500">{source?.name ?? "—"}</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">{source?.name ?? "—"}</span>
                             </td>
                           )}
 
@@ -929,13 +929,13 @@ export default function ContactsPage() {
                             <td className="px-4 py-3">
                               {bm && bm.name ? (
                                 <div className="flex items-center gap-2">
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                                     {bm.name.slice(0, 2).toUpperCase()}
                                   </span>
-                                  <span className="truncate text-xs text-slate-700">{bm.name}</span>
+                                  <span className="truncate text-xs text-slate-700 dark:text-slate-300">{bm.name}</span>
                                 </div>
                               ) : (
-                                <span className="text-xs text-slate-300">—</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                               )}
                             </td>
                           )}
@@ -955,20 +955,20 @@ export default function ContactsPage() {
                                     </span>
                                   ))}
                                   {tags.length > 3 && (
-                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                    <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
                                       +{tags.length - 3}
                                     </span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-xs text-slate-300">—</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                               )}
                             </td>
                           )}
 
                           {/* Created */}
                           <td className="px-4 py-3">
-                            <span className="text-xs text-slate-500">{formatDate(c.createdAt)}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(c.createdAt)}</span>
                           </td>
                         </tr>
                       );
@@ -980,8 +980,8 @@ export default function ContactsPage() {
 
             {/* Pagination footer */}
             {total > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
-                <p className="text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 px-5 py-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Showing{" "}
                   <span className="font-medium">{(safeP - 1) * pageSize + 1}</span>
                   {" "}to{" "}
@@ -995,7 +995,7 @@ export default function ContactsPage() {
                   <select
                     value={pageSize}
                     onChange={(e) => { setPageSize(Number(e.target.value) as 10 | 25 | 50); setPage(1); }}
-                    className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="h-8 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-2 text-xs text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {PAGE_SIZE_OPTIONS.map((n) => (
                       <option key={n} value={n}>{n} / page</option>
@@ -1007,12 +1007,12 @@ export default function ContactsPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={safeP <= 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
 
-                  <span className="text-xs text-slate-600 tabular-nums">
+                  <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">
                     {safeP} / {totalPages}
                   </span>
 
@@ -1021,7 +1021,7 @@ export default function ContactsPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={safeP >= totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -1040,17 +1040,17 @@ export default function ContactsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAssign(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
-            className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-base font-semibold text-slate-900">
+            <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">
               Assign {selectedIds.length} contact{selectedIds.length !== 1 ? "s" : ""}
             </h2>
-            <p className="mb-4 text-xs text-slate-500">Choose a user to assign these contacts to.</p>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">Choose a user to assign these contacts to.</p>
             <select
               value={assignBM}
               onChange={(e) => setAssignBM(e.target.value)}
-              className="mb-4 h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mb-4 h-9 w-full rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a user…</option>
               {BMS.map((bm) => (
@@ -1058,7 +1058,7 @@ export default function ContactsPage() {
               ))}
             </select>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowAssign(false)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setShowAssign(false)} className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
               <button type="button" onClick={() => { setSelected(new Set()); setShowAssign(false); }} disabled={!assignBM} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40">Assign</button>
             </div>
           </div>
@@ -1070,17 +1070,17 @@ export default function ContactsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowDelete(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
-            className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-base font-semibold text-slate-900">
+            <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">
               Delete {selectedIds.length} contact{selectedIds.length !== 1 ? "s" : ""}?
             </h2>
-            <p className="mb-5 text-sm text-slate-500">
+            <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
               This will remove the selected contacts. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowDelete(false)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setShowDelete(false)} className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
               <button type="button" onClick={() => { setSelected(new Set()); setShowDelete(false); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
             </div>
           </div>

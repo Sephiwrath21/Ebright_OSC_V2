@@ -60,20 +60,20 @@ interface ContactDetail {
 function cn(...p: Array<string | false | null | undefined>) { return p.filter(Boolean).join(" "); }
 
 const BADGE_STYLE: Record<string, string> = {
-  blue:    "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 ring-1 ring-inset ring-blue-200/70",
-  violet:  "bg-gradient-to-br from-violet-50 to-violet-100 text-violet-700 ring-1 ring-inset ring-violet-200/70",
-  purple:  "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 ring-1 ring-inset ring-purple-200/70",
-  amber:   "bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200/70",
-  yellow:  "bg-gradient-to-br from-yellow-50 to-yellow-100 text-yellow-700 ring-1 ring-inset ring-yellow-200/70",
-  orange:  "bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 ring-1 ring-inset ring-orange-200/70",
-  emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
-  green:   "bg-gradient-to-br from-green-50 to-green-100 text-green-700 ring-1 ring-inset ring-green-200/70",
-  cyan:    "bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 ring-1 ring-inset ring-cyan-200/70",
-  sky:     "bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70",
-  indigo:  "bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200/70",
-  rose:    "bg-gradient-to-br from-rose-50 to-rose-100 text-rose-700 ring-1 ring-inset ring-rose-200/70",
-  red:     "bg-gradient-to-br from-red-50 to-red-100 text-red-700 ring-1 ring-inset ring-red-200/70",
-  slate:   "bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/70",
+  blue:    "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200/70 dark:ring-blue-700/70",
+  violet:  "bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900 dark:to-violet-800 text-violet-700 dark:text-violet-300 ring-1 ring-inset ring-violet-200/70 dark:ring-violet-700/70",
+  purple:  "bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 text-purple-700 dark:text-purple-300 ring-1 ring-inset ring-purple-200/70 dark:ring-purple-700/70",
+  amber:   "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900 dark:to-amber-800 text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200/70 dark:ring-amber-700/70",
+  yellow:  "bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800 text-yellow-700 dark:text-yellow-300 ring-1 ring-inset ring-yellow-200/70 dark:ring-yellow-700/70",
+  orange:  "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900 dark:to-orange-800 text-orange-700 dark:text-orange-300 ring-1 ring-inset ring-orange-200/70 dark:ring-orange-700/70",
+  emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-200/70 dark:ring-emerald-700/70",
+  green:   "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 text-green-700 dark:text-green-300 ring-1 ring-inset ring-green-200/70 dark:ring-green-700/70",
+  cyan:    "bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900 dark:to-cyan-800 text-cyan-700 dark:text-cyan-300 ring-1 ring-inset ring-cyan-200/70 dark:ring-cyan-700/70",
+  sky:     "bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900 dark:to-sky-800 text-sky-700 dark:text-sky-300 ring-1 ring-inset ring-sky-200/70 dark:ring-sky-700/70",
+  indigo:  "bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900 dark:to-indigo-800 text-indigo-700 dark:text-indigo-300 ring-1 ring-inset ring-indigo-200/70 dark:ring-indigo-700/70",
+  rose:    "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900 dark:to-rose-800 text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200/70 dark:ring-rose-700/70",
+  red:     "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800 text-red-700 dark:text-red-300 ring-1 ring-inset ring-red-200/70 dark:ring-red-700/70",
+  slate:   "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-600/70",
 };
 const STAGE_COLOR_BY_CODE: Record<string, string> = {
   NL: "blue", CT: "violet", SU: "amber", ENR: "emerald",
@@ -126,16 +126,16 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-32 animate-pulse rounded-2xl bg-white shadow-sm" />
-        <div className="h-64 animate-pulse rounded-2xl bg-white shadow-sm" />
+        <div className="h-32 animate-pulse rounded-2xl bg-white dark:bg-slate-900 shadow-sm" />
+        <div className="h-64 animate-pulse rounded-2xl bg-white dark:bg-slate-900 shadow-sm" />
       </div>
     );
   }
   if (error || !contact) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+      <div className="rounded-2xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 px-4 py-6 text-center text-sm text-red-700 dark:text-red-300">
         {error ?? "Contact not found."}
-        <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100">
+        <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 dark:border-red-600 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60">
           Retry
         </button>
       </div>
@@ -157,42 +157,42 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
         <div className="flex flex-wrap items-start gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700">
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900 text-xl font-semibold text-indigo-700 dark:text-indigo-300">
             {initials(c.firstName, c.lastName)}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900">{fullName}</h1>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{fullName}</h1>
               {c.primaryStage && (
                 <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", stageBadge(c.primaryStage.shortCode, c.primaryStage.color))}>
                   {c.primaryStage.name}
                 </span>
               )}
               {c.leadSource && (
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
                   {c.leadSource.name}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <Lock className="h-2.5 w-2.5" /> Read-only
               </span>
             </div>
             {c.childName1 && (
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 Parent of {c.childName1}{c.childAge1 ? ` (${c.childAge1})` : ""}
               </p>
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
               {c.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{c.phone}</span>}
               {c.email && <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{c.email}</span>}
               {c.assignedUser?.name && (
                 <span className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[9px] font-semibold text-slate-600">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[9px] font-semibold text-slate-600 dark:text-slate-300">
                     {c.assignedUser.name.slice(0, 2).toUpperCase()}
                   </span>
-                  <span className="text-slate-600">{c.assignedUser.name}</span>
+                  <span className="text-slate-600 dark:text-slate-300">{c.assignedUser.name}</span>
                 </span>
               )}
             </div>
@@ -205,7 +205,7 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
                 href={`https://wa.me/${c.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 dark:border-green-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900"
               >
                 <MessageSquare className="h-4 w-4" /> WhatsApp
               </a>
@@ -213,15 +213,15 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
             {c.email && (
               <a
                 href={`mailto:${c.email}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 <Mail className="h-4 w-4" /> Email
               </a>
             )}
-            <button type="button" disabled title="Read-only view" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-400">
+            <button type="button" disabled title="Read-only view" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-400">
               <CheckSquare className="h-4 w-4" /> Task
             </button>
-            <button type="button" disabled title="Read-only view" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-400">
+            <button type="button" disabled title="Read-only view" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-400">
               <PhoneCall className="h-4 w-4" /> Log Call
             </button>
           </div>
@@ -230,7 +230,7 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
 
       {/* ── Tabs ── */}
       <div>
-        <div className="flex flex-wrap gap-1 border-b border-slate-200">
+        <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -238,7 +238,7 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
               onClick={() => setTab(t.key)}
               className={cn(
                 "-mb-px border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors",
-                tab === t.key ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700",
+                tab === t.key ? "border-indigo-600 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300",
               )}
             >
               {t.label}
@@ -265,16 +265,16 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={cn("mt-0.5 text-sm", value ? "text-slate-900" : "text-slate-400")}>{value || "Not set"}</p>
+      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className={cn("mt-0.5 text-sm", value ? "text-slate-900 dark:text-slate-100" : "text-slate-400")}>{value || "Not set"}</p>
     </div>
   );
 }
 
 function Card({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">{icon}{title}</h3>
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">{icon}{title}</h3>
       {children}
     </div>
   );
@@ -299,9 +299,9 @@ function Overview({ c }: { c: ContactDetail }) {
           {c.campaignName && <Field label="Campaign" value={c.campaignName} />}
         </div>
         {c.remarks && (
-          <div className="mt-4 rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-500">Remarks</p>
-            <p className="mt-0.5 text-sm text-slate-700">{c.remarks}</p>
+          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Remarks</p>
+            <p className="mt-0.5 text-sm text-slate-700 dark:text-slate-300">{c.remarks}</p>
           </div>
         )}
       </Card>
@@ -347,22 +347,22 @@ function Overview({ c }: { c: ContactDetail }) {
 function ActivityTimeline({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) return <EmptyCard label="No activity yet." />;
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
       <ul className="space-y-4">
         {items.map((it) => {
           const when = "changedAt" in it ? it.changedAt : it.createdAt;
           let icon = <Clock className="h-3.5 w-3.5" />;
           let text: React.ReactNode = null;
-          if (it.type === "note") { icon = <StickyNote className="h-3.5 w-3.5" />; text = <>Note{it.user?.name ? ` by ${it.user.name}` : ""}: <span className="text-slate-600">{it.body}</span></>; }
-          else if (it.type === "task") text = <>Task: <span className="text-slate-600">{it.title}</span>{it.completedAt ? " (completed)" : ""}</>;
-          else if (it.type === "call") { icon = <PhoneCall className="h-3.5 w-3.5" />; text = <>Call{it.outcome ? ` — ${it.outcome}` : ""}{it.notes ? <span className="text-slate-600">: {it.notes}</span> : ""}</>; }
-          else if (it.type === "message") { icon = <MessageSquare className="h-3.5 w-3.5" />; text = <>{it.direction === "IN" ? "Inbound" : "Outbound"} {it.channel} message: <span className="text-slate-600">{it.body}</span></>; }
-          else if (it.type === "stage_change") { icon = <ArrowRight className="h-3.5 w-3.5" />; text = <>Stage moved {it.fromStage ? `${it.fromStage.name} → ` : ""}<span className="font-medium">{it.toStage?.name ?? "?"}</span>{it.changedByUser?.name ? ` by ${it.changedByUser.name}` : ""}{it.note ? <span className="text-slate-500"> — {it.note}</span> : ""}</>; }
+          if (it.type === "note") { icon = <StickyNote className="h-3.5 w-3.5" />; text = <>Note{it.user?.name ? ` by ${it.user.name}` : ""}: <span className="text-slate-600 dark:text-slate-300">{it.body}</span></>; }
+          else if (it.type === "task") text = <>Task: <span className="text-slate-600 dark:text-slate-300">{it.title}</span>{it.completedAt ? " (completed)" : ""}</>;
+          else if (it.type === "call") { icon = <PhoneCall className="h-3.5 w-3.5" />; text = <>Call{it.outcome ? ` — ${it.outcome}` : ""}{it.notes ? <span className="text-slate-600 dark:text-slate-300">: {it.notes}</span> : ""}</>; }
+          else if (it.type === "message") { icon = <MessageSquare className="h-3.5 w-3.5" />; text = <>{it.direction === "IN" ? "Inbound" : "Outbound"} {it.channel} message: <span className="text-slate-600 dark:text-slate-300">{it.body}</span></>; }
+          else if (it.type === "stage_change") { icon = <ArrowRight className="h-3.5 w-3.5" />; text = <>Stage moved {it.fromStage ? `${it.fromStage.name} → ` : ""}<span className="font-medium">{it.toStage?.name ?? "?"}</span>{it.changedByUser?.name ? ` by ${it.changedByUser.name}` : ""}{it.note ? <span className="text-slate-500 dark:text-slate-400"> — {it.note}</span> : ""}</>; }
           return (
             <li key={`${it.type}-${it.id}`} className="flex gap-3">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">{icon}</span>
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300">{icon}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-900">{text}</p>
+                <p className="text-sm text-slate-900 dark:text-slate-100">{text}</p>
                 <p className="mt-0.5 text-[11px] text-slate-400">{fmtDateTime(when)}</p>
               </div>
             </li>
@@ -376,7 +376,7 @@ function ActivityTimeline({ items }: { items: ActivityItem[] }) {
 // ─── List tabs ────────────────────────────────────────────────────────────────
 
 function EmptyCard({ label }: { label: string }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">{label}</div>;
+  return <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 text-center text-sm text-slate-400 shadow-sm">{label}</div>;
 }
 
 function MessagesTab({ items }: { items: ContactDetail["messages"] }) {
@@ -384,14 +384,14 @@ function MessagesTab({ items }: { items: ContactDetail["messages"] }) {
   return (
     <div className="space-y-2">
       {items.map((m) => (
-        <div key={m.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-500">
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">{m.channel}</span>
+        <div key={m.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-medium">{m.channel}</span>
             <span>{m.direction === "IN" ? "Inbound" : "Outbound"}</span>
             <span className="ml-auto">{fmtDateTime(m.createdAt)}</span>
           </div>
-          {m.subject && <p className="text-sm font-medium text-slate-900">{m.subject}</p>}
-          <p className="text-sm text-slate-700">{m.body}</p>
+          {m.subject && <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.subject}</p>}
+          <p className="text-sm text-slate-700 dark:text-slate-300">{m.body}</p>
         </div>
       ))}
     </div>
@@ -403,14 +403,14 @@ function CallsTab({ items }: { items: ContactDetail["calls"] }) {
   return (
     <div className="space-y-2">
       {items.map((ca) => (
-        <div key={ca.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={ca.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm">
             <PhoneCall className="h-4 w-4 text-indigo-500" />
-            <span className="font-medium text-slate-900">{ca.outcome ?? "Call"}</span>
-            {ca.duration != null && <span className="text-xs text-slate-500">· {ca.duration}s</span>}
+            <span className="font-medium text-slate-900 dark:text-slate-100">{ca.outcome ?? "Call"}</span>
+            {ca.duration != null && <span className="text-xs text-slate-500 dark:text-slate-400">· {ca.duration}s</span>}
             <span className="ml-auto text-[11px] text-slate-400">{fmtDateTime(ca.createdAt)}</span>
           </div>
-          {ca.notes && <p className="mt-1 text-sm text-slate-600">{ca.notes}</p>}
+          {ca.notes && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{ca.notes}</p>}
         </div>
       ))}
     </div>
@@ -422,8 +422,8 @@ function NotesTab({ items }: { items: ContactDetail["notes"] }) {
   return (
     <div className="space-y-2">
       {items.map((n) => (
-        <div key={n.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-slate-700">{n.body}</p>
+        <div key={n.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <p className="text-sm text-slate-700 dark:text-slate-300">{n.body}</p>
           <p className="mt-1 text-[11px] text-slate-400">{n.user?.name ? `${n.user.name} · ` : ""}{fmtDateTime(n.createdAt)}</p>
         </div>
       ))}
@@ -436,10 +436,10 @@ function TasksTab({ items }: { items: ContactDetail["tasks"] }) {
   return (
     <div className="space-y-2">
       {items.map((t) => (
-        <div key={t.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <CheckSquare className={cn("h-4 w-4", t.completedAt ? "text-emerald-500" : "text-slate-300")} />
+        <div key={t.id} className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <CheckSquare className={cn("h-4 w-4", t.completedAt ? "text-emerald-500" : "text-slate-300 dark:text-slate-600")} />
           <div className="min-w-0 flex-1">
-            <p className={cn("text-sm", t.completedAt ? "text-slate-400 line-through" : "text-slate-900")}>{t.title}</p>
+            <p className={cn("text-sm", t.completedAt ? "text-slate-400 line-through" : "text-slate-900 dark:text-slate-100")}>{t.title}</p>
             <p className="text-[11px] text-slate-400">
               {t.dueAt ? `Due ${fmtDate(t.dueAt)}` : "No due date"}{t.assignedUser?.name ? ` · ${t.assignedUser.name}` : ""}
             </p>
@@ -455,27 +455,27 @@ function OpportunitiesTab({ items }: { items: OppDetail[] }) {
   return (
     <div className="space-y-4">
       {items.map((o) => (
-        <div key={o.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div key={o.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold text-slate-900">{o.pipeline?.name ?? "Pipeline"}</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{o.pipeline?.name ?? "Pipeline"}</span>
             {o.stage && (
               <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", stageBadge(o.stage.shortCode, o.stage.color))}>
                 {o.stage.name}
               </span>
             )}
-            <span className="ml-auto text-sm font-medium text-slate-700">RM {Number(o.value).toLocaleString("en-GB", { minimumFractionDigits: 2 })}</span>
+            <span className="ml-auto text-sm font-medium text-slate-700 dark:text-slate-300">RM {Number(o.value).toLocaleString("en-GB", { minimumFractionDigits: 2 })}</span>
           </div>
           <p className="mt-1 text-[11px] text-slate-400">
             Created {fmtDate(o.createdAt)}{o.assignedUser?.name ? ` · ${o.assignedUser.name}` : ""}
           </p>
           {o.stageHistory.length > 0 && (
-            <div className="mt-4 border-t border-slate-100 pt-3">
+            <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-3">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Stage history</p>
               <ul className="space-y-2">
                 {o.stageHistory.map((h) => (
-                  <li key={h.id} className="flex items-center gap-2 text-xs text-slate-600">
-                    <ArrowRight className="h-3 w-3 shrink-0 text-slate-300" />
-                    <span>{h.fromStage ? `${h.fromStage.name} → ` : ""}<span className="font-medium text-slate-800">{h.toStage?.name ?? "?"}</span></span>
+                  <li key={h.id} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <ArrowRight className="h-3 w-3 shrink-0 text-slate-300 dark:text-slate-600" />
+                    <span>{h.fromStage ? `${h.fromStage.name} → ` : ""}<span className="font-medium text-slate-800 dark:text-slate-200">{h.toStage?.name ?? "?"}</span></span>
                     {h.note && <span className="text-slate-400">— {h.note}</span>}
                     <span className="ml-auto shrink-0 text-[11px] text-slate-400">{fmtDate(h.changedAt)}</span>
                   </li>
