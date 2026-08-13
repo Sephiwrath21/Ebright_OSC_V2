@@ -91,6 +91,9 @@ import {
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
+  type FlowBucketTotals,
+  type FlowDrillTask,
+  type FlowEntityDetail,
   type FlowKanbanColumnColor,
 } from "@/task-manager/ui/types";
 import {
@@ -210,23 +213,19 @@ export default async function TaskManagerPage({
   // assigneeName already (see types.ts's comment on FlowPersonal.tasks).
   function toSelfEntityDetail(
     me: { userId: string; name: string },
-    personal: { totals: import("@/task-manager/ui/types").FlowBucketTotals; tasks: import("@/task-manager/ui/types").FlowDrillTask[] },
-  ): import("@/task-manager/ui/types").FlowEntityDetail {
-    const buckets: { completed: import("@/task-manager/ui/types").FlowDrillTask[]; pending: import("@/task-manager/ui/types").FlowDrillTask[]; na: import("@/task-manager/ui/types").FlowDrillTask[] } = {
-      completed: [],
-      pending: [],
-      na: [],
-    };
-    for (const t of personal.tasks) {
-      if (t.status === "DONE") buckets.completed.push(t);
-      else if (t.status === "SKIPPED") buckets.na.push(t);
-      else buckets.pending.push(t);
-    }
+    personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+  ): FlowEntityDetail {
     return {
       name: me.name,
       totals: personal.totals,
-      tasks: buckets,
-      members: [{ userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 }],
+      tasks: flowBucketize(personal.tasks),
+      members: [
+        // done/notDone are unused placeholders, not real data — no current
+        // consumer (groupTasksByPerson, entity-card-overview.tsx) reads a
+        // single-member roster's per-member counts; totals above is what
+        // drives the card.
+        { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
+      ],
     };
   }
 
@@ -957,12 +956,14 @@ export default async function TaskManagerPage({
     // identity, newly permitted by Task 3's exception.
     const memberOwnDepartment = daily.me.me.role === "MEMBER" ? daily.me.me.department : null;
     const memberOwnBranch = daily.me.me.role === "MEMBER" ? daily.me.me.branch : null;
-    const memberWholeDepartmentDaily = memberOwnDepartment
-      ? await getDepartmentDetail(email, memberOwnDepartment, "daily", dailyDate).catch(() => null)
-      : null;
-    const memberWholeBranchDaily = memberOwnBranch
-      ? await getBranchDetail(email, memberOwnBranch, "daily", dailyDate).catch(() => null)
-      : null;
+    const [memberWholeDepartmentDaily, memberWholeBranchDaily] = await Promise.all([
+      memberOwnDepartment
+        ? getDepartmentDetail(email, memberOwnDepartment, "daily", dailyDate).catch(() => null)
+        : Promise.resolve(null),
+      memberOwnBranch
+        ? getBranchDetail(email, memberOwnBranch, "daily", dailyDate).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
     // Personal date filters (2026-07-28): one control per period, mounted by
     // the view on BOTH that period's personal surfaces (donut card + "My
