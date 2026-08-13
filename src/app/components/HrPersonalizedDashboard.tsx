@@ -10,12 +10,12 @@ interface HrPersonalizedDashboardProps {
 type PaletteKey = "blue" | "green" | "amber" | "red" | "purple" | "gray";
 
 const palette: Record<PaletteKey, { dark: string; light: string }> = {
-  blue: { dark: "#185FA5", light: "#E6F1FB" },
-  green: { dark: "#0F6E56", light: "#E1F5EE" },
-  amber: { dark: "#854F0B", light: "#FAEEDA" },
-  red: { dark: "#A32D2D", light: "#FCEBEB" },
-  purple: { dark: "#3C3489", light: "#EEEDFE" },
-  gray: { dark: "#444441", light: "#F1EFE8" },
+  blue: { dark: "var(--cat-blue-fg)", light: "var(--cat-blue-bg)" },
+  green: { dark: "var(--cat-green-fg)", light: "var(--cat-green-bg)" },
+  amber: { dark: "var(--cat-amber-fg)", light: "var(--cat-amber-bg)" },
+  red: { dark: "var(--cat-red-fg)", light: "var(--cat-red-bg)" },
+  purple: { dark: "var(--cat-purple-fg)", light: "var(--cat-purple-bg)" },
+  gray: { dark: "var(--cat-gray-fg)", light: "var(--cat-gray-bg)" },
 };
 
 const card: React.CSSProperties = {
@@ -488,6 +488,10 @@ const tasks: Record<
 
 function shadeOfBlue(t: number): string {
   // Mix #E6F1FB (light) -> #185FA5 (dark) by t in [0,1]
+  // Intentionally kept as literal hex: this does numeric channel
+  // interpolation, which a `var(--cat-blue-*)` string cannot support
+  // (its resolved value isn't available for arithmetic at build/run time).
+  // These literals equal the light-mode palette.blue values by design.
   const a = { r: 0xe6, g: 0xf1, b: 0xfb };
   const b = { r: 0x18, g: 0x5f, b: 0xa5 };
   const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
