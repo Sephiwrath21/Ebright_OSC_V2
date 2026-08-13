@@ -23,31 +23,31 @@ interface Props {
 }
 
 const STATUS_PILL: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  draft: "bg-slate-100 text-slate-700 border-slate-300",
-  archived: "bg-rose-50 text-rose-700 border-rose-200",
+  active: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
+  draft: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
+  archived: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900 dark:text-rose-200 dark:border-rose-700",
 };
 
 const CATEGORY_PILL: Record<string, string> = {
-  Onboarding: "bg-blue-50 text-blue-700 border-blue-200",
-  Offboarding: "bg-rose-50 text-rose-700 border-rose-200",
-  Other: "bg-slate-100 text-slate-700 border-slate-300",
+  Onboarding: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700",
+  Offboarding: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900 dark:text-rose-200 dark:border-rose-700",
+  Other: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
 };
 
 const ACTOR_BADGE: Record<string, string> = {
-  Candidate: "bg-blue-50 text-blue-700 border-blue-200",
-  HOD: "bg-purple-50 text-purple-700 border-purple-200",
-  HR: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Buddy: "bg-amber-50 text-amber-700 border-amber-200",
-  System: "bg-slate-50 text-slate-700 border-slate-200",
+  Candidate: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700",
+  HOD: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700",
+  HR: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
+  Buddy: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700",
+  System: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
 };
 
 const TYPE_BADGE: Record<string, string> = {
-  Task: "bg-slate-100 text-slate-700",
-  Submission: "bg-blue-100 text-blue-700",
-  Meeting: "bg-amber-100 text-amber-700",
-  "Sign-off": "bg-emerald-100 text-emerald-700",
-  Reading: "bg-violet-100 text-violet-700",
+  Task: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+  Submission: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200",
+  Meeting: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200",
+  "Sign-off": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
+  Reading: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-200",
 };
 
 const ACTOR_OPTIONS = ["Candidate", "HOD", "HR", "Buddy", "System"];
@@ -137,25 +137,25 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/workflow-center" className="hover:text-slate-900">Workflow Center</Link>
+          <Link href="/dashboards/workflow-center" className="hover:text-slate-900 dark:hover:text-slate-100">Workflow Center</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium truncate">{workflow.name}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium truncate">{workflow.name}</span>
         </nav>
 
         {/* Back + actions row */}
         <div className="flex items-center justify-between mb-4">
           <Link
             href="/dashboards/workflow-center"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to Workflow Center
           </Link>
@@ -167,7 +167,7 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
                     type="button"
                     onClick={handleSaveDraft}
                     disabled={pending}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-60"
                   >
                     {pending ? "Saving…" : "Save Draft"}
                   </button>
@@ -184,7 +184,7 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
                       type="button"
                       onClick={handleArchive}
                       disabled={pending}
-                      className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                      className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900 dark:hover:text-rose-200 disabled:opacity-60"
                     >
                       Archive
                     </button>
@@ -206,7 +206,7 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
         </div>
 
         {error && (
-          <div role="alert" className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <div role="alert" className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-200">
             {error}
           </div>
         )}
@@ -223,22 +223,22 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
               role="dialog"
               aria-modal="true"
               aria-labelledby="delete-workflow-title"
-              className="relative w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+              className="relative w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
             >
               <div className="p-6">
-                <h2 id="delete-workflow-title" className="text-base font-semibold text-slate-900">
+                <h2 id="delete-workflow-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   Delete workflow?
                 </h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                   Are you sure you want to delete this workflow? This action cannot be undone.
                 </p>
               </div>
-              <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowDelete(false)}
                   disabled={pending}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -256,28 +256,28 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
         )}
 
         {/* Header card */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5">
           {canEdit ? (
             <input
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full text-xl font-semibold text-slate-900 border border-slate-300 rounded-md px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+              className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-500 dark:bg-slate-950 rounded-md px-2 py-1.5 focus:border-blue-500 focus:outline-none"
             />
           ) : (
-            <h1 className="text-xl font-semibold text-slate-900">{workflow.name}</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{workflow.name}</h1>
           )}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+            <span className="inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
               {workflow.departmentName}
             </span>
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CATEGORY_PILL[workflow.category] ?? "bg-violet-50 text-violet-700 border-violet-200"}`}>
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CATEGORY_PILL[workflow.category] ?? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900 dark:text-violet-200 dark:border-violet-700"}`}>
               {workflow.category}
             </span>
             <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${STATUS_PILL[workflow.status]}`}>
               {workflow.status}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
               {workflow.assignedCount} candidate{workflow.assignedCount === 1 ? "" : "s"} assigned
             </span>
           </div>
@@ -285,38 +285,38 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
 
         {/* Category + Trigger */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-2">Category</h2>
-            <p className="text-xs text-slate-500 mb-3">Drives auto-assignment behavior</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Category</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Drives auto-assignment behavior</p>
             {canEdit ? (
               <select
                 value={editCategory}
                 onChange={(e) => setEditCategory(e.target.value)}
-                className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full text-sm rounded-md border border-slate-300 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 px-3 py-2 focus:border-blue-500 focus:outline-none"
               >
                 {knownCategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-semibold text-slate-700">{workflow.category}</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{workflow.category}</p>
             )}
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-2">Trigger</h2>
-            <p className="text-xs text-slate-500 mb-3">When this workflow starts</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Trigger</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">When this workflow starts</p>
             {canEdit ? (
               <select
                 value={editTrigger}
                 onChange={(e) => setEditTrigger(e.target.value)}
-                className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full text-sm rounded-md border border-slate-300 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 px-3 py-2 focus:border-blue-500 focus:outline-none"
               >
                 {TRIGGER_OPTIONS.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-semibold text-slate-700">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {TRIGGER_OPTIONS.find((t) => t.value === workflow.trigger)?.label ?? workflow.trigger}
               </p>
             )}
@@ -324,18 +324,18 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
         </section>
 
         {/* Applies To */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">Linked Employee Types</h2>
-          <p className="text-xs text-slate-500 mb-3">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Linked Employee Types</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
             Which employee types this workflow applies to (edit via the list above on the
             list page — full multi-select editing in a later phase).
           </p>
           {workflow.appliesTo.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">None set yet.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 italic">None set yet.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {workflow.appliesTo.map((t) => (
-                <span key={t} className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 text-xs font-semibold">
+                <span key={t} className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 text-xs font-semibold dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700">
                   {t}
                 </span>
               ))}

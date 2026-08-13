@@ -13,11 +13,11 @@ interface Child {
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
-const INPUT  = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ED1C24] focus:border-[#ED1C24] transition-colors";
-const LABEL  = "block text-sm font-medium text-slate-700 mb-1.5";
+const INPUT  = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ED1C24] focus:border-[#ED1C24] transition-colors dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100";
+const LABEL  = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5";
 const BTN_P  = "w-full h-12 rounded-xl bg-[#ED1C24] text-white text-sm font-semibold tracking-widest uppercase hover:bg-[#d41920] active:scale-[0.98] transition-all";
-const BTN_S  = "w-full h-12 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium tracking-wide uppercase hover:bg-slate-200 active:scale-[0.98] transition-all";
-const REQ    = <span className="text-red-500 ml-0.5">*</span>;
+const BTN_S  = "w-full h-12 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium tracking-wide uppercase hover:bg-slate-200 active:scale-[0.98] transition-all dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+const REQ    = <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -70,21 +70,21 @@ export default function CrmFormsPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors rounded">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Forms</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Forms</span>
         </nav>
 
         {/* Form card — max 520px, centered */}
@@ -105,7 +105,7 @@ export default function CrmFormsPage() {
           </div>
 
           {/* Step body */}
-          <div className="bg-white border border-t-0 border-slate-200 rounded-b-2xl px-6 py-6 space-y-4 shadow-sm">
+          <div className="bg-white border border-t-0 border-slate-200 rounded-b-2xl px-6 py-6 space-y-4 shadow-sm dark:bg-slate-900 dark:border-slate-800">
 
             {/* ── Step 1 — Parent details ─────────────────────────────────── */}
             {step === 1 && (
@@ -159,7 +159,7 @@ export default function CrmFormsPage() {
                         className={`h-16 rounded-xl text-2xl font-bold border-2 transition-all duration-150 ${
                           numChildren === n
                             ? "text-white shadow-md scale-[1.02]"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:bg-red-50"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:bg-red-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-red-700 dark:hover:bg-red-900"
                         }`}
                         style={numChildren === n ? { borderColor: "#ED1C24", backgroundColor: "#ED1C24" } : {}}
                       >
@@ -177,7 +177,7 @@ export default function CrmFormsPage() {
             {step === 3 && (
               <>
                 {children.map((child, i) => (
-                  <div key={i} className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                  <div key={i} className="bg-slate-50 rounded-xl border border-slate-200 p-4 dark:bg-slate-800 dark:border-slate-700">
                     <p className="text-sm font-semibold mb-3" style={{ color: "#ED1C24" }}>Child {i + 1}</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -245,8 +245,8 @@ export default function CrmFormsPage() {
             {step === 5 && (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <CheckCircle2 className="w-24 h-24 text-green-500 mb-4" strokeWidth={1.5} />
-                <h2 className="text-2xl font-bold text-slate-900">Registration Successful!</h2>
-                <p className="mt-2 text-sm text-slate-600 leading-relaxed max-w-xs">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Registration Successful!</h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-xs">
                   A new lead has been added to Opportunities → New Lead. We will contact the parent shortly via WhatsApp to confirm the trial class schedule.
                 </p>
                 <button onClick={reset} className={BTN_P + " mt-6 max-w-[200px]"}>

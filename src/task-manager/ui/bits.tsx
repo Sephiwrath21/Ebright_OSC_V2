@@ -24,7 +24,7 @@ import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
  *  by the caller so it never disturbs row/flex layout. */
 function InlineActionError({ text }: { text: string }) {
   return (
-    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md">
+    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:ring-1 dark:ring-white/10">
       {text}
     </p>
   );
@@ -53,7 +53,7 @@ export function CalendarIcon({ className = "size-3" }: { className?: string }) {
  *  grids vs. the action-oriented Details/assign area). */
 export function PageSectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+    <h2 className="mt-2 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500 dark:border-slate-800 dark:text-slate-400">
       {children}
     </h2>
   );
@@ -70,9 +70,9 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           {title}
         </h3>
         {action}
@@ -118,7 +118,7 @@ export function StatusDonut({
           r={r}
           fill="none"
           strokeWidth={strokeWidth}
-          className="stroke-gray-100"
+          className="stroke-gray-100 dark:stroke-slate-800"
         />
         {segments.map((s) =>
           s.dash > 0 ? (
@@ -165,8 +165,8 @@ export function BucketLegend({
         const row = (
           <>
             <span className={`size-2.5 shrink-0 rounded-full ${b.dot}`} />
-            <span className="text-gray-600">{b.label}</span>
-            <span className="ml-auto font-semibold text-gray-900">{totals[b.key]}</span>
+            <span className="text-gray-600 dark:text-slate-300">{b.label}</span>
+            <span className="ml-auto font-semibold text-gray-900 dark:text-slate-100">{totals[b.key]}</span>
             <span className="w-9 text-right text-xs text-gray-400">
               {total > 0 ? Math.round((totals[b.key] / total) * 100) : 0}%
             </span>
@@ -177,7 +177,7 @@ export function BucketLegend({
             key={b.key}
             type="button"
             onClick={() => onSelect(b.key)}
-            className="flex items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm hover:bg-gray-50"
+            className="flex items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-800"
           >
             {row}
           </button>
@@ -203,7 +203,7 @@ export function CompletionMeter({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 ${className}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-800 ${className}`}>
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
         style={{ width: `${pct}%` }}
@@ -213,12 +213,12 @@ export function CompletionMeter({
 }
 
 const STATUS_CHIP: Record<FlowTaskRow["status"], { label: string; className: string }> = {
-  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700" },
-  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600" },
-  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700" },
-  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800" },
-  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800" },
-  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500" },
+  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
+  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300" },
+  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300" },
+  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300" },
+  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-300" },
 };
 
 export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
@@ -237,7 +237,7 @@ export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
 function statusCircleClasses(status: FlowTaskRow["status"]): string {
   if (status === "DONE") return "bg-emerald-500";
   if (status === "SKIPPED") return "bg-amber-400";
-  return "border-2 border-red-400 bg-white";
+  return "border-2 border-red-400 bg-white dark:bg-slate-900";
 }
 
 /**
@@ -332,7 +332,7 @@ function StatusDropdown({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-5 z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          className="absolute left-0 top-5 z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         >
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Statuses</p>
           <button
@@ -340,12 +340,12 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canReopen}
             onClick={() => run(onReopen)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
+            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />
             Pending
           </button>
-          <div className="my-1 border-t border-gray-100" />
+          <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Closed</p>
           <button
             type="button"
@@ -357,7 +357,7 @@ function StatusDropdown({
                 : undefined
             }
             onClick={() => run(onComplete)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="flex size-2.5 shrink-0 items-center justify-center text-[10px] font-bold text-emerald-500">
               ✓
@@ -369,7 +369,7 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canMarkNA}
             onClick={() => run(onSkip)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
@@ -437,7 +437,7 @@ function CompleteButton({
         disabled={completing}
         onClick={complete}
         className={`flex size-3 items-center justify-center rounded-full border-2 border-emerald-500 transition-colors hover:bg-emerald-500 disabled:opacity-50 ${
-          completing ? "bg-emerald-500" : "bg-white"
+          completing ? "bg-emerald-500" : "bg-white dark:bg-slate-900"
         }`}
       />
       {errorText && <InlineActionError text={errorText} />}
@@ -494,7 +494,7 @@ export function TaskRowLine({
           checked={selected ?? false}
           onChange={() => onToggleSelect(task.runBlockId)}
           aria-label={`Select ${task.blockTitle}`}
-          className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+          className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
         />
       )}
       {hideCompleted ? (
@@ -506,7 +506,7 @@ export function TaskRowLine({
       ) : canComplete ? (
         <CompleteButton task={task} onComplete={onComplete!} />
       ) : (
-        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white" />
+        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white dark:bg-slate-900" />
       )}
       <div
         className={`relative min-w-0 ${nameWidth === undefined ? "flex-1" : "shrink-0"}`}
@@ -515,20 +515,20 @@ export function TaskRowLine({
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
             className={`min-w-0 truncate text-sm font-semibold ${
-              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
             }`}
           >
             {task.blockTitle}
           </p>
           {task.fromSchedule && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900 dark:text-violet-300">
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
           )}
         </div>
         {!hideCompleted && (
-          <p className="truncate pr-2 text-xs text-gray-500">
+          <p className="truncate pr-2 text-xs text-gray-500 dark:text-slate-400">
             {task.runName} · {task.flowName}
           </p>
         )}
@@ -538,7 +538,7 @@ export function TaskRowLine({
             title="Drag to resize"
             className="absolute -right-1.5 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center"
           >
-            <div className="h-full w-px bg-gray-200 hover:w-0.5 hover:bg-blue-400" />
+            <div className="h-full w-px bg-gray-200 hover:w-0.5 hover:bg-blue-400 dark:bg-slate-700" />
           </div>
         )}
       </div>
@@ -584,7 +584,7 @@ function ToggleSwitch({
   label: string;
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+    <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
       {label}
       <button
         type="button"
@@ -593,11 +593,11 @@ function ToggleSwitch({
         aria-label={label}
         onClick={onChange}
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-blue-600" : "bg-gray-300"
+          checked ? "bg-blue-600" : "bg-gray-300 dark:bg-slate-700"
         }`}
       >
         <span
-          className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+          className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform dark:bg-slate-100 ${
             checked ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
         />
@@ -687,7 +687,7 @@ function BulkActionsButton({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         >
           {actions.map((a) => (
             <button
@@ -695,7 +695,7 @@ function BulkActionsButton({
               type="button"
               role="menuitem"
               onClick={() => run(a.onRun)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {a.icon}
               {a.label}
@@ -848,12 +848,12 @@ export function ResizableTaskList({
       <div className="flex items-center gap-3">
         {ownedVisibleTasks.length > 0 && (
           <>
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+            <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
               />
               Select all
             </label>
@@ -883,7 +883,7 @@ export function ResizableTaskList({
   return (
     <div>
       {controlBar}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 dark:divide-slate-800">
         {visibleTasks.map((t) => (
           <TaskRowLine
             key={t.runBlockId}
@@ -948,10 +948,10 @@ export function StatusOverviewCard({
   const drill = tasks ? setSelected : undefined;
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-white px-6 py-8 shadow-sm">
+    <div className="relative rounded-2xl border border-gray-200 bg-white px-6 py-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {action && <div className="absolute right-4 top-4">{action}</div>}
-      <p className="text-center text-lg font-semibold text-gray-900">{title}</p>
-      {subtitle && <p className="text-center text-sm text-gray-500">{subtitle}</p>}
+      <p className="text-center text-lg font-semibold text-gray-900 dark:text-slate-100">{title}</p>
+      {subtitle && <p className="text-center text-sm text-gray-500 dark:text-slate-400">{subtitle}</p>}
 
       <div className="mt-5 flex flex-col items-center">
         <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />
@@ -1012,7 +1012,7 @@ function ReassignPicker({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-800">
       <input
         value={search}
         onChange={(e) => {
@@ -1022,7 +1022,7 @@ function ReassignPicker({
         placeholder="Search staff by name…"
         className={`mb-1.5 ${pickerSearchClass}`}
       />
-      {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mb-1 text-xs text-red-600 dark:text-red-300">{error}</p>}
       <SinglePersonPickList
         members={candidates}
         disabled={busy}
@@ -1165,7 +1165,7 @@ export function EntityDrillModal({
     bulkActions.push({
       key: "reopen",
       label: "Mark Pending",
-      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
+      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />,
       onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId),
     });
   }
@@ -1176,12 +1176,12 @@ export function EntityDrillModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3">
+        <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3 dark:border-slate-800">
           <span className={`size-2.5 shrink-0 rounded-full ${meta.dot}`} />
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-slate-100">
             {name} — {meta.label}
           </p>
           <span className="text-xs text-gray-400">{rows.length}</span>
@@ -1189,19 +1189,19 @@ export function EntityDrillModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             ✕
           </button>
         </div>
         {ownedRows.length > 0 && (
           <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+            <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
               />
               Select all
             </label>
@@ -1215,7 +1215,7 @@ export function EntityDrillModal({
             No {meta.label.toLowerCase()} tasks this period.
           </p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-slate-800">
             {rows.map((t) => {
               const due = t.dueAt ? new Date(t.dueAt) : null;
               const dueDisplay = formatDueDate(due);
@@ -1233,20 +1233,20 @@ export function EntityDrillModal({
                         checked={selectedIds.has(t.runBlockId)}
                         onChange={() => toggleSelect(t.runBlockId)}
                         aria-label={`Select ${t.blockTitle}`}
-                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
                       />
                     )}
                     <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
                     <div className="min-w-0 flex-1">
                       <p
                         className={`truncate text-sm font-semibold ${
-                          t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+                          t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
                         }`}
                       >
                         {t.blockTitle}
                       </p>
                       {!isOwned && (
-                        <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
+                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
                       )}
                     </div>
                     {dueDisplay && (
@@ -1260,8 +1260,8 @@ export function EntityDrillModal({
                         }
                         className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                           reassignRow === t.runBlockId
-                            ? "border-blue-400 bg-blue-50 text-blue-700"
-                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                            ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-900"
                         }`}
                       >
                         Assign to Others

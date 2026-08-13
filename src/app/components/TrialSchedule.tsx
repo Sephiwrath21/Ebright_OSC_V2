@@ -127,30 +127,30 @@ export default function TrialSchedule() {
   }, [data]);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
       <header className="mb-4 space-y-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Trial Class Schedule</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Trial Class Schedule</h2>
             <span
               title="Read-only — superadmin view"
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
             >
               <Lock className="h-2.5 w-2.5" /> Read-only
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
             Students booked into trial classes for the selected range. Click a count for the branch &amp; source breakdown, then drill into who&apos;s joining.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-1 text-[11px]">
+            <label className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px]">
               <Building2 className="h-3 w-3 text-slate-400" />
               <select
                 value={branchId}
                 onChange={(e) => setBranchId(e.target.value || "all")}
-                className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="all">All Branches</option>
                 {branches.map((b) => (
@@ -159,7 +159,7 @@ export default function TrialSchedule() {
               </select>
             </label>
 
-            <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-0.5 text-[11px]">
+            <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 text-[11px]">
               <CalendarRange className="ml-1.5 h-3 w-3 text-slate-400" />
               {PRESET_OPTIONS.map((p) => (
                 <button
@@ -168,7 +168,7 @@ export default function TrialSchedule() {
                   onClick={() => setPreset(p.key)}
                   className={cn(
                     "rounded-full px-2.5 py-1 font-medium transition",
-                    preset === p.key ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900",
+                    preset === p.key ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm" : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
                   )}
                 >
                   {p.label}
@@ -177,13 +177,13 @@ export default function TrialSchedule() {
             </div>
 
             {preset === "custom" && (
-              <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px]">
+              <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px]">
                 <input
                   type="date"
                   value={customFrom}
                   max={customTo || undefined}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <span className="text-slate-400">→</span>
                 <input
@@ -191,17 +191,17 @@ export default function TrialSchedule() {
                   value={customTo}
                   min={customFrom || undefined}
                   onChange={(e) => setCustomTo(e.target.value)}
-                  className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             )}
 
             {/* Trials total — pushed to the far right end of the filter row */}
-            <div className="ml-auto inline-flex items-baseline gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 ring-1 ring-indigo-100">
-              <span className="text-2xl font-bold leading-none tabular-nums text-indigo-700">
+            <div className="ml-auto inline-flex items-baseline gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900 px-3 py-1.5 ring-1 ring-indigo-100 dark:ring-indigo-700">
+              <span className="text-2xl font-bold leading-none tabular-nums text-indigo-700 dark:text-indigo-300">
                 {loading ? "—" : weekTotal}
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">trials total</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400">trials total</span>
             </div>
         </div>
       </header>

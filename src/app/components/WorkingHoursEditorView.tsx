@@ -137,41 +137,41 @@ export default function WorkingHoursEditorView({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 space-y-6">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-all">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-all">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/attendance" className="hover:text-slate-900 transition-all">Attendance</Link>
+          <Link href="/attendance" className="hover:text-slate-900 dark:hover:text-slate-100 transition-all">Attendance</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Working Hours</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Working Hours</span>
         </nav>
 
-        <header className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8">
-          <h1 className="text-2xl font-bold text-slate-800">Working Hours</h1>
-          <p className="mt-1.5 text-sm font-medium text-slate-500">
+        <header className="bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 md:p-8">
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Working Hours</h1>
+          <p className="mt-1.5 text-sm font-medium text-slate-500 dark:text-slate-400">
             Each save creates a dated version. Past weeks keep the hours that were active then.
           </p>
         </header>
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[320px_1fr]">
           {/* Staff list */}
-          <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[70vh]">
-            <div className="px-4 py-3 border-b border-slate-200">
+          <aside className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[70vh]">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search name, branch, ID…"
-                className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
               />
-              <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {filteredStaff.length} of {staff.length}
               </p>
             </div>
-            <ul className="overflow-y-auto divide-y divide-slate-100">
+            <ul className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
               {filteredStaff.map((s) => {
                 const active = s.id === selectedId;
                 return (
@@ -181,15 +181,15 @@ export default function WorkingHoursEditorView({
                       onClick={() => selectStaff(s.id)}
                       disabled={isPending}
                       className={`w-full text-left px-4 py-3 transition-colors ${
-                        active ? "bg-indigo-50" : "hover:bg-slate-50"
+                        active ? "bg-indigo-50 dark:bg-indigo-900" : "hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`text-sm font-semibold ${active ? "text-indigo-700" : "text-slate-800"}`}>
+                        <span className={`text-sm font-semibold ${active ? "text-indigo-700 dark:text-indigo-300" : "text-slate-800 dark:text-slate-200"}`}>
                           {s.name}
                         </span>
                         {s.branch && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             {s.branch}
                           </span>
                         )}
@@ -207,22 +207,22 @@ export default function WorkingHoursEditorView({
           {/* Editor */}
           {selected ? (
             <section className="space-y-6">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6">
                 <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">{selected.name}</h2>
-                    <p className="text-sm text-slate-500 mt-0.5">
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{selected.name}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                       {selected.position ?? "—"} · {selected.branch ?? "—"} · {selected.employeeId ?? "—"}
                     </p>
                   </div>
-                  <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm text-slate-700 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100">
-                    <CalendarIcon className="w-4 h-4 text-slate-500" aria-hidden="true" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Effective from</span>
+                  <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 gap-2 text-sm text-slate-700 dark:text-slate-300 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900">
+                    <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Effective from</span>
                     <input
                       type="date"
                       value={effectiveFrom}
                       onChange={(e) => setEffectiveFrom(e.target.value)}
-                      className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none"
+                      className="bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none"
                     />
                   </label>
                 </div>
@@ -235,13 +235,13 @@ export default function WorkingHoursEditorView({
                       <div
                         key={day}
                         className={`border rounded-xl p-4 transition-all ${
-                          on ? "border-indigo-200 bg-indigo-50/40" : "border-slate-200 bg-slate-50/40"
+                          on ? "border-indigo-200 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-900/40" : "border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/40"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Clock className={`w-4 h-4 ${on ? "text-indigo-600" : "text-slate-400"}`} aria-hidden="true" />
-                            <span className={`text-sm font-semibold ${on ? "text-indigo-800" : "text-slate-700"}`}>
+                            <Clock className={`w-4 h-4 ${on ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} aria-hidden="true" />
+                            <span className={`text-sm font-semibold ${on ? "text-indigo-800 dark:text-indigo-200" : "text-slate-700 dark:text-slate-300"}`}>
                               {day}
                             </span>
                           </div>
@@ -251,7 +251,7 @@ export default function WorkingHoursEditorView({
                             className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full transition-colors ${
                               on
                                 ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
                             }`}
                           >
                             {on ? "On" : "Off"}
@@ -263,14 +263,14 @@ export default function WorkingHoursEditorView({
                               type="time"
                               value={v.start}
                               onChange={(e) => updateField(day, "start", e.target.value)}
-                              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 font-mono tabular-nums focus:outline-none focus:border-indigo-400"
+                              className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-800 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-indigo-400"
                             />
                             <span className="text-xs text-slate-400 font-semibold">to</span>
                             <input
                               type="time"
                               value={v.end}
                               onChange={(e) => updateField(day, "end", e.target.value)}
-                              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 font-mono tabular-nums focus:outline-none focus:border-indigo-400"
+                              className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-800 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-indigo-400"
                             />
                           </div>
                         )}
@@ -283,8 +283,8 @@ export default function WorkingHoursEditorView({
                   <div
                     className={`mt-5 flex items-start gap-2 text-sm rounded-xl px-3 py-2.5 font-medium ${
                       status.kind === "ok"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                        ? "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700"
+                        : "bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700"
                     }`}
                   >
                     {status.kind === "ok" ? (
@@ -310,11 +310,11 @@ export default function WorkingHoursEditorView({
               </div>
 
               {/* History */}
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-200">
-                  <History className="w-4 h-4 text-slate-500" aria-hidden="true" />
-                  <h3 className="text-sm font-semibold text-slate-800">Schedule History</h3>
-                  <span className="text-xs font-medium text-slate-500">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                  <History className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Schedule History</h3>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     {versions.length} version{versions.length === 1 ? "" : "s"}
                   </span>
                 </div>
@@ -323,12 +323,12 @@ export default function WorkingHoursEditorView({
                     No versions yet. Saving will create the first one.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                     {[...versions].reverse().map((v) => (
                       <li key={v.effectiveFrom} className="px-6 py-4">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-                            <CalendarIcon className="w-4 h-4 text-indigo-500" aria-hidden="true" />
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            <CalendarIcon className="w-4 h-4 text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                             From {v.effectiveFrom}
                           </span>
                         </div>
@@ -339,9 +339,9 @@ export default function WorkingHoursEditorView({
                             return (
                               <span
                                 key={day}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300"
                               >
-                                <span className="text-slate-500">{day}</span>
+                                <span className="text-slate-500 dark:text-slate-400">{day}</span>
                                 <span className="font-mono tabular-nums">{d.start}–{d.end}</span>
                               </span>
                             );
@@ -354,7 +354,7 @@ export default function WorkingHoursEditorView({
               </div>
             </section>
           ) : (
-            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-12 text-center text-sm font-medium text-slate-500">
+            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-12 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
               Select a staff member from the list.
             </section>
           )}

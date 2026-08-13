@@ -25,11 +25,11 @@ interface Automation {
 // ─── Static data ──────────────────────────────────────────────────────────────
 
 const TRIGGER_BADGE: Record<TriggerType, { label: string; cls: string }> = {
-  NEW_LEAD:       { label: "New Lead",       cls: "bg-blue-100 text-blue-700" },
-  STAGE_CHANGED:  { label: "Stage Changed",  cls: "bg-violet-100 text-violet-700" },
-  TIME_IN_STAGE:  { label: "Time in Stage",  cls: "bg-amber-100 text-amber-700" },
-  SCHEDULED:      { label: "Scheduled",      cls: "bg-indigo-100 text-indigo-700" },
-  FORM_SUBMITTED: { label: "Form Submitted", cls: "bg-emerald-100 text-emerald-700" },
+  NEW_LEAD:       { label: "New Lead",       cls: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" },
+  STAGE_CHANGED:  { label: "Stage Changed",  cls: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-200" },
+  TIME_IN_STAGE:  { label: "Time in Stage",  cls: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200" },
+  SCHEDULED:      { label: "Scheduled",      cls: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200" },
+  FORM_SUBMITTED: { label: "Form Submitted", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200" },
 };
 
 const INITIAL: Automation[] = [
@@ -84,7 +84,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
       onClick={onChange}
       aria-label={enabled ? "Disable" : "Enable"}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-        enabled ? "bg-emerald-500" : "bg-slate-300"
+        enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
       }`}
     >
       <span
@@ -132,27 +132,27 @@ export default function CrmAutomationsPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" /><span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-900 font-medium">Automations</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Automations</span>
         </nav>
 
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Automations</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Automate follow-ups, notifications, and stage transitions.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Automations</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Automate follow-ups, notifications, and stage transitions.</p>
           </div>
           <button className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
             <Plus className="w-4 h-4" /> New Automation
@@ -167,9 +167,9 @@ export default function CrmAutomationsPage() {
             { label: "Live",      value: live,                 sub: "currently active" },
             { label: "Last 24h",  value: 34,                   sub: "33 success · 1 failed" },
           ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{s.label}</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{s.value}</p>
+            <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 dark:bg-slate-900 dark:border-slate-800">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{s.label}</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{s.value}</p>
               <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
             </div>
           ))}
@@ -177,27 +177,27 @@ export default function CrmAutomationsPage() {
 
         {/* Templates */}
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-slate-700 mb-3">Starter Templates</h2>
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Starter Templates</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {TEMPLATES.map(t => {
               const badge = TRIGGER_BADGE[t.trigger];
               return (
                 <div
                   key={t.id}
-                  className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group dark:bg-slate-900 dark:border-slate-800 dark:hover:border-blue-700"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors leading-snug">
+                    <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 dark:text-slate-100 dark:group-hover:text-blue-400 transition-colors leading-snug">
                       {t.name}
                     </span>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>
                       {badge.label}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 leading-relaxed mb-3">{t.summary}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">{t.summary}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-slate-400">{t.steps} steps</span>
-                    <button className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                    <button className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
                       <Plus className="w-3 h-3" /> Use template
                     </button>
                   </div>
@@ -208,7 +208,7 @@ export default function CrmAutomationsPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="flex items-center gap-1 border-b border-slate-200 mb-4">
+        <div className="flex items-center gap-1 border-b border-slate-200 mb-4 dark:border-slate-800">
           {([
             { id: "custom",  label: `Custom (${automations.length})` },
             { id: "builtin", label: `Built-in (${BUILTIN_COUNT})` },
@@ -218,8 +218,8 @@ export default function CrmAutomationsPage() {
               onClick={() => setTab(t.id as Tab)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 tab === t.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               {t.label}
@@ -230,40 +230,40 @@ export default function CrmAutomationsPage() {
         {/* ── Custom tab ── */}
         {tab === "custom" && (
           automations.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
-              <Zap className="mx-auto mb-2 w-8 h-8 text-slate-300" />
-              <p className="text-sm text-slate-500">No custom automations yet.</p>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center dark:bg-slate-900 dark:border-slate-800">
+              <Zap className="mx-auto mb-2 w-8 h-8 text-slate-300 dark:text-slate-600" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">No custom automations yet.</p>
               <button className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors">
                 <Plus className="w-3.5 h-3.5" /> Create your first automation
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800">
               {automations.map((a, i) => {
                 const badge = TRIGGER_BADGE[a.triggerType];
                 return (
                   <div
                     key={a.id}
-                    className={`flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50 transition-colors ${
-                      i < automations.length - 1 ? "border-b border-slate-100" : ""
+                    className={`flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                      i < automations.length - 1 ? "border-b border-slate-100 dark:border-slate-800" : ""
                     }`}
                   >
                     {/* Status icon */}
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      a.enabled ? "bg-emerald-100" : "bg-slate-100"
+                      a.enabled ? "bg-emerald-100 dark:bg-emerald-900" : "bg-slate-100 dark:bg-slate-800"
                     }`}>
-                      <Zap className={`w-4 h-4 ${a.enabled ? "text-emerald-600" : "text-slate-400"}`} />
+                      <Zap className={`w-4 h-4 ${a.enabled ? "text-emerald-600 dark:text-emerald-300" : "text-slate-400"}`} />
                     </div>
 
                     {/* Name + meta */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-slate-900 truncate">{a.name}</span>
+                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{a.name}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>
                           {badge.label}
                         </span>
                         {a.branchName && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                             {a.branchName}
                           </span>
                         )}
@@ -271,7 +271,7 @@ export default function CrmAutomationsPage() {
                       {a.lastRun && (
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {a.lastRun.status === "COMPLETED" && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-                          {a.lastRun.status === "FAILED"    && <XCircle      className="w-3 h-3 text-red-500" />}
+                          {a.lastRun.status === "FAILED"    && <XCircle      className="w-3 h-3 text-red-500 dark:text-red-400" />}
                           {a.lastRun.status === "RUNNING"   && <Loader2      className="w-3 h-3 text-blue-500 animate-spin" />}
                           <span className="text-[11px] text-slate-400">{a.lastRun.when}</span>
                         </div>
@@ -285,21 +285,21 @@ export default function CrmAutomationsPage() {
                     <div className="flex items-center gap-0.5">
                       <button
                         title="Edit"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         title="Duplicate"
                         onClick={() => duplicateAuto(a.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       <button
                         title="Delete"
                         onClick={() => deleteAuto(a.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-400 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -315,14 +315,14 @@ export default function CrmAutomationsPage() {
         {tab === "builtin" && (
           <div className="space-y-3">
             {BUILTIN.map(cat => (
-              <div key={cat.category} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={cat.category} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800">
                 <button
                   onClick={() => toggleCat(cat.category)}
-                  className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition-colors"
+                  className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-800">{cat.category}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{cat.category}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {cat.items.length}
                     </span>
                   </div>
@@ -332,23 +332,23 @@ export default function CrmAutomationsPage() {
                 </button>
 
                 {openCats.has(cat.category) && (
-                  <div className="border-t border-slate-100">
+                  <div className="border-t border-slate-100 dark:border-slate-800">
                     {cat.items.map((item, idx) => (
                       <div
                         key={idx}
-                        className={`px-4 py-3 ${idx < cat.items.length - 1 ? "border-b border-slate-100" : ""}`}
+                        className={`px-4 py-3 ${idx < cat.items.length - 1 ? "border-b border-slate-100 dark:border-slate-800" : ""}`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 mt-0.5">
-                            <Zap className="w-3.5 h-3.5 text-slate-500" />
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 mt-0.5 dark:bg-slate-800">
+                            <Zap className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-800">{item.name}</p>
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{item.name}</p>
                             <p className="text-[11px] text-slate-400 mt-0.5">Trigger: {item.trigger}</p>
                             <ul className="mt-1.5 space-y-0.5">
                               {item.actions.map((act, j) => (
-                                <li key={j} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                                  <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0" />
+                                <li key={j} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 shrink-0" />
                                   {act}
                                 </li>
                               ))}

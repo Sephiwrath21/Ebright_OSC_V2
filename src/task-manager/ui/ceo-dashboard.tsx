@@ -61,7 +61,7 @@ function CardControls({
         title="Drag to reorder"
         aria-label="Drag to reorder"
         {...dragHandleProps}
-        className="flex size-6 cursor-grab touch-none items-center justify-center rounded-full text-gray-300 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
+        className="flex size-6 cursor-grab touch-none items-center justify-center rounded-full text-gray-300 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
       >
         ⠿
       </button>
@@ -70,7 +70,7 @@ function CardControls({
         title="Remove from my dashboard"
         disabled={pending}
         onClick={() => startTransition(onRemove)}
-        className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+        className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-red-400"
       >
         ×
       </button>
@@ -169,7 +169,7 @@ export function CeoDashboardSection({
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="w-56 appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+          className="w-56 appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         >
           <option value="">Add a department…</option>
           {availableToAdd.map((d) => (
@@ -195,11 +195,11 @@ export function CeoDashboardSection({
         >
           + Add
         </button>
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       {ordered.length === 0 ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-gray-400 dark:text-slate-400">
           No departments pinned yet — add one above to track it here.
         </p>
       ) : (

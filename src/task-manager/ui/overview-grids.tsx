@@ -39,16 +39,16 @@ function MiniDonutBlock({
   const drillable = Boolean(entity.tasks);
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm">
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
       {nameHref ? (
         <a
           href={nameHref}
-          className="w-full truncate text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+          className="w-full truncate text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
         >
           {entity.name}
         </a>
       ) : (
-        <p className="w-full truncate text-center text-sm font-semibold text-gray-900">
+        <p className="w-full truncate text-center text-sm font-semibold text-gray-900 dark:text-slate-100">
           {entity.name}
         </p>
       )}
@@ -58,18 +58,18 @@ function MiniDonutBlock({
         strokeWidth={12}
         onSegmentClick={drillable ? setDrill : undefined}
       >
-        <span className="text-sm font-bold text-gray-900">
+        <span className="text-sm font-bold text-gray-900 dark:text-slate-100">
           {flowCompletionPct(entity)}%
         </span>
       </StatusDonut>
-      <div className="flex gap-3 text-xs text-gray-500">
+      <div className="flex gap-3 text-xs text-gray-500 dark:text-slate-400">
         {BUCKET_META.map((b) =>
           drillable ? (
             <button
               key={b.key}
               type="button"
               onClick={() => setDrill(b.key)}
-              className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100"
+              className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-800"
             >
               <span className={`size-2 rounded-full ${b.dot}`} />
               {entity[b.key]}
@@ -107,7 +107,7 @@ export function EntityDonutGrid({
   return (
     <SectionCard title={title}>
       {entities.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">No activity.</p>
+        <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-400">No activity.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {entities.map((e) => (
@@ -148,14 +148,16 @@ export function RegionDonutGrids({
       title={title}
       action={
         roleVariants && (
-          <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
+          <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium dark:bg-slate-800">
             {["All", ...roleVariants.map((v) => v.role)].map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setSelectedRole(r)}
                 className={`rounded-md px-2.5 py-1 ${
-                  selectedRole === r ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                  selectedRole === r
+                    ? "bg-white text-gray-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
+                    : "text-gray-500 dark:text-slate-400"
                 }`}
               >
                 {r}
@@ -166,13 +168,13 @@ export function RegionDonutGrids({
       }
     >
       {shown.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">
+        <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-400">
           No {selectedRole === "All" ? "" : `${selectedRole.toLowerCase()} `}activity.
         </p>
       ) : (
         shown.map((region) => (
           <div key={region.name} className="mb-5 last:mb-0">
-            <p className="mb-2 text-sm font-semibold text-gray-700">{region.name}</p>
+            <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-slate-300">{region.name}</p>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {region.branches.map((b) => (
                 <MiniDonutBlock key={b.name} entity={b} />

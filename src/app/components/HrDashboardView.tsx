@@ -51,12 +51,12 @@ export interface HrDashboardData {
 }
 
 const ACCENTS = {
-  emerald: { bar: "bg-emerald-500", tile: "bg-emerald-50", icon: "text-emerald-600", text: "text-emerald-600" },
-  rose: { bar: "bg-rose-500", tile: "bg-rose-50", icon: "text-rose-600", text: "text-rose-600" },
-  blue: { bar: "bg-blue-500", tile: "bg-blue-50", icon: "text-blue-600", text: "text-blue-600" },
-  amber: { bar: "bg-amber-500", tile: "bg-amber-50", icon: "text-amber-600", text: "text-amber-600" },
-  violet: { bar: "bg-violet-500", tile: "bg-violet-50", icon: "text-violet-600", text: "text-violet-600" },
-  sky: { bar: "bg-sky-500", tile: "bg-sky-50", icon: "text-sky-600", text: "text-sky-600" },
+  emerald: { bar: "bg-emerald-500", tile: "bg-emerald-50 dark:bg-emerald-900", icon: "text-emerald-600 dark:text-emerald-400", text: "text-emerald-600 dark:text-emerald-400" },
+  rose: { bar: "bg-rose-500", tile: "bg-rose-50 dark:bg-rose-900", icon: "text-rose-600 dark:text-rose-400", text: "text-rose-600 dark:text-rose-400" },
+  blue: { bar: "bg-blue-500", tile: "bg-blue-50 dark:bg-blue-900", icon: "text-blue-600 dark:text-blue-400", text: "text-blue-600 dark:text-blue-400" },
+  amber: { bar: "bg-amber-500", tile: "bg-amber-50 dark:bg-amber-900", icon: "text-amber-600 dark:text-amber-400", text: "text-amber-600 dark:text-amber-400" },
+  violet: { bar: "bg-violet-500", tile: "bg-violet-50 dark:bg-violet-900", icon: "text-violet-600 dark:text-violet-400", text: "text-violet-600 dark:text-violet-400" },
+  sky: { bar: "bg-sky-500", tile: "bg-sky-50 dark:bg-sky-900", icon: "text-sky-600 dark:text-sky-400", text: "text-sky-600 dark:text-sky-400" },
 } as const;
 
 type Accent = keyof typeof ACCENTS;
@@ -96,41 +96,41 @@ export default function HrDashboardView({ initialMonth }: { initialMonth: string
   }, [month]);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-5">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">HR Dashboard</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">HR Dashboard</span>
         </nav>
 
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">HR Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">HR Dashboard</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Onboarding, offboarding, leave, and attendance flags at a glance.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm text-slate-700 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-              <CalendarIcon className="w-4 h-4 text-slate-500" aria-hidden="true" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Month</span>
+            <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 gap-2 text-sm text-slate-700 dark:text-slate-300 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900">
+              <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Month</span>
               <input
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value || todayMyt())}
-                className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none"
+                className="bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none"
               />
             </label>
             <button
               type="button"
               onClick={() => setMonth((m) => m)}
-              className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
               Refresh
@@ -139,14 +139,14 @@ export default function HrDashboardView({ initialMonth }: { initialMonth: string
         </header>
 
         {error && (
-          <div className="flex items-start gap-2 text-sm rounded-xl px-3 py-2.5 font-medium bg-rose-50 text-rose-700 border border-rose-200">
+          <div className="flex items-start gap-2 text-sm rounded-xl px-3 py-2.5 font-medium bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
             <span>Failed to load dashboard: {error}</span>
           </div>
         )}
 
         {!data?.leadsDbAvailable && (
-          <div className="flex items-start gap-2 text-xs rounded-xl px-3 py-2 font-medium bg-amber-50 text-amber-800 border border-amber-200">
+          <div className="flex items-start gap-2 text-xs rounded-xl px-3 py-2 font-medium bg-amber-50 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-700">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
             <span>
               <code>LEADS_DB_URL</code> is not configured — autocount name resolution disabled.
@@ -248,7 +248,7 @@ function DashboardCard({
 }) {
   const a = ACCENTS[accent];
   return (
-    <div className="relative bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[460px]">
+    <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[460px]">
       <span className={`absolute top-0 left-0 right-0 h-1 ${a.bar}`} aria-hidden="true" />
       <div className="flex items-start justify-between gap-3 px-5 pt-6 pb-3">
         <div className="min-w-0">
@@ -256,7 +256,7 @@ function DashboardCard({
             <div className={`${a.tile} w-8 h-8 rounded-lg flex items-center justify-center shrink-0`}>
               <Icon className={`w-4 h-4 ${a.icon}`} aria-hidden="true" />
             </div>
-            <p className="text-sm font-bold text-slate-800">{title}</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{title}</p>
           </div>
           <p className="mt-1 text-[11px] font-medium text-slate-400">{subtitle}</p>
         </div>
@@ -264,7 +264,7 @@ function DashboardCard({
           {loading ? "—" : count}
         </span>
       </div>
-      <ul className="overflow-y-auto divide-y divide-slate-100 border-t border-slate-100">
+      <ul className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
         {loading ? (
           <li className="px-5 py-6 text-center text-xs font-medium text-slate-400">Loading…</li>
         ) : items.length === 0 ? (
@@ -273,13 +273,13 @@ function DashboardCard({
           items.slice(0, 50).map((item, i) => (
             <li
               key={`${item.empNo ?? "_"}-${i}`}
-              className="px-5 py-2.5 flex items-center gap-3 hover:bg-slate-50"
+              className="px-5 py-2.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900 truncate">{item.name}</span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{item.name}</span>
                   {item.branch && (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap leading-4">
+                    <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap leading-4">
                       {item.branch}
                     </span>
                   )}
@@ -297,7 +297,7 @@ function DashboardCard({
                 </div>
               </div>
               {item.date && (
-                <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono whitespace-nowrap">
                   {dateLabel ? `${dateLabel} ` : ""}{item.date}
                 </span>
               )}
