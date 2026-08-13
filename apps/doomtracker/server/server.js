@@ -249,6 +249,39 @@ app.get('/api/admin/overview', auth, adminOnly, async (req, res) => {
   }
 });
 
+// Admin-only settings read/write for an ARBITRARY department (mirrors
+// /api/settings/:key, but the department comes from the URL instead of the
+// caller's own JWT). Lets an admin create/edit templates on another
+// department's behalf; adminOnly keeps everyone else out.
+app.get('/api/admin/settings/:department/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const dept = (req.params.department || '').trim();
+    if (!dept) return res.status(400).json({ error: 'department is required' });
+    const r = await pool.query('SELECT value FROM doomtracker.settings WHERE department=$1 AND key=$2', [dept, req.params.key]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ key: req.params.key, value: r.rows[0].value });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/settings/:department/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const dept = (req.params.department || '').trim();
+    if (!dept) return res.status(400).json({ error: 'department is required' });
+    const value = typeof req.body.value === 'string' ? req.body.value : JSON.stringify(req.body.value ?? '');
+    await pool.query(
+      `INSERT INTO doomtracker.settings (department, key, value, updated_at)
+       VALUES ($1,$2, to_jsonb($3::text), NOW())
+       ON CONFLICT (department, key) DO UPDATE SET value=to_jsonb($3::text), updated_at=NOW()`,
+      [dept, req.params.key, value]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const result = await pool.query('SELECT * FROM doomtracker.users WHERE email=$1', [email]);
