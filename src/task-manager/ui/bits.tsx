@@ -1322,49 +1322,6 @@ function ProofCell({
   );
 }
 
-/** Click-and-drag horizontal scroll for one line of un-truncated text
- *  (2026-08-13, TaskRowLine's title/subtitle — replaces the earlier
- *  truncate+tooltip approach: text no longer clips with an ellipsis, it
- *  overflows into a horizontally scrollable strip instead). Touch devices
- *  already get native swipe-scrolling for free from `overflow-x-auto`
- *  (no JS involved), so this hook deliberately does nothing for touch
- *  pointers — only `pointerType === "mouse"` triggers the custom drag,
- *  which is otherwise NOT a native browser behavior (only the visible
- *  scrollbar handle and shift+wheel are). Each call returns its own
- *  independent ref/state, so the title and subtitle each get their own
- *  scroll position — call it once per scrollable line, not shared. */
-function useDragScroll<T extends HTMLElement>() {
-  const ref = React.useRef<T | null>(null);
-  const drag = React.useRef<{ startX: number; startScrollLeft: number } | null>(null);
-  const [dragging, setDragging] = React.useState(false);
-
-  const onPointerDown = (e: React.PointerEvent<T>) => {
-    if (e.pointerType !== "mouse" || !ref.current) return;
-    drag.current = { startX: e.clientX, startScrollLeft: ref.current.scrollLeft };
-    ref.current.setPointerCapture(e.pointerId);
-    setDragging(true);
-  };
-  const onPointerMove = (e: React.PointerEvent<T>) => {
-    if (!drag.current || !ref.current) return;
-    ref.current.scrollLeft = drag.current.startScrollLeft - (e.clientX - drag.current.startX);
-  };
-  const endDrag = (e: React.PointerEvent<T>) => {
-    if (!drag.current) return;
-    drag.current = null;
-    setDragging(false);
-    ref.current?.releasePointerCapture(e.pointerId);
-  };
-
-  return {
-    ref,
-    dragging,
-    onPointerDown,
-    onPointerMove,
-    onPointerUp: endDrag,
-    onPointerCancel: endDrag,
-  };
-}
-
 export function TaskRowLine({
   task,
   myUserId,
@@ -1451,10 +1408,6 @@ export function TaskRowLine({
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedDueDay(task);
   const canReassign = Boolean(reassign) && isOwned && task.status !== "DONE" && task.status !== "SKIPPED";
   const [reassignOpen, setReassignOpen] = React.useState(false);
-  // Horizontal drag/swipe-to-scroll (2026-08-13) — replaces truncate+tooltip;
-  // see useDragScroll's own doc comment above.
-  const titleScroll = useDragScroll<HTMLParagraphElement>();
-  const subtitleScroll = useDragScroll<HTMLParagraphElement>();
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1546,14 +1499,9 @@ export function TaskRowLine({
       >
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
-            ref={titleScroll.ref}
-            className={`min-w-0 overflow-x-auto whitespace-nowrap text-sm font-semibold [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-              titleScroll.dragging ? "cursor-grabbing select-none" : "cursor-grab"
-            } ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
-            onPointerDown={titleScroll.onPointerDown}
-            onPointerMove={titleScroll.onPointerMove}
-            onPointerUp={titleScroll.onPointerUp}
-            onPointerCancel={titleScroll.onPointerCancel}
+            className={`min-w-0 text-sm font-semibold ${
+              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+            }`}
           >
             {task.blockTitle}
           </p>
@@ -1572,20 +1520,6 @@ export function TaskRowLine({
             <GuidelineIndicator guideline={task.guideline} title={task.blockTitle} />
           )}
         </div>
-        {!hideCompleted && (
-          <p
-            ref={subtitleScroll.ref}
-            className={`overflow-x-auto whitespace-nowrap pr-2 text-xs text-gray-500 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-              subtitleScroll.dragging ? "cursor-grabbing select-none" : "cursor-grab"
-            }`}
-            onPointerDown={subtitleScroll.onPointerDown}
-            onPointerMove={subtitleScroll.onPointerMove}
-            onPointerUp={subtitleScroll.onPointerUp}
-            onPointerCancel={subtitleScroll.onPointerCancel}
-          >
-            {task.runName} · {task.flowName}
-          </p>
-        )}
         {onResizeStart && (
           <div
             onPointerDown={onResizeStart}
