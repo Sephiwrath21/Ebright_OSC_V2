@@ -17,7 +17,7 @@ export default function TopBar({ onToggleSidebar, sidebarCollapsed, email, role,
   const ToggleIcon = sidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur border-b border-slate-200">
+    <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
       <div className="h-full flex items-center gap-3 px-4 md:px-6">
         {/* Left: sidebar toggle — hamburger opens the drawer on mobile, panel
             icon collapses the rail on desktop. */}
@@ -25,7 +25,7 @@ export default function TopBar({ onToggleSidebar, sidebarCollapsed, email, role,
           onClick={onToggleSidebar}
           aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!sidebarCollapsed}
-          className="shrink-0 p-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="shrink-0 p-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <Menu className="w-5 h-5 lg:hidden" aria-hidden="true" />
           <ToggleIcon className="w-5 h-5 hidden lg:block" aria-hidden="true" />

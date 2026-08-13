@@ -50,15 +50,15 @@ const STATUS_FILTERS: { label: string; value: StatusFilter }[] = [
 ];
 
 const ATT_STYLES: Record<AttendanceStatus, { dot: string; text: string; bg: string }> = {
-  present: { dot: "bg-green-500",  text: "text-green-700",  bg: "bg-green-50"  },
-  absent:  { dot: "bg-red-500",    text: "text-red-700",    bg: "bg-red-50"    },
-  late:    { dot: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50"  },
+  present: { dot: "bg-green-500",  text: "text-green-700 dark:text-green-300",  bg: "bg-green-50 dark:bg-green-900"  },
+  absent:  { dot: "bg-red-500",    text: "text-red-700 dark:text-red-300",    bg: "bg-red-50 dark:bg-red-900"    },
+  late:    { dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 dark:bg-amber-900"  },
 };
 
 function AttBadge({ status }: { status: AttendanceStatus | null }) {
   if (!status) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
         Unrecorded
       </span>
@@ -86,7 +86,7 @@ function AttToggle({
     { label: "Absent",  val: "absent"  },
   ];
   return (
-    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1 dark:bg-slate-800">
       {options.map(o => (
         <button
           key={o.val}
@@ -99,7 +99,7 @@ function AttToggle({
                 : o.val === "late"
                 ? "bg-amber-500 text-white"
                 : "bg-red-500 text-white"
-              : "text-slate-600 hover:bg-white hover:shadow-sm"
+              : "text-slate-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700"
           }`}
         >
           {o.label}
@@ -117,7 +117,7 @@ function StatPill({
   return (
     <div className="flex items-center gap-2">
       <span className={`text-xl font-bold ${color}`}>{count}</span>
-      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
     </div>
   );
 }
@@ -235,26 +235,26 @@ export default function FAAttendanceClient() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors dark:hover:text-slate-100">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium">Attendance</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors dark:hover:text-slate-100">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 font-medium dark:text-slate-200">Attendance</span>
         </nav>
 
         {/* Page header */}
         <div className="flex items-end justify-between gap-4 mb-1">
           <div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">FA Attendance</h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">FA Attendance</h1>
+            <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">
               {selectedEvent ? (
                 <>
                   {selectedEvent.name} · {fmtDate(selectedEvent.startDate)}
@@ -267,19 +267,19 @@ export default function FAAttendanceClient() {
 
           {/* Summary pills */}
           <div className="hidden sm:flex items-center gap-5 shrink-0 mb-0.5">
-            <StatPill label="present"    count={counts.present}    color="text-green-600" />
-            <div className="w-px h-6 bg-slate-200" />
-            <StatPill label="late"       count={counts.late}       color="text-amber-500" />
-            <div className="w-px h-6 bg-slate-200" />
-            <StatPill label="absent"     count={counts.absent}     color="text-red-500" />
-            <div className="w-px h-6 bg-slate-200" />
+            <StatPill label="present"    count={counts.present}    color="text-green-600 dark:text-green-400" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+            <StatPill label="late"       count={counts.late}       color="text-amber-500 dark:text-amber-400" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+            <StatPill label="absent"     count={counts.absent}     color="text-red-500 dark:text-red-400" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
             <StatPill label="unrecorded" count={counts.unrecorded} color="text-slate-400" />
           </div>
         </div>
       </div>
 
       {/* Sticky filter bar */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:bg-slate-950/95 dark:border-slate-800/80">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
 
@@ -287,7 +287,7 @@ export default function FAAttendanceClient() {
           <select
             value={eventId}
             onChange={e => { setEventId(e.target.value); setSession("all"); }}
-            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
             style={{ minWidth: 240 }}
           >
             {events.map(ev => (
@@ -302,7 +302,7 @@ export default function FAAttendanceClient() {
             <select
               value={session}
               onChange={e => setSession(e.target.value)}
-              className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               style={{ minWidth: 140 }}
             >
               <option value="all">All sessions</option>
@@ -316,7 +316,7 @@ export default function FAAttendanceClient() {
           <select
             value={branch}
             onChange={e => setBranch(e.target.value)}
-            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
             style={{ minWidth: 160 }}
           >
             <option value="all">All branches</option>
@@ -333,12 +333,12 @@ export default function FAAttendanceClient() {
               placeholder="Search name or ID…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
             />
           </div>
 
           {/* Status pill toggle */}
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 dark:bg-slate-900 dark:border-slate-800">
             {STATUS_FILTERS.map(f => (
               <button
                 key={f.value}
@@ -346,8 +346,8 @@ export default function FAAttendanceClient() {
                 onClick={() => setStatusFilter(f.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   statusFilter === f.value
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-slate-900 text-white dark:bg-slate-700"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
               >
                 {f.label}
@@ -365,13 +365,13 @@ export default function FAAttendanceClient() {
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
 
         {/* Mobile summary bar */}
-        <div className="sm:hidden bg-white border border-slate-200 rounded-2xl p-4 mb-5 flex items-center justify-around">
-          <StatPill label="present"    count={counts.present}    color="text-green-600" />
-          <div className="w-px h-6 bg-slate-200" />
-          <StatPill label="late"       count={counts.late}       color="text-amber-500" />
-          <div className="w-px h-6 bg-slate-200" />
-          <StatPill label="absent"     count={counts.absent}     color="text-red-500" />
-          <div className="w-px h-6 bg-slate-200" />
+        <div className="sm:hidden bg-white border border-slate-200 rounded-2xl p-4 mb-5 flex items-center justify-around dark:bg-slate-900 dark:border-slate-800">
+          <StatPill label="present"    count={counts.present}    color="text-green-600 dark:text-green-400" />
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+          <StatPill label="late"       count={counts.late}       color="text-amber-500 dark:text-amber-400" />
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+          <StatPill label="absent"     count={counts.absent}     color="text-red-500 dark:text-red-400" />
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
           <StatPill label="unrecorded" count={counts.unrecorded} color="text-slate-400" />
         </div>
 
@@ -382,11 +382,11 @@ export default function FAAttendanceClient() {
               <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
                 Attendance Progress
               </span>
-              <span className="text-[11px] font-semibold text-slate-500">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                 {counts.present + counts.late + counts.absent} / {counts.total} recorded
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden flex">
+            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden flex dark:bg-slate-800">
               <div
                 className="h-full bg-green-500 transition-all"
                 style={{ width: `${(counts.present / counts.total) * 100}%` }}
@@ -404,26 +404,26 @@ export default function FAAttendanceClient() {
         )}
 
         {loading ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center">
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center dark:bg-slate-900 dark:border-slate-800">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
-            <p className="text-sm text-slate-500">Loading attendance…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading attendance…</p>
           </div>
         ) : error ? (
-          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
-            <p className="text-sm font-medium text-red-600">{error}</p>
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center dark:bg-slate-900 dark:border-red-700">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-            <Users className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-medium text-slate-500">No students match your filters.</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center dark:bg-slate-900 dark:border-slate-800">
+            <Users className="w-10 h-10 text-slate-300 mb-3 dark:text-slate-600" />
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No students match your filters.</p>
             <p className="text-xs text-slate-400 mt-1">Try adjusting the session, branch, or status filters.</p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden dark:bg-slate-900 dark:border-slate-800">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-slate-800">
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Student</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Branch</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Grade</th>
@@ -432,24 +432,24 @@ export default function FAAttendanceClient() {
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Mark</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map(row => {
                     const eff = getStatus(row.id, row.status);
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors dark:hover:bg-slate-800">
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900 whitespace-nowrap">{row.name}</div>
+                          <div className="font-medium text-slate-900 whitespace-nowrap dark:text-slate-100">{row.name}</div>
                           <div className="text-xs text-slate-400 font-mono">#{row.studentId}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                             {row.branch}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-sm text-slate-700">
+                        <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300">
                           {gradeLabel(row.grade)}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap dark:text-slate-400">
                           {row.session}
                         </td>
                         <td className="px-4 py-3">
@@ -469,14 +469,14 @@ export default function FAAttendanceClient() {
             </div>
 
             {/* Table footer */}
-            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between dark:border-slate-800">
               <span className="text-xs text-slate-400">
                 {rows.length} student{rows.length !== 1 ? "s" : ""} shown
               </span>
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span><span className="font-semibold text-green-600">{counts.present}</span> present</span>
-                <span><span className="font-semibold text-amber-500">{counts.late}</span> late</span>
-                <span><span className="font-semibold text-red-500">{counts.absent}</span> absent</span>
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span><span className="font-semibold text-green-600 dark:text-green-400">{counts.present}</span> present</span>
+                <span><span className="font-semibold text-amber-500 dark:text-amber-400">{counts.late}</span> late</span>
+                <span><span className="font-semibold text-red-500 dark:text-red-400">{counts.absent}</span> absent</span>
                 <span><span className="font-semibold text-slate-400">{counts.unrecorded}</span> unrecorded</span>
               </div>
             </div>

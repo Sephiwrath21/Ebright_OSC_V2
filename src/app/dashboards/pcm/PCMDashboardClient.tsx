@@ -93,12 +93,12 @@ function getRangeLabel(preset: RangePreset, customStart: string, customEnd: stri
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const ACCENTS: Record<Accent, { strip: string; text: string; bg: string; iconBg: string }> = {
-  violet:  { strip:"bg-violet-500",  text:"text-violet-700",  bg:"bg-violet-50/60",  iconBg:"bg-violet-100 text-violet-600"  },
-  indigo:  { strip:"bg-indigo-500",  text:"text-indigo-700",  bg:"bg-indigo-50/60",  iconBg:"bg-indigo-100 text-indigo-600"  },
-  emerald: { strip:"bg-emerald-500", text:"text-emerald-700", bg:"bg-emerald-50/60", iconBg:"bg-emerald-100 text-emerald-600" },
-  rose:    { strip:"bg-rose-500",    text:"text-rose-700",    bg:"bg-rose-50/60",    iconBg:"bg-rose-100 text-rose-600"      },
-  amber:   { strip:"bg-amber-500",   text:"text-amber-700",   bg:"bg-amber-50/60",   iconBg:"bg-amber-100 text-amber-600"    },
-  cyan:    { strip:"bg-cyan-500",    text:"text-cyan-700",    bg:"bg-cyan-50/60",    iconBg:"bg-cyan-100 text-cyan-600"      },
+  violet:  { strip:"bg-violet-500",  text:"text-violet-700 dark:text-violet-300",  bg:"bg-violet-50/60 dark:bg-violet-900/30",  iconBg:"bg-violet-100 text-violet-600 dark:bg-violet-900 dark:text-violet-300"  },
+  indigo:  { strip:"bg-indigo-500",  text:"text-indigo-700 dark:text-indigo-300",  bg:"bg-indigo-50/60 dark:bg-indigo-900/30",  iconBg:"bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300"  },
+  emerald: { strip:"bg-emerald-500", text:"text-emerald-700 dark:text-emerald-300", bg:"bg-emerald-50/60 dark:bg-emerald-900/30", iconBg:"bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300" },
+  rose:    { strip:"bg-rose-500",    text:"text-rose-700 dark:text-rose-300",    bg:"bg-rose-50/60 dark:bg-rose-900/30",    iconBg:"bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-300"      },
+  amber:   { strip:"bg-amber-500",   text:"text-amber-700 dark:text-amber-300",   bg:"bg-amber-50/60 dark:bg-amber-900/30",   iconBg:"bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300"    },
+  cyan:    { strip:"bg-cyan-500",    text:"text-cyan-700 dark:text-cyan-300",    bg:"bg-cyan-50/60 dark:bg-cyan-900/30",    iconBg:"bg-cyan-100 text-cyan-600 dark:bg-cyan-900 dark:text-cyan-300"      },
 };
 
 function StatCard({ label, value, icon: Icon, accent }: {
@@ -106,7 +106,7 @@ function StatCard({ label, value, icon: Icon, accent }: {
 }) {
   const a = ACCENTS[accent];
   return (
-    <div className={`relative rounded-xl ${a.bg} border border-slate-200 shadow-sm p-4 overflow-hidden`}>
+    <div className={`relative rounded-xl ${a.bg} border border-slate-200 dark:border-slate-800 shadow-sm p-4 overflow-hidden`}>
       <div className={`absolute left-0 top-0 bottom-0 w-1 ${a.strip}`} />
       <div className="flex items-start justify-between pl-2">
         <div className={`text-[10px] font-semibold uppercase tracking-wider ${a.text}`}>{label}</div>
@@ -114,7 +114,7 @@ function StatCard({ label, value, icon: Icon, accent }: {
           <Icon className="w-3.5 h-3.5" />
         </div>
       </div>
-      <div className="text-3xl font-black text-slate-900 mt-2 pl-2">{value}</div>
+      <div className="text-3xl font-black text-slate-900 dark:text-slate-100 mt-2 pl-2">{value}</div>
     </div>
   );
 }
@@ -127,7 +127,7 @@ function TypeSplitCard({ label, invited, attended, totalAttended, accent, onView
   const shareOfAttended = totalAttended > 0 ? Math.round((attended / totalAttended) * 100) : 0;
   const a = ACCENTS[accent];
   return (
-    <div className={`relative rounded-xl ${a.bg} border border-slate-200 shadow-sm overflow-hidden`}>
+    <div className={`relative rounded-xl ${a.bg} border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden`}>
       <div className={`absolute left-0 top-0 bottom-0 w-1 ${a.strip}`} />
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-3">
@@ -136,7 +136,7 @@ function TypeSplitCard({ label, invited, attended, totalAttended, accent, onView
             {onViewDetails && (
               <button
                 onClick={onViewDetails}
-                className={`inline-flex items-center gap-1 rounded-md border border-current/30 px-2 py-0.5 text-[10px] font-semibold ${a.text} hover:bg-white/60 transition-colors`}
+                className={`inline-flex items-center gap-1 rounded-md border border-current/30 px-2 py-0.5 text-[10px] font-semibold ${a.text} hover:bg-white/60 dark:hover:bg-white/10 transition-colors`}
               >
                 <Receipt className="w-3 h-3" /> View renewals
               </button>
@@ -145,16 +145,16 @@ function TypeSplitCard({ label, invited, attended, totalAttended, accent, onView
           </div>
         </div>
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-3xl font-black text-slate-900">{invited}</span>
-          <span className="text-sm text-slate-500">invited</span>
-          <span className="text-slate-300 mx-1">·</span>
-          <span className="text-2xl font-bold text-slate-900">{attended}</span>
-          <span className="text-sm text-slate-500">attended</span>
+          <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{invited}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">invited</span>
+          <span className="text-slate-300 dark:text-slate-600 mx-1">·</span>
+          <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{attended}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">attended</span>
         </div>
-        <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-slate-200">
+        <div className="w-full h-2 bg-white dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
           <div className={`h-full ${a.strip} rounded-full transition-all`} style={{ width: `${internalPct}%` }} />
         </div>
-        <div className="text-[11px] text-slate-500 mt-2">
+        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
           {shareOfAttended}% of total attended is {label.replace("PCM ", "")}
         </div>
       </div>
@@ -346,9 +346,9 @@ export default function PCMDashboardClient() {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-slate-400">
-        <Link href="/dashboards" className="hover:text-slate-700 transition-colors">Home</Link>
+        <Link href="/dashboards" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Home</Link>
         <ChevronRight className="w-3.5 h-3.5" />
-        <span className="text-slate-700 font-medium">PCM System</span>
+        <span className="text-slate-700 dark:text-slate-300 font-medium">PCM System</span>
       </nav>
 
       {/* Hero */}
@@ -363,11 +363,11 @@ export default function PCMDashboardClient() {
       </div>
 
       {/* Range + Branch filter */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-3">
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-3">
         <div className="flex flex-wrap items-center gap-3">
           <Calendar className="w-4 h-4 text-violet-500 flex-shrink-0" />
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Show</span>
-          <div className="inline-flex p-1 rounded-lg bg-slate-100 border border-slate-200">
+          <div className="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             {([
               { id:"thisWeek",  label:"This week"  },
               { id:"thisMonth", label:"This month" },
@@ -382,7 +382,7 @@ export default function PCMDashboardClient() {
                 className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                   rangePreset === opt.id
                     ? "bg-violet-600 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 {opt.label}
@@ -393,16 +393,16 @@ export default function PCMDashboardClient() {
           {rangePreset === "custom" && (
             <div className="flex items-center gap-2">
               <CalendarRange className="w-3.5 h-3.5 text-violet-500" />
-              <input type="date" className="h-8 rounded-lg border border-slate-200 px-2 text-xs" value={customStart} onChange={e => setCustomStart(e.target.value)} />
+              <input type="date" className="h-8 rounded-lg border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 px-2 text-xs" value={customStart} onChange={e => setCustomStart(e.target.value)} />
               <span className="text-xs text-slate-400">→</span>
-              <input type="date" className="h-8 rounded-lg border border-slate-200 px-2 text-xs" value={customEnd} min={customStart} onChange={e => setCustomEnd(e.target.value)} />
+              <input type="date" className="h-8 rounded-lg border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 px-2 text-xs" value={customEnd} min={customStart} onChange={e => setCustomEnd(e.target.value)} />
             </div>
           )}
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Branch</span>
             <select
-              className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs min-w-[160px]"
+              className="h-8 rounded-lg border border-slate-200 bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 px-2 text-xs min-w-[160px]"
               value={branchFilter}
               onChange={e => setBranchFilter(e.target.value as BranchCode | "all")}
             >
@@ -416,12 +416,12 @@ export default function PCMDashboardClient() {
       </div>
 
       {loading && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-10 flex items-center justify-center gap-2 text-sm text-slate-500">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-10 flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> Loading PCM data…
         </div>
       )}
       {error && !loading && (
-        <div className="rounded-2xl bg-white border border-red-200 shadow-sm p-6 text-center text-sm font-medium text-red-600">{error}</div>
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900 shadow-sm p-6 text-center text-sm font-medium text-red-600 dark:text-red-400">{error}</div>
       )}
 
       {/* Stat cards */}
@@ -456,22 +456,22 @@ export default function PCMDashboardClient() {
       {renewalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setRenewalOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between">
+          <div className="relative bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-600 mb-0.5">PCM Renewal</div>
-                <h2 className="text-lg font-bold text-slate-900">Who renewed — coach &amp; amount</h2>
-                <p className="text-sm text-slate-500 mt-0.5">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-0.5">PCM Renewal</div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Who renewed — coach &amp; amount</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                   Renewals on record · {branchFilter === "all" ? "all branches" : branchFilter}
                 </p>
               </div>
-              <button onClick={() => setRenewalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+              <button onClick={() => setRenewalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-              <span className="text-slate-500">Total renewals: <strong className="text-slate-900">
+            <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <span className="text-slate-500 dark:text-slate-400">Total renewals: <strong className="text-slate-900 dark:text-slate-100">
                 RM {renewalRows.reduce((s, r) => s + r.amount, 0).toLocaleString("en-MY", { minimumFractionDigits:2 })}
               </strong></span>
               <span className="text-slate-400 text-xs">{renewalRows.length} student rows</span>
@@ -479,7 +479,7 @@ export default function PCMDashboardClient() {
 
             <div className="overflow-y-auto flex-1">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Coach</th>
@@ -488,7 +488,7 @@ export default function PCMDashboardClient() {
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {renewalLoading && (
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">Loading renewals…</td></tr>
                   )}
@@ -496,21 +496,21 @@ export default function PCMDashboardClient() {
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">No renewals on record for this filter.</td></tr>
                   )}
                   {!renewalLoading && renewalRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-slate-50/70">
+                    <tr key={i} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/70">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{r.studentName}</div>
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{r.studentName}</div>
                         <div className="text-xs text-slate-400 font-mono">#{r.studentId} · {r.grade}</div>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{r.coachName}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.coachName}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-bold">
+                        <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300 px-2 py-0.5 text-[10px] font-bold">
                           {r.branch}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">
                         {r.amount.toLocaleString("en-MY", { minimumFractionDigits:2 })}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{r.date}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{r.date}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -521,18 +521,18 @@ export default function PCMDashboardClient() {
       )}
 
       {/* Payment breakdown */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-base font-semibold text-slate-900">Outcome breakdown</h3>
-            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Outcome breakdown</h3>
+            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden text-[11px] font-semibold">
               {(["overall", "renewal"] as const).map(s => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setOutcomeScope(s)}
                   className={`px-3 py-1 transition-colors ${
-                    outcomeScope === s ? "bg-violet-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"
+                    outcomeScope === s ? "bg-violet-600 text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                   }`}
                 >
                   {s === "overall" ? "Overall" : "PCM Renewal"}
@@ -540,13 +540,13 @@ export default function PCMDashboardClient() {
               ))}
             </div>
           </div>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">
             across {outcomeStats.invited} {outcomeScope === "renewal" ? "renewal" : "invited"} student{outcomeStats.invited !== 1 ? "s" : ""}
           </span>
         </div>
 
         {/* Stacked bar */}
-        <div className="w-full h-4 rounded-full overflow-hidden flex bg-slate-100 border border-slate-200 mb-3">
+        <div className="w-full h-4 rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 mb-3">
           {outcomeStats.paid > 0 && (
             <div className="h-full bg-emerald-500" style={{ width:`${outcomeStats.paidPct}%` }} title={`Paid: ${outcomeStats.paid}`} />
           )}
@@ -557,41 +557,41 @@ export default function PCMDashboardClient() {
 
         <div className="grid grid-cols-2 gap-3">
           {/* Paid */}
-          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
+          <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Paid</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Paid</span>
             </div>
-            <div className="text-3xl font-black text-slate-900 leading-none">{outcomeStats.paid}</div>
-            <div className="text-[11px] text-slate-500 mt-1">{outcomeStats.paidPct}% of invited</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">└ {outcomeStats.paidAttended} attended · {outcomeStats.paidNotAttended} not attended</div>
+            <div className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{outcomeStats.paid}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{outcomeStats.paidPct}% of invited</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">└ {outcomeStats.paidAttended} attended · {outcomeStats.paidNotAttended} not attended</div>
           </div>
           {/* Unpaid */}
-          <div className="rounded-xl bg-rose-50 border border-rose-200 p-3">
+          <div className="rounded-xl bg-rose-50 dark:bg-rose-900 border border-rose-200 dark:border-rose-700 p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="w-2 h-2 rounded-full bg-rose-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Unpaid</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Unpaid</span>
             </div>
-            <div className="text-3xl font-black text-slate-900 leading-none">{outcomeStats.unpaid}</div>
-            <div className="text-[11px] text-slate-500 mt-1">{outcomeStats.unpaidPct}% of invited</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">└ {outcomeStats.unpaidAttended} attended · {outcomeStats.unpaidNotAttended} not attended</div>
+            <div className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{outcomeStats.unpaid}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{outcomeStats.unpaidPct}% of invited</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">└ {outcomeStats.unpaidAttended} attended · {outcomeStats.unpaidNotAttended} not attended</div>
           </div>
         </div>
       </div>
 
       {/* Attendance rate */}
-      <div className="rounded-2xl bg-white shadow-sm border border-violet-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-violet-100 to-indigo-100 px-5 py-2 border-b border-violet-200">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-violet-700">Attendance rate</div>
+      <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-violet-200 dark:border-violet-700 overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-100 to-indigo-100 dark:from-violet-900 dark:to-indigo-900 px-5 py-2 border-b border-violet-200 dark:border-violet-700">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-violet-700 dark:text-violet-300">Attendance rate</div>
         </div>
         <div className="p-6 flex items-center gap-6 flex-wrap">
-          <div className="text-6xl font-black text-violet-700 leading-none">{stats.attendancePct}%</div>
-          <div className="text-sm text-slate-500">
-            <strong className="text-slate-900">{stats.attended}</strong> attended /
-            <strong className="text-slate-900 ml-1">{stats.invited}</strong> invited
+          <div className="text-6xl font-black text-violet-700 dark:text-violet-300 leading-none">{stats.attendancePct}%</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            <strong className="text-slate-900 dark:text-slate-100">{stats.attended}</strong> attended /
+            <strong className="text-slate-900 dark:text-slate-100 ml-1">{stats.invited}</strong> invited
           </div>
           <div className="flex-1 min-w-[200px]">
-            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all"
                 style={{ width:`${stats.attendancePct}%` }}
@@ -602,10 +602,10 @@ export default function PCMDashboardClient() {
       </div>
 
       {/* Branch coverage */}
-      <div className="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-violet-50 to-indigo-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="text-base font-semibold text-violet-900">Invite coverage by branch</h2>
-          <span className="text-xs text-slate-500">
+      <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/40 dark:to-indigo-900/40 px-5 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-base font-semibold text-violet-900 dark:text-violet-200">Invite coverage by branch</h2>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             Target = total students ÷ 12 · {branchCards.length} branch{branchCards.length !== 1 ? "es" : ""}
           </span>
         </div>
@@ -621,28 +621,28 @@ export default function PCMDashboardClient() {
                          :                       "from-rose-500 to-rose-600";
               const bar  = tone === "emerald" ? "bg-emerald-500" : tone === "amber" ? "bg-amber-500" : "bg-rose-500";
               return (
-                <div key={c.code} className="rounded-xl border border-slate-200 shadow-sm overflow-hidden bg-white">
+                <div key={c.code} className="rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
                   <div className={`bg-gradient-to-r ${head} px-3 py-2 flex items-center justify-between`}>
                     <span className="font-mono text-xs font-bold uppercase text-white" title={c.name}>{c.code}</span>
                     <span className="text-[11px] font-bold text-white/90">{c.pct}%</span>
                   </div>
                   <div className="px-4 pt-3 pb-2">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-slate-900 leading-none">{c.invited}</span>
-                      <span className="text-base text-slate-300 font-semibold leading-none">/ {c.shouldInvite}</span>
+                      <span className="text-2xl font-black text-slate-900 dark:text-slate-100 leading-none">{c.invited}</span>
+                      <span className="text-base text-slate-300 dark:text-slate-600 font-semibold leading-none">/ {c.shouldInvite}</span>
                     </div>
                     <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mt-1">Invited / Target</div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mt-2">
+                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-2">
                       <div className={`h-full ${bar} rounded-full transition-all`} style={{ width:`${Math.min(100, c.pct)}%` }} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 border-t border-slate-100">
-                    <div className="px-3 py-2 text-center border-r border-slate-100">
-                      <div className="text-lg font-bold text-slate-900 leading-none">{c.totalStudents}</div>
+                  <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-700">
+                    <div className="px-3 py-2 text-center border-r border-slate-100 dark:border-slate-700">
+                      <div className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-none">{c.totalStudents}</div>
                       <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mt-1">Total students</div>
                     </div>
                     <div className="px-3 py-2 text-center">
-                      <div className="text-lg font-bold text-violet-700 leading-none">{c.shouldInvite}</div>
+                      <div className="text-lg font-bold text-violet-700 dark:text-violet-300 leading-none">{c.shouldInvite}</div>
                       <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mt-1">Should invite</div>
                     </div>
                   </div>

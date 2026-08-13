@@ -23,10 +23,12 @@ export interface BarDatum {
 }
 
 /**
- * Dependency-free horizontal bar chart. Light-theme friendly, sized to its
- * container. Bars are drawn as plain divs so labels wrap and align cleanly
- * regardless of how many categories there are. Rows are clickable when
- * onBarClick is provided, mirroring DonutChart's interaction.
+ * Dependency-free horizontal bar chart, sized to its container. Bars are
+ * drawn as plain divs so labels wrap and align cleanly regardless of how
+ * many categories there are. Rows are clickable when onBarClick is
+ * provided, mirroring DonutChart's interaction. Chrome (text, tracks,
+ * hover/active states) follows dark: variants; per-datum `color`/segment
+ * colors are caller-supplied data-series colors and are left untouched.
  */
 export default function BarChart({
   data,
@@ -57,26 +59,26 @@ export default function BarChart({
               aria-pressed={interactive ? isActive : undefined}
               className={`group w-full text-left rounded-lg px-1.5 py-1 transition-colors ${
                 interactive
-                  ? "hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 cursor-pointer"
+                  ? "hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-400 cursor-pointer"
                   : "cursor-default"
-              } ${isActive ? "bg-slate-50" : ""}`}
+              } ${isActive ? "bg-slate-50 dark:bg-slate-800" : ""}`}
             >
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <span
                   className={`text-sm truncate ${
-                    isActive ? "font-semibold text-slate-900" : "font-medium text-slate-600"
+                    isActive ? "font-semibold text-slate-900 dark:text-slate-100" : "font-medium text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   {d.label}
                 </span>
                 <span className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
-                  <span className="text-sm font-bold text-slate-900">
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     {valueFormatter(d.value)}
                   </span>
                   {d.meta && <span className="text-xs text-slate-400">{d.meta}</span>}
                 </span>
               </div>
-              <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden flex">
+              <div className="h-2.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
                 {d.segments && d.segments.length > 0 ? (
                   d.segments.map((seg) => (
                     <div

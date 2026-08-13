@@ -8,7 +8,9 @@ export interface DonutSegment {
 
 /**
  * Clean dependency-free SVG donut chart. Renders segments via stroke-dasharray
- * on stacked circles and shows the total in the center. Light-theme friendly.
+ * on stacked circles and shows the total in the center. Track ring and center
+ * text follow theme tokens/dark: variants, so this renders correctly in dark
+ * mode too.
  */
 export default function DonutChart({
   data,
@@ -41,7 +43,7 @@ export default function DonutChart({
       className="shrink-0"
     >
       <g transform={`rotate(-90 ${cx} ${cy})`}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--status-neutral-bg)" strokeWidth={thickness} />
         {total > 0 &&
           data.map((d, i) => {
             const len = (d.value / total) * c;
@@ -67,7 +69,7 @@ export default function DonutChart({
             return seg;
           })}
       </g>
-      <text x={cx} y={cy - 2} textAnchor="middle" dominantBaseline="middle" fontSize={size * 0.24} fontWeight={700} className="fill-slate-900">
+      <text x={cx} y={cy - 2} textAnchor="middle" dominantBaseline="middle" fontSize={size * 0.24} fontWeight={700} className="fill-slate-900 dark:fill-slate-100">
         {total}
       </text>
       <text x={cx} y={cy + size * 0.15} textAnchor="middle" dominantBaseline="middle" fontSize={size * 0.085} className="fill-slate-400" letterSpacing="0.08em">

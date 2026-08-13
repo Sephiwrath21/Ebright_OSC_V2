@@ -124,7 +124,7 @@ export default function EmployeeDetailModal({ userId, fallbackName, onClose }: P
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <ModalHeader
@@ -142,11 +142,11 @@ export default function EmployeeDetailModal({ userId, fallbackName, onClose }: P
             />
           )}
         </div>
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
+        <div className="flex justify-end border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-6 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
           >
             Close
           </button>
@@ -217,8 +217,8 @@ function ModalHeader({
 
 function LoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-sm text-slate-500">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-sm text-slate-500 dark:text-slate-400">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 dark:border-slate-600 border-t-slate-700 dark:border-t-slate-300" />
       Loading induction details…
     </div>
   );
@@ -227,11 +227,11 @@ function LoadingState() {
 function ErrorState({ message, fallbackName }: { message: string; fallbackName?: string | null }) {
   return (
     <div className="px-6 py-10">
-      <div className="flex items-start gap-3 rounded-lg bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-200">
+      <div className="flex items-start gap-3 rounded-lg bg-red-50 dark:bg-red-900 p-4 text-sm text-red-800 dark:text-red-200 ring-1 ring-red-200 dark:ring-red-700/40">
         <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
           <p className="font-semibold">Couldn&rsquo;t load induction for {fallbackName ?? "this employee"}</p>
-          <p className="mt-1 text-red-700">{message}</p>
+          <p className="mt-1 text-red-700 dark:text-red-300">{message}</p>
         </div>
       </div>
     </div>
@@ -281,7 +281,7 @@ function LoadedBody({
   return (
     <div className="space-y-5 px-6 py-5">
       {/* Profile summary */}
-      <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
+      <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 dark:bg-slate-800 p-4 ring-1 ring-slate-100 dark:ring-slate-700">
         <ProfileField
           icon={Calendar}
           label={data.inductionType === "Offboarding" ? "Last day" : "Start date"}
@@ -308,12 +308,12 @@ function LoadedBody({
       {/* Overall progress */}
       <div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-slate-700">Overall progress</span>
-          <span className="text-sm tabular-nums text-slate-500">
-            {done} of {total} done · <span className="font-bold text-slate-900">{pct}%</span>
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Overall progress</span>
+          <span className="text-sm tabular-nums text-slate-500 dark:text-slate-400">
+            {done} of {total} done · <span className="font-bold text-slate-900 dark:text-slate-100">{pct}%</span>
           </span>
         </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
           <div
             className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500"
             style={{ width: `${pct}%` }}
@@ -330,7 +330,7 @@ function LoadedBody({
           const phasePct = Math.round((phaseDone / phaseSteps.length) * 100);
           const isLocked = lockedPhases.has(phase.id);
           return (
-            <section key={phase.id} className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+            <section key={phase.id} className="overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-slate-700">
               <header
                 className={`flex items-center justify-between bg-gradient-to-r ${phase.accent} px-4 py-2 text-white`}
               >
@@ -347,7 +347,7 @@ function LoadedBody({
                   {phaseDone}/{phaseSteps.length} · {phasePct}%
                 </span>
               </header>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {phaseSteps.map((step) => (
                   <StepRow
                     key={step.id}
@@ -376,11 +376,11 @@ function ProfileField({
 }) {
   return (
     <div>
-      <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+      <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         <Icon className="h-3 w-3" />
         {label}
       </dt>
-      <dd className="mt-1 truncate text-sm font-semibold text-slate-800">{value}</dd>
+      <dd className="mt-1 truncate text-sm font-semibold text-slate-800 dark:text-slate-200">{value}</dd>
     </div>
   );
 }
@@ -438,7 +438,7 @@ function DurationField({ data }: { data: InductionView }) {
 
   return (
     <div className="col-span-2">
-      <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+      <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         <Hourglass className="h-3 w-3" />
         Induction duration
       </dt>
@@ -450,14 +450,14 @@ function DurationField({ data }: { data: InductionView }) {
             max={365}
             value={days}
             onChange={(e) => setDays(e.target.value)}
-            className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className="w-20 rounded-md border border-slate-300 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 px-2 py-1 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
-          <span className="text-xs text-slate-500">days</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">days</span>
           <button
             type="button"
             onClick={save}
             disabled={pending}
-            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+            className="rounded-md bg-slate-900 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-60"
           >
             {pending ? "Saving…" : "Save"}
           </button>
@@ -465,7 +465,7 @@ function DurationField({ data }: { data: InductionView }) {
             type="button"
             onClick={reset}
             disabled={pending}
-            className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+            className="rounded-md bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60"
             title="Clear override — fall back to template default"
           >
             Use default
@@ -478,25 +478,25 @@ function DurationField({ data }: { data: InductionView }) {
               setError(null);
             }}
             disabled={pending}
-            className="text-xs text-slate-500 hover:underline"
+            className="text-xs text-slate-500 dark:text-slate-400 hover:underline"
           >
             Cancel
           </button>
           {error && (
-            <p className="basis-full text-[10px] text-red-700">{error}</p>
+            <p className="basis-full text-[10px] text-red-700 dark:text-red-300">{error}</p>
           )}
         </div>
       ) : (
         <dd className="mt-1 flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-800">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
             {displayed} {displayed === 1 ? "day" : "days"}
           </span>
           {isOverride ? (
-            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 ring-1 ring-amber-200">
+            <span className="rounded-full bg-amber-50 dark:bg-amber-900 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-200 ring-1 ring-amber-200 dark:ring-amber-700/40">
               HR-set
             </span>
           ) : (
-            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">
+            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[9px] font-medium text-slate-500 dark:text-slate-400">
               default
             </span>
           )}
@@ -506,7 +506,7 @@ function DurationField({ data }: { data: InductionView }) {
               setEditing(true);
               setDays(String(displayed));
             }}
-            className="text-xs text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+            className="text-xs text-slate-500 dark:text-slate-400 underline-offset-2 hover:text-slate-700 dark:hover:text-slate-200 hover:underline"
           >
             Edit
           </button>
@@ -530,12 +530,12 @@ function StepRow({
     status === "Completed" ? Check : status === "In Progress" ? Clock : isLocked ? Lock : Circle;
   const statusColor =
     status === "Completed"
-      ? "text-emerald-600 bg-emerald-50 ring-emerald-200"
+      ? "text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900 ring-emerald-200 dark:ring-emerald-700/40"
       : status === "In Progress"
-        ? "text-amber-700 bg-amber-50 ring-amber-200"
+        ? "text-amber-700 dark:text-amber-200 bg-amber-50 dark:bg-amber-900 ring-amber-200 dark:ring-amber-700/40"
         : isLocked
-          ? "text-slate-500 bg-slate-100 ring-slate-200"
-          : "text-slate-500 bg-white ring-slate-200";
+          ? "text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 ring-slate-200 dark:ring-slate-600"
+          : "text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-700";
   const statusLabel =
     status === "Completed" ? "Completed" : status === "In Progress" ? "In progress" : isLocked ? "Locked" : "Pending";
   const reqLabel = `REQ-${String(step.stepNumber).padStart(3, "0")}`;
@@ -550,17 +550,17 @@ function StepRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-[10px] font-semibold text-rose-600">{reqLabel}</span>
+          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">{reqLabel}</span>
           <span
-            className={`text-sm font-semibold ${status === "Completed" ? "text-slate-500 line-through" : "text-slate-900"}`}
+            className={`text-sm font-semibold ${status === "Completed" ? "text-slate-500 dark:text-slate-400 line-through" : "text-slate-900 dark:text-slate-100"}`}
           >
             {step.stepNumber}. {step.title}
           </span>
         </div>
         {step.description && (
-          <p className="mt-0.5 text-xs text-slate-500">{step.description}</p>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{step.description}</p>
         )}
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
           <span
             className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${statusColor}`}
           >
@@ -583,14 +583,14 @@ function StepRow({
           <img
             src={`/api/induction-evidence/${step.id}`}
             alt={`Evidence for ${step.title}`}
-            className="h-12 w-12 rounded-md object-cover ring-1 ring-slate-200 transition hover:ring-2 hover:ring-emerald-400"
+            className="h-12 w-12 rounded-md object-cover ring-1 ring-slate-200 dark:ring-slate-700 transition hover:ring-2 hover:ring-emerald-400"
             loading="lazy"
           />
         </button>
       )}
       {!hasEvidence && status === "Completed" && (
         <span
-          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-slate-50 text-slate-300 ring-1 ring-slate-200"
+          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-600 ring-1 ring-slate-200 dark:ring-slate-700"
           title="No evidence on file"
         >
           <ImageIcon className="h-5 w-5" />
@@ -613,21 +613,21 @@ function EvidenceLightbox({
       className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-6"
       onClick={onClose}
     >
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-          <p className="truncate text-sm font-semibold text-slate-700">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 py-2">
+          <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-300">
             Evidence — {step.title}
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex flex-1 items-center justify-center bg-slate-50 p-4">
+        <div className="flex flex-1 items-center justify-center bg-slate-50 dark:bg-slate-800 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/induction-evidence/${step.id}`}
@@ -635,7 +635,7 @@ function EvidenceLightbox({
             className="max-h-[75vh] max-w-full object-contain"
           />
         </div>
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+        <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
           {step.completedAt && (
             <>Submitted {shortDateTime(step.evidenceUploadedAt ?? step.completedAt)}</>
           )}
