@@ -39,15 +39,15 @@ export default async function ComingSoonPage({
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
         <div className="max-w-7xl mx-auto px-6 pt-4 pb-10">
           <nav
             aria-label="Breadcrumb"
-            className="flex items-center gap-2 text-sm text-slate-500 mb-6 flex-wrap"
+            className="flex items-center gap-2 text-sm text-slate-500 mb-6 flex-wrap dark:text-slate-400"
           >
             <Link
               href="/home"
-              className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded"
+              className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded dark:hover:text-slate-100"
             >
               <Home className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
@@ -56,28 +56,28 @@ export default async function ComingSoonPage({
               <span key={crumb.label} className="flex items-center gap-2">
                 <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
                 {crumb.href ? (
-                  <Link href={crumb.href} className="hover:text-slate-900 transition-colors rounded">
+                  <Link href={crumb.href} className="hover:text-slate-900 transition-colors rounded dark:hover:text-slate-100">
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="text-slate-900 font-medium">{crumb.label}</span>
+                  <span className="text-slate-900 font-medium dark:text-slate-100">{crumb.label}</span>
                 )}
               </span>
             ))}
           </nav>
 
           <header className="mb-10">
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
               {title}
             </h1>
           </header>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center justify-center text-center dark:bg-slate-900 dark:border-slate-800">
             <div className={`${accent} w-12 h-12 rounded-xl flex items-center justify-center mb-5`}>
               <Icon className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
-            <h2 className="text-base font-semibold text-slate-900">{title} coming soon</h2>
-            <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title} coming soon</h2>
+            <p className="mt-1 text-sm text-slate-600 leading-relaxed dark:text-slate-300">
               This module is under development.
             </p>
           </div>

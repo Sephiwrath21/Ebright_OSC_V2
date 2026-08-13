@@ -40,7 +40,7 @@ export function DailyDatePicker({
     navigate(`${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`);
   };
   const arrowClass =
-    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600";
+    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -52,7 +52,7 @@ export function DailyDatePicker({
         value={value}
         onChange={(e) => e.target.value && navigate(e.target.value)}
         aria-label="Daily date"
-        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <button type="button" aria-label="Next day" onClick={() => shift(1)} className={arrowClass}>
         ▶
@@ -85,12 +85,12 @@ export function EntityPicker({
   };
 
   return (
-    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700">
+    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-300">
       {label}
       <select
         value={value}
         onChange={(e) => navigate(e.target.value)}
-        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       >
         {groups.map((g, i) =>
           g.label ? (

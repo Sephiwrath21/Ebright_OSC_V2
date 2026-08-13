@@ -179,28 +179,28 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-6">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500"
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"
         >
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200"
+            className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200 dark:hover:text-slate-100"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Account Management</span>
+          <span className="text-slate-900 font-medium dark:text-slate-100">Account Management</span>
         </nav>
 
         {/* Header */}
-        <header className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8">
-          <h1 className="text-2xl font-bold text-slate-800">Account Management</h1>
-          <p className="mt-1.5 text-sm font-medium text-slate-500">
+        <header className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8 dark:from-slate-900 dark:to-slate-950 dark:border-slate-800">
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Account Management</h1>
+          <p className="mt-1.5 text-sm font-medium text-slate-500 dark:text-slate-400">
             View and manage all user accounts across branches and departments.
           </p>
         </header>
@@ -216,12 +216,12 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, email, branch…"
-              className="h-10 w-full pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+              className="h-10 w-full pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
             />
           </div>
 
           <DropdownFilter
-            icon={<CircleUser className="w-4 h-4 text-slate-500" aria-hidden="true" />}
+            icon={<CircleUser className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />}
             value={roleId === "all" ? "all" : String(roleId)}
             onChange={(v) => handleRoleChange(v === "all" ? "all" : Number(v))}
             options={[
@@ -258,7 +258,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
                 <DropdownFilter
                   icon={
                     <Building2
-                      className="w-4 h-4 text-slate-500"
+                      className="w-4 h-4 text-slate-500 dark:text-slate-400"
                       aria-hidden="true"
                     />
                   }
@@ -280,7 +280,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
                 <DropdownFilter
                   icon={
                     <Layers
-                      className="w-4 h-4 text-slate-500"
+                      className="w-4 h-4 text-slate-500 dark:text-slate-400"
                       aria-hidden="true"
                     />
                   }
@@ -304,7 +304,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200"
+              className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-rose-700 dark:hover:bg-rose-900 dark:hover:text-rose-200"
             >
               <X className="w-4 h-4" aria-hidden="true" />
               Clear
@@ -313,12 +313,12 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
         </div>
 
         {/* Table */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-200">
-            <h2 className="text-base font-semibold text-slate-800">
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
               User Accounts
             </h2>
-            <p className="text-xs font-medium text-slate-500">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
               {filtered.length} of {data.users.length} accounts shown
             </p>
           </div>
@@ -326,7 +326,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-100 text-sm font-semibold text-slate-700">
+                <tr className="bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <th className="text-left px-6 py-3 font-semibold">Account</th>
                   <th className="text-center px-6 py-3 font-semibold">Role</th>
                   <th className="text-center px-6 py-3 font-semibold">
@@ -364,14 +364,14 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
             </table>
           </div>
 
-          <div className="flex items-center gap-2 px-6 py-3 border-t border-slate-200 bg-slate-50/50">
+          <div className="flex items-center gap-2 px-6 py-3 border-t border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50">
             <KeyRound
-              className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0"
+              className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0 dark:text-indigo-400"
               aria-hidden="true"
             />
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-slate-600 dark:text-slate-300">
               Passwords are stored as bcrypt hashes and cannot be viewed. Use{" "}
-              <span className="font-semibold text-slate-700">Send Reset Link</span>{" "}
+              <span className="font-semibold text-slate-700 dark:text-slate-200">Send Reset Link</span>{" "}
               to let a user set a new one.
             </span>
           </div>
@@ -397,12 +397,12 @@ function DropdownFilter({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200">
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200 dark:border-slate-500 dark:bg-slate-950 dark:focus-within:border-indigo-500 dark:focus-within:ring-indigo-900">
       {icon}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1 max-w-[180px]"
+        className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1 max-w-[180px] dark:text-slate-200"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -425,22 +425,22 @@ function UserRow({
   resetSent: boolean;
   onReset: () => void;
 }) {
-  const rowBg = zebra ? "bg-slate-50/50" : "bg-white";
+  const rowBg = zebra ? "bg-slate-50/50 dark:bg-slate-800/50" : "bg-white dark:bg-slate-900";
   const isSuperadmin = user.role_type.toLowerCase() === "superadmin";
   return (
     <tr
-      className={`${rowBg} hover:bg-slate-100 transition-colors duration-200 border-b border-slate-100 last:border-b-0`}
+      className={`${rowBg} hover:bg-slate-100 transition-colors duration-200 border-b border-slate-100 last:border-b-0 dark:hover:bg-slate-800 dark:border-slate-800`}
     >
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="rounded-full w-9 h-9 bg-indigo-100 text-indigo-700 font-semibold text-sm flex items-center justify-center shrink-0">
+          <div className="rounded-full w-9 h-9 bg-indigo-100 text-indigo-700 font-semibold text-sm flex items-center justify-center shrink-0 dark:bg-indigo-900 dark:text-indigo-200">
             {initials(user.full_name, user.email)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 truncate">
+            <div className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
               {user.full_name ?? "—"}
             </div>
-            <div className="text-[12px] text-slate-500 truncate">{user.email}</div>
+            <div className="text-[12px] text-slate-500 truncate dark:text-slate-400">{user.email}</div>
           </div>
         </div>
       </td>
@@ -461,7 +461,7 @@ function UserRow({
       </td>
       <td className="px-6 py-4 text-center">
         <div className="text-sm">
-          <div className="font-medium text-slate-700 tabular-nums">
+          <div className="font-medium text-slate-700 tabular-nums dark:text-slate-300">
             {relativeTime(user.last_login)}
           </div>
           {user.last_login && (
@@ -473,7 +473,7 @@ function UserRow({
       </td>
       <td className="px-6 py-4 text-right">
         {resetSent ? (
-          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold dark:bg-emerald-900 dark:border-emerald-700 dark:text-emerald-200">
             <Check className="w-3.5 h-3.5" aria-hidden="true" />
             Link sent
           </span>
@@ -481,7 +481,7 @@ function UserRow({
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-600 dark:hover:bg-indigo-900 dark:hover:text-indigo-200"
           >
             <KeyRound className="w-3.5 h-3.5" aria-hidden="true" />
             Send Reset Link
@@ -507,7 +507,7 @@ function BranchDeptCell({
 }) {
   if (isSuperadmin) {
     return (
-      <div className="text-sm font-medium text-slate-700">
+      <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
         Optimisation Department
       </div>
     );
@@ -524,10 +524,10 @@ function BranchDeptCell({
   return (
     <div className="text-sm">
       {branchName && (
-        <div className="font-semibold text-slate-800">{branchName}</div>
+        <div className="font-semibold text-slate-800 dark:text-slate-100">{branchName}</div>
       )}
       {deptLine && (
-        <div className="text-[12px] font-medium text-slate-500">{deptLine}</div>
+        <div className="text-[12px] font-medium text-slate-500 dark:text-slate-400">{deptLine}</div>
       )}
     </div>
   );
@@ -536,15 +536,15 @@ function BranchDeptCell({
 function RolePill({ roleType }: { roleType: string }) {
   const lower = roleType.toLowerCase();
   const palette: Record<string, { bg: string; text: string; dot: string }> = {
-    superadmin: { bg: "bg-rose-100", text: "text-rose-700", dot: "bg-rose-500" },
-    ceo: { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
-    admin: { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
-    finance: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
-    hr: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
+    superadmin: { bg: "bg-rose-100 dark:bg-rose-900", text: "text-rose-700 dark:text-rose-200", dot: "bg-rose-500" },
+    ceo: { bg: "bg-purple-100 dark:bg-purple-900", text: "text-purple-700 dark:text-purple-200", dot: "bg-purple-500" },
+    admin: { bg: "bg-indigo-100 dark:bg-indigo-900", text: "text-indigo-700 dark:text-indigo-200", dot: "bg-indigo-500" },
+    finance: { bg: "bg-amber-100 dark:bg-amber-900", text: "text-amber-700 dark:text-amber-200", dot: "bg-amber-500" },
+    hr: { bg: "bg-emerald-100 dark:bg-emerald-900", text: "text-emerald-700 dark:text-emerald-200", dot: "bg-emerald-500" },
   };
   const m =
     palette[lower] ??
-    { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" };
+    { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-600 dark:text-slate-300", dot: "bg-slate-400" };
 
   return (
     <span
@@ -563,7 +563,7 @@ function StatusPill({ status }: { status: string }) {
   const lower = status.toLowerCase();
   if (lower === "active") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
         Active
       </span>
@@ -571,14 +571,14 @@ function StatusPill({ status }: { status: string }) {
   }
   if (lower === "inactive" || lower === "disabled") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" aria-hidden="true" />
         Inactive
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600">
+    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
       {prettyRole(status)}
     </span>
   );

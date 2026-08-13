@@ -12,11 +12,11 @@ import { MOCK_EVENTS, MOCK_INVENTORY, type EventStatus } from "../_mock";
 /* ── Status badge ─────────────────────────────────────────────────────────── */
 
 const STATUS_STYLES: Record<EventStatus, { dot: string; text: string; bg: string }> = {
-  draft:     { dot: "bg-slate-400",  text: "text-slate-600",  bg: "bg-slate-100" },
-  open:      { dot: "bg-blue-500",   text: "text-blue-700",   bg: "bg-blue-50"   },
-  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700",   bg: "bg-teal-50"   },
-  closed:    { dot: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50"  },
-  completed: { dot: "bg-green-500",  text: "text-green-700",  bg: "bg-green-50"  },
+  draft:     { dot: "bg-slate-400",  text: "text-slate-600 dark:text-slate-300",  bg: "bg-slate-100 dark:bg-slate-800"  },
+  open:      { dot: "bg-blue-500",   text: "text-blue-700 dark:text-blue-300",   bg: "bg-blue-50 dark:bg-blue-900"    },
+  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700 dark:text-teal-300",   bg: "bg-teal-50 dark:bg-teal-900"    },
+  closed:    { dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 dark:bg-amber-900"   },
+  completed: { dot: "bg-green-500",  text: "text-green-700 dark:text-green-300",  bg: "bg-green-50 dark:bg-green-900"   },
 };
 
 function StatusBadge({ status }: { status: EventStatus }) {
@@ -35,7 +35,7 @@ function PackedCheckmark({ packed }: { packed: boolean }) {
   return (
     <span
       className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-        packed ? "border-green-500 bg-green-500" : "border-slate-300 bg-white"
+        packed ? "border-green-500 bg-green-500" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
       }`}
       aria-hidden
     >
@@ -59,13 +59,13 @@ function PackingRow({
       type="button"
       onClick={onToggle}
       aria-pressed={packed}
-      className="w-full flex items-center gap-2.5 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+      className="w-full flex items-center gap-2.5 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
     >
       <PackedCheckmark packed={packed} />
-      <span className={`flex-1 ${packed ? "line-through text-slate-400" : "text-slate-700"}`}>
+      <span className={`flex-1 ${packed ? "line-through text-slate-400" : "text-slate-700 dark:text-slate-300"}`}>
         {label}
       </span>
-      <span className={`font-mono font-semibold text-sm ${packed ? "text-slate-400 line-through" : "text-slate-900"}`}>
+      <span className={`font-mono font-semibold text-sm ${packed ? "text-slate-400 line-through" : "text-slate-900 dark:text-slate-100"}`}>
         {count}
       </span>
     </button>
@@ -90,24 +90,24 @@ function InventorySection({
 }) {
   const allPacked = totalItems > 0 && packed === totalItems;
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
       <div className="flex items-start gap-3 mb-4">
         <div className={`w-10 h-10 rounded-xl ${iconClass} flex items-center justify-center flex-shrink-0`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{subtitle}</p>
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
         </div>
-        <div className="text-5xl font-bold text-slate-900 leading-none tabular-nums">{total}</div>
+        <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 leading-none tabular-nums">{total}</div>
       </div>
 
-      <div className="border-t border-slate-100 my-4" />
+      <div className="border-t border-slate-100 dark:border-slate-800 my-4" />
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{breakdownTitle}</p>
         {totalItems > 0 && (
-          <span className={`text-[11px] font-semibold uppercase tracking-widest ${allPacked ? "text-green-600" : "text-slate-400"}`}>
+          <span className={`text-[11px] font-semibold uppercase tracking-widest ${allPacked ? "text-green-600 dark:text-green-400" : "text-slate-400"}`}>
             {allPacked ? "✓ All packed" : `${packed} / ${totalItems} packed`}
           </span>
         )}
@@ -164,13 +164,13 @@ export default function FAInventoryDetailClient() {
 
   if (!event || !inv) {
     return (
-      <div className="min-h-full bg-slate-50 flex items-center justify-center">
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
-          <CalendarDays className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">Event not found.</p>
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center">
+          <CalendarDays className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Event not found.</p>
           <Link
             href="/dashboards/fa/inventory"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Inventory
@@ -191,35 +191,35 @@ export default function FAInventoryDetailClient() {
   const certsProgress  = sectionProgress(certKeys);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa/inventory" className="hover:text-slate-900 transition-colors">Inventory</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium truncate max-w-[200px]">{event.name}</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa/inventory" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Inventory</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium truncate max-w-[200px]">{event.name}</span>
         </nav>
 
         {/* Page header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">Event Inventory</h1>
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">Event Inventory</h1>
         </div>
       </div>
 
       {/* Sticky bar */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200/80 dark:border-slate-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4">
           <StatusBadge status={event.status} />
-          <span className="text-sm font-semibold text-slate-900">{event.name}</span>
-          <div className="flex items-center gap-4 ml-auto text-xs text-slate-500">
+          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{event.name}</span>
+          <div className="flex items-center gap-4 ml-auto text-xs text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <CalendarDays className="w-3.5 h-3.5" />
               {event.dateLabel}
@@ -235,17 +235,17 @@ export default function FAInventoryDetailClient() {
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10 space-y-6">
 
         {/* Walk-in buffer */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
               <UserPlus className="w-4 h-4" />
             </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Walk-in buffer</p>
-              <p className="text-sm text-slate-700 mt-0.5">
+              <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">
                 {totalBuffer === 0
                   ? "No buffer — totals reflect confirmed attendees only."
-                  : <>Pack <strong className="text-slate-900">{totalBuffer}</strong> extra{totalBuffer === 1 ? "" : "s"} (medals + mics) for unannounced students.</>}
+                  : <>Pack <strong className="text-slate-900 dark:text-slate-100">{totalBuffer}</strong> extra{totalBuffer === 1 ? "" : "s"} (medals + mics) for unannounced students.</>}
               </p>
             </div>
           </div>
@@ -263,7 +263,7 @@ export default function FAInventoryDetailClient() {
                   onChange={(e) =>
                     setBuffer((prev) => ({ ...prev, [g]: Number(e.target.value) || 0 }))
                   }
-                  className="w-full text-center font-mono px-2 py-1.5 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full text-center font-mono px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-500 text-sm bg-white dark:bg-slate-950 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   aria-label={`Walk-in buffer for grade ${g}`}
                 />
               </label>
@@ -277,7 +277,7 @@ export default function FAInventoryDetailClient() {
           {/* Medals */}
           <InventorySection
             icon={<Trophy className="w-5 h-5" />}
-            iconClass="bg-amber-100 text-amber-700"
+            iconClass="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200"
             title="Medals"
             subtitle="One per expected attendee"
             total={inv.medalsTotal + totalBuffer}
@@ -298,7 +298,7 @@ export default function FAInventoryDetailClient() {
                     <>
                       Grade {grade}
                       {extra > 0 && (
-                        <span className="ml-2 text-xs text-amber-600 font-medium">+{extra} buffer</span>
+                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-medium">+{extra} buffer</span>
                       )}
                     </>
                   }
@@ -311,7 +311,7 @@ export default function FAInventoryDetailClient() {
           {/* Microphones */}
           <InventorySection
             icon={<Mic className="w-5 h-5" />}
-            iconClass="bg-blue-50 text-blue-600"
+            iconClass="bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-400"
             title="Microphones"
             subtitle="One per student — takeaway gift"
             total={inv.medalsTotal + totalBuffer}
@@ -332,7 +332,7 @@ export default function FAInventoryDetailClient() {
                     <>
                       Grade {grade}
                       {extra > 0 && (
-                        <span className="ml-2 text-xs text-amber-600 font-medium">+{extra} buffer</span>
+                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-medium">+{extra} buffer</span>
                       )}
                     </>
                   }
@@ -345,7 +345,7 @@ export default function FAInventoryDetailClient() {
           {/* Sashes */}
           <InventorySection
             icon={<Ribbon className="w-5 h-5" />}
-            iconClass="bg-rose-50 text-rose-600"
+            iconClass="bg-rose-50 text-rose-600 dark:bg-rose-900 dark:text-rose-400"
             title="Sashes"
             subtitle="Reused per session — worst-case per branch"
             total={inv.sashesTotal}
@@ -363,7 +363,7 @@ export default function FAInventoryDetailClient() {
                   onToggle={() => toggle(key)}
                   label={
                     <>
-                      <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded mr-2">
+                      <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded mr-2">
                         {code}
                       </span>
                       {name}
@@ -378,7 +378,7 @@ export default function FAInventoryDetailClient() {
           {/* Certificates */}
           <InventorySection
             icon={<Award className="w-5 h-5" />}
-            iconClass="bg-green-50 text-green-600"
+            iconClass="bg-green-50 text-green-600 dark:bg-green-900 dark:text-green-400"
             title="Certificates"
             subtitle="One per student — personalised by session"
             total={inv.certificatesTotal}

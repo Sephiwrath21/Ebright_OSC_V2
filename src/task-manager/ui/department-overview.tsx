@@ -44,9 +44,9 @@ function SummaryChip({
   tone: "neutral" | "completed" | "pending";
 }) {
   const toneClass = {
-    neutral: "border-indigo-100 bg-indigo-50 text-indigo-700",
-    completed: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    pending: "border-rose-100 bg-rose-50 text-rose-700",
+    neutral: "border-indigo-100 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900 dark:text-indigo-200",
+    completed: "border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
+    pending: "border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-200",
   }[tone];
   return (
     <div className={`flex flex-1 flex-col items-center rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
@@ -96,9 +96,9 @@ function MemberListRow({
 }) {
   const status = memberStatus(member);
   const badgeClass = {
-    completed: "bg-emerald-50 text-emerald-700",
-    pending: "bg-rose-100 text-rose-800",
-    none: "bg-gray-100 text-gray-500",
+    completed: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
+    pending: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
+    none: "bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-slate-300",
   }[status];
   const badgeLabel = { completed: "Completed", pending: "Pending", none: "No tasks" }[status];
 
@@ -110,11 +110,11 @@ function MemberListRow({
     >
       <InitialAvatar name={member.name} id={member.userId} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-gray-900">{member.name}</p>
-        <p className="truncate text-xs text-gray-500">{memberRowRoleLabel(member)}</p>
+        <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{member.name}</p>
+        <p className="truncate text-xs text-gray-500 dark:text-slate-400">{memberRowRoleLabel(member)}</p>
       </div>
       <div className="hidden shrink-0 items-center gap-2 sm:flex">
-        <span className="text-xs text-gray-500">{memberSummaryText(member)}</span>
+        <span className="text-xs text-gray-500 dark:text-slate-400">{memberSummaryText(member)}</span>
         <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
           {badgeLabel}
         </span>
@@ -122,7 +122,7 @@ function MemberListRow({
       <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium sm:hidden ${badgeClass}`}>
         {badgeLabel}
       </span>
-      <span className="shrink-0 text-gray-300">›</span>
+      <span className="shrink-0 text-gray-300 dark:text-slate-600">›</span>
     </button>
   );
 }
@@ -135,14 +135,14 @@ function TaskChecklistRow({ task }: { task: FlowTaskRow }) {
     <div className="flex items-center gap-3 py-2.5">
       <span
         className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 text-transparent"
+          done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 text-transparent dark:border-slate-600"
         }`}
       >
         <CheckIcon />
       </span>
       <span
         className={`min-w-0 flex-1 truncate text-sm font-semibold ${
-          done ? "text-gray-400 line-through" : "text-gray-900"
+          done ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
         }`}
       >
         {task.blockTitle}
@@ -184,11 +184,11 @@ function MemberDetailView({
   });
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <button
         type="button"
         onClick={onBack}
-        className="mb-4 text-xs font-medium text-blue-600 hover:text-blue-700"
+        className="mb-4 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
       >
         ← Back
       </button>
@@ -196,35 +196,35 @@ function MemberDetailView({
       <div className="mb-5 flex items-center gap-3">
         <InitialAvatar name={member.name} id={member.userId} />
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-gray-900">{member.name}</p>
-          <p className="truncate text-sm text-gray-500">{memberDetailRoleLabel(member, kind)}</p>
+          <p className="truncate text-base font-semibold text-gray-900 dark:text-slate-100">{member.name}</p>
+          <p className="truncate text-sm text-gray-500 dark:text-slate-400">{memberDetailRoleLabel(member, kind)}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-6">
         <StatusDonut totals={totals} size={140} strokeWidth={18}>
-          <span className="text-xl font-bold text-gray-900">{flowCompletionPct(totals)}%</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-slate-100">{flowCompletionPct(totals)}%</span>
         </StatusDonut>
         <div className="flex gap-6">
           <div>
-            <p className="text-2xl font-bold text-emerald-600">{totals.completed}</p>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Done</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{totals.completed}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">Done</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-rose-600">{totals.pending}</p>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Not Done</p>
+            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{totals.pending}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">Not Done</p>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-gray-100 p-4">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-gray-500">
+      <div className="mt-6 rounded-xl border border-gray-100 p-4 dark:border-slate-800">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           {label}
         </p>
         {sorted.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">No tasks this period.</p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-slate-800">
             {sorted.map((t) => (
               <TaskChecklistRow key={t.runBlockId} task={t} />
             ))}
@@ -287,7 +287,7 @@ export function EntityOverviewSection({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-gray-900">{entity.name} — {label}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">{entity.name} — {label}</h2>
         {headerControl}
       </div>
 
@@ -305,14 +305,14 @@ export function EntityOverviewSection({
           reassign={reassign}
         />
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
             Members
           </p>
           {entity.members.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No members this period.</p>
           ) : (
-            <div className="max-h-[480px] divide-y divide-gray-100 overflow-y-auto px-2">
+            <div className="max-h-[480px] divide-y divide-gray-100 overflow-y-auto px-2 dark:divide-slate-800">
               {entity.members.map((m) => (
                 <MemberListRow
                   key={m.userId}

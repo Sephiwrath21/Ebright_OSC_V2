@@ -140,32 +140,32 @@ export default function LeadsDashboard() {
   const rangeLabel = data ? formatRange(data.range.from, data.range.to) : "—";
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-950">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded">
+          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-950">
             CNS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Dashboard</span>
+          <span className="text-slate-900 font-medium dark:text-slate-100">Dashboard</span>
         </nav>
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
               Leads Dashboard
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {loading ? "Loading…" : rangeLabel} · NL by created · CT by trial date · SU / ENR by stage entry
             </p>
           </div>
@@ -175,7 +175,7 @@ export default function LeadsDashboard() {
             <select
               value={branchCode}
               onChange={(e) => setBranchCode(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             >
               <option value="">All branches</option>
               {allBranches.map((b) => (
@@ -186,7 +186,7 @@ export default function LeadsDashboard() {
             </select>
 
             {/* Date preset pill tabs */}
-            <div className="flex items-center gap-0.5 rounded-full bg-slate-100 p-1">
+            <div className="flex items-center gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
               {PRESETS.map((p) => (
                 <button
                   key={p.key}
@@ -195,8 +195,8 @@ export default function LeadsDashboard() {
                   className={[
                     "rounded-full px-3 py-1 text-sm transition-all",
                     preset === p.key
-                      ? "bg-white font-medium text-blue-700 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900",
+                      ? "bg-white font-medium text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
                   ].join(" ")}
                 >
                   {p.label}
@@ -209,21 +209,21 @@ export default function LeadsDashboard() {
         {/* ── Custom date pickers ─────────────────────────────────────────── */}
         {preset === "custom" && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-xs font-medium text-slate-500">From</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">From</span>
             <input
               type="date"
               value={customFrom}
               max={customTo || undefined}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
-            <span className="text-xs font-medium text-slate-500">to</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">to</span>
             <input
               type="date"
               value={customTo}
               min={customFrom || undefined}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
             {!customReady && (
               <span className="text-xs italic text-slate-400">
@@ -235,12 +235,12 @@ export default function LeadsDashboard() {
 
         {/* ── Error banner ────────────────────────────────────────────────── */}
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900 dark:text-red-200">
             Couldn&apos;t load metrics: {error}
             <button
               type="button"
               onClick={() => void load()}
-              className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100"
+              className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-slate-900 dark:text-red-200 dark:hover:bg-red-900"
             >
               Retry
             </button>
@@ -290,11 +290,11 @@ export default function LeadsDashboard() {
 
 function MainBlock({ data }: { data: MainTotals }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {/* Section title */}
       <div className="mb-5">
-        <h2 className="text-base font-bold text-blue-600">Main</h2>
-        <p className="text-xs text-slate-500">Overall pipeline</p>
+        <h2 className="text-base font-bold text-blue-600 dark:text-blue-400">Main</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Overall pipeline</p>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -331,12 +331,12 @@ function MainBlock({ data }: { data: MainTotals }) {
         </div>
 
         {/* Buffer — separated from the funnel; snapshot only */}
-        <div className="lg:border-l lg:border-slate-200 lg:pl-5">
-          <div className="flex h-full min-w-28 flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-center">
+        <div className="lg:border-l lg:border-slate-200 lg:pl-5 dark:lg:border-slate-800">
+          <div className="flex h-full min-w-28 flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-center dark:border-slate-700 dark:bg-slate-800">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
               Buffer
             </span>
-            <span className="mt-1.5 text-4xl font-bold text-slate-800">
+            <span className="mt-1.5 text-4xl font-bold text-slate-800 dark:text-slate-100">
               {data.BUF}
             </span>
             <span className="mt-1 text-[10px] text-slate-400">
@@ -365,18 +365,18 @@ function FunnelPair({
   return (
     <div className="space-y-2">
       {/* Big stat */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
           {label}
         </p>
-        <p className="mt-1 text-3xl font-bold text-slate-900">{value}</p>
+        <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
       </div>
       {/* Rate */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
           {rateLabel}
         </p>
-        <p className="mt-1 text-xl font-semibold text-slate-800">{rateValue}</p>
+        <p className="mt-1 text-xl font-semibold text-slate-800 dark:text-slate-200">{rateValue}</p>
         <p className="mt-0.5 text-[10px] text-slate-400">{rateHint}</p>
       </div>
     </div>
@@ -386,9 +386,9 @@ function FunnelPair({
 // ─── Region card ──────────────────────────────────────────────────────────────
 
 const ACCENT_TITLE: Record<string, string> = {
-  sky:     "text-sky-600",
-  amber:   "text-amber-600",
-  emerald: "text-emerald-600",
+  sky:     "text-sky-600 dark:text-sky-400",
+  amber:   "text-amber-600 dark:text-amber-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
 };
 
 function RegionCard({
@@ -403,7 +403,7 @@ function RegionCard({
   data: RegionTotals;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4">
         <h3 className={`text-sm font-bold ${ACCENT_TITLE[accent]}`}>{title}</h3>
         <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
@@ -422,11 +422,11 @@ function RegionCard({
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
         {label}
       </p>
-      <p className="mt-0.5 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-0.5 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }
@@ -443,12 +443,12 @@ function BranchBarChart({ branches }: { branches: BranchRow[] }) {
   const max = Math.max(1, ...branches.map((b) => b.NL));
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           New Leads by Branch
         </h2>
-        <div className="flex items-center gap-4 text-[11px] text-slate-500">
+        <div className="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400">
           <LegendDot color="bg-sky-500"     label="Region A" />
           <LegendDot color="bg-amber-500"   label="Region B" />
           <LegendDot color="bg-emerald-500" label="Region C" />
@@ -464,16 +464,16 @@ function BranchBarChart({ branches }: { branches: BranchRow[] }) {
               <span className="w-6 font-mono text-[11px] font-semibold tabular-nums text-slate-400">
                 {b.code}
               </span>
-              <span className="w-40 truncate text-xs text-slate-700">
+              <span className="w-40 truncate text-xs text-slate-700 dark:text-slate-300">
                 {b.name}
               </span>
-              <div className="flex-1 rounded-full bg-slate-100" style={{ height: 20 }}>
+              <div className="flex-1 rounded-full bg-slate-100 dark:bg-slate-800" style={{ height: 20 }}>
                 <div
                   className={`${color} h-full rounded-full transition-all duration-500`}
                   style={{ width }}
                 />
               </div>
-              <span className="w-8 text-right font-mono text-xs font-semibold tabular-nums text-slate-800">
+              <span className="w-8 text-right font-mono text-xs font-semibold tabular-nums text-slate-800 dark:text-slate-200">
                 {b.NL}
               </span>
             </div>
@@ -497,10 +497,10 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 function BranchTable({ branches }: { branches: BranchRow[] }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <thead className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
             <tr>
               <th className="px-5 py-3">Branch</th>
               <th className="px-4 py-3">Code</th>
@@ -512,27 +512,27 @@ function BranchTable({ branches }: { branches: BranchRow[] }) {
               <th className="px-4 py-3 text-right">Enrol</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {branches.map((b) => {
               const conv  = b.NL > 0 ? b.ENR / b.NL : 0;
               const enrol = b.SU > 0 ? b.ENR / b.SU : 0;
               return (
                 <tr
                   key={b.code}
-                  className="text-slate-800 transition-colors hover:bg-slate-50"
+                  className="text-slate-800 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <td className="px-5 py-3 font-medium">{b.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                     {b.code}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">{b.NL}</td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">{b.CT}</td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">{b.SU}</td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">{b.ENR}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-blue-600">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-blue-600 dark:text-blue-400">
                     {pct(conv)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-600">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
                     {pct(enrol)}
                   </td>
                 </tr>

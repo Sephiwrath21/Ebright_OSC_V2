@@ -56,7 +56,7 @@ function ScoreSlider({ value, onChange }: { value: number; onChange: (n: number)
         step={1}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-slate-900"
+        className="w-full accent-slate-900 dark:accent-slate-400"
       />
       <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1 px-0.5">
         {[0, 5, 10, 15, 20, 25].map(t => (
@@ -104,16 +104,16 @@ export default function FAReportFormClient() {
 
   if (!invitation) {
     return (
-      <div className="min-h-full bg-slate-50 flex items-center justify-center">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h1 className="text-xl font-semibold text-slate-700 mb-1">Invitation not found</h1>
-          <p className="text-sm text-slate-500 mb-4">
+          <AlertCircle className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <h1 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-1">Invitation not found</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             This report links to an invitation that doesn&apos;t exist.
           </p>
           <Link
             href="/dashboards/fa/reports"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline"
           >
             <ArrowLeft className="w-4 h-4" /> Back to reports
           </Link>
@@ -125,50 +125,50 @@ export default function FAReportFormClient() {
   const branchObj = BRANCHES.find(b => b.code === invitation.branch);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-28">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa/reports" className="hover:text-slate-900 transition-colors">Reports</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium truncate max-w-[200px]">{invitation.studentName}</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa/reports" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Reports</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium truncate max-w-[200px]">{invitation.studentName}</span>
         </nav>
 
         {/* Header */}
         <div className="flex items-start justify-between gap-6 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 tracking-widest">
+              <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 tracking-widest">
                 {invitation.branch}
               </span>
-              <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 tracking-widest">
+              <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 tracking-widest">
                 G{invitation.grade}
               </span>
               <span className="font-mono text-xs text-slate-400">#{invitation.studentId}</span>
               <span className="text-xs text-slate-400">·</span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {existing ? "Editing report" : "New report"}
               </span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               {invitation.studentName}
             </h1>
             {branchObj && (
-              <p className="text-sm text-slate-500 mt-1">{branchObj.name}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{branchObj.name}</p>
             )}
           </div>
           {existing && (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors shrink-0 mt-1"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shrink-0 mt-1"
               title="Certificate preview — backend not connected yet"
             >
               <Printer className="w-3.5 h-3.5" /> Preview certificate
@@ -176,10 +176,10 @@ export default function FAReportFormClient() {
           )}
         </div>
 
-        <hr className="border-slate-200 mb-6" />
+        <hr className="border-slate-200 dark:border-slate-800 mb-6" />
 
         {/* Date + Prepared by */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
               Date of Assessment
@@ -188,7 +188,7 @@ export default function FAReportFormClient() {
               type="date"
               value={assessDate}
               onChange={e => setAssessDate(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -200,7 +200,7 @@ export default function FAReportFormClient() {
               value={preparedBy}
               onChange={e => setPreparedBy(e.target.value)}
               placeholder="Coach name…"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+              className="w-full border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -214,20 +214,20 @@ export default function FAReportFormClient() {
             const score = scores[c.key];
             const Icon  = c.icon;
             return (
-              <div key={c.key} className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div key={c.key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <Icon className="w-4 h-4 text-slate-600" />
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <Icon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                     </div>
-                    <span className="font-semibold text-slate-900">{c.title}</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">{c.title}</span>
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-slate-900">{score}</span>
+                    <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">{score}</span>
                     <span className="text-sm text-slate-400">/ {FA_REPORT_MAX_PER_CRITERION}</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed mb-4">{c.description}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{c.description}</p>
                 <ScoreSlider
                   value={score}
                   onChange={n => setScores(prev => ({ ...prev, [c.key]: n }))}
@@ -241,7 +241,7 @@ export default function FAReportFormClient() {
                       className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                         score === preset
                           ? "bg-slate-900 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                       }`}
                     >
                       {preset}
@@ -255,19 +255,19 @@ export default function FAReportFormClient() {
 
         {/* Remarks */}
         <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Remarks</p>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5">
           <textarea
             value={remarks}
             onChange={e => setRemarks(e.target.value)}
             rows={6}
             maxLength={400}
             placeholder="Strengths shown, areas to work on, anything notable from the showcase…"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y placeholder:text-slate-400"
+            className="w-full border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y placeholder:text-slate-400"
             style={{ minHeight: 140 }}
           />
           <div
             className={`text-right font-mono text-[11px] mt-1.5 ${
-              remarks.length > 380 ? "text-red-500 font-bold" : "text-slate-400"
+              remarks.length > 380 ? "text-red-500 dark:text-red-400 font-bold" : "text-slate-400"
             }`}
           >
             {remarks.length} / 400
@@ -279,13 +279,13 @@ export default function FAReportFormClient() {
           Video Link{" "}
           <span className="normal-case font-normal">(optional)</span>
         </p>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5">
           <input
             type="url"
             value={videoLink}
             onChange={e => setVideoLink(e.target.value)}
             placeholder="https://drive.google.com/… or https://youtu.be/…"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+            className="w-full border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
           />
         </div>
 
@@ -295,20 +295,20 @@ export default function FAReportFormClient() {
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
               Score Breakdown
             </p>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-5">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                 {CRITERIA.map(c => (
                   <div key={c.key} className="text-center">
-                    <p className="text-2xl font-bold text-slate-900">{scores[c.key]}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{scores[c.key]}</p>
                     <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">
                       {c.title}
                     </p>
                   </div>
                 ))}
               </div>
-              <div className="pt-3 border-t border-slate-100 flex items-baseline gap-2 justify-center">
-                <span className="text-xs text-slate-500">Total</span>
-                <span className="text-2xl font-bold text-slate-900">{faReportTotal(existing)}</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline gap-2 justify-center">
+                <span className="text-xs text-slate-500 dark:text-slate-400">Total</span>
+                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{faReportTotal(existing)}</span>
                 <span className="text-sm text-slate-400">/ {totalMax}</span>
               </div>
             </div>
@@ -318,14 +318,14 @@ export default function FAReportFormClient() {
         {/* Inline messages */}
         <div className="space-y-3">
           {saved && (
-            <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-xs text-green-800 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
+            <div className="rounded-xl bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 p-3 text-xs text-green-800 dark:text-green-200 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 dark:text-green-400" />
               Report saved (mock only — backend not connected yet).
             </div>
           )}
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-800 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+            <div className="rounded-xl bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 p-3 text-xs text-red-800 dark:text-red-200 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500 dark:text-red-400" />
               {error}
             </div>
           )}
@@ -333,18 +333,18 @@ export default function FAReportFormClient() {
       </div>
 
       {/* Sticky bottom save bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4 flex-wrap">
           <div className="flex items-baseline gap-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Total</span>
-            <span className="text-2xl font-bold text-slate-900">{total}</span>
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{total}</span>
             <span className="text-sm text-slate-400">/ {totalMax}</span>
           </div>
 
           <div className="flex-1 min-w-[160px]">
-            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-slate-900 rounded-full transition-all"
+                className="h-full bg-slate-900 dark:bg-slate-400 rounded-full transition-all"
                 style={{ width: `${(total / totalMax) * 100}%` }}
               />
             </div>

@@ -172,11 +172,11 @@ const ALL_EVENTS: FAEvent[] = [
 ];
 
 const STATUS_STYLES: Record<EventStatus, { dot: string; text: string; bg: string }> = {
-  draft:     { dot: "bg-slate-400",  text: "text-slate-600",  bg: "bg-slate-100"  },
-  open:      { dot: "bg-blue-500",   text: "text-blue-700",   bg: "bg-blue-50"    },
-  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700",   bg: "bg-teal-50"    },
-  closed:    { dot: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50"   },
-  completed: { dot: "bg-green-500",  text: "text-green-700",  bg: "bg-green-50"   },
+  draft:     { dot: "bg-slate-400",  text: "text-slate-600 dark:text-slate-300",  bg: "bg-slate-100 dark:bg-slate-800"  },
+  open:      { dot: "bg-blue-500",   text: "text-blue-700 dark:text-blue-300",   bg: "bg-blue-50 dark:bg-blue-900"    },
+  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700 dark:text-teal-300",   bg: "bg-teal-50 dark:bg-teal-900"    },
+  closed:    { dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 dark:bg-amber-900"   },
+  completed: { dot: "bg-green-500",  text: "text-green-700 dark:text-green-300",  bg: "bg-green-50 dark:bg-green-900"   },
 };
 
 const STATUS_FLOW: Partial<Record<EventStatus, { label: string; next: EventStatus }>> = {
@@ -203,9 +203,9 @@ function StatCard({ label, value, highlight, sub }: {
   sub?: string;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-      <p className={`text-3xl font-bold leading-none ${highlight ? "text-green-600" : "text-slate-900"}`}>
+      <p className={`text-3xl font-bold leading-none ${highlight ? "text-green-600 dark:text-green-400" : "text-slate-900 dark:text-slate-100"}`}>
         {value}
       </p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
@@ -242,14 +242,14 @@ export default function FAEventDetailClient() {
 
   if (!event) {
     return (
-      <div className="min-h-full bg-slate-50 flex items-center justify-center">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <CalendarDays className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h1 className="text-xl font-semibold text-slate-700 mb-1">Event not found</h1>
-          <p className="text-sm text-slate-500 mb-4">This event doesn&apos;t exist or has been removed.</p>
+          <CalendarDays className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <h1 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-1">Event not found</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">This event doesn&apos;t exist or has been removed.</p>
           <Link
             href="/dashboards/fa/events"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline"
           >
             <ArrowLeft className="w-4 h-4" /> Back to events
           </Link>
@@ -267,13 +267,13 @@ export default function FAEventDetailClient() {
                   `${Math.abs(days)} days ago`;
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-12">
 
         {/* Back */}
         <Link
           href="/dashboards/fa/events"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors mb-5"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors mb-5"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to events
@@ -285,16 +285,16 @@ export default function FAEventDetailClient() {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <StatusBadge status={status} />
               {event.multiGrade && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                   <Key className="w-3 h-3" /> Multi-grade
                 </span>
               )}
               <span className="text-xs text-slate-400 font-medium">{countdown}</span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               {event.name}
             </h1>
-            <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-slate-500">
+            <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-slate-500 dark:text-slate-400">
               <span className="flex items-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                 {event.startDate === event.endDate
@@ -311,26 +311,26 @@ export default function FAEventDetailClient() {
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center w-9 h-9 border border-slate-200 bg-white rounded-xl hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
+              className="inline-flex items-center justify-center w-9 h-9 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:border-red-200 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900 hover:text-red-600 dark:hover:text-red-400 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <hr className="border-slate-200 mb-6" />
+        <hr className="border-slate-200 dark:border-slate-800 mb-6" />
 
         {/* Status action */}
         {nextStep && (
-          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-6 flex items-center justify-between gap-4">
-            <p className="text-sm text-slate-600">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 mb-6 flex items-center justify-between gap-4">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
               Ready to advance this event?
             </p>
             <button
@@ -356,11 +356,11 @@ export default function FAEventDetailClient() {
 
         {/* Invitation window */}
         {event.invitationOpen && event.invitationClose && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-6">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
               Invitation Window
             </p>
-            <p className="font-mono text-sm text-slate-800">
+            <p className="font-mono text-sm text-slate-800 dark:text-slate-200">
               {event.invitationOpen} → {event.invitationClose}
             </p>
           </div>
@@ -371,7 +371,7 @@ export default function FAEventDetailClient() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Sessions</p>
-              <h2 className="text-xl font-semibold text-slate-900">Sessions</h2>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Sessions</h2>
             </div>
             <button
               type="button"
@@ -382,9 +382,9 @@ export default function FAEventDetailClient() {
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-            <Clock className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-medium text-slate-600 mb-1">No sessions yet</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center text-center">
+            <Clock className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">No sessions yet</p>
             <p className="text-sm text-slate-400 max-w-xs">
               Add sessions to set up time slots across {event.days === 1 ? "the event day" : `all ${event.days} days`}.
             </p>
@@ -403,7 +403,7 @@ export default function FAEventDetailClient() {
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-4">
             Invitations
           </p>
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-10 flex flex-col items-center text-center">
             <p className="text-sm text-slate-400">
               {event.invited > 0
                 ? `${event.invited} invitations have been sent for this event.`
@@ -417,9 +417,9 @@ export default function FAEventDetailClient() {
       {/* Delete confirm overlay */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete this event?</h2>
-            <p className="text-sm text-slate-500 mb-6">
+          <div className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Delete this event?</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
               This will permanently delete <strong>{event.name}</strong> along with all its sessions,
               quotas, and invitations. This action cannot be undone.
             </p>
@@ -427,7 +427,7 @@ export default function FAEventDetailClient() {
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
-                className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>

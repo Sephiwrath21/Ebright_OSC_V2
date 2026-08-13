@@ -344,30 +344,30 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
         </section>
 
         {/* Step list */}
-        <section aria-labelledby="steps-heading" className="bg-white border border-slate-200 rounded-2xl mb-5">
-          <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+        <section aria-labelledby="steps-heading" className="bg-white border border-slate-200 rounded-2xl mb-5 dark:bg-slate-900 dark:border-slate-800">
+          <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3 dark:border-slate-800">
             <div>
-              <h2 id="steps-heading" className="text-sm font-semibold text-slate-900">Workflow Steps</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <h2 id="steps-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Workflow Steps</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {workflow.steps.length} step{workflow.steps.length === 1 ? "" : "s"}
               </p>
             </div>
           </header>
           {workflow.steps.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-slate-500 italic">
+            <p className="px-5 py-8 text-center text-sm text-slate-500 italic dark:text-slate-400">
               No steps yet. {canEdit ? "Add the first one below." : ""}
             </p>
           ) : (
-            <ol className="divide-y divide-slate-200">
+            <ol className="divide-y divide-slate-200 dark:divide-slate-800">
               {workflow.steps.map((step) => (
                 <li key={step.id} className="px-5 py-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0" aria-hidden="true">
+                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 dark:bg-slate-700 dark:text-slate-200" aria-hidden="true">
                       {step.stepNumber}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-slate-900">{step.title}</h3>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{step.title}</h3>
                         <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${ACTOR_BADGE[step.actorRole] ?? ACTOR_BADGE.System}`}>
                           {step.actorRole}
                         </span>
@@ -375,15 +375,15 @@ export function WorkflowDetailView({ workflow, canEdit, canDelete }: Props) {
                           {step.type}
                         </span>
                         {step.required && (
-                          <span className="inline-flex items-center rounded bg-rose-50 text-rose-700 px-2 py-0.5 text-[10px] font-semibold border border-rose-200">
+                          <span className="inline-flex items-center rounded bg-rose-50 text-rose-700 px-2 py-0.5 text-[10px] font-semibold border border-rose-200 dark:bg-rose-900 dark:text-rose-200 dark:border-rose-700">
                             Required
                           </span>
                         )}
                       </div>
                       {step.description && (
-                        <p className="mt-1 text-xs text-slate-600 leading-relaxed">{step.description}</p>
+                        <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">{step.description}</p>
                       )}
-                      <p className="mt-1.5 text-[11px] text-slate-500">
+                      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                         Due {step.dueDaysAfterStart === 0
                           ? "on day of workflow start"
                           : `${step.dueDaysAfterStart} day${step.dueDaysAfterStart === 1 ? "" : "s"} after start`}
@@ -453,8 +453,8 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
   };
 
   return (
-    <form onSubmit={submit} className="border-t border-slate-200 px-5 py-4 space-y-3 bg-slate-50">
-      <h3 className="text-xs font-semibold text-slate-700">Add Step</h3>
+    <form onSubmit={submit} className="border-t border-slate-200 px-5 py-4 space-y-3 bg-slate-50 dark:border-slate-800 dark:bg-slate-800">
+      <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-300">Add Step</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <input
           type="text"
@@ -462,12 +462,12 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Step title"
           required
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
         <select
           value={actor}
           onChange={(e) => setActor(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         >
           {ACTOR_OPTIONS.map((a) => (
             <option key={a} value={a}>Actor: {a}</option>
@@ -476,7 +476,7 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         >
           {TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>Type: {t}</option>
@@ -488,7 +488,7 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
           onChange={(e) => setDueDays(Number(e.target.value))}
           min={0}
           placeholder="Due days after start"
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
       <textarea
@@ -496,10 +496,10 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
         rows={2}
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <div className="flex items-center justify-between gap-3">
-        <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+        <label className="inline-flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
           <input
             type="checkbox"
             checked={required}
@@ -516,7 +516,7 @@ function AddStepForm({ workflowId }: { workflowId: number }) {
         </button>
       </div>
       {error && (
-        <p className="text-xs text-rose-700">{error}</p>
+        <p className="text-xs text-rose-700 dark:text-rose-300">{error}</p>
       )}
     </form>
   );
@@ -542,7 +542,7 @@ function DeleteStepButton({ stepId, disabled }: { stepId: number; disabled: bool
       type="button"
       onClick={handle}
       disabled={disabled || pending}
-      className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40"
+      className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40 dark:text-rose-400 dark:hover:text-rose-300"
     >
       {pending ? "…" : "Delete"}
     </button>

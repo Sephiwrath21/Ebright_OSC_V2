@@ -35,21 +35,21 @@ export default async function PersonalInductionPage({ params }: PageProps) {
         : "The link you used doesn’t match any active induction. Double-check the URL or contact HR.";
 
     return (
-      <main className="h-full flex-1 overflow-y-auto bg-slate-50 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8">
+      <main className="h-full flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-8">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex w-9 h-9 items-center justify-center rounded-full bg-red-100">
-              <AlertCircle className="w-5 h-5 text-red-600" aria-hidden="true" />
+            <span className="mt-0.5 inline-flex w-9 h-9 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" aria-hidden="true" />
             </span>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">{heading}</h1>
-              <p className="mt-1 text-sm text-slate-600">{detail}</p>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{heading}</h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{detail}</p>
             </div>
           </div>
           <div className="mt-6 flex justify-end">
             <Link
               href="/home"
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Go home
             </Link>

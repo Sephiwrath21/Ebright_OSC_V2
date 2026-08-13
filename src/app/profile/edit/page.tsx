@@ -43,10 +43,10 @@ export default async function EditMyProfilePage() {
           isSelfEdit
         />
       ) : (
-        <div className="min-h-full bg-slate-50">
+        <div className="min-h-full bg-slate-50 dark:bg-slate-950">
           <div className="max-w-xl mx-auto px-6 py-24 text-center">
-            <h1 className="text-2xl font-semibold text-slate-900">Profile not found</h1>
-            <p className="mt-2 text-sm text-slate-600">We couldn&apos;t load your profile right now.</p>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Profile not found</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">We couldn&apos;t load your profile right now.</p>
             <Link
               href="/profile"
               className="mt-6 inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
