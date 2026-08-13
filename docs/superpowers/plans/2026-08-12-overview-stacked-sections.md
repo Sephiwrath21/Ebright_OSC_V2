@@ -430,7 +430,7 @@ export function EntityCardOverview({
       </div>
 
       {sortMode === "person" ? (
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No one to show.</p>
           ) : (
@@ -474,7 +474,7 @@ export function EntityCardOverview({
           )}
         </div>
       ) : (
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {categoryCards.map((card) => (
             <div
               key={card.id}
