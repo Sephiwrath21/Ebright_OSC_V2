@@ -24,10 +24,10 @@ export function BranchOnboardingSection({ day3Complete }: Props) {
 
   if (!day3Complete) {
     return (
-      <section className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
         <p className="text-3xl mb-2" aria-hidden="true">🔒</p>
-        <h2 className="text-base font-semibold text-slate-700">3-Week Branch Onboarding</h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <h2 className="text-base font-semibold text-slate-700 dark:text-slate-300">3-Week Branch Onboarding</h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           🔒 Unlocks after Day 3 is completed.
         </p>
       </section>
@@ -37,8 +37,8 @@ export function BranchOnboardingSection({ day3Complete }: Props) {
   const tasks = BRANCH_WEEK_TASKS[activeWeek];
 
   return (
-    <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      <header className="px-5 py-4 border-b border-slate-200">
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <header className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <span className="inline-flex items-center rounded bg-violet-600 text-white text-[10px] font-bold tracking-widest uppercase px-2 py-1">
             3-Week Branch Onboarding
@@ -53,7 +53,7 @@ export function BranchOnboardingSection({ day3Complete }: Props) {
               className={`px-3 py-1.5 rounded-md text-xs font-semibold border ${
                 activeWeek === w
                   ? "bg-violet-600 text-white border-violet-600"
-                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               Week {w}
@@ -61,7 +61,7 @@ export function BranchOnboardingSection({ day3Complete }: Props) {
           ))}
         </div>
       </header>
-      <ul className="divide-y divide-slate-200">
+      <ul className="divide-y divide-slate-200 dark:divide-slate-800">
         {tasks.map((task, i) => (
           <ReadOnlyTaskItem key={i} task={task} />
         ))}
@@ -75,17 +75,17 @@ function ReadOnlyTaskItem({ task }: { task: SpecTask }) {
   return (
     <li className="px-5 py-3 flex items-start gap-3">
       <div
-        className="w-5 h-5 mt-0.5 rounded border-2 border-slate-300 shrink-0 opacity-40 cursor-default"
+        className="w-5 h-5 mt-0.5 rounded border-2 border-slate-300 dark:border-slate-600 shrink-0 opacity-40 cursor-default"
         aria-hidden="true"
       />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-slate-700">{task.title}</p>
+        <p className="text-sm text-slate-700 dark:text-slate-300">{task.title}</p>
         <div className="mt-1 flex items-center gap-2">
-          <span className="inline-flex items-center rounded bg-slate-800 text-white text-[10px] font-semibold px-1.5 py-0.5">
+          <span className="inline-flex items-center rounded bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-semibold px-1.5 py-0.5">
             {task.actor}
           </span>
           {!isCandidateActor && (
-            <span className="text-[11px] text-amber-700 font-semibold">
+            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold">
               ⏳ Awaiting {task.actor}
             </span>
           )}
