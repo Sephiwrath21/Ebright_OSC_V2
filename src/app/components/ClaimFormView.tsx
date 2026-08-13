@@ -239,7 +239,7 @@ const THEMES: Record<ClaimFormType, Theme> = {
 const TRANSPORT_RATE = 0.7;
 const TRANSPORT_ROUND_TRIP = 2;
 const HEALTH_ANNUAL_CAP = 500;
-const ACCENT_RED = "#E3172E";
+const ACCENT_RED = "var(--status-red-fg)";
 
 export default function ClaimFormView({
   type,
@@ -453,10 +453,10 @@ export default function ClaimFormView({
     height: "44px",
     padding: "0 16px",
     borderRadius: "10px",
-    border: "1px solid #E5E7EB",
-    background: "#fff",
+    border: "1px solid var(--status-track)",
+    background: "var(--surface-sunken)",
     fontSize: "14px",
-    color: "#171717",
+    color: "var(--text-primary)",
     outline: "none",
     transition: "border-color 0.15s, box-shadow 0.15s",
   };
@@ -466,12 +466,12 @@ export default function ClaimFormView({
     e.currentTarget.style.boxShadow = `0 0 0 4px ${theme.accentRing}`;
   };
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-    e.currentTarget.style.borderColor = "#E5E7EB";
+    e.currentTarget.style.borderColor = "var(--status-track)";
     e.currentTarget.style.boxShadow = "none";
   };
 
   return (
-    <div className="min-h-full" style={{ backgroundColor: "#FAFAFA" }}>
+    <div className="min-h-full" style={{ backgroundColor: "var(--surface-subtle)" }}>
       <div style={{ maxWidth: "820px", margin: "0 auto", padding: "24px 24px 56px" }}>
         {/* Breadcrumb */}
         <nav
@@ -482,7 +482,7 @@ export default function ClaimFormView({
             flexWrap: "wrap",
             gap: "6px",
             fontSize: "13px",
-            color: "#737373",
+            color: "var(--text-neutral)",
             marginBottom: "24px",
           }}
         >
@@ -490,22 +490,22 @@ export default function ClaimFormView({
             <Home size={13} strokeWidth={2} aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight size={12} style={{ color: "#D4D4D4" }} aria-hidden="true" />
+          <ChevronRight size={12} style={{ color: "var(--border-neutral)" }} aria-hidden="true" />
           <Link href="/dashboards/hrms">HRMS</Link>
-          <ChevronRight size={12} style={{ color: "#D4D4D4" }} aria-hidden="true" />
+          <ChevronRight size={12} style={{ color: "var(--border-neutral)" }} aria-hidden="true" />
           <Link href="/claim">Claims</Link>
-          <ChevronRight size={12} style={{ color: "#D4D4D4" }} aria-hidden="true" />
+          <ChevronRight size={12} style={{ color: "var(--border-neutral)" }} aria-hidden="true" />
           <Link href="/claim/new">New</Link>
-          <ChevronRight size={12} style={{ color: "#D4D4D4" }} aria-hidden="true" />
-          <span style={{ color: "#171717", fontWeight: 500 }}>{theme.label}</span>
+          <ChevronRight size={12} style={{ color: "var(--border-neutral)" }} aria-hidden="true" />
+          <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{theme.label}</span>
         </nav>
 
         {/* Form card */}
         <form
           onSubmit={handleSubmit}
           style={{
-            backgroundColor: "#fff",
-            border: "1px solid #E5E7EB",
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--status-track)",
             borderRadius: "20px",
             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
             overflow: "hidden",
@@ -517,7 +517,7 @@ export default function ClaimFormView({
               position: "relative",
               padding: "28px 32px 24px",
               background: `linear-gradient(135deg, ${theme.accentSoft} 0%, #fff 60%)`,
-              borderBottom: "1px solid #F3F4F6",
+              borderBottom: "1px solid var(--border-subtle)",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -545,14 +545,14 @@ export default function ClaimFormView({
                   style={{
                     fontSize: "22px",
                     fontWeight: 700,
-                    color: "#171717",
+                    color: "var(--text-primary)",
                     lineHeight: 1.15,
                     letterSpacing: "-0.01em",
                   }}
                 >
                   {theme.label}
                 </h1>
-                <p style={{ fontSize: "13.5px", color: "#737373", marginTop: "4px" }}>
+                <p style={{ fontSize: "13.5px", color: "var(--text-neutral)", marginTop: "4px" }}>
                   {theme.subtitle}
                 </p>
               </div>
@@ -565,9 +565,9 @@ export default function ClaimFormView({
                   display: "grid",
                   placeItems: "center",
                   borderRadius: "10px",
-                  color: "#A3A3A3",
+                  color: "var(--text-neutral-faint)",
                 }}
-                className="hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                className="hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
               >
                 <X size={18} aria-hidden="true" />
               </Link>
@@ -645,7 +645,7 @@ export default function ClaimFormView({
                         fontSize: "11px",
                         fontWeight: 700,
                         letterSpacing: "0.15em",
-                        color: "#A3A3A3",
+                        color: "var(--text-neutral-faint)",
                         pointerEvents: "none",
                       }}
                     >
@@ -673,7 +673,7 @@ export default function ClaimFormView({
                         transform: "translateY(-50%)",
                         fontSize: "13px",
                         fontWeight: 600,
-                        color: "#737373",
+                        color: "var(--text-neutral)",
                         pointerEvents: "none",
                       }}
                     >
@@ -720,14 +720,14 @@ export default function ClaimFormView({
                             placeholder={`Student ${i + 1} full name`}
                             style={{
                               ...inputStyle,
-                              borderColor: isDup ? ACCENT_RED : "#E5E7EB",
+                              borderColor: isDup ? ACCENT_RED : "var(--status-track)",
                               paddingRight: isDup ? "104px" : "16px",
                             }}
                             onFocus={handleFocus}
                             onBlur={(e) => {
                               e.currentTarget.style.borderColor = isDup
                                 ? ACCENT_RED
-                                : "#E5E7EB";
+                                : "var(--status-track)";
                               e.currentTarget.style.boxShadow = "none";
                             }}
                           />
@@ -760,9 +760,9 @@ export default function ClaimFormView({
                               display: "grid",
                               placeItems: "center",
                               borderRadius: "10px",
-                              border: "1px solid #E5E7EB",
-                              backgroundColor: "#fff",
-                              color: "#A3A3A3",
+                              border: "1px solid var(--status-track)",
+                              backgroundColor: "var(--surface)",
+                              color: "var(--text-neutral-faint)",
                               cursor: "pointer",
                             }}
                           >
@@ -784,7 +784,7 @@ export default function ClaimFormView({
                         gap: "6px",
                         fontSize: "12.5px",
                         fontWeight: 600,
-                        color: students.length >= 20 ? "#A3A3A3" : theme.accentText,
+                        color: students.length >= 20 ? "var(--text-neutral-faint)" : theme.accentText,
                         background: "transparent",
                         border: "none",
                         cursor: students.length >= 20 ? "not-allowed" : "pointer",
@@ -806,9 +806,9 @@ export default function ClaimFormView({
             {/* Health annual cap */}
             {type === "health" && (() => {
               const stateColor = healthOverCap
-                ? { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", bar: "#DC2626" }
+                ? { bg: "var(--tint-red)", border: "var(--tint-red-strong)", text: "var(--accent-red-strong)", bar: "var(--status-red-fg)" }
                 : healthNearCap
-                  ? { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E", bar: "#D97706" }
+                  ? { bg: "var(--tint-amber)", border: "var(--accent-amber)", text: "var(--accent-amber-strong)", bar: "var(--accent-amber)" }
                   : {
                       bg: theme.accentSoft,
                       border: theme.accentBorder,
@@ -1014,11 +1014,11 @@ export default function ClaimFormView({
                     style={{
                       cursor: "pointer",
                       borderRadius: "14px",
-                      border: `2px dashed ${dragOver ? theme.accent : "#E5E7EB"}`,
+                      border: `2px dashed ${dragOver ? theme.accent : "var(--status-track)"}`,
                       padding: "32px",
                       textAlign: "center",
                       transition: "all 0.2s",
-                      backgroundColor: dragOver ? theme.accentSoft : "#FAFAFA",
+                      backgroundColor: dragOver ? theme.accentSoft : "var(--surface-subtle)",
                     }}
                   >
                     <input
@@ -1040,19 +1040,19 @@ export default function ClaimFormView({
                         borderRadius: "9999px",
                         display: "grid",
                         placeItems: "center",
-                        backgroundColor: dragOver ? theme.accentRing : "#F5F5F5",
+                        backgroundColor: dragOver ? theme.accentRing : "var(--status-neutral-bg)",
                       }}
                     >
                       <Upload
                         size={18}
                         strokeWidth={1.75}
-                        style={{ color: dragOver ? theme.accent : "#737373" }}
+                        style={{ color: dragOver ? theme.accent : "var(--text-neutral)" }}
                       />
                     </div>
                     <p
                       style={{
                         fontSize: "13.5px",
-                        color: "#404040",
+                        color: "var(--text-strong)",
                         fontWeight: 500,
                         marginBottom: "4px",
                       }}
@@ -1060,7 +1060,7 @@ export default function ClaimFormView({
                       Click to upload{" "}
                       <span style={{ color: theme.accent }}>documents and evidences</span>
                     </p>
-                    <p style={{ fontSize: "11.5px", color: "#A3A3A3" }}>
+                    <p style={{ fontSize: "11.5px", color: "var(--text-neutral-faint)" }}>
                       PDF, JPG or PNG · Up to {MAX_CLAIM_DOCS} files · Max 5MB each
                     </p>
                   </div>
@@ -1074,7 +1074,7 @@ export default function ClaimFormView({
                           justifyContent: "space-between",
                         }}
                       >
-                        <span style={{ fontSize: "11.5px", fontWeight: 600, color: "#737373" }}>
+                        <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-neutral)" }}>
                           {docFiles.length} of {MAX_CLAIM_DOCS} file
                           {docFiles.length === 1 ? "" : "s"}
                         </span>
@@ -1179,11 +1179,11 @@ export default function ClaimFormView({
                   style={{
                     cursor: "pointer",
                     borderRadius: "14px",
-                    border: `2px dashed ${dragOver ? theme.accent : "#E5E7EB"}`,
+                    border: `2px dashed ${dragOver ? theme.accent : "var(--status-track)"}`,
                     padding: "32px",
                     textAlign: "center",
                     transition: "all 0.2s",
-                    backgroundColor: dragOver ? theme.accentSoft : "#FAFAFA",
+                    backgroundColor: dragOver ? theme.accentSoft : "var(--surface-subtle)",
                   }}
                 >
                   <input
@@ -1201,19 +1201,19 @@ export default function ClaimFormView({
                       borderRadius: "9999px",
                       display: "grid",
                       placeItems: "center",
-                      backgroundColor: dragOver ? theme.accentRing : "#F5F5F5",
+                      backgroundColor: dragOver ? theme.accentRing : "var(--status-neutral-bg)",
                     }}
                   >
                     <Upload
                       size={18}
                       strokeWidth={1.75}
-                      style={{ color: dragOver ? theme.accent : "#737373" }}
+                      style={{ color: dragOver ? theme.accent : "var(--text-neutral)" }}
                     />
                   </div>
                   <p
                     style={{
                       fontSize: "13.5px",
-                      color: "#404040",
+                      color: "var(--text-strong)",
                       fontWeight: 500,
                       marginBottom: "4px",
                     }}
@@ -1221,7 +1221,7 @@ export default function ClaimFormView({
                     Click to upload{" "}
                     <span style={{ color: theme.accent }}>Receipt or MC</span>
                   </p>
-                  <p style={{ fontSize: "11.5px", color: "#A3A3A3" }}>
+                  <p style={{ fontSize: "11.5px", color: "var(--text-neutral-faint)" }}>
                     PDF, JPG or PNG · Max 5MB
                   </p>
                 </div>
@@ -1353,22 +1353,22 @@ export default function ClaimFormView({
                 gap: "12px",
                 alignItems: "flex-start",
                 borderRadius: "12px",
-                backgroundColor: "#FFFBEB",
-                border: "1px solid #FDE68A",
+                backgroundColor: "var(--tint-amber)",
+                border: "1px solid var(--accent-amber)",
                 padding: "14px 16px",
               }}
             >
               <Clock
                 size={17}
                 strokeWidth={2}
-                style={{ color: "#D97706", marginTop: "2px", flexShrink: 0 }}
+                style={{ color: "var(--accent-amber)", marginTop: "2px", flexShrink: 0 }}
                 aria-hidden="true"
               />
               <div>
-                <p style={{ fontSize: "13.5px", fontWeight: 600, color: "#78350F", marginBottom: "2px" }}>
+                <p style={{ fontSize: "13.5px", fontWeight: 600, color: "var(--accent-amber-strong)", marginBottom: "2px" }}>
                   Submission Deadline
                 </p>
-                <p style={{ fontSize: "12px", color: "#92400E", lineHeight: 1.55 }}>
+                <p style={{ fontSize: "12px", color: "var(--accent-amber-strong)", lineHeight: 1.55 }}>
                   Submit by the <b>2nd</b> of each month. Late submissions roll into the
                   next cycle.
                 </p>
@@ -1435,8 +1435,8 @@ export default function ClaimFormView({
                   gap: "12px",
                   alignItems: "flex-start",
                   borderRadius: "12px",
-                  backgroundColor: "#FEF2F2",
-                  border: "1px solid #FECACA",
+                  backgroundColor: "var(--tint-red)",
+                  border: "1px solid var(--tint-red-strong)",
                   padding: "14px 16px",
                 }}
               >
@@ -1458,10 +1458,10 @@ export default function ClaimFormView({
                   !
                 </div>
                 <div>
-                  <p style={{ fontSize: "13.5px", fontWeight: 600, color: "#7F1D1D" }}>
+                  <p style={{ fontSize: "13.5px", fontWeight: 600, color: "var(--accent-red-strong)" }}>
                     Could not submit claim
                   </p>
-                  <p style={{ fontSize: "12px", color: "#991B1B", lineHeight: 1.55 }}>
+                  <p style={{ fontSize: "12px", color: "var(--accent-red-strong)", lineHeight: 1.55 }}>
                     {errorMsg}
                   </p>
                 </div>
@@ -1473,8 +1473,8 @@ export default function ClaimFormView({
           <div
             style={{
               padding: "18px 32px",
-              borderTop: "1px solid #F3F4F6",
-              backgroundColor: "#FAFAFA",
+              borderTop: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--surface-subtle)",
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
@@ -1489,13 +1489,13 @@ export default function ClaimFormView({
                 alignItems: "center",
                 padding: "0 20px",
                 borderRadius: "10px",
-                border: "1px solid #E5E7EB",
-                backgroundColor: "#fff",
+                border: "1px solid var(--status-track)",
+                backgroundColor: "var(--surface)",
                 fontSize: "13.5px",
                 fontWeight: 500,
-                color: "#404040",
+                color: "var(--text-strong)",
               }}
-              className="hover:bg-neutral-50 transition-colors"
+              className="hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
             >
               Cancel
             </Link>
@@ -1506,7 +1506,7 @@ export default function ClaimFormView({
                 height: "44px",
                 padding: "0 24px",
                 borderRadius: "10px",
-                backgroundColor: canSubmit && !isPending ? theme.accent : "#D4D4D4",
+                backgroundColor: canSubmit && !isPending ? theme.accent : "var(--border-neutral)",
                 color: "#fff",
                 fontSize: "13.5px",
                 fontWeight: 600,
@@ -1625,7 +1625,7 @@ function FieldBlock({
           fontWeight: 600,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "#737373",
+          color: "var(--text-neutral)",
         }}
       >
         {icon}
@@ -1639,7 +1639,7 @@ function FieldBlock({
         <p
           style={{
             fontSize: "11.5px",
-            color: "#A3A3A3",
+            color: "var(--text-neutral-faint)",
             display: "inline-flex",
             alignItems: "center",
             gap: "4px",
@@ -1653,7 +1653,7 @@ function FieldBlock({
 }
 
 function Divider() {
-  return <div style={{ height: "1px", backgroundColor: "#F3F4F6" }} />;
+  return <div style={{ height: "1px", backgroundColor: "var(--border-subtle)" }} />;
 }
 
 function CalcCell({ label, value }: { label: string; value: string }) {
@@ -1754,7 +1754,7 @@ function SuccessScreen({
     <div
       style={{
         minHeight: "100%",
-        backgroundColor: "#FAFAFA",
+        backgroundColor: "var(--surface-subtle)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1767,19 +1767,19 @@ function SuccessScreen({
             width: "64px",
             height: "64px",
             borderRadius: "9999px",
-            backgroundColor: "#ECFDF5",
+            backgroundColor: "var(--tint-green)",
             display: "grid",
             placeItems: "center",
             margin: "0 auto 20px",
           }}
         >
-          <CheckCircle2 size={32} strokeWidth={1.75} style={{ color: "#10B981" }} />
+          <CheckCircle2 size={32} strokeWidth={1.75} style={{ color: "var(--accent-green)" }} />
         </div>
         <h2
           style={{
             fontSize: "24px",
             fontWeight: 700,
-            color: "#171717",
+            color: "var(--text-primary)",
             marginBottom: "8px",
           }}
         >
@@ -1788,17 +1788,17 @@ function SuccessScreen({
         <p
           style={{
             fontSize: "13.5px",
-            color: "#737373",
+            color: "var(--text-neutral)",
             lineHeight: 1.55,
             marginBottom: "4px",
           }}
         >
           Your {theme.label.toLowerCase()} of{" "}
-          <span style={{ fontWeight: 600, color: "#262626" }}>{amountLabel}</span> for{" "}
-          <span style={{ fontWeight: 600, color: "#262626" }}>{date}</span> has been sent
+          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{amountLabel}</span> for{" "}
+          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{date}</span> has been sent
           for approval.
         </p>
-        <p style={{ fontSize: "12px", color: "#A3A3A3", marginBottom: "32px" }}>
+        <p style={{ fontSize: "12px", color: "var(--text-neutral-faint)", marginBottom: "32px" }}>
           You&apos;ll receive a notification once it&apos;s reviewed.
         </p>
         <div
@@ -1812,11 +1812,11 @@ function SuccessScreen({
               alignItems: "center",
               padding: "0 20px",
               borderRadius: "10px",
-              border: "1px solid #E5E7EB",
-              backgroundColor: "#fff",
+              border: "1px solid var(--status-track)",
+              backgroundColor: "var(--surface)",
               fontSize: "13.5px",
               fontWeight: 500,
-              color: "#404040",
+              color: "var(--text-strong)",
             }}
           >
             Back to Claims
