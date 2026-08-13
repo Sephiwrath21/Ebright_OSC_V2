@@ -129,11 +129,13 @@ export function TaskManagerView({
   /** EntityCardOverview's "HOD Assigned Task" filter mode (Overview card
    *  redesign, 2026-08-12) — all-time, HOD-assigned-only entity payload,
    *  fetched server-side alongside daily/monthly. Null when the viewer has
-   *  no department/branch to fetch it for, or the fetch failed; the card
-   *  falls back to `monthly.department`/`monthly.branch` in that case (see
-   *  the fallback below) rather than crashing on undefined. */
+   *  no department/branch to fetch it for, or the fetch failed; the section
+   *  is omitted entirely in that case (TaskOverviewStack's hodAssigned prop
+   *  is left undefined) rather than falling back to other data. */
   hodAssignedDepartment?: { department: FlowEntityDetail } | null;
   hodAssignedBranch?: { branch: FlowEntityDetail } | null;
+  /** CEO Assigned Task equivalent of hodAssignedDepartment/hodAssignedBranch
+   *  above — same shape, same omit-on-null behavior. */
   ceoAssignedDepartment?: { department: FlowEntityDetail } | null;
   ceoAssignedBranch?: { branch: FlowEntityDetail } | null;
   /** Active task categories — feeds EntityCardOverview's "Sort: Type" mode. */
@@ -621,7 +623,7 @@ export function TaskManagerView({
 
       {/* ---- Branch Overview (branch kind) — below My Tasks since the
           2026-07-29 personal-first reorder. SAME component as Department
-          Overview (EntityCardOverview, 2026-08-12 redesign): "{branch} —
+          Overview (TaskOverviewStack, 2026-08-12 redesign): "{branch} —
           Overview" heading + Filter/Date/Sort/View controls, and
           person/type-grouped task cards (Manager → Branch Exec →
           FT Coach → PT Coach sort, applied by the data layer). ---- */}
