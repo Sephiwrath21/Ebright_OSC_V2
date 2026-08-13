@@ -615,6 +615,16 @@ export default async function TaskManagerPage({
     // re-checks (incl. HOD's own-department scoping) on every call.
     const canReassign = role === "ADMIN" || role === "OPS" || role === "HOD" || elevatedDeptSite;
     const reassign = canReassign ? { staff, action: reassignTask } : undefined;
+    // Self-service "Assign to Others" for the TaskOverviewStack card grids
+    // (2026-08-13) — DELIBERATELY unconditional/unrestricted-by-role,
+    // unlike `reassign` above: reassignFlowTask's own self-service branch
+    // only ever lets the caller hand off a task that's already THEIRS, so
+    // every viewer gets this control regardless of role — the data layer
+    // re-enforces the same-department/branch scope, this is purely "does
+    // the trigger render" on the client. Reuses the same reassignTask
+    // action as the manager-only `reassign` above — one server action,
+    // two different authorization paths inside reassignFlowTask.
+    const cardReassign = { staff, action: reassignTask };
     // Same gate as the /task-manager/categories admin page and
     // createTaskCategory's own server-side check — only these viewers get
     // the assign form's inline "+ Add new type" option (2026-08-12).
@@ -734,6 +744,7 @@ export default async function TaskManagerPage({
               onReopen={reopenTask}
               onUploadProof={uploadProof}
               onRemoveProof={removeProof}
+              reassign={cardReassign}
             />
           </>
         );
@@ -783,6 +794,7 @@ export default async function TaskManagerPage({
               onReopen={reopenTask}
               onUploadProof={uploadProof}
               onRemoveProof={removeProof}
+              reassign={cardReassign}
             />
           </>
         );
@@ -980,6 +992,7 @@ export default async function TaskManagerPage({
         uploadProofAction={uploadProof}
         removeProofAction={removeProof}
         reassign={reassign}
+        cardReassign={cardReassign}
         manpowerScheduleHref="/task-manager/manpower-schedule"
         staff={staff}
         hodKanban={hodKanban}

@@ -16,20 +16,25 @@
 // task that isn't the viewer's own). This is exactly the confirmed Task
 // Interactivity rule (own card actionable, everyone else's read-only) —
 // achieved for free by passing the SAME action props to every row in every
-// card, with no extra per-card conditional logic needed here.
+// card, with no extra per-card conditional logic needed here. Due Date and
+// the status text badge are suppressed on every row via TaskRowLine's
+// hideDueDate/hideStatusChip (2026-08-13) — a plain checklist (dot + title)
+// was always the design intent; those two columns were an artifact of
+// reusing TaskRowLine's richer "My Tasks" rendering, not a deliberate
+// addition.
 //
-// Type-sort cards stay a plain, read-only Task/Assignee table — a category
-// card mixes multiple people's tasks together, which doesn't map cleanly
-// onto "my own row is actionable" the way a Person-sort card does; the
-// confirmed Task Interactivity requirement was specifically about the
-// self-scoped Daily/Monthly card, reachable via Person-sort. A viewer can
-// always switch to Person-sort to act on their own task.
-//
-// Known, accepted gap (2026-08-12, unchanged from the original redesign):
-// the old EntityOverviewSection roster had an "Assign to Others" reassign
-// action on every pending row. Neither this component nor its predecessor
-// has that — cut deliberately for the first pass. Reassign from the
-// viewer's own delegated/ad hoc tasks still works elsewhere on this page.
+// "Assign to Others" (2026-08-13, self-service): every row — own card AND
+// Type-sort rows alike — gets a reassign trigger when it's the VIEWER'S
+// OWN pending task, letting them hand it off to a teammate without needing
+// a manager role. TaskRowLine handles this itself (own isOwned check,
+// gated to pending); the Type-sort table below wires the same
+// ReassignPicker (bits.tsx) directly, since it doesn't use TaskRowLine.
+// reassignFlowTask (data layer) re-enforces the same-department/branch
+// scope regardless of what this UI shows. Reassigning an OTHER person's
+// task from this card grid (manager oversight, not self-service) is still
+// not supported here — unchanged, known gap from the original redesign;
+// use the existing delegated/ad hoc oversight cards elsewhere on this page
+// for that.
 import * as React from "react";
 import type {
   ActionResult,
@@ -40,7 +45,7 @@ import type {
   ProofUploadHandler,
 } from "./types";
 import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
-import { TaskRowLine } from "./bits";
+import { ReassignPicker, TaskRowLine, type ReassignControl } from "./bits";
 
 type SortMode = "person" | "type";
 
@@ -61,6 +66,7 @@ export function EntityCardOverview({
   onReopen,
   onUploadProof,
   onRemoveProof,
+  reassign,
 }: {
   /** The section's own heading, e.g. "Daily" / "Monthly" / "HOD Assigned
    *  Task" / "CEO Assigned Task" — TaskOverviewStack renders it above this
@@ -96,9 +102,16 @@ export function EntityCardOverview({
   onReopen?: (runBlockId: string) => Promise<ActionResult>;
   onUploadProof?: ProofUploadHandler;
   onRemoveProof?: ProofRemoveHandler;
+  /** "Assign to Others" self-service handoff (2026-08-13) — passed straight
+   *  through to every row (Person-sort via TaskRowLine, Type-sort via a
+   *  direct ReassignPicker wiring below); only ever surfaces on the
+   *  viewer's own pending task, regardless of which card/row it appears
+   *  in. Omit to disable the action everywhere in this section. */
+  reassign?: ReassignControl;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   const [onlyMe, setOnlyMe] = React.useState(false);
+  const [typeReassignOpen, setTypeReassignOpen] = React.useState<string | null>(null);
 
   const tasks = flattenTasks(entity);
   const scopeId = showViewToggle && onlyMe ? myUserId : undefined;
@@ -162,6 +175,9 @@ export function EntityCardOverview({
                           onUploadProof={onUploadProof}
                           onRemoveProof={onRemoveProof}
                           hideCompleted={isOwnCard}
+                          hideDueDate
+                          hideStatusChip
+                          reassign={reassign}
                         />
                       ))
                     )}
@@ -191,12 +207,53 @@ export function EntityCardOverview({
                       </tr>
                     </thead>
                     <tbody>
-                      {card.tasks.map((t) => (
-                        <tr key={t.runBlockId} className="border-t border-dashed border-gray-100">
-                          <td className="truncate py-1.5 pr-2">{t.blockTitle}</td>
-                          <td className="truncate py-1.5 text-gray-500">{t.assigneeName}</td>
-                        </tr>
-                      ))}
+                      {card.tasks.map((t) => {
+                        const canReassignRow =
+                          Boolean(reassign) &&
+                          t.assigneeId === myUserId &&
+                          t.status !== "DONE" &&
+                          t.status !== "SKIPPED";
+                        return (
+                          <React.Fragment key={t.runBlockId}>
+                            <tr className="border-t border-dashed border-gray-100">
+                              <td className="truncate py-1.5 pr-2">{t.blockTitle}</td>
+                              <td className="py-1.5 text-gray-500">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="truncate">{t.assigneeName}</span>
+                                  {canReassignRow && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setTypeReassignOpen(
+                                          typeReassignOpen === t.runBlockId ? null : t.runBlockId,
+                                        )
+                                      }
+                                      className="shrink-0 rounded-full border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                                    >
+                                      Assign to Others
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            {canReassignRow && reassign && typeReassignOpen === t.runBlockId && (
+                              <tr>
+                                <td colSpan={2} className="pb-2">
+                                  <ReassignPicker
+                                    staff={reassign.staff}
+                                    currentAssigneeId={t.assigneeId}
+                                    onPick={async (userId) => {
+                                      const r = await reassign.action(t.runBlockId, userId);
+                                      if (r.ok) setTypeReassignOpen(null);
+                                      return r;
+                                    }}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}

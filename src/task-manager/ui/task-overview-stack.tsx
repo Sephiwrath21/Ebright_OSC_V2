@@ -10,6 +10,7 @@
 import * as React from "react";
 import type { FlowCategoryOption, FlowEntityDetail } from "./types";
 import { EntityCardOverview } from "./entity-card-overview";
+import type { ReassignControl } from "./bits";
 
 interface SectionData {
   entity: FlowEntityDetail;
@@ -30,6 +31,7 @@ export function TaskOverviewStack({
   onReopen,
   onUploadProof,
   onRemoveProof,
+  reassign,
 }: {
   entityName: string;
   categories: FlowCategoryOption[];
@@ -43,6 +45,9 @@ export function TaskOverviewStack({
   onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
   onUploadProof?: import("./types").ProofUploadHandler;
   onRemoveProof?: import("./types").ProofRemoveHandler;
+  /** "Assign to Others" self-service handoff (2026-08-13) — passed through
+   *  identically to every section's EntityCardOverview. */
+  reassign?: ReassignControl;
 }) {
   const sections: { key: string; label: string; data?: SectionData }[] = [
     { key: "daily", label: "Daily", data: daily },
@@ -70,6 +75,7 @@ export function TaskOverviewStack({
               onReopen={onReopen}
               onUploadProof={onUploadProof}
               onRemoveProof={onRemoveProof}
+              reassign={reassign}
             />
           ),
       )}

@@ -1338,6 +1338,9 @@ export function TaskRowLine({
   selected,
   onToggleSelect,
   tree,
+  hideDueDate,
+  hideStatusChip,
+  reassign,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -1382,11 +1385,29 @@ export function TaskRowLine({
     | { kind: "parent"; count: number; expanded: boolean; onToggle: () => void }
     | { kind: "flat" }
     | { kind: "child" };
+  /** Suppress the Due Date display entirely, both the fixed hideCompleted
+   *  column and the free-form badge (2026-08-13, EntityCardOverview's card
+   *  rows — a plain checklist shouldn't show a due-date column). */
+  hideDueDate?: boolean;
+  /** Suppress the status text badge (Completed/Pending/In progress/etc.) —
+   *  only relevant outside hideCompleted mode, which never renders it
+   *  anyway (2026-08-13, same EntityCardOverview motivation as
+   *  hideDueDate). */
+  hideStatusChip?: boolean;
+  /** "Assign to Others" self-service handoff (2026-08-13): when provided
+   *  and this row is the viewer's own pending task, renders a trigger that
+   *  opens the same inline ReassignPicker the manager-oversight
+   *  EntityDrillModal already uses. reassignFlowTask itself re-checks
+   *  authorization (self-service is scoped server-side to same department/
+   *  branch) — this prop only controls whether the trigger renders. */
+  reassign?: ReassignControl;
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedDueDay(task);
+  const canReassign = Boolean(reassign) && isOwned && task.status !== "DONE" && task.status !== "SKIPPED";
+  const [reassignOpen, setReassignOpen] = React.useState(false);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1403,6 +1424,7 @@ export function TaskRowLine({
         : nameWidth;
 
   return (
+    <div>
     <div
       className={`group flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
         hideCompleted && (task.status === "DONE" || task.status === "SKIPPED") ? "opacity-60" : ""
@@ -1536,21 +1558,48 @@ export function TaskRowLine({
       )}
       {/* Due Date: in table mode a FIXED column (constant width/position,
           always rendered — dash when no due date); outside the table the
-          original content-sized badge. */}
-      {hideCompleted ? (
-        <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
-          {dueDisplay ? (
-            <span className={dueDisplay.className}>{dueDisplay.text}</span>
-          ) : (
-            <span className="text-gray-300">—</span>
-          )}
-        </span>
-      ) : (
-        dueDisplay && (
-          <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
-        )
+          original content-sized badge. Suppressed entirely by hideDueDate
+          (2026-08-13, EntityCardOverview's plain-checklist cards). */}
+      {!hideDueDate &&
+        (hideCompleted ? (
+          <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+            {dueDisplay ? (
+              <span className={dueDisplay.className}>{dueDisplay.text}</span>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )}
+          </span>
+        ) : (
+          dueDisplay && (
+            <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+          )
+        ))}
+      {!hideCompleted && !hideStatusChip && <StatusChip status={task.status} />}
+      {canReassign && (
+        <button
+          type="button"
+          onClick={() => setReassignOpen((o) => !o)}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            reassignOpen
+              ? "border-blue-400 bg-blue-50 text-blue-700"
+              : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+          }`}
+        >
+          Assign to Others
+        </button>
       )}
-      {!hideCompleted && <StatusChip status={task.status} />}
+    </div>
+    {canReassign && reassign && reassignOpen && (
+      <ReassignPicker
+        staff={reassign.staff}
+        currentAssigneeId={task.assigneeId}
+        onPick={async (userId) => {
+          const r = await reassign.action(task.runBlockId, userId);
+          if (r.ok) setReassignOpen(false);
+          return r;
+        }}
+      />
+    )}
     </div>
   );
 }
@@ -2472,8 +2521,11 @@ export interface ReassignControl {
  *  one new assignee). Built from the + Task picker's OWN exported pieces
  *  (pickerSearchClass + SinglePersonPickList — same search input, same
  *  "Name · Role" rows), so the two pickers share one styling source and
- *  can't drift apart. Renders under the task row inside EntityDrillModal. */
-function ReassignPicker({
+ *  can't drift apart. Renders under the task row inside EntityDrillModal
+ *  and TaskRowLine; exported (2026-08-13) so EntityCardOverview's Type-sort
+ *  table can reuse it directly too, rather than each caller re-implementing
+ *  the same picker. */
+export function ReassignPicker({
   staff,
   currentAssigneeId,
   onPick,

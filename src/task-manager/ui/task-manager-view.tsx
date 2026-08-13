@@ -93,6 +93,7 @@ export function TaskManagerView({
   uploadProofAction,
   removeProofAction,
   reassign,
+  cardReassign,
   manpowerScheduleHref,
   staff,
   hodKanban,
@@ -139,6 +140,16 @@ export function TaskManagerView({
   /** "Assign to Others" control for every Pending drill modal on this page —
    *  the page only provides it to the 5 assign-capable identities. */
   reassign?: ReassignControl;
+  /** "Assign to Others" self-service handoff (2026-08-13) for the
+   *  TaskOverviewStack card grids (departmentOverview/branchOverview/
+   *  myOverview) — DELIBERATELY separate from `reassign` above: this one is
+   *  built unconditionally (every role, since self-service only ever lets
+   *  the viewer hand off their OWN pending task), while `reassign` stays
+   *  gated to the 5 manager identities for the delegated/ad hoc oversight
+   *  cards elsewhere on this page, unchanged. reassignFlowTask (the shared
+   *  underlying action both ultimately call) re-enforces the correct scope
+   *  server-side either way. */
+  cardReassign?: ReassignControl;
   /** HOD/DEPT_SITE only: replaces daily.department in the inline Details
    *  Daily section — the page re-fetches it for the selected ?date=. */
   departmentDaily?: FlowEntityDetail;
@@ -366,6 +377,7 @@ export function TaskManagerView({
             onReopen={reopenTaskAction}
             onUploadProof={uploadProofAction}
             onRemoveProof={removeProofAction}
+            reassign={cardReassign}
           />
         </>
       )}
@@ -392,6 +404,7 @@ export function TaskManagerView({
             onReopen={reopenTaskAction}
             onUploadProof={uploadProofAction}
             onRemoveProof={removeProofAction}
+            reassign={cardReassign}
           />
           {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
               Manager only, not the view-only BRANCH_SITE login. The
@@ -444,6 +457,7 @@ export function TaskManagerView({
           onReopen={reopenTaskAction}
           onUploadProof={uploadProofAction}
           onRemoveProof={removeProofAction}
+          reassign={cardReassign}
         />
       )}
 
