@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased bg-slate-50`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -41,7 +41,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="h-full overflow-hidden flex flex-col bg-slate-50"
+        className="h-full overflow-hidden flex flex-col"
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>
