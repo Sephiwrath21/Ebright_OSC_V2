@@ -71,7 +71,7 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     expect(shows("BRANCH_SITE", "taskManager", "adhocOversight")).toBe(true);
   });
 
-  it("department staff see EXACTLY Daily/Monthly/HOD Assigned — no stream or delegated extras", () => {
+  it("department/branch staff (myOverview roles) have no stream or delegated extras on Task Manager", () => {
     expect(shows("DEPT_MEMBER", "home", "assignerStreams")).toBe(false);
     expect(shows("DEPT_MEMBER", "taskManager", "assignerStreams")).toBe(false);
     expect(shows("DEPT_MEMBER", "taskManager", "delegated")).toBe(false);
@@ -142,17 +142,10 @@ describe("cross-page consistency invariants", () => {
     }
   });
 
-  it("a My Tasks list implies its personal card (and vice versa for Daily)", () => {
+  it("myTasksDaily/myTasksMonthly no longer appear in any taskManager array (2026-08-12: subsumed into myOverview/departmentOverview/branchOverview — this invariant used to be checked implicitly via the old personalDaily/myTasksDaily pairing test, which became vacuous once neither key remained)", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
-      // CEO exception (2026-08-01 redesign): Home shows the ONE combined
-      // "My Tasks" card (ceoCombinedList) while Task Manager shows the
-      // standard Daily table WITHOUT a separate personal donut card.
-      if (shows(v, "home", "ceoCombinedList") || shows(v, "taskManager", "ceoCombinedList")) continue;
-      expect(shows(v, "taskManager", "myTasksDaily")).toBe(shows(v, "taskManager", "personalDaily"));
-      // Monthly list implies the Monthly card (not necessarily the reverse).
-      if (shows(v, "taskManager", "myTasksMonthly")) {
-        expect(shows(v, "taskManager", "personalMonthly")).toBe(true);
-      }
+      expect(shows(v, "taskManager", "myTasksDaily"), `${v} should not show myTasksDaily on Task Manager`).toBe(false);
+      expect(shows(v, "taskManager", "myTasksMonthly"), `${v} should not show myTasksMonthly on Task Manager`).toBe(false);
     }
   });
 

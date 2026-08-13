@@ -46,17 +46,19 @@ export type SectionKey =
   | "assignerStreams" // generic non-dedicated assigner-stream cards
   | "delegated" // "Task Assignment" card
   // personal lists / boards
-  | "myTasksDaily"
-  | "myTasksMonthly"
+  | "myTasksDaily" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
+  | "myTasksMonthly" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
   | "myTasksAdhoc" // Branch Manager's always-rendered ad hoc list
   | "myBoard" // HOD's personal Kanban
   | "assignedByMeList" // 2026-08-05: HOD's "Task Assignment" inline list
   // (Task/Proof of Completion/Assignee/Due Date, the shared My Tasks table
   // reused read-only) — distinct from "delegated" above, which drives an
   // unused donut card; CEO's equivalent is the separate ceoTaskTable below.
+  // no longer used in any home/taskManager array as of 2026-08-12; retained
+  // pending a cleanup task
   // CEO-specific sections
   | "ceoCombinedList"
-  | "ceoTaskTable"
+  | "ceoTaskTable" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
   | "ceoKanban"
   | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc
 
