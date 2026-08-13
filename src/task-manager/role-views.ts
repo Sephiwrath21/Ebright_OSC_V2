@@ -34,6 +34,7 @@ export type SectionKey =
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
   | "departmentOverview" // own-department detail (chips + donut + roster)
   | "branchOverview" // own-branch detail (same component as department)
+  | "myOverview" // 2026-08-12: self-scoped 4-section stack (no owned entity)
   | "adhocOversight" // branch-wide all-time ad hoc card (Manager oversight)
   | "manpowerLink" // Manpower Schedule link card
   // personal donut cards
@@ -99,33 +100,43 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // drill-down instead.
   CEO: {
     home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
-    taskManager: ["myTasksDaily", "ceoTaskTable", "entityDropdowns"],
+    // 2026-08-12 stacked-sections redesign: myOverview replaces
+    // myTasksDaily (own Daily/Monthly, now actionable card-grid form) and
+    // ceoTaskTable (own delegated-out list) — the CEO no longer has one
+    // combined cross-department "tasks I assigned" table; the same
+    // information is reachable per-department via entityDropdowns's new
+    // CEO Assigned Task section instead (confirmed accepted trade-off, see
+    // design doc addendum). Monthly is new for the CEO here (never had it
+    // before this redesign).
+    taskManager: ["myOverview", "entityDropdowns"],
     weekdayRange: "mon-sun",
     addTaskHeader: true,
   },
   OPS: {
     home: ["orgGrids"],
-    taskManager: ["personalDaily", "personalMonthly", "assignerStreams", "myTasksDaily", "myTasksMonthly"],
+    // 2026-08-12: myOverview replaces personalDaily/personalMonthly/
+    // myTasksDaily/myTasksMonthly (own Daily/Monthly, now actionable
+    // card-grid form). assignerStreams is a different concept (incoming
+    // tasks grouped by who assigned them) and is unaffected. OPS has no
+    // owned department, so myOverview here renders Daily/Monthly only —
+    // no HOD/CEO Assigned Task section (see page.tsx wiring).
+    taskManager: ["myOverview", "assignerStreams"],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
   HOD: {
     home: ["personalDaily", "personalMonthly", "ceoAssigned", "departmentOverview"],
-    // assignedByMeList (2026-08-05): mirrors CEO's own tasks-→-ceoTaskTable
-    // ordering — own tasks/board first, then what HOD delegated OUT to
-    // their department, then the broader department overview. Task
-    // Manager only (Home stays summary-card territory, matching every
-    // other detailed list in this app).
-    taskManager: [
-      "personalDaily",
-      "personalMonthly",
-      "ceoAssigned",
-      "myTasksDaily",
-      "myTasksMonthly",
-      "myBoard",
-      "assignedByMeList",
-      "departmentOverview",
-    ],
+    // 2026-08-12 stacked-sections redesign: personalDaily/personalMonthly/
+    // ceoAssigned/myTasksDaily/myTasksMonthly/assignedByMeList are all
+    // retired from Task Manager (Home keeps them, unchanged) — every one
+    // of them is subsumed into departmentOverview's restructured 4-section
+    // stack: the HOD's own card already appears (actionable) inside the
+    // whole-department Daily/Monthly grid, and the new entity-wide HOD/CEO
+    // Assigned Task sections cover what ceoAssigned (personal, day-
+    // windowed) and assignedByMeList (delegated-out list) used to show,
+    // now visible department-wide instead of just to the HOD. myBoard
+    // (Kanban) is unrelated and unaffected.
+    taskManager: ["myBoard", "departmentOverview"],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
@@ -146,17 +157,13 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   },
   BRANCH_MANAGER: {
     home: ["personalDaily", "personalMonthly", "personalAdhoc", "branchOverview"],
-    taskManager: [
-      "personalDaily",
-      "personalMonthly",
-      "personalAdhoc",
-      "myTasksDaily",
-      "myTasksMonthly",
-      "myTasksAdhoc",
-      "branchOverview",
-      "adhocOversight",
-      "manpowerLink",
-    ],
+    // 2026-08-12: personalDaily/personalMonthly/myTasksDaily/myTasksMonthly
+    // are retired — subsumed into branchOverview's restructured 4-section
+    // stack, same reasoning as HOD's departmentOverview above. Ad hoc
+    // (personalAdhoc/myTasksAdhoc/adhocOversight) and manpowerLink are
+    // UNTOUCHED — a fundamentally different, non-recurring cadence that's
+    // explicitly outside this redesign's scope.
+    taskManager: ["personalAdhoc", "myTasksAdhoc", "branchOverview", "adhocOversight", "manpowerLink"],
     weekdayRange: "tue-sun",
     addTaskHeader: false,
   },
@@ -172,14 +179,28 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // final spec (no generic stream/delegated cards).
   DEPT_MEMBER: {
     home: ["personalDaily", "personalMonthly", "hodAssigned"],
-    taskManager: ["personalDaily", "personalMonthly", "hodAssigned", "myTasksDaily", "myTasksMonthly"],
+    // 2026-08-12 stacked-sections redesign (corrected per review):
+    // myOverview here is NOT self-only for Daily — plain department-side
+    // staff now see their WHOLE department's Daily roster (own card
+    // actionable, everyone else's read-only, same as HOD's own Daily
+    // section), via the new getDepartmentDetail MEMBER-daily exception
+    // (queries.ts). Monthly stays self-only (unchanged from personalMonthly
+    // today). No HOD Assigned Task section — hodAssigned is dropped here
+    // (Home keeps it, unchanged); confirmed correction, not the original
+    // "entity-wide, visible to everyone" plan.
+    taskManager: ["myOverview"],
     weekdayRange: "tue-sat",
     addTaskHeader: false,
   },
   // Branch Exec — Daily ONLY, Tue–Sun (2026-07-29 final spec).
   BRANCH_MEMBER: {
     home: ["personalDaily"],
-    taskManager: ["personalDaily", "myTasksDaily"],
+    // 2026-08-12: myOverview here renders Daily ONLY (no Monthly prop
+    // passed — preserves the Daily-only constraint), whole-branch
+    // visibility via the new getBranchDetail MEMBER-daily exception (same
+    // rule as DEPT_MEMBER's department, applied symmetrically to the
+    // branch side). No HOD/CEO Assigned Task section, same as DEPT_MEMBER.
+    taskManager: ["myOverview"],
     weekdayRange: "tue-sun",
     addTaskHeader: false,
   },
@@ -187,7 +208,8 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // 2026-07-29 final spec).
   COACH: {
     home: ["personalDaily"],
-    taskManager: ["personalDaily", "myTasksDaily"],
+    // Same as BRANCH_MEMBER above — Daily-only whole-branch myOverview.
+    taskManager: ["myOverview"],
     weekdayRange: "wed-sun",
     addTaskHeader: false,
   },
