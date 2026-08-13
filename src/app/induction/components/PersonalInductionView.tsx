@@ -83,27 +83,27 @@ export default function PersonalInductionView({
   const journeyTitle = isOffboarding ? "Offboarding Process" : "Onboarding Journey";
 
   return (
-    <div className="h-full flex-1 overflow-y-auto bg-slate-50">
+    <div className="h-full flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
-        <header className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+        <header className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
             {profile.inductionType}
           </p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="mt-2 text-2xl sm:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
             {headline}
           </h1>
-          <p className="mt-2 text-sm sm:text-base text-slate-600">{subline}</p>
+          <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-300">{subline}</p>
 
           {profile.buddyName && (
-            <div className="mt-5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-              <p className="text-sm font-medium text-amber-900">
+            <div className="mt-5 rounded-xl bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 px-4 py-3">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
                 Your induction buddy is {profile.buddyName}
                 {profile.buddyEmail && (
                   <>
                     {" — "}
                     <a
                       href={`mailto:${profile.buddyEmail}`}
-                      className="underline underline-offset-2 hover:text-amber-700"
+                      className="underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
                     >
                       {profile.buddyEmail}
                     </a>
@@ -116,26 +116,26 @@ export default function PersonalInductionView({
           <div className="mt-6">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Progress</h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Progress</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {completed} of {total} steps complete
                 </p>
               </div>
-              <span className="text-2xl font-semibold tabular-nums text-slate-900">{pct}%</span>
+              <span className="text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{pct}%</span>
             </div>
-            <div className="mt-3 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="mt-3 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-[width] duration-300"
                 style={{ width: `${pct}%` }}
               />
             </div>
             {isHalfway && (
-              <p className="mt-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+              <p className="mt-3 rounded-md bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
                 You&rsquo;re halfway there — keep going!
               </p>
             )}
             {!canMarkComplete && (
-              <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <p className="mt-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
                 Read-only view — sign in as the employee or HR to mark steps complete.
               </p>
             )}
@@ -144,20 +144,20 @@ export default function PersonalInductionView({
 
         {isOffboarding ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+            <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6">
               <header className="mb-4">
-                <h2 className="text-base font-semibold text-slate-900">{journeyTitle}</h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{journeyTitle}</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Your end-to-end flow at a glance.
                 </p>
               </header>
               <WorkflowDiagram steps={profile.steps} />
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+            <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6">
               <header className="mb-4">
-                <h2 className="text-base font-semibold text-slate-900">Your checklist</h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Your checklist</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Mark each task complete as you go.
                 </p>
               </header>
@@ -169,7 +169,7 @@ export default function PersonalInductionView({
             </section>
           </div>
         ) : (
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
             <OnboardingWorkflow
               steps={profile.steps}
               startDate={profile.startDate}
@@ -192,11 +192,11 @@ export default function PersonalInductionView({
         {!isOffboarding && <CandidateWorkflowSection assignment={workflowAssignment} />}
 
         {isComplete && (
-          <footer className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-            <h2 className="text-lg font-semibold text-emerald-900">
+          <footer className="rounded-2xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 p-6 text-center">
+            <h2 className="text-lg font-semibold text-emerald-900 dark:text-emerald-200">
               {isOffboarding ? "Offboarding Complete" : "Onboarding Complete!"}
             </h2>
-            <p className="mt-1 text-sm text-emerald-800">
+            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-300">
               {isOffboarding
                 ? "All exit steps are signed off. Wishing you the best for what comes next."
                 : "You&rsquo;ve finished every step. Welcome aboard."}
