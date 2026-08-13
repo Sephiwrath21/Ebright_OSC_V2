@@ -1151,14 +1151,11 @@ export default async function TaskManagerPage({
         myOverview={{
           entityName: myOverviewData.entityName,
           daily: myOverviewData.daily,
-          // BRANCH_MEMBER/COACH are Daily-only — role-views.ts's weekdayRange
-          // already distinguishes them from DEPT_MEMBER, but myOverview
-          // itself has no role awareness; the simplest correct signal
-          // available here is: does this viewer's weekday range mark them
-          // Daily-only? Reuse weekdayRangeOf(viewRole) already computed
-          // above for the weekday sidebar, rather than re-deriving role
-          // logic a second time.
-          monthly: weekdayRangeOf(viewRole) === "tue-sun" || weekdayRangeOf(viewRole) === "wed-sun" ? undefined : myOverviewData.monthly,
+          // BRANCH_MEMBER/COACH are Daily-only (role-views.ts) — checked
+          // directly by role rather than inferring it from their weekday
+          // range, which exists for a different purpose (picking sidebar
+          // days) and isn't guaranteed to stay coupled to Daily-only-ness.
+          monthly: viewRole === "BRANCH_MEMBER" || viewRole === "COACH" ? undefined : myOverviewData.monthly,
         }}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}

@@ -142,10 +142,10 @@ export function TaskManagerView({
    *  BRANCH_MEMBER/COACH, no hodAssigned/ceoAssigned for OPS/CEO). */
   myOverview?: {
     entityName: string;
-    daily?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
-    monthly?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
-    hodAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
-    ceoAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
+    daily?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
+    ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
   /** Personal date filters (2026-07-28, ?date=/?mdate=): each is mounted on
    *  BOTH its period's personal surfaces — the top Daily/Monthly donut card
