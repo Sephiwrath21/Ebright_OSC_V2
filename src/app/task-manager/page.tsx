@@ -1100,6 +1100,31 @@ export default async function TaskManagerPage({
       };
     }
 
+    // myOverview (2026-08-12): built for every role — TaskManagerView only
+    // renders it when role-views.ts's shows(view, "taskManager", "myOverview")
+    // is true (HOD/DEPT_SITE/BRANCH_MANAGER/BRANCH_SITE/ADMIN/
+    // ELEVATED_DEPT_SITE never read this prop; it's harmless to always
+    // build it, same defensive-but-simple shape as the rest of this
+    // function's optional fetches).
+    const myOverviewData = {
+      entityName: daily.me.me.name,
+      daily: memberWholeDepartmentDaily
+        ? { entity: memberWholeDepartmentDaily.department, dateControl: personalDailyControl, showViewToggle: true }
+        : memberWholeBranchDaily
+          ? { entity: memberWholeBranchDaily.branch, dateControl: personalDailyControl, showViewToggle: true }
+          : { entity: toSelfEntityDetail(daily.me.me, daily.me), dateControl: personalDailyControl, showViewToggle: false },
+      // Monthly stays self-only for every myOverview role, always — even
+      // DEPT_MEMBER (whose Daily section is whole-department) keeps
+      // Monthly self-scoped, per the confirmed correction. Omitted
+      // entirely for BRANCH_MEMBER/COACH (Daily-only) — see below.
+      monthly: { entity: toSelfEntityDetail(monthly.me.me, monthly.me), dateControl: personalMonthlyControl, showViewToggle: false },
+      // No HOD/CEO Assigned Task section for OPS/CEO (no owned entity) —
+      // DEPT_MEMBER/BRANCH_MEMBER/COACH don't get these either per the
+      // confirmed correction, so this stays omitted for every myOverview
+      // role. If a future role needs it, wire hodAssigned/ceoAssigned here
+      // the same way departmentOverview/branchOverview do (a later task).
+    };
+
     body = (
       <TaskManagerView
         daily={daily}
@@ -1123,6 +1148,18 @@ export default async function TaskManagerPage({
         hodAssignedDepartment={hodAssignedDepartment}
         hodAssignedBranch={hodAssignedBranch}
         categoryList={categoryList}
+        myOverview={{
+          entityName: myOverviewData.entityName,
+          daily: myOverviewData.daily,
+          // BRANCH_MEMBER/COACH are Daily-only — role-views.ts's weekdayRange
+          // already distinguishes them from DEPT_MEMBER, but myOverview
+          // itself has no role awareness; the simplest correct signal
+          // available here is: does this viewer's weekday range mark them
+          // Daily-only? Reuse weekdayRangeOf(viewRole) already computed
+          // above for the weekday sidebar, rather than re-deriving role
+          // logic a second time.
+          monthly: weekdayRangeOf(viewRole) === "tue-sun" || weekdayRangeOf(viewRole) === "wed-sun" ? undefined : myOverviewData.monthly,
+        }}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
         personalMonthlyMonthControl={personalMonthlyMonthControl}

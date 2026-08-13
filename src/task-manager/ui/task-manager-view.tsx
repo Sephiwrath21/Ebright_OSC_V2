@@ -78,6 +78,7 @@ export function TaskManagerView({
   hodAssignedDepartment,
   hodAssignedBranch,
   categoryList,
+  myOverview,
   personalDailyControl,
   personalMonthlyControl,
   personalMonthlyMonthControl,
@@ -133,6 +134,19 @@ export function TaskManagerView({
   hodAssignedBranch?: { branch: FlowEntityDetail } | null;
   /** Active task categories — feeds EntityCardOverview's "Sort: Type" mode. */
   categoryList?: FlowCategoryOption[];
+  /** Self-scoped 4-section stack (2026-08-12 stacked-sections redesign) —
+   *  OPS, CEO, and every MEMBER-role viewer (DEPT_MEMBER/BRANCH_MEMBER/
+   *  COACH) with no owned entity. `daily`/`monthly`/`hodAssigned`/
+   *  `ceoAssigned` mirror TaskOverviewStack's own optional per-section
+   *  props exactly — omit a section to omit it (e.g. no monthly for
+   *  BRANCH_MEMBER/COACH, no hodAssigned/ceoAssigned for OPS/CEO). */
+  myOverview?: {
+    entityName: string;
+    daily?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    monthly?: { entity: import("./types").FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    hodAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
+    ceoAssigned?: { entity: import("./types").FlowEntityDetail; showViewToggle: boolean };
+  };
   /** Personal date filters (2026-07-28, ?date=/?mdate=): each is mounted on
    *  BOTH its period's personal surfaces — the top Daily/Monthly donut card
    *  and the matching "My Tasks" heading — so one selection drives the donut
