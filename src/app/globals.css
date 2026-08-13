@@ -88,6 +88,39 @@
   --accent-pink-strong: #9D174D;
   --tint-pink: #FDF2F8;
 
+  /* Per-claim-type tokens: break dark-mode colour collisions between claim
+     types that share a hue family in ClaimFormView/ClaimDetailView (e.g.
+     internship/referral both green, transport/jackpot both amber). Light
+     values below are byte-identical to the shared tokens they replace, so
+     light mode is unchanged — only the matching block in the `.dark` rule
+     further down diverges, to a distinct hue per type. */
+  --claim-referral-fg: #1D9E75;
+  --claim-referral-bg: #E8F7F0;
+  --claim-referral-border: #ECFDF5;
+  --claim-jackpot-accent: #F59E0B;
+  --claim-jackpot-strong: #92400E;
+  --claim-jackpot-soft: #FFFBEB;
+  --claim-jackpot-border: #FFF8EC;
+  --claim-trainer-accent: #EF4444;
+  --claim-trainer-strong: #991B1B;
+  --claim-trainer-soft: #FEF2F2;
+  --claim-trainer-border: #FECACA;
+  --claim-class-accent: #6366F1;
+  --claim-class-strong: #6D28D9;
+  --claim-class-soft: #EDE9FE;
+  --claim-roadshow-accent: #6366F1;
+  --claim-roadshow-strong: #7C3AED;
+  --claim-roadshow-soft: #EDE9FE;
+  --claim-rm-incentive-accent: #7C3AED;
+  --claim-rm-incentive-strong: #6D28D9;
+  --claim-rm-incentive-soft: #EDE9FE;
+  --claim-part-time-accent: #0EA5E9;
+  --claim-part-time-strong: #378ADD;
+  --claim-part-time-soft: #E8F0FB;
+  --claim-showcase-accent: #0EA5E9;
+  --claim-showcase-strong: #378ADD;
+  --claim-showcase-soft: #EFF6FF;
+
   /* Categorical badge pairs for the HR dashboard. Its chips are inline-styled,
      so they read these rather than Tailwind variants. */
   --cat-blue-fg: #185FA5;
@@ -172,6 +205,40 @@
   --accent-pink: #F472B6;           /* pink-400 */
   --accent-pink-strong: #F9A8D4;    /* pink-300 */
   --tint-pink: #831843;             /* pink-900 */
+
+  /* Per-claim-type tokens (dark): a distinct hue per type, breaking the
+     collisions the shared tokens above would otherwise create. Anchor types
+     (sales, health, transport, sales_incentive, renewal_incentive, ot,
+     branch_rank_reward, internship) keep the original shared tokens
+     untouched; these are only for the types that would otherwise collide
+     with an anchor. -900 for fills (never -950 — invisible on slate-900),
+     -300/-400 for text/icons. */
+  --claim-referral-fg: #5EEAD4;          /* teal-300 */
+  --claim-referral-bg: #134E4A;          /* teal-900 */
+  --claim-referral-border: #134E4A;      /* teal-900 */
+  --claim-jackpot-accent: #FB923C;       /* orange-400 */
+  --claim-jackpot-strong: #FDBA74;       /* orange-300 */
+  --claim-jackpot-soft: #7C2D12;         /* orange-900 */
+  --claim-jackpot-border: #7C2D12;       /* orange-900 */
+  --claim-trainer-accent: #FB7185;       /* rose-400 */
+  --claim-trainer-strong: #FDA4AF;       /* rose-300 */
+  --claim-trainer-soft: #881337;         /* rose-900 */
+  --claim-trainer-border: #9F1239;       /* rose-800 */
+  --claim-class-accent: #E879F9;         /* fuchsia-400 */
+  --claim-class-strong: #F0ABFC;         /* fuchsia-300 */
+  --claim-class-soft: #701A75;           /* fuchsia-900 */
+  --claim-roadshow-accent: #22D3EE;      /* cyan-400 */
+  --claim-roadshow-strong: #67E8F9;      /* cyan-300 */
+  --claim-roadshow-soft: #164E63;        /* cyan-900 */
+  --claim-rm-incentive-accent: #F472B6;  /* pink-400 */
+  --claim-rm-incentive-strong: #F9A8D4;  /* pink-300 */
+  --claim-rm-incentive-soft: #831843;    /* pink-900 */
+  --claim-part-time-accent: #4ADE80;     /* green-400 */
+  --claim-part-time-strong: #86EFAC;     /* green-300 */
+  --claim-part-time-soft: #14532D;       /* green-900 */
+  --claim-showcase-accent: #A3E635;      /* lime-400 */
+  --claim-showcase-strong: #BEF264;      /* lime-300 */
+  --claim-showcase-soft: #365314;        /* lime-900 */
 
   /* Categorical badge pairs. The light values are pale tints used as chip
      backgrounds, which read as bright patches on a dark card — so dark flips
