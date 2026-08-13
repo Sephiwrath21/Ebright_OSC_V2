@@ -94,7 +94,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; labe
   pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
   approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
   rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
-  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "#A855F7", label: "Disbursed" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "var(--accent-violet-strong)", label: "Disbursed" },
   received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Received" },
 };
 
