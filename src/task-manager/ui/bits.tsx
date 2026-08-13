@@ -1502,6 +1502,7 @@ export function TaskRowLine({
             className={`min-w-0 truncate text-sm font-semibold ${
               task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
             }`}
+            title={task.blockTitle}
           >
             {task.blockTitle}
           </p>
@@ -1521,7 +1522,7 @@ export function TaskRowLine({
           )}
         </div>
         {!hideCompleted && (
-          <p className="truncate pr-2 text-xs text-gray-500">
+          <p className="truncate pr-2 text-xs text-gray-500" title={`${task.runName} · ${task.flowName}`}>
             {task.runName} · {task.flowName}
           </p>
         )}
