@@ -72,11 +72,11 @@ const DEFAULT_BRANCH = "Subang Taipan";
  *  Carries the selected Daily date across so switching modes keeps it. */
 function ModeTabs({ active, date }: { active: "department" | "branch"; date?: string }) {
   const base = "rounded-lg px-4 py-1.5 text-sm font-medium";
-  const on = "bg-white text-gray-900 shadow-sm";
-  const off = "text-gray-500 hover:text-gray-700";
+  const on = "bg-white text-gray-900 shadow-sm dark:bg-slate-900 dark:text-slate-100";
+  const off = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200";
   const suffix = date ? `&date=${date}` : "";
   return (
-    <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
+    <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-800">
       <Link
         href={`/task-manager?view=department${suffix}`}
         className={`${base} ${active === "department" ? on : off}`}
@@ -468,7 +468,7 @@ export default async function TaskManagerPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold">Task Manager</h1>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                   Your tasks, team status, and assignments — daily and monthly.
                 </p>
               </div>
@@ -565,7 +565,7 @@ export default async function TaskManagerPage({
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
         <div>
           <h1 className="text-2xl font-bold">Task Manager</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
             Your tasks, team status, and assignments — daily and monthly.
           </p>
         </div>
