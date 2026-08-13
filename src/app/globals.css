@@ -72,6 +72,36 @@
   --tint-amber: #FFFBEB;
   --tint-red: #FEF2F2;
   --tint-red-strong: #FECACA;
+
+  /* Extra hue families. Claims has 16 types but the palette above only had
+     ~5 hues, so several types collapsed onto the same colour in dark. */
+  --accent-orange: #EA580C;
+  --accent-orange-strong: #9A3412;
+  --tint-orange: #FFF7ED;
+  --accent-cyan: #0891B2;
+  --accent-cyan-strong: #155E75;
+  --tint-cyan: #ECFEFF;
+  --accent-teal: #0D9488;
+  --accent-teal-strong: #115E59;
+  --tint-teal: #F0FDFA;
+  --accent-pink: #DB2777;
+  --accent-pink-strong: #9D174D;
+  --tint-pink: #FDF2F8;
+
+  /* Categorical badge pairs for the HR dashboard. Its chips are inline-styled,
+     so they read these rather than Tailwind variants. */
+  --cat-blue-fg: #185FA5;
+  --cat-blue-bg: #E6F1FB;
+  --cat-green-fg: #0F6E56;
+  --cat-green-bg: #E1F5EE;
+  --cat-amber-fg: #854F0B;
+  --cat-amber-bg: #FAEEDA;
+  --cat-red-fg: #A32D2D;
+  --cat-red-bg: #FCEBEB;
+  --cat-purple-fg: #3C3489;
+  --cat-purple-bg: #EEEDFE;
+  --cat-gray-fg: #444441;
+  --cat-gray-bg: #F1EFE8;
 }
 
 .dark {
@@ -128,6 +158,36 @@
   --tint-amber: #78350F;      /* amber-900 */
   --tint-red: #7F1D1D;        /* red-900 */
   --tint-red-strong: #991B1B; /* red-800 */
+
+  /* Extra hue families, so the 16 claim types stay tellable apart. */
+  --accent-orange: #FB923C;         /* orange-400 */
+  --accent-orange-strong: #FDBA74;  /* orange-300 */
+  --tint-orange: #7C2D12;           /* orange-900 */
+  --accent-cyan: #22D3EE;           /* cyan-400 */
+  --accent-cyan-strong: #67E8F9;    /* cyan-300 */
+  --tint-cyan: #164E63;             /* cyan-900 */
+  --accent-teal: #2DD4BF;           /* teal-400 */
+  --accent-teal-strong: #5EEAD4;    /* teal-300 */
+  --tint-teal: #134E4A;             /* teal-900 */
+  --accent-pink: #F472B6;           /* pink-400 */
+  --accent-pink-strong: #F9A8D4;    /* pink-300 */
+  --tint-pink: #831843;             /* pink-900 */
+
+  /* Categorical badge pairs. The light values are pale tints used as chip
+     backgrounds, which read as bright patches on a dark card — so dark flips
+     them to a -900 fill with -300 text. */
+  --cat-blue-fg: #93C5FD;   /* blue-300 */
+  --cat-blue-bg: #1E3A8A;   /* blue-900 */
+  --cat-green-fg: #6EE7B7;  /* emerald-300 */
+  --cat-green-bg: #064E3B;  /* emerald-900 */
+  --cat-amber-fg: #FCD34D;  /* amber-300 */
+  --cat-amber-bg: #78350F;  /* amber-900 */
+  --cat-red-fg: #FCA5A5;    /* red-300 */
+  --cat-red-bg: #7F1D1D;    /* red-900 */
+  --cat-purple-fg: #C4B5FD; /* violet-300 */
+  --cat-purple-bg: #4C1D95; /* violet-900 */
+  --cat-gray-fg: #CBD5E1;   /* slate-300 */
+  --cat-gray-bg: #1E293B;   /* slate-800 */
 }
 
 @theme inline {
@@ -148,4 +208,5 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   display: none !important;
   -webkit-appearance: none;
 }
+
 
