@@ -211,7 +211,7 @@ export default function EmployeeForm({
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{ background: "rgba(0, 0, 0, 0.45)" }}
       >
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
           <CredentialScreen
             data={{
               ...state.credentials,
@@ -235,48 +235,48 @@ export default function EmployeeForm({
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-32">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           {isSelfEdit ? (
             <>
-              <Link href="/profile" className="hover:text-slate-900 transition-colors">My Profile</Link>
+              <Link href="/profile" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">My Profile</Link>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-              <span className="text-slate-900 font-medium">Edit</span>
+              <span className="text-slate-900 dark:text-slate-100 font-medium">Edit</span>
             </>
           ) : (
             <>
-              <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+              <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-              <Link href="/dashboard-employee-management" className="hover:text-slate-900 transition-colors">Employees</Link>
+              <Link href="/dashboard-employee-management" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Employees</Link>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
               {isEdit && employee ? (
                 <>
-                  <Link href={`/dashboard-employee-management/${employee.id}`} className="hover:text-slate-900 transition-colors truncate max-w-[180px]">
+                  <Link href={`/dashboard-employee-management/${employee.id}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors truncate max-w-[180px]">
                     {employee.fullName}
                   </Link>
                   <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-                  <span className="text-slate-900 font-medium">Edit</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-medium">Edit</span>
                 </>
               ) : (
-                <span className="text-slate-900 font-medium">New</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium">New</span>
               )}
             </>
           )}
         </nav>
 
         <header className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">{headingText}</h1>
-          <p className="mt-1 text-sm text-slate-500">{headingDesc}</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">{headingText}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{headingDesc}</p>
         </header>
 
         {state?.error && (
-          <div role="alert" className="mb-5 flex items-start gap-3 p-4 rounded-lg border border-red-200 bg-red-50 text-sm text-red-800">
+          <div role="alert" className="mb-5 flex items-start gap-3 p-4 rounded-lg border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 text-sm text-red-800 dark:text-red-200">
             <CircleAlert className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
             <span>{state.error}</span>
           </div>
@@ -303,7 +303,7 @@ export default function EmployeeForm({
                 name="email"
                 type="email"
                 placeholder="name@ebright.my"
-                className={`${inputCls}${isSelfEdit ? " bg-slate-50 text-slate-600" : ""}`}
+                className={`${inputCls}${isSelfEdit ? " bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300" : ""}`}
                 defaultValue={employee?.email ?? ""}
                 required
                 readOnly={isSelfEdit}
@@ -357,12 +357,12 @@ export default function EmployeeForm({
                   type="text"
                   value={existingId}
                   readOnly
-                  className={`${inputCls} bg-slate-50 text-slate-600`}
+                  className={`${inputCls} bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300`}
                 />
               ) : (
                 <div className="flex items-stretch gap-2">
                   <div
-                    className="inline-flex items-center justify-center h-10 w-16 rounded-lg border border-slate-200 bg-slate-50 font-mono text-sm font-semibold text-slate-700 select-none"
+                    className="inline-flex items-center justify-center h-10 w-16 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 font-mono text-sm font-semibold text-slate-700 dark:text-slate-300 select-none"
                     title="Role code (auto from selected role)"
                     aria-label="Role code"
                   >
@@ -379,7 +379,7 @@ export default function EmployeeForm({
                           : "Department code"
                       }
                       className={`${inputCls} pr-8 appearance-none cursor-pointer font-mono ${
-                        fixedDeptForRole !== null ? "bg-slate-50 text-slate-600 cursor-not-allowed" : ""
+                        fixedDeptForRole !== null ? "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-not-allowed" : ""
                       }`}
                     >
                       <option value="" disabled>
@@ -532,19 +532,19 @@ export default function EmployeeForm({
               </div>
             </Field>
             <Field label="Probation">
-              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm cursor-pointer hover:bg-slate-50">
-                <input name="probation" type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked={employee?.probation ?? false} />
-                <span className="text-slate-700">Currently on probation</span>
+              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+                <input name="probation" type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-500 text-blue-600 focus:ring-blue-500" defaultChecked={employee?.probation ?? false} />
+                <span className="text-slate-700 dark:text-slate-300">Currently on probation</span>
               </label>
             </Field>
 
             {!isEdit && !isSelfEdit && (
               <div className="col-span-2 space-y-4">
-                <hr className="border-slate-200" />
+                <hr className="border-slate-200 dark:border-slate-800" />
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">Assign to onboarding</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Assign to onboarding</p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       Generate login credentials and assign an induction workflow.
                     </p>
                   </div>
@@ -556,12 +556,12 @@ export default function EmployeeForm({
                       onChange={(e) => setAssignOnboarding(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-blue-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-5" />
+                    <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-blue-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-5" />
                   </label>
                 </div>
 
                 {assignOnboarding && (
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-blue-100 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/20 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Workflow Template" required>
                       <div className="relative">
                         <select
@@ -676,19 +676,19 @@ export default function EmployeeForm({
           </Section>
           </div>
 
-          <div className="sticky bottom-0 -mx-6 px-6 py-4 bg-slate-50/85 backdrop-blur border-t border-slate-200 flex items-center justify-end gap-2">
+          <div className="sticky bottom-0 -mx-6 px-6 py-4 bg-slate-50/85 dark:bg-slate-950/85 backdrop-blur border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => router.push(isSelfEdit ? "/profile" : isEdit && employee ? `/dashboard-employee-management/${employee.id}` : "/dashboard-employee-management")}
               disabled={pending}
-              className="h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
+              className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={pending}
-              className="h-10 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="h-10 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {pending ? savingText : saveButtonText}
             </button>
@@ -700,7 +700,7 @@ export default function EmployeeForm({
 }
 
 const inputCls =
-  "block w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "block w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
 
 // ──────────────────────────────────────────────────────────
 // TabNav — pill-segmented control matching the AppShell tabs.
@@ -711,7 +711,7 @@ function TabNav({ active, onChange }: { active: TabKey; onChange: (key: TabKey) 
     <div
       role="tablist"
       aria-label="Employee form sections"
-      className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100"
+      className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800"
     >
       {TABS.map((t) => {
         const isActive = t.key === active;
@@ -722,10 +722,10 @@ function TabNav({ active, onChange }: { active: TabKey; onChange: (key: TabKey) 
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(t.key)}
-            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
               isActive
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
             {t.label}
@@ -797,10 +797,10 @@ function PhoneInput({
   const submitValue = digits ? `+60 ${formatted}` : "";
 
   return (
-    <div className="flex items-stretch h-10 rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+    <div className="flex items-stretch h-10 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
       <span
         aria-hidden="true"
-        className="inline-flex items-center px-3 bg-slate-50 border-r border-slate-200 text-sm font-semibold text-slate-600 select-none"
+        className="inline-flex items-center px-3 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 select-none"
       >
         +60
       </span>
@@ -811,7 +811,7 @@ function PhoneInput({
         value={formatted}
         onChange={(e) => setDigits(e.target.value.replace(/\D/g, "").slice(0, 10))}
         placeholder="11-XXXX XXXX"
-        className="flex-1 px-3 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        className="flex-1 px-3 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
       />
       <input type="hidden" name={name} value={submitValue} />
     </div>
@@ -832,14 +832,14 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl border border-slate-200 shadow-sm">
-      <header className="flex items-center gap-3 px-6 py-5 border-b border-slate-100">
-        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-blue-600" aria-hidden="true" />
+    <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <header className="flex items-center gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 flex items-center justify-center shrink-0">
+          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-300" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-500">{description}</p>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
       </header>
@@ -865,12 +865,12 @@ function Field({
 }) {
   return (
     <label className={`block ${span === 2 ? "md:col-span-2" : ""}`}>
-      <span className="block text-sm font-medium text-slate-700 mb-1.5">
+      <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
         {label}
-        {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
+        {required && <span className="text-red-500 dark:text-red-400 ml-0.5" aria-hidden="true">*</span>}
       </span>
       {children}
-      {hint && <span className="block mt-1 text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="block mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</span>}
     </label>
   );
 }

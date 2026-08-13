@@ -104,22 +104,22 @@ function StatCard({
     <>
       <div className={`absolute top-0 left-0 right-0 h-[3px] ${accentClass}`} aria-hidden="true" />
       <Icon
-        className="absolute top-3 right-3 w-10 h-10 text-slate-200 pointer-events-none"
+        className="absolute top-3 right-3 w-10 h-10 text-slate-200 dark:text-slate-800 pointer-events-none"
         aria-hidden="true"
       />
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      <p className="mt-1.5 text-[11px] text-slate-500">{subtitle}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-none">{value}</p>
+      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{subtitle}</p>
     </>
   );
 
   const baseClasses =
-    "relative bg-white border rounded-2xl p-4 overflow-hidden transition";
+    "relative bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-2xl p-4 overflow-hidden transition";
   const stateClasses = isClickable
-    ? `cursor-pointer hover:border-slate-300 hover:shadow-md text-left w-full ${
-        isActive ? "border-slate-400 shadow-md ring-2 ring-slate-200" : "border-slate-200"
+    ? `cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md text-left w-full ${
+        isActive ? "border-slate-400 dark:border-slate-500 shadow-md ring-2 ring-slate-200 dark:ring-slate-700" : "border-slate-200 dark:border-slate-800"
       }`
-    : "border-slate-200";
+    : "border-slate-200 dark:border-slate-800";
 
   if (isClickable) {
     return (
