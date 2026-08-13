@@ -11,10 +11,10 @@
 // and everyone else's read-only:
 //   Staff (DEPT_MEMBER/BRANCH_MEMBER/COACH): myOverview — a self-scoped
 //                    TaskOverviewStack with no HOD/CEO Assigned sections.
-//                    DEPT_MEMBER/BRANCH_MEMBER see their WHOLE department/
-//                    branch's Daily roster (own row actionable); Monthly
-//                    (DEPT_MEMBER only) stays self-only. BRANCH_MEMBER/COACH
-//                    are Daily-only.
+//                    DEPT_MEMBER/BRANCH_MEMBER/COACH see their WHOLE
+//                    department/branch's Daily roster (own row actionable);
+//                    Monthly (DEPT_MEMBER only) stays self-only.
+//                    BRANCH_MEMBER/COACH are Daily-only.
 //   HOD/DEPT_SITE:   myBoard (HOD's own freeform Kanban, HOD only) ·
 //                    departmentOverview — a TaskOverviewStack for the HOD's
 //                    own department (Daily/Monthly/HOD Assigned/CEO
@@ -41,9 +41,9 @@
 //                    (home-overview.tsx).
 // No role has a Daily/Monthly toggle anywhere on this page — every
 // TaskOverviewStack shows BOTH periods simultaneously, stacked top to
-// bottom. Every drillable card opens its bucket's task list in a modal
-// (EntityDrillModal, via TaskRowLine/StatusDropdown inside
-// EntityCardOverview).
+// bottom. Every drillable donut card (Ad hoc, assigner streams) opens its
+// bucket's task list in a modal (EntityDrillModal, via StatusOverviewCard)
+// — TaskOverviewStack's cards render rows inline instead, no modal.
 //
 // Callers fetch BOTH periods (getFlowDetail ×2) so every Daily/Monthly pair
 // can render together. `period`/`dailyHref`/`monthlyHref` are accepted but no
