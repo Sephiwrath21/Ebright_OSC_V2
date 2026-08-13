@@ -27,12 +27,12 @@ function fmtDate(iso: string): string {
 
 function FilledBadge({ filled }: { filled: boolean }) {
   return filled ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300">
       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
       Filled
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
       Pending
     </span>
@@ -144,33 +144,33 @@ export default function FAReportsClient() {
   const globalCoverage = globalTotal === 0 ? 0 : Math.round((globalFilled / globalTotal) * 100);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium">Reports</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium">Reports</span>
         </nav>
 
         {/* Page header */}
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">FA Reports</h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">FA Reports</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {globalTotal} students attended · {globalFilled} reports filled ({globalCoverage}%)
             </p>
           </div>
           {totalFilled > 0 && (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors mb-0.5"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-0.5"
               title="Bulk export — not connected yet"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -181,7 +181,7 @@ export default function FAReportsClient() {
       </div>
 
       {/* Sticky filter bar */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200/80 dark:border-slate-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
 
@@ -192,12 +192,12 @@ export default function FAReportsClient() {
               placeholder="Search name, ID, or preparer…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg w-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
             />
           </div>
 
           <select
-            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="py-2 px-3 text-sm bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ minWidth: 220 }}
             value={eventId}
             onChange={e => setEventId(e.target.value)}
@@ -211,7 +211,7 @@ export default function FAReportsClient() {
           </select>
 
           <select
-            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="py-2 px-3 text-sm bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ minWidth: 160 }}
             value={branch}
             onChange={e => setBranch(e.target.value)}
@@ -222,7 +222,7 @@ export default function FAReportsClient() {
             ))}
           </select>
 
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1">
             {FILLED_FILTERS.map(f => (
               <button
                 key={f.value}
@@ -231,7 +231,7 @@ export default function FAReportsClient() {
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   filled === f.value
                     ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
                 {f.label}
@@ -248,26 +248,26 @@ export default function FAReportsClient() {
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
         {loading ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-16 flex flex-col items-center text-center">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
-            <p className="text-sm text-slate-500">Loading reports…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading reports…</p>
           </div>
         ) : error ? (
-          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
-            <p className="text-sm font-medium text-red-600">{error}</p>
+          <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900 rounded-2xl p-8 text-center">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-            <Users className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-medium text-slate-500">No attendees match your filters.</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center text-center">
+            <Users className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No attendees match your filters.</p>
             <p className="text-xs text-slate-400 mt-1">Try adjusting the branch, event, or status filters.</p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-slate-800">
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Student</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Branch</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap">Grade</th>
@@ -280,25 +280,25 @@ export default function FAReportsClient() {
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map(row => {
                     const r = row.report;
                     const total = r ? faReportTotal(r) : null;
                     return (
-                      <tr key={row.invitationId} className="hover:bg-slate-50 transition-colors">
+                      <tr key={row.invitationId} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900 whitespace-nowrap">{row.name}</div>
+                          <div className="font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">{row.name}</div>
                           <div className="text-xs text-slate-400 font-mono">#{row.studentId}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          <span className="font-mono text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                             {row.branch}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-sm text-slate-700 whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">
                           {gradeLabel(row.grade)}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap max-w-[180px] truncate">
+                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap max-w-[180px] truncate">
                           {row.eventName}
                         </td>
                         <td className="px-4 py-3">
@@ -306,18 +306,18 @@ export default function FAReportsClient() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {total !== null ? (
-                            <span className="font-mono text-sm font-semibold text-slate-900">
+                            <span className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                               {total} <span className="text-slate-400 font-normal">/ {totalMax}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {r?.preparedBy ? (
-                            <span className="text-sm text-slate-700">{r.preparedBy}</span>
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{r.preparedBy}</span>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -326,12 +326,12 @@ export default function FAReportsClient() {
                               href={r.videoLink}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 whitespace-nowrap transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap transition-colors"
                             >
                               ▶ Watch
                             </a>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -340,19 +340,19 @@ export default function FAReportsClient() {
                               href={r.evidencePhotoLink}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 whitespace-nowrap transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap transition-colors"
                             >
                               <Camera className="w-3 h-3" /> View
                             </a>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-1.5">
                             <Link
                               href={`/dashboards/fa/reports/${row.invitationId}`}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 whitespace-nowrap transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap transition-colors"
                             >
                               <Pencil className="w-3 h-3" />
                               {r ? "Edit" : "Fill"}
@@ -360,7 +360,7 @@ export default function FAReportsClient() {
                             {r && (
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 whitespace-nowrap transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap transition-colors"
                                 title="Certificate print — not connected yet"
                               >
                                 <Printer className="w-3 h-3" /> Print

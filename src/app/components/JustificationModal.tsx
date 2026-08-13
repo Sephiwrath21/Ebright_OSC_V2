@@ -84,15 +84,15 @@ export default function JustificationModal({
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+        className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-2 px-5 py-4 border-b border-slate-200">
+        <div className="flex items-start justify-between gap-2 px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-slate-900">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               {isEdit ? "Edit justification" : "Justify No Record"}
             </h2>
-            <p className="text-xs font-medium text-slate-500 mt-0.5 truncate">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
               {target.employeeName}
               <span className="ml-1 text-slate-400 font-mono">· {target.empNo}</span>
               {target.branch && <span className="ml-1 text-slate-400">· {target.branch}</span>}
@@ -102,7 +102,7 @@ export default function JustificationModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" aria-hidden="true" />
@@ -111,7 +111,7 @@ export default function JustificationModal({
 
         <div className="p-5 space-y-4">
           <div>
-            <label htmlFor="just-reason" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label htmlFor="just-reason" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               Reason
             </label>
             <textarea
@@ -121,7 +121,7 @@ export default function JustificationModal({
               rows={4}
               autoFocus
               placeholder="Why are they not scanning today? — e.g. on-site visit at Ampang, scanner offline, approved medical without MC..."
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none"
             />
             <p className="mt-1 text-[11px] text-slate-400">
               Saved on HRFS attendance_justification. Removes the person from Missing today.
@@ -129,20 +129,20 @@ export default function JustificationModal({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-sm rounded-xl px-3 py-2.5 font-medium bg-rose-50 text-rose-700 border border-rose-200">
+            <div className="flex items-start gap-2 text-sm rounded-xl px-3 py-2.5 font-medium bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 px-5 py-3 bg-slate-50 border-t border-slate-200">
+        <div className="flex items-center justify-between gap-2 px-5 py-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800">
           {isEdit ? (
             <button
               type="button"
               onClick={onDelete}
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900 dark:hover:text-rose-200 disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               Remove
@@ -155,7 +155,7 @@ export default function JustificationModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="h-9 px-3 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              className="h-9 px-3 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
             >
               Cancel
             </button>

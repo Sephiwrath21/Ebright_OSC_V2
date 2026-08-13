@@ -159,7 +159,7 @@ function DayDropdown({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-10 z-20 w-48 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          className="absolute left-0 top-10 z-20 w-48 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         >
           {groups.map((g) => {
             const isActive = g.key === active.key;
@@ -172,12 +172,12 @@ function DayDropdown({
                   onSelect(g.key);
                   setOpen(false);
                 }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
-                  isActive ? "bg-blue-50 font-semibold text-blue-700" : "text-gray-700"
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-800 ${
+                  isActive ? "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "text-gray-700 dark:text-slate-300"
                 }`}
               >
                 <span>{g.label}</span>
-                <span className={isActive ? "text-blue-700" : "text-gray-400"}>{openCount(g)}</span>
+                <span className={isActive ? "text-blue-700 dark:text-blue-300" : "text-gray-400"}>{openCount(g)}</span>
               </button>
             );
           })}
@@ -275,7 +275,7 @@ function MemberRow({
   const allDone = total > 0 && member.notDone === 0;
 
   return (
-    <div className="border-b border-gray-100 last:border-b-0">
+    <div className="border-b border-gray-100 last:border-b-0 dark:border-slate-800">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -283,26 +283,28 @@ function MemberRow({
       >
         <InitialAvatar name={member.name} id={member.userId} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-gray-900">{member.name}</p>
-          <p className="truncate text-xs text-gray-500">{member.employmentType || "—"}</p>
+          <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{member.name}</p>
+          <p className="truncate text-xs text-gray-500 dark:text-slate-400">{member.employmentType || "—"}</p>
         </div>
         <div className="hidden w-32 shrink-0 sm:block">
           <CompletionMeter done={member.done} total={total} />
         </div>
-        <span className="w-24 shrink-0 text-right text-xs text-gray-500">
+        <span className="w-24 shrink-0 text-right text-xs text-gray-500 dark:text-slate-400">
           {member.done} done · {member.notDone} open
         </span>
         <span
           className={`inline-flex w-24 shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            allDone ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+            allDone
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+              : "bg-red-50 text-red-600 dark:bg-red-900 dark:text-red-300"
           }`}
         >
           {allDone ? "Completed" : "Pending"}
         </span>
-        <span className="shrink-0 text-gray-300">{open ? "▾" : "▸"}</span>
+        <span className="shrink-0 text-gray-300 dark:text-slate-600">{open ? "▾" : "▸"}</span>
       </button>
       {open && (
-        <div className="mb-2 rounded-xl bg-gray-50 px-4 py-1">
+        <div className="mb-2 rounded-xl bg-gray-50 px-4 py-1 dark:bg-slate-800">
           <ResizableTaskList tasks={tasks} emptyLabel="No tasks this period." />
         </div>
       )}
@@ -581,17 +583,17 @@ export function TaskManagerView({
               <PageSectionHeading>Details</PageSectionHeading>
               <a
                 href={manpowerScheduleHref}
-                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50"
+                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-slate-800"
               >
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
                     Manpower Schedule
                   </h3>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
                     Plan today's staffing grid — assignments sync straight to each coach's task list.
                   </p>
                 </div>
-                <span className="text-sm font-medium text-blue-600">Open →</span>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Open →</span>
               </a>
             </>
           )}

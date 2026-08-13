@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./Providers";
+import { cookies } from "next/headers";
+import { parseTheme, THEME_COOKIE } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,15 +25,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolved on the server so the very first paint is already the right theme —
+  // this is what removes the flash, with no blocking inline script.
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased bg-slate-50`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased ${
+        theme === "dark" ? "dark" : ""
+      }`}
       suppressHydrationWarning
     >
       <head>
@@ -41,7 +49,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="h-full overflow-hidden flex flex-col bg-slate-50"
+        className="h-full overflow-hidden flex flex-col"
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>

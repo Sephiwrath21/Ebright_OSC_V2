@@ -18,10 +18,10 @@ import {
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
 const C = {
-  green: "#1D9E75",
-  amber: "#EF9F27",
-  blue:  "#378ADD",
-  red:   "#DC2626",
+  green: "var(--status-green-fg)",
+  amber: "var(--status-amber-fg)",
+  blue:  "var(--status-blue-fg)",
+  red:   "var(--status-red-fg)",
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
   const totalDaysWorked = daysWorked(v?.startDate);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <GreetingHeader name={greetName} style={{ marginBottom: 32 }} />
@@ -245,7 +245,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
 
             {/* Weekly stats footer — fills the gap and adds quick context */}
             {data?.week && (
-              <div className="mt-5 grid grid-cols-3 gap-2 pt-4 border-t border-slate-100">
+              <div className="mt-5 grid grid-cols-3 gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <WeekStat
                   label="Hours worked"
                   value={`${data.week.totalHours}h`}
@@ -276,7 +276,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-bold text-slate-900">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {loading ? "Loading…" : v?.fullName || "—"}
                   </h3>
                   <span
@@ -287,13 +287,13 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
                     Profile complete
                   </span>
                 </div>
-                <p className="text-sm text-slate-600 mt-0.5">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
                   {v?.position || "—"}{v?.department ? ` · ${v.department}` : ""}
                 </p>
               </div>
             </div>
 
-            <dl className="divide-y divide-slate-100 text-sm">
+            <dl className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               <InfoRow icon={<UserCircle2  className="w-3.5 h-3.5" />} label="Employee ID" value={v?.employeeId || "—"} />
               <InfoRow icon={<Building2    className="w-3.5 h-3.5" />} label="Department"  value={v?.department || "—"} />
               <InfoRow icon={<Building2    className="w-3.5 h-3.5" />} label="Branch"      value={v?.branchName || "—"} />
@@ -304,7 +304,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
             {totalDaysWorked !== null && (
               <div
                 className="mt-4 rounded-xl px-4 py-3 flex items-center gap-2.5"
-                style={{ background: "#E8F7F0", color: C.green }}
+                style={{ background: "var(--status-green-bg)", color: C.green }}
               >
                 <Briefcase className="w-4 h-4 shrink-0" />
                 <p className="text-sm font-semibold">
@@ -335,12 +335,12 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
           <Card>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900">To-do / pending actions</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Tap to mark complete</p>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">To-do / pending actions</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tap to mark complete</p>
               </div>
               <span
                 className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold"
-                style={{ background: "#FFF8EC", color: C.amber }}
+                style={{ background: "var(--status-amber-bg)", color: C.amber }}
               >
                 {pendingCount} pending
               </span>
@@ -360,7 +360,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl bg-white p-5 border border-slate-200">{children}</div>;
+  return <div className="rounded-2xl bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800">{children}</div>;
 }
 
 function CardHeader({ title, subtitle, icon }: { title: string; subtitle?: string; icon?: React.ReactNode }) {
@@ -368,8 +368,8 @@ function CardHeader({ title, subtitle, icon }: { title: string; subtitle?: strin
     <div className="flex items-start gap-2 mb-4">
       {icon && <span className="mt-0.5">{icon}</span>}
       <div>
-        <h3 className="text-base font-bold text-slate-900">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+        {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -385,12 +385,12 @@ function MetricCard({
   trend?: { tone: "up" | "down"; text: string };
 }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-200 p-4">
-      <div className="flex items-center gap-2 text-slate-500 mb-2">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-2">
         {icon}
         <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-3xl font-black text-slate-900 leading-none">{value}</p>
+      <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{value}</p>
       {trend ? (
         <p className="text-[11px] font-semibold mt-2"
            style={{ color: trend.tone === "up" ? C.green : C.red }}>
@@ -410,7 +410,7 @@ function Donut({ percent }: { percent: number }) {
   return (
     <div className="relative w-[120px] h-[120px] shrink-0">
       <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#E5E7EB" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="var(--status-track)" strokeWidth="10" />
         <circle
           cx="60" cy="60" r={r} fill="none"
           stroke={C.green}
@@ -422,7 +422,7 @@ function Donut({ percent }: { percent: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-black text-slate-900">{percent}%</span>
+        <span className="text-2xl font-black text-slate-900 dark:text-slate-100">{percent}%</span>
         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">on time</span>
       </div>
     </div>
@@ -435,19 +435,19 @@ function WeekRow({ day, state, label }: {
   label: string;
 }) {
   const tone =
-    state === "ontime"    ? { bg: "#E8F7F0", fg: C.green,   w: "85%"  }
-    : state === "late"    ? { bg: "#FFF1D6", fg: C.amber,   w: "60%"  }
-    : state === "absent"  ? { bg: "#FEE7E7", fg: C.red,     w: "40%"  }
-    : state === "holiday" ? { bg: "#EDE9FE", fg: "#7C3AED", w: "100%" }
-    :                       { bg: "#F1F5F9", fg: "#94A3B8", w: "0%"   };
+    state === "ontime"    ? { bg: "var(--status-green-bg)",       fg: C.green,                     w: "85%"  }
+    : state === "late"    ? { bg: "var(--status-amber-bg-strong)", fg: C.amber,                    w: "60%"  }
+    : state === "absent"  ? { bg: "var(--status-red-bg)",         fg: C.red,                       w: "40%"  }
+    : state === "holiday" ? { bg: "var(--status-violet-bg)",      fg: "var(--status-violet-fg)",    w: "100%" }
+    :                       { bg: "var(--status-neutral-bg)",     fg: "var(--status-neutral-fg)",   w: "0%"   };
 
   const labelColor =
-    state === "today" || state === "upcoming" ? "#94A3B8" : tone.fg;
+    state === "today" || state === "upcoming" ? "var(--status-neutral-fg)" : tone.fg;
 
   return (
     <div className="flex items-center gap-3">
-      <span className="w-8 text-[11px] font-bold text-slate-500 shrink-0">{day}</span>
-      <div className="flex-1 h-7 rounded-lg bg-slate-100 overflow-hidden relative">
+      <span className="w-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">{day}</span>
+      <div className="flex-1 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
         <div className="h-full rounded-lg transition-all" style={{ width: tone.w, background: tone.bg }} />
         <span
           className="absolute inset-0 flex items-center px-2.5 text-[11px] font-semibold"
@@ -472,7 +472,7 @@ function WeekStat({ label, value, tone }: {
     : C.red;
 
   return (
-    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2.5">
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
       <p className="text-base font-black mt-0.5" style={{ color: fg }}>{value}</p>
     </div>
@@ -482,11 +482,11 @@ function WeekStat({ label, value, tone }: {
 function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
   const pillStyle = (() => {
     switch (t.pill?.tone) {
-      case "blue":  return { bg: "#E8F0FB", fg: C.blue };
-      case "red":   return { bg: "#FEE7E7", fg: C.red  };
-      case "amber": return { bg: "#FFF8EC", fg: C.amber };
-      case "green": return { bg: "#E8F7F0", fg: C.green };
-      default:      return { bg: "#F1F5F9", fg: "#475569" };
+      case "blue":  return { bg: "var(--status-blue-bg)",  fg: C.blue };
+      case "red":   return { bg: "var(--status-red-bg)",   fg: C.red  };
+      case "amber": return { bg: "var(--status-amber-bg)", fg: C.amber };
+      case "green": return { bg: "var(--status-green-bg)", fg: C.green };
+      default:      return { bg: "var(--status-neutral-bg)", fg: "var(--status-neutral-fg-strong)" };
     }
   })();
 
@@ -495,13 +495,13 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-start gap-3 text-left rounded-xl p-3 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-start gap-3 text-left rounded-xl p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
       >
         <span
           className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
           style={{
             background:  t.done ? C.green : "transparent",
-            borderColor: t.done ? C.green : "#CBD5E1",
+            borderColor: t.done ? C.green : "var(--status-border-idle)",
           }}
         >
           {t.done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
@@ -509,7 +509,7 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-semibold ${t.done ? "line-through text-slate-400" : "text-slate-800"}`}>
+            <span className={`text-sm font-semibold ${t.done ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-200"}`}>
               {t.title}
             </span>
             {t.pill && (
@@ -522,13 +522,13 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
             )}
           </div>
           {t.subtitle && (
-            <p className={`text-xs mt-0.5 ${t.done ? "text-slate-300 line-through" : "text-slate-500"}`}>
+            <p className={`text-xs mt-0.5 ${t.done ? "text-slate-300 dark:text-slate-600 line-through" : "text-slate-500 dark:text-slate-400"}`}>
               {t.subtitle}
             </p>
           )}
           {typeof t.progress === "number" && !t.done && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                 <div className="h-full rounded-full transition-all"
                      style={{ width: `${t.progress}%`, background: C.blue }} />
               </div>
@@ -546,22 +546,22 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
 function Announcement({ title, body, tag }: { title: string; body: string; tag: string }) {
   return (
     <div
-      className="rounded-xl bg-slate-50 pl-4 pr-3 py-3 border-l-4 hover:bg-slate-100/70 transition-colors cursor-pointer flex items-start justify-between gap-2"
+      className="rounded-xl bg-slate-50 dark:bg-slate-800 pl-4 pr-3 py-3 border-l-4 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 transition-colors cursor-pointer flex items-start justify-between gap-2"
       style={{ borderLeftColor: C.blue }}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-slate-800 truncate">{title}</p>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{title}</p>
           <span
             className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-            style={{ background: "#E8F0FB", color: C.blue }}
+            style={{ background: "var(--status-blue-bg)", color: C.blue }}
           >
             {tag}
           </span>
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">{body}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{body}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 mt-1 shrink-0" />
+      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 mt-1 shrink-0" />
     </div>
   );
 }
@@ -569,11 +569,11 @@ function Announcement({ title, body, tag }: { title: string; body: string; tag: 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <dt className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+      <dt className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
         <span className="text-slate-400">{icon}</span>
         {label}
       </dt>
-      <dd className="text-sm font-semibold text-slate-800 truncate">{value}</dd>
+      <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</dd>
     </div>
   );
 }

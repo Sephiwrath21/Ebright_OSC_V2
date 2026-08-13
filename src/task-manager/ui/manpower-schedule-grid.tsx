@@ -17,6 +17,29 @@ import {
 } from "./types";
 import { personLightColor } from "./palette";
 
+// personLightColor (in ./palette.ts, not owned by this file) returns one of
+// ten fixed "bg-X-100 text-X-800" pill treatments keyed by person-id hash.
+// palette.ts is out of scope for this dark-mode pass, so the dark companion
+// for each of its ten known outputs is mapped here instead — this keeps
+// every person's color distinguishable in dark mode instead of collapsing
+// them onto one shared shade. Falls back to no dark override if palette.ts's
+// hue list ever changes without this map being updated alongside it.
+const PERSON_LIGHT_TO_DARK: Record<string, string> = {
+  "bg-blue-100 text-blue-800": "dark:bg-blue-900 dark:text-blue-200",
+  "bg-emerald-100 text-emerald-800": "dark:bg-emerald-900 dark:text-emerald-200",
+  "bg-amber-100 text-amber-800": "dark:bg-amber-900 dark:text-amber-200",
+  "bg-rose-100 text-rose-800": "dark:bg-rose-900 dark:text-rose-200",
+  "bg-violet-100 text-violet-800": "dark:bg-violet-900 dark:text-violet-200",
+  "bg-cyan-100 text-cyan-800": "dark:bg-cyan-900 dark:text-cyan-200",
+  "bg-orange-100 text-orange-800": "dark:bg-orange-900 dark:text-orange-200",
+  "bg-lime-100 text-lime-800": "dark:bg-lime-900 dark:text-lime-200",
+  "bg-pink-100 text-pink-800": "dark:bg-pink-900 dark:text-pink-200",
+  "bg-teal-100 text-teal-800": "dark:bg-teal-900 dark:text-teal-200",
+};
+function personDarkColor(staffId: string): string {
+  return PERSON_LIGHT_TO_DARK[personLightColor(staffId)] ?? "";
+}
+
 function rowKey(cell: { startTime: string; endTime: string }): string {
   return `${cell.startTime}-${cell.endTime}`;
 }
@@ -43,7 +66,7 @@ export interface ManpowerScheduleActions {
 
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
-  return <p className="mt-2 text-xs text-red-600">{error}</p>;
+  return <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>;
 }
 
 function EditableCell({
@@ -73,7 +96,9 @@ function EditableCell({
           });
         }}
         className={`w-full rounded-md border-0 px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          cell.assignedStaffId ? personLightColor(cell.assignedStaffId) : "bg-gray-50 text-gray-400"
+          cell.assignedStaffId
+            ? `${personLightColor(cell.assignedStaffId)} ${personDarkColor(cell.assignedStaffId)}`
+            : "bg-gray-50 text-gray-400 dark:bg-slate-800 dark:text-slate-400"
         }`}
       >
         <option value="">–</option>
@@ -90,13 +115,13 @@ function EditableCell({
 
 function StaticCell({ cell }: { cell: FlowScheduleCell }) {
   if (!cell.assignedStaffId) {
-    return <span className="text-xs text-gray-300">–</span>;
+    return <span className="text-xs text-gray-300 dark:text-slate-600">–</span>;
   }
   return (
     <span
       className={`inline-flex w-full items-center justify-center rounded-md px-2 py-1.5 text-xs font-medium ${personLightColor(
         cell.assignedStaffId,
-      )}`}
+      )} ${personDarkColor(cell.assignedStaffId)}`}
     >
       {cell.assignedStaffName}
     </span>
@@ -115,7 +140,7 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+        className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
       >
         + Add time row
       </button>
@@ -128,14 +153,14 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
         type="time"
         value={start}
         onChange={(e) => setStart(e.target.value)}
-        className="rounded-full border border-gray-300 px-3 py-1 text-xs"
+        className="rounded-full border border-gray-300 px-3 py-1 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
-      <span className="text-xs text-gray-400">to</span>
+      <span className="text-xs text-gray-400 dark:text-slate-400">to</span>
       <input
         type="time"
         value={end}
         onChange={(e) => setEnd(e.target.value)}
-        className="rounded-full border border-gray-300 px-3 py-1 text-xs"
+        className="rounded-full border border-gray-300 px-3 py-1 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <button
         type="button"
@@ -163,7 +188,7 @@ function AddRowForm({ onAdd }: { onAdd: (startTime: string, endTime: string) => 
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="text-xs font-medium text-gray-400 hover:text-gray-600"
+        className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300"
       >
         Cancel
       </button>
@@ -198,12 +223,12 @@ function RowTimeLabel({
   if (!editing) {
     return (
       <div>
-        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-slate-300">
           {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-xs text-gray-400 hover:text-blue-600"
+            className="text-xs text-gray-400 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
             title="Edit time"
           >
             ✎
@@ -212,7 +237,7 @@ function RowTimeLabel({
             type="button"
             onClick={handleDelete}
             disabled={pending}
-            className="text-xs text-gray-400 hover:text-red-600"
+            className="text-xs text-gray-400 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
             title="Remove row"
           >
             ×
@@ -230,13 +255,13 @@ function RowTimeLabel({
           type="time"
           value={start}
           onChange={(e) => setStart(e.target.value)}
-          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs"
+          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
         <input
           type="time"
           value={end}
           onChange={(e) => setEnd(e.target.value)}
-          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs"
+          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -257,14 +282,14 @@ function RowTimeLabel({
               }
             })
           }
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+          className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Save
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="text-xs font-medium text-gray-400 hover:text-gray-600"
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300"
         >
           Cancel
         </button>
@@ -291,11 +316,11 @@ export function ManpowerScheduleGrid({
 
   if (!schedule) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           Manpower Schedule
         </h3>
-        <p className="mb-3 text-sm text-gray-400">No schedule planned for this day yet.</p>
+        <p className="mb-3 text-sm text-gray-400 dark:text-slate-400">No schedule planned for this day yet.</p>
         {canEdit && (
           <button
             type="button"
@@ -334,20 +359,20 @@ export function ManpowerScheduleGrid({
   const cellAt = new Map(schedule.cells.map((c) => [`${rowKey(c)}::${c.roleColumn}`, c]));
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
             Manpower Schedule
           </h3>
-          <p className="mt-1 text-sm text-gray-600">{schedule.date}</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">{schedule.date}</p>
         </div>
         <div className="flex items-center gap-3">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
               schedule.status === "PUBLISHED"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200"
             }`}
           >
             {schedule.status}
@@ -374,9 +399,9 @@ export function ManpowerScheduleGrid({
         <table className="w-full min-w-[560px] border-separate border-spacing-y-1.5">
           <thead>
             <tr>
-              <th className="px-2 text-left text-xs font-semibold text-gray-500">Slot</th>
+              <th className="px-2 text-left text-xs font-semibold text-gray-500 dark:text-slate-400">Slot</th>
               {columns.map((col) => (
-                <th key={col} className="px-2 text-left text-xs font-semibold text-gray-500">
+                <th key={col} className="px-2 text-left text-xs font-semibold text-gray-500 dark:text-slate-400">
                   <div className="flex items-center gap-1">
                     {col}
                     {canEdit && col !== "Manager" && (
@@ -388,7 +413,7 @@ export function ManpowerScheduleGrid({
                             if (!result.ok) setError(result.message);
                           })
                         }
-                        className="text-gray-300 hover:text-red-600"
+                        className="text-gray-300 hover:text-red-600 dark:text-slate-600 dark:hover:text-red-400"
                         title="Remove seat"
                       >
                         ×
@@ -410,7 +435,7 @@ export function ManpowerScheduleGrid({
                       onDelete={() => actions.deleteRow(row.startTime, row.endTime)}
                     />
                   ) : (
-                    <span className="whitespace-nowrap text-sm font-medium text-gray-700">
+                    <span className="whitespace-nowrap text-sm font-medium text-gray-700 dark:text-slate-300">
                       {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
                     </span>
                   )}
@@ -420,7 +445,7 @@ export function ManpowerScheduleGrid({
                   return (
                     <td key={col} className="min-w-32 px-2 py-1 align-top">
                       {!cell ? (
-                        <span className="text-xs text-gray-300">–</span>
+                        <span className="text-xs text-gray-300 dark:text-slate-600">–</span>
                       ) : canEdit ? (
                         <EditableCell cell={cell} staff={staff} onAssign={actions.assignCell} />
                       ) : (
@@ -446,7 +471,7 @@ export function ManpowerScheduleGrid({
                 if (!result.ok) setError(result.message);
               })
             }
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             + Add Coach seat
           </button>
@@ -458,7 +483,7 @@ export function ManpowerScheduleGrid({
                 if (!result.ok) setError(result.message);
               })
             }
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             + Add Exec seat
           </button>

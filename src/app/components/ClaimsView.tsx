@@ -62,11 +62,11 @@ const cycleSteps = [
 // Status breakdown drives the donut slices and the interactive legend.
 // "submitted" is the total (all claims) shown in the donut center, not a slice.
 const STATUS_META = [
-  { key: "pending", label: "Pending", color: "#F59E0B", text: "text-amber-600" },
-  { key: "approved", label: "Approved", color: "#10B981", text: "text-emerald-600" },
-  { key: "rejected", label: "Rejected", color: "#EF4444", text: "text-red-600" },
-  { key: "disbursed", label: "Disbursed", color: "#A855F7", text: "text-purple-600" },
-  { key: "received", label: "Received", color: "#14B8A6", text: "text-teal-600" },
+  { key: "pending", label: "Pending", color: "#F59E0B", text: "text-amber-600 dark:text-amber-400" },
+  { key: "approved", label: "Approved", color: "#10B981", text: "text-emerald-600 dark:text-emerald-400" },
+  { key: "rejected", label: "Rejected", color: "#EF4444", text: "text-red-600 dark:text-red-400" },
+  { key: "disbursed", label: "Disbursed", color: "#A855F7", text: "text-purple-600 dark:text-purple-400" },
+  { key: "received", label: "Received", color: "#14B8A6", text: "text-teal-600 dark:text-teal-400" },
 ] as const;
 
 // Stable color per claim type for the "Claims by Type" bar chart.
@@ -91,11 +91,11 @@ const TYPE_COLORS: Record<string, string> = {
 const TYPE_FALLBACK_COLOR = "#64748B";
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
-  approved: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Approved" },
-  rejected: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Rejected" },
-  disbursed: { bg: "#FAF5FF", text: "#6B21A8", dot: "#A855F7", label: "Disbursed" },
-  received: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Received" },
+  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
+  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
+  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "var(--accent-violet-strong)", label: "Disbursed" },
+  received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Received" },
 };
 
 const TYPE_LABEL: Record<string, string> = CLAIM_TYPE_LABELS;
@@ -205,7 +205,7 @@ export default function ClaimsView({
           year: "numeric",
         }),
         value: count,
-        color: "#3B82F6",
+        color: "var(--accent-blue)",
         segments: CLAIM_TYPES.filter((t) => (byType.get(t.id) ?? 0) > 0).map((t) => ({
           key: t.id,
           label: t.shortLabel,
@@ -238,36 +238,36 @@ export default function ClaimsView({
   const reminderMonthLabel = isSubmissionDeadlineStep ? lastMonthLabel : monthLabel;
   
   const cycleCardClass = isSubmissionDeadlineStep
-    ? "bg-red-50 border-red-200"
-    : "bg-white border-slate-200";
+    ? "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700"
+    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800";
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10 space-y-6">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             HRMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Claims</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Claims</span>
         </nav>
 
         {/* Page header */}
         <header className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               Claims
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {isFinance
                 ? "Review and approve expense claims from all employees."
                 : "Submit and track your expense claims."}
@@ -292,24 +292,24 @@ export default function ClaimsView({
           <div className="flex items-center justify-center flex-wrap gap-3 mb-6">
             <h2
               id="cycle-heading"
-              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+              className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase"
             >
               Monthly Claim Cycle
             </h2>
-            <span className="text-slate-300">—</span>
-            <p className="text-sm font-semibold text-slate-800">
+            <span className="text-slate-300 dark:text-slate-600">—</span>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
               {isSubmissionDeadlineStep ? `${reminderMonthLabel} Claims` : monthLabel}
             </p>
             {cycleSteps.some((s) => s.day === currentDay) && (
               <span
-                className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-3 py-1 text-xs font-semibold"
+                className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-3 py-1 text-xs font-semibold"
               >
                 Deadline today!
               </span>
             )}
           </div>
           {isSubmissionDeadlineStep && (
-            <p className="text-xs text-slate-500 text-center mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-4">
               Timeline below shows {monthLabel} schedule
             </p>
           )}
@@ -324,10 +324,10 @@ export default function ClaimsView({
                     style={{ flexShrink: 0 }}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border whitespace-nowrap transition-all ${
                       isSubmissionStep
-                        ? "bg-red-50 border-red-300 ring-2 ring-red-200"
+                        ? "bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-700 ring-2 ring-red-200 dark:ring-red-700"
                         : isPast
-                        ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200"
-                        : "bg-slate-50 border-slate-200"
+                        ? "bg-emerald-50 dark:bg-emerald-900 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-200 dark:ring-emerald-700"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800"
                     }`}
                   >
                     <span
@@ -343,10 +343,10 @@ export default function ClaimsView({
                     <p
                       className={`text-sm ${
                         isSubmissionStep
-                          ? "text-red-700 font-semibold"
+                          ? "text-red-700 dark:text-red-300 font-semibold"
                           : isPast
-                          ? "text-emerald-700 font-semibold"
-                          : "text-slate-600"
+                          ? "text-emerald-700 dark:text-emerald-300 font-semibold"
+                          : "text-slate-600 dark:text-slate-300"
                       }`}
                     >
                       <span className="font-semibold">{step.date}</span>
@@ -361,7 +361,7 @@ export default function ClaimsView({
                         flex: "1 1 0%",
                         height: "2px",
                         margin: "0 8px",
-                        backgroundColor: isPast ? "#60a5fa" : "#bfdbfe",
+                        backgroundColor: isPast ? "var(--accent-blue)" : "var(--status-track)",
                       }}
                     />
                   )}
@@ -376,12 +376,12 @@ export default function ClaimsView({
         {/* Status overview — donut + interactive legend */}
         <section
           aria-labelledby="status-heading"
-          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6"
         >
           <div className="flex items-center justify-between mb-5">
             <h2
               id="status-heading"
-              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+              className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase"
             >
               Claims by Status
             </h2>
@@ -389,7 +389,7 @@ export default function ClaimsView({
               <button
                 type="button"
                 onClick={() => setStatusFilter("")}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               >
                 Clear filter
               </button>
@@ -410,8 +410,8 @@ export default function ClaimsView({
                   }
                 />
               ) : (
-                <div className="w-[168px] h-[168px] rounded-full border-[20px] border-slate-100 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-slate-900">0</span>
+                <div className="w-[168px] h-[168px] rounded-full border-[20px] border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">0</span>
                   <span className="text-[11px] tracking-widest text-slate-400">CLAIMS</span>
                 </div>
               )}
@@ -436,10 +436,10 @@ export default function ClaimsView({
                         setStatusFilter(isActive ? "" : s.key)
                       }
                       aria-pressed={isActive}
-                      className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 ${
+                      className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-400 ${
                         isActive
-                          ? "border-slate-300 bg-slate-50 ring-1 ring-slate-200"
-                          : "border-slate-200"
+                          ? "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700"
+                          : "border-slate-200 dark:border-slate-800"
                       }`}
                     >
                       <span
@@ -447,7 +447,7 @@ export default function ClaimsView({
                         style={{ backgroundColor: s.color }}
                         aria-hidden="true"
                       />
-                      <span className="text-sm font-medium text-slate-600 truncate">
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                         {s.label}
                       </span>
                       <span className="ml-auto flex items-baseline gap-1.5 shrink-0">
@@ -465,20 +465,20 @@ export default function ClaimsView({
                   type="button"
                   onClick={() => setStatusFilter("")}
                   aria-pressed={statusFilter === ""}
-                  className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-blue-300 hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 ${
+                  className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-400 ${
                     statusFilter === ""
-                      ? "border-blue-200 bg-blue-50/50 ring-1 ring-blue-200"
-                      : "border-slate-200"
+                      ? "border-blue-200 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/50 ring-1 ring-blue-200 dark:ring-blue-800"
+                      : "border-slate-200 dark:border-slate-800"
                   }`}
                 >
                   <span
                     className="w-3 h-3 rounded-full shrink-0 bg-blue-500"
                     aria-hidden="true"
                   />
-                  <span className="text-sm font-semibold text-slate-700 truncate">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">
                     All Submitted
                   </span>
-                  <span className="ml-auto text-lg font-bold text-blue-600 shrink-0">
+                  <span className="ml-auto text-lg font-bold text-blue-600 dark:text-blue-400 shrink-0">
                     {totalClaims}
                   </span>
                 </button>
@@ -492,12 +492,12 @@ export default function ClaimsView({
         {/* Type overview — claim amount by type */}
         <section
           aria-labelledby="type-heading"
-          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6"
         >
           <div className="flex items-center justify-between mb-5">
             <h2
               id="type-heading"
-              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+              className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase"
             >
               Approved Amount by Type
             </h2>
@@ -505,7 +505,7 @@ export default function ClaimsView({
               <button
                 type="button"
                 onClick={() => setTypeFilter("")}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               >
                 Clear filter
               </button>
@@ -521,8 +521,8 @@ export default function ClaimsView({
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-sm font-semibold text-slate-700">No approved claims yet</p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No approved claims yet</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Approved claim amounts by type will appear here once available.
               </p>
             </div>
@@ -532,12 +532,12 @@ export default function ClaimsView({
         {/* Claims made by month */}
         <section
           aria-labelledby="month-heading"
-          className="bg-white border border-slate-200 rounded-2xl px-6 py-6"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6"
         >
           <div className="flex items-center justify-between mb-5">
             <h2
               id="month-heading"
-              className="text-xs font-semibold tracking-widest text-slate-500 uppercase"
+              className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase"
             >
               Claims Made by Month
             </h2>
@@ -545,7 +545,7 @@ export default function ClaimsView({
               <button
                 type="button"
                 onClick={() => setMonthFilter("")}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               >
                 Clear filter
               </button>
@@ -568,15 +568,15 @@ export default function ClaimsView({
                       style={{ backgroundColor: t.color }}
                       aria-hidden="true"
                     />
-                    <span className="text-xs text-slate-600">{t.label}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-300">{t.label}</span>
                   </li>
                 ))}
               </ul>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-sm font-semibold text-slate-700">No claims yet</p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No claims yet</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Monthly claim activity will appear here once available.
               </p>
             </div>
@@ -601,7 +601,7 @@ export default function ClaimsView({
                   ? "Search by claim ID, employee, or type…"
                   : "Search by claim ID or type…"
               }
-              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 dark:text-slate-100 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -609,7 +609,7 @@ export default function ClaimsView({
             aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"
           >
             <option value="">All Status</option>
             {STATUS_OPTIONS.map((s) => (
@@ -623,7 +623,7 @@ export default function ClaimsView({
             aria-label="Filter by type"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
           >
             <option value="">All Types</option>
             {TYPE_OPTIONS.map((t) => (
@@ -638,7 +638,7 @@ export default function ClaimsView({
               aria-label="Filter by branch or department"
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+              className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
             >
               <option value="">All Branches / Depts</option>
               {orgOptions.filter((o) => o.kind === "branch").length > 0 && (
@@ -670,7 +670,7 @@ export default function ClaimsView({
             aria-label="Filter by month"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"
+            className="shrink-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"
           >
             <option value="">All Months</option>
             {monthOptions.map((m) => (
@@ -685,20 +685,20 @@ export default function ClaimsView({
         </section>
 
         {/* Claims table */}
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-slate-500" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-slate-900">All Claims</h2>
+              <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">All Claims</h2>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {filtered.length} {filtered.length === 1 ? "record" : "records"}
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
                 <tr>
                   <th className="text-left px-6 py-3">Claim ID</th>
                   {isFinance && <th className="text-left px-6 py-3">Employee</th>}
@@ -715,16 +715,16 @@ export default function ClaimsView({
                   <tr>
                     <td colSpan={isFinance ? 8 : 6} className="px-6 py-20">
                       <div className="flex flex-col items-center gap-3 text-center">
-                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                           <Inbox className="w-6 h-6 text-slate-400" aria-hidden="true" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-700">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             {claims.length === 0
                               ? "No claims yet"
                               : "No claims match your filters"}
                           </p>
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             {claims.length === 0
                               ? "Submitted claims will appear here once available."
                               : "Try adjusting the search or filters."}
@@ -736,32 +736,32 @@ export default function ClaimsView({
                 ) : (
                   filtered.map((c) => {
                     const badge = STATUS_BADGE[c.status] ?? {
-                      bg: "#F1F5F9",
-                      text: "#334155",
-                      dot: "#64748B",
+                      bg: "var(--status-neutral-bg)",
+                      text: "var(--text-strong)",
+                      dot: "var(--text-muted-strong)",
                       label: c.status,
                     };
                     return (
                       <tr
                         key={c.claimId}
-                        className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors"
+                        className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors"
                       >
-                        <td className="px-6 py-4 font-semibold text-blue-600">
+                        <td className="px-6 py-4 font-semibold text-blue-600 dark:text-blue-400">
                           {c.displayId}
                         </td>
                         {isFinance && (
-                          <td className="px-6 py-4 text-slate-800">{c.employeeName}</td>
+                          <td className="px-6 py-4 text-slate-800 dark:text-slate-200">{c.employeeName}</td>
                         )}
                         {isFinance && (
-                          <td className="px-6 py-4 text-slate-600">{c.branch}</td>
+                          <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{c.branch}</td>
                         )}
-                        <td className="px-6 py-4 text-slate-700">
+                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
                           {TYPE_LABEL[c.claimType] ?? c.claimType}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-slate-900 tabular-nums">
+                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
                           RM {c.amount.toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 text-slate-600 tabular-nums">
+                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300 tabular-nums">
                           {new Date(c.claimDate).toLocaleDateString("en-GB")}
                         </td>
                         <td className="px-6 py-4">
@@ -781,7 +781,7 @@ export default function ClaimsView({
                           <Link
                             href={`/claim/${c.claimId}`}
                             aria-label={`View ${c.displayId}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                           >
                             <Eye className="w-4 h-4" aria-hidden="true" />
                           </Link>

@@ -277,15 +277,15 @@ export default async function ManpowerSchedulePage({
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Manpower Schedule</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold dark:text-slate-100">Manpower Schedule</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
               Plan the day&apos;s staffing grid — assignments sync to each coach&apos;s task list on
               publish.
             </p>
           </div>
           <Link
             href="/task-manager"
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             ← Task Manager
           </Link>
@@ -293,14 +293,14 @@ export default async function ManpowerSchedulePage({
         <div className="flex items-center gap-3 text-sm">
           <a
             href={hrefFor(shiftDate(date, -1))}
-            className="font-medium text-blue-600 hover:text-blue-700"
+            className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             ← Prev day
           </a>
-          <span className="font-semibold text-gray-700">{date}</span>
+          <span className="font-semibold text-gray-700 dark:text-slate-300">{date}</span>
           <a
             href={hrefFor(shiftDate(date, 1))}
-            className="font-medium text-blue-600 hover:text-blue-700"
+            className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Next day →
           </a>

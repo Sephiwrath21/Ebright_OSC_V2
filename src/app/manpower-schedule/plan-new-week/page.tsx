@@ -125,10 +125,10 @@ function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPicke
     const { date, current } = cell;
     const isToday = isSameDay(date, today);
     let cls = "relative z-10 w-8 h-8 inline-flex items-center justify-center text-sm rounded-full transition-colors pointer-events-none ";
-    if (!current) cls += "text-slate-300";
+    if (!current) cls += "text-slate-300 dark:text-slate-600";
     else if (inSelectedWeek) cls += "text-white font-semibold";
-    else if (isToday) cls += "text-indigo-600 font-semibold underline";
-    else cls += "text-slate-700";
+    else if (isToday) cls += "text-indigo-600 dark:text-indigo-400 font-semibold underline";
+    else cls += "text-slate-700 dark:text-slate-300";
     return cls;
   }
 
@@ -154,28 +154,28 @@ function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPicke
     <div className="w-full">
       {/* Date range display */}
       <div className="flex gap-2 mb-3">
-        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedMonday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
+        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedMonday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium dark:border-indigo-700 dark:bg-indigo-900 dark:text-indigo-300" : "border-slate-200 text-slate-400 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"}`}>
           {selectedMonday ? formatDate(selectedMonday) : "Start date"}
         </div>
-        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedSunday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
+        <div className={`flex-1 text-center text-xs py-1.5 px-2 rounded-lg border transition-colors ${selectedSunday ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium dark:border-indigo-700 dark:bg-indigo-900 dark:text-indigo-300" : "border-slate-200 text-slate-400 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"}`}>
           {selectedSunday ? formatDate(selectedSunday) : "End date"}
         </div>
       </div>
 
       {/* Month/Year nav */}
       <div className="flex items-center justify-between mb-2">
-        <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Previous month">
+        <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Previous month">
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
         <div className="flex gap-1.5">
-          <select value={viewMonth} onChange={e => setViewMonth(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+          <select value={viewMonth} onChange={e => setViewMonth(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100">
             {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select value={viewYear} onChange={e => setViewYear(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+          <select value={viewYear} onChange={e => setViewYear(Number(e.target.value))} className="text-xs border border-slate-200 rounded-md px-1.5 py-0.5 text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100">
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Next month">
+        <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Next month">
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -201,9 +201,9 @@ function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPicke
               key={rIdx}
               className={`relative grid grid-cols-7 h-8 rounded-sm ${
                 rowStatus === "Finalized"
-                  ? "bg-emerald-50/70"
+                  ? "bg-emerald-50/70 dark:bg-emerald-900/40"
                   : rowStatus === "Updated"
-                  ? "bg-amber-50/70"
+                  ? "bg-amber-50/70 dark:bg-amber-900/40"
                   : ""
               }`}
             >
@@ -220,7 +220,7 @@ function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPicke
               {/* Hover outline pill */}
               {showHover && hovRange && (
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 h-7 border-2 border-indigo-400 rounded-full pointer-events-none z-0"
+                  className="absolute top-1/2 -translate-y-1/2 h-7 border-2 border-indigo-400 dark:border-indigo-500 rounded-full pointer-events-none z-0"
                   style={{
                     left:  `${(hovRange.startCol / 7) * 100}%`,
                     right: `${((6 - hovRange.endCol) / 7) * 100}%`,
@@ -254,15 +254,15 @@ function WeekPicker({ selectedMonday, onSelect, scheduledWeeks = {} }: WeekPicke
 
       {/* Legend — only shown when branch has any schedules */}
       {hasAnySchedule && (
-        <div className="mt-2.5 flex items-center gap-3 pt-2 border-t border-slate-100">
+        <div className="mt-2.5 flex items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
           <span className="text-[10px] text-slate-400 font-medium">Schedule:</span>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-medium text-slate-500">Finalized</span>
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Finalized</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="text-[10px] font-medium text-slate-500">Updated</span>
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Updated</span>
           </div>
         </div>
       )}
@@ -396,7 +396,8 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   const selectCls =
     "w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-white " +
     "focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors " +
-    "appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400";
+    "appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 " +
+    "dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900 dark:disabled:text-slate-600";
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
     backgroundRepeat: "no-repeat" as const,
@@ -405,43 +406,43 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-6">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-5">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-5">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/manpower-schedule" className="hover:text-slate-900 transition-colors">Manpower Planning</Link>
+          <Link href="/manpower-schedule" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Manpower Planning</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Plan New Week</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Plan New Week</span>
         </nav>
 
-        <div className="max-w-5xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="max-w-5xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
           {/* ── Title header spanning both columns ── */}
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h1 className="text-xl font-bold text-slate-900">Plan New Week</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Plan New Week</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Pick a branch and the upcoming week to build the new manpower roster.
             </p>
           </div>
 
           {/* ── 2-column content ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+          <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-slate-800">
           {/* ── Step 1: Branch ── */}
           <div>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-semibold inline-flex items-center justify-center shrink-0">1</span>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                  <p className="text-sm font-semibold text-slate-900">Select branch</p>
+                  <Building2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Select branch</p>
                 </div>
-                <p className="text-xs text-slate-500">Choose the branch to plan manpower for</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Choose the branch to plan manpower for</p>
               </div>
             </div>
 
@@ -474,12 +475,12 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
                 ))}
               </select>
 
-              {branchesError && <p className="text-xs text-rose-600">{branchesError}</p>}
+              {branchesError && <p className="text-xs text-rose-600 dark:text-rose-400">{branchesError}</p>}
 
               {selectedBranch ? (
-                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
+                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl dark:bg-indigo-900 dark:border-indigo-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
-                  <span className="text-xs text-indigo-700">
+                  <span className="text-xs text-indigo-700 dark:text-indigo-300">
                     {selectedBranch.region ? `Region ${selectedBranch.region} · ` : ""}
                     <span className="font-semibold">{selectedBranch.branch_name}</span>
                     {" "}· {selectedBranch.staff_count}{" "}
@@ -487,7 +488,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
                   </span>
                 </div>
               ) : (
-                <div className="h-9 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                <div className="h-9 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center">
                   <p className="text-xs text-slate-400">No branch selected</p>
                 </div>
               )}
@@ -504,8 +505,8 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
                         key={date}
                         className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                           status === "Finalized"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700"
+                            : "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700"
                         }`}
                       >
                         <span className={`w-1 h-1 rounded-full inline-block ${status === "Finalized" ? "bg-emerald-500" : "bg-amber-400"}`} />
@@ -526,14 +527,14 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
               selectedBranch ? "opacity-100" : "opacity-40 pointer-events-none"
             }`}
           >
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
-              <span className={`w-6 h-6 rounded-full text-white text-xs font-semibold inline-flex items-center justify-center shrink-0 transition-colors ${selectedBranch ? "bg-indigo-600" : "bg-slate-300"}`}>2</span>
+            <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+              <span className={`w-6 h-6 rounded-full text-white text-xs font-semibold inline-flex items-center justify-center shrink-0 transition-colors ${selectedBranch ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"}`}>2</span>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <CalendarDays className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                  <p className="text-sm font-semibold text-slate-900">Select a week</p>
+                  <CalendarDays className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Select a week</p>
                 </div>
-                <p className="text-xs text-slate-500">Click any day — the full Mon–Sun week is selected</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Click any day — the full Mon–Sun week is selected</p>
               </div>
             </div>
 
@@ -548,8 +549,8 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
               {selectedWeekStatus && (
                 <div className={`mt-2.5 flex items-start gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
                   selectedWeekStatus === "Finalized"
-                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
-                    : "bg-amber-50 border border-amber-200 text-amber-700"
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:border-emerald-700 dark:text-emerald-300"
+                    : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-900 dark:border-amber-700 dark:text-amber-300"
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${selectedWeekStatus === "Finalized" ? "bg-emerald-500" : "bg-amber-400"}`} />
                   <span>
@@ -565,7 +566,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
                 className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   selectedMonday
                     ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600"
                 }`}
               >
                 {selectedMonday && selectedSunday
@@ -579,12 +580,12 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
 
         {/* Confirmed banner */}
         {confirmed && selectedBranch && selectedMonday && selectedSunday && (
-          <div className="mt-4 max-w-5xl mx-auto flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <p className="text-sm font-medium text-emerald-800">
+          <div className="mt-4 max-w-5xl mx-auto flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl dark:bg-emerald-900 dark:border-emerald-700">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-300 shrink-0" />
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
               Planning new week for{" "}
               <span className="font-semibold">{selectedBranch.branch_name}</span>
-              <span className="font-normal text-emerald-700"> · {formatDate(selectedMonday)} – {formatDate(selectedSunday)}</span>
+              <span className="font-normal text-emerald-700 dark:text-emerald-300"> · {formatDate(selectedMonday)} – {formatDate(selectedSunday)}</span>
             </p>
           </div>
         )}
@@ -606,7 +607,7 @@ export default function PlanNewWeekPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-indigo-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-indigo-600 dark:text-indigo-400 font-semibold text-lg">
           Loading…
         </div>
       </AppShell>

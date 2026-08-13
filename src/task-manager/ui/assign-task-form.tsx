@@ -30,11 +30,13 @@ const CADENCE_LABELS: Record<CadenceOption, string> = {
 };
 
 const selectClass =
-  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
+  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 function dayChipClass(active: boolean): string {
   return `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-    active ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+    active
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
   }`;
 }
 
@@ -133,21 +135,21 @@ export function AssignTaskForm({
     // scroll independently while the submit footer below stays pinned —
     // the modal card caps the height (max-h), this fills it. Non-bare
     // (inline card) has no height cap, so the same markup just flows.
-    <div className={bare ? "flex min-h-0 flex-1 flex-col" : "rounded-2xl border border-gray-200 bg-white p-5"}>
+    <div className={bare ? "flex min-h-0 flex-1 flex-col" : "rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"}>
       {!bare && (
-        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           Assign Task
         </h3>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-        <label className="max-w-xl text-sm text-gray-600">
+        <label className="max-w-xl text-sm text-gray-600 dark:text-slate-300">
           Task title
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Type here..."
-            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400"
           />
         </label>
 
@@ -158,7 +160,7 @@ export function AssignTaskForm({
           restrictToGroup={recipientGroup}
         />
 
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600 dark:text-slate-300">
           Cadence
           <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
             {visibleCadences.map((value) => {
@@ -173,7 +175,7 @@ export function AssignTaskForm({
                   className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                     active
                       ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                      : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-400"
                   }`}
                 >
                   {CADENCE_LABELS[value]}
@@ -185,7 +187,7 @@ export function AssignTaskForm({
 
         {showDay && (
           <div className="max-w-md">
-            <p className="text-sm text-gray-600">Day</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Day</p>
             <div className="mt-1 flex flex-wrap gap-2">
               {FLOW_DAYS.map((d) => (
                 <button
@@ -200,13 +202,13 @@ export function AssignTaskForm({
               ))}
             </div>
             {days.length > 0 && (
-              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-800 dark:bg-slate-800">
                 <div className="mb-1.5 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-500">Selected ({days.length})</p>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Selected ({days.length})</p>
                   <button
                     type="button"
                     onClick={() => setDays([])}
-                    className="text-xs font-medium text-gray-400 hover:text-gray-600"
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300"
                   >
                     Clear all
                   </button>
@@ -222,7 +224,7 @@ export function AssignTaskForm({
             )}
           </div>
         )}
-        <label className="max-w-xs text-sm text-gray-600">
+        <label className="max-w-xs text-sm text-gray-600 dark:text-slate-300">
           Due Date (optional)
           <input
             type="date"
@@ -238,7 +240,7 @@ export function AssignTaskForm({
           (10 selected people + day chips + due date) or how short the
           viewport is — the 2026-07-25 mobile/tablet bug was this button
           rendering off-screen with no scroll path. All screen sizes. */}
-      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3">
+      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3 dark:border-slate-800">
         <button
           type="button"
           onClick={submit}
@@ -248,7 +250,7 @@ export function AssignTaskForm({
           {pending ? "Assigning…" : "Assign task"}
         </button>
         {message && (
-          <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {message.text}
           </p>
         )}

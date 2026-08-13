@@ -146,9 +146,9 @@ function SummaryTable({
     return { h: hrs.toString(), m: min.toString().padStart(2, "0") };
   };
   return (
-    <div className="mt-12 bg-white p-8 rounded-2xl border border-slate-200 shadow-md overflow-hidden text-slate-800">
-      <header className="border-b border-slate-200 pb-4 mb-4 text-center">
-        <h2 className="m-0 text-lg font-bold text-slate-800">
+    <div className="mt-12 bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden text-slate-800 dark:text-slate-200">
+      <header className="border-b border-slate-200 dark:border-slate-800 pb-4 mb-4 text-center">
+        <h2 className="m-0 text-lg font-bold text-slate-800 dark:text-slate-200">
           {title}
         </h2>
       </header>
@@ -156,11 +156,11 @@ function SummaryTable({
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="w-[60px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">No.</th>
-              <th className="w-[250px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-left">Name</th>
-              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Class (Coach)</th>
-              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Executive</th>
-              <th className="w-[240px] border border-slate-300 bg-slate-800 p-3 text-white font-bold text-center">Total (hrs:min)</th>
+              <th className="w-[60px] border border-slate-300 dark:border-slate-700 bg-slate-800 p-3 text-white font-bold text-center">No.</th>
+              <th className="w-[250px] border border-slate-300 dark:border-slate-700 bg-slate-800 p-3 text-white font-bold text-left">Name</th>
+              <th className="w-[240px] border border-slate-300 dark:border-slate-700 bg-slate-800 p-3 text-white font-bold text-center">Class (Coach)</th>
+              <th className="w-[240px] border border-slate-300 dark:border-slate-700 bg-slate-800 p-3 text-white font-bold text-center">Executive</th>
+              <th className="w-[240px] border border-slate-300 dark:border-slate-700 bg-slate-800 p-3 text-white font-bold text-center">Total (hrs:min)</th>
             </tr>
           </thead>
           <tbody>
@@ -169,18 +169,18 @@ function SummaryTable({
               const e = fmt(row.execHrs);
               const t = fmt(row.total);
               return (
-                <tr key={row.name} className="even:bg-slate-50 hover:bg-slate-100 transition-colors">
-                  <td className="border border-slate-300 px-3 py-3 text-center font-bold text-slate-500">{i + 1}</td>
-                  <td className="border border-slate-300 px-3 py-3 font-black text-slate-800">{row.name}</td>
+                <tr key={row.name} className="even:bg-slate-50 hover:bg-slate-100 transition-colors dark:even:bg-slate-800/60 dark:hover:bg-slate-700">
+                  <td className="border border-slate-300 dark:border-slate-700 px-3 py-3 text-center font-bold text-slate-500 dark:text-slate-400">{i + 1}</td>
+                  <td className="border border-slate-300 dark:border-slate-700 px-3 py-3 font-black text-slate-800 dark:text-slate-200">{row.name}</td>
                   {[c, e, t].map((time, j) => (
-                    <td key={j} className={`border border-slate-300 px-2 py-3 ${j === 2 ? "bg-blue-50/50" : ""}`}>
+                    <td key={j} className={`border border-slate-300 dark:border-slate-700 px-2 py-3 ${j === 2 ? "bg-blue-50/50 dark:bg-blue-900/40" : ""}`}>
                       <div className="flex flex-row gap-4 items-center justify-center">
-                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded">
-                          <span className="text-sm font-bold text-slate-700">{time.h}</span>
+                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded dark:bg-slate-950 dark:border-slate-700">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{time.h}</span>
                           <span className="text-[9px] uppercase font-black text-slate-400">hrs</span>
                         </div>
-                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded">
-                          <span className="text-sm font-bold text-slate-700">{time.m}</span>
+                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded dark:bg-slate-950 dark:border-slate-700">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{time.m}</span>
                           <span className="text-[9px] uppercase font-black text-slate-400">min</span>
                         </div>
                       </div>
@@ -259,15 +259,15 @@ function DayScheduleTable({
   return (
     <div className="overflow-x-auto relative">
       <table className="w-full border-collapse" style={{ minWidth: `${470 + (coachCount + execCount) * 115}px` }}>
-        <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-700 font-bold">
+        <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-700 font-bold dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-300">
           <tr>
-            <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 border-r border-slate-200 text-slate-600 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
+            <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 border-r border-slate-200 text-slate-600 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300">
               Time Slot
             </th>
             {/* Manager column header */}
-            <th className="p-3 text-center border-l border-slate-200 w-[130px] bg-emerald-50/40 border-b-4 border-b-emerald-400">
+            <th className="p-3 text-center border-l border-slate-200 w-[130px] bg-emerald-50/40 border-b-4 border-b-emerald-400 dark:bg-emerald-900/40 dark:border-slate-700">
               <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[10px] font-extrabold text-slate-800">MANAGER</span>
+                <span className="text-[10px] font-extrabold text-slate-800 dark:text-slate-200">MANAGER</span>
                 {showColumnControls && editable ? (
                   <div className="flex items-center gap-1">
                     <select
@@ -275,7 +275,7 @@ function DayScheduleTable({
                       onChange={e =>
                         setManagerReplacementBranch?.(p => ({ ...p, [day]: e.target.value }))
                       }
-                      className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 transition-colors outline-none"
+                      className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 transition-colors outline-none dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700 dark:hover:bg-emerald-800"
                     >
                       <option value="">Own Branch</option>
                       {ALL_BRANCHES.filter(b => b !== branch).map(b => (
@@ -285,7 +285,7 @@ function DayScheduleTable({
                     {managerReplacementBranch[day] && (
                       <button
                         onClick={() => setManagerReplacementBranch?.(p => ({ ...p, [day]: "" }))}
-                        className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
+                        className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors dark:text-red-400 dark:hover:text-red-300"
                         title="Clear replacement branch"
                       >
                         ✕
@@ -296,14 +296,14 @@ function DayScheduleTable({
                 {showColumnControls && editable && (
                   <button
                     onClick={() => onClearColumn?.("MANAGER")}
-                    className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                    className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer dark:text-red-400"
                     title="Clear this column for the whole day"
                   >
                     Clear
                   </button>
                 )}
                 {(!editable || !showColumnControls) && (
-                  <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2 py-0.5 font-bold">
+                  <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2 py-0.5 font-bold dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700">
                     {managerReplacementBranch[day] || "Own Branch"}
                   </span>
                 )}
@@ -315,32 +315,32 @@ function DayScheduleTable({
               const isTraining = col.type === "training";
               const isStar = col.type === "star";
 
-              let colBg = "bg-blue-50/40 border-b-blue-400";
-              let labelColor = "text-blue-800";
-              let badgeClass = "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100";
-              let textBadge = "text-blue-600 bg-blue-50 border-blue-100";
+              let colBg = "bg-blue-50/40 border-b-blue-400 dark:bg-blue-900/40";
+              let labelColor = "text-blue-800 dark:text-blue-200";
+              let badgeClass = "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-800";
+              let textBadge = "text-blue-600 bg-blue-50 border-blue-100 dark:text-blue-300 dark:bg-blue-900 dark:border-blue-700";
 
               if (isExec) {
-                colBg = "bg-purple-50/40 border-b-purple-400";
-                labelColor = "text-purple-800";
-                badgeClass = "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100";
-                textBadge = "text-purple-600 bg-purple-50 border-purple-100";
+                colBg = "bg-purple-50/40 border-b-purple-400 dark:bg-purple-900/40";
+                labelColor = "text-purple-800 dark:text-purple-200";
+                badgeClass = "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700 dark:hover:bg-purple-800";
+                textBadge = "text-purple-600 bg-purple-50 border-purple-100 dark:text-purple-300 dark:bg-purple-900 dark:border-purple-700";
               } else if (isTraining) {
-                colBg = "bg-amber-50/40 border-b-amber-400";
-                labelColor = "text-amber-800";
-                badgeClass = "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100";
-                textBadge = "text-amber-600 bg-amber-50 border-amber-100";
+                colBg = "bg-amber-50/40 border-b-amber-400 dark:bg-amber-900/40";
+                labelColor = "text-amber-800 dark:text-amber-200";
+                badgeClass = "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-800";
+                textBadge = "text-amber-600 bg-amber-50 border-amber-100 dark:text-amber-300 dark:bg-amber-900 dark:border-amber-700";
               } else if (isStar) {
-                colBg = "bg-rose-50/40 border-b-rose-400";
-                labelColor = "text-rose-800";
-                badgeClass = "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100";
-                textBadge = "text-rose-600 bg-rose-50 border-rose-100";
+                colBg = "bg-rose-50/40 border-b-rose-400 dark:bg-rose-900/40";
+                labelColor = "text-rose-800 dark:text-rose-200";
+                badgeClass = "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900 dark:text-rose-300 dark:border-rose-700 dark:hover:bg-rose-800";
+                textBadge = "text-rose-600 bg-rose-50 border-rose-100 dark:text-rose-300 dark:bg-rose-900 dark:border-rose-700";
               }
 
               return (
                 <th
                   key={col.id}
-                  className={`p-3 text-center border-l border-slate-200 w-[115px] border-b-4 ${colBg}`}
+                  className={`p-3 text-center border-l border-slate-200 dark:border-slate-700 w-[115px] border-b-4 ${colBg}`}
                 >
                   <div className="flex flex-col items-center gap-1.5">
                     <span className={`text-[10px] font-extrabold ${labelColor}`}>{col.label}</span>
@@ -370,7 +370,7 @@ function DayScheduleTable({
                                 return next;
                               })
                             }
-                            className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors"
+                            className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors dark:text-red-400 dark:hover:text-red-300"
                             title="Clear replacement branch"
                           >
                             ✕
@@ -385,7 +385,7 @@ function DayScheduleTable({
                     {showColumnControls && editable && (
                       <button
                         onClick={() => onClearColumn?.(col.id)}
-                        className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                        className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer dark:text-red-400"
                         title="Clear this column for the whole day"
                       >
                         Clear
@@ -395,7 +395,7 @@ function DayScheduleTable({
                 </th>
               );
             })}
-            <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold">
+            <th className="p-3 text-center border-l border-slate-200 w-[180px] bg-slate-50 text-slate-600 font-semibold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               Notes/Remarks
             </th>
           </tr>
@@ -412,18 +412,18 @@ function DayScheduleTable({
               <tr
                 key={slotLabel}
                 className={`border-b transition-colors group ${
-                  isOpenClose ? "bg-indigo-50/30" : "hover:bg-slate-50/50"
+                  isOpenClose ? "bg-indigo-50/30 dark:bg-indigo-900/30" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                 }`}
               >
                 <td
-                  className={`p-3 font-bold border-r border-slate-200 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors text-slate-900 w-[160px] min-w-[160px] whitespace-nowrap ${
+                  className={`p-3 font-bold border-r border-slate-200 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors text-slate-900 w-[160px] min-w-[160px] whitespace-nowrap dark:border-slate-700 dark:text-slate-100 ${
                     isOpenClose
-                      ? "bg-indigo-100/50 group-hover:bg-indigo-100/50"
-                      : "bg-slate-50 group-hover:bg-slate-100"
+                      ? "bg-indigo-100/50 group-hover:bg-indigo-100/50 dark:bg-indigo-900/50 dark:group-hover:bg-indigo-900/50"
+                      : "bg-slate-50 group-hover:bg-slate-100 dark:bg-slate-900 dark:group-hover:bg-slate-800"
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span className="font-bold text-[11px] text-slate-800 whitespace-nowrap">{slotLabel}</span>
+                    <span className="font-bold text-[11px] text-slate-800 whitespace-nowrap dark:text-slate-200">{slotLabel}</span>
                     {!isOpenClose && (
                       <span className="text-[9px] font-medium text-slate-400 mt-0.5 whitespace-nowrap">{getDurationLabel(slotLabel)}</span>
                     )}
@@ -431,7 +431,7 @@ function DayScheduleTable({
                 </td>
 
                 {!isOpenClose && (
-                  <td className="p-1.5 border-l border-slate-200 align-middle bg-emerald-50/10 w-[130px]">
+                  <td className="p-1.5 border-l border-slate-200 align-middle bg-emerald-50/10 w-[130px] dark:border-slate-700 dark:bg-emerald-900/10">
                     {showManager ? (() => {
                       // Manager cell uses BMs from the replacement branch
                       // when one is set on this day, otherwise own branch.
@@ -446,9 +446,9 @@ function DayScheduleTable({
                           className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${
                             managerVal
                               ? checkIfLeavingSoon(managerVal)
-                                ? "bg-red-50 text-red-700 border border-red-200"
+                                ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
                                 : getSoftStaffColor(managerVal)
-                              : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80"
+                              : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/60 dark:hover:bg-emerald-900/60"
                           }`}
                           style={{
                             backgroundImage: `url("${SELECT_ARROW_DARK}")`,
@@ -482,15 +482,15 @@ function DayScheduleTable({
                         </select>
                       );
                     })() : (
-                      <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 border border-dashed border-emerald-100 flex items-center justify-center">
-                        <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider">—</span>
+                      <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 border border-dashed border-emerald-100 flex items-center justify-center dark:bg-emerald-900/30 dark:border-emerald-800">
+                        <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider dark:text-emerald-700">—</span>
                       </div>
                     )}
                   </td>
                 )}
 
                 {isOpenClose ? (
-                  <td colSpan={COLUMNS.length + 2} className="p-3 border-l border-slate-200 text-center">
+                  <td colSpan={COLUMNS.length + 2} className="p-3 border-l border-slate-200 text-center dark:border-slate-700">
                     <span className="inline-flex items-center gap-2 bg-indigo-600 text-white text-[10px] uppercase tracking-wider font-extrabold px-4 py-1.5 rounded-xl shadow-xs">
                       All Staff — Executive ({slotObj.type === "opening" ? "Opening" : "Closing"})
                     </span>
@@ -503,22 +503,22 @@ function DayScheduleTable({
                       const isTraining = col.type === "training";
                       const isStar = col.type === "star";
 
-                      let colBg = "bg-blue-50/10";
-                      if (isExec) colBg = "bg-purple-50/10";
-                      else if (isTraining) colBg = "bg-amber-50/10";
-                      else if (isStar) colBg = "bg-rose-50/10";
+                      let colBg = "bg-blue-50/10 dark:bg-blue-900/10";
+                      if (isExec) colBg = "bg-purple-50/10 dark:bg-purple-900/10";
+                      else if (isTraining) colBg = "bg-amber-50/10 dark:bg-amber-900/10";
+                      else if (isStar) colBg = "bg-rose-50/10 dark:bg-rose-900/10";
 
                       const selectTheme = val
                         ? checkIfLeavingSoon(val)
-                          ? "bg-red-50 text-red-700 border border-red-200"
+                          ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
                           : getSoftStaffColor(val)
                         : isExec
-                          ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80"
+                          ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/60 dark:hover:bg-purple-900/60"
                           : isTraining
-                            ? "bg-amber-50/40 text-amber-600 border border-amber-200/60 hover:bg-amber-50/80"
+                            ? "bg-amber-50/40 text-amber-600 border border-amber-200/60 hover:bg-amber-50/80 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/60 dark:hover:bg-amber-900/60"
                             : isStar
-                              ? "bg-rose-50/40 text-rose-600 border border-rose-200/60 hover:bg-rose-50/80"
-                              : "bg-blue-50/40 text-blue-600 border border-blue-200/60 hover:bg-blue-50/80";
+                              ? "bg-rose-50/40 text-rose-600 border border-rose-200/60 hover:bg-rose-50/80 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-700/60 dark:hover:bg-rose-900/60"
+                              : "bg-blue-50/40 text-blue-600 border border-blue-200/60 hover:bg-blue-50/80 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700/60 dark:hover:bg-blue-900/60";
 
                       // Coach/Exec cell uses PT/FT coaches from the
                       // replacement branch when one is set for this
@@ -539,7 +539,7 @@ function DayScheduleTable({
                       return (
                         <td
                           key={col.id}
-                          className={`p-1.5 border-l border-slate-200 align-middle ${colBg}`}
+                          className={`p-1.5 border-l border-slate-200 dark:border-slate-700 align-middle ${colBg}`}
                         >
                           <select
                             disabled={!editable}
@@ -574,7 +574,7 @@ function DayScheduleTable({
                         </td>
                       );
                     })}
-                    <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white">
+                    <td className="p-1.5 border-l border-slate-200 w-[180px] bg-white dark:border-slate-700 dark:bg-slate-800">
                       <textarea
                         disabled={!editable}
                         value={tableNotes[`${day}-${slotLabel}-notes`] ?? ""}
@@ -582,7 +582,7 @@ function DayScheduleTable({
                           onNoteChange?.(`${day}-${slotLabel}-notes`, e.target.value)
                         }
                         placeholder="Add remarks..."
-                        className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block"
+                        className="w-full p-1 text-[11px] border border-slate-200 rounded-xl bg-white resize-none h-[28px] overflow-y-auto outline-none focus:border-blue-500 transition-all font-medium italic text-slate-600 block dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300"
                       />
                     </td>
                   </>
@@ -1236,30 +1236,30 @@ function PlanNewWeekGridContent() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-20">
         {/* Breadcrumb */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           {/* Breadcrumb */}
           <nav
             aria-label="Breadcrumb"
-            className="flex items-center gap-2 text-sm text-slate-500 flex-wrap"
+            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 flex-wrap"
           >
             <Link
               href="/home"
-              className="flex items-center gap-1 hover:text-slate-900 transition-colors shrink-0"
+              className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0"
             >
               <HomeIcon className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-            <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors shrink-0">
+            <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0">
               HRMS
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
             <Link
               href="/manpower-schedule"
-              className="hover:text-slate-900 transition-colors shrink-0"
+              className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0"
             >
               Manpower Planning
             </Link>
@@ -1272,7 +1272,7 @@ function PlanNewWeekGridContent() {
                   ? "/manpower-schedule/archive"
                   : "/manpower-schedule/plan-new-week"
               }
-              className="hover:text-slate-900 transition-colors shrink-0"
+              className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0"
             >
               {mode === "update"
                 ? "Update Manpower Schedule"
@@ -1281,10 +1281,10 @@ function PlanNewWeekGridContent() {
                 : "Plan New Week"}
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-            <span className="text-slate-900 font-medium shrink-0">
+            <span className="text-slate-900 dark:text-slate-100 font-medium shrink-0">
               {branch}
               {weekRangeLabel && (
-                <span className="text-slate-500 font-normal">
+                <span className="text-slate-500 dark:text-slate-400 font-normal">
                   {" "}
                   ({weekRangeLabel})
                 </span>
@@ -1296,14 +1296,14 @@ function PlanNewWeekGridContent() {
                In update mode they live inside the Actual section header. */}
           {!loading && mode !== "update" && (
             <div className="flex items-center gap-3 select-none shrink-0 whitespace-nowrap">
-              <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl px-3 py-1.5 shadow-xs text-[11px]">
+              <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl px-3 py-1.5 shadow-xs text-[11px] dark:bg-slate-900 dark:border-slate-700">
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Coach:</span>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Coach:</span>
                   <select
                     disabled={isReadOnly}
                     value={coachCount}
                     onChange={(e) => handleCountChange("coach", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer dark:bg-slate-950 dark:hover:bg-slate-800 dark:border-slate-500 dark:text-slate-100"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                       <option key={n} value={n}>{n}</option>
@@ -1311,12 +1311,12 @@ function PlanNewWeekGridContent() {
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Exec:</span>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Exec:</span>
                   <select
                     disabled={isReadOnly}
                     value={execCount}
                     onChange={(e) => handleCountChange("exec", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer dark:bg-slate-950 dark:hover:bg-slate-800 dark:border-slate-500 dark:text-slate-100"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                       <option key={n} value={n}>{n}</option>
@@ -1324,12 +1324,12 @@ function PlanNewWeekGridContent() {
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Train:</span>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Train:</span>
                   <select
                     disabled={isReadOnly}
                     value={trainingCount}
                     onChange={(e) => handleCountChange("training", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer dark:bg-slate-950 dark:hover:bg-slate-800 dark:border-slate-500 dark:text-slate-100"
                   >
                     {[0, 1].map(n => (
                       <option key={n} value={n}>{n}</option>
@@ -1337,12 +1337,12 @@ function PlanNewWeekGridContent() {
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-500">Star:</span>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Star:</span>
                   <select
                     disabled={isReadOnly}
                     value={starCount}
                     onChange={(e) => handleCountChange("star", Number(e.target.value))}
-                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer"
+                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-bold text-slate-700 outline-none transition-colors cursor-pointer dark:bg-slate-950 dark:hover:bg-slate-800 dark:border-slate-500 dark:text-slate-100"
                   >
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                       <option key={n} value={n}>{n}</option>
@@ -1358,17 +1358,17 @@ function PlanNewWeekGridContent() {
         {mode === "update" && (
           <div className="mb-4 flex flex-col gap-2">
             {periodStatus === "archived" && (
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-emerald-800 shadow-xs">
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-emerald-800 shadow-xs dark:bg-emerald-900 dark:border-emerald-700/80 dark:text-emerald-200">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                   <span>This week's schedule has been Finalized &amp; Archived. Manpower cost reports have been generated.</span>
                 </div>
-                <span className="bg-emerald-100/80 text-emerald-800 text-[10px] uppercase px-2.5 py-1 rounded-lg">Archived</span>
+                <span className="bg-emerald-100/80 text-emerald-800 text-[10px] uppercase px-2.5 py-1 rounded-lg dark:bg-emerald-800/80 dark:text-emerald-200">Archived</span>
               </div>
             )}
             {changedSinceArchive && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 shadow-xs">
-                <span className="bg-amber-100 text-amber-800 text-[10px] uppercase px-2.5 py-1 rounded-lg shrink-0">Warning</span>
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 shadow-xs dark:bg-amber-900 dark:border-amber-700/80 dark:text-amber-200">
+                <span className="bg-amber-100 text-amber-800 text-[10px] uppercase px-2.5 py-1 rounded-lg shrink-0 dark:bg-amber-800 dark:text-amber-200">Warning</span>
                 <span>Schedule modified since last archive. Click "Final Submit &amp; Archive" at the bottom to update cost reports.</span>
               </div>
             )}
@@ -1377,7 +1377,7 @@ function PlanNewWeekGridContent() {
 
         {/* ─── Main content area ──────────────────────────────────────────────── */}
         {loading ? (
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center justify-center gap-2 py-24 px-6 text-center dark:bg-slate-900 dark:border-slate-800">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Loading schedule…
             </span>
@@ -1386,10 +1386,10 @@ function PlanNewWeekGridContent() {
           /* ── UPDATE MODE: Planning (top, read-only) + Actual (bottom, editable) ── */
           <div className="flex flex-col">
             {/* Shared day-tab bar — sticky flush strip, no card rounding so it sits tight to the TopBar */}
-            <div className="sticky top-0 z-20 -mx-6 bg-white border-b-2 border-slate-200 shadow-sm">
+            <div className="sticky top-0 z-20 -mx-6 bg-white border-b-2 border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800">
               <div className="px-6 py-3 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
                 {/* Day tabs */}
-                <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
+                <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10 dark:bg-slate-800/80">
                   {workingDays.map(d => {
                     const active = selectedDay === d;
                     return (
@@ -1398,8 +1398,8 @@ function PlanNewWeekGridContent() {
                         onClick={() => setSelectedDay(d)}
                         className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
                           active
-                            ? "bg-white text-indigo-600 shadow-xs"
-                            : "text-slate-500 hover:text-slate-800"
+                            ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400"
+                            : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                         }`}
                       >
                         {d.slice(0, 3).toUpperCase()}
@@ -1410,7 +1410,7 @@ function PlanNewWeekGridContent() {
 
                 {/* Day title centered */}
                 <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
-                  <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight">
+                  <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight dark:text-slate-200">
                     {day}
                   </h2>
                   <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
@@ -1424,8 +1424,8 @@ function PlanNewWeekGridContent() {
             </div>
 
             {/* ── Planning Table (read-only top) — greyed out to signal non-editable ── */}
-            <div className="mt-5 rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              {/* Planning section header */}
+            <div className="mt-5 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+              {/* Planning section header — intentionally a fixed dark bar in both themes */}
               <div className="bg-slate-600 px-5 py-3 flex items-center gap-3">
                 <span className="text-slate-300 font-black uppercase tracking-widest text-xs">Planning</span>
                 <span className="text-[10px] font-bold text-slate-400 bg-slate-700 border border-slate-500 px-2.5 py-0.5 rounded-full">
@@ -1435,12 +1435,12 @@ function PlanNewWeekGridContent() {
 
               {/* Grey wash over the table body to reinforce read-only state */}
               <div
-                className="bg-slate-100 select-none pointer-events-none"
+                className="bg-slate-100 dark:bg-slate-800 select-none pointer-events-none"
                 style={{ filter: "grayscale(0.55) opacity(0.72)" }}
               >
                 {daySlots.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-2 py-12 px-6 text-center">
-                    <span className="text-sm font-bold text-slate-500">
+                    <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
                       {workingDays.length === 0
                         ? `No operating days set up for ${branch} yet`
                         : `No schedule set up for ${branch} on ${day}`}
@@ -1459,7 +1459,7 @@ function PlanNewWeekGridContent() {
             </div>
 
             {/* ── Actual Table (editable bottom) ── */}
-            <div className="mt-5 bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+            <div className="mt-5 bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
               {/* Actual section header — contains column-count controls + action buttons */}
               <div className="bg-[#2D3F50] px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
                 <span className="text-white font-black uppercase tracking-widest text-xs shrink-0">Actual</span>
@@ -1550,14 +1550,14 @@ function PlanNewWeekGridContent() {
 
               {daySlots.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-12 px-6 text-center">
-                  <span className="text-sm font-bold text-slate-700">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                     {workingDays.length === 0
                       ? `No operating days set up for ${branch} yet`
                       : `No schedule set up for ${branch} on ${day}`}
                   </span>
                   <Link
                     href="/manpower-schedule/settings"
-                    className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                    className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors dark:text-indigo-400 dark:border-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900"
                   >
                     Go to Settings
                   </Link>
@@ -1582,7 +1582,7 @@ function PlanNewWeekGridContent() {
           </div>
         ) : (
           /* ── CREATE / VIEW MODE: Single table ── */
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -1591,9 +1591,9 @@ function PlanNewWeekGridContent() {
               </div>
             ) : (
               <>
-                <header className="bg-white p-4 border-b flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
+                <header className="bg-white p-4 border-b flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap dark:bg-slate-900 dark:border-slate-800">
                   {/* Day tabs */}
-                  <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10">
+                  <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10 dark:bg-slate-800/80">
                     {workingDays.map(d => {
                       const active = selectedDay === d;
                       return (
@@ -1602,8 +1602,8 @@ function PlanNewWeekGridContent() {
                           onClick={() => setSelectedDay(d)}
                           className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
                             active
-                              ? "bg-white text-indigo-600 shadow-xs"
-                              : "text-slate-500 hover:text-slate-800"
+                              ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400"
+                              : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                           }`}
                         >
                           {d.slice(0, 3).toUpperCase()}
@@ -1614,7 +1614,7 @@ function PlanNewWeekGridContent() {
 
                   {/* Day title centered */}
                   <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
-                    <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight">
+                    <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight dark:text-slate-200">
                       {day}
                     </h2>
                     <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
@@ -1627,7 +1627,7 @@ function PlanNewWeekGridContent() {
                     {isEditing && (
                       <button
                         onClick={() => clearAllForDay(day)}
-                        className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1"
+                        className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1 dark:text-red-400"
                       >
                         Clear All
                       </button>
@@ -1642,7 +1642,7 @@ function PlanNewWeekGridContent() {
                     ) : (
                       <button
                         onClick={() => setEditingDays(p => ({ ...p, [day]: true }))}
-                        className="text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-5 py-2 rounded-xl font-bold text-xs transition-colors"
+                        className="text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-5 py-2 rounded-xl font-bold text-xs transition-colors dark:text-indigo-400 dark:border-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900"
                       >
                         Edit Day
                       </button>
@@ -1652,18 +1652,18 @@ function PlanNewWeekGridContent() {
 
                 {daySlots.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
-                    <span className="text-sm font-bold text-slate-700">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                       {workingDays.length === 0
                         ? `No operating days set up for ${branch} yet`
                         : `No schedule set up for ${branch} on ${day}`}
                     </span>
-                    <span className="text-xs text-slate-500 max-w-md">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
                       This branch has no operating hours or time slots configured{workingDays.length === 0 ? "" : " for this day"} yet.
                       An Admin needs to set them up in Manpower Schedule Settings before staff can be assigned.
                     </span>
                     <Link
                       href="/manpower-schedule/settings"
-                      className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                      className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors dark:text-indigo-400 dark:border-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900"
                     >
                       Go to Settings
                     </Link>
@@ -1694,7 +1694,7 @@ function PlanNewWeekGridContent() {
         {!isReadOnly && (
           <div className="mt-16 text-center pb-10">
             {errorMsg && (
-              <p className="text-sm font-bold text-red-600 mb-4">{errorMsg}</p>
+              <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-4">{errorMsg}</p>
             )}
             <button
               onClick={scheduleType === "actual" ? handleArchiveWeek : handleSaveWeeklyPlan}
@@ -1714,15 +1714,15 @@ function PlanNewWeekGridContent() {
         )}
 
         {isReadOnly && (
-          <div className="mt-12 mx-auto max-w-md text-center bg-slate-100 border border-slate-200 px-6 py-4 rounded-xl">
-            <span className="font-semibold text-slate-500 text-sm">
+          <div className="mt-12 mx-auto max-w-md text-center bg-slate-100 border border-slate-200 px-6 py-4 rounded-xl dark:bg-slate-800 dark:border-slate-700">
+            <span className="font-semibold text-slate-500 dark:text-slate-400 text-sm">
               Read-only view
             </span>
           </div>
         )}
 
         {loading && (
-          <div className="fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+          <div className="fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400">
             Loading...
           </div>
         )}
@@ -1731,30 +1731,30 @@ function PlanNewWeekGridContent() {
       {/* Add Employee modal (visual only) */}
       {showAddEmployeeModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-sm flex flex-col gap-5">
-            <h2 className="text-lg font-bold text-slate-800 text-center">
+          <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-sm flex flex-col gap-5 dark:bg-slate-900 dark:border-slate-800">
+            <h2 className="text-lg font-bold text-slate-800 text-center dark:text-slate-200">
               Add Employee
             </h2>
-            <div className="text-xs text-slate-500 text-center font-medium bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-              Branch: <span className="font-semibold text-slate-700">{branch}</span>
+            <div className="text-xs text-slate-500 text-center font-medium bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400">
+              Branch: <span className="font-semibold text-slate-700 dark:text-slate-300">{branch}</span>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-600">Full Name</label>
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Full Name</label>
               <input
                 type="text"
                 value={newEmployeeName}
                 onChange={e => setNewEmployeeName(e.target.value)}
                 placeholder="e.g. Ahmad Bin Ali"
-                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors"
+                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 autoFocus
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-600">Role</label>
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Role</label>
               <select
                 value={newEmployeePosition}
                 onChange={e => setNewEmployeePosition(e.target.value)}
-                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors"
+                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="Part Time">Part Time</option>
                 <option value="Full Time">Full Time</option>
@@ -1764,7 +1764,7 @@ function PlanNewWeekGridContent() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAddEmployeeModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 text-sm transition-colors"
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 text-sm transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -1795,7 +1795,7 @@ export default function PlanNewWeekGridPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-blue-600 dark:text-blue-400 font-semibold text-lg">
           Loading...
         </div>
       </AppShell>
@@ -1810,7 +1810,7 @@ export default function PlanNewWeekGridPage() {
     <AppShell email={userEmail} role={userRole} name={userName}>
       <Suspense
         fallback={
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
             Loading week...
           </div>
         }

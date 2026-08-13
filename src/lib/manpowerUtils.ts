@@ -53,24 +53,27 @@ function hashName(name: string): number {
 }
 
 export function getEmployeeColor(name: string): string {
-  if (!name || name === "None" || name === "-- Select --") return "bg-white text-slate-400 border border-slate-200";
+  if (!name || name === "None" || name === "-- Select --") return "bg-white dark:bg-slate-900 text-slate-400 border border-slate-200 dark:border-slate-700";
   const colorIndex = hashName(name) % COLOR_PALETTE.length;
   return COLOR_PALETTE[colorIndex];
 }
 
+// Pale -50 tints would render as bright patches on the dark planning grid, so
+// each carries a -900 fill / -200 text / -700 border companion. Twelve distinct
+// hues, so staff stay tellable apart in either theme.
 const SOFT_STAFF_PALETTE = [
-  "bg-blue-50 text-blue-800 border-blue-200",
-  "bg-emerald-50 text-emerald-800 border-emerald-200",
-  "bg-purple-50 text-purple-800 border-purple-200",
-  "bg-pink-50 text-pink-800 border-pink-200",
-  "bg-amber-50 text-amber-800 border-amber-200",
-  "bg-rose-50 text-rose-800 border-rose-200",
-  "bg-cyan-50 text-cyan-800 border-cyan-200",
-  "bg-teal-50 text-teal-800 border-teal-200",
-  "bg-violet-50 text-violet-800 border-violet-200",
-  "bg-orange-50 text-orange-800 border-orange-200",
-  "bg-indigo-50 text-indigo-800 border-indigo-200",
-  "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200",
+  "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700",
+  "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
+  "bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700",
+  "bg-pink-50 text-pink-800 border-pink-200 dark:bg-pink-900 dark:text-pink-200 dark:border-pink-700",
+  "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700",
+  "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-900 dark:text-rose-200 dark:border-rose-700",
+  "bg-cyan-50 text-cyan-800 border-cyan-200 dark:bg-cyan-900 dark:text-cyan-200 dark:border-cyan-700",
+  "bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:border-teal-700",
+  "bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-900 dark:text-violet-200 dark:border-violet-700",
+  "bg-orange-50 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700",
+  "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-700",
+  "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-900 dark:text-fuchsia-200 dark:border-fuchsia-700",
 ];
 
 export function getSoftStaffColor(name: string): string {
@@ -99,7 +102,7 @@ export const STAFF_COLORS = [
 ];
 
 export function getStaffColorByIndex(name: string, staffList: string[]): string {
-  if (!name || name === "None") return "bg-white border border-slate-200 text-slate-400";
+  if (!name || name === "None") return "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400";
   const idx = staffList.indexOf(name);
   if (idx >= 0) return STAFF_COLORS[idx % STAFF_COLORS.length];
   return getEmployeeColor(name);

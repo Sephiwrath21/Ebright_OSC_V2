@@ -40,9 +40,9 @@ interface KanbanResponse {
 // ─── Lookup maps ──────────────────────────────────────────────────────────────
 
 const CAT_CLS: Record<string, string> = {
-  Junior: "bg-blue-100 text-blue-700",
-  Mid:    "bg-amber-100 text-amber-700",
-  Senior: "bg-purple-100 text-purple-700",
+  Junior: "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
+  Mid:    "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",
+  Senior: "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300",
 };
 
 const DOT_CLS: Record<string, string> = {
@@ -58,16 +58,16 @@ const SRC_CHIP: Record<string, { label: string; cls: string }> = {
   tiktok:   { label: "tt",   cls: "bg-slate-900 text-white" },
   meta:     { label: "fb",   cls: "bg-blue-600 text-white" },
   facebook: { label: "fb",   cls: "bg-blue-600 text-white" },
-  referral: { label: "ref",  cls: "bg-emerald-100 text-emerald-700" },
-  "walk-in":{ label: "walk", cls: "bg-slate-100 text-slate-600" },
+  referral: { label: "ref",  cls: "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300" },
+  "walk-in":{ label: "walk", cls: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" },
   whatsapp: { label: "wa",   cls: "bg-green-500 text-white" },
-  website:  { label: "web",  cls: "bg-indigo-100 text-indigo-700" },
-  wix:      { label: "wix",  cls: "bg-indigo-100 text-indigo-700" },
+  website:  { label: "web",  cls: "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300" },
+  wix:      { label: "wix",  cls: "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300" },
 };
 function srcChip(source: string | null): { label: string; cls: string } {
-  if (!source) return { label: "—", cls: "bg-slate-100 text-slate-500" };
+  if (!source) return { label: "—", cls: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400" };
   const key = source.toLowerCase();
-  return SRC_CHIP[key] ?? { label: source.slice(0, 6).toLowerCase(), cls: "bg-slate-100 text-slate-600" };
+  return SRC_CHIP[key] ?? { label: source.slice(0, 6).toLowerCase(), cls: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" };
 }
 
 function ageBorder(h: number) {
@@ -83,10 +83,10 @@ function KanbanCard({ card }: { card: Card }) {
   return (
     <Link
       href={`/crm/contacts/${card.contactId}`}
-      className={`block bg-white border border-slate-200 border-l-4 ${ageBorder(card.hoursInStage)} rounded-xl p-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150`}
+      className={`block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${ageBorder(card.hoursInStage)} rounded-xl p-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-sm font-semibold text-slate-900 leading-snug">{card.name}</span>
+        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{card.name}</span>
         {card.category && (
           <span className={`text-xs rounded-full px-2 py-0.5 font-medium shrink-0 ${CAT_CLS[card.category]}`}>{card.category}</span>
         )}
@@ -94,7 +94,7 @@ function KanbanCard({ card }: { card: Card }) {
 
       {card.trialDate && (
         <div className="mb-2">
-          <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">
+          <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5">
             <Calendar className="w-3 h-3" />
             {card.trialDate}{card.trialTime ? ` @ ${card.trialTime}` : ""}
           </span>
@@ -104,7 +104,7 @@ function KanbanCard({ card }: { card: Card }) {
       {card.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {card.tags.slice(0, 3).map(t => (
-            <span key={t} className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">{t}</span>
+            <span key={t} className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full px-2 py-0.5">{t}</span>
           ))}
         </div>
       )}
@@ -112,7 +112,7 @@ function KanbanCard({ card }: { card: Card }) {
       <div className="flex items-center justify-between mt-1">
         <div className="flex items-center gap-1.5">
           <span className={`text-xs rounded-full px-1.5 py-0.5 font-medium leading-none ${src.cls}`}>{src.label}</span>
-          {card.value > 0 && <span className="text-xs text-slate-500">MYR {card.value.toLocaleString()}</span>}
+          {card.value > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">MYR {card.value.toLocaleString()}</span>}
         </div>
         <span className="text-xs text-slate-400">
           {card.hoursInStage < 24 ? `${card.hoursInStage}h ago` : `${Math.floor(card.hoursInStage / 24)}d ago`}
@@ -132,11 +132,11 @@ function KanbanColumn({ stage, filterCards }: { stage: Column; filterCards: (c: 
 
   return (
     <div className="flex flex-col w-[17rem] shrink-0">
-      <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 mb-1.5 flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 mb-1.5 flex items-center gap-2">
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotClass(stage.color)}`} />
-        <span className="text-sm font-medium text-slate-800 truncate flex-1" title={stage.name}>{stage.name}</span>
+        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate flex-1" title={stage.name}>{stage.name}</span>
         <span className="text-xs bg-blue-600 text-white rounded-full px-2 py-0.5 font-medium shrink-0">{stage.count.toLocaleString()}</span>
-        <button onClick={() => setAsc(!asc)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Toggle sort">
+        <button onClick={() => setAsc(!asc)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" title="Toggle sort">
           {asc ? <ArrowUpWideNarrow className="w-3.5 h-3.5" /> : <ArrowDownWideNarrow className="w-3.5 h-3.5" />}
         </button>
       </div>
@@ -157,7 +157,7 @@ function KanbanColumn({ stage, filterCards }: { stage: Column; filterCards: (c: 
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const SEL = "h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const SEL = "h-9 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function OpportunitiesBoard() {
   const [scope,  setScope]  = useState("all");   // 'all' | branchId
@@ -211,34 +211,34 @@ export default function OpportunitiesBoard() {
   }), [source, age]);
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-50">
+    <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="px-6 pt-4 pb-3 shrink-0">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" /><span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors rounded">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Opportunities</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Opportunities</span>
         </nav>
 
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Opportunities</h1>
-            <p className="text-sm text-slate-500 mt-0.5">{loading ? "Loading…" : `${total.toLocaleString()} opportunities`}</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Opportunities</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{loading ? "Loading…" : `${total.toLocaleString()} opportunities`}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button disabled title="Read-only view" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400 cursor-not-allowed">
+            <button disabled title="Read-only view" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-medium text-slate-400 cursor-not-allowed">
               <MessageCircle className="w-4 h-4" /> WhatsApp Leads
             </button>
             <button disabled title="Read-only view" className="inline-flex items-center gap-1.5 rounded-lg bg-blue-300 px-3 py-2 text-sm font-medium text-white cursor-not-allowed">
               <Plus className="w-4 h-4" /> New Opportunity
             </button>
-            <button disabled title="Read-only view" className="p-2 rounded-lg border border-slate-200 bg-white cursor-not-allowed">
-              <MoreHorizontal className="w-4 h-4 text-slate-300" />
+            <button disabled title="Read-only view" className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 cursor-not-allowed">
+              <MoreHorizontal className="w-4 h-4 text-slate-300 dark:text-slate-600" />
             </button>
           </div>
         </div>
@@ -255,10 +255,10 @@ export default function OpportunitiesBoard() {
               value={search}
               onChange={e => onSearch(e.target.value)}
               placeholder="Search contacts…"
-              className="h-9 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 py-2 pl-9 pr-8 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {search && (
-              <button onClick={() => onSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button onClick={() => onSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -282,7 +282,7 @@ export default function OpportunitiesBoard() {
           </select>
 
           <div className="ml-auto">
-            <button disabled title="Read-only view" className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-400 cursor-not-allowed">
+            <button disabled title="Read-only view" className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-400 cursor-not-allowed">
               <Settings2 className="w-4 h-4" /> Manage Fields
             </button>
           </div>
@@ -290,9 +290,9 @@ export default function OpportunitiesBoard() {
       </div>
 
       {error ? (
-        <div className="mx-6 mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mx-6 mb-6 rounded-xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-300">
           Couldn&apos;t load opportunities: {error}
-          <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100">Retry</button>
+          <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 dark:border-red-600 bg-white dark:bg-red-950 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900">Retry</button>
         </div>
       ) : (
         <div className="overflow-x-auto px-6 pb-6">
@@ -300,8 +300,8 @@ export default function OpportunitiesBoard() {
             {loading && stages.length === 0
               ? Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="w-[17rem] shrink-0">
-                    <div className="h-12 animate-pulse rounded-xl bg-white mb-1.5" />
-                    <div className="h-40 animate-pulse rounded-xl bg-white/60" />
+                    <div className="h-12 animate-pulse rounded-xl bg-white dark:bg-slate-800 mb-1.5" />
+                    <div className="h-40 animate-pulse rounded-xl bg-white/60 dark:bg-slate-800/60" />
                   </div>
                 ))
               : stages.map(s => <KanbanColumn key={s.id} stage={s} filterCards={filterCards} />)}

@@ -1,8 +1,260 @@
 @import "tailwindcss";
 
+/* Tailwind v4 resolves `dark:` against prefers-color-scheme by default. This
+   switches it to the class strategy so the server-rendered `dark` class on
+   <html> is what decides the theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --background: #f8fafc; /* slate-50 — matches AppShell so no white bleed-through */
   --foreground: #171717;
+}
+
+.dark {
+  color-scheme: dark; /* native scrollbars, <select> popups and form chrome follow the theme */
+  --background: #020617; /* slate-950 — matches the dark shell */
+  --foreground: #f1f5f9; /* slate-100 */
+}
+
+/* Dashboard status tokens. Inline styles in the dashboards read these, so they
+   cannot use Tailwind `dark:` variants — the theme switch happens here instead.
+   Light values are exactly the hexes these replaced, so light mode is unchanged. */
+:root {
+  --status-green-fg: #1D9E75;
+  --status-green-bg: #E8F7F0;
+  --status-amber-fg: #EF9F27;
+  --status-amber-bg: #FFF8EC;
+  --status-amber-bg-strong: #FFF1D6;
+  --status-blue-fg: #378ADD;
+  --status-blue-bg: #E8F0FB;
+  --status-red-fg: #DC2626;
+  --status-red-bg: #FEE7E7;
+  --status-violet-fg: #7C3AED;
+  --status-violet-bg: #EDE9FE;
+  --status-neutral-fg: #94A3B8;
+  --status-neutral-bg: #F1F5F9;
+  --status-neutral-fg-strong: #475569;
+  --status-track: #E5E7EB;
+  --status-border-idle: #CBD5E1;
+  --surface: #FFFFFF;
+  --text-primary: #0F172A;
+  --text-secondary: #374151;
+  --text-muted: #9CA3AF;
+
+  /* Surfaces and borders */
+  --surface-subtle: #FAFAFA;
+  --surface-sunken: #F8FAFC;
+  --border-subtle: #E2E8F0;
+  --border-neutral: #D4D4D4;
+
+  /* Text ramp */
+  --text-strong: #334155;
+  --text-muted-strong: #64748B;
+  --text-neutral: #737373;
+  --text-neutral-faint: #A3A3A3;
+
+  /* Accent foregrounds */
+  --accent-green: #10B981;
+  --accent-green-strong: #047857;
+  --accent-blue: #3B82F6;
+  --accent-amber: #F59E0B;
+  --accent-amber-strong: #92400E;
+  --accent-red: #EF4444;
+  --accent-red-strong: #991B1B;
+  --accent-indigo: #6366F1;
+  --accent-sky: #0EA5E9;
+  --accent-violet-strong: #6D28D9;
+
+  /* Accent tints (subtle backgrounds) */
+  --tint-green: #ECFDF5;
+  --tint-blue: #EFF6FF;
+  --tint-amber: #FFFBEB;
+  --tint-red: #FEF2F2;
+  --tint-red-strong: #FECACA;
+
+  /* Extra hue families. Claims has 16 types but the palette above only had
+     ~5 hues, so several types collapsed onto the same colour in dark. */
+  --accent-orange: #EA580C;
+  --accent-orange-strong: #9A3412;
+  --tint-orange: #FFF7ED;
+  --accent-cyan: #0891B2;
+  --accent-cyan-strong: #155E75;
+  --tint-cyan: #ECFEFF;
+  --accent-teal: #0D9488;
+  --accent-teal-strong: #115E59;
+  --tint-teal: #F0FDFA;
+  --accent-pink: #DB2777;
+  --accent-pink-strong: #9D174D;
+  --tint-pink: #FDF2F8;
+
+  /* Per-claim-type tokens: break dark-mode colour collisions between claim
+     types that share a hue family in ClaimFormView/ClaimDetailView (e.g.
+     internship/referral both green, transport/jackpot both amber). Light
+     values below are byte-identical to the shared tokens they replace, so
+     light mode is unchanged — only the matching block in the `.dark` rule
+     further down diverges, to a distinct hue per type. */
+  --claim-referral-fg: #1D9E75;
+  --claim-referral-bg: #E8F7F0;
+  --claim-referral-border: #ECFDF5;
+  --claim-jackpot-accent: #F59E0B;
+  --claim-jackpot-strong: #92400E;
+  --claim-jackpot-soft: #FFFBEB;
+  --claim-jackpot-border: #FFF8EC;
+  --claim-trainer-accent: #EF4444;
+  --claim-trainer-strong: #991B1B;
+  --claim-trainer-soft: #FEF2F2;
+  --claim-trainer-border: #FECACA;
+  --claim-class-accent: #6366F1;
+  --claim-class-strong: #6D28D9;
+  --claim-class-soft: #EDE9FE;
+  --claim-roadshow-accent: #6366F1;
+  --claim-roadshow-strong: #7C3AED;
+  --claim-roadshow-soft: #EDE9FE;
+  --claim-rm-incentive-accent: #7C3AED;
+  --claim-rm-incentive-strong: #6D28D9;
+  --claim-rm-incentive-soft: #EDE9FE;
+  --claim-part-time-accent: #0EA5E9;
+  --claim-part-time-strong: #378ADD;
+  --claim-part-time-soft: #E8F0FB;
+  --claim-showcase-accent: #0EA5E9;
+  --claim-showcase-strong: #378ADD;
+  --claim-showcase-soft: #EFF6FF;
+
+  /* Categorical badge pairs for the HR dashboard. Its chips are inline-styled,
+     so they read these rather than Tailwind variants. */
+  --cat-blue-fg: #185FA5;
+  --cat-blue-bg: #E6F1FB;
+  --cat-green-fg: #0F6E56;
+  --cat-green-bg: #E1F5EE;
+  --cat-amber-fg: #854F0B;
+  --cat-amber-bg: #FAEEDA;
+  --cat-red-fg: #A32D2D;
+  --cat-red-bg: #FCEBEB;
+  --cat-purple-fg: #3C3489;
+  --cat-purple-bg: #EEEDFE;
+  --cat-gray-fg: #444441;
+  --cat-gray-bg: #F1EFE8;
+}
+
+.dark {
+  --status-green-fg: #6EE7B7;
+  --status-green-bg: #064E3B;
+  --status-amber-fg: #FCD34D;
+  --status-amber-bg: #78350F;
+  --status-amber-bg-strong: #92400E;
+  --status-blue-fg: #93C5FD;
+  --status-blue-bg: #1E3A8A;
+  --status-red-fg: #FCA5A5;
+  --status-red-bg: #7F1D1D;
+  --status-violet-fg: #C4B5FD;
+  --status-violet-bg: #4C1D95;
+  --status-neutral-fg: #94A3B8;
+  --status-neutral-bg: #1E293B;
+  --status-neutral-fg-strong: #CBD5E1;
+  --status-track: #334155;
+  --status-border-idle: #475569;
+  --surface: #0F172A;        /* slate-900 — matches converted card surfaces */
+  --text-primary: #F1F5F9;   /* slate-100 */
+  --text-secondary: #CBD5E1; /* slate-300 */
+  --text-muted: #94A3B8;     /* slate-400 */
+
+  /* Surfaces and borders */
+  --surface-subtle: #1E293B;   /* slate-800 — nested/raised blocks */
+  --surface-sunken: #020617;   /* slate-950 — inset fields, page ground */
+  --border-subtle: #1E293B;    /* slate-800 */
+  --border-neutral: #404040;   /* neutral-700 */
+
+  /* Text ramp. Nothing dimmer than slate-400 on slate-900: slate-500 measures
+     3.75:1 and fails WCAG AA for text. */
+  --text-strong: #CBD5E1;         /* slate-300 */
+  --text-muted-strong: #94A3B8;   /* slate-400 */
+  --text-neutral: #A3A3A3;        /* neutral-400 */
+  --text-neutral-faint: #A3A3A3;  /* neutral-400 — floor, not dimmer */
+
+  /* Accent foregrounds, lightened so they read on dark fills */
+  --accent-green: #34D399;         /* emerald-400 */
+  --accent-green-strong: #6EE7B7;  /* emerald-300 */
+  --accent-blue: #60A5FA;          /* blue-400 */
+  --accent-amber: #FBBF24;         /* amber-400 */
+  --accent-amber-strong: #FCD34D;  /* amber-300 */
+  --accent-red: #F87171;           /* red-400 */
+  --accent-red-strong: #FCA5A5;    /* red-300 */
+  --accent-indigo: #818CF8;        /* indigo-400 */
+  --accent-sky: #38BDF8;           /* sky-400 */
+  --accent-violet-strong: #C4B5FD; /* violet-300 */
+
+  /* Accent tints. -900 not -950: -950 fills measure ~1.2:1 on slate-900 and
+     are effectively invisible. */
+  --tint-green: #064E3B;      /* emerald-900 */
+  --tint-blue: #1E3A8A;       /* blue-900 */
+  --tint-amber: #78350F;      /* amber-900 */
+  --tint-red: #7F1D1D;        /* red-900 */
+  --tint-red-strong: #991B1B; /* red-800 */
+
+  /* Extra hue families, so the 16 claim types stay tellable apart. */
+  --accent-orange: #FB923C;         /* orange-400 */
+  --accent-orange-strong: #FDBA74;  /* orange-300 */
+  --tint-orange: #7C2D12;           /* orange-900 */
+  --accent-cyan: #22D3EE;           /* cyan-400 */
+  --accent-cyan-strong: #67E8F9;    /* cyan-300 */
+  --tint-cyan: #164E63;             /* cyan-900 */
+  --accent-teal: #2DD4BF;           /* teal-400 */
+  --accent-teal-strong: #5EEAD4;    /* teal-300 */
+  --tint-teal: #134E4A;             /* teal-900 */
+  --accent-pink: #F472B6;           /* pink-400 */
+  --accent-pink-strong: #F9A8D4;    /* pink-300 */
+  --tint-pink: #831843;             /* pink-900 */
+
+  /* Per-claim-type tokens (dark): a distinct hue per type, breaking the
+     collisions the shared tokens above would otherwise create. Anchor types
+     (sales, health, transport, sales_incentive, renewal_incentive, ot,
+     branch_rank_reward, internship) keep the original shared tokens
+     untouched; these are only for the types that would otherwise collide
+     with an anchor. -900 for fills (never -950 — invisible on slate-900),
+     -300/-400 for text/icons. */
+  --claim-referral-fg: #5EEAD4;          /* teal-300 */
+  --claim-referral-bg: #134E4A;          /* teal-900 */
+  --claim-referral-border: #134E4A;      /* teal-900 */
+  --claim-jackpot-accent: #FB923C;       /* orange-400 */
+  --claim-jackpot-strong: #FDBA74;       /* orange-300 */
+  --claim-jackpot-soft: #7C2D12;         /* orange-900 */
+  --claim-jackpot-border: #7C2D12;       /* orange-900 */
+  --claim-trainer-accent: #FB7185;       /* rose-400 */
+  --claim-trainer-strong: #FDA4AF;       /* rose-300 */
+  --claim-trainer-soft: #881337;         /* rose-900 */
+  --claim-trainer-border: #9F1239;       /* rose-800 */
+  --claim-class-accent: #E879F9;         /* fuchsia-400 */
+  --claim-class-strong: #F0ABFC;         /* fuchsia-300 */
+  --claim-class-soft: #701A75;           /* fuchsia-900 */
+  --claim-roadshow-accent: #22D3EE;      /* cyan-400 */
+  --claim-roadshow-strong: #67E8F9;      /* cyan-300 */
+  --claim-roadshow-soft: #164E63;        /* cyan-900 */
+  --claim-rm-incentive-accent: #F472B6;  /* pink-400 */
+  --claim-rm-incentive-strong: #F9A8D4;  /* pink-300 */
+  --claim-rm-incentive-soft: #831843;    /* pink-900 */
+  --claim-part-time-accent: #4ADE80;     /* green-400 */
+  --claim-part-time-strong: #86EFAC;     /* green-300 */
+  --claim-part-time-soft: #14532D;       /* green-900 */
+  --claim-showcase-accent: #A3E635;      /* lime-400 */
+  --claim-showcase-strong: #BEF264;      /* lime-300 */
+  --claim-showcase-soft: #365314;        /* lime-900 */
+
+  /* Categorical badge pairs. The light values are pale tints used as chip
+     backgrounds, which read as bright patches on a dark card — so dark flips
+     them to a -900 fill with -300 text. */
+  --cat-blue-fg: #93C5FD;   /* blue-300 */
+  --cat-blue-bg: #1E3A8A;   /* blue-900 */
+  --cat-green-fg: #6EE7B7;  /* emerald-300 */
+  --cat-green-bg: #064E3B;  /* emerald-900 */
+  --cat-amber-fg: #FCD34D;  /* amber-300 */
+  --cat-amber-bg: #78350F;  /* amber-900 */
+  --cat-red-fg: #FCA5A5;    /* red-300 */
+  --cat-red-bg: #7F1D1D;    /* red-900 */
+  --cat-purple-fg: #C4B5FD; /* violet-300 */
+  --cat-purple-bg: #4C1D95; /* violet-900 */
+  --cat-gray-fg: #CBD5E1;   /* slate-300 */
+  --cat-gray-bg: #1E293B;   /* slate-800 */
 }
 
 @theme inline {
@@ -23,3 +275,5 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   display: none !important;
   -webkit-appearance: none;
 }
+
+

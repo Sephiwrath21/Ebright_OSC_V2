@@ -220,30 +220,30 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
   const liveClock = TIME_FMT.format(now ?? new Date(0));
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-5">
         {/* Breadcrumb — same pattern as /attendance landing page. */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 rounded"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/attendance" className="hover:text-slate-900 transition-colors">Attendance</Link>
+          <Link href="/attendance" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Attendance</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Summary</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Summary</span>
         </nav>
 
         {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 Attendance Dashboard
               </h1>
             </div>
@@ -259,7 +259,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
                 value={selectedBranchId === null ? "all" : String(selectedBranchId)}
                 onChange={(e) => onChangeBranch(e.target.value)}
                 disabled={isPending}
-                className="bg-transparent text-sm font-bold text-slate-900 focus:outline-none disabled:cursor-wait"
+                className="bg-transparent text-sm font-bold text-slate-900 dark:text-slate-100 focus:outline-none disabled:cursor-wait"
               >
                 <option value="all">All branches</option>
                 {data.branches.map((b) => (
@@ -270,23 +270,23 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
               </select>
             </FilterChip>
             <FilterChip icon={<CalendarIcon className="w-4 h-4 text-blue-600" aria-hidden="true" />} label="Date">
-              <span className="text-sm font-bold text-slate-900 tabular-nums">{dateChipLabel}</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100 tabular-nums">{dateChipLabel}</span>
               <input
                 type="date"
                 value={data.selectedDate}
                 onChange={(e) => onChangeDate(e.target.value)}
                 disabled={isPending}
                 aria-label="Select date"
-                className="w-5 h-5 ml-1 opacity-70 hover:opacity-100 cursor-pointer"
+                className="w-5 h-5 ml-1 opacity-70 hover:opacity-100 cursor-pointer dark:[color-scheme:dark]"
               />
               {isToday ? (
-                <span className="ml-2 text-[11px] font-bold uppercase tracking-wider text-blue-600">Today</span>
+                <span className="ml-2 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Today</span>
               ) : (
                 <button
                   type="button"
                   onClick={() => onChangeDate(todayIso)}
                   disabled={isPending}
-                  className="ml-2 text-[11px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 disabled:opacity-60"
+                  className="ml-2 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-60"
                 >
                   Today
                 </button>
@@ -297,7 +297,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
             type="button"
             onClick={onPullHistory}
             disabled={pulling || isPending}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-blue-200 bg-white text-blue-700 text-sm font-semibold hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-600 transition-colors disabled:opacity-60"
           >
             <Database className={`w-4 h-4 ${pulling ? "animate-pulse" : ""}`} aria-hidden="true" />
             {pulling ? "Pulling…" : "Pull History"}
@@ -343,23 +343,23 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         </section>
 
         {/* Info banner */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-xl border border-blue-100 bg-blue-50/40">
-          <div className="flex items-center gap-2 text-sm text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-xl border border-blue-100 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/40">
+          <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <Info className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
             <span>
-              Live sync from office scanner. 1st scan = <strong className="text-blue-700">Check-In</strong>.
-              Subsequent scans update <strong className="text-rose-700">Check-Out</strong>. Records reset at midnight.
+              Live sync from office scanner. 1st scan = <strong className="text-blue-700 dark:text-blue-300">Check-In</strong>.
+              Subsequent scans update <strong className="text-rose-700 dark:text-rose-300">Check-Out</strong>. Records reset at midnight.
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white border border-emerald-200 text-emerald-700 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
               <span className="relative inline-flex w-1.5 h-1.5">
                 <span className="absolute inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
                 <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
               </span>
               <span className="tabular-nums">{liveClock}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
               <Database className="w-3 h-3" aria-hidden="true" />
               <span className="tabular-nums">{data.recordsToday}</span>
             </span>
@@ -369,13 +369,13 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         {/* Main grid: table + Missing Today side panel */}
         <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}>
           {/* Attendance table */}
-          <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b-2 border-blue-500/80">
               <div className="flex items-center gap-3">
                 <span className="w-1 h-6 rounded-full bg-blue-500" aria-hidden="true" />
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Today&rsquo;s Attendance</h2>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Today&rsquo;s Attendance</h2>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                     {data.selectedBranch?.branch_name ?? "All branches"} · {data.counts.totalEmployees} employees
                     {statusFilter && (
                       <>
@@ -383,7 +383,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
                         <button
                           type="button"
                           onClick={() => setStatusFilter(null)}
-                          className="text-blue-600 font-semibold hover:text-blue-800 underline-offset-2 hover:underline"
+                          className="text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-800 dark:hover:text-blue-300 underline-offset-2 hover:underline"
                         >
                           Clear filter
                         </button>
@@ -392,19 +392,19 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-500">
+              <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 <RefreshCw className="w-3 h-3" aria-hidden="true" />
                 Auto-refresh · 5s
               </span>
             </div>
-            <div className="px-6 py-4 border-b border-slate-100">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name, ID, department, or position…"
-                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-slate-200 dark:border-slate-500 bg-slate-50/50 dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900"
                 />
               </div>
             </div>
@@ -412,7 +412,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr className="bg-slate-50 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     <th className="text-left px-4 py-2">Employee</th>
                     <th className="text-left px-3 py-2">Dept / Role</th>
                     <th className="text-left px-3 py-2 whitespace-nowrap">Date</th>
@@ -499,19 +499,19 @@ function FilterChip({
   children: React.ReactNode;
 }) {
   return (
-    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm text-slate-700 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 gap-2 text-sm text-slate-700 dark:text-slate-300 focus-within:border-blue-400 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900 transition-all">
       {icon}
-      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
       {children}
     </label>
   );
 }
 
 const ACCENTS = {
-  blue: { bar: "bg-blue-500", glow: "before:bg-blue-500/30", tile: "bg-blue-50", icon: "text-blue-600", ring: "ring-blue-300 border-blue-300", focus: "focus-visible:ring-blue-400", text: "text-blue-600" },
-  emerald: { bar: "bg-emerald-500", glow: "before:bg-emerald-500/30", tile: "bg-emerald-50", icon: "text-emerald-600", ring: "ring-emerald-300 border-emerald-300", focus: "focus-visible:ring-emerald-400", text: "text-emerald-600" },
-  amber: { bar: "bg-amber-500", glow: "before:bg-amber-500/30", tile: "bg-amber-50", icon: "text-amber-600", ring: "ring-amber-300 border-amber-300", focus: "focus-visible:ring-amber-400", text: "text-amber-600" },
-  rose: { bar: "bg-rose-500", glow: "before:bg-rose-500/30", tile: "bg-rose-50", icon: "text-rose-600", ring: "ring-rose-300 border-rose-300", focus: "focus-visible:ring-rose-400", text: "text-rose-600" },
+  blue: { bar: "bg-blue-500", glow: "before:bg-blue-500/30", tile: "bg-blue-50 dark:bg-blue-900", icon: "text-blue-600", ring: "ring-blue-300 border-blue-300 dark:ring-blue-600 dark:border-blue-600", focus: "focus-visible:ring-blue-400", text: "text-blue-600" },
+  emerald: { bar: "bg-emerald-500", glow: "before:bg-emerald-500/30", tile: "bg-emerald-50 dark:bg-emerald-900", icon: "text-emerald-600", ring: "ring-emerald-300 border-emerald-300 dark:ring-emerald-600 dark:border-emerald-600", focus: "focus-visible:ring-emerald-400", text: "text-emerald-600" },
+  amber: { bar: "bg-amber-500", glow: "before:bg-amber-500/30", tile: "bg-amber-50 dark:bg-amber-900", icon: "text-amber-600", ring: "ring-amber-300 border-amber-300 dark:ring-amber-600 dark:border-amber-600", focus: "focus-visible:ring-amber-400", text: "text-amber-600" },
+  rose: { bar: "bg-rose-500", glow: "before:bg-rose-500/30", tile: "bg-rose-50 dark:bg-rose-900", icon: "text-rose-600", ring: "ring-rose-300 border-rose-300 dark:ring-rose-600 dark:border-rose-600", focus: "focus-visible:ring-rose-400", text: "text-rose-600" },
 } as const;
 
 function StatCard({
@@ -537,7 +537,7 @@ function StatCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`relative text-left bg-white border border-slate-200 rounded-2xl shadow-sm p-5 pt-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${a.focus} ${selected ? `ring-2 shadow-md -translate-y-0.5 ${a.ring}` : ""}`}
+      className={`relative text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5 pt-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${a.focus} ${selected ? `ring-2 shadow-md -translate-y-0.5 ${a.ring}` : ""}`}
     >
       {/* Top accent bar with soft glow */}
       <span className={`absolute top-0 left-0 right-0 h-1 ${a.bar}`} aria-hidden="true" />
@@ -551,7 +551,7 @@ function StatCard({
           <p className={`text-4xl font-bold tracking-tight tabular-nums ${a.text}`}>
             {value}
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-700">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</p>
           {caption && <p className="mt-0.5 text-xs text-slate-400">{caption}</p>}
         </div>
       </div>
@@ -562,7 +562,7 @@ function StatCard({
 function ScannerStatusChip({ online }: { online: boolean }) {
   if (online) {
     return (
-      <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
         <span className="relative inline-flex w-2 h-2 items-center justify-center">
           <span className="absolute inline-flex w-2 h-2 rounded-full bg-emerald-400 opacity-75 animate-ping" />
           <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
@@ -573,7 +573,7 @@ function ScannerStatusChip({ online }: { online: boolean }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-500">
+    <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-500 dark:text-slate-400">
       <RadioReceiver className="w-4 h-4" aria-hidden="true" />
       Scanner Offline
     </span>
@@ -608,46 +608,46 @@ function AttendanceTableRow({
         : "—";
 
   return (
-    <tr className="bg-white odd:bg-slate-50/40 hover:bg-blue-50/40 transition-colors border-b border-slate-100 last:border-b-0">
+    <tr className="bg-white dark:bg-slate-900 odd:bg-slate-50/40 dark:odd:bg-slate-800/50 hover:bg-blue-50/40 dark:hover:bg-blue-900/30 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0">
       <td className="px-4 py-1.5 align-middle">
         <div className="leading-tight">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-tight">{row.name}</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-tight">{row.name}</span>
             {row.visiting_from && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
+              <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
                 Visit · {row.visiting_from}
               </span>
             )}
             {showHomeBadge && row.home_branch_code && !row.visiting_from && (
-              <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
+              <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
                 {row.home_branch_code}
               </span>
             )}
             {row.absence_kind === "on_leave" && (
-              <span className="inline-flex items-center rounded-full bg-sky-100 text-sky-700 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
+              <span className="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
                 {row.leave_type_code ?? "Leave"}
               </span>
             )}
             {row.absence_kind === "mia" && (
-              <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
+              <span className="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300 px-1.5 text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap leading-4">
                 MIA · {row.leave_type_code ?? "UL"}
               </span>
             )}
           </div>
           {row.employee_code && (
             <div className="mt-0.5 text-[10px] font-medium text-slate-400 font-mono tracking-tight">
-              <span className="text-slate-300">ID</span> · {row.employee_code}
+              <span className="text-slate-300 dark:text-slate-600">ID</span> · {row.employee_code}
             </div>
           )}
         </div>
       </td>
       <td className="px-3 py-1.5 whitespace-nowrap text-[11px]">
-        {row.department && <span className="font-semibold text-slate-800">{row.department}</span>}
-        {row.department && row.position && <span className="mx-1 text-slate-300">·</span>}
-        {row.position && <span className="font-medium text-slate-500">{row.position}</span>}
+        {row.department && <span className="font-semibold text-slate-800 dark:text-slate-200">{row.department}</span>}
+        {row.department && row.position && <span className="mx-1 text-slate-300 dark:text-slate-600">·</span>}
+        {row.position && <span className="font-medium text-slate-500 dark:text-slate-400">{row.position}</span>}
         {!row.department && !row.position && <span className="text-slate-400">—</span>}
       </td>
-      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] text-slate-500 font-medium">
+      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400 font-medium">
         {dateLabel.replace(", ", " ")}
       </td>
       <td className="px-3 py-1.5">
@@ -666,7 +666,7 @@ function AttendanceTableRow({
         <StatusPill variant={outVariant} label={outLabel} />
       </td>
       <td className="px-4 py-1.5 text-right">
-        <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 tabular-nums">
+        <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 tabular-nums">
           {row.scans}
         </span>
       </td>
@@ -675,9 +675,9 @@ function AttendanceTableRow({
 }
 
 function TimeCell({ iso, tone }: { iso: string | null; tone: "ok" | "late" }) {
-  if (!iso) return <span className="text-slate-300 font-mono text-xs">—</span>;
+  if (!iso) return <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>;
   return (
-    <span className={`font-mono text-xs tabular-nums whitespace-nowrap ${tone === "late" ? "text-amber-600 font-bold" : "text-slate-700 font-medium"}`}>
+    <span className={`font-mono text-xs tabular-nums whitespace-nowrap ${tone === "late" ? "text-amber-600 font-bold" : "text-slate-700 dark:text-slate-300 font-medium"}`}>
       {TIME_FMT.format(new Date(iso))}
     </span>
   );
@@ -691,12 +691,12 @@ function StatusPill({
   label: string;
 }) {
   const styles = {
-    on_time:      "bg-emerald-50 text-emerald-700 border border-emerald-200",
-    late:         "bg-rose-50 text-rose-700 border border-rose-200",
-    normal:       "bg-slate-50 text-slate-600 border border-slate-200",
-    early:        "bg-amber-50 text-amber-700 border border-amber-200",
-    currently_in: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-    muted:        "bg-slate-50 text-slate-400 border border-slate-100",
+    on_time:      "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700",
+    late:         "bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700",
+    normal:       "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
+    early:        "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700",
+    currently_in: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700",
+    muted:        "bg-slate-50 dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-800",
   }[variant];
   // Icon vs dot: late + early use an icon (matches the reference), the rest
   // use a small dot so the pill height stays consistent.
@@ -719,10 +719,10 @@ function StatusPill({
 }
 
 const PANEL_ACCENT = {
-  rose:    { border: "border-rose-500/80",    bar: "bg-rose-500",    chipBg: "bg-rose-50",    chipBorder: "border-rose-200",    chipText: "text-rose-700",    dot: "bg-rose-500"    },
-  violet:  { border: "border-violet-500/80",  bar: "bg-violet-500",  chipBg: "bg-violet-50",  chipBorder: "border-violet-200",  chipText: "text-violet-700",  dot: "bg-violet-500"  },
-  amber:   { border: "border-amber-500/80",   bar: "bg-amber-500",   chipBg: "bg-amber-50",   chipBorder: "border-amber-200",   chipText: "text-amber-700",   dot: "bg-amber-500"   },
-  emerald: { border: "border-emerald-500/80", bar: "bg-emerald-500", chipBg: "bg-emerald-50", chipBorder: "border-emerald-200", chipText: "text-emerald-700", dot: "bg-emerald-500" },
+  rose:    { border: "border-rose-500/80",    bar: "bg-rose-500",    chipBg: "bg-rose-50 dark:bg-rose-900",    chipBorder: "border-rose-200 dark:border-rose-700",    chipText: "text-rose-700 dark:text-rose-300",    dot: "bg-rose-500"    },
+  violet:  { border: "border-violet-500/80",  bar: "bg-violet-500",  chipBg: "bg-violet-50 dark:bg-violet-900",  chipBorder: "border-violet-200 dark:border-violet-700",  chipText: "text-violet-700 dark:text-violet-300",  dot: "bg-violet-500"  },
+  amber:   { border: "border-amber-500/80",   bar: "bg-amber-500",   chipBg: "bg-amber-50 dark:bg-amber-900",   chipBorder: "border-amber-200 dark:border-amber-700",   chipText: "text-amber-700 dark:text-amber-300",   dot: "bg-amber-500"   },
+  emerald: { border: "border-emerald-500/80", bar: "bg-emerald-500", chipBg: "bg-emerald-50 dark:bg-emerald-900", chipBorder: "border-emerald-200 dark:border-emerald-700", chipText: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
 } as const;
 
 function AbsencePanel({
@@ -750,13 +750,13 @@ function AbsencePanel({
 }) {
   const a = PANEL_ACCENT[accent];
   return (
-    <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[420px]">
+    <aside className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[420px]">
       <div className={`flex items-center justify-between gap-2 px-5 py-4 border-b-2 ${a.border}`}>
         <div className="flex items-center gap-3 min-w-0">
           <span className={`w-1 h-6 rounded-full shrink-0 ${a.bar}`} aria-hidden="true" />
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-slate-900">{title}</h2>
-            <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{subtitle}</p>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h2>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">{subtitle}</p>
           </div>
         </div>
         <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-xs font-bold whitespace-nowrap ${a.chipBg} ${a.chipBorder} ${a.chipText}`}>
@@ -764,7 +764,7 @@ function AbsencePanel({
           {rows.length} {countLabel}
         </span>
       </div>
-      <ul className="overflow-y-auto divide-y divide-slate-100">
+      <ul className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
         {rows.length === 0 ? (
           <li className="px-5 py-6 text-center text-xs font-medium text-slate-400">
             None.
@@ -784,8 +784,8 @@ function AbsencePanel({
           ).map(([branchKey, branchRows]) => (
             <li key={branchKey ?? "_all"}>
               {branchKey !== null && (
-                <div className="px-5 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="px-5 py-1.5 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {branchKey}
                   </span>
                   <span className="text-[10px] font-semibold text-slate-400">
@@ -793,12 +793,12 @@ function AbsencePanel({
                   </span>
                 </div>
               )}
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {branchRows.map((row) => {
                   const tag = chip ? chip(row) : null;
                   return (
                     <li key={row.user_id} className="px-5 py-3 flex items-center gap-3">
-                      <div className="rounded-full w-8 h-8 bg-slate-100 text-slate-600 font-bold text-[11px] flex items-center justify-center shrink-0">
+                      <div className="rounded-full w-8 h-8 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] flex items-center justify-center shrink-0">
                         {row.name
                           .split(" ")
                           .map((p) => p[0])
@@ -808,8 +808,8 @@ function AbsencePanel({
                           .toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900 truncate">{row.name}</p>
-                        <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{row.name}</p>
+                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                           {row.position ?? "—"}
                           {row.home_branch_code && <span className="ml-1 text-slate-400">· {row.home_branch_code}</span>}
                         </p>
@@ -823,7 +823,7 @@ function AbsencePanel({
                         <button
                           type="button"
                           onClick={() => onAction(row)}
-                          className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-slate-200 bg-white text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                          className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                         >
                           {actionLabel}
                         </button>

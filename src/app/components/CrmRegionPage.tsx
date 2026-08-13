@@ -67,7 +67,7 @@ function Pill({
       className={`rounded-full font-medium transition-all ${pad} ${
         active
           ? "text-white shadow-sm ring-1 ring-black/10"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
       }`}
       style={active ? { backgroundColor: BRAND } : undefined}
     >
@@ -78,18 +78,18 @@ function Pill({
 
 function DayCell({ day, counts }: { day: TrialDay; counts: DayCounts }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{day}</div>
       <div className="mt-2 flex items-center justify-center gap-1.5 text-xl font-bold tabular-nums leading-none">
         <span
-          className={counts.CT > 0 ? "" : "text-slate-300"}
+          className={counts.CT > 0 ? "" : "text-slate-300 dark:text-slate-600"}
           style={counts.CT > 0 ? { color: BRAND } : undefined}
         >
           {counts.CT}
         </span>
-        <span className="text-slate-300 font-light">|</span>
+        <span className="text-slate-300 dark:text-slate-600 font-light">|</span>
         <span
-          className={counts.ENR > 0 ? "" : "text-slate-300"}
+          className={counts.ENR > 0 ? "" : "text-slate-300 dark:text-slate-600"}
           style={counts.ENR > 0 ? { color: BRAND } : undefined}
         >
           {counts.ENR}
@@ -113,10 +113,10 @@ function GridRow({
   const hasAny = totals.CT > 0 || totals.ENR > 0;
   return (
     <div
-      className={`grid items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors ${
+      className={`grid items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors dark:bg-slate-900 ${
         emphasis
-          ? "border-l-4 border-slate-200"
-          : "border-slate-200 hover:border-slate-300"
+          ? "border-l-4 border-slate-200 dark:border-slate-800"
+          : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
       }`}
       style={{
         gridTemplateColumns: "minmax(160px,200px) repeat(5,1fr)",
@@ -127,8 +127,8 @@ function GridRow({
         <div
           className={`truncate ${
             emphasis
-              ? "text-lg font-bold text-slate-900"
-              : "text-base font-semibold text-slate-800"
+              ? "text-lg font-bold text-slate-900 dark:text-slate-100"
+              : "text-base font-semibold text-slate-800 dark:text-slate-200"
           }`}
         >
           {label}
@@ -241,21 +241,21 @@ export default function CrmRegionPage() {
   }, [rowsToRender]);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors rounded">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Region</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Region</span>
         </nav>
 
         {/* Page header */}
@@ -268,8 +268,8 @@ export default function CrmRegionPage() {
               <MapPinned className="w-5 h-5" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Day Distribution</h1>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Day Distribution</h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 CT bookings by preferred trial day · Each cell shows{" "}
                 <span className="font-medium" style={{ color: BRAND }}>CT</span>
                 <span className="text-slate-400"> | </span>
@@ -281,7 +281,7 @@ export default function CrmRegionPage() {
             type="button"
             onClick={handleRefresh}
             disabled={spin}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${spin ? "animate-spin" : ""}`} />
             Refresh
@@ -289,7 +289,7 @@ export default function CrmRegionPage() {
         </div>
 
         {/* Filter card */}
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm mb-6">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm mb-6 dark:border-slate-800 dark:bg-slate-900">
           {/* Date range + Region share one row (Region to the right) */}
           <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
             <div>
@@ -350,17 +350,17 @@ export default function CrmRegionPage() {
 
         {/* Grid rows */}
         {loading ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm">
-            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-[#ED1C24]" />
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-700 border-t-[#ED1C24]" />
             <p className="text-slate-400">Loading day distribution…</p>
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-sm shadow-sm">
-            <p className="text-red-600">Couldn&apos;t load day distribution: {error}</p>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-sm shadow-sm dark:border-red-700 dark:bg-red-900">
+            <p className="text-red-600 dark:text-red-300">Couldn&apos;t load day distribution: {error}</p>
           </div>
         ) : rowsToRender.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm">
-            <p className="text-slate-500">No branches match the current filters.</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p className="text-slate-500 dark:text-slate-400">No branches match the current filters.</p>
             <p className="mt-1 text-xs text-slate-400">
               Make sure branches have a region assigned (A / B / C) under Settings → Branches.
             </p>

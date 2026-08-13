@@ -20,33 +20,33 @@ export default async function PackagePage() {
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
               <Home className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <Link href="/dashboards/sms" className="hover:text-slate-900 transition-colors rounded">
+            <Link href="/dashboards/sms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
               SMS
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <span className="text-slate-900 font-medium">Package</span>
+            <span className="text-slate-900 dark:text-slate-100 font-medium">Package</span>
           </nav>
 
           <header className="mb-10">
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               Package Management
             </h1>
           </header>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
             <div className="bg-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center mb-5">
               <BookUser className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
-            <h2 className="text-base font-semibold text-slate-900">Package Management coming soon</h2>
-            <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Package Management coming soon</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               This module is under development.
             </p>
           </div>

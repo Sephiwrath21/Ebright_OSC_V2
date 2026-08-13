@@ -37,18 +37,18 @@ function StepBar({ current }: { current: number }) {
               <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                 done   ? "bg-blue-600 text-white" :
                 active ? "bg-blue-600 text-white" :
-                         "bg-slate-200 text-slate-500"
+                         "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
               }`}>
                 {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
               </div>
               <span className={`text-sm font-medium transition-colors ${
-                active ? "text-slate-900" : done ? "text-blue-600" : "text-slate-400"
+                active ? "text-slate-900 dark:text-slate-100" : done ? "text-blue-600 dark:text-blue-400" : "text-slate-400"
               }`}>
                 {label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-px mx-3 transition-colors ${done ? "bg-blue-400" : "bg-slate-200"}`} />
+              <div className={`flex-1 h-px mx-3 transition-colors ${done ? "bg-blue-400" : "bg-slate-200 dark:bg-slate-800"}`} />
             )}
           </div>
         );
@@ -68,10 +68,10 @@ function SelectCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex flex-col items-start gap-1.5 rounded-xl border-2 bg-white p-4 text-left transition-all hover:shadow-md focus:outline-none ${
+      className={`flex flex-col items-start gap-1.5 rounded-xl border-2 bg-white dark:bg-slate-800 p-4 text-left transition-all hover:shadow-md focus:outline-none ${
         selected
-          ? "border-blue-500 shadow-sm ring-2 ring-blue-100"
-          : "border-slate-200 hover:border-slate-300"
+          ? "border-blue-500 dark:border-blue-400 shadow-sm ring-2 ring-blue-100 dark:ring-blue-900"
+          : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-600"
       }`}
     >
       <span className="inline-block h-4 w-4 rounded-full" style={{ backgroundColor: accent }} />
@@ -88,7 +88,7 @@ function StepPlatform({ platforms, value, onChange, onNext }: {
 }) {
   return (
     <div>
-      <h2 className="text-base font-semibold text-slate-800 mb-4">Select Platform</h2>
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Select Platform</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         {platforms.map(p => (
           <SelectCard key={p.code} code={p.code} name={p.name} accent={p.accent}
@@ -115,7 +115,7 @@ function StepType({ types, value, onChange, onNext, onBack }: {
 }) {
   return (
     <div>
-      <h2 className="text-base font-semibold text-slate-800 mb-4">Select Ticket Type</h2>
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Select Ticket Type</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         {types.map(t => (
           <SelectCard key={t.code} code={t.code} name={t.name} accent={t.accent}
@@ -125,7 +125,7 @@ function StepType({ types, value, onChange, onNext, onBack }: {
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
@@ -187,56 +187,56 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
     if (validate()) onSubmit();
   }
 
-  const inputCls  = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
-  const selectCls = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
+  const inputCls  = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-400";
+  const selectCls = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-400";
 
   return (
     <form onSubmit={handleSubmit} noValidate>
       {/* Summary chips */}
       <div className="flex items-center gap-2 mb-5">
         {platform && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: platform.accent }} />
             {platform.name}
           </span>
         )}
         {type && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: type.accent }} />
             {type.name}
           </span>
         )}
       </div>
 
-      <h2 className="text-base font-semibold text-slate-800 mb-4">Ticket Details</h2>
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Ticket Details</h2>
 
       <div className="flex flex-col gap-4">
         {/* Subject */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-700">Subject <span className="text-red-500">*</span></label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subject <span className="text-red-500 dark:text-red-400">*</span></label>
           <input
             value={value.subject}
             onChange={e => set("subject", e.target.value)}
             placeholder="Brief description of the request"
             className={`${inputCls} ${errors.subject ? "border-red-400" : ""}`}
           />
-          {errors.subject && <p className="text-[11px] text-red-500">{errors.subject}</p>}
+          {errors.subject && <p className="text-[11px] text-red-500 dark:text-red-400">{errors.subject}</p>}
         </div>
 
         {/* Requester */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700">Student / Requester <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Student / Requester <span className="text-red-500 dark:text-red-400">*</span></label>
             <input
               value={value.requesterName}
               onChange={e => set("requesterName", e.target.value)}
               placeholder="Full name"
               className={`${inputCls} ${errors.requesterName ? "border-red-400" : ""}`}
             />
-            {errors.requesterName && <p className="text-[11px] text-red-500">{errors.requesterName}</p>}
+            {errors.requesterName && <p className="text-[11px] text-red-500 dark:text-red-400">{errors.requesterName}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700">Contact (phone / email)</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Contact (phone / email)</label>
             <input
               value={value.requesterContact}
               onChange={e => set("requesterContact", e.target.value)}
@@ -249,7 +249,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
         {/* Branch + Priority */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700">Branch <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Branch <span className="text-red-500 dark:text-red-400">*</span></label>
             <select
               value={value.branch}
               onChange={e => set("branch", e.target.value)}
@@ -258,10 +258,10 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
               <option value="">Select branch…</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.code ? `${b.code} — ${b.name}` : b.name}</option>)}
             </select>
-            {errors.branch && <p className="text-[11px] text-red-500">{errors.branch}</p>}
+            {errors.branch && <p className="text-[11px] text-red-500 dark:text-red-400">{errors.branch}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700">Priority</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Priority</label>
             <select value={value.priority} onChange={e => set("priority", e.target.value)} className={selectCls}>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -270,7 +270,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
 
         {/* Description */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-700">Description</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Description</label>
           <textarea
             value={value.description}
             onChange={e => set("description", e.target.value)}
@@ -285,7 +285,7 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
@@ -305,12 +305,12 @@ function StepDetails({ value, onChange, onSubmit, onBack, platform, type, branch
 function SuccessScreen({ subject, onReset }: { subject: string; onReset: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 mb-4">
-        <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900 mb-4">
+        <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-300" />
       </div>
-      <h2 className="text-lg font-bold text-slate-900 mb-1">Ticket Ready</h2>
-      <p className="text-sm text-slate-500 mb-6 max-w-xs">
-        <span className="font-semibold text-slate-800">&ldquo;{subject}&rdquo;</span> is ready to submit. This is a read-only preview — no ticket was written.
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">Ticket Ready</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-xs">
+        <span className="font-semibold text-slate-800 dark:text-slate-200">&ldquo;{subject}&rdquo;</span> is ready to submit. This is a read-only preview — no ticket was written.
       </p>
       <div className="flex gap-3">
         <button
@@ -321,7 +321,7 @@ function SuccessScreen({ subject, onReset }: { subject: string; onReset: () => v
         </button>
         <Link
           href="/crm/ticket/my-tickets"
-          className="rounded-xl border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          className="rounded-xl border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           View My Tickets
         </Link>
@@ -379,39 +379,39 @@ export default function CrmTicketNewPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-3xl mx-auto px-6 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" /><span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-700">Ticket</span>
+          <span className="text-slate-700 dark:text-slate-300">Ticket</span>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-900 font-medium">New Ticket</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">New Ticket</span>
         </nav>
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">New Ticket</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Submit a new support ticket</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">New Ticket</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Submit a new support ticket</p>
         </div>
 
         {/* Step bar */}
         {!submitted && <StepBar current={step} />}
 
         {loadErr && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-700 dark:bg-red-900 dark:text-red-300">
             Couldn&apos;t load form data: {loadErr}
           </div>
         )}
 
         {/* Step content card */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-8 py-7">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-8 py-7 dark:bg-slate-900 dark:border-slate-800">
           {submitted ? (
             <SuccessScreen subject={details.subject} onReset={reset} />
           ) : step === 0 ? (

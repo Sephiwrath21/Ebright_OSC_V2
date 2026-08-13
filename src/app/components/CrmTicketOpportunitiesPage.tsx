@@ -38,13 +38,13 @@ interface KanbanResponse { columns: KanbanColumn[]; total: number }
 
 // Column styling keyed by real ticket status.
 const STATUS_STYLE: Record<string, { header: string; dot: string; count: string }> = {
-  received:    { header: "bg-slate-100 text-slate-700",   dot: "bg-slate-400",   count: "bg-slate-200 text-slate-700" },
-  in_progress: { header: "bg-blue-50 text-blue-700",      dot: "bg-blue-500",    count: "bg-blue-100 text-blue-700" },
-  approved:    { header: "bg-violet-50 text-violet-700",  dot: "bg-violet-500",  count: "bg-violet-100 text-violet-700" },
-  complete:    { header: "bg-emerald-50 text-emerald-700",dot: "bg-emerald-500", count: "bg-emerald-100 text-emerald-700" },
-  rejected:    { header: "bg-red-50 text-red-700",        dot: "bg-red-400",     count: "bg-red-100 text-red-700" },
+  received:    { header: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",   dot: "bg-slate-400",   count: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300" },
+  in_progress: { header: "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200",      dot: "bg-blue-500",    count: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" },
+  approved:    { header: "bg-violet-50 text-violet-700 dark:bg-violet-900 dark:text-violet-200",  dot: "bg-violet-500",  count: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-200" },
+  complete:    { header: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",dot: "bg-emerald-500", count: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200" },
+  rejected:    { header: "bg-red-50 text-red-700 dark:bg-red-900 dark:text-red-200",        dot: "bg-red-400",     count: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" },
 };
-const FALLBACK_STYLE = { header: "bg-slate-100 text-slate-700", dot: "bg-slate-400", count: "bg-slate-200 text-slate-700" };
+const FALLBACK_STYLE = { header: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", dot: "bg-slate-400", count: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300" };
 
 function ageOf(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -94,34 +94,34 @@ export default function CrmTicketOpportunitiesPage() {
   const columns = data?.columns ?? [];
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" /><span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-700">Ticket</span>
+          <span className="text-slate-700 dark:text-slate-300">Ticket</span>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-900 font-medium">Opportunities</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Opportunities</span>
         </nav>
 
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Ticket Opportunities</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Ticket Opportunities</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Tickets grouped by status{data ? ` · ${data.total.toLocaleString()} total` : ""}.
             </p>
           </div>
 
           {/* Day filter */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
               {RANGE_OPTIONS.map((o) => (
                 <button
                   key={o.key}
@@ -130,7 +130,7 @@ export default function CrmTicketOpportunitiesPage() {
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     range === o.key
                       ? "bg-blue-600 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
                   {o.label}
@@ -139,13 +139,13 @@ export default function CrmTicketOpportunitiesPage() {
             </div>
 
             {range === "custom" && (
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1">
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
                 <input
                   type="date"
                   value={customFrom}
                   max={customTo || undefined}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                   aria-label="From date"
                 />
                 <span className="text-xs text-slate-400">→</span>
@@ -154,7 +154,7 @@ export default function CrmTicketOpportunitiesPage() {
                   value={customTo}
                   min={customFrom || undefined}
                   onChange={(e) => setCustomTo(e.target.value)}
-                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                   aria-label="To date"
                 />
               </div>
@@ -163,16 +163,16 @@ export default function CrmTicketOpportunitiesPage() {
         </div>
 
         {range === "custom" && (!customFrom || !customTo) ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-16 text-center shadow-sm">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-16 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <p className="text-sm text-slate-400">Pick a start and end date to view tickets in that range.</p>
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-700 dark:bg-red-900 dark:text-red-300">
             Couldn&apos;t load tickets: {error}
           </div>
         ) : loading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-16 text-center shadow-sm">
-            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+          <div className="rounded-2xl border border-slate-200 bg-white p-16 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-700 border-t-blue-600" />
             <p className="text-sm text-slate-400">Loading board…</p>
           </div>
         ) : (
@@ -193,26 +193,26 @@ export default function CrmTicketOpportunitiesPage() {
                   </div>
 
                   {/* Cards */}
-                  <div className="flex flex-col gap-2 min-h-[120px] rounded-xl p-1.5">
+                  <div className="flex flex-col gap-2 min-h-[120px] rounded-xl p-1.5 dark:bg-slate-900/50">
                     {col.cards.map(card => (
                       <div
                         key={card.id}
-                        className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all"
+                        className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all dark:bg-slate-800 dark:border-slate-700"
                       >
-                        <p className="text-xs font-semibold text-slate-800 leading-snug mb-0.5">{card.subject}</p>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug mb-0.5">{card.subject}</p>
                         <p className="text-[10px] text-slate-400 font-mono mb-1.5">{card.ticketNumber}</p>
                         <div className="flex items-center gap-1.5 mb-2">
                           <User className="w-3 h-3 text-slate-400" />
-                          <span className="text-[10px] text-slate-500 truncate">{card.studentName ?? card.submitterName ?? "—"}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{card.studentName ?? card.submitterName ?? "—"}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: card.accentColor ?? "#94a3b8" }} />
                               {card.platform}
                             </span>
                             {(card.branchCode || card.branchName) && (
-                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                 {card.branchCode ?? card.branchName}
                               </span>
                             )}
@@ -223,7 +223,7 @@ export default function CrmTicketOpportunitiesPage() {
                     ))}
 
                     {col.cards.length === 0 && (
-                      <div className="flex items-center justify-center h-16 rounded-xl border-2 border-dashed border-slate-200">
+                      <div className="flex items-center justify-center h-16 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
                         <span className="text-[11px] text-slate-400">No tickets</span>
                       </div>
                     )}

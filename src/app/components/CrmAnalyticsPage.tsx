@@ -48,9 +48,9 @@ function rangeParams(win: DateWindow): string {
 }
 
 const REGION_STYLE: Record<Region, { border: string; label: string; bg: string; text: string }> = {
-  A: { border: "border-t-rose-400",    label: "Region A", bg: "bg-rose-50",    text: "text-rose-700" },
-  B: { border: "border-t-amber-400",   label: "Region B", bg: "bg-amber-50",   text: "text-amber-700" },
-  C: { border: "border-t-emerald-400", label: "Region C", bg: "bg-emerald-50", text: "text-emerald-700" },
+  A: { border: "border-t-rose-400",    label: "Region A", bg: "bg-rose-50 dark:bg-rose-900",       text: "text-rose-700 dark:text-rose-200" },
+  B: { border: "border-t-amber-400",   label: "Region B", bg: "bg-amber-50 dark:bg-amber-900",     text: "text-amber-700 dark:text-amber-200" },
+  C: { border: "border-t-emerald-400", label: "Region C", bg: "bg-emerald-50 dark:bg-emerald-900", text: "text-emerald-700 dark:text-emerald-200" },
 };
 
 const EMPTY: Metrics = { NL: 0, CT: 0, SU: 0, ENR: 0 };
@@ -99,8 +99,8 @@ function TrendChart({ data }: { data: MonthPoint[] }) {
         const val = Math.round(maxVal * p);
         return (
           <g key={p}>
-            <line x1={P.l} y1={yp} x2={CW - P.r} y2={yp} stroke="#e2e8f0" strokeWidth="1" />
-            <text x={P.l - 6} y={yp + 4} textAnchor="end" fill="#94a3b8" fontSize="10">{val}</text>
+            <line x1={P.l} y1={yp} x2={CW - P.r} y2={yp} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth="1" />
+            <text x={P.l - 6} y={yp + 4} textAnchor="end" className="fill-slate-400" fontSize="10">{val}</text>
           </g>
         );
       })}
@@ -109,7 +109,7 @@ function TrendChart({ data }: { data: MonthPoint[] }) {
       <path d={makePath("SU")}  stroke="#f59e0b" fill="none" strokeWidth="2" strokeLinejoin="round" />
       <path d={makePath("ENR")} stroke="#10b981" fill="none" strokeWidth="2" strokeLinejoin="round" />
       {data.map((d, i) => (
-        <text key={i} x={cx(i)} y={CH - 4} textAnchor="middle" fill="#94a3b8" fontSize="10">{monthLabel(d.month)}</text>
+        <text key={i} x={cx(i)} y={CH - 4} textAnchor="middle" className="fill-slate-400" fontSize="10">{monthLabel(d.month)}</text>
       ))}
     </svg>
   );
@@ -129,7 +129,7 @@ function Select<T extends string>({
       <select
         value={value}
         onChange={e => onChange(e.target.value as T)}
-        className="appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer transition-colors"
+        className="appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer transition-colors dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
       >
         {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
       </select>
@@ -209,36 +209,36 @@ export default function CrmAnalyticsPage() {
   }
 
   const KPI_CARDS = [
-    { key: "NL",  label: "New Leads",        Icon: Users,        color: "text-indigo-600", bg: "bg-indigo-50", val: kpi.NL,  sub: null },
-    { key: "CT",  label: "Confirmed Trial",  Icon: CalendarCheck,color: "text-blue-600",   bg: "bg-blue-50",   val: kpi.CT,  sub: pct(kpi.CT,  kpi.NL) + " of NL" },
-    { key: "SU",  label: "Show-Up",          Icon: UserCheck,    color: "text-amber-600",  bg: "bg-amber-50",  val: kpi.SU,  sub: pct(kpi.SU,  kpi.CT) + " of CT" },
-    { key: "ENR", label: "Enrolled",         Icon: GraduationCap,color: "text-emerald-600",bg: "bg-emerald-50",val: kpi.ENR, sub: pct(kpi.ENR, kpi.SU) + " of SU" },
+    { key: "NL",  label: "New Leads",        Icon: Users,        color: "text-indigo-600 dark:text-indigo-300",   bg: "bg-indigo-50 dark:bg-indigo-900",   val: kpi.NL,  sub: null },
+    { key: "CT",  label: "Confirmed Trial",  Icon: CalendarCheck,color: "text-blue-600 dark:text-blue-300",       bg: "bg-blue-50 dark:bg-blue-900",       val: kpi.CT,  sub: pct(kpi.CT,  kpi.NL) + " of NL" },
+    { key: "SU",  label: "Show-Up",          Icon: UserCheck,    color: "text-amber-600 dark:text-amber-300",     bg: "bg-amber-50 dark:bg-amber-900",     val: kpi.SU,  sub: pct(kpi.SU,  kpi.CT) + " of CT" },
+    { key: "ENR", label: "Enrolled",         Icon: GraduationCap,color: "text-emerald-600 dark:text-emerald-300",bg: "bg-emerald-50 dark:bg-emerald-900",val: kpi.ENR, sub: pct(kpi.ENR, kpi.SU) + " of SU" },
   ];
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" /><span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <Link href="/dashboards/crm" className="hover:text-slate-900 transition-colors">CNS</Link>
+          <Link href="/dashboards/crm" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">CNS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-700">Lead</span>
+          <span className="text-slate-700 dark:text-slate-300">Lead</span>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-900 font-medium">Analytics</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Analytics</span>
         </nav>
 
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Lead performance across all regions and branches.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Analytics</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Lead performance across all regions and branches.</p>
           </div>
-          <button className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+          <button className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
             <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
@@ -278,12 +278,12 @@ export default function CrmAnalyticsPage() {
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-sm shadow-sm">
-            <p className="text-red-600">Couldn&apos;t load analytics: {error}</p>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-sm shadow-sm dark:border-red-700 dark:bg-red-900">
+            <p className="text-red-600 dark:text-red-300">Couldn&apos;t load analytics: {error}</p>
           </div>
         ) : loading && !data ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-16 text-center text-sm shadow-sm">
-            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+          <div className="rounded-xl border border-slate-200 bg-white p-16 text-center text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto mb-2 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-500" />
             <p className="text-slate-400">Loading analytics…</p>
           </div>
         ) : (
@@ -291,22 +291,22 @@ export default function CrmAnalyticsPage() {
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {KPI_CARDS.map(c => (
-            <div key={c.key} className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-4">
+            <div key={c.key} className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-4 dark:bg-slate-900 dark:border-slate-800">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{c.label}</span>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider dark:text-slate-400">{c.label}</span>
                 <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${c.bg}`}>
                   <c.Icon className={`w-4 h-4 ${c.color}`} />
                 </span>
               </div>
-              <p className="text-3xl font-bold text-slate-900">{c.val.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{c.val.toLocaleString()}</p>
               {c.sub && <p className="text-xs text-slate-400 mt-1">{c.sub}</p>}
             </div>
           ))}
         </div>
 
         {/* Conversion funnel */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 mb-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Conversion Funnel</p>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 mb-4 dark:bg-slate-900 dark:border-slate-800">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 dark:text-slate-400">Conversion Funnel</p>
           <div className="flex items-center gap-2 flex-wrap">
             {[
               { label: "NL → CT",  val: pct(kpi.CT,  kpi.NL) },
@@ -314,17 +314,17 @@ export default function CrmAnalyticsPage() {
               { label: "SU → ENR", val: pct(kpi.ENR, kpi.SU) },
             ].map((f, i) => (
               <div key={i} className="flex items-center gap-2">
-                {i > 0 && <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />}
-                <div className="bg-slate-50 rounded-lg border border-slate-200 px-4 py-2 text-center min-w-[80px]">
-                  <p className="text-lg font-bold text-slate-800">{f.val}</p>
+                {i > 0 && <ArrowRight className="w-4 h-4 text-slate-300 shrink-0 dark:text-slate-600" />}
+                <div className="bg-slate-50 rounded-lg border border-slate-200 px-4 py-2 text-center min-w-[80px] dark:bg-slate-800 dark:border-slate-800">
+                  <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{f.val}</p>
                   <p className="text-[10px] text-slate-400 font-medium">{f.label}</p>
                 </div>
               </div>
             ))}
-            <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
-            <div className="bg-emerald-50 rounded-lg border border-emerald-200 px-4 py-2 text-center min-w-[80px]">
-              <p className="text-lg font-bold text-emerald-700">{pct(kpi.ENR, kpi.NL)}</p>
-              <p className="text-[10px] text-emerald-500 font-medium">NL → ENR</p>
+            <ArrowRight className="w-4 h-4 text-slate-300 shrink-0 dark:text-slate-600" />
+            <div className="bg-emerald-50 rounded-lg border border-emerald-200 px-4 py-2 text-center min-w-[80px] dark:bg-emerald-900 dark:border-emerald-700">
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{pct(kpi.ENR, kpi.NL)}</p>
+              <p className="text-[10px] text-emerald-500 font-medium dark:text-emerald-400">NL → ENR</p>
             </div>
           </div>
         </div>
@@ -336,15 +336,15 @@ export default function CrmAnalyticsPage() {
               const s = REGION_STYLE[r];
               const d = data?.regions?.[r] ?? EMPTY;
               return (
-                <div key={r} className={`bg-white rounded-xl border-t-4 border border-slate-200 shadow-sm overflow-hidden ${s.border}`}>
+                <div key={r} className={`bg-white rounded-xl border-t-4 border border-slate-200 shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800 ${s.border}`}>
                   <div className={`px-4 py-2 ${s.bg}`}>
                     <span className={`text-xs font-bold uppercase tracking-wider ${s.text}`}>{s.label}</span>
                   </div>
-                  <div className="grid grid-cols-4 divide-x divide-slate-100 px-0 py-3">
+                  <div className="grid grid-cols-4 divide-x divide-slate-100 px-0 py-3 dark:divide-slate-800">
                     {(["NL", "CT", "SU", "ENR"] as const).map(k => (
                       <div key={k} className="px-3 text-center">
                         <p className="text-[10px] text-slate-400 font-medium">{k}</p>
-                        <p className="text-lg font-bold text-slate-800 mt-0.5">{d[k]}</p>
+                        <p className="text-lg font-bold text-slate-800 mt-0.5 dark:text-slate-200">{d[k]}</p>
                         {k !== "NL" && (
                           <p className="text-[10px] text-slate-400">{pct(d[k], k === "CT" ? d.NL : k === "SU" ? d.CT : d.SU)}</p>
                         )}
@@ -358,9 +358,9 @@ export default function CrmAnalyticsPage() {
         )}
 
         {/* Trend chart */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 mb-4">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 mb-4 dark:bg-slate-900 dark:border-slate-800">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monthly Trend</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Monthly Trend</p>
             <div className="flex items-center gap-3 text-[10px] font-medium">
               {[
                 { label: "NL",  color: "bg-indigo-500" },
@@ -368,7 +368,7 @@ export default function CrmAnalyticsPage() {
                 { label: "SU",  color: "bg-amber-500" },
                 { label: "ENR", color: "bg-emerald-500" },
               ].map(l => (
-                <span key={l.label} className="flex items-center gap-1 text-slate-500">
+                <span key={l.label} className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
                   <span className={`w-2.5 h-0.5 rounded ${l.color}`} />
                   {l.label}
                 </span>
@@ -383,18 +383,18 @@ export default function CrmAnalyticsPage() {
         </div>
 
         {/* Branch performance table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-200">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch Performance</p>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+          <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Branch Performance</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-800">
                 <tr>
                   {["Branch", "Reg", "NL", "CT", "SU", "ENR", "CT%", "SU%", "ENR%", "Conv%"].map(h => (
                     <th
                       key={h}
-                      className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 ${
+                      className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ${
                         h === "Branch" ? "text-left" : "text-right"
                       }`}
                     >
@@ -409,21 +409,21 @@ export default function CrmAnalyticsPage() {
                 ) : tableBranches.map((b) => {
                   const rs = REGION_STYLE[b.region];
                   return (
-                    <tr key={b.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors`}>
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{b.name}</td>
+                    <tr key={b.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:hover:bg-slate-800`}>
+                      <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">{b.name}</td>
                       <td className="px-4 py-2.5 text-right">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${rs.bg} ${rs.text}`}>
                           {b.region}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right text-slate-700">{b.NL}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-700">{b.CT}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-700">{b.SU}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-700">{b.ENR}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-500">{pct(b.CT,  b.NL)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-500">{pct(b.SU,  b.CT)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-500">{pct(b.ENR, b.SU)}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">{pct(b.ENR, b.NL)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">{b.NL}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">{b.CT}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">{b.SU}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">{b.ENR}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{pct(b.CT,  b.NL)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{pct(b.SU,  b.CT)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{pct(b.ENR, b.SU)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">{pct(b.ENR, b.NL)}</td>
                     </tr>
                   );
                 })}
@@ -431,17 +431,17 @@ export default function CrmAnalyticsPage() {
                 {tableBranches.length > 0 && (() => {
                   const t = sum(tableBranches);
                   return (
-                    <tr className="bg-slate-50 font-semibold border-t-2 border-slate-200">
-                      <td className="px-4 py-2.5 text-slate-800">Total</td>
+                    <tr className="bg-slate-50 font-semibold border-t-2 border-slate-200 dark:bg-slate-800 dark:border-slate-800">
+                      <td className="px-4 py-2.5 text-slate-800 dark:text-slate-200">Total</td>
                       <td className="px-4 py-2.5" />
-                      <td className="px-4 py-2.5 text-right text-slate-800">{t.NL}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-800">{t.CT}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-800">{t.SU}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-800">{t.ENR}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{pct(t.CT,  t.NL)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{pct(t.SU,  t.CT)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{pct(t.ENR, t.SU)}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-emerald-600">{pct(t.ENR, t.NL)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 dark:text-slate-200">{t.NL}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 dark:text-slate-200">{t.CT}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 dark:text-slate-200">{t.SU}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 dark:text-slate-200">{t.ENR}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 dark:text-slate-300">{pct(t.CT,  t.NL)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 dark:text-slate-300">{pct(t.SU,  t.CT)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 dark:text-slate-300">{pct(t.ENR, t.SU)}</td>
+                      <td className="px-4 py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{pct(t.ENR, t.NL)}</td>
                     </tr>
                   );
                 })()}
