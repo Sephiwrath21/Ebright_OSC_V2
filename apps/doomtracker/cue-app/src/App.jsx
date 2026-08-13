@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   LayoutDashboard, GitBranch, ListChecks, Users, Calendar, CalendarDays, Plus, Mail,
   Circle, CheckCircle2, AlertTriangle, Clock, ChevronRight, ChevronLeft, X, Trash2,
-  Send, Sparkles, BookOpen, Play, CheckSquare, BarChart2, GripVertical, ListTodo, Braces, Paperclip, Grid, GitMerge, Link, Square, Type, Minus, MousePointer, Diamond, Undo2, Redo2, LogOut, Folder, ChevronDown, Pencil, Maximize, Lock, Upload, Eye, Download, ClipboardList, Copy, ExternalLink, Kanban, Filter, ArrowUpDown, Check, Table2, GanttChart
+  Send, Sparkles, BookOpen, Play, CheckSquare, BarChart2, GripVertical, ListTodo, Braces, Paperclip, Grid, GitMerge, Link, Square, Type, Minus, MousePointer, Diamond, Undo2, Redo2, LogOut, Folder, ChevronDown, Pencil, Maximize, Lock, Upload, Eye, Download, ClipboardList, Copy, ExternalLink, Kanban, Filter, ArrowUpDown, Check, Table2, GanttChart, Key
 } from "lucide-react";
-import { storage, login, logout, ssoLogin, getCurrentUser, sendNotification, setAuthExpiredHandler, setSaveErrorHandler, listUsers, createUser, updateUser, getDepartmentsOverview, listPeople } from "./storage";
+import { storage, login, logout, ssoLogin, getCurrentUser, sendNotification, setAuthExpiredHandler, setSaveErrorHandler, listUsers, createUser, updateUser, getDepartmentsOverview, listPeople, adminGetSetting, adminSetSetting } from "./storage";
 
 // EMBEDDED = this is the build served inside the Ebright portal (base
 // /flowghan-embed/). In that mode there is no password login — the app signs in
@@ -3175,7 +3175,7 @@ function NewRunsheet({ onCreate, onCancel, template }) {
 /* ---------------------------------------------------------------
    LIBRARY
 --------------------------------------------------------------- */
-function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder, onAddModule, onRenameTemplate, onDeleteTemplate, onDeleteModule, onDuplicateTemplate }) {
+function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder, onAddModule, onRenameTemplate, onDeleteTemplate, onDeleteModule, onDuplicateTemplate, isAdmin, myDepartment, libraryDept, onSelectDept, deptLoading, deptLoadError }) {
   const [libraryDragId, setLibraryDragId] = useState(null);
   const [libraryDragOverId, setLibraryDragOverId] = useState(null);
   const [openModules, setOpenModules] = useState({});
@@ -3203,9 +3203,59 @@ function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder,
 
   return (
     <div>
-      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.ink, margin: "0 0 4px" }}>Library</h1>
-      <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 22px" }}>Reusable templates your team runs from, grouped by department.</p>
+      {isAdmin && libraryDept ? (
+        <>
+          <button onClick={() => onSelectDept(null)} style={{
+            display: "flex", alignItems: "center", gap: 6, background: "transparent",
+            border: "none", cursor: "pointer", padding: 0, marginBottom: 10,
+            fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 500, color: C.spotlightDeep,
+          }}>
+            <ChevronLeft size={14} /> My Library
+          </button>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.ink, margin: "0 0 4px" }}>{libraryDept}</h1>
+          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 22px" }}>Viewing and creating templates on behalf of {libraryDept}.</p>
+        </>
+      ) : (
+        <>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.ink, margin: "0 0 4px" }}>Library</h1>
+          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 22px" }}>Reusable templates your team runs from, grouped by department.</p>
+        </>
+      )}
 
+      {isAdmin && !libraryDept && (
+        <div style={{ marginBottom: 26 }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: C.ink, margin: "0 0 10px" }}>Other departments</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+            {DEPARTMENTS.filter((d) => d.name !== myDepartment).map((d) => (
+              <button
+                key={d.name}
+                onClick={() => onSelectDept(d.name)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, textAlign: "left",
+                  background: C.card, border: `1px solid ${C.line}`, borderRadius: 12,
+                  cursor: "pointer", padding: "13px 14px",
+                }}
+              >
+                <Folder size={17} color={C.spotlightDeep} strokeWidth={2} />
+                <div>
+                  <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13.5, fontWeight: 600, color: C.ink }}>{d.name}</div>
+                  <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight }}>{d.head}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && libraryDept && deptLoading ? (
+        <div style={{ padding: "18px 0", fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slateLight, fontStyle: "italic" }}>
+          Loading {libraryDept}'s library…
+        </div>
+      ) : isAdmin && libraryDept && deptLoadError ? (
+        <div style={{ padding: "18px 0", fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.curtainDeep }}>
+          Couldn't load {libraryDept}'s library. Try selecting the department again.
+        </div>
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {modules.map((mod) => {
           const open = isOpen(mod);
@@ -3225,28 +3275,32 @@ function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder,
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: C.ink }}>{mod}</span>
                   <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slateLight }}>{modTemplates.length}</span>
                 </button>
-                <button onClick={() => onNewTemplate(mod)} style={{
-                  display: "flex", alignItems: "center", gap: 6, background: "transparent",
-                  border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "6px 11px",
-                  fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 500, color: C.spotlightDeep,
-                }}>
-                  <Plus size={14} /> New template
-                </button>
-                <button
-                  onClick={() => {
-                    const msg = modTemplates.length
-                      ? `Delete the folder "${mod}" and its ${modTemplates.length} template${modTemplates.length > 1 ? "s" : ""}? This can't be undone.`
-                      : `Delete the empty folder "${mod}"?`;
-                    if (window.confirm(msg)) onDeleteModule(mod);
-                  }}
-                  title={modTemplates.length ? "Delete folder (and its templates)" : "Delete folder"}
-                  style={{
-                    display: "flex", alignItems: "center", background: "transparent", border: "none",
-                    cursor: "pointer", padding: "6px 7px", color: C.curtainDeep, flexShrink: 0,
-                  }}
-                >
-                  <Trash2 size={15} />
-                </button>
+                {isAdmin && (
+                  <button onClick={() => onNewTemplate(mod)} style={{
+                    display: "flex", alignItems: "center", gap: 6, background: "transparent",
+                    border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "6px 11px",
+                    fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 500, color: C.spotlightDeep,
+                  }}>
+                    <Plus size={14} /> New template
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const msg = modTemplates.length
+                        ? `Delete the folder "${mod}" and its ${modTemplates.length} template${modTemplates.length > 1 ? "s" : ""}? This can't be undone.`
+                        : `Delete the empty folder "${mod}"?`;
+                      if (window.confirm(msg)) onDeleteModule(mod);
+                    }}
+                    title={modTemplates.length ? "Delete folder (and its templates)" : "Delete folder"}
+                    style={{
+                      display: "flex", alignItems: "center", background: "transparent", border: "none",
+                      cursor: "pointer", padding: "6px 7px", color: C.curtainDeep, flexShrink: 0,
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
               {open && modTemplates.length === 0 && (
                 <div style={{
@@ -3300,13 +3354,15 @@ function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder,
                         <span style={{ flex: 1, fontFamily: "'Work Sans', sans-serif", fontSize: 13.5, color: C.ink }}>{String(i + 1).padStart(2, "0")} {t.name}</span>
                       </button>
                     )}
-                    <button onClick={() => startRename(t)} title="Rename template" style={{
-                      display: "flex", alignItems: "center", background: "transparent", border: "none",
-                      cursor: "pointer", padding: "8px 7px", color: C.slate,
-                    }}>
-                      <Pencil size={15} />
-                    </button>
-                    {onDuplicateTemplate && (
+                    {isAdmin && (
+                      <button onClick={() => startRename(t)} title="Rename template" style={{
+                        display: "flex", alignItems: "center", background: "transparent", border: "none",
+                        cursor: "pointer", padding: "8px 7px", color: C.slate,
+                      }}>
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {isAdmin && onDuplicateTemplate && (
                       <button onClick={() => onDuplicateTemplate(t.id)} title="Duplicate as a new workflow (for other flows/endings)" style={{
                         display: "flex", alignItems: "center", background: "transparent", border: "none",
                         cursor: "pointer", padding: "8px 7px", color: C.slate,
@@ -3314,13 +3370,15 @@ function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder,
                         <Copy size={15} />
                       </button>
                     )}
-                    <button
-                      onClick={() => { if (window.confirm(`Delete "${t.name}"? This can't be undone.`)) onDeleteTemplate(t.id); }}
-                      title="Delete template"
-                      style={{ display: "flex", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", padding: "8px 7px", color: C.curtainDeep }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { if (window.confirm(`Delete "${t.name}"? This can't be undone.`)) onDeleteTemplate(t.id); }}
+                        title="Delete template"
+                        style={{ display: "flex", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", padding: "8px 7px", color: C.curtainDeep }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                     <button onClick={() => onOpenTemplate(t.id)} title="Open" style={{
                       display: "flex", alignItems: "center", background: "transparent", border: "none",
                       cursor: "pointer", padding: "8px 14px 8px 7px", color: C.slateLight,
@@ -3334,6 +3392,7 @@ function Library({ templates, modules, onOpenTemplate, onNewTemplate, onReorder,
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -4828,6 +4887,19 @@ const FC_FIELD_TYPES = [
   { type: "email", label: "Email" },
   { type: "url", label: "Link (URL)" },
 ];
+// Grayed-out preview text shown under a question so the HOD can see what kind
+// of answer the assignee will be typing — types with their own option-row
+// editor (dropdown/multiselect) don't use this.
+const FC_ANSWER_PREVIEW = {
+  text: "Short answer text",
+  longtext: "Long answer text",
+  date: "mm / dd / yyyy",
+  number: "0",
+  checkbox: "Single checkbox — checked counts as \"Yes\"",
+  file: "File attachment",
+  email: "email@example.com",
+  url: "https://example.com",
+};
 
 /* ---------------------------------------------------------------
    PUBLIC (no-login) FORM LINKS
@@ -5508,7 +5580,7 @@ function FcPreview({ nodes, edges, name, endNodes, traceEnd, setTraceEnd, routes
 }
 const fcPrevBtn = { display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: "rgba(255,255,255,0.8)" };
 
-function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
+function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, deptLabel, isAdmin }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
   const [nodes, setNodes] = useState(template.flowchart?.nodes ?? []);
@@ -5694,6 +5766,10 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   // or assigning anything downstream.
   const hasTasks = nodes.some(fcIsTask);
   const canEnterDownstream = valid && hasTasks;
+  // Only Optimisation builds the flowchart's structure (add/move/delete/connect
+  // tasks) — a department's own HOD works downstream in Entry/Gantt/Editor/Kanban
+  // (due dates, assignees) but sees the chart itself as read-only.
+  const canEdit = isAdmin;
   // Same bar as the Editor: a half-built chart isn't worth previewing, and the
   // arrows a preview would draw are exactly what the rules check are there.
   const canPreview = valid && hasTasks;
@@ -5816,6 +5892,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
     clipboard.current = { nodes: ns, edges: es };
   };
   const pasteClipboard = () => {
+    if (!canEdit) return;
     const c = clipboard.current;
     if (!c || !c.nodes?.length) return;
     record();
@@ -5829,6 +5906,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
 
   const addShape = (type, x, y) => {
+    if (!canEdit) return;
     record();
     const i = nodes.length;
     const nx = x != null ? Math.max(0, Math.round(x / FC_SNAP) * FC_SNAP) : 60 + (i % 5) * 30;
@@ -5839,7 +5917,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
 
   const startDrag = (e, n) => {
-    if (e.button !== 0) return;
+    if (!canEdit || e.button !== 0) return;
     const p = toContent(e.clientX, e.clientY);
     // Dragging a shape that's part of a multi-selection moves the whole group.
     const ids = selNodes.includes(n.id) && selNodes.length > 1 ? selNodes : [n.id];
@@ -5849,6 +5927,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
 
   const startLink = (e, n) => {
+    if (!canEdit) return;
     e.stopPropagation(); e.preventDefault();
     const c = fcCenter(n);
     const p = toContent(e.clientX, e.clientY);
@@ -5856,6 +5935,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
 
   const startResize = (e, n, corner) => {
+    if (!canEdit) return;
     e.stopPropagation(); e.preventDefault();
     const { w, h } = fcNodeSize(n);
     resize.current = { id: n.id, corner, start: { x: n.x, y: n.y, w, h }, moved: false, snapshot: { nodes, edges } };
@@ -5953,21 +6033,22 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   };
 
   const deleteNode = (id) => {
+    if (!canEdit) return;
     record();
     setNodes((ns) => ns.filter((n) => n.id !== id));
     setEdges((es) => es.filter((e) => e.from !== id && e.to !== id));
     setSelNode(null);
   };
   const deleteNodes = (ids) => {
-    if (!ids.length) return;
+    if (!canEdit || !ids.length) return;
     record();
     setNodes((ns) => ns.filter((n) => !ids.includes(n.id)));
     setEdges((es) => es.filter((e) => !ids.includes(e.from) && !ids.includes(e.to)));
     setSelNodes([]);
   };
-  const deleteEdge = (id) => { record(); setEdges((es) => es.filter((e) => e.id !== id)); setSelEdge(null); };
-  const setNodeLabel = (id, label) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, label } : n)));
-  const setEdgeLabel = (id, label) => setEdges((es) => es.map((e) => (e.id === id ? { ...e, label } : e)));
+  const deleteEdge = (id) => { if (!canEdit) return; record(); setEdges((es) => es.filter((e) => e.id !== id)); setSelEdge(null); };
+  const setNodeLabel = (id, label) => { if (!canEdit) return; setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, label } : n))); };
+  const setEdgeLabel = (id, label) => { if (!canEdit) return; setEdges((es) => es.map((e) => (e.id === id ? { ...e, label } : e))); };
   // Assignment edits (HOD): who does it, when it's due, and what to do.
   const patchNode = (id, patch) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, ...patch } : n)));
 
@@ -6025,6 +6106,33 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
   const addFormField = (id) => { record(); const n = nodes.find((x) => x.id === id); patchNode(id, { formFields: [...(n?.formFields || []), { id: `fld-${Date.now()}`, label: "", type: "text", options: [], required: false }] }); };
   const updateFormField = (id, fldId, patch) => { const n = nodes.find((x) => x.id === id); patchNode(id, { formFields: (n?.formFields || []).map((f) => (f.id === fldId ? { ...f, ...patch } : f)) }); };
   const removeFormField = (id, fldId) => { record(); const n = nodes.find((x) => x.id === id); patchNode(id, { formFields: (n?.formFields || []).filter((f) => f.id !== fldId) }); };
+  // Drag a type off the field-type palette and drop it onto the question list
+  // (or click a palette chip) to insert a new question preset to that type.
+  const insertFormField = (id, atIndex, type = "text") => {
+    record();
+    const n = nodes.find((x) => x.id === id);
+    const list = [...(n?.formFields || [])];
+    const fld = { id: `fld-${Date.now()}`, label: "", type, options: [], required: false };
+    list.splice(atIndex, 0, fld);
+    patchNode(id, { formFields: list });
+    return fld.id;
+  };
+  const duplicateFormField = (id, fldId) => {
+    record();
+    const n = nodes.find((x) => x.id === id);
+    const list = [...(n?.formFields || [])];
+    const idx = list.findIndex((f) => f.id === fldId);
+    if (idx === -1) return;
+    list.splice(idx + 1, 0, { ...list[idx], id: `fld-${Date.now()}` });
+    patchNode(id, { formFields: list });
+  };
+  // Drop-target highlight while dragging a type off the field-type palette;
+  // {nodeId, index} of the slot the pointer is currently over. One is enough
+  // since only one drag can be in flight at a time.
+  const [fieldDropTarget, setFieldDropTarget] = useState(null);
+  // Which question card shows its focused (blue-accent) styling — Google-Forms-style.
+  const [focusedFieldId, setFocusedFieldId] = useState(null);
+  const fieldLabelRefs = useRef({}); // fld.id -> <input> element, so a freshly-dropped field can be auto-focused
   // Public form links: snapshot a node's form fields into a shareable (no-login)
   // link for someone outside the org. See fcReadPublicForms / PublicFormPage.
   const [publicLinkFlash, setPublicLinkFlash] = useState(null); // nodeId whose link was just copied
@@ -6117,6 +6225,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
       if (mod && e.shiftKey && key === "h") { e.preventDefault(); fitView(); return; }
       if (typing) return;
       if (fcMode !== "flowchart") return;   // Delete only affects the canvas, not the editor list
+      if (!canEdit) return;
       if (e.key === "Escape" && traceEnd) { setTraceEnd(null); return; }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selNodes.length) { e.preventDefault(); deleteNodes(selNodes); }
@@ -6125,7 +6234,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selNodes, selEdge, editing, undoStack, redoStack, nodes, edges, fcMode, traceEnd, preview]);
+  }, [selNodes, selEdge, editing, undoStack, redoStack, nodes, edges, fcMode, traceEnd, preview, canEdit]);
 
   const selectedNode = nodes.find((n) => n.id === selNode);
   const selectedEdge = edges.find((e) => e.id === selEdge);
@@ -6165,9 +6274,9 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
               style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: C.ink, background: C.card, border: `1px solid ${C.spotlight}`, borderRadius: 7, padding: "2px 8px", outline: "none" }}
             />
           ) : (
-            <h1 onDoubleClick={() => { setNameDraft(template.name); setEditingName(true); }} title="Double-click to rename" style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: C.ink, margin: 0, cursor: "text", display: "inline-block" }}>{template.name}</h1>
+            <h1 onDoubleClick={() => { if (!canEdit) return; setNameDraft(template.name); setEditingName(true); }} title={canEdit ? "Double-click to rename" : ""} style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: C.ink, margin: 0, cursor: canEdit ? "text" : "default", display: "inline-block" }}>{template.name}</h1>
           )}
-          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "2px 0 0" }}>{template.module} · {{ flowchart: "workflow flowchart", entry: "task scheduling", gantt: "timeline", kanban: "task board", editor: "task editor" }[fcMode]}</p>
+          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "2px 0 0" }}>{deptLabel ? `${deptLabel} · ` : ""}{template.module} · {{ flowchart: "workflow flowchart", entry: "task scheduling", gantt: "timeline", kanban: "task board", editor: "task editor" }[fcMode]}</p>
         </div>
         <div style={{ display: "flex", background: C.paperDim, borderRadius: 10, padding: 3, flexShrink: 0 }}>
           <button onClick={() => setFcMode("flowchart")} style={toggleBtn(fcMode === "flowchart")}><GitMerge size={15} /> Flowchart</button>
@@ -6205,6 +6314,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
           </button>
         </div>
         {fcMode === "flowchart" && (<>
+        {canEdit && (
         <div style={{ display: "flex", gap: 4 }}>
           <button onClick={undo} disabled={!undoStack.length} title="Undo (Ctrl+Z)" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: undoStack.length ? "pointer" : "not-allowed", color: undoStack.length ? C.ink : C.slateLight }}>
             <Undo2 size={16} />
@@ -6213,6 +6323,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
             <Redo2 size={16} />
           </button>
         </div>
+        )}
         <div
           onClick={() => { if (!valid) { const first = errors.find((e) => e.nodeId || e.edgeId); if (first) focusError(first); } }}
           title={valid ? "" : "Click to jump to the first issue"}
@@ -6376,6 +6487,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
       {fcMode === "flowchart" && (
       <div style={{ display: "flex", gap: 16, alignItems: "stretch", flex: 1, minHeight: 0 }}>
         {/* Palette */}
+        {canEdit ? (
         <div style={{ ...panelCard, width: 158, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
           <span style={labelStyle}>Shapes</span>
           {FC_SHAPES.map((s) => (
@@ -6398,6 +6510,14 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
             Drag a shape onto the canvas (or click to add). Double-click to rename. Drag a blue dot onto another shape to connect. Shift+drag empty space to box-select; Shift+click to add. Drag empty space to pan · Ctrl+scroll to zoom.
           </p>
         </div>
+        ) : (
+        <div style={{ ...panelCard, width: 158, flexShrink: 0 }}>
+          <span style={labelStyle}>View only</span>
+          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight, margin: "8px 0 0", lineHeight: 1.5 }}>
+            Optimisation manages this flowchart's structure. Switch to Entry, Gantt, Editor or Kanban to set due dates and assignees.
+          </p>
+        </div>
+        )}
 
         {/* Canvas */}
         <div
@@ -6406,6 +6526,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
             if (e.target !== canvasRef.current) return;
             setSelEdge(null); setEditing(null);
             if (e.shiftKey) {
+              if (!canEdit) return;
               const p = toContent(e.clientX, e.clientY);
               box.current = { x0: p.x, y0: p.y };
               setBoxRect({ x: p.x, y: p.y, w: 0, h: 0 });
@@ -6420,6 +6541,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
+            if (!canEdit) return;
             const type = e.dataTransfer.getData("fc-shape");
             if (!type) return;
             const p = toContent(e.clientX, e.clientY);
@@ -6490,7 +6612,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                   )}
                   <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: "stroke", cursor: "pointer" }}
                     onClick={() => { setSelEdge(e.id); setSelNode(null); }}
-                    onDoubleClick={() => { record(); setSelEdge(e.id); setSelNode(null); setEditing({ kind: "edge", id: e.id }); }} />
+                    onDoubleClick={() => { if (!canEdit) return; record(); setSelEdge(e.id); setSelNode(null); setEditing({ kind: "edge", id: e.id }); }} />
                   {e.label && !isEditing && (
                     <g style={{ pointerEvents: "none" }}>
                       <rect x={mid.x - e.label.length * 3.7 - 6} y={mid.y - 10} width={e.label.length * 7.4 + 12} height={19} rx={5} fill="#fff" stroke={C.line} />
@@ -6546,8 +6668,8 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                   if (e.shiftKey) { setSelNodes((s) => (s.includes(n.id) ? s.filter((x) => x !== n.id) : [...s, n.id])); setSelEdge(null); }
                   else { setSelNode(n.id); setSelEdge(null); }
                 }}
-                onDoubleClick={(e) => { e.stopPropagation(); record(); setSelNode(n.id); setSelEdge(null); setEditing({ kind: "node", id: n.id }); }}
-                style={{ position: "absolute", left: n.x, top: n.y, width: w, height: h, cursor: "grab", userSelect: "none" }}
+                onDoubleClick={(e) => { e.stopPropagation(); if (!canEdit) return; record(); setSelNode(n.id); setSelEdge(null); setEditing({ kind: "node", id: n.id }); }}
+                style={{ position: "absolute", left: n.x, top: n.y, width: w, height: h, cursor: canEdit ? "grab" : "default", userSelect: "none" }}
               >
                 <div style={{
                   position: "absolute", inset: 0, background: meta.bg,
@@ -6571,14 +6693,14 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                     {resolve(fcNodeText(n, meta.name, fcNodeNums))}
                   </div>
                 )}
-                {showDots && DOTS.map(([side, fx, fy]) => (
+                {canEdit && showDots && DOTS.map(([side, fx, fy]) => (
                   <div key={side}
                     onMouseDown={(e) => startLink(e, n)}
                     title="Drag to connect"
                     style={{ position: "absolute", left: w * fx - 6, top: h * fy - 6, width: 12, height: 12, borderRadius: "50%", background: "#fff", border: `2px solid #3B6FB0`, cursor: "crosshair", zIndex: 5 }}
                   />
                 ))}
-                {selNodes.length === 1 && isSel && !isEditing && [["nw", 0, 0, "nwse"], ["ne", 1, 0, "nesw"], ["sw", 0, 1, "nesw"], ["se", 1, 1, "nwse"]].map(([corner, fx, fy, cur]) => (
+                {canEdit && selNodes.length === 1 && isSel && !isEditing && [["nw", 0, 0, "nwse"], ["ne", 1, 0, "nesw"], ["sw", 0, 1, "nesw"], ["se", 1, 1, "nwse"]].map(([corner, fx, fy, cur]) => (
                   <div key={corner}
                     onMouseDown={(e) => startResize(e, n, corner)}
                     title="Drag to resize"
@@ -6618,18 +6740,22 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
             {selNodes.length > 1 ? (
               <>
                 <span style={labelStyle}>{selNodes.length} shapes selected</span>
-                <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "10px 0 0", lineHeight: 1.5 }}>
-                  Drag any of them to move the group. Ctrl+C / Ctrl+V copies them together.
-                </p>
-                <button onClick={() => deleteNodes(selNodes)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
-                  <Trash2 size={14} /> Delete {selNodes.length} shapes
-                </button>
+                {canEdit && (
+                  <>
+                    <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "10px 0 0", lineHeight: 1.5 }}>
+                      Drag any of them to move the group. Ctrl+C / Ctrl+V copies them together.
+                    </p>
+                    <button onClick={() => deleteNodes(selNodes)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
+                      <Trash2 size={14} /> Delete {selNodes.length} shapes
+                    </button>
+                  </>
+                )}
               </>
             ) : selectedNode ? (
               <>
                 <span style={labelStyle}>{FC_META[selectedNode.type].name} shape</span>
                 <label style={{ display: "block", marginTop: 12, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate }}>Label
-                  <input value={selectedNode.label} onFocus={record} onChange={(e) => setNodeLabel(selectedNode.id, e.target.value)} placeholder={FC_META[selectedNode.type].name} style={inputStyle} />
+                  <input value={selectedNode.label} disabled={!canEdit} onFocus={record} onChange={(e) => setNodeLabel(selectedNode.id, e.target.value)} placeholder={FC_META[selectedNode.type].name} style={canEdit ? inputStyle : disabledInput} />
                 </label>
                 {fcNodeNums[selectedNode.id] && (
                   <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slate, margin: "8px 0 0", lineHeight: 1.5 }}>
@@ -6643,25 +6769,29 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                   </p>
                 )}
 
-                <button onClick={() => deleteNode(selectedNode.id)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
-                  <Trash2 size={14} /> Delete shape
-                </button>
+                {canEdit && (
+                  <button onClick={() => deleteNode(selectedNode.id)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
+                    <Trash2 size={14} /> Delete shape
+                  </button>
+                )}
               </>
             ) : selectedEdge ? (
               <>
                 <span style={labelStyle}>Connection</span>
                 <label style={{ display: "block", marginTop: 12, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate }}>Branch label
-                  <input value={selectedEdge.label} onFocus={record} onChange={(e) => setEdgeLabel(selectedEdge.id, e.target.value)} placeholder="e.g. Yes / No" style={inputStyle} />
+                  <input value={selectedEdge.label} disabled={!canEdit} onFocus={record} onChange={(e) => setEdgeLabel(selectedEdge.id, e.target.value)} placeholder="e.g. Yes / No" style={canEdit ? inputStyle : disabledInput} />
                 </label>
-                <button onClick={() => deleteEdge(selectedEdge.id)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
-                  <Trash2 size={14} /> Delete connection
-                </button>
+                {canEdit && (
+                  <button onClick={() => deleteEdge(selectedEdge.id)} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 11px", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.curtainDeep }}>
+                    <Trash2 size={14} /> Delete connection
+                  </button>
+                )}
               </>
             ) : (
               <>
                 <span style={labelStyle}>Inspector</span>
                 <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "10px 0 0", lineHeight: 1.5 }}>
-                  Select a shape or connection to rename or delete it. Double-click anything to rename it inline.
+                  {canEdit ? "Select a shape or connection to rename or delete it. Double-click anything to rename it inline." : "Select a shape or connection to view its details."}
                 </p>
               </>
             )}
@@ -6771,7 +6901,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
               <Table2 size={26} color={C.slateLight} />
               <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, margin: "12px 0 6px" }}>No tasks yet</h3>
               <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 16px", lineHeight: 1.55 }}>
-                Build your workflow in the <b>Flowchart</b> first. Each task box becomes a row here where you set its schedule.
+                Build your workflow in the <b>Flowchart</b> first. Each task box becomes a row here where you set its schedule and break it into subtasks.
               </p>
               <button onClick={() => setFcMode("flowchart")} style={{ ...fcBarBtn, display: "inline-flex", margin: "0 auto" }}><GitMerge size={14} /> Go to flowchart</button>
             </div>
@@ -6781,7 +6911,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Work Sans', sans-serif", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: C.ink }}>
-                    {["#", "Task", "Duration (days)", "Start", "End", "Status"].map((h) => (
+                    {["#", "Task", "Duration (days)", "Start", "End", "Status", "Subtasks"].map((h) => (
                       <th key={h} style={{ ...labelStyle, color: "#FFFFFF", textAlign: "left", padding: "9px 12px", borderBottom: `1px solid ${C.ink}` }}>{h}</th>
                     ))}
                   </tr>
@@ -6791,8 +6921,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                     const typeColor = FC_META[n.type].border;
                     const statusColor = FC_STATUS_COLOR[n.status || "not_started"];
                     const fieldStyle = { ...inputStyle, marginTop: 0, background: "#FFFFFF", border: `1px solid ${C.line}`, boxShadow: "0 1px 3px rgba(0,0,0,0.45)" };
+                    const subs = n.subtasks || [];
+                    const open = !!openTasks[n.id];
                     return (
-                    <tr key={n.id} style={{ background: C.ink, borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
+                    <React.Fragment key={n.id}>
+                    <tr style={{ background: C.ink, borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.14)" }}>
                       <td style={{ padding: "8px 12px", borderLeft: `3px solid ${typeColor}`, fontFamily: "'JetBrains Mono', monospace", color: typeColor, fontWeight: 600, whiteSpace: "nowrap" }}>{fcNodeNums[n.id] || i + 1}</td>
                       <td style={{ padding: "8px 12px", minWidth: 180 }}>
                         <input value={n.label} onFocus={record} onChange={(e) => setNodeLabel(n.id, e.target.value)} placeholder={FC_META[n.type].name} style={fieldStyle} />
@@ -6820,7 +6953,34 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                           <option value="done" style={{ background: FC_STATUS_COLOR.done.bg, color: FC_STATUS_COLOR.done.text }}>Done</option>
                         </select>
                       </td>
+                      <td style={{ padding: "8px 12px", width: 150 }}>
+                        <button onClick={() => toggleTaskOpen(n.id)} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 7, cursor: "pointer", padding: "6px 10px", fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: "#FFFFFF", whiteSpace: "nowrap" }}>
+                          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />} {subs.length > 0 ? `${subs.length} subtask${subs.length === 1 ? "" : "s"}` : "Add subtasks"}
+                        </button>
+                      </td>
                     </tr>
+                    {open && (
+                      <tr style={{ background: "#10151F", borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
+                        <td colSpan={7} style={{ padding: "12px 16px 16px 40px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 640 }}>
+                            {subs.length === 0 && (
+                              <p style={{ margin: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)" }}>No subtasks yet — break this task down for the assignee.</p>
+                            )}
+                            {subs.map((s, si) => (
+                              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{fcSubNumber(fcNodeNums[n.id] || i + 1, si)}</span>
+                                <input value={s.title} onFocus={record} onChange={(e) => updateSubtask(n.id, s.id, { title: e.target.value })} placeholder="Describe the subtask…"
+                                  style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: "#fff", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 6, padding: "6px 9px" }} />
+                                <button onClick={() => removeSubtask(n.id, s.id)} title="Delete subtask" style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 4, color: "rgba(255,255,255,0.55)", display: "flex", alignItems: "center" }}><Trash2 size={14} /></button>
+                              </div>
+                            ))}
+                            <button onClick={() => addSubtask(n.id)} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 7, cursor: "pointer", padding: "6px 10px", marginTop: 2, fontFamily: "'Work Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#fff" }}><Plus size={13} /> Subtask</button>
+                            <p style={{ margin: "4px 0 0", fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>Assign who does each subtask in the <b>Editor</b> tab.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -6940,7 +7100,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
               <ListChecks size={26} color={C.slateLight} />
               <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, margin: "12px 0 6px" }}>No tasks yet</h3>
               <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate, margin: "0 0 16px", lineHeight: 1.55 }}>
-                Build your workflow in the <b>Flowchart</b> first. Each task box becomes a row here where you add subtasks, an assignee and a due date.
+                Build your workflow in the <b>Flowchart</b> first. Each task box becomes a card here where you assign it and set a due date.
               </p>
               <button onClick={() => setFcMode("flowchart")} style={{ ...fcBarBtn, display: "inline-flex", margin: "0 auto" }}><GitMerge size={14} /> Go to flowchart</button>
             </div>
@@ -7092,20 +7252,18 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                           <Lock size={14} color={C.spotlightDeep} /> Step rules
                           <span style={{ color: C.slateLight, fontWeight: 500 }}>· who can start this, and when</span>
                         </span>
-                        <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: i > 0 ? "pointer" : "not-allowed", opacity: i > 0 ? 1 : 0.55 }}>
-                          <input type="checkbox" disabled={i === 0} checked={!!n.lockPrev} onChange={(e) => { record(); patchNode(n.id, { lockPrev: e.target.checked }); }} style={{ accentColor: C.spotlight, marginTop: 2, flexShrink: 0, cursor: i > 0 ? "pointer" : "not-allowed" }} />
-                          <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.ink, lineHeight: 1.4 }}>
-                            Wait for the previous step
-                            <span style={{ display: "block", fontSize: 11.5, color: C.slate }}>{i > 0 ? `Stays locked until step ${i} “${prevTask?.label || "the step before"}” is ticked off.` : "This is the first step — nothing comes before it."}</span>
-                          </span>
-                        </label>
-                        <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer" }}>
-                          <input type="checkbox" checked={!!n.keyStep} onChange={(e) => { record(); patchNode(n.id, { keyStep: e.target.checked, keyAck: false }); }} style={{ accentColor: C.spotlight, marginTop: 2, flexShrink: 0 }} />
-                          <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.ink, lineHeight: 1.4 }}>
-                            Key step — lock it and show guidance first
-                            <span style={{ display: "block", fontSize: 11.5, color: C.slate }}>For crucial steps. The assignee must read your note and unlock it before they can tick it off.</span>
-                          </span>
-                        </label>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button type="button" disabled={i === 0} onClick={() => { record(); patchNode(n.id, { lockPrev: !n.lockPrev }); }}
+                            title={i > 0 ? `Wait for the previous step — stays locked until step ${i} “${prevTask?.label || "the step before"}” is ticked off.` : "Wait for the previous step — this is the first step, nothing comes before it."}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: n.lockPrev ? C.spotlight : C.paper, color: n.lockPrev ? "#fff" : C.ink, border: `1px solid ${n.lockPrev ? C.spotlight : C.line}`, borderRadius: 8, padding: "7px 12px", cursor: i > 0 ? "pointer" : "not-allowed", opacity: i > 0 ? 1 : 0.55, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 600 }}>
+                            <Clock size={13} /> Wait for previous step
+                          </button>
+                          <button type="button" onClick={() => { record(); patchNode(n.id, { keyStep: !n.keyStep, keyAck: false }); }}
+                            title="Key step — lock it and show guidance first. For crucial steps. The assignee must read your note and unlock it before they can tick it off."
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: n.keyStep ? C.spotlight : C.paper, color: n.keyStep ? "#fff" : C.ink, border: `1px solid ${n.keyStep ? C.spotlight : C.line}`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 600 }}>
+                            <Key size={13} /> Key step
+                          </button>
+                        </div>
                         {n.keyStep && (
                           <textarea value={n.guidance || ""} onFocus={record} onChange={(e) => patchNode(n.id, { guidance: e.target.value })} placeholder="Guidance the assignee must read before starting — why it matters, what to watch for, who to check with…" rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.4 }} />
                         )}
@@ -7204,14 +7362,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                       </div>
                       )}
 
+                      {subs.length > 0 && (
                       <div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <span style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6 }}><ListTodo size={14} color={C.spotlightDeep} /> Subtasks {subs.length > 0 && <span style={{ color: C.slateLight, fontWeight: 500 }}>· {subsDone}/{subs.length}</span>}</span>
-                          <button onClick={() => addSubtask(n.id)} style={{ ...fcBarBtn, padding: "5px 9px", fontSize: 12 }}><Plus size={13} /> Subtask</button>
+                          <span style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6 }}><ListTodo size={14} color={C.spotlightDeep} /> Subtasks <span style={{ color: C.slateLight, fontWeight: 500 }}>· {subsDone}/{subs.length}</span></span>
                         </div>
-                        {subs.length === 0 ? (
-                          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slateLight, margin: "8px 0 0" }}>No subtasks yet — break the task into steps for the assignee.</p>
-                        ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                             {subs.map((s, si) => {
                               const subInherit = !(s.assignee?.email || "").trim();
@@ -7225,8 +7380,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                                   ? <CheckCircle2 size={15} color={C.sageDeep} style={{ flexShrink: 0 }} title="The assignee ticked this off" />
                                   : <Circle size={15} color={C.slateLight} style={{ flexShrink: 0 }} />}
                                 {fcNodeNums[n.id] && <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, fontWeight: 700, color: C.slateLight }}>{fcSubNumber(fcNodeNums[n.id], si)}</span>}
-                                <input value={s.title} onChange={(e) => updateSubtask(n.id, s.id, { title: e.target.value })} placeholder="Describe the subtask…"
-                                  style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: s.done ? C.slateLight : C.ink, textDecoration: s.done ? "line-through" : "none", background: "transparent", border: "none", outline: "none", padding: "4px 2px" }} />
+                                <span style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: s.done ? C.slateLight : C.ink, textDecoration: s.done ? "line-through" : "none", padding: "4px 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title || "Untitled subtask"}</span>
                                 <span style={{ flexShrink: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: s.done ? C.sageDeep : C.slateLight, background: s.done ? "#EAF4EC" : C.paperDim, borderRadius: 999, padding: "2px 8px" }}>{s.done ? "Done" : "Pending"}</span>
                                 {isApprovalDecision(n) && (() => {
                                   const key = `${n.id}-sub-${s.id}-approval`;
@@ -7241,7 +7395,6 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                                     </button>
                                   );
                                 })()}
-                                <button onClick={() => removeSubtask(n.id, s.id)} title="Delete subtask" style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 4, color: C.slateLight, display: "flex", alignItems: "center" }}><Trash2 size={14} /></button>
                                </div>
                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 23 }}>
                                  <input value={s.assignee?.name || ""} onFocus={record} onChange={(e) => updateSubtask(n.id, s.id, { assignee: { ...(s.assignee || {}), name: e.target.value } })} placeholder={`Assignee name — blank = ${n.assignee?.name || "task's assignee"}`}
@@ -7265,8 +7418,8 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                               );
                             })}
                           </div>
-                        )}
                       </div>
+                      )}
 
                       {/* Form fields — HOD defines; the assignee fills them in from My Work */}
                       <div>
@@ -7274,36 +7427,137 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate }) {
                           <span style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6 }}><ClipboardList size={14} color={C.spotlightDeep} /> Form fields {(n.formFields?.length ?? 0) > 0 && <span style={{ color: C.slateLight, fontWeight: 500 }}>· {n.formFields.length}</span>}</span>
                           <button onClick={() => addFormField(n.id)} style={{ ...fcBarBtn, padding: "5px 9px", fontSize: 12 }}><Plus size={13} /> Field</button>
                         </div>
+
+                        {/* Answer-type palette — drag a chip onto the list below to add a question of that type (or click it) */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                          {FC_FIELD_TYPES.map((ft) => (
+                            <button key={ft.type} type="button" draggable
+                              onDragStart={(e) => e.dataTransfer.setData("fc-field-type", ft.type)}
+                              onDragEnd={() => setFieldDropTarget(null)}
+                              onClick={() => { const newId = insertFormField(n.id, n.formFields?.length ?? 0, ft.type); requestAnimationFrame(() => fieldLabelRefs.current[newId]?.focus()); }}
+                              title={`Drag onto the list to add a "${ft.label}" question, or click to add one at the end.`}
+                              style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11, fontWeight: 600, color: C.slate, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 999, padding: "4px 10px", cursor: "grab" }}>
+                              {ft.label}
+                            </button>
+                          ))}
+                        </div>
+
                         {(n.formFields?.length ?? 0) === 0 ? (
-                          <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slateLight, margin: "8px 0 0" }}>No form fields — add one to collect an answer, date, choice or file from the assignee.</p>
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); setFieldDropTarget({ nodeId: n.id, index: 0 }); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const type = e.dataTransfer.getData("fc-field-type");
+                              setFieldDropTarget(null);
+                              if (!type) return;
+                              const newId = insertFormField(n.id, 0, type);
+                              requestAnimationFrame(() => fieldLabelRefs.current[newId]?.focus());
+                            }}
+                            style={{
+                              marginTop: 8, borderRadius: 8, padding: "12px 10px",
+                              border: `1.5px dashed ${fieldDropTarget?.nodeId === n.id ? C.spotlight : C.line}`,
+                              background: fieldDropTarget?.nodeId === n.id ? "rgba(79,143,107,0.08)" : "transparent",
+                            }}
+                          >
+                            <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slateLight, margin: 0 }}>Drag a field type above onto here, or click one to add.</p>
+                          </div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                            {n.formFields.map((f) => {
+                            {n.formFields.map((f, fi) => {
                               const needsOptions = f.type === "dropdown" || f.type === "multiselect";
+                              const isDropTarget = fieldDropTarget?.nodeId === n.id && fieldDropTarget?.index === fi;
                               return (
-                              <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 8, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 10px" }}>
-                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <input value={f.label} onFocus={record} onChange={(e) => updateFormField(n.id, f.id, { label: e.target.value })} placeholder="Field label (what to ask for)…"
-                                  style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.ink, background: "transparent", border: "none", outline: "none", padding: "4px 2px" }} />
-                                <button onClick={() => removeFormField(n.id, f.id)} title="Delete field" style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 4, color: C.slateLight, display: "flex", alignItems: "center" }}><Trash2 size={14} /></button>
+                              <div key={f.id}
+                                onDragOver={(e) => { e.preventDefault(); setFieldDropTarget({ nodeId: n.id, index: fi }); }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  const type = e.dataTransfer.getData("fc-field-type");
+                                  setFieldDropTarget(null);
+                                  if (!type) return;
+                                  const newId = insertFormField(n.id, fi, type);
+                                  requestAnimationFrame(() => fieldLabelRefs.current[newId]?.focus());
+                                }}
+                                style={{ borderTop: isDropTarget ? `2px solid ${C.spotlight}` : "2px solid transparent", paddingTop: isDropTarget ? 4 : 0 }}
+                              >
+                              <div style={{
+                                display: "flex", flexDirection: "column", gap: 12, background: C.card,
+                                border: `1px solid ${focusedFieldId === f.id ? C.spotlight : C.line}`,
+                                borderLeft: `4px solid ${focusedFieldId === f.id ? C.spotlight : "transparent"}`,
+                                borderRadius: 10, padding: "14px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                              }}>
+                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <input ref={(el) => { if (el) fieldLabelRefs.current[f.id] = el; else delete fieldLabelRefs.current[f.id]; }} value={f.label}
+                                  onFocus={() => { record(); setFocusedFieldId(f.id); }}
+                                  onBlur={() => setFocusedFieldId((id) => (id === f.id ? null : id))}
+                                  onChange={(e) => updateFormField(n.id, f.id, { label: e.target.value })} placeholder="Untitled Question"
+                                  style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 14, fontWeight: 500, color: C.ink, background: C.paperDim, border: "none", borderBottom: `1px solid ${C.line}`, borderRadius: "4px 4px 0 0", outline: "none", padding: "9px 10px" }} />
+                                <div style={{ position: "relative", flexShrink: 0 }}>
+                                  <select value={f.type} onChange={(e) => updateFormField(n.id, f.id, { type: e.target.value })}
+                                    title="Change this question's answer type"
+                                    style={{ appearance: "none", fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 7, padding: "8px 26px 8px 10px", cursor: "pointer" }}>
+                                    {FC_FIELD_TYPES.map((ft) => <option key={ft.type} value={ft.type}>{ft.label}</option>)}
+                                  </select>
+                                  <ChevronDown size={13} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: C.slateLight }} />
+                                </div>
                                </div>
-                               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", paddingLeft: 2 }}>
-                                 <select value={f.type} onChange={(e) => updateFormField(n.id, f.id, { type: e.target.value })}
-                                   style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px", cursor: "pointer" }}>
-                                   {FC_FIELD_TYPES.map((ft) => <option key={ft.type} value={ft.type}>{ft.label}</option>)}
-                                 </select>
-                                 <label style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slate, cursor: "pointer" }}>
-                                   <input type="checkbox" checked={!!f.required} onChange={(e) => updateFormField(n.id, f.id, { required: e.target.checked })} style={{ accentColor: C.spotlight, cursor: "pointer" }} /> Required
+                               {needsOptions ? (
+                                 <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingLeft: 2 }}>
+                                   {(f.options?.length ? f.options : [""]).map((opt, oi) => (
+                                     <div key={oi} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                       {f.type === "multiselect"
+                                         ? <div style={{ width: 15, height: 15, borderRadius: 3, border: `1.5px solid ${C.slateLight}`, flexShrink: 0 }} />
+                                         : <div style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${C.slateLight}`, flexShrink: 0 }} />}
+                                       <input value={opt} onFocus={record}
+                                         onChange={(e) => { const next = [...(f.options?.length ? f.options : [""])]; next[oi] = e.target.value; updateFormField(n.id, f.id, { options: next }); }}
+                                         placeholder={`Option ${oi + 1}`}
+                                         style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.ink, background: "transparent", border: "none", borderBottom: `1px solid ${C.line}`, outline: "none", padding: "3px 2px" }} />
+                                       <button onClick={() => { const next = (f.options?.length ? f.options : [""]).filter((_, idx) => idx !== oi); updateFormField(n.id, f.id, { options: next }); }}
+                                         title="Remove option" style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 3, color: C.slateLight, display: "flex", alignItems: "center" }}><X size={13} /></button>
+                                     </div>
+                                   ))}
+                                   <button onClick={() => updateFormField(n.id, f.id, { options: [...(f.options || []), ""] })}
+                                     style={{ alignSelf: "flex-start", fontFamily: "'Work Sans', sans-serif", fontSize: 12, fontWeight: 600, color: C.spotlight, background: "none", border: "none", cursor: "pointer", padding: "4px 2px" }}>
+                                     + Add option
+                                   </button>
+                                 </div>
+                               ) : f.type === "date" ? (
+                                 <input type="date" title="Preview only — click the calendar icon to see what the assignee gets in My Work. Picking a date here doesn't get saved."
+                                   style={{ maxWidth: 200, fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slateLight, background: "transparent", border: "none", borderBottom: `1px solid ${C.line}`, outline: "none", padding: "3px 2px 7px", marginLeft: 2, cursor: "pointer" }} />
+                               ) : (
+                                 <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, fontStyle: "italic", color: C.slateLight, borderBottom: `1px solid ${C.line}`, paddingBottom: 7, paddingLeft: 2, maxWidth: 280 }}>
+                                   {FC_ANSWER_PREVIEW[f.type] || "Answer"}
+                                 </div>
+                               )}
+                               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                                 <button onClick={() => duplicateFormField(n.id, f.id)} title="Duplicate question" style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6, color: C.slateLight, display: "flex", alignItems: "center" }}><Copy size={14} /></button>
+                                 <button onClick={() => removeFormField(n.id, f.id)} title="Delete question" style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6, color: C.slateLight, display: "flex", alignItems: "center" }}><Trash2 size={14} /></button>
+                                 <div style={{ width: 1, height: 16, background: C.line, margin: "0 6px" }} />
+                                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate, cursor: "pointer" }}>
+                                   Required
+                                   <input type="checkbox" checked={!!f.required} onChange={(e) => updateFormField(n.id, f.id, { required: e.target.checked })} style={{ accentColor: C.spotlight, cursor: "pointer", width: 15, height: 15 }} />
                                  </label>
                                </div>
-                               {needsOptions && (
-                                 <textarea value={(f.options || []).join("\n")} onFocus={record} onChange={(e) => updateFormField(n.id, f.id, { options: e.target.value.split("\n") })} placeholder={"One option per line…"} rows={2}
-                                   style={{ ...inputStyle, fontSize: 11.5, resize: "vertical", lineHeight: 1.5 }} />
-                               )}
                                <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: C.slateLight, paddingLeft: 2 }}>The assignee fills this in from <b style={{ color: C.slate }}>My Work</b>.</div>
+                              </div>
                               </div>
                               );
                             })}
+                            <div
+                              onDragOver={(e) => { e.preventDefault(); setFieldDropTarget({ nodeId: n.id, index: n.formFields.length }); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const type = e.dataTransfer.getData("fc-field-type");
+                                setFieldDropTarget(null);
+                                if (!type) return;
+                                const newId = insertFormField(n.id, n.formFields.length, type);
+                                requestAnimationFrame(() => fieldLabelRefs.current[newId]?.focus());
+                              }}
+                              style={{
+                                height: fieldDropTarget?.nodeId === n.id && fieldDropTarget?.index === n.formFields.length ? 8 : 4,
+                                borderRadius: 4,
+                                background: fieldDropTarget?.nodeId === n.id && fieldDropTarget?.index === n.formFields.length ? C.spotlight : "transparent",
+                              }}
+                            />
                           </div>
                         )}
                         {(n.formFields?.length ?? 0) > 0 && (
@@ -8972,6 +9226,14 @@ export default function App() {
   const [runsheets, setRunsheets] = useState([]);
   const [templates, setTemplates] = useState([showcaseTemplate, minusWeek15Template, parentConfirmationTemplate]);
   const [modules, setModules] = useState(["Marketing"]);
+  // Admin-only: when set, Library/template editing targets THIS other
+  // department's data (via the admin-only endpoints) instead of the admin's
+  // own. null = viewing the admin's own department, same as any other user.
+  const [libraryDept, setLibraryDept] = useState(null);
+  const [deptTemplates, setDeptTemplates] = useState([]);
+  const [deptModules, setDeptModules] = useState([]);
+  const [deptLoading, setDeptLoading] = useState(false);
+  const [deptLoadError, setDeptLoadError] = useState(false);
   const [openTemplateId, setOpenTemplateId] = useState(showcaseTemplate.id);
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -9076,6 +9338,55 @@ export default function App() {
     // reloads that department's data.
     loadData();
   }, [loadData]);
+
+  // Admin-only: loads the picked OTHER department's templates/modules whenever
+  // libraryDept changes. Mirrors loadData's seeding convention (new/empty
+  // department -> a single folder named after that department) but never
+  // seeds/writes on load - only an explicit save (persistDeptTemplates/
+  // persistDeptModules) writes into that department's bucket.
+  useEffect(() => {
+    if (!libraryDept) return;
+    let alive = true;
+    (async () => {
+      setDeptLoading(true);
+      setDeptLoadError(false);
+      try {
+        const [tRes, mRes] = await Promise.all([
+          adminGetSetting(libraryDept, "ebright-templates"),
+          adminGetSetting(libraryDept, "ebright-modules"),
+        ]);
+        if (!alive) return;
+        const tParsed = tRes ? JSON.parse(tRes.value) : null;
+        setDeptTemplates(Array.isArray(tParsed) ? tParsed : []);
+        const mParsed = mRes ? JSON.parse(mRes.value) : null;
+        setDeptModules(mParsed && mParsed.length ? mParsed : [libraryDept]);
+      } catch (e) {
+        console.error("Failed to load department library:", e);
+        if (alive) setDeptLoadError(true);
+      } finally {
+        if (alive) setDeptLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [libraryDept]);
+
+  const persistDeptTemplates = useCallback(async (next) => {
+    setDeptTemplates(next);
+    try {
+      await adminSetSetting(libraryDept, "ebright-templates", JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save department templates:", e);
+    }
+  }, [libraryDept]);
+
+  const persistDeptModules = useCallback(async (next) => {
+    setDeptModules(next);
+    try {
+      await adminSetSetting(libraryDept, "ebright-modules", JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save department modules:", e);
+    }
+  }, [libraryDept]);
 
   // Embedded (portal) SSO: on mount, exchange the logged-in portal session for a
   // Flowghan token instead of ever showing a password box. Runs once; standalone
@@ -9338,9 +9649,9 @@ export default function App() {
     persist(next);
   };
 
-  const handleNewTemplate = (module = "Marketing") => {
+  const handleNewTemplate = (module = "Marketing", list = templates, persist = persistTemplates) => {
     const t = { id: "t-" + Date.now(), name: "New template", description: "", steps: [], module };
-    persistTemplates([...templates, t]);
+    persist([...list, t]);
     setOpenTemplateId(t.id);
     setTab("template");
   };
@@ -9349,8 +9660,8 @@ export default function App() {
   // for the OTHER endings/flows of a chart. The copy is a clean slate: the flow choice and
   // every runtime trace (decision picks, done/proof/answers) are cleared so the HOD can
   // pick a different ending in the copy without inheriting the original's progress.
-  const handleDuplicateTemplate = (id) => {
-    const src = templates.find((t) => t.id === id);
+  const handleDuplicateTemplate = (id, list = templates, persist = persistTemplates) => {
+    const src = list.find((t) => t.id === id);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
     copy.id = "t-" + Date.now();
@@ -9363,47 +9674,47 @@ export default function App() {
         (n.subtasks || []).forEach((s) => { delete s.done; delete s.proof; delete s.completedAt; });
       });
     }
-    persistTemplates([...templates, copy]);
+    persist([...list, copy]);
     setOpenTemplateId(copy.id);
     setTab("template");
   };
 
-  const handleAddModule = (name) => {
+  const handleAddModule = (name, modList = modules, persistMod = persistModules) => {
     const trimmed = (name || "").trim();
     if (!trimmed) return;
-    if (modules.some((m) => m.toLowerCase() === trimmed.toLowerCase())) return;
-    persistModules([...modules, trimmed]);
+    if (modList.some((m) => m.toLowerCase() === trimmed.toLowerCase())) return;
+    persistMod([...modList, trimmed]);
   };
 
   // Remove a module (folder). Any templates that lived in it are deleted too —
   // otherwise they'd be orphaned (no folder to show them). The Library confirms
   // first and warns when the folder isn't empty.
-  const deleteModule = (mod) => {
-    persistModules(modules.filter((m) => m !== mod));
-    const survivors = templates.filter((t) => (t.module || "Marketing") !== mod);
-    if (survivors.length !== templates.length) {
-      persistTemplates(survivors);
+  const deleteModule = (mod, modList = modules, list = templates, persistMod = persistModules, persist = persistTemplates) => {
+    persistMod(modList.filter((m) => m !== mod));
+    const survivors = list.filter((t) => (t.module || "Marketing") !== mod);
+    if (survivors.length !== list.length) {
+      persist(survivors);
       if (!survivors.some((t) => t.id === openTemplateId)) setTab("library");
     }
   };
 
-  const reorderTemplates = (fromId, toId) => {
+  const reorderTemplates = (fromId, toId, list = templates, persist = persistTemplates) => {
     if (!fromId || !toId || fromId === toId) return;
-    const next = [...templates];
+    const next = [...list];
     const fromIndex = next.findIndex((t) => t.id === fromId);
     const toIndex = next.findIndex((t) => t.id === toId);
     if (fromIndex < 0 || toIndex < 0) return;
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
-    persistTemplates(next);
+    persist(next);
   };
 
-  const renameTemplate = (id, name) => {
-    persistTemplates(templates.map((t) => (t.id === id ? { ...t, name } : t)));
+  const renameTemplate = (id, name, list = templates, persist = persistTemplates) => {
+    persist(list.map((t) => (t.id === id ? { ...t, name } : t)));
   };
 
-  const deleteTemplate = (id) => {
-    persistTemplates(templates.filter((t) => t.id !== id));
+  const deleteTemplate = (id, list = templates, persist = persistTemplates) => {
+    persist(list.filter((t) => t.id !== id));
     if (openTemplateId === id) setTab("library");
   };
 
@@ -9465,6 +9776,15 @@ export default function App() {
       </div>
     );
   }
+
+  // Admin browsing another department's Library targets that department's own
+  // data instead of the admin's own — every other tab keeps reading
+  // templates/modules directly, so an admin's own work stays scoped to their
+  // own department everywhere except Library/template-editing.
+  const activeTemplates = (isAdmin && libraryDept) ? deptTemplates : templates;
+  const activeModules = (isAdmin && libraryDept) ? deptModules : modules;
+  const persistActiveTemplates = (isAdmin && libraryDept) ? persistDeptTemplates : persistTemplates;
+  const persistActiveModules = (isAdmin && libraryDept) ? persistDeptModules : persistModules;
 
   return (
     <div style={{ position: "relative", display: "flex", height: "100%", background: C.paper, borderRadius: 18, overflow: "hidden", fontFamily: "'Work Sans', sans-serif" }}>
@@ -9568,17 +9888,30 @@ export default function App() {
           : <DeptWorkflows templates={templates} onOpenTemplate={openTemplate} />)}
         {tab === "detail" && selected && <RunsheetDetail runsheet={selected} template={templates.find((t) => t.id === selected.templateId) || showcaseTemplate} currentUser={currentUser} onBack={() => setTab("runsheets")} onToggle={handleToggle} onReassign={handleReassign} onFieldChange={handleFieldChange} onApprove={handleApprove} onReject={handleReject} onRejectionReason={handleRejectionReason} onAddComment={handleAddComment} onReorderTasks={reorderTasks} onToggleSubtask={handleToggleSubtask} onUpdateStep={handleUpdateStep} onUpdateTask={handleUpdateTask} onSaveDrawings={handleSaveDrawings} onToggleWeekComplete={handleToggleWeekComplete} />}
         {tab === "new" && <NewRunsheet onCreate={handleCreate} onCancel={() => setTab("runsheets")} template={templates.find((t) => t.id === "showcase-template") || showcaseTemplate} />}
-        {tab === "library" && <Library templates={templates} modules={modules} onOpenTemplate={openTemplate} onNewTemplate={handleNewTemplate} onReorder={reorderTemplates} onAddModule={handleAddModule} onRenameTemplate={renameTemplate} onDeleteTemplate={deleteTemplate} onDeleteModule={deleteModule} onDuplicateTemplate={handleDuplicateTemplate} />}
+        {tab === "library" && (
+          <Library
+            templates={activeTemplates} modules={activeModules} onOpenTemplate={openTemplate}
+            onNewTemplate={(m) => handleNewTemplate(m, activeTemplates, persistActiveTemplates)}
+            onReorder={(f, tId) => reorderTemplates(f, tId, activeTemplates, persistActiveTemplates)}
+            onAddModule={(n) => handleAddModule(n, activeModules, persistActiveModules)}
+            onRenameTemplate={(id, n) => renameTemplate(id, n, activeTemplates, persistActiveTemplates)}
+            onDeleteTemplate={(id) => deleteTemplate(id, activeTemplates, persistActiveTemplates)}
+            onDeleteModule={(m) => deleteModule(m, activeModules, activeTemplates, persistActiveModules, persistActiveTemplates)}
+            onDuplicateTemplate={(id) => handleDuplicateTemplate(id, activeTemplates, persistActiveTemplates)}
+            isAdmin={isAdmin} myDepartment={authUser?.department} libraryDept={libraryDept} onSelectDept={setLibraryDept}
+            deptLoading={deptLoading} deptLoadError={deptLoadError}
+          />
+        )}
         {tab === "template" && (() => {
-          const t = templates.find((x) => x.id === openTemplateId);
+          const t = activeTemplates.find((x) => x.id === openTemplateId);
           // The three original Marketing templates keep the old step editor.
           // Every other template — non-Marketing AND newly-created Marketing ones —
           // uses the flowchart editor (with approval sending + per-subtask proof).
           const LEGACY_TEMPLATE_IDS = ["showcase-template", "minus-week-15", "parent-confirmation"];
           if (t && !LEGACY_TEMPLATE_IDS.includes(t.id)) {
-            return <FlowchartCanvas key={t.id} template={t} onBack={() => setTab("library")} onRename={(name) => renameTemplate(t.id, name)} onSave={(flowchart) => persistTemplates(templates.map((x) => (x.id === t.id ? { ...x, flowchart } : x)))} onDuplicate={() => handleDuplicateTemplate(t.id)} />;
+            return <FlowchartCanvas key={t.id} template={t} onBack={() => setTab("library")} onRename={(name) => renameTemplate(t.id, name, activeTemplates, persistActiveTemplates)} onSave={(flowchart) => persistActiveTemplates(activeTemplates.map((x) => (x.id === t.id ? { ...x, flowchart } : x)))} onDuplicate={() => handleDuplicateTemplate(t.id, activeTemplates, persistActiveTemplates)} deptLabel={libraryDept || null} isAdmin={isAdmin} />;
           }
-          return <TemplateEditor templateId={openTemplateId} templates={templates} setTemplates={persistTemplates} onBack={() => setTab("library")} onRunWorkflow={handleRunWorkflow} />;
+          return <TemplateEditor templateId={openTemplateId} templates={activeTemplates} setTemplates={persistActiveTemplates} onBack={() => setTab("library")} onRunWorkflow={handleRunWorkflow} />;
         })()}
         {tab === "directory" && isAdmin && <CastCrew />}
         {tab === "overview" && isAdmin && <DeptOverview />}

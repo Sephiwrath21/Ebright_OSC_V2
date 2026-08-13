@@ -224,6 +224,25 @@ export async function getDepartmentsOverview() {
   return res.json(); // [{ department, templates: [...], runsheets: [...] }, ...]
 }
 
+// Admin-only: read/write a settings key for an ARBITRARY department (not just
+// the caller's own). Lets an admin create templates/flowcharts on another
+// department's behalf; mirrors storage.get/set's null-on-404 convention.
+export async function adminGetSetting(department, key) {
+  const res = await apiFetch(`/api/admin/settings/${encodeURIComponent(department)}/${encodeURIComponent(key)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to load ${key} for ${department}: HTTP ${res.status}`);
+  const data = await res.json();
+  return { key, value: data.value };
+}
+
+export async function adminSetSetting(department, key, value) {
+  const res = await apiFetch(`/api/admin/settings/${encodeURIComponent(department)}/${encodeURIComponent(key)}`, {
+    method: "PUT", json: true, body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw new Error(`Failed to save ${key} for ${department}: HTTP ${res.status}`);
+  return { key, value };
+}
+
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
