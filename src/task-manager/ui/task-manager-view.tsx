@@ -171,11 +171,12 @@ export function TaskManagerView({
     hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
     ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
-  /** Personal date filters (2026-07-28, ?date=/?mdate=): each is mounted on
-   *  BOTH its period's personal surfaces — the top Daily/Monthly donut card
-   *  and the matching "My Tasks" heading — so one selection drives the donut
-   *  AND the list. The daily one shares ?date= with departmentDailyControl,
-   *  keeping every Daily surface on the page on the same day. */
+  /** Personal date filters (2026-07-28, ?date=/?mdate=; repurposed
+   *  2026-08-12 as TaskOverviewStack's dateControl): feed the Daily/Monthly
+   *  section headings inside myOverview/departmentOverview/branchOverview's
+   *  TaskOverviewStack — the daily one shares ?date= with
+   *  departmentDailyControl, keeping every Daily surface on the page on the
+   *  same day. */
   personalDailyControl?: React.ReactNode;
   personalMonthlyControl?: React.ReactNode;
   /** Branch Manager's personal "Ad hoc" card + list (2026-07-29): plain
