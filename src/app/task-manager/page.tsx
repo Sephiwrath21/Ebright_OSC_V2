@@ -25,9 +25,11 @@ import {
   createKanbanColumn,
   deleteKanbanCard,
   deleteKanbanColumn,
+  getBranchCeoAssigned,
   getBranchDetail,
   getBranchHodAssigned,
   getCeoDashboardConfig,
+  getDepartmentCeoAssigned,
   getDepartmentDetail,
   getDepartmentHodAssigned,
   getFlowDetail,
@@ -730,10 +732,11 @@ export default async function TaskManagerPage({
           sp.department && (FLOW_DEPARTMENTS as readonly string[]).includes(sp.department)
             ? sp.department
             : fallback;
-        const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
+        const [dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail] = await Promise.all([
           getDepartmentDetail(email, department, "daily", dailyDate),
           getDepartmentDetail(email, department, "monthly"),
           getDepartmentHodAssigned(email, department).catch(() => null),
+          getDepartmentCeoAssigned(email, department).catch(() => null),
         ]);
         overview = (
           <>
@@ -766,10 +769,11 @@ export default async function TaskManagerPage({
       } else {
         const branch =
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
-        const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
+        const [dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail] = await Promise.all([
           getBranchDetail(email, branch, "daily", dailyDate),
           getBranchDetail(email, branch, "monthly"),
           getBranchHodAssigned(email, branch).catch(() => null),
+          getBranchCeoAssigned(email, branch).catch(() => null),
         ]);
         overview = (
           <>
@@ -896,12 +900,20 @@ export default async function TaskManagerPage({
     // load, so each is caught individually — same defensive shape as the
     // rest of this page's optional fetches. (categoryList is fetched once,
     // higher up, and reused here.)
-    const [hodAssignedDepartment, hodAssignedBranch] = await Promise.all([
+    const [hodAssignedDepartment, hodAssignedBranch, ceoAssignedDepartment, ceoAssignedBranch] = await Promise.all([
       daily.department
         ? getDepartmentHodAssigned(email, daily.department.name).catch(() => null)
         : Promise.resolve(null),
       daily.branch
         ? getBranchHodAssigned(email, daily.branch.name).catch(() => null)
+        : Promise.resolve(null),
+      // CEO Assigned Task (2026-08-12 stacked-sections redesign) — same
+      // shape/gating as the HOD-assigned fetch above.
+      daily.department
+        ? getDepartmentCeoAssigned(email, daily.department.name).catch(() => null)
+        : Promise.resolve(null),
+      daily.branch
+        ? getBranchCeoAssigned(email, daily.branch.name).catch(() => null)
         : Promise.resolve(null),
     ]);
 
