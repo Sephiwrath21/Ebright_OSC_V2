@@ -135,11 +135,18 @@ export default function DashboardHome({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {dashboards.map((dashboard) => {
             const isDisabled = isLocked(dashboard.id);
-            const targetHref = dashboard.id === "academy" ? "/academy" : dashboard.id === "sms" ? "/sms" : dashboard.id === "task-manager" ? "/task-manager" : `/dashboards/${dashboard.id}`;
+            const isExternal = dashboard.id === "sms";
+            const targetHref = dashboard.id === "academy" ? "/academy" : isExternal ? "https://staging-sms.ebright.my/" : dashboard.id === "task-manager" ? "/task-manager" : `/dashboards/${dashboard.id}`;
             const href = isDisabled ? "#" : targetHref;
 
             return (
-              <Link key={dashboard.id} href={href} aria-disabled={isDisabled} className={isDisabled ? "pointer-events-none" : ""}>
+              <Link
+                key={dashboard.id}
+                href={href}
+                aria-disabled={isDisabled}
+                className={isDisabled ? "pointer-events-none" : ""}
+                {...(!isDisabled && isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              >
                 <div className={`p-3 rounded-lg flex items-center justify-center gap-3 aspect-square transition-all duration-300
                   ${isDisabled ? "bg-slate-300 text-slate-500 opacity-60 grayscale" : `${dashboard.color} text-white hover:shadow-lg hover:scale-105`}
                 `}>
