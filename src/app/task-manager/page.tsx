@@ -202,6 +202,34 @@ export default async function TaskManagerPage({
   const monthlyCarry = carryTM("date");
   const dailyCarry = carryTM("mdate", "mrange");
 
+  // Self-scoped sections (2026-08-12 stacked-sections redesign): a role
+  // with no owned entity (OPS, CEO, and Monthly for every MEMBER-role
+  // viewer) gets a synthetic one-member FlowEntityDetail built from data
+  // ALREADY fetched (daily.me/monthly.me's FlowPersonal), not a new query.
+  // FlowDrillTask rows here always carry the viewer's own name in
+  // assigneeName already (see types.ts's comment on FlowPersonal.tasks).
+  function toSelfEntityDetail(
+    me: { userId: string; name: string },
+    personal: { totals: import("@/task-manager/ui/types").FlowBucketTotals; tasks: import("@/task-manager/ui/types").FlowDrillTask[] },
+  ): import("@/task-manager/ui/types").FlowEntityDetail {
+    const buckets: { completed: import("@/task-manager/ui/types").FlowDrillTask[]; pending: import("@/task-manager/ui/types").FlowDrillTask[]; na: import("@/task-manager/ui/types").FlowDrillTask[] } = {
+      completed: [],
+      pending: [],
+      na: [],
+    };
+    for (const t of personal.tasks) {
+      if (t.status === "DONE") buckets.completed.push(t);
+      else if (t.status === "SKIPPED") buckets.na.push(t);
+      else buckets.pending.push(t);
+    }
+    return {
+      name: me.name,
+      totals: personal.totals,
+      tasks: buckets,
+      members: [{ userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 }],
+    };
+  }
+
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
   // and maps to { ok:false, message } instead of letting the framework
@@ -916,6 +944,25 @@ export default async function TaskManagerPage({
         ? getBranchCeoAssigned(email, daily.branch.name).catch(() => null)
         : Promise.resolve(null),
     ]);
+
+    // DEPT_MEMBER/BRANCH_MEMBER/COACH's whole-department/branch Daily
+    // section (2026-08-12, corrected design — confirmed: plain staff see
+    // their whole department/branch's Daily roster, not just their own
+    // row). Only meaningful for roles resolving to myOverview with no
+    // owned entity but a real department/branch membership — gated on the
+    // same daily.me.me.department/branch fields the new getDepartmentDetail/
+    // getBranchDetail MEMBER-daily exception checks server-side. Uses the
+    // SAME getDepartmentDetail/getBranchDetail functions HOD's own
+    // department Daily section already uses — just a different caller
+    // identity, newly permitted by Task 3's exception.
+    const memberOwnDepartment = daily.me.me.role === "MEMBER" ? daily.me.me.department : null;
+    const memberOwnBranch = daily.me.me.role === "MEMBER" ? daily.me.me.branch : null;
+    const memberWholeDepartmentDaily = memberOwnDepartment
+      ? await getDepartmentDetail(email, memberOwnDepartment, "daily", dailyDate).catch(() => null)
+      : null;
+    const memberWholeBranchDaily = memberOwnBranch
+      ? await getBranchDetail(email, memberOwnBranch, "daily", dailyDate).catch(() => null)
+      : null;
 
     // Personal date filters (2026-07-28): one control per period, mounted by
     // the view on BOTH that period's personal surfaces (donut card + "My
