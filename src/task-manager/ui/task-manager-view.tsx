@@ -46,7 +46,7 @@ import {
 import { resolveViewRole, shows } from "../role-views";
 import { CeoDashboardSection } from "./ceo-dashboard";
 import { CeoTaskTable } from "./ceo-task-table";
-import { EntityCardOverview } from "./entity-card-overview";
+import { TaskOverviewStack } from "./task-overview-stack";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
   PageSectionHeading,
@@ -77,6 +77,8 @@ export function TaskManagerView({
   departmentDailyControl,
   hodAssignedDepartment,
   hodAssignedBranch,
+  ceoAssignedDepartment,
+  ceoAssignedBranch,
   categoryList,
   myOverview,
   personalDailyControl,
@@ -132,6 +134,8 @@ export function TaskManagerView({
    *  the fallback below) rather than crashing on undefined. */
   hodAssignedDepartment?: { department: FlowEntityDetail } | null;
   hodAssignedBranch?: { branch: FlowEntityDetail } | null;
+  ceoAssignedDepartment?: { department: FlowEntityDetail } | null;
+  ceoAssignedBranch?: { branch: FlowEntityDetail } | null;
   /** Active task categories — feeds EntityCardOverview's "Sort: Type" mode. */
   categoryList?: FlowCategoryOption[];
   /** Self-scoped 4-section stack (2026-08-12 stacked-sections redesign) —
@@ -594,14 +598,23 @@ export function TaskManagerView({
         monthly.department && (
         <>
           <PageSectionHeading>Department Overview</PageSectionHeading>
-          <EntityCardOverview
+          <TaskOverviewStack
             entityName={daily.department.name}
-            daily={departmentDaily ?? daily.department}
-            monthly={monthly.department}
-            hodAssigned={hodAssignedDepartment?.department ?? monthly.department}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            dailyDateControl={departmentDailyControl}
+            daily={{ entity: departmentDaily ?? daily.department, dateControl: departmentDailyControl, showViewToggle: true }}
+            monthly={{ entity: monthly.department, showViewToggle: true }}
+            hodAssigned={
+              hodAssignedDepartment ? { entity: hodAssignedDepartment.department, showViewToggle: true } : undefined
+            }
+            ceoAssigned={
+              ceoAssignedDepartment ? { entity: ceoAssignedDepartment.department, showViewToggle: true } : undefined
+            }
+            onComplete={completeTaskAction}
+            onSkip={skipTaskAction}
+            onReopen={reopenTaskAction}
+            onUploadProof={uploadProofAction}
+            onRemoveProof={removeProofAction}
           />
         </>
       )}
@@ -615,15 +628,19 @@ export function TaskManagerView({
       {shows(view, "taskManager", "branchOverview") && daily.branch && monthly.branch && (
         <>
           <PageSectionHeading>Branch Overview</PageSectionHeading>
-          <EntityCardOverview
+          <TaskOverviewStack
             entityName={daily.branch.name}
-            daily={daily.branch}
-            monthly={monthly.branch}
-            hodAssigned={hodAssignedBranch?.branch ?? monthly.branch}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            dailyDateControl={personalDailyControl}
-            monthlyDateControl={personalMonthlyControl}
+            daily={{ entity: daily.branch, dateControl: personalDailyControl, showViewToggle: true }}
+            monthly={{ entity: monthly.branch, dateControl: personalMonthlyControl, showViewToggle: true }}
+            hodAssigned={hodAssignedBranch ? { entity: hodAssignedBranch.branch, showViewToggle: true } : undefined}
+            ceoAssigned={ceoAssignedBranch ? { entity: ceoAssignedBranch.branch, showViewToggle: true } : undefined}
+            onComplete={completeTaskAction}
+            onSkip={skipTaskAction}
+            onReopen={reopenTaskAction}
+            onUploadProof={uploadProofAction}
+            onRemoveProof={removeProofAction}
           />
           {/* Ad hoc oversight (branch-wide, ALL-TIME by design) — Branch
               Manager only, not the view-only BRANCH_SITE login. The
@@ -654,6 +671,29 @@ export function TaskManagerView({
             </>
           )}
         </>
+      )}
+
+      {/* ---- myOverview (2026-08-12 stacked-sections redesign): the
+          self-scoped 4-section stack for roles with no owned entity — OPS,
+          CEO, and every MEMBER-role viewer (DEPT_MEMBER/BRANCH_MEMBER/
+          COACH). Replaces personalDaily/personalMonthly/ceoAssigned/
+          hodAssigned/myTasksDaily/myTasksMonthly/assignedByMeList/
+          ceoTaskTable for these roles (see role-views.ts). ---- */}
+      {shows(view, "taskManager", "myOverview") && myOverview && (
+        <TaskOverviewStack
+          entityName={myOverview.entityName}
+          categories={categoryList ?? []}
+          myUserId={me.me.userId}
+          daily={myOverview.daily}
+          monthly={myOverview.monthly}
+          hodAssigned={myOverview.hodAssigned}
+          ceoAssigned={myOverview.ceoAssigned}
+          onComplete={completeTaskAction}
+          onSkip={skipTaskAction}
+          onReopen={reopenTaskAction}
+          onUploadProof={uploadProofAction}
+          onRemoveProof={removeProofAction}
+        />
       )}
 
       {/* OPS's assign form: "+ Task" renders in the PAGE HEADER (2026-07-29

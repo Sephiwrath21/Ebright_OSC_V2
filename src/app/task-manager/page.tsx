@@ -1147,6 +1147,8 @@ export default async function TaskManagerPage({
         departmentDailyControl={departmentDailyControl}
         hodAssignedDepartment={hodAssignedDepartment}
         hodAssignedBranch={hodAssignedBranch}
+        ceoAssignedDepartment={ceoAssignedDepartment}
+        ceoAssignedBranch={ceoAssignedBranch}
         categoryList={categoryList}
         myOverview={{
           entityName: myOverviewData.entityName,
