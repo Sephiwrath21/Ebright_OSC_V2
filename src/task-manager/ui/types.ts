@@ -459,6 +459,10 @@ export interface FlowTemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
+  /** Task Category ("Type", 2026-08-15) — set per task within the group,
+   *  same field TaskTemplate already carries for the single-task "+ Task"
+   *  form's own Type dropdown; null = uncategorized. */
+  categoryId: string | null;
 }
 
 export interface FlowTemplateGroupDetail {
@@ -473,6 +477,9 @@ export interface FlowTemplateGroupTaskInput {
   id?: string;
   title: string;
   subtasks: string[];
+  /** Task Category ("Type", 2026-08-15) — see FlowTemplateGroupTask's own
+   *  doc comment. Absent/empty string = uncategorized. */
+  categoryId?: string;
 }
 
 export type TemplateGroupLoadResult =
@@ -535,7 +542,7 @@ export interface FlowTemplateGroupControl {
   load: (groupId: string) => Promise<TemplateGroupLoadResult>;
   create: (input: {
     name: string;
-    tasks: { title: string; subtasks: string[] }[];
+    tasks: { title: string; subtasks: string[]; categoryId?: string }[];
   }) => Promise<TemplateGroupSaveResult>;
   edit: (
     groupId: string,

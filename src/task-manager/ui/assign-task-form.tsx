@@ -27,6 +27,7 @@ import {
 import { RecipientPicker } from "./recipient-picker";
 import { compressImageFile } from "./image-compress";
 import { SubtaskListEditor } from "./subtask-list-editor";
+import { CategoryPicker } from "./category-picker";
 
 const CADENCE_LABELS: Record<CadenceOption, string> = {
   daily: "Daily",
@@ -128,29 +129,12 @@ export function AssignTaskForm({
   const [templateName, setTemplateName] = React.useState("");
   // Inline "+ Add new type" (2026-08-12): categories start from the prop,
   // then grow locally as this session creates new ones — no page refresh
-  // needed to pick a category you just added.
+  // needed to pick a category you just added. Lifted here (rather than
+  // living inside CategoryPicker) since this form only ever renders one
+  // instance — see category-picker.tsx's own header comment for why a
+  // multi-instance caller (Template/Package's per-task pickers) needs to
+  // lift it too.
   const [localCategories, setLocalCategories] = React.useState(categories ?? []);
-  const [addingCategory, setAddingCategory] = React.useState(false);
-  const [newCategoryName, setNewCategoryName] = React.useState("");
-  const [categoryBusy, setCategoryBusy] = React.useState(false);
-  const [categoryError, setCategoryError] = React.useState<string | null>(null);
-
-  const submitNewCategory = async () => {
-    const name = newCategoryName.trim();
-    if (!name || !onCreateCategory) return;
-    setCategoryBusy(true);
-    setCategoryError(null);
-    const result = await onCreateCategory(name);
-    setCategoryBusy(false);
-    if (!result.ok) {
-      setCategoryError(result.message);
-      return;
-    }
-    setLocalCategories((prev) => [...prev, { id: result.id, name: result.name }]);
-    setCategoryId(result.id);
-    setAddingCategory(false);
-    setNewCategoryName("");
-  };
 
   /** "Start from a template": load the full template and pre-fill the
    *  structure fields. Recipients/days/due date are untouched (they're
@@ -338,69 +322,13 @@ export function AssignTaskForm({
           </div>
         )}
 
-        {(localCategories.length > 0 || onCreateCategory) && (
-          <div className="max-w-xl">
-            {addingCategory ? (
-              <div className="text-sm text-gray-600">
-                New type name
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g. Flowghan"
-                    maxLength={100}
-                    disabled={categoryBusy}
-                    className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none disabled:opacity-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void submitNewCategory()}
-                    disabled={categoryBusy || !newCategoryName.trim()}
-                    className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingCategory(false);
-                      setNewCategoryName("");
-                      setCategoryError(null);
-                    }}
-                    disabled={categoryBusy}
-                    className="text-xs font-medium text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {categoryError && <p className="mt-1.5 text-xs text-red-600">{categoryError}</p>}
-              </div>
-            ) : (
-              <label className="text-sm text-gray-600">
-                Category
-                <select
-                  value={categoryId}
-                  onChange={(e) => {
-                    if (e.target.value === "__add_new__") {
-                      setAddingCategory(true);
-                      return;
-                    }
-                    setCategoryId(e.target.value);
-                  }}
-                  className={`mt-1 ${selectClass}`}
-                >
-                  <option value="">Uncategorized</option>
-                  {localCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                  {onCreateCategory && <option value="__add_new__">+ Add new type</option>}
-                </select>
-              </label>
-            )}
-          </div>
-        )}
+        <CategoryPicker
+          value={categoryId}
+          onChange={setCategoryId}
+          categories={localCategories}
+          onCreateCategory={onCreateCategory}
+          onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+        />
 
         <label className="max-w-xl text-sm text-gray-600">
           Task title

@@ -105,7 +105,50 @@ const groupTaskSchema = z.object({
   id: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(200),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  /** Task Category ("Type", 2026-08-15) — same field TaskTemplate already
+   *  carries for the single-task "+ Task" form's own Type dropdown. Stored
+   *  on the TaskTemplate row as a PRE-FILL default only (not authoritative
+   *  — the authoritative per-assignment value lives on RunBlock.categoryId,
+   *  same as every other template), so it's threaded into
+   *  createTemplateGroup/editTemplateGroup's TaskTemplate writes and into
+   *  applyTemplateGroup/the new-member-task fan-out's assignFlowTaskCore
+   *  calls, but never propagated to already-created pending instances the
+   *  way title/subtasks edits are. */
+  categoryId: z.string().min(1).optional(),
 });
+
+/** Validates a submitted categoryId against a real, non-archived
+ *  TaskCategory — same rule assignFlowTaskCore already enforces
+ *  (tasks-internal.ts) — and resolves it to a plain nullable id ready for a
+ *  Prisma write. Absent input resolves to null (uncategorized). Used for a
+ *  user's own fresh form submission (create/edit), where a stale/invalid id
+ *  genuinely indicates something worth surfacing as an error. */
+async function resolveCategoryId(categoryId?: string): Promise<string | null> {
+  if (!categoryId) return null;
+  const category = await prisma.taskCategory.findFirst({
+    where: { id: categoryId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!category) throw new ApiHttpError(400, "That category no longer exists or is archived");
+  return category.id;
+}
+
+/** Like resolveCategoryId, but degrades to uncategorized (undefined)
+ *  instead of throwing when the id no longer resolves to an active
+ *  category (2026-08-15) — for re-applying an ALREADY-SAVED
+ *  TaskTemplate's stored categoryId (applyTemplateGroup), where the
+ *  category being archived AFTER the template was created/edited shouldn't
+ *  retroactively block assigning that template; assignFlowTaskCore itself
+ *  still hard-validates, so passing a since-archived id straight through
+ *  would throw and block the whole "Assign" action. */
+async function resolveStoredCategoryId(categoryId: string | null): Promise<string | undefined> {
+  if (!categoryId) return undefined;
+  const category = await prisma.taskCategory.findFirst({
+    where: { id: categoryId, archivedAt: null },
+    select: { id: true },
+  });
+  return category?.id;
+}
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -132,6 +175,7 @@ export interface TemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
+  categoryId: string | null;
 }
 
 export interface TemplateGroupDetail {
@@ -195,6 +239,7 @@ export function getTemplateGroup(
         id: t.id,
         title: t.title,
         subtasks: Array.isArray(t.subtasks) ? (t.subtasks as string[]) : [],
+        categoryId: t.categoryId,
       })),
     };
   }, "getTemplateGroup");
@@ -215,6 +260,7 @@ export function createTemplateGroup(
         data: { createdById: user.id, name: body.name, scope },
       });
       for (const [index, t] of body.tasks.entries()) {
+        const categoryId = await resolveCategoryId(t.categoryId);
         await tx.taskTemplate.create({
           data: {
             createdById: user.id,
@@ -223,6 +269,7 @@ export function createTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: g.id,
             groupPosition: index,
+            categoryId,
           },
         });
       }
@@ -437,11 +484,18 @@ export function editTemplateGroup(
     let newTaskAssignedTo = 0;
     let newTaskSkipped = 0;
     for (const [index, t] of body.tasks.entries()) {
+      const categoryId = await resolveCategoryId(t.categoryId);
       if (t.id && existingIds.has(t.id)) {
         const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
         updatedTasks += result.updatedTasks;
         employees += result.employees;
-        await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
+        // Category is a pre-fill default only (see groupTaskSchema's own
+        // comment) — updated directly here rather than threaded through
+        // editTaskTemplateCore, which propagates title/subtasks to already-
+        // pending instances; a category "edit" has no such propagation
+        // target (the authoritative per-assignment value already lives on
+        // each instance's own RunBlock.categoryId, set at assignment time).
+        await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index, categoryId } });
       } else {
         const newTask = await prisma.taskTemplate.create({
           data: {
@@ -451,6 +505,7 @@ export function editTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: id,
             groupPosition: index,
+            categoryId,
           },
         });
         createdTasks += 1;
@@ -469,6 +524,7 @@ export function editTemplateGroup(
             dueDate: schedule.dueDate,
             cadence: schedule.cadence,
             fromTemplateId: newTask.id,
+            categoryId: categoryId ?? undefined,
           } satisfies FlowAssignInput);
           newTaskAssignedTo += 1;
         }
@@ -618,6 +674,7 @@ export function applyTemplateGroup(
         dueDate: body.dueDate,
         cadence: body.cadence,
         fromTemplateId: t.id,
+        categoryId: await resolveStoredCategoryId(t.categoryId),
       } satisfies FlowAssignInput);
       created += result.created;
     }

@@ -7,8 +7,14 @@
 // control.load on open). Editing warns with live pending counts before
 // saving, same safety pattern as the single-task Edit hub tab.
 import * as React from "react";
-import type { FlowTemplateGroupControl, FlowTemplateGroupTaskInput } from "./types";
+import type {
+  CreateCategoryResult,
+  FlowCategoryOption,
+  FlowTemplateGroupControl,
+  FlowTemplateGroupTaskInput,
+} from "./types";
 import { SubtaskListEditor } from "./subtask-list-editor";
+import { CategoryPicker } from "./category-picker";
 
 const TASK_MAX = 20;
 
@@ -17,12 +23,21 @@ export function TemplateGroupFormModal({
   groupId,
   onClose,
   label = "Template",
+  categories,
+  onCreateCategory,
 }: {
   control: FlowTemplateGroupControl;
   groupId?: string;
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
   label?: "Template" | "Package";
+  /** Task Category ("Type", 2026-08-15) — active categories for each task's
+   *  own Type dropdown, same prop shape as AssignTaskForm's. Omit or pass an
+   *  empty array to hide every dropdown (e.g. before any category exists). */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" — see AssignTaskForm's own doc comment; same
+   *  gate (canManageTaskTemplateGroups), passed by both pages identically. */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
 }) {
   const isEdit = Boolean(groupId);
   const labelLower = label.toLowerCase();
@@ -32,6 +47,11 @@ export function TemplateGroupFormModal({
   const [loading, setLoading] = React.useState(isEdit);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+  // Lifted here, not inside CategoryPicker (2026-08-15) — this form renders
+  // ONE picker per task, so a category created from any task's "+ Add new
+  // type" needs to show up in every OTHER task's dropdown too; see
+  // category-picker.tsx's own header comment.
+  const [localCategories, setLocalCategories] = React.useState(categories ?? []);
 
   React.useEffect(() => {
     if (!groupId) return;
@@ -44,7 +64,14 @@ export function TemplateGroupFormModal({
         return;
       }
       setName(result.group.name);
-      setTasks(result.group.tasks.map((t) => ({ id: t.id, title: t.title, subtasks: t.subtasks })));
+      setTasks(
+        result.group.tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          subtasks: t.subtasks,
+          categoryId: t.categoryId ?? undefined,
+        })),
+      );
       setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
     });
     return () => {
@@ -67,6 +94,9 @@ export function TemplateGroupFormModal({
   };
   const updateSubtasks = (index: number, subtasks: string[]) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, subtasks } : t)));
+  };
+  const updateCategory = (index: number, categoryId: string) => {
+    setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, categoryId: categoryId || undefined } : t)));
   };
 
   const save = () => {
@@ -166,6 +196,15 @@ export function TemplateGroupFormModal({
                       ✕
                     </button>
                   )}
+                </div>
+                <div className="mt-2">
+                  <CategoryPicker
+                    value={task.categoryId ?? ""}
+                    onChange={(categoryId) => updateCategory(index, categoryId)}
+                    categories={localCategories}
+                    onCreateCategory={onCreateCategory}
+                    onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+                  />
                 </div>
                 <div className="ml-4 mt-2 border-l-2 border-gray-200 pl-3">
                   <SubtaskListEditor subtasks={task.subtasks} onChange={(next) => updateSubtasks(index, next)} />
