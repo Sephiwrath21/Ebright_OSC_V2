@@ -1,13 +1,16 @@
-// Task Categories ("Type", 2026-08-12): admin-managed, extensible task
-// grouping — Flowghan/CNS/SMS/Inventory/HRMS/Email Marketing, etc, org-
-// defined with no fixed list. Flat lookup table, no fan-out/cascade logic
-// (unlike TaskTemplateGroup) — a category never owns or reconciles tasks,
-// it's just a name a task can optionally point at once, at assignment
-// time. Same permission gate as Template/Package management
-// (canManageTaskTemplateGroups): Super Admin + elevated Operations/
-// Optimisation dept-site only. There is no separate "view" tier here —
-// unlike Template/Package, nobody else needs to manage categories, and the
-// assign form only needs the flat active list (see listActiveCategories).
+// Task Categories ("Type", 2026-08-12): extensible task grouping —
+// Flowghan/CNS/SMS/Inventory/HRMS/Email Marketing, etc, org-defined with no
+// fixed list. Flat lookup table, no fan-out/cascade logic (unlike
+// TaskTemplateGroup) — a category never owns or reconciles tasks, it's
+// just a name a task can optionally point at once, at assignment time.
+// Managed EXCLUSIVELY inline from the Assign Task form's Type dropdown
+// (2026-08-15: the standalone /task-manager/categories admin page —
+// rename/archive/unarchive/reorder/full-list-view — was removed; there is
+// no other way to manage categories). Creation stays gated by
+// canManageTaskTemplateGroups (Super Admin + elevated Operations/
+// Optimisation dept-site), re-enforced server-side in createTaskCategory
+// regardless of what the client sends. Any assign-capable user may READ
+// the active list via listActiveTaskCategories to populate that dropdown.
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { ApiHttpError } from "../lib/api-server";
@@ -29,31 +32,12 @@ export interface TaskCategorySummary {
   archivedAt: string | null; // ISO
 }
 
-/** Admin management list — every category, active AND archived, ordered
- *  for the management page (archived ones render with an Unarchive
- *  action there). Gated the same as the create/rename/archive actions
- *  below (no separate view-only tier for this admin surface). */
-export function listTaskCategories(email: string): Promise<TaskCategorySummary[]> {
-  return native(async () => {
-    await requireCategoryManageAccess(email);
-    const categories = await prisma.taskCategory.findMany({
-      orderBy: [{ archivedAt: "asc" }, { order: "asc" }],
-    });
-    return categories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      order: c.order,
-      archivedAt: c.archivedAt ? c.archivedAt.toISOString() : null,
-    }));
-  }, "listTaskCategories");
-}
-
 /** The assign form's flat picker list — active (non-archived) categories
  *  only, no manage-access gate: any assign-capable actor may READ this
  *  list to pick a category for a new task, even though only Super
- *  Admin/Operations may create/rename/archive them. Callers pass the
- *  acting user's email purely to resolve them (requireUserByEmail already
- *  404s an unknown email) — there is no additional authorization check. */
+ *  Admin/Operations may create one. Callers pass the acting user's email
+ *  purely to resolve them (requireUserByEmail already 404s an unknown
+ *  email) — there is no additional authorization check. */
 export function listActiveTaskCategories(email: string): Promise<TaskCategorySummary[]> {
   return native(async () => {
     await requireUserByEmail(email);
@@ -95,74 +79,3 @@ export function createTaskCategory(
   }, "createTaskCategory");
 }
 
-const renameSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-});
-export type RenameTaskCategoryInput = z.input<typeof renameSchema>;
-
-export function renameTaskCategory(
-  email: string,
-  categoryId: string,
-  input: RenameTaskCategoryInput,
-): Promise<{ ok: true }> {
-  return native(async () => {
-    await requireCategoryManageAccess(email);
-    const id = z.string().min(1).parse(categoryId);
-    const body = renameSchema.parse(input);
-    const existing = await prisma.taskCategory.findUnique({ where: { id } });
-    if (!existing) throw new ApiHttpError(404, "Category not found");
-    await prisma.taskCategory.update({ where: { id }, data: { name: body.name } });
-    return { ok: true };
-  }, "renameTaskCategory");
-}
-
-/** Reversible — sets archivedAt, never deletes the row (tasks already
- *  pointing at it via categoryId keep a live FK; only NEW assignments
- *  won't be able to pick it, since listActiveTaskCategories excludes it). */
-export function archiveTaskCategory(email: string, categoryId: string): Promise<{ ok: true }> {
-  return native(async () => {
-    await requireCategoryManageAccess(email);
-    const id = z.string().min(1).parse(categoryId);
-    const existing = await prisma.taskCategory.findUnique({ where: { id } });
-    if (!existing) throw new ApiHttpError(404, "Category not found");
-    await prisma.taskCategory.update({ where: { id }, data: { archivedAt: new Date() } });
-    return { ok: true };
-  }, "archiveTaskCategory");
-}
-
-export function unarchiveTaskCategory(email: string, categoryId: string): Promise<{ ok: true }> {
-  return native(async () => {
-    await requireCategoryManageAccess(email);
-    const id = z.string().min(1).parse(categoryId);
-    const existing = await prisma.taskCategory.findUnique({ where: { id } });
-    if (!existing) throw new ApiHttpError(404, "Category not found");
-    await prisma.taskCategory.update({ where: { id }, data: { archivedAt: null } });
-    return { ok: true };
-  }, "unarchiveTaskCategory");
-}
-
-const reorderSchema = z.object({
-  orderedIds: z.array(z.string().min(1)).min(1).max(200),
-});
-export type ReorderTaskCategoriesInput = z.input<typeof reorderSchema>;
-
-/** Full-list reorder (drag-and-drop on the management page submits the
- *  WHOLE new active order, not a single move) — stamps `order` as each
- *  id's index in the submitted array. Only active category ids are valid
- *  here; archived ones keep whatever `order` they had when archived
- *  (irrelevant while archived — listActiveTaskCategories excludes them). */
-export function reorderTaskCategories(
-  email: string,
-  input: ReorderTaskCategoriesInput,
-): Promise<{ ok: true }> {
-  return native(async () => {
-    await requireCategoryManageAccess(email);
-    const body = reorderSchema.parse(input);
-    await Promise.all(
-      body.orderedIds.map((id, index) =>
-        prisma.taskCategory.update({ where: { id }, data: { order: index } }),
-      ),
-    );
-    return { ok: true };
-  }, "reorderTaskCategories");
-}

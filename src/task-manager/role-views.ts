@@ -259,14 +259,16 @@ export function isElevatedDeptSite(user: {
  *  access is unchanged (explicit product decision, 2026-08-11 — the
  *  revised matrix's table omitted a CEO row, but that wasn't a removal).
  *
- *  2026-08-12 addition: also returns `categories`, the sidebar gate for
- *  /task-manager/categories — deliberately NOT part of the `viewer` set
- *  above, since (unlike Template/Package/Package Table) there is no
- *  separate View tier for category management; it's manage-tier only. */
+ *  (2026-08-12 added, then removed 2026-08-15: a standalone /task-manager/
+ *  categories admin page briefly existed; categories are now managed
+ *  exclusively inline from the Assign Task form's Type dropdown, gated by
+ *  canManageTaskTemplateGroups on that dropdown's "+ Add new type" option
+ *  directly — see assign-task-form.tsx and createTaskCategory — so there's
+ *  no separate sidebar surface or nav-access key for it anymore.) */
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
-}): { template: boolean; package: boolean; packageTable: boolean; categories: boolean } {
+}): { template: boolean; package: boolean; packageTable: boolean } {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
   const branchManagerViewer = user.role === "BRANCH";
@@ -275,11 +277,6 @@ export function taskManagerNavAccess(user: {
     template: viewer,
     package: viewer,
     packageTable: viewer,
-    // Categories (2026-08-12): unlike Template/Package/Package Table, there
-    // is no separate View tier for this admin-only surface — same gate as
-    // the create/rename/archive actions themselves (canManageTaskTemplate
-    // Groups), not the broader `viewer` set above.
-    categories: manage,
   };
 }
 
@@ -326,6 +323,17 @@ export function resolveViewRole(user: {
       if (user.branch === null) return "DEPT_MEMBER";
       return user.employmentType === "Coach" ? "COACH" : "BRANCH_MEMBER";
   }
+}
+
+/** Is this view an individual PERSON's login, vs a shared/site account
+ *  (DEPT_SITE, BRANCH_SITE, ELEVATED_DEPT_SITE — e.g. finance@/od@ style
+ *  logins nobody "personally" owns, whoever's on duty signs in)? Drives the
+ *  Department/Branch Overview's default View toggle (2026-08-15): a real
+ *  person landing on their own team's overview should see "Only Me" first
+ *  (they have actual personal tasks to check); a site account has none, so
+ *  "View All" (the whole roster) is the only view that makes sense for it. */
+export function isPersonalAccountView(view: ViewRole): boolean {
+  return view !== "DEPT_SITE" && view !== "BRANCH_SITE" && view !== "ELEVATED_DEPT_SITE";
 }
 
 /** Does this view show `key` on `page`? The ONE question every render gate

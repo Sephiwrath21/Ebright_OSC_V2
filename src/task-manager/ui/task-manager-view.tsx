@@ -69,7 +69,7 @@ import {
   flowStreamLabel,
   visibleAssignerStreams,
 } from "./types";
-import { resolveViewRole, shows } from "../role-views";
+import { isPersonalAccountView, resolveViewRole, shows } from "../role-views";
 import { TaskOverviewStack } from "./task-overview-stack";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
@@ -219,6 +219,12 @@ export function TaskManagerView({
   // 2026-07-29 centralization) via shows(view, "taskManager", key) — e.g.
   // BRANCH_MEMBER (Branch Exec/Coach) = Daily only.
   const view = resolveViewRole(me.me);
+  // Department/Branch Overview's View toggle default (2026-08-15): a real
+  // person (HOD, Branch Manager) lands on "Only Me" first — they have
+  // actual personal tasks to check before browsing the whole roster; a
+  // shared/site account (DEPT_SITE, BRANCH_SITE) has none, so it still
+  // defaults to "View All". See isPersonalAccountView's doc comment.
+  const defaultOnlyMe = isPersonalAccountView(view);
   // NOTE: elevated department sites (Operation/Optimisation) never reach
   // this view — the page routes them to the dropdown entity overview, where
   // their "+ Task" button lives in the page header.
@@ -364,13 +370,22 @@ export function TaskManagerView({
             entityName={daily.department.name}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            daily={{ entity: departmentDaily ?? daily.department, dateControl: departmentDailyControl, showViewToggle: true }}
-            monthly={{ entity: monthly.department, showViewToggle: true }}
+            daily={{
+              entity: departmentDaily ?? daily.department,
+              dateControl: departmentDailyControl,
+              showViewToggle: true,
+              defaultOnlyMe,
+            }}
+            monthly={{ entity: monthly.department, showViewToggle: true, defaultOnlyMe }}
             hodAssigned={
-              hodAssignedDepartment ? { entity: hodAssignedDepartment.department, showViewToggle: true } : undefined
+              hodAssignedDepartment
+                ? { entity: hodAssignedDepartment.department, showViewToggle: true, defaultOnlyMe }
+                : undefined
             }
             ceoAssigned={
-              ceoAssignedDepartment ? { entity: ceoAssignedDepartment.department, showViewToggle: true } : undefined
+              ceoAssignedDepartment
+                ? { entity: ceoAssignedDepartment.department, showViewToggle: true, defaultOnlyMe }
+                : undefined
             }
             onComplete={completeTaskAction}
             onSkip={skipTaskAction}
@@ -395,10 +410,21 @@ export function TaskManagerView({
             entityName={daily.branch.name}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            daily={{ entity: daily.branch, dateControl: personalDailyControl, showViewToggle: true }}
-            monthly={{ entity: monthly.branch, dateControl: personalMonthlyControl, showViewToggle: true }}
-            hodAssigned={hodAssignedBranch ? { entity: hodAssignedBranch.branch, showViewToggle: true } : undefined}
-            ceoAssigned={ceoAssignedBranch ? { entity: ceoAssignedBranch.branch, showViewToggle: true } : undefined}
+            daily={{ entity: daily.branch, dateControl: personalDailyControl, showViewToggle: true, defaultOnlyMe }}
+            monthly={{
+              entity: monthly.branch,
+              dateControl: personalMonthlyControl,
+              showViewToggle: true,
+              defaultOnlyMe,
+            }}
+            hodAssigned={
+              hodAssignedBranch
+                ? { entity: hodAssignedBranch.branch, showViewToggle: true, defaultOnlyMe }
+                : undefined
+            }
+            ceoAssigned={
+              ceoAssignedBranch ? { entity: ceoAssignedBranch.branch, showViewToggle: true, defaultOnlyMe } : undefined
+            }
             onComplete={completeTaskAction}
             onSkip={skipTaskAction}
             onReopen={reopenTaskAction}

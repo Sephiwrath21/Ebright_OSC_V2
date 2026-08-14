@@ -64,6 +64,7 @@ import {
 import { isElevatedDeptSite } from "@/task-manager/analytics/_lib";
 import {
   canManageTaskTemplateGroups,
+  isPersonalAccountView,
   resolveViewRole,
   shows,
   showsAddTaskHeader,
@@ -473,7 +474,6 @@ export default async function TaskManagerPage({
     try {
       const { id } = await createTaskCategory(email, { name });
       revalidatePath("/task-manager");
-      revalidatePath("/task-manager/categories");
       return { ok: true, id, name };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
@@ -608,6 +608,11 @@ export default async function TaskManagerPage({
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization).
     const viewRole = resolveViewRole(daily.me.me);
+    // myOverview's Daily View-toggle default (2026-08-15) — see
+    // isPersonalAccountView's doc comment; every role that actually renders
+    // myOverview is a personal account, so this is always true in practice,
+    // but computed properly rather than hardcoded in case that changes.
+    const defaultOnlyMe = isPersonalAccountView(viewRole);
     // "Assign to Others" — same identities as the assign form MINUS the CEO
     // (2026-08-01: the CEO is view-only on the org-wide/department/branch
     // drill-downs — reassigning other people's existing tasks isn't part of
@@ -625,9 +630,10 @@ export default async function TaskManagerPage({
     // action as the manager-only `reassign` above — one server action,
     // two different authorization paths inside reassignFlowTask.
     const cardReassign = { staff, action: reassignTask };
-    // Same gate as the /task-manager/categories admin page and
-    // createTaskCategory's own server-side check — only these viewers get
-    // the assign form's inline "+ Add new type" option (2026-08-12).
+    // Same gate as createTaskCategory's own server-side check — only these
+    // viewers get the assign form's inline "+ Add new type" option
+    // (2026-08-12; this is the ONLY way to create a category as of
+    // 2026-08-15, the standalone admin page was removed).
     const canManageCategories = canManageTaskTemplateGroups({
       role,
       department: daily.me.me.department ?? null,
@@ -960,11 +966,29 @@ export default async function TaskManagerPage({
     // build it, same defensive-but-simple shape as the rest of this
     // function's optional fetches).
     const myOverviewData = {
-      entityName: daily.me.me.name,
+      // Empty (2026-08-15, was daily.me.me.name, briefly "My Tasks") —
+      // EntityCardOverview omits the "X — " heading prefix entirely when
+      // entityName is empty, printing just "Daily"/"Monthly" alone. Every
+      // myOverview section is inherently the viewer's own overview, and the
+      // Person-sort card directly below already says "My Tasks" (isOwnCard
+      // check) — so this heading saying "My Tasks — Daily" right above a
+      // card ALSO saying "My Tasks" was itself a redundant repeat, the same
+      // class of issue this was meant to fix in the first place.
+      entityName: "",
       daily: memberWholeDepartmentDaily
-        ? { entity: memberWholeDepartmentDaily.department, dateControl: personalDailyControl, showViewToggle: true }
+        ? {
+            entity: memberWholeDepartmentDaily.department,
+            dateControl: personalDailyControl,
+            showViewToggle: true,
+            defaultOnlyMe,
+          }
         : memberWholeBranchDaily
-          ? { entity: memberWholeBranchDaily.branch, dateControl: personalDailyControl, showViewToggle: true }
+          ? {
+              entity: memberWholeBranchDaily.branch,
+              dateControl: personalDailyControl,
+              showViewToggle: true,
+              defaultOnlyMe,
+            }
           : { entity: toSelfEntityDetail(daily.me.me, daily.me), dateControl: personalDailyControl, showViewToggle: false },
       // Monthly stays self-only for every myOverview role, always — even
       // DEPT_MEMBER (whose Daily section is whole-department) keeps

@@ -16,6 +16,9 @@ interface SectionData {
   entity: FlowEntityDetail;
   dateControl?: React.ReactNode;
   showViewToggle: boolean;
+  /** Initial View-toggle state when showViewToggle is true (2026-08-15) —
+   *  see EntityCardOverview's own doc comment. */
+  defaultOnlyMe?: boolean;
 }
 
 export function TaskOverviewStack({
@@ -70,6 +73,7 @@ export function TaskOverviewStack({
               myUserId={myUserId}
               dateControl={data.dateControl}
               showViewToggle={data.showViewToggle}
+              defaultOnlyMe={data.defaultOnlyMe}
               onComplete={onComplete}
               onSkip={onSkip}
               onReopen={onReopen}

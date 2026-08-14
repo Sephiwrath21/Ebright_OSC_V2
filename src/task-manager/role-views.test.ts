@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canManageTaskTemplateGroups,
+  isPersonalAccountView,
   ROLE_VIEWS,
   resolveViewRole,
   shows,
@@ -206,7 +207,6 @@ describe("taskManagerNavAccess", () => {
       template: true,
       package: true,
       packageTable: true,
-      categories: true,
     });
   });
   it("Operation (elevated dept-site): all three true", () => {
@@ -214,7 +214,6 @@ describe("taskManagerNavAccess", () => {
       template: true,
       package: true,
       packageTable: true,
-      categories: true,
     });
   });
   it("HOD: all three true (view-only, but sidebar-visible)", () => {
@@ -222,7 +221,6 @@ describe("taskManagerNavAccess", () => {
       template: true,
       package: true,
       packageTable: true,
-      categories: false,
     });
   });
   it("CEO: all three true (view-only, but sidebar-visible)", () => {
@@ -230,7 +228,6 @@ describe("taskManagerNavAccess", () => {
       template: true,
       package: true,
       packageTable: true,
-      categories: false,
     });
   });
   it("Branch Manager (BRANCH): all three true (2026-08-11 — Template added, same tier as HOD)", () => {
@@ -238,7 +235,6 @@ describe("taskManagerNavAccess", () => {
       template: true,
       package: true,
       packageTable: true,
-      categories: false,
     });
   });
   it("OPS role: all three false (not in the matrix)", () => {
@@ -246,7 +242,6 @@ describe("taskManagerNavAccess", () => {
       template: false,
       package: false,
       packageTable: false,
-      categories: false,
     });
   });
   it("non-elevated dept-site (Department): all three false", () => {
@@ -254,7 +249,6 @@ describe("taskManagerNavAccess", () => {
       template: false,
       package: false,
       packageTable: false,
-      categories: false,
     });
   });
   it("BRANCH_SITE (Branch): all three false", () => {
@@ -262,7 +256,6 @@ describe("taskManagerNavAccess", () => {
       template: false,
       package: false,
       packageTable: false,
-      categories: false,
     });
   });
   it("MEMBER (Intern/HQ Exec/Branch Exec/Coach/unspecified): all three false", () => {
@@ -270,7 +263,30 @@ describe("taskManagerNavAccess", () => {
       template: false,
       package: false,
       packageTable: false,
-      categories: false,
     });
+  });
+});
+
+describe("isPersonalAccountView", () => {
+  it("false for the three shared/site views", () => {
+    const siteViews: ViewRole[] = ["DEPT_SITE", "BRANCH_SITE", "ELEVATED_DEPT_SITE"];
+    for (const view of siteViews) {
+      expect(isPersonalAccountView(view)).toBe(false);
+    }
+  });
+  it("true for every individual-person view", () => {
+    const personalViews: ViewRole[] = [
+      "ADMIN",
+      "CEO",
+      "OPS",
+      "HOD",
+      "BRANCH_MANAGER",
+      "DEPT_MEMBER",
+      "BRANCH_MEMBER",
+      "COACH",
+    ];
+    for (const view of personalViews) {
+      expect(isPersonalAccountView(view)).toBe(true);
+    }
   });
 });

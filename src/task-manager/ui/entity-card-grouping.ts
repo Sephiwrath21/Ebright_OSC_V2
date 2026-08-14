@@ -58,9 +58,12 @@ export function groupTasksByCategory(
     id: UNCATEGORIZED_CARD_ID,
     name: "Uncategorized",
     // Catches genuinely-uncategorized tasks AND tasks whose categoryId
-    // points at an archived category (archiveTaskCategory only excludes
-    // the category from the active list; it never touches the FK on
-    // tasks already assigned to it) — without this, such a task matches
+    // points at a historically-archived category (2026-08-15: category
+    // archiving/renaming was removed along with the standalone admin page —
+    // categories can now only be created, never archived, going forward —
+    // but any category archived before then still has archivedAt set, is
+    // excluded from listActiveTaskCategories, and never had its FK on
+    // already-assigned tasks touched) — without this, such a task matches
     // no categoryCards entry and isn't `=== null`, so it would silently
     // disappear from every card.
     tasks: scopedTasks.filter((t) => t.categoryId === null || !knownIds.has(t.categoryId)),

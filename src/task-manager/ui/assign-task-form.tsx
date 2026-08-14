@@ -83,12 +83,13 @@ export function AssignTaskForm({
    *  entirely — e.g. before any category has ever been created. */
   categories?: FlowCategoryOption[];
   /** Inline "+ Add new type" (2026-08-12): creates a category without
-   *  leaving the assign form. Omit to hide the option entirely — the
-   *  caller only passes this for viewers who pass
-   *  canManageTaskTemplateGroups (Super Admin + elevated Operations/
-   *  Optimisation dept-sites), the same gate as the /task-manager/categories
-   *  admin page; everyone else sees a plain dropdown of existing active
-   *  categories. The server re-enforces the same gate regardless. */
+   *  leaving the assign form — the ONLY way to create one (2026-08-15: the
+   *  standalone /task-manager/categories admin page was removed). Omit to
+   *  hide the option entirely — the caller only passes this for viewers who
+   *  pass canManageTaskTemplateGroups (Super Admin + elevated Operations/
+   *  Optimisation dept-sites); everyone else sees a plain dropdown of
+   *  existing active categories. The server re-enforces the same gate
+   *  regardless. */
   onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
