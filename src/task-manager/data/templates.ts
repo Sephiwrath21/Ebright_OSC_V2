@@ -132,6 +132,7 @@ export function getTaskTemplate(email: string, templateId: string): Promise<Task
       title: row.title,
       subtasks: Array.isArray(row.subtasks) ? (row.subtasks as string[]) : [],
       cadence: row.cadence ? CADENCE_OPTION_OF[row.cadence] : null,
+      categoryId: row.categoryId,
       guidelineUrl: row.guidelineUrl,
       guidelineImage:
         row.guidelineMime && row.guidelineImage

@@ -17,7 +17,9 @@ import {
   visibleCadenceOptions,
   type AssignActionResult,
   type CadenceOption,
+  type CreateCategoryResult,
   type FlowAssignInput,
+  type FlowCategoryOption,
   type FlowGroup,
   type FlowStaffMember,
   type FlowTemplateControl,
@@ -25,6 +27,7 @@ import {
 import { RecipientPicker } from "./recipient-picker";
 import { compressImageFile } from "./image-compress";
 import { SubtaskListEditor } from "./subtask-list-editor";
+import { CategoryPicker } from "./category-picker";
 
 const CADENCE_LABELS: Record<CadenceOption, string> = {
   daily: "Daily",
@@ -50,6 +53,8 @@ export function AssignTaskForm({
   quickSelfId,
   hideCadence = false,
   templates,
+  categories,
+  onCreateCategory,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -76,6 +81,19 @@ export function AssignTaskForm({
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
   templates?: FlowTemplateControl;
+  /** Task Categories ("Type", 2026-08-12): active categories for the new
+   *  Category dropdown. Omit or pass an empty array to hide the dropdown
+   *  entirely — e.g. before any category has ever been created. */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12): creates a category without
+   *  leaving the assign form — the ONLY way to create one (2026-08-15: the
+   *  standalone /task-manager/categories admin page was removed). Omit to
+   *  hide the option entirely — the caller only passes this for viewers who
+   *  pass canManageTaskTemplateGroups (Super Admin + elevated Operations/
+   *  Optimisation dept-sites); everyone else sees a plain dropdown of
+   *  existing active categories. The server re-enforces the same gate
+   *  regardless. */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -107,9 +125,18 @@ export function AssignTaskForm({
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   // Task Templates (2026-07-31)
   const [templateId, setTemplateId] = React.useState("");
+  const [categoryId, setCategoryId] = React.useState("");
   const [templateBusy, setTemplateBusy] = React.useState(false);
   const [saveTemplate, setSaveTemplate] = React.useState(false);
   const [templateName, setTemplateName] = React.useState("");
+  // Inline "+ Add new type" (2026-08-12): categories start from the prop,
+  // then grow locally as this session creates new ones — no page refresh
+  // needed to pick a category you just added. Lifted here (rather than
+  // living inside CategoryPicker) since this form only ever renders one
+  // instance — see category-picker.tsx's own header comment for why a
+  // multi-instance caller (Template/Package's per-task pickers) needs to
+  // lift it too.
+  const [localCategories, setLocalCategories] = React.useState(categories ?? []);
 
   /** "Start from a template": load the full template and pre-fill the
    *  structure fields. Recipients/days/due date are untouched (they're
@@ -130,6 +157,7 @@ export function AssignTaskForm({
     setSubtasks(t.subtasks);
     setSubtaskEditorKey((k) => k + 1);
     setCadence(hideCadence ? "daily" : t.cadence);
+    setCategoryId(t.categoryId ?? "");
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
       setGuidelineImage({
@@ -234,6 +262,7 @@ export function AssignTaskForm({
           ? { name: templateName.trim() || title.trim() }
           : undefined,
         fromTemplateId: templateId || undefined,
+        categoryId: categoryId || undefined,
       });
       if (result.ok) {
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
@@ -247,6 +276,7 @@ export function AssignTaskForm({
         setSubtasks([]);
         setSubtaskEditorKey((k) => k + 1);
         setTemplateId("");
+        setCategoryId("");
         setSaveTemplate(false);
         setTemplateName("");
       } else {
@@ -293,6 +323,14 @@ export function AssignTaskForm({
             {templateBusy && <p className="mt-1.5 text-xs text-gray-400">Loading template…</p>}
           </div>
         )}
+
+        <CategoryPicker
+          value={categoryId}
+          onChange={setCategoryId}
+          categories={localCategories}
+          onCreateCategory={onCreateCategory}
+          onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+        />
 
         <label className="max-w-xl text-sm text-gray-600 dark:text-slate-300">
           Task title

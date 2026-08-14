@@ -13,7 +13,13 @@
 // visit or when localStorage is unavailable.
 import * as React from "react";
 import { LayoutGrid, List } from "lucide-react";
-import type { FlowStaffMember, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
+import type {
+  CreateCategoryResult,
+  FlowCategoryOption,
+  FlowStaffMember,
+  FlowTemplateGroupControl,
+  FlowTemplateGroupSummary,
+} from "./types";
 import { TemplateGroupFormModal } from "./template-group-form";
 import { TemplateGroupAssignModal } from "./template-group-assign-modal";
 import { TemplateGroupAssigneesModal } from "./template-group-assignees-modal";
@@ -93,6 +99,8 @@ export function TemplateGroupDashboard({
   hideCadence = false,
   label = "Template",
   canEdit = true,
+  categories,
+  onCreateCategory,
 }: {
   staff: FlowStaffMember[];
   control: FlowTemplateGroupControl;
@@ -111,6 +119,11 @@ export function TemplateGroupDashboard({
    *  own name/task-count/preview content and the grid/list view toggle are
    *  unaffected, view-only roles still see their cards. */
   canEdit?: boolean;
+  /** Task Category ("Type", 2026-08-15) — forwarded straight through to
+   *  both create/edit TemplateGroupFormModal instances below; see that
+   *  component's own doc comment. */
+  categories?: FlowCategoryOption[];
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
@@ -296,13 +309,23 @@ export function TemplateGroupDashboard({
         </div>
       )}
 
-      {createOpen && <TemplateGroupFormModal control={control} onClose={() => setCreateOpen(false)} label={label} />}
+      {createOpen && (
+        <TemplateGroupFormModal
+          control={control}
+          onClose={() => setCreateOpen(false)}
+          label={label}
+          categories={categories}
+          onCreateCategory={onCreateCategory}
+        />
+      )}
       {editGroupId && (
         <TemplateGroupFormModal
           control={control}
           groupId={editGroupId}
           onClose={() => setEditGroupId(null)}
           label={label}
+          categories={categories}
+          onCreateCategory={onCreateCategory}
         />
       )}
       {assignedGroup && (

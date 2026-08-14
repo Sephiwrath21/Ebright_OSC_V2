@@ -107,14 +107,57 @@ const groupTaskSchema = z.object({
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
 });
 
+/** Validates a submitted categoryId against a real, non-archived
+ *  TaskCategory — same rule assignFlowTaskCore already enforces
+ *  (tasks-internal.ts) — and resolves it to a plain nullable id ready for a
+ *  Prisma write. Absent input resolves to null (uncategorized). Used for a
+ *  user's own fresh form submission (create/edit), where a stale/invalid id
+ *  genuinely indicates something worth surfacing as an error. */
+async function resolveCategoryId(categoryId?: string): Promise<string | null> {
+  if (!categoryId) return null;
+  const category = await prisma.taskCategory.findFirst({
+    where: { id: categoryId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!category) throw new ApiHttpError(400, "That category no longer exists or is archived");
+  return category.id;
+}
+
+/** Like resolveCategoryId, but degrades to uncategorized (undefined)
+ *  instead of throwing when the id no longer resolves to an active
+ *  category (2026-08-15) — for re-applying an ALREADY-SAVED
+ *  TaskTemplate's stored categoryId (applyTemplateGroup), where the
+ *  category being archived AFTER the template was created/edited shouldn't
+ *  retroactively block assigning that template; assignFlowTaskCore itself
+ *  still hard-validates, so passing a since-archived id straight through
+ *  would throw and block the whole "Assign" action. */
+async function resolveStoredCategoryId(categoryId: string | null): Promise<string | undefined> {
+  if (!categoryId) return undefined;
+  const category = await prisma.taskCategory.findFirst({
+    where: { id: categoryId, archivedAt: null },
+    select: { id: true },
+  });
+  return category?.id;
+}
+
+// Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+// the group (a sibling of `name`, not a per-task field — see
+// TaskTemplateGroup.categoryId's schema comment). Stored on the group row
+// as a PRE-FILL default only for applyTemplateGroup's fan-out (not
+// authoritative — the authoritative per-assignment value lives on
+// RunBlock.categoryId, same as every other categoryId path in this app).
+const categoryIdSchema = z.string().min(1).optional();
+
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  categoryId: categoryIdSchema,
   tasks: z.array(groupTaskSchema.omit({ id: true })).min(1).max(GROUP_TASK_MAX),
 });
 export type CreateTemplateGroupInput = z.input<typeof createGroupSchema>;
 
 const editGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  categoryId: categoryIdSchema,
   tasks: z.array(groupTaskSchema).min(1).max(GROUP_TASK_MAX),
 });
 export type EditTemplateGroupInput = z.input<typeof editGroupSchema>;
@@ -138,6 +181,7 @@ export interface TemplateGroupDetail {
   id: string;
   name: string;
   tasks: TemplateGroupTask[];
+  categoryId: string | null;
 }
 
 /** Cards data for the /task-manager/template or /task-manager/package
@@ -191,6 +235,7 @@ export function getTemplateGroup(
     return {
       id: group.id,
       name: group.name,
+      categoryId: group.categoryId,
       tasks: group.templates.map((t) => ({
         id: t.id,
         title: t.title,
@@ -210,9 +255,10 @@ export function createTemplateGroup(
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const body = createGroupSchema.parse(input);
+    const categoryId = await resolveCategoryId(body.categoryId);
     const group = await prisma.$transaction(async (tx) => {
       const g = await tx.taskTemplateGroup.create({
-        data: { createdById: user.id, name: body.name, scope },
+        data: { createdById: user.id, name: body.name, scope, categoryId },
       });
       for (const [index, t] of body.tasks.entries()) {
         await tx.taskTemplate.create({
@@ -388,8 +434,9 @@ export function editTemplateGroup(
       select: { id: true },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
+    const categoryId = await resolveCategoryId(body.categoryId);
 
-    await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name } });
+    await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name, categoryId } });
 
     const existing = await prisma.taskTemplate.findMany({
       where: { templateGroupId: id },
@@ -469,6 +516,7 @@ export function editTemplateGroup(
             dueDate: schedule.dueDate,
             cadence: schedule.cadence,
             fromTemplateId: newTask.id,
+            categoryId: categoryId ?? undefined,
           } satisfies FlowAssignInput);
           newTaskAssignedTo += 1;
         }
@@ -606,6 +654,11 @@ export function applyTemplateGroup(
     if (group.templates.length === 0) {
       throw new ApiHttpError(400, `This ${NOUN[scope]} has no tasks to assign`);
     }
+    // The group's ONE shared Type (see TaskTemplateGroup.categoryId's
+    // schema comment) — resolved once and applied to every fanned-out
+    // task, not read per-TaskTemplate (TaskTemplate itself carries no
+    // categoryId at all since the per-task design was superseded).
+    const categoryId = await resolveStoredCategoryId(group.categoryId);
 
     let created = 0;
     for (const t of group.templates) {
@@ -618,6 +671,7 @@ export function applyTemplateGroup(
         dueDate: body.dueDate,
         cadence: body.cadence,
         fromTemplateId: t.id,
+        categoryId,
       } satisfies FlowAssignInput);
       created += result.created;
     }

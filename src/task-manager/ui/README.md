@@ -18,9 +18,9 @@ Live demo of both surfaces (inside this repo): `/osc-demo`.
 | BRANCH (branch manager) | own branch meters | Branch Status Daily · Monthly · Ad hoc Tasks (OPS/Admin-started runs), + branch roster |
 | CEO | + "Assigned by me" meter | CEO Tasks (assigned by them) · all-departments Daily + Monthly donut grids |
 | OPS (Operation site) | same as CEO | own Daily + Monthly + assigner streams · assign form (no org grids) |
-| Superadmin (ADMIN) | same as CEO | Department\|Branch toggle → dropdown → selected entity's full Daily + Monthly detail inline (`EntityOverviewSection`) · "+ Task" in the page header — the org grids (all-departments · Branch by Region · Ad hoc by Region) render on the OSC **Home page** instead (`home-overview.tsx` via `overview-grids.tsx`, wired in `src/app/home/scoped-overview-section.tsx` — the one Home overview every role gets, scoped per role) |
-| Elevated dept sites (DEPT_SITE Operation/Optimisation — `isElevatedDeptSite`) | — | department dropdown (all 6, never branches) → full Daily + Monthly detail · "+ Task" in the page header |
-| Other DEPT_SITE / HOD | — | own department's full Daily + Monthly detail inline (the folded-in Department Overview page; its old route redirects to /task-manager) |
+| Superadmin (ADMIN) | same as CEO | Department\|Branch toggle → dropdown → selected entity's full Daily + Monthly + HOD Assigned card grid (`EntityCardOverview`, 2026-08-12) · "+ Task" in the page header — the org grids (all-departments · Branch by Region · Ad hoc by Region) render on the OSC **Home page** instead (`home-overview.tsx` via `overview-grids.tsx`, wired in `src/app/home/scoped-overview-section.tsx` — the one Home overview every role gets, scoped per role) |
+| Elevated dept sites (DEPT_SITE Operation/Optimisation — `isElevatedDeptSite`) | — | department dropdown (all 6, never branches) → full Daily + Monthly + HOD Assigned card grid (`EntityCardOverview`) · "+ Task" in the page header |
+| Other DEPT_SITE / HOD | — | own department's full Daily + Monthly + HOD Assigned card grid inline (`EntityCardOverview`, the folded-in Department Overview page; its old route redirects to /task-manager) |
 
 The page needs BOTH periods: call `getFlowDetail(email, "daily")` and
 `getFlowDetail(email, "monthly")` and pass them as `daily`/`monthly` props.

@@ -30,6 +30,7 @@ import AppShell from "@/app/components/AppShell";
 import { canManageTaskTemplateGroups } from "@/task-manager/role-views";
 import {
   applyTemplateGroup,
+  createTaskCategory,
   createTemplateGroup,
   deleteTemplateGroup,
   editTemplateGroup,
@@ -38,6 +39,7 @@ import {
   getFlowStaff,
   getMyRole,
   getTemplateGroup,
+  listActiveTaskCategories,
   listTemplateGroups,
   removeGroupAssignee,
   FlowBridgeError,
@@ -77,6 +79,7 @@ export default async function TaskManagerPackagePage() {
   let groups;
   let staff;
   let role: { role: string; department: string | null };
+  let categoryList;
   try {
     const [groupsResult, staffResult, roleResult] = await Promise.all([
       listTemplateGroups(email, SCOPE),
@@ -86,6 +89,12 @@ export default async function TaskManagerPackagePage() {
     groups = groupsResult;
     staff = staffResult.staff;
     role = roleResult;
+    // Active categories for each task's Type dropdown (2026-08-15) — same
+    // fetch AssignTaskForm's own Type dropdown uses on the main Overview
+    // page; defensive (empty on failure) since it shouldn't fail the whole
+    // page load. Categories are shared org-wide (not scoped by TEMPLATE vs
+    // PACKAGE), same list template/page.tsx offers.
+    categoryList = await listActiveTaskCategories(email).catch(() => []);
   } catch (err) {
     // Genuine "no View access" (403 from listTemplateGroups's
     // requireGroupViewAccess) bounces to /task-manager — everything else
@@ -223,6 +232,27 @@ export default async function TaskManagerPackagePage() {
     }
   }
 
+  // Inline "+ Add new type" (2026-08-15) — same gate as canEdit below
+  // (canManageTaskTemplateGroups), mirroring template/page.tsx's own
+  // createCategory action; createTaskCategory re-enforces the gate
+  // server-side regardless.
+  async function createCategory(
+    name: string,
+  ): Promise<import("@/task-manager/ui/types").CreateCategoryResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const { id } = await createTaskCategory(email, { name });
+      revalidatePath("/task-manager/package");
+      return { ok: true, id, name };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
+  const canEdit = canManageTaskTemplateGroups(role);
+
   return (
     <AppShell email={su.email} role={su.role} name={su.name}>
       <div className="mx-auto max-w-[1400px] p-6">
@@ -231,7 +261,9 @@ export default async function TaskManagerPackagePage() {
           <TemplateGroupDashboard
             staff={staff}
             label="Package"
-            canEdit={canManageTaskTemplateGroups(role)}
+            canEdit={canEdit}
+            categories={categoryList}
+            onCreateCategory={canEdit ? createCategory : undefined}
             control={{
               list: groups,
               load: loadGroup,

@@ -13,7 +13,9 @@
 import * as React from "react";
 import type {
   AssignActionResult,
+  CreateCategoryResult,
   FlowAssignInput,
+  FlowCategoryOption,
   FlowGroup,
   FlowStaffMember,
   FlowTemplateControl,
@@ -43,6 +45,8 @@ export function AddTaskButton({
   staff,
   action,
   templates,
+  categories,
+  onCreateCategory,
   recipientGroup,
   quickSelfId,
   hideCadence,
@@ -52,6 +56,13 @@ export function AddTaskButton({
   /** Task Templates (2026-07-31) — saved list + load/rename/delete
    *  actions, passed straight through to the form. */
   templates?: FlowTemplateControl;
+  /** Task Categories (2026-08-12) — active-category list, passed straight
+   *  through to AssignTaskForm's Category dropdown. */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12) — passed straight through to
+   *  AssignTaskForm; omitted entirely for viewers who can't manage
+   *  categories (the caller decides, via canManageTaskTemplateGroups). */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Restrict the recipient picker to one group (2026-08-01: the CEO
    *  assigns to HODs only) — passed straight through to AssignTaskForm;
    *  the server re-enforces regardless. */
@@ -128,6 +139,8 @@ export function AddTaskButton({
                 staff={staff}
                 action={action}
                 templates={templates}
+                categories={categories}
+                onCreateCategory={onCreateCategory}
                 recipientGroup={recipientGroup}
                 quickSelfId={quickSelfId}
                 hideCadence={hideCadence}

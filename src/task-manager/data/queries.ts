@@ -16,32 +16,42 @@ import {
   canViewEntity,
   canViewOrg,
   fetchPeriodBlocks,
-  formatLocalDate,
   isElevatedDeptSite,
-  parseLocalDate,
   UNASSIGNED,
 } from "../analytics/_lib";
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
+  getEntityCeoAssignedPayload,
+  getEntityHodAssignedPayload,
   getEntityPayload,
   getMePayload,
   getOrgPayload,
   resolvedDate,
 } from "../analytics/_payloads";
+import type { EntityPayload } from "../analytics/_payloads";
 import { advanceRecurringBlocks } from "../engine/recurrence";
 import { native, requireUserByEmail } from "./core";
 
-/** Personal progress for the dashboard card (daily or monthly). */
+/** Personal progress for the dashboard card (daily or monthly).
+ *
+ *  `opts.strictWindow` (2026-08-15, the Overview page's embedded weekday-tab
+ *  view): forwarded straight to getMePayload — off (default) preserves this
+ *  function's original wide semantics for its original caller (the Home
+ *  dashboard's personal progress card); the weekday-tab view passes `true`
+ *  since each tab must show ONLY that day's tasks, not every same-cadence
+ *  block regardless of date. See getFlowDetail's own strictWindow comment
+ *  for the full rule. */
 export function getFlowOverview(
   email: string,
   period: FlowPeriod,
   date?: string,
+  opts?: { strictWindow?: boolean },
 ): Promise<FlowOverviewResponse> {
   return native(async () => {
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    const payload = await getMePayload(user, q.period, q.date);
+    const payload = await getMePayload(user, q.period, q.date, { strictWindow: opts?.strictWindow });
     return { period: q.period, date: resolvedDate(q.date), ...payload } as FlowOverviewResponse;
   }, "getFlowOverview");
 }
@@ -170,90 +180,6 @@ export function getFlowDetail(
   }, "getFlowDetail");
 }
 
-/** Sidebar count badges (2026-07-29, ClickUp-reference): the viewer's OWN
- *  not-yet-completed task counts — Pending/Active/Overdue/Escalated only;
- *  DONE and SKIPPED (N/A) are excluded, per the confirmed rule.
- *  - `weekdays`: per day of the DAILY anchor's Mon–Sun week, keyed
- *    YYYY-MM-DD (the WeekdaySidebar's per-day badges);
- *  - `months`: per month (1..12) of the MONTHLY anchor's year (the
- *    MonthSidebar's per-month badges — stepping the year re-fetches);
- *  - `monthChunks`: the anchor MONTH's 7-day chunks, keyed "from-to" (the
- *    expanded accordion sub-items' badges).
- *  Blocks with no dueAt fall back to startedAt for day/month keying, the
- *  same dueAt-else-startedAt rule the windows use. */
-export function getMySidebarCounts(
-  email: string,
-  dailyDate?: string,
-  monthlyDate?: string,
-): Promise<{
-  weekdays: Record<string, number>;
-  months: Record<number, number>;
-  monthChunks: Record<string, number>;
-}> {
-  return native(async () => {
-    const user = await requireUserByEmail(email);
-
-    const dailyAnchor = dailyDate ? parseLocalDate(dailyDate) : new Date();
-    const monday = new Date(
-      dailyAnchor.getFullYear(),
-      dailyAnchor.getMonth(),
-      dailyAnchor.getDate() - ((dailyAnchor.getDay() + 6) % 7),
-    );
-    const weekWindow = {
-      start: monday,
-      end: new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7),
-      period: "daily" as const,
-    };
-
-    const monthlyAnchor = monthlyDate ? parseLocalDate(monthlyDate) : new Date();
-    const year = monthlyAnchor.getFullYear();
-    const yearWindow = {
-      start: new Date(year, 0, 1),
-      end: new Date(year + 1, 0, 1),
-      period: "monthly" as const,
-    };
-
-    const [weekBlocks, yearBlocks] = await Promise.all([
-      fetchPeriodBlocks(weekWindow, { assigneeId: user.id, strictWindow: true }),
-      fetchPeriodBlocks(yearWindow, { assigneeId: user.id, strictWindow: true }),
-    ]);
-    const isOpen = (b: { status: string }) => b.status !== "DONE" && b.status !== "SKIPPED";
-    const keyDate = (b: { dueAt: Date | null; startedAt: Date | null }) => b.dueAt ?? b.startedAt;
-
-    const weekdays: Record<string, number> = {};
-    for (const b of weekBlocks) {
-      if (!isOpen(b)) continue;
-      const kd = keyDate(b);
-      if (!kd) continue;
-      const k = formatLocalDate(kd);
-      weekdays[k] = (weekdays[k] ?? 0) + 1;
-    }
-
-    const months: Record<number, number> = {};
-    const monthChunks: Record<string, number> = {};
-    const anchorMonth = monthlyAnchor.getMonth();
-    const daysInAnchorMonth = new Date(year, anchorMonth + 1, 0).getDate();
-    for (const b of yearBlocks) {
-      if (!isOpen(b)) continue;
-      const d = keyDate(b);
-      if (!d) continue;
-      const m = d.getMonth() + 1;
-      months[m] = (months[m] ?? 0) + 1;
-      if (d.getMonth() === anchorMonth) {
-        // FOUR chunks (2026-07-30 confirmation): 1-7 · 8-14 · 15-21 ·
-        // 22-{last day} — keys must match monthDayChunks() in the UI.
-        let from = Math.floor((d.getDate() - 1) / 7) * 7 + 1;
-        if (from > 22) from = 22;
-        const to = from === 22 ? daysInAnchorMonth : from + 6;
-        const k = `${from}-${to}`;
-        monthChunks[k] = (monthChunks[k] ?? 0) + 1;
-      }
-    }
-
-    return { weekdays, months, monthChunks };
-  }, "getMySidebarCounts");
-}
-
 // Deliberately no per-user auth (donor parity): call sites must sit behind
 // session auth. Returns the PII-free staff subset only.
 /** Assignable staff directory (recipient picker options). */
@@ -298,7 +224,9 @@ const departmentQuerySchema = analyticsQuerySchema.extend({
   department: z.string().min(1).max(200),
 });
 
-/** Full detail for ONE department by name (org roles any; HOD/DEPT_SITE own only). */
+/** Full detail for ONE department by name (org roles any; HOD/DEPT_SITE own
+ *  only; MEMBER additionally sees own department's Daily only (see
+ *  ownDailyView below)). */
 export function getDepartmentDetail(
   email: string,
   department: string,
@@ -309,7 +237,17 @@ export function getDepartmentDetail(
     await advanceRecurringBlocks();
     const q = departmentQuerySchema.parse({ department, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    if (!canViewEntity(user, "department", q.department)) {
+    // Stacked-sections redesign (2026-08-12): plain department-side staff
+    // (role MEMBER) may view their OWN department's whole-roster DAILY
+    // detail — the new page-wide Daily section's confirmed visibility rule
+    // — but NOT Monthly (unchanged, still self-only for MEMBER). Scoped
+    // locally to this function (not canViewEntity itself, which has no
+    // period and also gates getBranchDetail/the HOD/CEO-assigned queries —
+    // widening it there would silently unlock Monthly whole-department
+    // detail too, which must stay unchanged).
+    const ownDailyView =
+      user.role === "MEMBER" && q.period === "daily" && q.department === (user.department ?? UNASSIGNED);
+    if (!canViewEntity(user, "department", q.department) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own department");
     }
     const payload = await getEntityPayload("department", q.department, q.period, q.date);
@@ -321,12 +259,52 @@ export function getDepartmentDetail(
   }, "getDepartmentDetail");
 }
 
+/** "HOD Assigned Task" filter mode for the Overview card redesign
+ *  (2026-08-12) — all-time, no period/date param (mirrors
+ *  getDepartmentDetail's auth check, different payload source). */
+export function getDepartmentHodAssigned(
+  email: string,
+  department: string,
+): Promise<{ department: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ department: z.string().min(1).max(200) }).parse({ department });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "department", q.department)) {
+      throw new ApiHttpError(403, "You can only view your own department");
+    }
+    const payload = await getEntityHodAssignedPayload("department", q.department);
+    return { department: { name: q.department, ...payload } };
+  }, "getDepartmentHodAssigned");
+}
+
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign) —
+ *  all-time, no period/date param (mirrors getDepartmentHodAssigned, a
+ *  different payload source/assignerRole). */
+export function getDepartmentCeoAssigned(
+  email: string,
+  department: string,
+): Promise<{ department: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ department: z.string().min(1).max(200) }).parse({ department });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "department", q.department)) {
+      throw new ApiHttpError(403, "You can only view your own department");
+    }
+    const payload = await getEntityCeoAssignedPayload("department", q.department);
+    return { department: { name: q.department, ...payload } };
+  }, "getDepartmentCeoAssigned");
+}
+
 const branchQuerySchema = analyticsQuerySchema.extend({
   branch: z.string().min(1).max(200),
 });
 
 /** Full detail for ONE branch by name (org roles any; BRANCH/BRANCH_SITE own
- *  only — elevated department sites deliberately have NO branch access). */
+ *  only — elevated department sites deliberately have NO branch access;
+ *  MEMBER additionally sees own branch's Daily only (see ownDailyView
+ *  below)). */
 export function getBranchDetail(
   email: string,
   branch: string,
@@ -337,7 +315,12 @@ export function getBranchDetail(
     await advanceRecurringBlocks();
     const q = branchQuerySchema.parse({ branch, period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    if (!canViewEntity(user, "branch", q.branch)) {
+    // Same rule as getDepartmentDetail above — plain branch-side staff
+    // (role MEMBER, e.g. Branch Exec/Coach) may view their own branch's
+    // whole-roster DAILY detail only; Monthly stays self-only.
+    const ownDailyView =
+      user.role === "MEMBER" && q.period === "daily" && q.branch === (user.branch ?? UNASSIGNED);
+    if (!canViewEntity(user, "branch", q.branch) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own branch");
     }
     const payload = await getEntityPayload("branch", q.branch, q.period, q.date);
@@ -347,4 +330,40 @@ export function getBranchDetail(
       branch: { name: q.branch, ...payload },
     } as FlowBranchDetailResponse;
   }, "getBranchDetail");
+}
+
+/** "HOD Assigned Task" filter mode for the Overview card redesign
+ *  (2026-08-12) — all-time, no period/date param. */
+export function getBranchHodAssigned(
+  email: string,
+  branch: string,
+): Promise<{ branch: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ branch: z.string().min(1).max(200) }).parse({ branch });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityHodAssignedPayload("branch", q.branch);
+    return { branch: { name: q.branch, ...payload } };
+  }, "getBranchHodAssigned");
+}
+
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign) —
+ *  all-time, no period/date param. */
+export function getBranchCeoAssigned(
+  email: string,
+  branch: string,
+): Promise<{ branch: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ branch: z.string().min(1).max(200) }).parse({ branch });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityCeoAssignedPayload("branch", q.branch);
+    return { branch: { name: q.branch, ...payload } };
+  }, "getBranchCeoAssigned");
 }

@@ -7,8 +7,14 @@
 // control.load on open). Editing warns with live pending counts before
 // saving, same safety pattern as the single-task Edit hub tab.
 import * as React from "react";
-import type { FlowTemplateGroupControl, FlowTemplateGroupTaskInput } from "./types";
+import type {
+  CreateCategoryResult,
+  FlowCategoryOption,
+  FlowTemplateGroupControl,
+  FlowTemplateGroupTaskInput,
+} from "./types";
 import { SubtaskListEditor } from "./subtask-list-editor";
+import { CategoryPicker } from "./category-picker";
 
 const TASK_MAX = 20;
 
@@ -17,21 +23,37 @@ export function TemplateGroupFormModal({
   groupId,
   onClose,
   label = "Template",
+  categories,
+  onCreateCategory,
 }: {
   control: FlowTemplateGroupControl;
   groupId?: string;
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
   label?: "Template" | "Package";
+  /** Task Category ("Type", 2026-08-15) — active categories for this
+   *  template/package's own Type dropdown (ONE per group, a sibling of
+   *  `name` — not per-task), same prop shape as AssignTaskForm's. Omit or
+   *  pass an empty array to hide the dropdown entirely (e.g. before any
+   *  category exists). */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" — see AssignTaskForm's own doc comment; same
+   *  gate (canManageTaskTemplateGroups), passed by both pages identically. */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
 }) {
   const isEdit = Boolean(groupId);
   const labelLower = label.toLowerCase();
   const [name, setName] = React.useState("");
+  const [categoryId, setCategoryId] = React.useState("");
   const [tasks, setTasks] = React.useState<FlowTemplateGroupTaskInput[]>([{ title: "", subtasks: [] }]);
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [loading, setLoading] = React.useState(isEdit);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+  // Inline "+ Add new type" (2026-08-12): categories start from the prop,
+  // then grow locally as this session creates new ones — no page refresh
+  // needed to pick a category you just added.
+  const [localCategories, setLocalCategories] = React.useState(categories ?? []);
 
   React.useEffect(() => {
     if (!groupId) return;
@@ -44,6 +66,7 @@ export function TemplateGroupFormModal({
         return;
       }
       setName(result.group.name);
+      setCategoryId(result.group.categoryId ?? "");
       setTasks(result.group.tasks.map((t) => ({ id: t.id, title: t.title, subtasks: t.subtasks })));
       setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
     });
@@ -100,8 +123,8 @@ export function TemplateGroupFormModal({
         }
       }
       const result = isEdit
-        ? await control.edit(groupId as string, { name: trimmedName, tasks: cleanTasks })
-        : await control.create({ name: trimmedName, tasks: cleanTasks });
+        ? await control.edit(groupId as string, { name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks })
+        : await control.create({ name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks });
       if (result.ok) {
         onClose();
       } else {
@@ -142,6 +165,14 @@ export function TemplateGroupFormModal({
                 className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               />
             </label>
+
+            <CategoryPicker
+              value={categoryId}
+              onChange={setCategoryId}
+              categories={localCategories}
+              onCreateCategory={onCreateCategory}
+              onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+            />
 
             {tasks.map((task, index) => (
               <div key={taskKeys[index]} className="rounded-2xl border border-gray-200 p-3 dark:border-slate-800">

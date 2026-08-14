@@ -8,6 +8,13 @@ export type FlowPeriod = "daily" | "monthly";
  *  Next.js masks thrown action error messages in production. */
 export type ActionResult = { ok: true } | { ok: false; message: string };
 export type AssignActionResult = { ok: true; created: number } | { ok: false; message: string };
+/** The assign form's inline "+ Add new type" action (2026-08-12) — the ONLY
+ *  way to create a category (2026-08-15: the standalone admin page was
+ *  removed). Returns the newly created category's real id/name so the form
+ *  can select it immediately without a placeholder id. */
+export type CreateCategoryResult =
+  | { ok: true; id: string; name: string }
+  | { ok: false; message: string };
 /** The Proof column's upload action (2026-07-30): returns the (possibly
  *  new) Proof id so the row can show the 📎 immediately, without waiting
  *  for the server payload to refresh. */
@@ -58,6 +65,9 @@ export interface FlowTaskRow {
   /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
    *  viewer; image served by /api/task-manager/guideline-image/[id]. */
   guideline?: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  categoryId: string | null;
+  categoryName: string | null;
   /** Who assigned the task — the "Assigned by" column in the personal My
    *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
    *  undefined elsewhere (column shows a dash). */
@@ -310,6 +320,12 @@ export interface FlowAssignInput {
    *  the created tasks to that template (template deletion cancels its
    *  still-pending assignments). */
   fromTemplateId?: string;
+  /** Task Category ("Type", 2026-08-12) — set ONCE at assignment time,
+   *  never editable afterward. Omit/undefined = Uncategorized. Every
+   *  RunBlock this assignment creates (all recipients × days, and every
+   *  subtask) gets this SAME categoryId — same fan-out shape as
+   *  guidelineId. */
+  categoryId?: string;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -319,6 +335,13 @@ export interface FlowAssignInput {
    *  this form. Which options are even choosable depends on the targeted
    *  assignee(s) — see visibleCadenceOptions. */
   cadence: CadenceOption;
+}
+
+/** Assign form's flat Category picker option (2026-08-12) — active
+ *  categories only, see data/task-categories.ts's listActiveTaskCategories. */
+export interface FlowCategoryOption {
+  id: string;
+  name: string;
 }
 
 export type CadenceOption = FlowPeriod | "adhoc";
@@ -343,6 +366,7 @@ export interface FlowTemplateDetail {
   title: string;
   subtasks: string[];
   cadence: CadenceOption | null;
+  categoryId: string | null;
   guidelineUrl: string | null;
   guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
 }
@@ -441,6 +465,11 @@ export interface FlowTemplateGroupDetail {
   id: string;
   name: string;
   tasks: FlowTemplateGroupTask[];
+  /** Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+   *  the group (a sibling of `name`, not a per-task field) — distinct from
+   *  TaskTemplate.categoryId, which is per-task and only used by the
+   *  single-task "+ Task" form's own Type dropdown. null = uncategorized. */
+  categoryId: string | null;
 }
 
 /** Task shape submitted from the Create/Edit form — `id` present only for
@@ -511,11 +540,12 @@ export interface FlowTemplateGroupControl {
   load: (groupId: string) => Promise<TemplateGroupLoadResult>;
   create: (input: {
     name: string;
+    categoryId?: string;
     tasks: { title: string; subtasks: string[] }[];
   }) => Promise<TemplateGroupSaveResult>;
   edit: (
     groupId: string,
-    input: { name: string; tasks: FlowTemplateGroupTaskInput[] },
+    input: { name: string; categoryId?: string; tasks: FlowTemplateGroupTaskInput[] },
   ) => Promise<TemplateGroupEditResult>;
   impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
   remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
