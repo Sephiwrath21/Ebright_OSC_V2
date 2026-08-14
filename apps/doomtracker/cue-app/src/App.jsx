@@ -5638,7 +5638,7 @@ function AssigneeNameInput({ value, onFocus, onChange, onPick, placeholder, styl
   );
 }
 
-function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, deptLabel, isAdmin }) {
+function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, deptLabel, isAdmin, sidebarCollapsed, setSidebarCollapsed }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
   const [nodes, setNodes] = useState(template.flowchart?.nodes ?? []);
@@ -5666,6 +5666,24 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
   const [link, setLink] = useState(null);       // active drag-to-connect: { from, sx, sy, x, y }
   const [editing, setEditing] = useState(null);  // inline label edit: { kind: "node"|"edge", id }
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  // Collapsing the side panels frees up canvas width on a big chart, without
+  // losing access to them — a thin strip with a toggle stays in their place.
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  // Focus mode: the whole editor becomes canvas — tabs, toolbar and the main
+  // Flowghan sidebar all get out of the way, and Shapes/Shortcuts dock in their
+  // own bars above/below the canvas instead of squeezing or covering it.
+  // Workflow rules go back to living in the inspector once you exit, which is
+  // when you'd check them anyway.
+  const [focusMode, setFocusMode] = useState(false);
+  // Both bars can collapse to a thin strip so they only take canvas space when
+  // actually wanted — Shortcuts starts collapsed since it's reference, not needed
+  // every time; Shapes starts open since you need it right away to draw.
+  const [focusShapesCollapsed, setFocusShapesCollapsed] = useState(false);
+  const [focusShortcutsCollapsed, setFocusShortcutsCollapsed] = useState(true);
+  const sidebarWasCollapsed = useRef(sidebarCollapsed);
+  const enterFocusMode = () => { sidebarWasCollapsed.current = sidebarCollapsed; setSidebarCollapsed(true); setFocusMode(true); };
+  const exitFocusMode = () => { setSidebarCollapsed(sidebarWasCollapsed.current); setFocusMode(false); };
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [guides, setGuides] = useState([]);   // alignment guide lines while dragging
@@ -6034,10 +6052,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
     let x = Math.max(0, Math.round((p.x - dc.dx) / FC_SNAP) * FC_SNAP);
     let y = Math.max(0, Math.round((p.y - dc.dy) / FC_SNAP) * FC_SNAP);
     if (dc.ids.length === 1) {
+      // Guides are shown as a hint only — the shape still follows the cursor
+      // exactly, it doesn't get pulled onto the line. Drop the `x`/`y` this
+      // returns; keep only the guide lines to draw.
       const others = nodes.filter((n) => n.id !== dc.id).map((n) => ({ ...n, ...fcNodeSize(n) }));
-      const snapped = fcSnapGuides({ x, y, w, h }, others);
-      x = snapped.x; y = snapped.y;
-      setGuides(snapped.guides);
+      setGuides(fcSnapGuides({ x, y, w, h }, others).guides);
     } else {
       setGuides([]);
     }
@@ -6074,6 +6093,45 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
       drag.current = null;
     }
     setGuides([]);
+  };
+
+  // Drag/pan/resize/link/box-select gestures track the mouse on the whole
+  // window rather than just the canvas div — otherwise the cursor crossing
+  // the visible edge of the canvas (which happens well before you're done
+  // placing a shape on a big chart) would end the gesture right there via
+  // mouseleave, making it impossible to drag anything past that edge.
+  useEffect(() => {
+    window.addEventListener("mousemove", onCanvasMove);
+    window.addEventListener("mouseup", onCanvasUp);
+    return () => {
+      window.removeEventListener("mousemove", onCanvasMove);
+      window.removeEventListener("mouseup", onCanvasUp);
+    };
+  });
+
+  // Where a click-added shape (as opposed to a drag-dropped one, which already
+  // lands exactly where it's released) should appear. Anchor next to whichever
+  // shape is currently selected — that's "where you're working" far more
+  // reliably than the middle of the screen, which can be empty space once
+  // you're zoomed out and the chart only fills a corner of the view. Only
+  // when nothing is selected (e.g. an empty canvas) do we fall back to the
+  // middle of the current view.
+  const addShapeAtViewCenter = (type) => {
+    const { w, h } = fcSize(type);
+    const anchor = nodes.find((n) => n.id === selNode);
+    if (anchor) {
+      const s = fcNodeSize(anchor);
+      addShape(type, anchor.x + s.w + 60, anchor.y);
+      return;
+    }
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) { addShape(type); return; }
+    // Fan consecutive clicks out diagonally so they don't stack exactly on top
+    // of each other when the view hasn't moved between clicks.
+    const stagger = (nodes.length % 5) * 30;
+    const cx = (rect.width / 2 - view.tx) / view.scale + stagger;
+    const cy = (rect.height / 2 - view.ty) / view.scale + stagger;
+    addShape(type, cx - w / 2, cy - h / 2);
   };
 
   const zoomBy = (factor) => setView((v) => ({ ...v, scale: Math.min(2, Math.max(0.4, +(v.scale * factor).toFixed(2))) }));
@@ -6294,7 +6352,9 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
       if (typing) return;
       if (fcMode !== "flowchart") return;   // Delete only affects the canvas, not the editor list
       if (!canEdit) return;
+      if (e.key === "Escape" && focusMode) { exitFocusMode(); return; }
       if (e.key === "Escape" && traceEnd) { setTraceEnd(null); return; }
+      if (/^[1-5]$/.test(e.key)) { e.preventDefault(); addShapeAtViewCenter(FC_SHAPES[Number(e.key) - 1].type); return; }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selNodes.length) { e.preventDefault(); deleteNodes(selNodes); }
         else if (selEdge) { e.preventDefault(); deleteEdge(selEdge); }
@@ -6302,7 +6362,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selNodes, selEdge, editing, undoStack, redoStack, nodes, edges, fcMode, traceEnd, preview, canEdit]);
+  }, [selNodes, selEdge, editing, undoStack, redoStack, nodes, edges, fcMode, traceEnd, preview, canEdit, focusMode]);
 
   const selectedNode = nodes.find((n) => n.id === selNode);
   const selectedEdge = edges.find((e) => e.id === selEdge);
@@ -6318,6 +6378,47 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
   const proofNode = nodes.find((n) => n.id === proofFor);
   const currentProof = pendingProof || proofNode?.proof || null;
 
+  // Shared between the docked Shapes palette and the floating one in focus mode.
+  const shapeButtons = FC_SHAPES.map((s, i) => (
+    <button
+      key={s.type}
+      onClick={() => addShapeAtViewCenter(s.type)}
+      draggable
+      onDragStart={(e) => e.dataTransfer.setData("fc-shape", s.type)}
+      title={`${s.hint} (press ${i + 1})`}
+      style={{
+        display: "flex", alignItems: "center", gap: 9, background: s.bg, border: `1.5px solid ${s.border}`,
+        borderRadius: 8, cursor: "grab", padding: "8px 10px", textAlign: "left",
+      }}
+    >
+      <span style={{ width: 16, height: 16, flexShrink: 0, background: s.border, borderRadius: s.type === "start" || s.type === "end" ? 999 : 3, transform: s.type === "decision" ? "rotate(45deg) scale(0.8)" : s.type === "io" ? "skewX(-18deg)" : "none" }} />
+      <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 600, color: s.border }}>{s.name}</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: s.border, opacity: 0.6, marginLeft: 1 }}>{i + 1}</span>
+    </button>
+  ));
+
+  // Shared between the docked Shortcuts panel and the floating one in focus mode.
+  const shortcutRows = [
+    ["Add shape", "Drag / click / 1–5"],
+    ["Rename", "Double-click"],
+    ["Connect", "Drag blue dot"],
+    ["Move shape", "Drag"],
+    ["Resize", "Drag corners"],
+    ["Multi-select", "Shift+drag / click"],
+    ["Delete", "Del / ⌫"],
+    ["Undo", "Ctrl + Z"],
+    ["Redo", "Ctrl + Y"],
+    ["Copy / Paste", "Ctrl + C / V"],
+    ["Zoom", "Ctrl + Scroll"],
+    ["Fit to screen", "Ctrl+Shift+H"],
+    ["Pan", "Drag canvas"],
+  ].map(([action, keys]) => (
+    <div key={action} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexShrink: 0 }}>
+      <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, whiteSpace: "nowrap" }}>{action}</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 500, color: C.inkSoft, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 7px", whiteSpace: "nowrap" }}>{keys}</span>
+    </div>
+  ));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Dashes crawling along a lit route, so its direction reads at a glance.
@@ -6327,11 +6428,12 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
         .fc-flow { animation: fcFlow 1s linear infinite; }
         @media (prefers-reduced-motion: reduce) { .fc-flow { animation: none; } }
       `}</style>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, flexShrink: 0 }}>
-        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 12px", fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate }}>
+      {!focusMode && (
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", rowGap: 10, gap: 14, marginBottom: 18, flexShrink: 0 }}>
+        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: "pointer", padding: "7px 12px", fontFamily: "'Work Sans', sans-serif", fontSize: 13, color: C.slate }}>
           <ChevronLeft size={15} /> Library
         </button>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
           {editingName ? (
             <input
               autoFocus
@@ -6382,21 +6484,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
           </button>
         </div>
         {fcMode === "flowchart" && (<>
-        {canEdit && (
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={undo} disabled={!undoStack.length} title="Undo (Ctrl+Z)" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: undoStack.length ? "pointer" : "not-allowed", color: undoStack.length ? C.ink : C.slateLight }}>
-            <Undo2 size={16} />
-          </button>
-          <button onClick={redo} disabled={!redoStack.length} title="Redo (Ctrl+Shift+Z)" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, cursor: redoStack.length ? "pointer" : "not-allowed", color: redoStack.length ? C.ink : C.slateLight }}>
-            <Redo2 size={16} />
-          </button>
-        </div>
-        )}
         <div
           onClick={() => { if (!valid) { const first = errors.find((e) => e.nodeId || e.edgeId); if (first) focusError(first); } }}
           title={valid ? "" : "Click to jump to the first issue"}
           style={{
-            display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9,
+            display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, flexShrink: 0,
             fontFamily: "'Work Sans', sans-serif", fontSize: 13, fontWeight: 600,
             background: valid ? "#E8F3EC" : "#FBEAE8", color: valid ? C.sageDeep : "#B23A2E",
             border: `1px solid ${valid ? "#Bfe0Cc" : "#F0C9C4"}`,
@@ -6449,11 +6541,21 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
             </>
           )}
         </div>
+        {canEdit && (
+          <button
+            onClick={enterFocusMode}
+            title="Draw full-screen, distraction-free — shapes and shortcuts float on the canvas, workflow rules wait until you exit"
+            style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 13px", fontFamily: "'Work Sans', sans-serif", fontSize: 13, fontWeight: 600, color: C.ink, cursor: "pointer" }}
+          >
+            <Maximize size={15} /> Focus mode
+          </button>
+        )}
         </>)}
       </div>
+      )}
 
       {/* Trace bar — when the workflow has more than one ending, light one route at a time */}
-      {fcMode === "flowchart" && endNodes.length > 1 && nodes.some((n) => n.type === "start") && (
+      {!focusMode && fcMode === "flowchart" && endNodes.length > 1 && nodes.some((n) => n.type === "start") && (
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", marginBottom: 14, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, flexShrink: 0 }}>
         <span style={{ ...labelStyle, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}><GitBranch size={13} /> Show route to</span>
         <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, overflowX: "auto", minWidth: 0 }}>
@@ -6552,40 +6654,69 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
       </div>
       )}
 
+      {/* Focus mode: Shapes and Shortcuts dock in their own bars above and
+          below the canvas instead of docking beside it or floating over it —
+          so the canvas itself stays completely free to draw on. Each bar
+          collapses to a thin strip when you don't need it, to give back
+          even more of that space. */}
+      {focusMode && (
+      <div style={{ ...panelCard, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, flexShrink: 0, padding: focusShapesCollapsed ? "6px 16px" : 16 }}>
+        <button
+          onClick={() => setFocusShapesCollapsed((v) => !v)}
+          title={focusShapesCollapsed ? "Show shapes" : "Hide shapes"}
+          style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+        >
+          <ChevronDown size={14} color={C.slate} style={{ transform: focusShapesCollapsed ? "none" : "rotate(180deg)", transition: "transform 0.15s" }} />
+          <span style={labelStyle}>Shapes</span>
+        </button>
+        {!focusShapesCollapsed && shapeButtons}
+        <div style={{ flex: 1, minWidth: 8 }} />
+        <button
+          onClick={exitFocusMode}
+          title="Exit focus mode (Esc) — you'll see workflow rules again to fix anything"
+          style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, background: C.ink, color: "#fff", border: "none", borderRadius: 8, padding: "8px 13px", fontFamily: "'Work Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+        >
+          <X size={15} /> Exit focus mode
+        </button>
+      </div>
+      )}
+
       {fcMode === "flowchart" && (
       <div style={{ display: "flex", gap: 16, alignItems: "stretch", flex: 1, minHeight: 0 }}>
-        {/* Palette */}
-        {canEdit ? (
-        <div style={{ ...panelCard, width: 158, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Palette — collapsible so a big chart can use the width it frees up.
+            Collapsed, it's a thin strip with just a chevron to bring it back.
+            In focus mode it doesn't dock here at all — it moves into the
+            Shapes bar above the canvas. */}
+        {!focusMode && (paletteCollapsed ? (
+        <button
+          onClick={() => setPaletteCollapsed(false)}
+          title="Show shapes panel"
+          style={{ ...panelCard, width: 22, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", color: C.slate }}
+        >
+          <ChevronRight size={15} />
+        </button>
+        ) : canEdit ? (
+        <div style={{ ...panelCard, width: 158, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, position: "relative" }}>
+          <button onClick={() => setPaletteCollapsed(true)} title="Hide shapes panel" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: C.slateLight }}>
+            <ChevronLeft size={14} />
+          </button>
           <span style={labelStyle}>Shapes</span>
-          {FC_SHAPES.map((s) => (
-            <button
-              key={s.type}
-              onClick={() => addShape(s.type)}
-              draggable
-              onDragStart={(e) => e.dataTransfer.setData("fc-shape", s.type)}
-              title={s.hint}
-              style={{
-                display: "flex", alignItems: "center", gap: 9, background: s.bg, border: `1.5px solid ${s.border}`,
-                borderRadius: 8, cursor: "grab", padding: "8px 10px", textAlign: "left",
-              }}
-            >
-              <span style={{ width: 16, height: 16, flexShrink: 0, background: s.border, borderRadius: s.type === "start" || s.type === "end" ? 999 : 3, transform: s.type === "decision" ? "rotate(45deg) scale(0.8)" : s.type === "io" ? "skewX(-18deg)" : "none" }} />
-              <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 600, color: s.border }}>{s.name}</span>
-            </button>
-          ))}
+          {shapeButtons}
           <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: C.slateLight, margin: "4px 0 0", lineHeight: 1.45 }}>
             Drag a shape onto the canvas (or click to add). Double-click to rename. Drag a blue dot onto another shape to connect. Shift+drag empty space to box-select; Shift+click to add. Drag empty space to pan · Ctrl+scroll to zoom.
           </p>
         </div>
         ) : (
-        <div style={{ ...panelCard, width: 158, flexShrink: 0 }}>
+        <div style={{ ...panelCard, width: 158, flexShrink: 0, position: "relative" }}>
+          <button onClick={() => setPaletteCollapsed(true)} title="Hide panel" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: C.slateLight }}>
+            <ChevronLeft size={14} />
+          </button>
           <span style={labelStyle}>View only</span>
           <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight, margin: "8px 0 0", lineHeight: 1.5 }}>
             Optimisation manages this flowchart's structure. Switch to Entry, Gantt, Editor or Kanban to set due dates and assignees.
           </p>
         </div>
-        )}
+        ))}
 
         {/* Canvas */}
         <div
@@ -6603,9 +6734,6 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
               startPan(e);
             }
           }}
-          onMouseMove={onCanvasMove}
-          onMouseUp={onCanvasUp}
-          onMouseLeave={onCanvasUp}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -6800,11 +6928,27 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
             <button onClick={() => zoomBy(1.1)} title="Zoom in" style={fcZoomBtn}>+</button>
             <button onClick={fitView} title="Fit to screen (Ctrl+Shift+H)" style={fcZoomBtn}><Maximize size={14} /></button>
           </div>
+
         </div>
 
-        {/* Inspector + validation */}
+        {/* Inspector + validation — collapsible for the same reason as the palette.
+            The "Valid workflow" badge stays up in the toolbar either way, so
+            collapsing this never hides whether the chart is valid. In focus
+            mode it doesn't render at all — Workflow rules wait until you exit. */}
+        {!focusMode && (inspectorCollapsed ? (
+        <button
+          onClick={() => setInspectorCollapsed(false)}
+          title="Show inspector panel"
+          style={{ ...panelCard, width: 22, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", color: C.slate }}
+        >
+          <ChevronLeft size={15} />
+        </button>
+        ) : (
         <div style={{ width: 258, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={panelCard}>
+          <div style={{ ...panelCard, position: "relative" }}>
+            <button onClick={() => setInspectorCollapsed(true)} title="Hide inspector panel" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: C.slateLight }}>
+              <ChevronRight size={14} />
+            </button>
             {selNodes.length > 1 ? (
               <>
                 <span style={labelStyle}>{selNodes.length} shapes selected</span>
@@ -6905,29 +7049,25 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
           <div style={panelCard}>
             <span style={labelStyle}>Shortcuts</span>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                ["Add shape", "Drag / click"],
-                ["Rename", "Double-click"],
-                ["Connect", "Drag blue dot"],
-                ["Move shape", "Drag"],
-                ["Resize", "Drag corners"],
-                ["Multi-select", "Shift+drag / click"],
-                ["Delete", "Del / ⌫"],
-                ["Undo", "Ctrl + Z"],
-                ["Redo", "Ctrl + Y"],
-                ["Copy / Paste", "Ctrl + C / V"],
-                ["Zoom", "Ctrl + Scroll"],
-                ["Fit to screen", "Ctrl+Shift+H"],
-                ["Pan", "Drag canvas"],
-              ].map(([action, keys]) => (
-                <div key={action} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate }}>{action}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 500, color: C.inkSoft, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 7px", whiteSpace: "nowrap" }}>{keys}</span>
-                </div>
-              ))}
+              {shortcutRows}
             </div>
           </div>
         </div>
+        ))}
+      </div>
+      )}
+
+      {focusMode && (
+      <div style={{ ...panelCard, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 14, maxHeight: focusShortcutsCollapsed ? "none" : 90, overflowY: "auto", flexShrink: 0, padding: focusShortcutsCollapsed ? "6px 16px" : 16 }}>
+        <button
+          onClick={() => setFocusShortcutsCollapsed((v) => !v)}
+          title={focusShortcutsCollapsed ? "Show shortcuts" : "Hide shortcuts"}
+          style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+        >
+          <ChevronDown size={14} color={C.slate} style={{ transform: focusShortcutsCollapsed ? "none" : "rotate(180deg)", transition: "transform 0.15s" }} />
+          <span style={labelStyle}>Shortcuts</span>
+        </button>
+        {!focusShortcutsCollapsed && shortcutRows}
       </div>
       )}
 
@@ -9989,7 +10129,7 @@ export default function App() {
           // uses the flowchart editor (with approval sending + per-subtask proof).
           const LEGACY_TEMPLATE_IDS = ["showcase-template", "minus-week-15", "parent-confirmation"];
           if (t && !LEGACY_TEMPLATE_IDS.includes(t.id)) {
-            return <FlowchartCanvas key={t.id} template={t} onBack={() => setTab("library")} onRename={(name) => renameTemplate(t.id, name, activeTemplates, persistActiveTemplates)} onSave={(flowchart) => persistActiveTemplates(activeTemplates.map((x) => (x.id === t.id ? { ...x, flowchart } : x)))} onDuplicate={() => handleDuplicateTemplate(t.id, activeTemplates, persistActiveTemplates)} deptLabel={libraryDept || null} isAdmin={isAdmin} />;
+            return <FlowchartCanvas key={t.id} template={t} onBack={() => setTab("library")} onRename={(name) => renameTemplate(t.id, name, activeTemplates, persistActiveTemplates)} onSave={(flowchart) => persistActiveTemplates(activeTemplates.map((x) => (x.id === t.id ? { ...x, flowchart } : x)))} onDuplicate={() => handleDuplicateTemplate(t.id, activeTemplates, persistActiveTemplates)} deptLabel={libraryDept || null} isAdmin={isAdmin} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} />;
           }
           return <TemplateEditor templateId={openTemplateId} templates={activeTemplates} setTemplates={persistActiveTemplates} onBack={() => setTab("library")} onRunWorkflow={handleRunWorkflow} />;
         })()}
