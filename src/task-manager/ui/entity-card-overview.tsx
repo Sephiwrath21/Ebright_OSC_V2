@@ -397,7 +397,14 @@ export function EntityCardOverview({
                       </div>
                     </div>
                   ) : (
-                  <div className="px-3 py-1">
+                  <div
+                    // Scrollable body (2026-08-15) — OTHER people's cards
+                    // only, same treatment as the Type-sort card grid: a
+                    // capped height with both-axis scroll instead of an
+                    // ever-growing card in a "View All" grid. The own card
+                    // (checkboxes/resize/weekday-tabs) is unaffected.
+                    className={`px-3 py-1 ${isOwnCard ? "" : "max-h-80 overflow-auto"}`}
+                  >
                     {card.tasks.length === 0 ? (
                       <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
                     ) : (
