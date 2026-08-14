@@ -175,36 +175,35 @@ export function TemplateGroupFormModal({
 
             {tasks.map((task, index) => (
               <div key={taskKeys[index]} className="rounded-2xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="flex-1 text-sm text-gray-600">
-                    Task {index + 1}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-gray-600">Task {index + 1}</p>
+                    <CategoryPicker
+                      value={task.categoryId ?? ""}
+                      onChange={(categoryId) => updateCategory(index, categoryId)}
+                      categories={localCategories}
+                      onCreateCategory={onCreateCategory}
+                      onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+                    />
                     <input
                       value={task.title}
                       onChange={(e) => updateTitle(index, e.target.value)}
                       placeholder="Task title"
+                      aria-label={`Task ${index + 1} title`}
                       maxLength={200}
-                      className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                      className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
                     />
-                  </label>
+                  </div>
                   {tasks.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeTask(index)}
                       aria-label={`Remove task ${index + 1}`}
-                      className="mt-5 shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                      className="mt-6 shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                     >
                       ✕
                     </button>
                   )}
-                </div>
-                <div className="mt-2">
-                  <CategoryPicker
-                    value={task.categoryId ?? ""}
-                    onChange={(categoryId) => updateCategory(index, categoryId)}
-                    categories={localCategories}
-                    onCreateCategory={onCreateCategory}
-                    onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
-                  />
                 </div>
                 <div className="ml-4 mt-2 border-l-2 border-gray-200 pl-3">
                   <SubtaskListEditor subtasks={task.subtasks} onChange={(next) => updateSubtasks(index, next)} />
