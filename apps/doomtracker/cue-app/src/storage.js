@@ -217,6 +217,16 @@ export async function listPeople() {
   return res.json(); // [{ name, email }, ...]
 }
 
+// Searches the real HRFS employee directory (name -> email), for autofilling
+// assignee fields. Unlike listPeople() above, this isn't limited to people who
+// already have a Flowghan account. Returns [] on error so a flaky lookup never
+// blocks typing a name in by hand.
+export async function searchEmployees(q) {
+  const res = await apiFetch(`/api/hrfs/employees?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
+  return res.json(); // [{ name, email }, ...]
+}
+
 // Admin-only, read-only company overview: every department's templates + runsheets.
 export async function getDepartmentsOverview() {
   const res = await apiFetch("/api/admin/overview");

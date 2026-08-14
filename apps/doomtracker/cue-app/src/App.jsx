@@ -4,7 +4,7 @@ import {
   Circle, CheckCircle2, AlertTriangle, Clock, ChevronRight, ChevronLeft, X, Trash2,
   Send, Sparkles, BookOpen, Play, CheckSquare, BarChart2, GripVertical, ListTodo, Braces, Paperclip, Grid, GitMerge, Link, Square, Type, Minus, MousePointer, Diamond, Undo2, Redo2, LogOut, Folder, ChevronDown, Pencil, Maximize, Lock, Upload, Eye, Download, ClipboardList, Copy, ExternalLink, Kanban, Filter, ArrowUpDown, Check, Table2, GanttChart, Key
 } from "lucide-react";
-import { storage, login, logout, ssoLogin, getCurrentUser, sendNotification, setAuthExpiredHandler, setSaveErrorHandler, listUsers, createUser, updateUser, getDepartmentsOverview, listPeople, adminGetSetting, adminSetSetting } from "./storage";
+import { storage, login, logout, ssoLogin, getCurrentUser, sendNotification, setAuthExpiredHandler, setSaveErrorHandler, listUsers, createUser, updateUser, getDepartmentsOverview, listPeople, searchEmployees, adminGetSetting, adminSetSetting } from "./storage";
 
 // EMBEDDED = this is the build served inside the Ebright portal (base
 // /flowghan-embed/). In that mode there is no password login — the app signs in
@@ -4880,7 +4880,7 @@ const FC_FIELD_TYPES = [
   { type: "longtext", label: "Long text" },
   { type: "date", label: "Date" },
   { type: "number", label: "Number" },
-  { type: "dropdown", label: "Dropdown" },
+  { type: "dropdown", label: "Option" },
   { type: "multiselect", label: "Multi-select" },
   { type: "checkbox", label: "Checkbox" },
   { type: "file", label: "File upload" },
@@ -5580,6 +5580,64 @@ function FcPreview({ nodes, edges, name, endNodes, traceEnd, setTraceEnd, routes
 }
 const fcPrevBtn = { display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: "rgba(255,255,255,0.8)" };
 
+// "Assignee name" input with HRFS-backed autocomplete: as the HOD types, it
+// looks up matching active employees and offers them in a dropdown; picking
+// one fills both this name field and the paired email field via onPick, so
+// the HOD never has to type (or mistype) a Gmail address by hand. Free typing
+// without picking a suggestion still works exactly as before.
+function AssigneeNameInput({ value, onFocus, onChange, onPick, placeholder, style, wrapStyle }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const boxRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    const onDocMouseDown = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    onChange(v);
+    setOpen(true);
+    clearTimeout(debounceRef.current);
+    const q = v.trim();
+    if (q.length < 2) { setSuggestions([]); setLoading(false); return; }
+    setLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      const results = await searchEmployees(q);
+      setSuggestions(results);
+      setLoading(false);
+    }, 250);
+  };
+
+  return (
+    <div ref={boxRef} style={{ position: "relative", ...wrapStyle }}>
+      <input value={value || ""} onFocus={(e) => { onFocus?.(e); if (suggestions.length > 0) setOpen(true); }} onChange={handleChange} placeholder={placeholder} autoComplete="off" style={style} />
+      {open && (loading || suggestions.length > 0) && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20, marginTop: 3, background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, boxShadow: "0 6px 18px rgba(28,27,42,0.14)", maxHeight: 190, overflowY: "auto" }}>
+          {loading && (
+            <div style={{ padding: "8px 10px", fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight }}>Searching…</div>
+          )}
+          {!loading && suggestions.map((p) => (
+            <div key={p.email} onMouseDown={() => { onPick(p); setOpen(false); }}
+              style={{ padding: "7px 10px", cursor: "pointer" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = C.paperDim; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+              <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, fontWeight: 600, color: C.ink }}>{p.name}</div>
+              <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: C.slateLight }}>{p.email}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, deptLabel, isAdmin }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
@@ -6081,7 +6139,17 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
     setShowOffBranch(false);
     setFcMode("flowchart");
   };
-  const setAssignee = (id, field, value) => patchNode(id, { assignee: { name: "", email: "", ...(nodes.find((n) => n.id === id)?.assignee), [field]: value } });
+  // Clearing the name entirely also clears the email: with autofill now
+  // setting both together, an emptied name field means "remove this
+  // assignee", not "keep them assigned but nameless" — otherwise the Gmail
+  // and the Assignees bar (keyed off email) would keep showing someone the
+  // name field no longer names.
+  const assigneePatch = (current, field, value) => {
+    const patch = { ...(current || {}), [field]: value };
+    if (field === "name" && !value.trim()) patch.email = "";
+    return patch;
+  };
+  const setAssignee = (id, field, value) => patchNode(id, { assignee: assigneePatch({ name: "", email: "", ...(nodes.find((n) => n.id === id)?.assignee) }, field, value) });
   const setDue = (id, due) => patchNode(id, { due });
   // Entry-stage status is independent of the Editor/Kanban `done` flag (fcNodeDone
   // and its call sites are untouched), but setting it to "done" here also flips
@@ -6479,8 +6547,8 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
             ));
           })()}
         </div>
-        <button onClick={() => setShowOutbox(true)} title="Preview the reminder emails" style={fcBarBtn}><Mail size={14} /> Outbox</button>
-        <button onClick={() => setShowTeam(true)} title="Set the HOD & CEO email addresses" style={fcBarBtn}><Users size={14} /> Team</button>
+        <button onClick={() => setShowOutbox(true)} title="Preview the reminder emails" style={fcBarBtn}><Mail size={14} /> Reminder Emails</button>
+        <button onClick={() => setShowTeam(true)} title="Set the HOD & CEO email addresses" style={fcBarBtn}><Users size={14} /> HOD &amp; CEO Emails</button>
       </div>
       )}
 
@@ -7225,7 +7293,9 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                       )}
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <label style={{ flex: "1 1 160px", fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate }}>Assignee name
-                          <input value={n.assignee?.name || ""} onFocus={record} onChange={(e) => setAssignee(n.id, "name", e.target.value)} placeholder="e.g. Aisha Rahman" style={inputStyle} />
+                          <AssigneeNameInput value={n.assignee?.name || ""} onFocus={record} onChange={(v) => setAssignee(n.id, "name", v)}
+                            onPick={(p) => patchNode(n.id, { assignee: { ...(n.assignee || {}), name: p.name, email: p.email } })}
+                            placeholder="e.g. Aisha Rahman" style={inputStyle} />
                         </label>
                         <label style={{ flex: "1 1 180px", fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate }}>Assignee Gmail
                           <input type="email" value={n.assignee?.email || ""} onFocus={record} onChange={(e) => setAssignee(n.id, "email", e.target.value)} placeholder="name@gmail.com" style={inputStyle} />
@@ -7373,6 +7443,8 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                               const subWho = subInherit
                                 ? (n.assignee?.name || n.assignee?.email || "the task's assignee")
                                 : (s.assignee?.name || s.assignee?.email);
+                              const subDueInherit = !(s.due || "").trim();
+                              const subDue = subDueInherit ? n.due : s.due;
                               return (
                               <div key={s.id} ref={(el) => { editorRefs.current[`sub-${n.id}-${s.id}`] = el; }} style={{ display: "flex", flexDirection: "column", gap: 8, background: flashItem === `sub-${n.id}-${s.id}` ? "#FBF3E7" : C.paper, border: `1px solid ${flashItem === `sub-${n.id}-${s.id}` ? C.spotlight : C.line}`, borderRadius: 8, padding: "8px 10px", transition: "background 0.4s, border-color 0.4s" }}>
                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -7397,13 +7469,21 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                                 })()}
                                </div>
                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 23 }}>
-                                 <input value={s.assignee?.name || ""} onFocus={record} onChange={(e) => updateSubtask(n.id, s.id, { assignee: { ...(s.assignee || {}), name: e.target.value } })} placeholder={`Assignee name — blank = ${n.assignee?.name || "task's assignee"}`}
-                                   style={{ flex: "1 1 150px", minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px" }} />
+                                 <AssigneeNameInput value={s.assignee?.name || ""} onFocus={record} onChange={(v) => updateSubtask(n.id, s.id, { assignee: assigneePatch(s.assignee, "name", v) })}
+                                   onPick={(p) => updateSubtask(n.id, s.id, { assignee: { ...(s.assignee || {}), name: p.name, email: p.email } })}
+                                   placeholder={`Assignee name — blank = ${n.assignee?.name || "task's assignee"}`}
+                                   wrapStyle={{ flex: "1 1 150px", minWidth: 0 }}
+                                   style={{ width: "100%", boxSizing: "border-box", fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px" }} />
                                  <input type="email" value={s.assignee?.email || ""} onFocus={record} onChange={(e) => updateSubtask(n.id, s.id, { assignee: { ...(s.assignee || {}), email: e.target.value } })} placeholder="Different Gmail? (blank = same as task)"
                                    style={{ flex: "1 1 170px", minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px" }} />
+                                 <label style={{ flex: "0 1 150px", minWidth: 0, display: "flex", alignItems: "center", gap: 6, fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slate }}>
+                                   Due
+                                   <input type="date" value={s.due || ""} onFocus={record} title="Blank = same due date as the task" onChange={(e) => updateSubtask(n.id, s.id, { due: e.target.value })}
+                                     style={{ flex: 1, minWidth: 0, fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.ink, background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px" }} />
+                                 </label>
                                </div>
                                <div style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: C.slateLight, paddingLeft: 23 }}>
-                                 Goes to <b style={{ color: C.slate }}>{subWho}</b>{subInherit ? " (same as the task)" : ""} — they tick it off and attach proof in <b style={{ color: C.slate }}>My Work</b>.
+                                 Goes to <b style={{ color: C.slate }}>{subWho}</b>{subInherit ? " (same as the task)" : ""} — due <b style={{ color: C.slate }}>{subDue ? fcFmtDate(subDue) : "no date set"}</b>{subDueInherit ? " (same as the task)" : ""} — they tick it off and attach proof in <b style={{ color: C.slate }}>My Work</b>.
                                </div>
                                {s.proof && (
                                  <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 23 }}>
@@ -7712,7 +7792,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
           <div style={{ ...fcModal, maxWidth: 460 }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: C.ink, margin: 0 }}>Team emails</h3>
+                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: C.ink, margin: 0 }}>HOD &amp; CEO Emails</h3>
                 <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "4px 0 0" }}>Who's copied on the 24-hour reminder and the overdue escalation.</p>
               </div>
               <button onClick={() => setShowTeam(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.slate }}><X size={18} /></button>
@@ -7737,7 +7817,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
           <div style={fcModal} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: C.ink, margin: 0 }}>Reminder outbox</h3>
+                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: C.ink, margin: 0 }}>Reminder Emails</h3>
                 <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12.5, color: C.slate, margin: "4px 0 0" }}>The emails Flowghan sends for each assigned step. <b style={{ color: C.spotlight }}>“Send now” delivers a real email</b> to the recipients below.</p>
               </div>
               <button onClick={() => setShowOutbox(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.slate }}><X size={18} /></button>
