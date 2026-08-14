@@ -390,6 +390,30 @@ app.get('/api/people', auth, async (req, res) => {
   }
 });
 
+// Employee name/email lookup for the "Assignee name" autofill (searches the
+// real HRFS employee directory, unlike /api/people above which only lists
+// people who already have a Flowghan account). Read-only, any authed user —
+// an HOD may need to assign work to someone outside their own department.
+// Short queries are ignored so a stray keystroke doesn't fetch half the company.
+app.get('/api/hrfs/employees', auth, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+  try {
+    const r = await hrfsPool.query(
+      `SELECT p.full_name AS name, u.email
+       FROM user_profile p
+       JOIN users u ON u.user_id = p.user_id
+       WHERE u.status = 'active' AND p.full_name ILIKE $1
+       ORDER BY p.full_name
+       LIMIT 8`,
+      [`%${q}%`]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- NOTIFY (ad-hoc reminder email from the flowchart Outbox; no DB) ---
 app.post('/api/notify', auth, async (req, res) => {
   try {
