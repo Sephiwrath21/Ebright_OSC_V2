@@ -15,10 +15,10 @@ import type { BranchOpt, DepartmentOpt, EmployeeOverviewRow } from "@/lib/employ
 // Resignation tab's own Exit Type dropdown offers) — the badge shown here is
 // literally whatever was saved on that profile page, not a separate signal.
 const EXIT_TYPE_META: Record<string, { label: string; classes: string }> = {
-  Resignation: { label: "Resignation", classes: "bg-[#90aeee7d] text-[#390ff2]" },
-  "End of Contract": { label: "End of Contract", classes: "bg-[#67eab37d] text-[#307348]" },
-  "Internship Completed": { label: "Internship Completed", classes: "bg-[#d8a1fa7d] text-[#621096]" },
-  "Termination/Dismissal": { label: "Termination/Dismissal", classes: "bg-[#f38e8e6b] text-[#961010]" },
+  Resignation: { label: "Resignation", classes: "bg-[#90aeee7d] text-[#390ff2] dark:bg-blue-900 dark:text-blue-200" },
+  "End of Contract": { label: "End of Contract", classes: "bg-[#67eab37d] text-[#307348] dark:bg-emerald-900 dark:text-emerald-200" },
+  "Internship Completed": { label: "Internship Completed", classes: "bg-[#d8a1fa7d] text-[#621096] dark:bg-violet-900 dark:text-violet-200" },
+  "Termination/Dismissal": { label: "Termination/Dismissal", classes: "bg-[#f38e8e6b] text-[#961010] dark:bg-rose-900 dark:text-rose-200" },
 };
 
 const MONTHS = [
@@ -166,33 +166,33 @@ export default function ExitListView({
     : "grid-cols-[minmax(180px,2fr)_minmax(120px,1fr)_minmax(140px,1fr)_minmax(150px,1fr)_60px]";
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors dark:hover:text-slate-100">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors dark:hover:text-slate-100">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           {locationContext ? (
             <>
-              <Link href={`/employee-folder/exit?by=${locationContext.groupBy}`} className="hover:text-slate-900 transition-colors">
+              <Link href={`/employee-folder/exit?by=${locationContext.groupBy}`} className="hover:text-slate-900 transition-colors dark:hover:text-slate-100">
                 Exit
               </Link>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-              <span className="text-slate-900 font-medium">{locationContext.name}</span>
+              <span className="text-slate-900 font-medium dark:text-slate-100">{locationContext.name}</span>
             </>
           ) : (
-            <span className="text-slate-900 font-medium">Exit</span>
+            <span className="text-slate-900 font-medium dark:text-slate-100">Exit</span>
           )}
         </nav>
 
-        <div className="bg-white rounded-[20px] p-5 mb-3">
-          <h2 className="text-base font-medium text-black/77 mb-3">Search Filter</h2>
+        <div className="bg-white rounded-[20px] p-5 mb-3 dark:bg-slate-900">
+          <h2 className="text-base font-medium text-black/77 mb-3 dark:text-slate-200">Search Filter</h2>
 
           {/* Main row — always visible: Name search, Position, and (only for
               the combined cross-location view) separate Branch/Department
@@ -214,7 +214,7 @@ export default function ExitListView({
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               />
             </div>
             <select
@@ -223,7 +223,7 @@ export default function ExitListView({
                 setTypeFilter(e.target.value as PositionGroup | "");
                 setPage(1);
               }}
-              className="shrink-0 w-[92px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[130px]"
+              className="shrink-0 w-[92px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[130px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             >
               <option value="">All positions</option>
               {POSITION_GROUPS.map((g) => (
@@ -238,7 +238,7 @@ export default function ExitListView({
                     setBranchFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="shrink-0 w-[96px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[140px]"
+                  className="shrink-0 w-[96px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[140px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 >
                   <option value="">All branches</option>
                   {branchOptions.map((b) => (
@@ -251,7 +251,7 @@ export default function ExitListView({
                     setDepartmentFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="shrink-0 w-[104px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[160px]"
+                  className="shrink-0 w-[104px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[160px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 >
                   <option value="">All departments</option>
                   {departmentOptions.map((d) => (
@@ -272,7 +272,7 @@ export default function ExitListView({
                   setExitTypeFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[150px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="">All exit types</option>
                 {Object.entries(EXIT_TYPE_META).map(([key, meta]) => (
@@ -285,7 +285,7 @@ export default function ExitListView({
                   setMonthFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[130px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="">month</option>
                 {MONTHS.map((m) => (
@@ -298,7 +298,7 @@ export default function ExitListView({
                   setYearFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[110px]"
+                className="h-11 px-3 rounded-lg border-2 border-black/25 text-sm text-black/67 min-w-[110px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="">year</option>
                 {years.map((y) => (
@@ -313,7 +313,7 @@ export default function ExitListView({
               type="button"
               onClick={() => setAdvancedOpen((v) => !v)}
               aria-expanded={advancedOpen}
-              className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#004386c9] hover:underline"
+              className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#004386c9] hover:underline dark:text-blue-300"
             >
               {advancedOpen ? "hide advanced filters" : "advanced filters"}
               <ChevronDown className={`w-4 h-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -322,7 +322,7 @@ export default function ExitListView({
               <button
                 type="button"
                 onClick={resetFilters}
-                className="h-11 px-4 rounded-lg border-2 border-[#8ac4f3bd] text-sm font-medium text-[#004386c9] hover:bg-[#8ac4f320]"
+                className="h-11 px-4 rounded-lg border-2 border-[#8ac4f3bd] text-sm font-medium text-[#004386c9] hover:bg-[#8ac4f320] dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
               >
                 Reset
               </button>
@@ -336,14 +336,14 @@ export default function ExitListView({
           </div>
         </div>
 
-        <h1 className="text-xl font-medium text-black mb-4">Exit</h1>
+        <h1 className="text-xl font-medium text-black mb-4 dark:text-slate-100">Exit</h1>
 
         {/* Widest table in Employee Folder (up to 6 columns) — horizontal
             scroll below each column's own minmax() floor keeps every column
             reachable by swipe on mobile. The whole table (including Name)
             scrolls together as one unit — deliberately no sticky column. */}
-        <div className="bg-white rounded-[20px] overflow-x-auto">
-          <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#a4e2f480] text-[15px] font-medium text-black`}>
+        <div className="bg-white rounded-[20px] overflow-x-auto dark:bg-slate-900">
+          <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#a4e2f480] text-[15px] font-medium text-black dark:bg-slate-800 dark:text-slate-100`}>
             <span>Name</span>
             <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} label="Last Date" />
             <span>Position</span>
@@ -353,34 +353,34 @@ export default function ExitListView({
           </div>
 
           {visible.length === 0 ? (
-            <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
+            <div className="px-8 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees match these filters.</div>
           ) : (
             visible.map((row) => {
               const exitType = exitTypeByUserId?.[row.id];
               return (
                 <div
                   key={row.id}
-                  className={`grid ${gridColsClass} gap-4 px-8 h-14 items-center border-b border-black/10 last:border-b-0`}
+                  className={`grid ${gridColsClass} gap-4 px-8 h-14 items-center border-b border-black/10 last:border-b-0 dark:border-slate-800`}
                 >
                   <Link
                     href={`/employee-folder/exit/employee/${row.id}${profileQuery}`}
-                    className="text-base font-medium text-black hover:underline truncate min-w-0"
+                    className="text-base font-medium text-black hover:underline truncate min-w-0 dark:text-slate-100"
                   >
                     {row.fullName}
                   </Link>
-                  <span className="text-[15px] text-black/67 truncate">
+                  <span className="text-[15px] text-black/67 truncate dark:text-slate-300">
                     {lastWorkingDateByUserId?.[row.id] ?? row.date ?? "—"}
                   </span>
-                  <span className="text-[15px] text-black/67 truncate">{row.position ?? "—"}</span>
+                  <span className="text-[15px] text-black/67 truncate dark:text-slate-300">{row.position ?? "—"}</span>
                   {showLocation && (
-                    <span className="text-[15px] text-black/67 truncate">
+                    <span className="text-[15px] text-black/67 truncate dark:text-slate-300">
                       {row.departmentName ?? row.branchName ?? "—"}
                     </span>
                   )}
                   <span>
                     {exitType ? (
                       <span
-                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${EXIT_TYPE_META[exitType]?.classes ?? "bg-slate-100 text-slate-600"}`}
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${EXIT_TYPE_META[exitType]?.classes ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}
                       >
                         {EXIT_TYPE_META[exitType]?.label ?? exitType}
                       </span>

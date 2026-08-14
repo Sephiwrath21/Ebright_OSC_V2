@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 const fontStack =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-const RED = "#DC2626";
+// Theme-aware for text/border-only uses (byte-identical to #DC2626 in light,
+// swaps to a lighter red in dark). Solid fills carrying WHITE text/icons use
+// the fixed RED_SOLID literal instead — see per-usage comments below.
+const RED = "var(--status-red-fg)";
+const RED_SOLID = "#DC2626";
 const MAX_FILE_BYTES = 1_500_000; // ~1.5MB
 
 type Announcement = {
@@ -84,7 +88,7 @@ export default function Announcements() {
             padding: "6px 12px",
             border: "none",
             borderRadius: 8,
-            background: RED,
+            background: RED_SOLID,
             color: "#fff",
             fontSize: 12,
             fontWeight: 600,
@@ -120,8 +124,8 @@ export default function Announcements() {
               style={{
                 textAlign: "left",
                 cursor: "pointer",
-                background: "#FFFFFF",
-                border: "0.5px solid #E5E7EB",
+                background: "var(--surface)",
+                border: "0.5px solid var(--status-track)",
                 borderLeft: `3px solid ${RED}`,
                 borderRadius: 10,
                 overflow: "hidden",
@@ -149,7 +153,7 @@ export default function Announcements() {
                 <span
                   style={{
                     fontSize: 13,
-                    color: "#475569",
+                    color: "var(--status-neutral-fg-strong)",
                     lineHeight: 1.45,
                     display: "-webkit-box",
                     WebkitLineClamp: 3,
@@ -250,8 +254,9 @@ function BulletinBoard({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="dark:ring-1 dark:ring-white/10"
         style={{
-          background: "#FFFFFF",
+          background: "var(--surface)",
           borderRadius: 16,
           width: "min(760px, 100%)",
           maxHeight: "90vh",
@@ -266,7 +271,7 @@ function BulletinBoard({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "0.5px solid #E5E7EB",
+            borderBottom: "0.5px solid var(--status-track)",
           }}
         >
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: RED, letterSpacing: "0.02em" }}>
@@ -284,7 +289,7 @@ function BulletinBoard({
                   padding: "7px 14px",
                   border: "none",
                   borderRadius: 8,
-                  background: RED,
+                  background: RED_SOLID,
                   color: "#fff",
                   fontSize: 13,
                   fontWeight: 600,
@@ -315,7 +320,7 @@ function BulletinBoard({
               key={a.id}
               ref={a.id === focusId ? focusRef : undefined}
               style={{
-                border: "0.5px solid #E5E7EB",
+                border: "0.5px solid var(--status-track)",
                 borderLeft: `4px solid ${RED}`,
                 borderRadius: 12,
                 padding: "16px 18px",
@@ -327,8 +332,8 @@ function BulletinBoard({
                   <span
                     style={{
                       fontSize: 12,
-                      color: "#64748B",
-                      background: "#F1F5F9",
+                      color: "var(--text-muted-strong)",
+                      background: "var(--status-neutral-bg)",
                       borderRadius: 999,
                       padding: "3px 10px",
                     }}
@@ -363,7 +368,7 @@ function BulletinBoard({
                 style={{
                   margin: "10px 0 0",
                   fontSize: 14,
-                  color: "#1F2937",
+                  color: "var(--text-primary)",
                   lineHeight: 1.6,
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
@@ -474,12 +479,12 @@ function AnnouncementForm({
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "10px 12px",
-    border: "0.5px solid #E5E7EB",
+    border: "0.5px solid var(--status-track)",
     borderRadius: 8,
     outline: "none",
     fontFamily: "inherit",
     fontSize: 14,
-    color: "#1F2937",
+    color: "var(--text-primary)",
   };
 
   return (
@@ -499,8 +504,9 @@ function AnnouncementForm({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="dark:ring-1 dark:ring-white/10"
         style={{
-          background: "#FFFFFF",
+          background: "var(--surface)",
           borderRadius: 16,
           width: "min(520px, 100%)",
           maxHeight: "90vh",
@@ -513,7 +519,7 @@ function AnnouncementForm({
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
             {editing ? "Edit announcement" : "New announcement"}
           </h2>
           <button
@@ -562,7 +568,7 @@ function AnnouncementForm({
               padding: "8px 14px",
               border: `1px solid ${RED}`,
               borderRadius: 8,
-              background: "#FEF2F2",
+              background: "var(--tint-red)",
               color: RED,
               fontSize: 13,
               fontWeight: 700,
@@ -613,10 +619,10 @@ function AnnouncementForm({
             onClick={onClose}
             style={{
               padding: "9px 16px",
-              border: "0.5px solid #E5E7EB",
+              border: "0.5px solid var(--status-track)",
               borderRadius: 8,
-              background: "#fff",
-              color: "#475569",
+              background: "var(--surface)",
+              color: "var(--status-neutral-fg-strong)",
               fontSize: 13,
               fontWeight: 600,
               fontFamily: "inherit",
@@ -633,7 +639,10 @@ function AnnouncementForm({
               padding: "9px 18px",
               border: "none",
               borderRadius: 8,
-              background: saving ? "#CBD5E1" : RED,
+              // Solid fill with white text — fixed literals (not the
+              // theme-aware RED var) so dark mode's lighter red doesn't
+              // drop white-on-fill contrast.
+              background: saving ? "var(--status-border-idle)" : RED_SOLID,
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
