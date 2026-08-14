@@ -4,11 +4,7 @@
 // action closures, same three-way SetupPendingError/NoAccountError/generic-
 // error card handling — just no initial-load 403 redirect (getFlowDetail's
 // "daily" fetch has no separate View-tier gate the way listTemplateGroups
-// does). Uses getFlowOverview (not getFlowDetail) for the per-weekday
-// fetches: getFlowDetail's role branches additionally pull org/department/
-// branch-wide payloads this page never reads, and this page calls it once
-// per weekday (up to 7x) — getFlowOverview has the same (email, period,
-// date) signature but returns only the personal payload every role needs.
+// does) and a week's worth of getFlowDetail calls instead of one.
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
@@ -17,7 +13,7 @@ import AppShell from "@/app/components/AppShell";
 import { resolveViewRole, weekdayRangeOf, thisWeekDatesForRange } from "@/task-manager/role-views";
 import {
   completeFlowTask,
-  getFlowOverview,
+  getFlowDetail,
   removeFlowTaskProof,
   uploadFlowTaskProof,
   FlowBridgeError,
@@ -53,20 +49,20 @@ export default async function TaskManagerMyWeekPage() {
   let myUserId: string;
   try {
     const now = new Date();
-    const todayResult = await getFlowOverview(email, "daily");
-    myUserId = todayResult.me.userId;
-    const view = resolveViewRole(todayResult.me);
+    const todayResult = await getFlowDetail(email, "daily");
+    myUserId = todayResult.me.me.userId;
+    const view = resolveViewRole(todayResult.me.me);
     const range = weekdayRangeOf(view);
     const weekDates = thisWeekDatesForRange(range, now);
     const todayDateStr = todayResult.date;
     const otherDates = weekDates.filter((d) => d.date !== todayDateStr);
-    const otherResults = await Promise.all(otherDates.map((d) => getFlowOverview(email, "daily", d.date)));
+    const otherResults = await Promise.all(otherDates.map((d) => getFlowDetail(email, "daily", d.date)));
     const resultByDate = new Map(otherResults.map((r) => [r.date, r]));
     resultByDate.set(todayDateStr, todayResult);
     days = weekDates.map((d) => ({
       weekday: d.weekday,
       date: d.date,
-      tasks: resultByDate.get(d.date)?.tasks ?? [],
+      tasks: resultByDate.get(d.date)?.me.tasks ?? [],
     }));
   } catch (err) {
     return errorPage(err);
