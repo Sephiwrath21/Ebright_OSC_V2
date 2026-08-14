@@ -346,6 +346,61 @@ export function weekdayRangeOf(view: ViewRole): WeekdayRange {
   return ROLE_VIEWS[view].weekdayRange;
 }
 
+/** { startOffset, endOffset } as days-from-Monday, inclusive, for each
+ *  WeekdayRange value — e.g. "tue-sat" starts the day after Monday and
+ *  ends 4 days after that (Saturday). */
+const WEEKDAY_RANGE_BOUNDS: Record<WeekdayRange, { startOffset: number; endOffset: number }> = {
+  "mon-sun": { startOffset: 0, endOffset: 6 },
+  "tue-sat": { startOffset: 1, endOffset: 5 },
+  "tue-sun": { startOffset: 1, endOffset: 6 },
+  "wed-sun": { startOffset: 2, endOffset: 6 },
+};
+
+const WEEKDAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+/** Formats a Date as local YYYY-MM-DD. Deliberately NOT imported from
+ *  analytics/_lib.ts's formatLocalDate — this file is pure (no server
+ *  imports, see the file header), and _lib.ts transitively constructs a
+ *  real Prisma client at import time (same reasoning documented in
+ *  hrfs-map.ts's header for a similar import-boundary decision). */
+function formatLocalDateString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** This week's actual calendar dates for every weekday in `range`,
+ *  Monday-anchored (the week containing `today` runs Monday..Sunday
+ *  regardless of what day `today` itself is — a Sunday reference date
+ *  still resolves to THAT week's Monday, not the next one). Pure —
+ *  `today` defaults to `new Date()` but is always passed explicitly by
+ *  callers in practice (a bare `new Date()` default is only for tests /
+ *  convenience, not relied on in the request path — pages pass their own
+ *  captured `Date` so a single request sees one consistent "now"). */
+export function thisWeekDatesForRange(
+  range: WeekdayRange,
+  today: Date = new Date(),
+): { weekday: string; date: string }[] {
+  const day = today.getDay(); // 0 = Sunday .. 6 = Saturday
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset);
+
+  const { startOffset, endOffset } = WEEKDAY_RANGE_BOUNDS[range];
+  const result: { weekday: string; date: string }[] = [];
+  for (let offset = startOffset; offset <= endOffset; offset++) {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset);
+    result.push({ weekday: WEEKDAY_NAMES[offset], date: formatLocalDateString(d) });
+  }
+  return result;
+}
+
 export function showsAddTaskHeader(view: ViewRole): boolean {
   return ROLE_VIEWS[view].addTaskHeader;
 }

@@ -12,6 +12,7 @@ import {
   shows,
   showsAddTaskHeader,
   taskManagerNavAccess,
+  thisWeekDatesForRange,
   weekdayRangeOf,
   type ViewRole,
 } from "./role-views";
@@ -264,6 +265,69 @@ describe("taskManagerNavAccess", () => {
       package: false,
       packageTable: false,
     });
+  });
+});
+
+describe("thisWeekDatesForRange", () => {
+  // Friday 2026-08-14 — a known, fixed reference date (a real Friday).
+  const FRIDAY = new Date(2026, 7, 14); // month is 0-indexed: 7 = August
+
+  it("mon-sun: returns all 7 days of the week containing the reference date", () => {
+    const result = thisWeekDatesForRange("mon-sun", FRIDAY);
+    expect(result).toEqual([
+      { weekday: "Monday", date: "2026-08-10" },
+      { weekday: "Tuesday", date: "2026-08-11" },
+      { weekday: "Wednesday", date: "2026-08-12" },
+      { weekday: "Thursday", date: "2026-08-13" },
+      { weekday: "Friday", date: "2026-08-14" },
+      { weekday: "Saturday", date: "2026-08-15" },
+      { weekday: "Sunday", date: "2026-08-16" },
+    ]);
+  });
+
+  it("tue-sat: returns Tuesday through Saturday of that same week", () => {
+    const result = thisWeekDatesForRange("tue-sat", FRIDAY);
+    expect(result).toEqual([
+      { weekday: "Tuesday", date: "2026-08-11" },
+      { weekday: "Wednesday", date: "2026-08-12" },
+      { weekday: "Thursday", date: "2026-08-13" },
+      { weekday: "Friday", date: "2026-08-14" },
+      { weekday: "Saturday", date: "2026-08-15" },
+    ]);
+  });
+
+  it("tue-sun: returns Tuesday through Sunday of that same week", () => {
+    const result = thisWeekDatesForRange("tue-sun", FRIDAY);
+    expect(result.map((d) => d.weekday)).toEqual([
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ]);
+    expect(result[0].date).toBe("2026-08-11");
+    expect(result[5].date).toBe("2026-08-16");
+  });
+
+  it("wed-sun: returns Wednesday through Sunday of that same week", () => {
+    const result = thisWeekDatesForRange("wed-sun", FRIDAY);
+    expect(result.map((d) => d.weekday)).toEqual(["Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
+    expect(result[0].date).toBe("2026-08-12");
+  });
+
+  it("works when the reference date is itself a Sunday (week wraps backward correctly)", () => {
+    const SUNDAY = new Date(2026, 7, 16); // 2026-08-16 is the Sunday of that same week
+    const result = thisWeekDatesForRange("mon-sun", SUNDAY);
+    expect(result[0].date).toBe("2026-08-10"); // still Monday of the SAME week, not the next one
+    expect(result[6].date).toBe("2026-08-16");
+  });
+
+  it("works when the reference date is itself a Monday", () => {
+    const MONDAY = new Date(2026, 7, 10);
+    const result = thisWeekDatesForRange("tue-sat", MONDAY);
+    expect(result[0].date).toBe("2026-08-11");
+    expect(result[4].date).toBe("2026-08-15");
   });
 });
 
