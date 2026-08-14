@@ -339,12 +339,17 @@ export function EntityCardOverview({
               return (
                 <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
                   <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
-                    {/* Own card (2026-08-15): the viewer's name/avatar is
-                        already shown top-right on every page — repeating it
-                        as this card's header is redundant. Every OTHER
-                        card still shows the person's name, since that's
-                        the only way to tell whose tasks a card holds. */}
-                    {isOwnCard ? "My Tasks" : card.name}
+                    {/* Own card (2026-08-15): "My Tasks" only in Only Me
+                        mode, where it's the sole card on screen — the
+                        viewer's name/avatar is already shown top-right on
+                        every page, so repeating it here would be redundant.
+                        In View All, showing "My Tasks" instead of a real
+                        name breaks the scanning pattern every OTHER card
+                        follows (all named) and reads as confusing/
+                        unidentifiable in a full roster grid — so the own
+                        card shows its real name there too, same as
+                        everyone else's. */}
+                    {isOwnCard && onlyMe ? "My Tasks" : card.name}
                   </div>
                   {showMyWeek && myWeek ? (
                     <div className="flex gap-3 p-3">
