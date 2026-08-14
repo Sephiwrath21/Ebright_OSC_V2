@@ -71,7 +71,7 @@ import {
 } from "./types";
 import { isPersonalAccountView, resolveViewRole, shows } from "../role-views";
 import { TaskOverviewStack } from "./task-overview-stack";
-import type { MyWeekDay } from "./entity-card-overview";
+import type { MyWeekConfig } from "./entity-card-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
   PageSectionHeading,
@@ -183,7 +183,7 @@ export function TaskManagerView({
       entity: FlowEntityDetail;
       dateControl?: React.ReactNode;
       showViewToggle: boolean;
-      myWeek?: { days: MyWeekDay[]; todayDate: string };
+      myWeek?: MyWeekConfig;
     };
     monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
     hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
@@ -193,7 +193,7 @@ export function TaskManagerView({
    *  Overview's OWN Daily section only (myOverview's Daily gets it via
    *  myOverview.daily.myWeek instead, since that section is built entirely
    *  by the caller). See EntityCardOverview's `myWeek` prop doc comment. */
-  myWeek?: { days: MyWeekDay[]; todayDate: string };
+  myWeek?: MyWeekConfig;
   /** Personal date filters (2026-07-28, ?date=/?mdate=; repurposed
    *  2026-08-12 as TaskOverviewStack's dateControl): feed the Daily/Monthly
    *  section headings inside myOverview/departmentOverview/branchOverview's

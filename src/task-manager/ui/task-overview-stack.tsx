@@ -9,7 +9,7 @@
 // roles get which sections).
 import * as React from "react";
 import type { FlowCategoryOption, FlowEntityDetail } from "./types";
-import { EntityCardOverview, type MyWeekDay } from "./entity-card-overview";
+import { EntityCardOverview, type MyWeekConfig } from "./entity-card-overview";
 import type { ReassignControl } from "./bits";
 
 interface SectionData {
@@ -23,7 +23,7 @@ interface SectionData {
    *  EntityCardOverview's own `myWeek` prop doc comment. Only ever set on
    *  the "daily" SectionData; Monthly/HOD/CEO Assigned have no per-weekday
    *  concept, so callers never build this for those. */
-  myWeek?: { days: MyWeekDay[]; todayDate: string };
+  myWeek?: MyWeekConfig;
 }
 
 export function TaskOverviewStack({

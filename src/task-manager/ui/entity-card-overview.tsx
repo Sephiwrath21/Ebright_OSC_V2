@@ -36,6 +36,7 @@
 // use the existing delegated/ad hoc oversight cards elsewhere on this page
 // for that.
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import type {
   ActionResult,
   FlowCategoryOption,
@@ -84,6 +85,17 @@ export interface MyWeekDay {
   weekday: string;
   date: string;
   tasks: FlowTaskRow[];
+}
+
+/** EntityCardOverview's `myWeek` prop shape, exported so every caller
+ *  building a "daily" SectionData (task-overview-stack.tsx, page.tsx,
+ *  task-manager-view.tsx) shares one definition instead of copies that can
+ *  drift. See EntityCardOverview's own `myWeek` prop doc comment for the
+ *  two-way date-picker sync this enables. */
+export interface MyWeekConfig {
+  days: MyWeekDay[];
+  selectedDate: string;
+  nav: { basePath: string; extraParams?: Record<string, string> };
 }
 
 /** View toggle persistence (2026-08-14) — ONE shared preference per user,
@@ -181,18 +193,25 @@ export function EntityCardOverview({
    *  SectionData; Monthly/HOD/CEO Assigned have no per-weekday concept).
    *  When provided, the own card renders a weekday-tab column beside its
    *  task list instead of the single globally-selected date's `card.tasks`
-   *  — the rest of the section (other people's cards, Type-sort, the
-   *  existing `dateControl` date-arrow picker) is completely unaffected,
-   *  since this only replaces what the OWN card shows. Only rendered when
-   *  the own card is the ONLY card on screen (Sort: Person, "Only Me" —
-   *  the reference design's actual layout); a "View All" grid with several
-   *  narrow cards per row keeps the own card's plain single-date list, to
-   *  avoid squeezing the wider tab+list layout into a cramped grid cell.
-   *  `todayDate` is the server-computed "today" (YYYY-MM-DD, local) —
-   *  passed down rather than computed client-side via `new Date()` to stay
-   *  hydration-safe (same reasoning as this file's other stored-preference
-   *  state). */
-  myWeek?: { days: MyWeekDay[]; todayDate: string };
+   *  — the rest of the section (other people's cards, Type-sort) is
+   *  unaffected. Only rendered when the own card is the ONLY card on
+   *  screen (Sort: Person, "Only Me" — the reference design's actual
+   *  layout); a "View All" grid with several narrow cards per row keeps
+   *  the own card's plain single-date list, to avoid squeezing the wider
+   *  tab+list layout into a cramped grid cell.
+   *
+   *  Two-way synced with the section's own `dateControl` date-arrow picker
+   *  (2026-08-15): `selectedDate` is the server-resolved "currently active"
+   *  date (whatever the picker shows, defaulting to today when nothing's
+   *  picked) — `days`/its per-day counts are computed server-side for the
+   *  WEEK CONTAINING that date, so moving the picker to a different week
+   *  recomputes the whole tab list on the next server render. Clicking a
+   *  tab navigates via `nav` (the exact basePath/extraParams the section's
+   *  own DailyDatePicker instance already carries, so tab clicks produce
+   *  an identical URL shape to clicking that picker's own arrows) rather
+   *  than owning separate client state, keeping the picker's displayed
+   *  value and the highlighted tab from ever drifting apart. */
+  myWeek?: MyWeekConfig;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
@@ -250,13 +269,19 @@ export function EntityCardOverview({
   const personCards = sortMode === "person" ? groupTasksByPerson(entity.members, tasks, scopeId) : [];
   const categoryCards = sortMode === "type" ? groupTasksByCategory(categories, tasks, scopeId) : [];
 
-  // Weekday-tab selection for the own card's myWeek view (2026-08-15) —
-  // defaults to "today" (server-computed, see the prop's own doc comment).
-  // Only ever rendered when the own card is the section's sole card (see
-  // showMyWeek below), so one selection is unambiguous — no per-card keying
-  // needed the way onlyMe/sortMode aren't per-card either.
-  const [myWeekDate, setMyWeekDate] = React.useState(myWeek?.todayDate);
-  const selectedMyWeekDay = myWeek?.days.find((d) => d.date === myWeekDate) ?? myWeek?.days[0];
+  // Weekday-tab selection for the own card's myWeek view (2026-08-15) — NOT
+  // local state: derived straight from myWeek.selectedDate (the server-
+  // resolved, picker-synced "currently active" date, see the prop's own
+  // doc comment), so the highlighted tab can never drift from what the
+  // picker shows. Falls back to the first day in range on the rare case
+  // selectedDate's weekday isn't one of them (role's range excludes it).
+  const router = useRouter();
+  const selectedMyWeekDay = myWeek?.days.find((d) => d.date === myWeek.selectedDate) ?? myWeek?.days[0];
+  const selectMyWeekDate = (date: string) => {
+    if (!myWeek) return;
+    const qs = new URLSearchParams({ ...myWeek.nav.extraParams, date });
+    router.push(`${myWeek.nav.basePath}?${qs.toString()}`);
+  };
 
   return (
     <div
@@ -328,14 +353,14 @@ export function EntityCardOverview({
                           const pendingCount = d.tasks.filter(
                             (t) => t.status !== "DONE" && t.status !== "SKIPPED",
                           ).length;
-                          const active = d.date === selectedMyWeekDay?.date;
+                          const active = d.date === myWeek.selectedDate;
                           return (
                             <button
                               key={d.date}
                               type="button"
                               role="tab"
                               aria-selected={active}
-                              onClick={() => setMyWeekDate(d.date)}
+                              onClick={() => selectMyWeekDate(d.date)}
                               className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
                                 active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
                               }`}

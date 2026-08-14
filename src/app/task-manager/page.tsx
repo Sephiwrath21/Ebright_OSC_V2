@@ -617,22 +617,27 @@ export default async function TaskManagerPage({
     // but computed properly rather than hardcoded in case that changes.
     const defaultOnlyMe = isPersonalAccountView(viewRole);
     // My Week embedded view (2026-08-15): the viewer's own tasks for every
-    // weekday in their role's range, fetched once here and reused by every
-    // "daily" SectionData this page (and TaskManagerView's own Department/
-    // Branch Overview) builds below — the own card's weekday-tab view (see
-    // EntityCardOverview's `myWeek` prop) always shows the SAME data
-    // regardless of which section it appears in, since it's still just the
-    // viewer's own tasks. `getFlowDetail` (not the lighter `getFlowOverview`
-    // — see role-views.ts's `thisWeekDatesForRange` doc comment) is
-    // deliberately reused per day: `getFlowOverview` skips `strictWindow:
-    // true`, which would show the SAME un-windowed task set on every tab
-    // instead of that day's actual tasks. `now`/`todayDateStr` are computed
-    // once, server-side, and passed down rather than read via `new Date()`
-    // client-side, to stay hydration-safe.
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const todayDateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const myWeekDates = thisWeekDatesForRange(weekdayRangeOf(viewRole), now);
+    // weekday in their role's range, WEEK-SYNCED to whatever date the
+    // section's own DailyDatePicker currently shows (`daily.date` — the
+    // resolved ?date=, defaulting to today when unset) rather than always
+    // "today" — moving the picker to a different week recomputes the whole
+    // tab list (dates AND counts) on the next server render, and clicking a
+    // tab navigates via router.push to a new ?date= (EntityCardOverview),
+    // which lands back here and does the same. `getFlowDetail` (not the
+    // lighter `getFlowOverview` — see role-views.ts's `thisWeekDatesForRange`
+    // doc comment) is deliberately reused per day: `getFlowOverview` skips
+    // `strictWindow: true`, which would show the SAME un-windowed task set
+    // on every tab instead of that day's actual tasks. Built once here and
+    // reused by every "daily" SectionData this page (and TaskManagerView's
+    // own Department/Branch Overview) constructs below — still just the
+    // viewer's own tasks regardless of which section it appears in; only
+    // `nav` (which URL the picker/tabs for THAT section navigate) differs
+    // per site, via buildMyWeek.
+    const [dailyDateY, dailyDateM, dailyDateD] = daily.date.split("-").map(Number);
+    const myWeekDates = thisWeekDatesForRange(
+      weekdayRangeOf(viewRole),
+      new Date(dailyDateY, dailyDateM - 1, dailyDateD),
+    );
     const myWeekOtherDates = myWeekDates.filter((d) => d.date !== daily.date);
     const myWeekOtherResults = await Promise.all(
       myWeekOtherDates.map((d) => getFlowDetail(email, "daily", d.date)),
@@ -644,7 +649,16 @@ export default async function TaskManagerPage({
       date: d.date,
       tasks: myWeekResultByDate.get(d.date)?.me.tasks ?? [],
     }));
-    const myWeek = { days: myWeekDays, todayDate: todayDateStr };
+    const buildMyWeek = (nav: { basePath: string; extraParams?: Record<string, string> }) => ({
+      days: myWeekDays,
+      selectedDate: daily.date,
+      nav,
+    });
+    // Every "personal" Daily section (myOverview, and TaskManagerView's own
+    // departmentOverview/branchOverview) shares the SAME DailyDatePicker
+    // wiring (personalDailyControl/departmentDailyControl, both built from
+    // monthlyCarry below) — so they share this one nav config too.
+    const personalMyWeek = buildMyWeek({ basePath: "/task-manager", extraParams: monthlyCarry });
     // "Assign to Others" — same identities as the assign form MINUS the CEO
     // (2026-08-01: the CEO is view-only on the org-wide/department/branch
     // drill-downs — reassigning other people's existing tasks isn't part of
@@ -773,7 +787,7 @@ export default async function TaskManagerPage({
                   />
                 ),
                 showViewToggle: true,
-                myWeek,
+                myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "department", department } }),
               }}
               monthly={{ entity: monthlyDetail.department, showViewToggle: true }}
               hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.department, showViewToggle: true } : undefined}
@@ -824,7 +838,7 @@ export default async function TaskManagerPage({
                   />
                 ),
                 showViewToggle: true,
-                myWeek,
+                myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "branch", branch } }),
               }}
               monthly={{ entity: monthlyDetail.branch, showViewToggle: true }}
               hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.branch, showViewToggle: true } : undefined}
@@ -1015,7 +1029,7 @@ export default async function TaskManagerPage({
             dateControl: personalDailyControl,
             showViewToggle: true,
             defaultOnlyMe,
-            myWeek,
+            myWeek: personalMyWeek,
           }
         : memberWholeBranchDaily
           ? {
@@ -1023,13 +1037,13 @@ export default async function TaskManagerPage({
               dateControl: personalDailyControl,
               showViewToggle: true,
               defaultOnlyMe,
-              myWeek,
+              myWeek: personalMyWeek,
             }
           : {
               entity: toSelfEntityDetail(daily.me.me, daily.me),
               dateControl: personalDailyControl,
               showViewToggle: false,
-              myWeek,
+              myWeek: personalMyWeek,
             },
       // Monthly stays self-only for every myOverview role, always — even
       // DEPT_MEMBER (whose Daily section is whole-department) keeps
@@ -1068,7 +1082,7 @@ export default async function TaskManagerPage({
         ceoAssignedDepartment={ceoAssignedDepartment}
         ceoAssignedBranch={ceoAssignedBranch}
         categoryList={categoryList}
-        myWeek={myWeek}
+        myWeek={personalMyWeek}
         myOverview={{
           entityName: myOverviewData.entityName,
           daily: myOverviewData.daily,
