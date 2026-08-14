@@ -32,6 +32,7 @@ import {
   getDepartmentDetail,
   getDepartmentHodAssigned,
   getFlowDetail,
+  getFlowOverview,
   getFlowStaff,
   getHodKanban,
   moveKanbanCard,
@@ -623,31 +624,41 @@ export default async function TaskManagerPage({
     // "today" — moving the picker to a different week recomputes the whole
     // tab list (dates AND counts) on the next server render, and clicking a
     // tab navigates via router.push to a new ?date= (EntityCardOverview),
-    // which lands back here and does the same. `getFlowDetail` (not the
-    // lighter `getFlowOverview` — see role-views.ts's `thisWeekDatesForRange`
-    // doc comment) is deliberately reused per day: `getFlowOverview` skips
-    // `strictWindow: true`, which would show the SAME un-windowed task set
-    // on every tab instead of that day's actual tasks. Built once here and
-    // reused by every "daily" SectionData this page (and TaskManagerView's
-    // own Department/Branch Overview) constructs below — still just the
+    // which lands back here and does the same. Built once here and reused
+    // by every "daily" SectionData this page (and TaskManagerView's own
+    // Department/Branch Overview) constructs below — still just the
     // viewer's own tasks regardless of which section it appears in; only
     // `nav` (which URL the picker/tabs for THAT section navigate) differs
     // per site, via buildMyWeek.
+    //
+    // getFlowOverview (not getFlowDetail) with strictWindow:true — a real
+    // DB connection timeout surfaced with getFlowDetail here (2026-08-15):
+    // getFlowDetail's role branches ALSO pull org/department/branch-wide
+    // payloads this view never reads, multiplied by up to 7 concurrent
+    // calls (one per weekday) on top of the page's own daily/monthly/staff
+    // fetches. getFlowOverview only runs getMePayload — the personal-only
+    // piece this view actually needs — and strictWindow:true is essential
+    // (without it every tab would show the SAME un-windowed task set
+    // instead of that day's actual tasks; this is why the original
+    // getFlowOverview swap on this branch was reverted before strictWindow
+    // support existed here). Every day (including the picker's own
+    // selected date) is now fetched uniformly through this lighter path —
+    // no more special-casing/reusing the already-fetched `daily` object,
+    // since that one's the heavy getFlowDetail result the others no longer
+    // match the shape of.
     const [dailyDateY, dailyDateM, dailyDateD] = daily.date.split("-").map(Number);
     const myWeekDates = thisWeekDatesForRange(
       weekdayRangeOf(viewRole),
       new Date(dailyDateY, dailyDateM - 1, dailyDateD),
     );
-    const myWeekOtherDates = myWeekDates.filter((d) => d.date !== daily.date);
-    const myWeekOtherResults = await Promise.all(
-      myWeekOtherDates.map((d) => getFlowDetail(email, "daily", d.date)),
+    const myWeekResults = await Promise.all(
+      myWeekDates.map((d) => getFlowOverview(email, "daily", d.date, { strictWindow: true })),
     );
-    const myWeekResultByDate = new Map(myWeekOtherResults.map((r) => [r.date, r]));
-    if (myWeekDates.some((d) => d.date === daily.date)) myWeekResultByDate.set(daily.date, daily);
+    const myWeekResultByDate = new Map(myWeekResults.map((r) => [r.date, r]));
     const myWeekDays: MyWeekDay[] = myWeekDates.map((d) => ({
       weekday: d.weekday,
       date: d.date,
-      tasks: myWeekResultByDate.get(d.date)?.me.tasks ?? [],
+      tasks: myWeekResultByDate.get(d.date)?.tasks ?? [],
     }));
     const buildMyWeek = (nav: { basePath: string; extraParams?: Record<string, string> }) => ({
       days: myWeekDays,

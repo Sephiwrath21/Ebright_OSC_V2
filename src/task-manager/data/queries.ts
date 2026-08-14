@@ -33,16 +33,25 @@ import type { EntityPayload } from "../analytics/_payloads";
 import { advanceRecurringBlocks } from "../engine/recurrence";
 import { native, requireUserByEmail } from "./core";
 
-/** Personal progress for the dashboard card (daily or monthly). */
+/** Personal progress for the dashboard card (daily or monthly).
+ *
+ *  `opts.strictWindow` (2026-08-15, the Overview page's embedded weekday-tab
+ *  view): forwarded straight to getMePayload — off (default) preserves this
+ *  function's original wide semantics for its original caller (the Home
+ *  dashboard's personal progress card); the weekday-tab view passes `true`
+ *  since each tab must show ONLY that day's tasks, not every same-cadence
+ *  block regardless of date. See getFlowDetail's own strictWindow comment
+ *  for the full rule. */
 export function getFlowOverview(
   email: string,
   period: FlowPeriod,
   date?: string,
+  opts?: { strictWindow?: boolean },
 ): Promise<FlowOverviewResponse> {
   return native(async () => {
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    const payload = await getMePayload(user, q.period, q.date);
+    const payload = await getMePayload(user, q.period, q.date, { strictWindow: opts?.strictWindow });
     return { period: q.period, date: resolvedDate(q.date), ...payload } as FlowOverviewResponse;
   }, "getFlowOverview");
 }
