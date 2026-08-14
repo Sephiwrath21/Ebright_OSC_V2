@@ -465,17 +465,17 @@ export function TaskManagerView({
               <PageSectionHeading>Details</PageSectionHeading>
               <a
                 href={manpowerScheduleHref}
-                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50"
+                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-blue-900"
               >
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
                     Manpower Schedule
                   </h3>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
                     Plan today's staffing grid — assignments sync straight to each coach's task list.
                   </p>
                 </div>
-                <span className="text-sm font-medium text-blue-600">Open →</span>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Open →</span>
               </a>
             </>
           )}

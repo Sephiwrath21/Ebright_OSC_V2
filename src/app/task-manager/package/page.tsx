@@ -256,7 +256,7 @@ export default async function TaskManagerPackagePage() {
   return (
     <AppShell email={su.email} role={su.role} name={su.name}>
       <div className="mx-auto max-w-[1400px] p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Package</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Package</h1>
         <div className="mt-6">
           <TemplateGroupDashboard
             staff={staff}

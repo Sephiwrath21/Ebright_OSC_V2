@@ -39,7 +39,7 @@ export function WorkflowDiagram({ steps }: Props) {
                 isFuture ? "opacity-40" : ""
               } ${
                 isCurrent
-                  ? "shadow-lg ring-2 ring-offset-2 ring-blue-300"
+                  ? "shadow-lg ring-2 ring-offset-2 ring-blue-300 dark:ring-offset-slate-900"
                   : ""
               }`}
             >

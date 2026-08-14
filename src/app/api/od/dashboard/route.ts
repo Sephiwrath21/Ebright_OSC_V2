@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSpaceTasks } from "@/lib/clickup";
-import { isCrmAvailable } from "@/lib/crm-db";
-import { getTicketCounterByPlatform } from "@/lib/crm-tickets";
+import { isCrmAvailable, getTicketCounterByPlatform } from "@/lib/crm/ticket-counter";
 
 export const dynamic = "force-dynamic";
 

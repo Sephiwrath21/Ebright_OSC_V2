@@ -132,6 +132,23 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
   },
 };
 
+// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
+// Probation) have no section segment, "separate-pages" stages (Onboarding/
+// Active/Exit) land on their first section. Used to send a real stage-move
+// action (Proceed, or Probation's Confirm decision — see ProbationPanel in
+// ActiveProfilePanels.tsx) straight to the employee's new profile,
+// whichever URL shape that target stage actually uses. Lives here rather
+// than in StageProfileView.tsx (its original home) because ProbationPanel
+// needs it too, and StageProfileView.tsx itself imports FROM
+// ActiveProfilePanels.tsx — importing back the other way would be circular.
+export function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
+  const config = STAGE_PROFILE_CONFIG[stage];
+  if (config.profileMode === "separate-pages") {
+    return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
+  }
+  return `/employee-folder/${stage}/employee/${employeeId}`;
+}
+
 // Cumulative history shown above each stage's card (Emp_Folder duplicates
 // every prior stage's own panel markup inline and switches between them via
 // radio-button tabs — bookmark-tabs on Probation, top-tabs on Onboarding/
@@ -160,14 +177,15 @@ export const STAGE_HISTORY_GROUPS: Record<EmployeeStage, StageHistoryGroup[]> = 
 };
 
 // Exact "move to next stage" button labels lifted from each stage's own
-// proceed button markup (pre-proceed-btn/probation-next-btn/onboarding-next-
-// btn/active-exit-btn) — Exit is terminal, no button. Kept UI-only (confirm
-// dialog + notice, no real employment.status mutation) since actually moving
-// an employee is a real, semi-irreversible action nothing has explicitly
-// authorized yet — same "not wired up" convention as every other unbacked action.
+// proceed button markup (pre-proceed-btn/onboarding-next-btn/active-exit-
+// btn) — Exit is terminal, no button. Probation deliberately has no entry
+// here anymore — its own "Next" button (nextStage: "onboarding",
+// proceedFromProbation) was removed as redundant, per explicit decision
+// (see conversation): the Confirm decision button already achieves the same
+// visible effect (isEffectivelyConfirmed treats probation_status
+// "Confirmed" as Active immediately, no separate proceed step needed).
 export const STAGE_PROCEED_BUTTON: Partial<Record<EmployeeStage, { label: string; nextStage: EmployeeStage }>> = {
   pre: { label: "Proceed", nextStage: "probation" },
-  probation: { label: "Next", nextStage: "onboarding" },
   onboarding: { label: "Next", nextStage: "active" },
   active: { label: "Exit", nextStage: "exit" },
 };

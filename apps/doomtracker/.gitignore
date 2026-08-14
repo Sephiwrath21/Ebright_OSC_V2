@@ -1,0 +1,12 @@
+# Flowghan (DoomTracker) — dependencies and build artifacts are never committed.
+node_modules/
+**/node_modules/
+
+# Vite build output (server serves this; build it on deploy).
+dist/
+cue-app/dist/
+
+# Secrets — real .env is created from .env.example on each host.
+.env
+**/.env
+!**/.env.example

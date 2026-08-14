@@ -115,40 +115,40 @@ function ArchiveOverviewContent() {
     });
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500 mb-6"
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6"
         >
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <HomeIcon className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             HRMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/manpower-schedule" className="hover:text-slate-900 transition-colors">
+          <Link href="/manpower-schedule" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Manpower Planning
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Archive Overview</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Archive Overview</span>
         </nav>
 
         {/* Page heading + branch filter on one line */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Archive Overview</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Browse historical schedules and past rosters.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Archive Overview</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Browse historical schedules and past rosters.</p>
           </div>
           <div className="w-full sm:w-64 shrink-0">
-            <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+            <label className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 block mb-1">
               Branch
             </label>
             <BranchSearchSelect
@@ -165,30 +165,30 @@ function ArchiveOverviewContent() {
 
         {/* List body */}
         {loading ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-12 text-center">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">Loading archived schedules...</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium">Loading archived schedules...</p>
           </div>
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-            <p className="text-red-600 font-medium">{error}</p>
+          <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-2xl p-6 text-center">
+            <p className="text-red-600 dark:text-red-300 font-medium">{error}</p>
           </div>
         ) : drillYear !== null && drillMonth !== null ? (
           <div>
             <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">
+              <h2 className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-slate-200">
                 {drillYear} <span className="text-slate-400">›</span>{" "}
                 {MONTH_NAMES[drillMonth]}
               </h2>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               {distinctWeeks.map((week, wi) => {
                 const weekRecs = drilled.filter(r => r.startDate === week.startDate);
                 return (
                   <div
                     key={week.startDate}
                     className={`flex gap-4 items-start px-5 py-4 ${
-                      wi < distinctWeeks.length - 1 ? "border-b border-slate-100" : ""
+                      wi < distinctWeeks.length - 1 ? "border-b border-slate-100 dark:border-slate-800" : ""
                     }`}
                   >
                     <div className="w-28 shrink-0 text-xs font-black text-slate-400 pt-2">
@@ -200,20 +200,20 @@ function ArchiveOverviewContent() {
                           <button
                             key={record.id}
                             onClick={() => openRecord(record)}
-                            className="text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 rounded-xl px-4 py-3 transition-colors min-w-[160px]"
+                            className="text-left bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 border border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl px-4 py-3 transition-colors min-w-[160px]"
                           >
-                            <div className="font-black text-sm text-blue-800 uppercase tracking-wide">
+                            <div className="font-black text-sm text-blue-800 dark:text-blue-200 uppercase tracking-wide">
                               {record.branch}
                             </div>
-                            <div className="text-xs text-blue-500 font-bold mt-0.5">
+                            <div className="text-xs text-blue-500 dark:text-blue-300 font-bold mt-0.5">
                               {format(parseISO(record.startDate), "dd MMM")} –{" "}
                               {format(parseISO(record.endDate), "dd MMM")}
                             </div>
                             <span
                               className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${
                                 record.status === "Finalized"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-amber-100 text-amber-700"
+                                  ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                                  : "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
                               }`}
                             >
                               {record.status}
@@ -221,7 +221,7 @@ function ArchiveOverviewContent() {
                           </button>
                         ))
                       ) : (
-                        <span className="text-slate-200 text-sm font-bold pt-1">—</span>
+                        <span className="text-slate-200 dark:text-slate-600 text-sm font-bold pt-1">—</span>
                       )}
                     </div>
                   </div>
@@ -230,8 +230,8 @@ function ArchiveOverviewContent() {
             </div>
           </div>
         ) : Object.keys(byYear).length === 0 ? (
-          <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-slate-300 text-center shadow-sm">
-            <p className="text-slate-500 font-bold text-lg uppercase tracking-widest">
+          <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-center shadow-sm">
+            <p className="text-slate-500 dark:text-slate-400 font-bold text-lg uppercase tracking-widest">
               No archived records found.
             </p>
           </div>
@@ -249,7 +249,7 @@ function ArchiveOverviewContent() {
                 return (
                   <div
                     key={year}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                    className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
                   >
                     <div className="bg-[#2D3F50] px-6 py-3">
                       <h2 className="text-white font-black text-xl uppercase tracking-widest">
@@ -273,7 +273,7 @@ function ArchiveOverviewContent() {
                             className={`rounded-xl py-3 px-2 text-center transition-colors ${
                               hasRecords
                                 ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-sm"
-                                : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed"
                             }`}
                           >
                             <div className="font-black text-sm">{MONTH_SHORT[mi]}</div>

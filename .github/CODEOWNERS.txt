@@ -1,0 +1,2 @@
+# Only these accounts' approvals satisfy the PR gate
+* @EbrightOD @ekalmaco @baltoratora @siakap09 @ernyshl

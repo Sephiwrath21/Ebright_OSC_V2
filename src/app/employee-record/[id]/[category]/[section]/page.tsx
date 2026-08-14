@@ -5,6 +5,8 @@ import EmployeeRecordView from "@/app/components/EmployeeRecordView";
 import {
   getEmployeeById,
   getEmployeeOverviewRowById,
+  getOnboardingCandidateDetail,
+  type EmployeeStage,
   listLeaveHistory,
   getResumeInfo,
   getReferenceCheck,
@@ -26,6 +28,7 @@ import {
   getPaymentInfo,
   listPerformanceReviews,
   getPayslip,
+  listPayslipHistory,
   listBranches,
   listDepartments,
   listEmployeeTasks,
@@ -52,8 +55,32 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const numId = Number(id);
   if (Number.isNaN(numId)) notFound();
 
-  const employee = await getEmployeeOverviewRowById(numId);
-  if (!employee) notFound();
+  // Candidate — a future hire sourced from onboarding_candidate with no
+  // real portal account yet (see getOnboardingCandidateDetail), same
+  // negative-sentinel (-source_id) convention the Pre-stage profile flow
+  // already uses (see [stage]/employee/[id]/page.tsx). Every other
+  // section's own table lookup below (getResumeInfo, listLeaveHistory, ...)
+  // already no-ops safely for a user_id that doesn't exist, so only where
+  // the employee summary/employeeDetail comes from needs special-casing —
+  // getOnboardingCandidateDetail already returns the full EmployeeDetailFull
+  // shape (id/fullName/position/branchName/departmentName included, every
+  // real-table field null), so it doubles as both `employee` and
+  // `employeeDetail` directly, no separate real-account lookup needed.
+  const isCandidate = numId < 0;
+  let employee: { id: number; fullName: string; position: string | null; branchName: string | null; departmentName: string | null; employeeId: string | null };
+  let employeeStage: EmployeeStage;
+  let candidateDetail: Awaited<ReturnType<typeof getOnboardingCandidateDetail>> = null;
+  if (isCandidate) {
+    candidateDetail = await getOnboardingCandidateDetail(-numId);
+    if (!candidateDetail) notFound();
+    employee = candidateDetail;
+    employeeStage = "pre";
+  } else {
+    const found = await getEmployeeOverviewRowById(numId);
+    if (!found) notFound();
+    employee = found;
+    employeeStage = found.stage;
+  }
 
   // Personal Info's own 3 data sections (not Guardian Info) map cleanly onto
   // user_profile/bank_details/emergency_contact, already assembled by
@@ -61,9 +88,11 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   // the same leave_request source as the Active-stage MC/Leave tab. Finance >
   // Tax Info also needs employeeDetail — its Bank Details subsection reuses
   // bank_details (already assembled onto EmployeeDetailFull), same as
-  // Payment & Bank Info.
+  // Payment & Bank Info. Skipped entirely for a candidate — candidateDetail
+  // above already covers it, and there's no real users row to query anyway.
   const needsEmployeeDetail =
-    (category === "personal-info" && PERSONAL_INFO_SECTIONS.has(section)) || (category === "finance" && section === "tax-info");
+    !isCandidate &&
+    ((category === "personal-info" && PERSONAL_INFO_SECTIONS.has(section)) || (category === "finance" && section === "tax-info"));
   const needsLocationOptions = category === "active-employment" && section === "transfer";
 
   // Every section's data fetch is independent (keyed only by numId, at most
@@ -73,7 +102,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   // needs both employeeDetail and payrollInfo). Batched into one Promise.all
   // so they run concurrently instead.
   const [
-    employeeDetail,
+    employeeDetailFetched,
     leaveHistory,
     resumeInfo,
     referenceCheck,
@@ -96,6 +125,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     paymentInfo,
     performanceReview,
     payslip,
+    payslipHistory,
     tasks,
   ] = await Promise.all([
     needsEmployeeDetail ? getEmployeeById(numId) : Promise.resolve(null),
@@ -121,24 +151,32 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     category === "personal-info" && section === "payment" ? getPaymentInfo(numId) : Promise.resolve(undefined),
     category === "active-employment" && section === "performance-review" ? listPerformanceReviews(numId) : Promise.resolve(undefined),
     category === "finance" && section === "payroll" ? getPayslip(numId) : Promise.resolve(undefined),
+    category === "finance" && section === "payroll" ? listPayslipHistory(numId) : Promise.resolve(undefined),
     category === "task" ? listEmployeeTasks(numId) : Promise.resolve(undefined),
   ]);
+
+  // Candidates never hit the needsEmployeeDetail fetch above (it's forced
+  // null), so their own employeeDetail is candidateDetail itself — already
+  // the full EmployeeDetailFull shape from getOnboardingCandidateDetail.
+  const employeeDetail = isCandidate ? candidateDetail : employeeDetailFetched;
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <EmployeeRecordView
         employeeId={employee.id}
+        canEdit={canEdit}
         employeeName={employee.fullName}
         category={cat}
         sectionKey={section}
         position={employee.position}
         branchName={employee.branchName}
         departmentName={employee.departmentName}
-        stage={employee.stage}
+        stage={employeeStage}
         employeeCode={employee.employeeId}
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
@@ -164,6 +202,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         paymentInfo={paymentInfo}
         performanceReview={performanceReview}
         payslip={payslip}
+        payslipHistory={payslipHistory}
         tasks={tasks}
       />
     </AppShell>

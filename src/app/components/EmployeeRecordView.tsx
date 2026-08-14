@@ -65,6 +65,7 @@ import type {
   PaymentInfoData,
   PerformanceReviewEntry,
   PayslipInfo,
+  PayslipHistoryEntry,
   EmployeeTasksSummary,
 } from "@/lib/employeeQueries";
 
@@ -75,7 +76,7 @@ import type {
 // w-[210px] Tailwind class since it now only ever renders at its one fixed
 // desktop size.
 const RAIL_GAP_PX = 10;
-const RAIL_BASE = "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]";
+const RAIL_BASE = "bg-[#b0ffbfa8] dark:bg-slate-800 border-[#0a6e03] dark:border-emerald-700 text-[#4b4949d6] dark:text-slate-300";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
 
 interface Props {
@@ -133,11 +134,17 @@ interface Props {
   performanceReview?: PerformanceReviewEntry[];
   /** Real payslip data — only fetched for Finance > Payroll/Payslip. */
   payslip?: PayslipInfo | null;
+  /** Real payslip_history data — only fetched for Finance > Payroll/Payslip. */
+  payslipHistory?: PayslipHistoryEntry[];
   /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
   /** Real Task Manager data (separate database) — only fetched for the Task category. */
   tasks?: EmployeeTasksSummary;
+  /** false hides every panel's Edit/Save toggle (view-only) — e.g. a CEO viewing
+   *  someone else's record, where the server-side guard already blocks the save.
+   *  Defaults true so this stays a no-op unless a caller opts in. */
+  canEdit?: boolean;
 }
 
 export default function EmployeeRecordView({
@@ -172,46 +179,48 @@ export default function EmployeeRecordView({
   paymentInfo,
   performanceReview,
   payslip,
+  payslipHistory,
   branches,
   departments,
   tasks,
+  canEdit = true,
 }: Props) {
   const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       {/* No longer needs a --rail-width custom property: the vertical rail
           is either hidden outright (touch devices, replaced by the mobile
           sub-tab row) or rendered at its one fixed w-[210px] (mouse/
           trackpad-driven browsers) — neither consumer needs a shared fluid
           value anymore. */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Employee Record</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Employee Record</span>
         </nav>
 
         <div className="flex items-start gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-lg flex items-center justify-center shrink-0">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-semibold text-lg flex items-center justify-center shrink-0">
             {initialsFromName(employeeName)}
           </div>
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-xl font-semibold text-slate-900">{employeeName}</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{employeeName}</h1>
             {stage && stage !== "pre" && employeeCode && (
-              <span className="block text-xs text-slate-500">ID: {employeeCode}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">ID: {employeeCode}</span>
             )}
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
               {departmentName ?? branchName ?? "--"} · {position || "--"}
             </span>
-            <span className="block text-xs text-slate-500">{stage ? STAGE_LABELS[stage] : "--"}</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">{stage ? STAGE_LABELS[stage] : "--"}</span>
           </div>
         </div>
 
@@ -243,7 +252,7 @@ export default function EmployeeRecordView({
             overflow-x-auto), never wrapped to a second row, either way. */}
         <nav
           aria-label="Employee record categories"
-          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
+          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
         >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
@@ -253,8 +262,8 @@ export default function EmployeeRecordView({
                 href={`/employee-record/${employeeId}/${cat.key}`}
                 className={`shrink-0 flex items-center px-4 py-2 text-sm font-medium transition-colors rounded-t-[10px] border-2 border-b-0 [@media(hover:none)]:rounded-full [@media(hover:none)]:border-0 ${
                   isActive
-                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] [@media(hover:none)]:text-[#004386c9]"
-                    : "bg-[#68d4ffa8] border-[#49a2c6] text-black hover:bg-[#68d4ff] [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 [@media(hover:none)]:hover:bg-[#dde8f7]"
+                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] dark:[@media(hover:none)]:bg-slate-600 [@media(hover:none)]:text-[#004386c9] dark:[@media(hover:none)]:text-slate-100"
+                    : "bg-[#68d4ffa8] dark:bg-slate-800 border-[#49a2c6] dark:border-slate-600 text-black dark:text-slate-200 hover:bg-[#68d4ff] dark:hover:bg-slate-700 [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 dark:[@media(hover:none)]:text-slate-400 [@media(hover:none)]:hover:bg-[#dde8f7] dark:[@media(hover:none)]:hover:bg-slate-700"
                 }`}
               >
                 {cat.label}
@@ -282,7 +291,7 @@ export default function EmployeeRecordView({
         {category.sections.length > 1 && (
           <nav
             aria-label={`${category.label} sections`}
-            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] rounded-full p-1"
+            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] dark:bg-slate-800 rounded-full p-1"
           >
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
@@ -291,7 +300,7 @@ export default function EmployeeRecordView({
                   key={section.key}
                   href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
                   className={`shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+                    isActive ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
                   }`}
                 >
                   {section.label}
@@ -308,41 +317,88 @@ export default function EmployeeRecordView({
             keep fitting side by side instead of the rail getting pushed
             below the content. */}
         <div className="flex items-start gap-3 sm:gap-4">
-          <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
+          <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
               if (sectionKey === "personal-info" && employeeDetail)
-                return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} />;
+                return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />;
               if (sectionKey === "guardian-info" && guardianInfo !== undefined)
-                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} />;
+                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />;
               if (sectionKey === "payment" && employeeDetail && paymentInfo !== undefined)
-                return <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} />;
+                return (
+                  <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
+                );
               if (sectionKey === "emergency-contact" && employeeDetail)
                 return (
-                  <EmergencyContactPanel employee={employeeDetail} onSave={(data) => updateEmergencyContact(employeeId, data)} />
+                  <EmergencyContactPanel
+                    employee={employeeDetail}
+                    onSave={(data) => updateEmergencyContact(employeeId, data)}
+                    canEdit={canEdit}
+                  />
                 );
               if (sectionKey === "leave" && leaveHistory) return <LeavePanel rows={leaveHistory} />;
               if (category.key === "hr-info" && sectionKey === "resume" && resumeInfo)
-                return <ResumePanel userId={employeeId} resumeFileId={resumeInfo.resumeFileId} cvFileId={resumeInfo.cvFileId} />;
+                return (
+                  <ResumePanel
+                    userId={employeeId}
+                    resumeFileId={resumeInfo.resumeFileId}
+                    cvFileId={resumeInfo.cvFileId}
+                    canEdit={canEdit}
+                  />
+                );
               if (category.key === "hr-info" && sectionKey === "reference" && referenceCheck !== undefined)
-                return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} />;
+                return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />;
               if (category.key === "hr-info" && sectionKey === "medical-check" && medicalCheck !== undefined)
-                return <MedicalCheckPanel userId={employeeId} data={medicalCheck} />;
+                return <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />;
               if (category.key === "hr-info" && sectionKey === "handbook" && documentsInfo !== undefined)
-                return <DocumentsPanel userId={employeeId} data={documentsInfo} showEmploymentContract={false} />;
+                return (
+                  <DocumentsPanel
+                    userId={employeeId}
+                    data={documentsInfo}
+                    showEmploymentContract={false}
+                    canEdit={canEdit}
+                  />
+                );
               if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
-                return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
-              if (category.key === "finance" && sectionKey === "payroll" && salaryRevisions !== undefined && payslip !== undefined)
-                return <PayrollPanel employeeId={employeeId} salaryRevisions={salaryRevisions} payslip={payslip} />;
+                return (
+                  <OnboardingPayrollPanel
+                    userId={employeeId}
+                    data={payrollInfo}
+                    employeeDetail={employeeDetail}
+                    heading="Tax Info"
+                    showBankDetails={false}
+                    canEdit={canEdit}
+                  />
+                );
+              if (
+                category.key === "finance" &&
+                sectionKey === "payroll" &&
+                salaryRevisions !== undefined &&
+                payslip !== undefined &&
+                payslipHistory !== undefined
+              )
+                return (
+                  <PayrollPanel
+                    employeeId={employeeId}
+                    salaryRevisions={salaryRevisions}
+                    payslip={payslip}
+                    payslipHistory={payslipHistory}
+                    canEdit={canEdit}
+                  />
+                );
               if (category.key === "hr-info" && sectionKey === "nda-nc" && ndaInfo !== undefined && nonCompeteInfo !== undefined)
-                return <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} />;
+                return (
+                  <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                );
               if (category.key === "active-employment" && sectionKey === "cert" && achievements !== undefined)
-                return <AchievementPanel userId={employeeId} data={achievements} />;
+                return <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />;
               if (category.key === "active-employment" && sectionKey === "performance-review" && performanceReview !== undefined)
-                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} />;
+                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />;
               if (category.key === "active-employment" && sectionKey === "promotion" && promotions !== undefined)
-                return <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} />;
+                return (
+                  <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
+                );
               if (category.key === "active-employment" && sectionKey === "transfer" && transfers !== undefined)
                 return (
                   <TransferPanel
@@ -351,29 +407,30 @@ export default function EmployeeRecordView({
                     branches={branches ?? []}
                     departments={departments ?? []}
                     currentLocation={departmentName ?? branchName}
+                    canEdit={canEdit}
                   />
                 );
               if (category.key === "active-employment" && sectionKey === "training" && trainings !== undefined)
-                return <TrainingPanel userId={employeeId} data={trainings} />;
+                return <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "domestic-inquiry" && domesticInquiries !== undefined)
-                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} />;
+                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "suspension" && suspensionLetters !== undefined)
-                return <SuspensionPanel userId={employeeId} data={suspensionLetters} />;
+                return <SuspensionPanel userId={employeeId} data={suspensionLetters} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "showcause" && showcauseWarningLetters !== undefined)
-                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} />;
+                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "pip" && pips !== undefined)
-                return <PipPanel userId={employeeId} data={pips} />;
+                return <PipPanel userId={employeeId} data={pips} canEdit={canEdit} />;
               if (category.key === "task" && sectionKey === "pending" && tasks !== undefined)
                 return <TaskPendingPanel tasks={tasks.pending} />;
               if (category.key === "task" && sectionKey === "overdue" && tasks !== undefined)
                 return <TaskOverduePanel tasks={tasks.overdue} />;
-              if (StaticPanel) return <StaticPanel />;
+              if (StaticPanel) return <StaticPanel canEdit={canEdit} />;
               return (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-                  <p className="text-base font-semibold text-slate-800">
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-6 py-10 text-center">
+                  <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
                     {category.label} — {currentSection.label}
                   </p>
-                  <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                     This section&apos;s fields aren&apos;t wired up yet. Navigation and layout match the reference; the form content
                     is pending a scoping decision.
                   </p>
@@ -439,10 +496,12 @@ function PaymentInfoPanel({
   employee,
   employeeId,
   data,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   employeeId: number;
   data: PaymentInfoData | null;
+  canEdit?: boolean;
 }) {
   const [bankName, setBankName] = useState(employee.bankName ?? "");
   const [accountName, setAccountName] = useState(employee.accountName ?? "");
@@ -463,7 +522,7 @@ function PaymentInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Payment &amp; Bank Info</PanelHeading>
       <Subsection heading="Bank Details">
         <EditableField label="Bank Name" value={bankName} onChange={setBankName} />

@@ -1,11 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
 import { STAFF_ROLE_ID, getEmployeeOverviewRowById, listBranches, listDepartments, resolveDepartmentBranch } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
+import { resolveNewProbationEndDate } from "@/lib/probationDecision";
+import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
 
 export interface ActionResult {
   ok: boolean;
@@ -18,6 +21,24 @@ async function requireSession(): Promise<ActionResult | null> {
   return null;
 }
 
+// CEO is view-only across the whole system except their own profile, per
+// explicit decision (see conversation, 2026-08-11) — matched by user_id,
+// never name/role, to avoid ambiguity. userId omitted entirely (the
+// create-a-new-employee case, addPreStageEmployee below) always blocks CEO,
+// since there's no existing row that could be "their own". Non-CEO accounts
+// pass through immediately without any behavior change.
+async function requireNotCeoUnlessOwnProfile(userId?: number): Promise<ActionResult | null> {
+  const session = await auth();
+  if (!session?.user?.email) return { ok: false, error: "Not signed in." };
+  const me = await prisma.users.findUnique({
+    where: { email: session.user.email },
+    select: { user_id: true, role: { select: { role_type: true } } },
+  });
+  if (me?.role?.role_type?.toLowerCase() !== "ceo") return null;
+  if (userId != null && me.user_id === userId) return null;
+  return { ok: false, error: "CEO accounts can only edit their own profile." };
+}
+
 // Every mutation below targets a specific employee (userId, always the first
 // parameter) — this blocks a department/branch-scoped account from writing
 // to an out-of-scope employee's record via a direct action call, not just
@@ -26,6 +47,13 @@ async function requireSession(): Promise<ActionResult | null> {
 async function requireEmployeeInScope(userId: number): Promise<ActionResult | null> {
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
+
+  // Checked before the fullAccess/department/branch logic below — CEO now
+  // has fullAccess: true for VIEWING (see employeeScope.ts), so without
+  // this, the fullAccess shortcut a few lines down would let a CEO write to
+  // any employee's record. This blocks that regardless of scope.
+  const ceoError = await requireNotCeoUnlessOwnProfile(userId);
+  if (ceoError) return ceoError;
 
   const target = await prisma.users.findUnique({
     where: { user_id: userId },
@@ -50,10 +78,35 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
 
   const emp = target.employment[0];
   const inScope = isRowInScope(scope, {
+    id: userId,
     departmentCode: emp?.department?.department_code ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
   });
   if (!inScope) return { ok: false, error: "You do not have access to this employee's record." };
+  return null;
+}
+
+// Deliberately narrower than every other write in this file — per explicit
+// decision (see conversation), restricted to role_type "hr"/"superadmin"
+// specifically, not the broader is_full_access flag or department/branch
+// scope that requireEmployeeInScope above allows for general edits. Checked
+// in addition to (not instead of) requireEmployeeInScope, so an HR account
+// still can't act on someone outside their scope. Originally built for
+// Probation's Confirm/Extend/Stop decision (decideProbationOutcome below);
+// reused as-is (same role check, generic error message) for Exit >
+// Clearance's "add a new checklist item beyond the fixed 5" gate, per
+// explicit instruction not to invent a second HR-only check.
+async function requireHrOrSuperadmin(): Promise<ActionResult | null> {
+  const session = await auth();
+  if (!session?.user?.email) return { ok: false, error: "Not signed in." };
+  const me = await prisma.users.findUnique({
+    where: { email: session.user.email },
+    select: { role: { select: { role_type: true } } },
+  });
+  const roleType = me?.role?.role_type?.toLowerCase();
+  if (roleType !== "hr" && roleType !== "superadmin") {
+    return { ok: false, error: "Only HR or Superadmin accounts can perform this action." };
+  }
   return null;
 }
 
@@ -385,11 +438,14 @@ export async function updateMedicalCheck(userId: number, input: UpdateMedicalChe
 
 // Real probation table — Probation stage's own tab. confirmationLetter*/
 // extensionLetter* follow updateResume's exact pattern (two independent
-// Drive-file fields, each replaced/cleared the same way).
+// Drive-file fields, each replaced/cleared the same way). probationStatus/
+// startDate/endDate deliberately removed from this input — per explicit
+// decision (see conversation), Start/End Date are now read-only from
+// ebright_hrfs.BranchStaff (see probationDecision.ts) and Probation Status
+// is only ever settable via the HR/Superadmin-only decideProbationOutcome
+// below, not this broader-access form — keeping them here would have left
+// exactly the loophole that restriction was meant to close.
 export interface UpdateProbationInput {
-  probationStatus: string;
-  startDate: string; // yyyy-mm-dd, "" = unset
-  endDate: string;
   confirmDate: string;
   extEndDate: string;
   confirmationLetterFileId: string | null;
@@ -431,9 +487,6 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     }
 
     const data = {
-      probation_status: input.probationStatus || null,
-      start_date: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
-      end_date: input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
       confirm_date: input.confirmDate ? new Date(`${input.confirmDate}T00:00:00Z`) : null,
       ext_end_date: input.extEndDate ? new Date(`${input.extEndDate}T00:00:00Z`) : null,
       confirmation_letter_file_id: confirmationLetterFileId,
@@ -447,6 +500,111 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Probation." };
+  }
+}
+
+// The one write path this whole Probation feature introduces (see
+// conversation) — everything else it reads (BranchStaff dates,
+// career_applications feedback2/status2) is read-only. HR/Superadmin only
+// (requireHrOrSuperadmin above), on top of the usual scope check. Writes
+// ONLY to the probation table, per explicit decision (see conversation) —
+// no other hrfs table is touched by this action, including employment.
+// "Confirmed" still moves a Full-Time employee to Active immediately in
+// effect, without a second write: computeAutoConfirmedProbationIds (see
+// probationDecision.ts) already treats a local probation_status="Confirmed"
+// exactly the same as a live status2="Accept" read, live, on every render —
+// the same mechanism that already handles the "nobody's clicked anything,
+// status2 already says Accept" case. So the moment this upsert lands, the
+// very next page load already shows them as Active, purely from this one
+// write. Extended/Stopped only ever write the decision either way — Stopped
+// stays in Probation with its display flipped to "Stop", Extended just
+// keeps the existing timeline.
+// localFeedback: the CURRENTLY-TYPED Feedback field value, passed by the
+// caller only when this person has no career_applications match (see
+// ProbationDisplayInfo.hasCareerApplicationMatch) — undefined for a matched
+// person, whose Feedback stays external/read-only. Folded into this same
+// action (rather than requiring a separate Save of the outer form first) so
+// there's no ordering question between "did they save the typed Feedback"
+// and "is Feedback present" — both happen atomically here. Confirmed/Stopped
+// both require Feedback to be present first, per explicit decision (see
+// conversation): checks feedback2 for a matched person, local_feedback
+// (this call's own localFeedback param) for an unmatched one — Extended has
+// no such requirement. Confirmed also auto-stamps confirm_date to today;
+// decideProbationOutcome remains the only write path this whole feature
+// introduces, now covering three fields instead of two.
+export async function decideProbationOutcome(
+  userId: number,
+  outcome: "Confirmed" | "Extended" | "Stopped",
+  localFeedback?: string,
+): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
+
+  try {
+    if (outcome === "Confirmed" || outcome === "Stopped") {
+      const profile = await prisma.user_profile.findUnique({ where: { user_id: userId }, select: { full_name: true } });
+      const careerApplications = await lookupCareerApplicationsByName();
+      const match = careerApplications.get(normalizeName(profile?.full_name ?? ""));
+      const effectiveFeedback = match ? match.feedback2 : localFeedback;
+      if (!effectiveFeedback || !effectiveFeedback.trim()) {
+        return { ok: false, error: "Feedback must be filled in before Confirm or Stop." };
+      }
+    }
+
+    const session = await auth();
+    const me = await prisma.users.findUnique({ where: { email: session!.user!.email! }, select: { user_id: true } });
+    if (!me) return { ok: false, error: "Not signed in." };
+
+    const now = new Date();
+    const fields = {
+      probation_status: outcome,
+      decided_by: me.user_id,
+      decided_at: now,
+      ...(outcome === "Confirmed" ? { confirm_date: now } : {}),
+      ...(localFeedback !== undefined ? { local_feedback: localFeedback || null } : {}),
+    };
+    await prisma.probation.upsert({
+      where: { user_id: userId },
+      update: fields,
+      create: { user_id: userId, ...fields },
+    });
+
+    // Restores what the old standalone "Next" button (proceedFromProbation,
+    // removed as redundant — see conversation) used to do on its own click.
+    // Load-bearing, not cosmetic: computeRealAccountLifecycleOverrides only
+    // affects DISPLAY on pages that explicitly apply it (namelists, the
+    // Probation profile's own dual-list guard) — it was never a substitute
+    // for this real write. Without it, employment.status never actually
+    // becomes "active": getEmployeeOverviewRowById (which every profile
+    // page's own stage-match guard reads) computes purely from the raw
+    // stored status, so /active/employee/[id]/... 404s, AND the person
+    // never appears on the real Active namelist either (that list filters
+    // on raw stage too) — a live bug found this exact way (see
+    // conversation). Confirmed's only prerequisite here is being HR/
+    // Superadmin (already checked above) plus having a real employment row
+    // — same as every other write in this file, no separate Full-Time
+    // re-check needed since this action is only ever reachable from the
+    // Probation panel, itself only shown for Full-Time people.
+    if (outcome === "Confirmed") {
+      const employment = await prisma.employment.findFirst({
+        where: { user_id: userId },
+        orderBy: { start_date: "desc" },
+      });
+      if (employment) {
+        await prisma.employment.update({
+          where: { employment_id: employment.employment_id },
+          data: { status: "active", probation: false },
+        });
+      }
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to record probation decision." };
   }
 }
 
@@ -993,6 +1151,288 @@ export async function updateExitInterviewNote(userId: number, input: UpdateExitI
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Exit Interview Note." };
+  }
+}
+
+// ─── Exit > Clearance: Knowledge Transfer/Asset Recovery/System Revocation
+// checklists + Financial Settlement — per explicit design (see
+// conversation). toggleXItem() is open to any in-scope role (matches the
+// general edit permission every other field in this file uses); addXItem()
+// additionally requires requireHrOrSuperadmin() — anyone else can check/
+// uncheck the fixed 5 items but not add a 6th. scope: "all" writes user_id:
+// null (global, every employee's checklist going forward); scope:
+// "employee" writes user_id: userId (this employee only) — see
+// exit_knowledge_transfer_item's own schema comment for why neither case
+// needs a backfill of other employees' checklists.
+
+export interface AddExitChecklistItemInput {
+  label: string;
+  scope: "all" | "employee";
+}
+
+async function resolveCurrentUserId(): Promise<number | null> {
+  const session = await auth();
+  if (!session?.user?.email) return null;
+  const me = await prisma.users.findUnique({ where: { email: session.user.email }, select: { user_id: true } });
+  return me?.user_id ?? null;
+}
+
+export async function addKnowledgeTransferItem(userId: number, input: AddExitChecklistItemInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: "Item label is required." };
+  try {
+    const createdById = await resolveCurrentUserId();
+    await prisma.exit_knowledge_transfer_item.create({
+      data: { user_id: input.scope === "employee" ? userId : null, label, created_by_id: createdById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to add checklist item." };
+  }
+}
+
+export async function toggleKnowledgeTransferItem(userId: number, itemId: number, checked: boolean): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const checkedById = await resolveCurrentUserId();
+    await prisma.exit_knowledge_transfer_state.upsert({
+      where: { user_id_item_id: { user_id: userId, item_id: itemId } },
+      update: { checked, checked_at: new Date(), checked_by_id: checkedById },
+      create: { user_id: userId, item_id: itemId, checked, checked_at: new Date(), checked_by_id: checkedById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update checklist item." };
+  }
+}
+
+// Renaming a global item's label changes it for every employee, same
+// reasoning as delete above — there's no per-employee override of a global
+// item's text either. HR/Superadmin-only, same gate as add/delete.
+export async function renameKnowledgeTransferItem(userId: number, itemId: number, label: string): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const trimmed = label.trim();
+  if (!trimmed) return { ok: false, error: "Item label is required." };
+  try {
+    await prisma.exit_knowledge_transfer_item.update({ where: { id: itemId }, data: { label: trimmed } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to rename checklist item." };
+  }
+}
+
+// Deleting a global item (user_id null) deletes it for every employee, not
+// just this one — there's no "hide this global item for just one employee"
+// concept in this design. exit_knowledge_transfer_state.item_id cascades
+// (onDelete: Cascade), so this single delete also removes every employee's
+// checked-state row for it in the same statement. HR/Superadmin-only, same
+// gate as adding — including for one of the original seeded 5, which are
+// unprotected regular global rows like any other.
+export async function deleteKnowledgeTransferItem(userId: number, itemId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  try {
+    await prisma.exit_knowledge_transfer_item.delete({ where: { id: itemId } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete checklist item." };
+  }
+}
+
+export async function addAssetRecoveryItem(userId: number, input: AddExitChecklistItemInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: "Item label is required." };
+  try {
+    const createdById = await resolveCurrentUserId();
+    await prisma.exit_asset_recovery_item.create({
+      data: { user_id: input.scope === "employee" ? userId : null, label, created_by_id: createdById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to add checklist item." };
+  }
+}
+
+export async function toggleAssetRecoveryItem(userId: number, itemId: number, checked: boolean): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const checkedById = await resolveCurrentUserId();
+    await prisma.exit_asset_recovery_state.upsert({
+      where: { user_id_item_id: { user_id: userId, item_id: itemId } },
+      update: { checked, checked_at: new Date(), checked_by_id: checkedById },
+      create: { user_id: userId, item_id: itemId, checked, checked_at: new Date(), checked_by_id: checkedById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update checklist item." };
+  }
+}
+
+export async function renameAssetRecoveryItem(userId: number, itemId: number, label: string): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const trimmed = label.trim();
+  if (!trimmed) return { ok: false, error: "Item label is required." };
+  try {
+    await prisma.exit_asset_recovery_item.update({ where: { id: itemId }, data: { label: trimmed } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to rename checklist item." };
+  }
+}
+
+export async function deleteAssetRecoveryItem(userId: number, itemId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  try {
+    await prisma.exit_asset_recovery_item.delete({ where: { id: itemId } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete checklist item." };
+  }
+}
+
+export async function addSystemRevocationItem(userId: number, input: AddExitChecklistItemInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: "Item label is required." };
+  try {
+    const createdById = await resolveCurrentUserId();
+    await prisma.exit_system_revocation_item.create({
+      data: { user_id: input.scope === "employee" ? userId : null, label, created_by_id: createdById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to add checklist item." };
+  }
+}
+
+export async function toggleSystemRevocationItem(userId: number, itemId: number, checked: boolean): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const checkedById = await resolveCurrentUserId();
+    await prisma.exit_system_revocation_state.upsert({
+      where: { user_id_item_id: { user_id: userId, item_id: itemId } },
+      update: { checked, checked_at: new Date(), checked_by_id: checkedById },
+      create: { user_id: userId, item_id: itemId, checked, checked_at: new Date(), checked_by_id: checkedById },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to update checklist item." };
+  }
+}
+
+export async function renameSystemRevocationItem(userId: number, itemId: number, label: string): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  const trimmed = label.trim();
+  if (!trimmed) return { ok: false, error: "Item label is required." };
+  try {
+    await prisma.exit_system_revocation_item.update({ where: { id: itemId }, data: { label: trimmed } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to rename checklist item." };
+  }
+}
+
+export async function deleteSystemRevocationItem(userId: number, itemId: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  const roleError = await requireHrOrSuperadmin();
+  if (roleError) return roleError;
+  try {
+    await prisma.exit_system_revocation_item.delete({ where: { id: itemId } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete checklist item." };
+  }
+}
+
+export interface UpdateFinancialSettlementInput {
+  finalPayDate: string;
+  outstandingLeavePayout: string;
+  outstandingClaims: string;
+  loanAdvanceDeduction: string;
+  notes: string;
+  settlementLetterFileId: string | null;
+  settlementLetterFile: File | null;
+}
+
+export async function updateFinancialSettlement(userId: number, input: UpdateFinancialSettlementInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    let settlementLetterFileId = input.settlementLetterFileId;
+    if (input.settlementLetterFile) {
+      const uploaded = await uploadToDrive(input.settlementLetterFile, {
+        prefix: "settlement-letter",
+        folderEnvVar: "GOOGLE_DRIVE_SETTLEMENT_LETTER_ID",
+      });
+      settlementLetterFileId = uploaded.id;
+    }
+    const fields = {
+      final_pay_date: input.finalPayDate ? new Date(`${input.finalPayDate}T00:00:00Z`) : null,
+      outstanding_leave_payout: input.outstandingLeavePayout ? Number.parseFloat(input.outstandingLeavePayout) : null,
+      outstanding_claims: input.outstandingClaims ? Number.parseFloat(input.outstandingClaims) : null,
+      loan_advance_deduction: input.loanAdvanceDeduction ? Number.parseFloat(input.loanAdvanceDeduction) : null,
+      notes: input.notes || null,
+      settlement_letter_file_id: settlementLetterFileId,
+    };
+    await prisma.exit_financial_settlement.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to save Financial Settlement." };
   }
 }
 
@@ -1847,11 +2287,16 @@ export async function deletePerformanceReview(userId: number, id: number): Promi
   }
 }
 
+// attachmentFileId/attachmentFile are retired, per explicit decision (see
+// conversation) — the single-upload Payslip widget they backed is replaced
+// by payslip_history (see addPayslipHistory below). basicPay/type are
+// unchanged. Deliberately no attachment handling left here at all (not
+// even a no-op pass-through) — this closes off the write path so
+// payslip.attachment_file_id can't get silently repopulated by a future
+// caller; the column itself stays in the schema, just never written again.
 export interface UpdatePayslipInput {
   basicPay: string;
   type: string;
-  attachmentFileId: string | null;
-  attachmentFile: File | null;
 }
 
 export async function updatePayslip(userId: number, input: UpdatePayslipInput): Promise<ActionResult> {
@@ -1860,26 +2305,61 @@ export async function updatePayslip(userId: number, input: UpdatePayslipInput): 
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
   try {
-    const existing = await prisma.payslip.findUnique({ where: { user_id: userId } });
-
-    let attachmentFileId = input.attachmentFileId;
-    if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "payslip", folderEnvVar: "GOOGLE_DRIVE_PAYSLIP_ID" });
-      attachmentFileId = uploaded.id;
-    }
-    if (existing?.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
-      await deleteFromDrive(existing.attachment_file_id);
-    }
-
     const fields = {
       basic_pay: input.basicPay ? Number.parseFloat(input.basicPay) : null,
       type: input.type || null,
-      attachment_file_id: attachmentFileId,
     };
     await prisma.payslip.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Payslip." };
+  }
+}
+
+// Payslip History — same shape as addAchievement (repeatable, own file per
+// row), except both fields are required: a payslip history entry with no
+// month or no file isn't a meaningful record the way a blank Achievement
+// date/attachment can be. Add + Delete only, per explicit decision (see
+// conversation, "same UI pattern as Training") — Training itself has
+// delete but no in-place edit, and that's the pattern this follows; no
+// updatePayslipHistory exists, so a wrong month/file is corrected by
+// deleting the row and adding a new one, not editing it.
+export interface AddPayslipHistoryInput {
+  month: string; // "YYYY-MM"
+  attachmentFile: File | null;
+}
+
+export async function addPayslipHistory(userId: number, input: AddPayslipHistoryInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  if (!input.month) return { ok: false, error: "Month is required." };
+  if (!input.attachmentFile) return { ok: false, error: "Payslip file is required." };
+  try {
+    const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "payslip", folderEnvVar: "GOOGLE_DRIVE_PAYSLIP_ID" });
+    await prisma.payslip_history.create({
+      data: { user_id: userId, month: input.month, attachment_file_id: uploaded.id },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to save Payslip History." };
+  }
+}
+
+export async function deletePayslipHistory(userId: number, id: number): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const row = await prisma.payslip_history.findUnique({ where: { payslip_history_id: id } });
+    if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
+    await deleteFromDrive(row.attachment_file_id);
+    await prisma.payslip_history.delete({ where: { payslip_history_id: id } });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to delete Payslip History." };
   }
 }
 
@@ -1906,6 +2386,10 @@ export interface AddPreStageEmployeeInput {
 export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Promise<ActionResult & { id?: number }> {
   const authError = await requireSession();
   if (authError) return authError;
+  // No existing userId here (this creates a brand-new employee) — always
+  // blocks CEO, since there's no row that could be "their own profile".
+  const ceoError = await requireNotCeoUnlessOwnProfile();
+  if (ceoError) return ceoError;
 
   const fullName = input.fullName.trim();
   if (!fullName) return { ok: false, error: "Full Name is required." };
@@ -1924,7 +2408,13 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
   const scope = await getCurrentEmployeeScope();
   if (!scope) return { ok: false, error: "Not signed in." };
   if (!scope.fullAccess) {
+    // No real id yet (this employee doesn't exist until the insert below
+    // succeeds) — -1 can never equal a real user_id, so an ownUserId-scoped
+    // (individual staff) account correctly fails this check and can't
+    // create new employee records at all, only department/branch-scoped
+    // accounts (checked via departmentCode/branchCode, not id) can.
     const inScope = isRowInScope(scope, {
+      id: -1,
       departmentCode: input.departmentCode || null,
       branchCode: input.branchCode || null,
     });
@@ -1939,10 +2429,28 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
     if (input.branchCode && !branch) return { ok: false, error: "Unknown branch." };
     if (input.departmentCode && !department) return { ok: false, error: "Unknown department." };
 
-    // No login is being set up here (password stays null) — just placeholder
-    // enough to satisfy users.email's UNIQUE NOT NULL constraint. HR replaces
-    // this with the employee's real email once they actually onboard.
-    const placeholderEmail = `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@placeholder.ebright.my`;
+    // No login is being set up here (password stays null) — just enough to
+    // satisfy users.email's UNIQUE NOT NULL constraint (true blank/null
+    // isn't possible without making the login-identifier column nullable
+    // app-wide — out of scope here, see conversation). The form itself has
+    // no email field at all (AddPreStageEmployeeModal.tsx), so this is
+    // never shown to HR either way; the format only matters for how it
+    // reads later, e.g. when investigating live data. HR replaces this with
+    // the employee's real email once they actually onboard.
+    //
+    // Deliberately NOT the pre-<ms>-<rand>@placeholder.ebright.my shape
+    // used previously — per explicit decision (see conversation),
+    // syncCareerApplicationsToPreStage()'s own create branch (still active
+    // on production) turned out to generate that exact same pattern as ITS
+    // fallback too, making a synced ghost indistinguishable from a genuine
+    // manual add by email alone (see computePreEligibleRows's own comment
+    // in careerApplicationSync.ts — start_date is what actually
+    // distinguishes them now, not email). This format shares no component
+    // (prefix, domain, or Date.now()/Math.random() generation) with that
+    // one, and uses the .invalid TLD (RFC 2606 — reserved specifically for
+    // addresses that must never resolve as real) so it also reads
+    // unambiguously as a placeholder rather than an obfuscated real address.
+    const placeholderEmail = `no-email-${randomUUID()}@unset.invalid`;
 
     const user = await prisma.users.create({
       data: {
@@ -1977,15 +2485,21 @@ export async function addPreStageEmployee(input: AddPreStageEmployeeInput): Prom
 
 // ─── Pre stage's "Proceed" button — the only stage-transition button that's
 // actually wired to a real employment update (the rest stay the pre-existing
-// "not wired up" placeholder). Full-time positions go to Probation
-// (probation=true); everything else (Part Time/Intern) goes to Onboarding
-// (status="onboarding") — same 2-way split positionGroup() already uses.
+// "not wired up" placeholder). Full Time's only path to Active is Probation
+// confirmation (see decideProbationOutcome) — this
+// button must not bypass that, same rule proceedFromOnboarding already
+// enforces below (see its own comment) — must not let this button send a
+// Full-Time person straight to Active with no real board_stage-driven
+// Probation membership to back it up (see conversation: exactly this
+// produced a stuck, unreachable "Active" record for a Full-Time test
+// account with no career_applications match at all). Only Part Time/
+// Intern/Protege Intern proceed via this button, straight to Onboarding.
 // Also clears employment.start_date forward to today when it's still in the
-// future: Pre-stage membership is checked ahead of status/probation
-// (start_date in the future always wins), so without this the employee would
-// stay stuck in Pre no matter what status/probation gets set to here — this
-// button is an explicit "they're proceeding right now" override, not
-// something that waits for the originally-planned date to actually arrive. ───
+// future: Pre-stage membership is checked ahead of status (start_date in
+// the future always wins), so without this the employee would stay stuck
+// in Pre no matter what status gets set here — this button is an explicit
+// "they're proceeding right now" override, not something that waits for
+// the originally-planned date to actually arrive. ───
 
 export async function proceedFromPreStage(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -1996,22 +2510,70 @@ export async function proceedFromPreStage(userId: number): Promise<ActionResult>
     const employment = await prisma.employment.findFirst({
       where: { user_id: userId },
       orderBy: { start_date: "desc" },
+      include: { branch: true, department: true },
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
 
+    // Full Time used to hard-block here entirely ("move to Active via
+    // Probation confirmation, not this button") — per explicit decision
+    // (see conversation), it now advances them too, HR/Superadmin-only
+    // (unlike Part Time/Intern below, which stays open to any in-scope
+    // role — unchanged). The write itself (start_date bump + status:
+    // "onboarding") is identical either way and deliberately doesn't try to
+    // decide Probation membership — computeRealAccountLifecycleOverrides
+    // (careerApplicationSync.ts) already does that correctly, purely
+    // computed from this same start_date/status plus the live
+    // career_applications match: Full Time + a "Probation" board_stage
+    // match, or Full Time + no match at all once start_date has arrived
+    // (this button's exact effect), both land on Probation+Onboarding
+    // automatically; a match with any OTHER board_stage stays Onboarding-
+    // only, same as it already does for everyone else. Nothing here needs
+    // to special-case which of those applies.
     const isFullTime = positionGroup(employment.position) === "Full Time";
+    if (isFullTime) {
+      const roleError = await requireHrOrSuperadmin();
+      if (roleError) return roleError;
+    }
+
     const todayIso = new Date().toISOString().slice(0, 10);
     const startIso = employment.start_date ? employment.start_date.toISOString().slice(0, 10) : null;
     const needsStartDateBump = !startIso || startIso > todayIso;
+    const finalStartIso = needsStartDateBump ? todayIso : startIso!;
 
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },
       data: {
         ...(needsStartDateBump ? { start_date: new Date(`${todayIso}T00:00:00Z`) } : {}),
-        status: isFullTime ? "active" : "onboarding",
-        probation: isFullTime,
+        status: "onboarding",
+        probation: false,
       },
     });
+
+    // computeRealAccountLifecycleOverrides puts a Full-Time person here onto
+    // Probation+Onboarding purely from employment (see the comment above) —
+    // but getProbationDisplayInfo's own Start/End Date fields read from a
+    // real hrfs.probation row (BranchStaff match first, else this local
+    // row), which never existed for someone who only ever went through this
+    // button. Without this, the Probation panel shows blank Start/End Date
+    // forever for exactly the population this whole feature was built for
+    // (see conversation — the addPreStageEmployee/no-match case).
+    if (isFullTime) {
+      const profile = await prisma.user_profile.findUnique({ where: { user_id: userId }, select: { full_name: true } });
+      const fullName = profile?.full_name ?? "";
+      const startDate = new Date(`${finalStartIso}T00:00:00Z`);
+      const endDateIso = await resolveNewProbationEndDate(
+        fullName,
+        startDate,
+        employment.branch?.branch_code ?? null,
+        employment.department?.department_code ?? null,
+      );
+      const probationFields = { start_date: startDate, end_date: new Date(`${endDateIso}T00:00:00Z`) };
+      await prisma.probation.upsert({
+        where: { user_id: userId },
+        update: probationFields,
+        create: { user_id: userId, ...probationFields },
+      });
+    }
 
     return { ok: true };
   } catch (e) {
@@ -2044,7 +2606,11 @@ export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
     if (!scope.fullAccess) {
       const [departments, branches] = await Promise.all([listDepartments(), listBranches()]);
       const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
-      if (!isRowInScope(scope, { departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
+      // No real user_id (this candidate has no portal account) — -1 can
+      // never equal a real user_id, so an ownUserId-scoped (individual
+      // staff) account correctly fails this check; only department/branch-
+      // scoped accounts can delete a candidate in their own department/branch.
+      if (!isRowInScope(scope, { id: -1, departmentCode: loc.departmentCode, branchCode: loc.branchCode })) {
         return { ok: false, error: "You do not have access to this candidate." };
       }
     }
@@ -2069,50 +2635,15 @@ export async function deleteEmployeeRecord(id: number): Promise<ActionResult> {
   }
 }
 
-// ─── Probation stage's "Next" button — real employment update, gated on the
-// probation table's own Probation Status being "Confirmed" (re-checked here
-// server-side too, not just via the UI's disabled button, since a client
-// could otherwise call this action directly). Setting status="onboarding"
-// clears them out of Probation the same way it clears a non-full-time
-// employee out of Pre — nonExitStage() checks status==="onboarding" before
-// the probation flag, so probation is also reset to false here for data
-// cleanliness now that it no longer applies. ───
-
-export async function proceedFromProbation(userId: number): Promise<ActionResult> {
-  const authError = await requireSession();
-  if (authError) return authError;
-  const scopeError = await requireEmployeeInScope(userId);
-  if (scopeError) return scopeError;
-  try {
-    const probation = await prisma.probation.findUnique({ where: { user_id: userId } });
-    if (probation?.probation_status !== "Confirmed") {
-      return { ok: false, error: "Probation Status must be Confirmed before proceeding." };
-    }
-
-    const employment = await prisma.employment.findFirst({
-      where: { user_id: userId },
-      orderBy: { start_date: "desc" },
-    });
-    if (!employment) return { ok: false, error: "No employment record found for this employee." };
-
-    await prisma.employment.update({
-      where: { employment_id: employment.employment_id },
-      data: { status: "onboarding", probation: false },
-    });
-
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Failed to proceed." };
-  }
-}
-
-// ─── Onboarding stage's "Next" button — real employment update, no
-// prerequisite gate (unlike Probation's Confirmed-status requirement, nothing
-// was specified for Onboarding->Active, so the button stays always-enabled).
-// nonExitStage() checks status==="onboarding" before the probation flag, so
-// once status flips to "active" this employee is Active regardless of
-// probation — cleared here too for data cleanliness now that it no longer
-// applies, same as Probation's own transition. ───
+// ─── Onboarding stage's "Next" button — real employment update. Part Time/
+// Intern only (per explicit decision, see conversation) — this is their
+// manual early-advance out of the 3-fixed-day Onboarding window (see
+// computeRealAccountLifecycleOverrides); Full Time is gated out below since
+// their only path to Active is Probation confirmation. nonExitStage() checks
+// status==="onboarding" before the probation flag, so once status flips to
+// "active" this employee is Active regardless of probation — cleared here
+// too for data cleanliness now that it no longer applies, same as
+// Probation's own transition. ───
 
 export async function proceedFromOnboarding(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2125,6 +2656,13 @@ export async function proceedFromOnboarding(userId: number): Promise<ActionResul
       orderBy: { start_date: "desc" },
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
+    // Full Time's only path to Active is Probation confirmation (see
+    // decideProbationOutcome) — must not let this button bypass that, now
+    // that Full Time rows are also dual-listed onto this same Onboarding
+    // view (see computeRealAccountLifecycleOverrides).
+    if (positionGroup(employment.position) === "Full Time") {
+      return { ok: false, error: "Full Time employees move to Active via Probation confirmation, not this button." };
+    }
 
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },

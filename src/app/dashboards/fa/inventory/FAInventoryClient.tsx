@@ -6,11 +6,11 @@ import Link from "next/link";
 import { MOCK_EVENTS, type EventStatus, type InventoryEvent } from "./_mock";
 
 const STATUS_STYLES: Record<EventStatus, { dot: string; text: string; bg: string }> = {
-  draft:     { dot: "bg-slate-400",  text: "text-slate-600",  bg: "bg-slate-100" },
-  open:      { dot: "bg-blue-500",   text: "text-blue-700",   bg: "bg-blue-50"   },
-  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700",   bg: "bg-teal-50"   },
-  closed:    { dot: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50"  },
-  completed: { dot: "bg-green-500",  text: "text-green-700",  bg: "bg-green-50"  },
+  draft:     { dot: "bg-slate-400",  text: "text-slate-600 dark:text-slate-300",  bg: "bg-slate-100 dark:bg-slate-800"  },
+  open:      { dot: "bg-blue-500",   text: "text-blue-700 dark:text-blue-300",   bg: "bg-blue-50 dark:bg-blue-900"    },
+  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700 dark:text-teal-300",   bg: "bg-teal-50 dark:bg-teal-900"    },
+  closed:    { dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 dark:bg-amber-900"   },
+  completed: { dot: "bg-green-500",  text: "text-green-700 dark:text-green-300",  bg: "bg-green-50 dark:bg-green-900"   },
 };
 
 const STATUS_FILTERS: { label: string; value: EventStatus | "all" }[] = [
@@ -35,7 +35,7 @@ function EventCard({ event }: { event: InventoryEvent }) {
   return (
     <Link
       href={`/dashboards/fa/inventory/${event.id}`}
-      className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-3 hover:border-slate-300 hover:shadow-sm transition-all"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col gap-3 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none">
@@ -44,9 +44,9 @@ function EventCard({ event }: { event: InventoryEvent }) {
         <StatusBadge status={event.status} />
       </div>
 
-      <h3 className="text-base font-semibold text-slate-900 leading-snug">{event.name}</h3>
+      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-snug">{event.name}</h3>
 
-      <div className="space-y-1.5 text-sm text-slate-500 mt-auto">
+      <div className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400 mt-auto">
         <div className="flex items-center gap-1.5">
           <CalendarDays className="w-3.5 h-3.5 shrink-0" />
           <span>{event.dateLabel}</span>
@@ -72,29 +72,29 @@ export default function FAInventoryClient() {
   });
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium">Inventory</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium">Inventory</span>
         </nav>
 
         {/* Page header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">Event Inventory</h1>
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">Event Inventory</h1>
         </div>
       </div>
 
       {/* Sticky search + filters bar */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200/80 dark:border-slate-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative">
@@ -104,11 +104,11 @@ export default function FAInventoryClient() {
                 placeholder="Search events or venues..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+                className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1">
               {STATUS_FILTERS.map((f) => (
                 <button
                   key={f.value}
@@ -117,7 +117,7 @@ export default function FAInventoryClient() {
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     statusFilter === f.value
                       ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
                   {f.label}
@@ -134,9 +134,9 @@ export default function FAInventoryClient() {
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
         {filtered.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-            <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-medium text-slate-500">No events match your filters.</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center text-center">
+            <CalendarDays className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No events match your filters.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

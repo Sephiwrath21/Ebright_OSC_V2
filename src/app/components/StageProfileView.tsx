@@ -13,6 +13,7 @@ import {
   STAGE_PROCEED_BUTTON,
   STAGE_HISTORY_TAB_STYLE,
   HISTORY_TAB_LABEL,
+  profileUrlForStage,
   type ProfileSection,
 } from "@/lib/stageProfileConfig";
 import type {
@@ -38,7 +39,10 @@ import type {
   ResignationInfo,
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
+  ExitChecklistItem,
+  FinancialSettlementInfo,
 } from "@/lib/employeeQueries";
+import type { ProbationDisplayInfo } from "@/lib/probationDecision";
 import {
   PanelHeading,
   RecordTable,
@@ -64,12 +68,15 @@ import {
   ResignationPanel,
   ReferenceLetterPanel,
   ExitInterviewNotesPanel,
+  KnowledgeTransferPanel,
+  AssetRecoveryPanel,
+  SystemRevocationPanel,
+  FinancialSettlementPanel,
 } from "@/app/components/ActiveProfilePanels";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
 import {
   updateEmergencyContact,
   proceedFromPreStage,
-  proceedFromProbation,
   proceedFromOnboarding,
   proceedFromActive,
 } from "@/lib/employeeRecordActions";
@@ -89,6 +96,20 @@ interface Props {
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
   probationInfo?: ProbationInfo | null;
+  /** BranchStaff/career_applications-derived Start Date/End Date/Feedback/
+   *  display status (see probationDecision.ts) — undefined only when this
+   *  isn't the Probation section (mirrors probationInfo's own gating). */
+  probationDisplay?: ProbationDisplayInfo;
+  /** HR/Superadmin only, per explicit decision (see conversation) — gates
+   *  the Confirm/Extend/Stop buttons; decideProbationOutcome re-checks this
+   *  server-side regardless. */
+  canDecideProbation?: boolean;
+  /** false when the viewer is a CEO looking at someone else's profile —
+   *  hides every panel's Edit/Save toggle (server-side already blocks the
+   *  write regardless, via requireNotCeoUnlessOwnProfile in
+   *  employeeRecordActions.ts; this just avoids a dead button). Defaults
+   *  true so every other caller keeps its current behavior unchanged. */
+  canEdit?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -102,6 +123,15 @@ interface Props {
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  /** Exit's 4 Clearance sub-tabs — undefined outside Exit, same gating as
+   *  resignationInfo/etc above. canAddChecklistItem is resolved server-side
+   *  from the session role (HR/Superadmin only), same pattern as
+   *  canDecideProbation. */
+  knowledgeTransferChecklist?: ExitChecklistItem[];
+  assetRecoveryChecklist?: ExitChecklistItem[];
+  systemRevocationChecklist?: ExitChecklistItem[];
+  financialSettlement?: FinancialSettlementInfo | null;
+  canAddChecklistItem?: boolean;
   /** Combined Branch/Department option lists for Transfer's From/To dropdowns. */
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
@@ -135,6 +165,9 @@ export default function StageProfileView({
   referenceCheck,
   medicalCheck,
   probationInfo,
+  probationDisplay,
+  canDecideProbation,
+  canEdit,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -148,6 +181,11 @@ export default function StageProfileView({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  knowledgeTransferChecklist,
+  assetRecoveryChecklist,
+  systemRevocationChecklist,
+  financialSettlement,
+  canAddChecklistItem,
   branches,
   departments,
   locationGroup,
@@ -185,10 +223,14 @@ export default function StageProfileView({
   // button uses — Full Time goes to Probation, everything else skips
   // straight to Onboarding, same split js/pre-proceed.js already encodes.
   const proceedTargetStage = stage === "pre" ? (isFullTime ? "probation" : "onboarding") : proceedButton?.nextStage;
-  // Probation's own "Next" only makes sense once Probation Status is
-  // actually Confirmed — In Progress/Extended/Stopped all keep the button
-  // disabled (re-checked server-side too, in proceedFromProbation).
-  const probationConfirmed = probationInfo?.probationStatus === "Confirmed";
+  // Onboarding's own "Next" (proceedFromOnboarding) is Part Time/Intern
+  // only — a Full Time person dual-listed here can only reach Active via
+  // Probation's Confirm decision (see decideProbationOutcome), same rule
+  // proceedFromOnboarding already rejects server-side. Per explicit
+  // decision (see conversation), the button itself is now hidden for that
+  // case too, not just server-rejected on click — the rejection alone left
+  // a clickable button that always errors, confusing rather than informative.
+  const showProceedButton = proceedButton && !(stage === "onboarding" && isFullTime);
   const [confirmingProceed, setConfirmingProceed] = useState(false);
   const [proceeding, setProceeding] = useState(false);
   const [proceedNotice, setProceedNotice] = useState<string | null>(null);
@@ -590,12 +632,11 @@ export default function StageProfileView({
               <SidebarField label="Phone Number">{formatDisplayPhone(employeeDetail?.phone)}</SidebarField>
               <SidebarField label="Email">{employeeDetail?.email || "--"}</SidebarField>
 
-              {proceedButton && (
+              {showProceedButton && (
                 <div className="relative mt-1 w-full">
                   <button
                     type="button"
-                    disabled={proceeding || (stage === "probation" && !probationConfirmed)}
-                    title={stage === "probation" && !probationConfirmed ? "Probation Status must be Confirmed first" : undefined}
+                    disabled={proceeding}
                     onClick={() => setConfirmingProceed(true)}
                     className="w-full min-h-11 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
                   >
@@ -624,6 +665,9 @@ export default function StageProfileView({
                 referenceCheck,
                 medicalCheck,
                 probationInfo,
+                probationDisplay,
+                canDecideProbation,
+                canEdit,
                 documentsInfo,
                 payrollInfo,
                 achievements,
@@ -637,6 +681,11 @@ export default function StageProfileView({
                 resignationInfo,
                 referenceLetterInfo,
                 exitInterviewNoteInfo,
+                knowledgeTransferChecklist,
+                assetRecoveryChecklist,
+                systemRevocationChecklist,
+                financialSettlement,
+                canAddChecklistItem,
                 branches,
                 departments,
                 employeeId,
@@ -667,23 +716,23 @@ export default function StageProfileView({
         </div>
       </div>
 
-      {confirmingProceed && proceedButton && proceedTargetStage && (
+      {confirmingProceed && showProceedButton && proceedTargetStage && (
         <ConfirmDialog
           message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedTargetStage]}?`}
           onCancel={() => setConfirmingProceed(false)}
           onConfirm={async () => {
             // Every stage with a Proceed/Next button is now wired to a real
-            // employment update — Exit is terminal, so there's no button (and
-            // no placeholder branch) left for it.
+            // employment update — Exit is terminal (no button), and
+            // Probation's own "Next" was removed as redundant (see
+            // STAGE_PROCEED_BUTTON's own comment), so neither has a branch
+            // here anymore.
             setProceeding(true);
             const result =
               stage === "pre"
                 ? await proceedFromPreStage(employeeId)
-                : stage === "probation"
-                  ? await proceedFromProbation(employeeId)
-                  : stage === "onboarding"
-                    ? await proceedFromOnboarding(employeeId)
-                    : await proceedFromActive(employeeId);
+                : stage === "onboarding"
+                  ? await proceedFromOnboarding(employeeId)
+                  : await proceedFromActive(employeeId);
             setProceeding(false);
             setConfirmingProceed(false);
             if (!result.ok) {
@@ -716,18 +765,6 @@ function formatDisplayPhone(value: string | null | undefined): string {
   return composePhoneValue(countryCode, digits) || "--";
 }
 
-// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
-// Probation) have no section segment, "separate-pages" stages (Onboarding/
-// Active/Exit) land on their first section. Used to send "Proceed" straight
-// to the employee's new profile after a real stage move, whichever URL shape
-// that target stage actually uses.
-function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
-  const config = STAGE_PROFILE_CONFIG[stage];
-  if (config.profileMode === "separate-pages") {
-    return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
-  }
-  return `/employee-folder/${stage}/employee/${employeeId}`;
-}
 
 // Shared by both the current stage's own section and every history-tab
 // selection — a history click on Active's "Salary Revision"/"MC/ Leave"/
@@ -743,6 +780,9 @@ function resolvePanel({
   referenceCheck,
   medicalCheck,
   probationInfo,
+  probationDisplay,
+  canDecideProbation,
+  canEdit,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -756,6 +796,11 @@ function resolvePanel({
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
+  knowledgeTransferChecklist,
+  assetRecoveryChecklist,
+  systemRevocationChecklist,
+  financialSettlement,
+  canAddChecklistItem,
   branches,
   departments,
   employeeId,
@@ -769,6 +814,9 @@ function resolvePanel({
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
   probationInfo?: ProbationInfo | null;
+  probationDisplay?: ProbationDisplayInfo;
+  canDecideProbation?: boolean;
+  canEdit?: boolean;
   documentsInfo?: DocumentsInfo | null;
   payrollInfo?: PayrollInfo | null;
   achievements?: AchievementEntry[];
@@ -782,6 +830,11 @@ function resolvePanel({
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  knowledgeTransferChecklist?: ExitChecklistItem[];
+  assetRecoveryChecklist?: ExitChecklistItem[];
+  systemRevocationChecklist?: ExitChecklistItem[];
+  financialSettlement?: FinancialSettlementInfo | null;
+  canAddChecklistItem?: boolean;
   branches?: BranchOpt[];
   departments?: DepartmentOpt[];
   employeeId: number;
@@ -790,47 +843,68 @@ function resolvePanel({
     return <LeaveHistoryPanel rows={leaveHistory} />;
   }
   if (originStage === "onboarding" && section.key === "emergency-contact" && employeeDetail) {
-    return <EmergencyContactPanel employee={employeeDetail} onSave={(data) => updateEmergencyContact(employeeId, data)} />;
+    return (
+      <EmergencyContactPanel
+        employee={employeeDetail}
+        onSave={(data) => updateEmergencyContact(employeeId, data)}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
-  // same populated data instead of a placeholder "Not provided".
+  // same populated data instead of a placeholder "-".
   if (section.key === "personal-info" && employeeDetail) {
-    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter />;
+    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />;
   }
   // Real resume table — same as above, shared with Employee Record's HR Info
   // > Resume/CV tab.
   if (section.key === "resume" && resumeInfo) {
-    return <ResumePanel userId={employeeId} resumeFileId={resumeInfo.resumeFileId} cvFileId={resumeInfo.cvFileId} />;
+    return (
+      <ResumePanel
+        userId={employeeId}
+        resumeFileId={resumeInfo.resumeFileId}
+        cvFileId={resumeInfo.cvFileId}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real interview_assessment table — Pre stage's own Interview Assessment
   // tab. interviewAssessment can validly be null (no row saved yet), so this
   // must gate on !== undefined rather than truthiness — an empty real panel
   // still beats falling through to a placeholder.
   if (section.key === "interview" && interviewAssessment !== undefined) {
-    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} />;
+    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} canEdit={canEdit} />;
   }
   // Real reference_check/medical_check/probation tables — same !== undefined
   // gating as interview_assessment above (a valid "no row saved yet" null
   // still renders the real empty panel, not a placeholder).
   if (section.key === "reference" && referenceCheck !== undefined) {
-    return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} />;
+    return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />;
   }
   if (section.key === "medical" && medicalCheck !== undefined) {
-    return <MedicalCheckPanel userId={employeeId} data={medicalCheck} />;
+    return <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />;
   }
-  if (section.key === "probation" && probationInfo !== undefined) {
-    return <ProbationPanel userId={employeeId} data={probationInfo} />;
+  if (section.key === "probation" && probationInfo !== undefined && probationDisplay) {
+    return (
+      <ProbationPanel
+        userId={employeeId}
+        data={probationInfo}
+        display={probationDisplay}
+        canDecide={canDecideProbation ?? false}
+        canEdit={canEdit}
+      />
+    );
   }
   // Real documents table — shared with Employee Record's HR Info > Handbook tab.
   if (section.key === "documents" && documentsInfo !== undefined) {
-    return <DocumentsPanel userId={employeeId} data={documentsInfo} />;
+    return <DocumentsPanel userId={employeeId} data={documentsInfo} canEdit={canEdit} />;
   }
   // Real payroll table (+ reused bank_details for the Bank Details
   // subsection) — shared with Employee Record's Finance > Tax Info tab.
   if (section.key === "payroll" && payrollInfo !== undefined && employeeDetail) {
-    return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} />;
+    return <OnboardingPayrollPanel userId={employeeId} data={payrollInfo} employeeDetail={employeeDetail} canEdit={canEdit} />;
   }
   // Active stage's 7 remaining real tabs — achievement/salary_revision/
   // promotion/transfer/training are repeatable (list + "add new" modal, via
@@ -838,13 +912,13 @@ function resolvePanel({
   // singleton; disciplinary is a read-only combined summary of the 4
   // Employee Record Disciplinary sub-tables.
   if (section.key === "achievement" && achievements !== undefined) {
-    return <AchievementPanel userId={employeeId} data={achievements} />;
+    return <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />;
   }
   if (section.key === "salary-revision" && salaryRevisions !== undefined) {
-    return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} />;
+    return <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} canEdit={canEdit} />;
   }
   if (section.key === "promotion" && promotions !== undefined) {
-    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} />;
+    return <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} canEdit={canEdit} />;
   }
   if (section.key === "transfer" && transfers !== undefined) {
     return (
@@ -854,32 +928,67 @@ function resolvePanel({
         branches={branches ?? []}
         departments={departments ?? []}
         currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+        canEdit={canEdit}
       />
     );
   }
   if (section.key === "training" && trainings !== undefined) {
-    return <TrainingPanel userId={employeeId} data={trainings} />;
+    return <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />;
   }
   if (section.key === "nda" && ndaInfo !== undefined) {
-    return <NdaPanel userId={employeeId} data={ndaInfo} />;
+    return <NdaPanel userId={employeeId} data={ndaInfo} canEdit={canEdit} />;
   }
   if (section.key === "non-compete" && nonCompeteInfo !== undefined) {
-    return <NonCompetePanel userId={employeeId} data={nonCompeteInfo} />;
+    return <NonCompetePanel userId={employeeId} data={nonCompeteInfo} canEdit={canEdit} />;
   }
   if (section.key === "disciplinary" && disciplinarySummary !== undefined) {
     return <DisciplinarySummaryPanel data={disciplinarySummary} />;
   }
-  // Exit stage's 3 real singleton tabs — Resignation/Reference Letter/Exit
-  // Interview Notes. Its 4 Clearance sub-tabs remain placeholders (no
-  // backing tables), still resolved via STAGE_CONTENT_PANELS below.
+  // Exit stage's own tabs — Resignation/Reference Letter/Exit Interview
+  // Notes, plus its 4 Clearance sub-tabs (real now — see
+  // ActiveProfilePanels.KnowledgeTransferPanel/AssetRecoveryPanel/
+  // SystemRevocationPanel/FinancialSettlementPanel).
   if (section.key === "resignation" && resignationInfo !== undefined) {
-    return <ResignationPanel userId={employeeId} data={resignationInfo} />;
+    return <ResignationPanel userId={employeeId} data={resignationInfo} canEdit={canEdit} />;
   }
   if (section.key === "reference-letter" && referenceLetterInfo !== undefined) {
-    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} />;
+    return <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} canEdit={canEdit} />;
   }
   if (section.key === "exit-interview-notes" && exitInterviewNoteInfo !== undefined) {
-    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} />;
+    return <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} canEdit={canEdit} />;
+  }
+  if (section.key === "knowledge-transfer" && knowledgeTransferChecklist !== undefined) {
+    return (
+      <KnowledgeTransferPanel
+        userId={employeeId}
+        items={knowledgeTransferChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
+  }
+  if (section.key === "asset-recovery" && assetRecoveryChecklist !== undefined) {
+    return (
+      <AssetRecoveryPanel
+        userId={employeeId}
+        items={assetRecoveryChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
+  }
+  if (section.key === "system-revocation" && systemRevocationChecklist !== undefined) {
+    return (
+      <SystemRevocationPanel
+        userId={employeeId}
+        items={systemRevocationChecklist}
+        canAddItem={canAddChecklistItem ?? false}
+        canEdit={canEdit}
+      />
+    );
+  }
+  if (section.key === "financial-settlement" && financialSettlement !== undefined) {
+    return <FinancialSettlementPanel userId={employeeId} data={financialSettlement} canEdit={canEdit} />;
   }
   if (STAGE_CONTENT_PANELS[section.key]) {
     const ContentPanel = STAGE_CONTENT_PANELS[section.key];

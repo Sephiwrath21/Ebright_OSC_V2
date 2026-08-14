@@ -15,9 +15,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -58,19 +58,42 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
+        # CRM_DATABASE_URL / BETTER_AUTH_SECRET are forwarded as real remote
+        # env vars via `envs:` below, NOT interpolated into `script:` text.
+        # 2026-08-13: a trailing newline on the CRM_DATABASE_URL secret was
+        # getting spliced into the *middle* of a script line by GitHub's own
+        # ${{ }} substitution, before ssh-action ever ran — combined with
+        # script_stop's line-by-line dispatch, that left an unterminated
+        # quote which swallowed ssh-action's own next glue-check line
+        # (`DRONE_SSH_PREV_COMMAND_EXIT_CODE=...`) into the value, which then
+        # got written straight into .env. Passing the secret via `env:`/
+        # `envs:` keeps its raw bytes (newline included) out of the script
+        # text entirely, so this can't recur regardless of whether the
+        # secret itself carries a trailing newline.
+        env:
+          CRM_DATABASE_URL: ${{ secrets.CRM_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
           # failure even though the build finished and the container came up.
           # Give it generous headroom so a slow-but-successful deploy is green.
-          command_timeout: 20m
+          # 2026-08-11: raised 20m -> 40m — production's FIRST build of the
+          # CRM-era image (new deps + 3 prisma generates + bigger next build)
+          # has no layer cache and exceeded 20m ("Run Command Timeout").
+          command_timeout: 40m
           script_stop: true
           script: |
             set -euo pipefail
+            # Everything below redirects into ~/deploy.log on the server, so a
+            # failure looks like a bare "exit 1" in the Actions UI. Dump the
+            # log's tail on ANY exit so the real error is visible in CI.
+            trap 'echo "=== ~/deploy.log (last 120 lines) ==="; tail -120 ~/deploy.log 2>/dev/null || echo "(no deploy.log — failed before first redirect, e.g. cd)"' EXIT
             cd ~/Ebright_OSC_V2
 
             echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ===" > ~/deploy.log 2>&1
@@ -113,6 +136,32 @@ jobs:
             printf '%s\n' 'GOOGLE_DRIVE_SA_EMAIL="${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}"' >> .env
             printf '%s\n' 'GOOGLE_DRIVE_SA_PRIVATE_KEY="${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}"' >> .env
             printf '%s\n' 'GOOGLE_DRIVE_FOLDER_ID="${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}"' >> .env
+
+            # CRM runtime env (CRM port, 2026-08-07). Same pattern as the Drive
+            # keys above, but guarded: only rewrite when the GitHub secret is
+            # actually defined, so a manually-added value in the server's .env
+            # survives until the secrets are configured.
+            # The values are passed through tr -d '\r\n' because a secret
+            # pasted with a trailing newline writes a bare '"' line into .env,
+            # which breaks docker compose's env_file parser ("unexpected
+            # character '\"' in variable name"). Also heal any such orphan
+            # quote line an earlier deploy already left behind.
+            sed -i '/^"$/d' .env || true
+            # $CRM_DATABASE_URL / $BETTER_AUTH_SECRET are real shell env vars
+            # here, forwarded by ssh-action's `envs:` (see the step's `env:`
+            # block above) — not spliced into this script's text by GitHub
+            # Actions. tr -d '\r\n' is kept as defensive cleanup in case the
+            # secret's actual value legitimately ends in whitespace.
+            CRM_URL="$(printf '%s' "$CRM_DATABASE_URL" | tr -d '\r\n')"
+            if [ -n "$CRM_URL" ]; then
+              sed -i '/^CRM_DATABASE_URL=/d' .env || true
+              printf 'CRM_DATABASE_URL="%s"\n' "$CRM_URL" >> .env
+            fi
+            BA_SECRET="$(printf '%s' "$BETTER_AUTH_SECRET" | tr -d '\r\n')"
+            if [ -n "$BA_SECRET" ]; then
+              sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
+              printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
+            fi
 
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on

@@ -75,7 +75,7 @@ export function CreateInductionProfileModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {state.mode === "form" ? (
@@ -179,12 +179,12 @@ function FormView({
 
   return (
     <>
-      <header className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3">
+      <header className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
         <div>
-          <h2 id="create-induction-title" className="text-base font-bold text-slate-900">
+          <h2 id="create-induction-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
             Create Induction Profile
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             Generates an induction link the candidate can use to start their journey.
           </p>
         </div>
@@ -192,7 +192,7 @@ function FormView({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="text-slate-400 hover:text-slate-700 text-lg leading-none px-2"
+          className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-lg leading-none px-2"
         >
           ×
         </button>
@@ -206,7 +206,7 @@ function FormView({
             onChange={(e) => setEmployeeName(e.target.value)}
             required
             placeholder="Full name"
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm dark:text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </Field>
 
@@ -217,22 +217,22 @@ function FormView({
             onChange={(e) => setEmployeeEmail(e.target.value)}
             required
             placeholder="name@ebright.my"
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm dark:text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             Must match an existing employee account.
           </p>
         </Field>
 
         <Field label="Induction Type">
-          <div className="flex border border-slate-300 rounded-md overflow-hidden">
+          <div className="flex border border-slate-300 dark:border-slate-600 rounded-md overflow-hidden">
             <button
               type="button"
               onClick={() => setInductionType("Onboarding")}
               className={`flex-1 py-2 text-sm font-semibold transition ${
                 inductionType === "Onboarding"
                   ? "bg-blue-600 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               Onboarding (New Hire)
@@ -243,7 +243,7 @@ function FormView({
               className={`flex-1 py-2 text-sm font-semibold transition ${
                 inductionType === "Offboarding"
                   ? "bg-blue-600 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               Offboarding (Exiting)
@@ -256,7 +256,7 @@ function FormView({
             value={workflowTemplate}
             onChange={(e) => setWorkflowTemplate(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm dark:text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             {WORKFLOW_TEMPLATES.map((t) => (
               <option key={t.value} value={t.value}>
@@ -272,7 +272,7 @@ function FormView({
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm dark:text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </Field>
 
@@ -280,7 +280,7 @@ function FormView({
           <select
             value={buddyUserId}
             onChange={(e) => setBuddyUserId(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 py-2 text-sm dark:text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">No buddy assigned</option>
             {employees
@@ -295,7 +295,7 @@ function FormView({
 
         {error && (
           <div
-            className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"
+            className="rounded-md border border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900 px-3 py-2 text-xs text-rose-800 dark:text-rose-200"
             role="alert"
           >
             {error}
@@ -303,12 +303,12 @@ function FormView({
         )}
       </form>
 
-      <footer className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-2 bg-slate-50">
+      <footer className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 bg-slate-50 dark:bg-slate-800">
         <button
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
         >
           Cancel
         </button>
@@ -336,8 +336,8 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-semibold text-slate-700 mb-1">
-        {label} {required && <span className="text-red-600">*</span>}
+      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+        {label} {required && <span className="text-red-600 dark:text-red-400">*</span>}
       </span>
       {children}
     </label>

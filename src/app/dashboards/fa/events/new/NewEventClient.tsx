@@ -100,13 +100,13 @@ export default function NewEventClient() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-12">
 
         {/* Back */}
         <Link
           href="/dashboards/fa/events"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors mb-5"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors mb-5"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to events
@@ -115,11 +115,11 @@ export default function NewEventClient() {
         {/* Page header */}
         <div className="mb-8">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">New event</p>
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
             Create FA Event
           </h1>
-          <hr className="border-slate-200 mt-5 mb-4" />
-          <p className="text-sm text-slate-500">
+          <hr className="border-slate-200 dark:border-slate-800 mt-5 mb-4" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Fill in the event details. You&apos;ll add sessions and branch quotas on the next screen.
           </p>
         </div>
@@ -130,18 +130,18 @@ export default function NewEventClient() {
           <div className="lg:col-span-2 space-y-5">
 
             {/* Event details section */}
-            <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
               <div className="mb-5 flex items-center gap-2">
                 <CalendarDays className="w-4 h-4 text-slate-400" />
-                <h2 className="text-lg font-semibold text-slate-900">Event details</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Event details</h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Event name</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Event name</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                     placeholder="e.g. 27-28 June Weekly Showcase"
@@ -150,12 +150,12 @@ export default function NewEventClient() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Venue</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Venue</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <input
                       type="text"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition"
+                      className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition"
                       value={form.venue}
                       onChange={e => setForm(f => ({ ...f, venue: e.target.value }))}
                       placeholder="e.g. Atria Mall, Pavilion KL"
@@ -165,20 +165,20 @@ export default function NewEventClient() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Start date</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start date</label>
                     <input
                       type="date"
-                      className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
+                      className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
                       value={form.startDate}
                       min={today}
                       onChange={e => handleStartDateChange(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">End date</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">End date</label>
                     <input
                       type="date"
-                      className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
+                      className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
                       value={form.endDate}
                       min={form.startDate || today}
                       onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
@@ -187,7 +187,7 @@ export default function NewEventClient() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Number of days</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Number of days</label>
                   <div className="flex gap-2">
                     {([1, 2, 3] as const).map(n => (
                       <button
@@ -197,7 +197,7 @@ export default function NewEventClient() {
                         className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                           form.numberOfDays === n
                             ? "bg-slate-900 text-white border-slate-900"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                            : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600"
                         }`}
                       >
                         {n} day{n > 1 ? "s" : ""}
@@ -209,29 +209,29 @@ export default function NewEventClient() {
             </section>
 
             {/* Invitation window section */}
-            <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
               <div className="mb-3 flex items-center gap-2">
                 <Users className="w-4 h-4 text-slate-400" />
-                <h2 className="text-lg font-semibold text-slate-900">Invitation window</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Invitation window</h2>
               </div>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                 The period when Branch Managers can invite students to this event. Must close before the event starts.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Open date</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Open date</label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
                     value={form.invitationOpenDate}
                     onChange={e => setForm(f => ({ ...f, invitationOpenDate: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Close date</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Close date</label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
                     value={form.invitationCloseDate}
                     min={form.invitationOpenDate}
                     max={form.startDate}
@@ -242,13 +242,13 @@ export default function NewEventClient() {
             </section>
 
             {/* Notes section */}
-            <section className="bg-white border border-slate-200 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-3">Notes</h2>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Notes</h2>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                 Internal notes <span className="text-slate-400 font-normal">(optional)</span>
               </label>
               <textarea
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition min-h-[80px] resize-y"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400 transition min-h-[80px] resize-y"
                 value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Internal notes about this event…"
@@ -256,7 +256,7 @@ export default function NewEventClient() {
             </section>
 
             {error && (
-              <div className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm border border-red-200">
+              <div className="rounded-xl bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 px-4 py-3 text-sm border border-red-200 dark:border-red-700">
                 {error}
               </div>
             )}
@@ -264,7 +264,7 @@ export default function NewEventClient() {
             <div className="flex justify-end gap-3">
               <Link
                 href="/dashboards/fa/events"
-                className="px-4 py-2.5 text-sm font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors"
+                className="px-4 py-2.5 text-sm font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </Link>
@@ -280,19 +280,19 @@ export default function NewEventClient() {
 
           {/* Right: preview */}
           <div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 sticky top-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sticky top-4">
               <div className="flex items-center gap-2 mb-4">
                 <Info className="w-4 h-4 text-slate-400" />
-                <h3 className="text-sm font-semibold text-slate-900">Preview</h3>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview</h3>
               </div>
               <dl className="space-y-4">
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Name</dt>
-                  <dd className="text-sm font-medium text-slate-900">{form.name || "—"}</dd>
+                  <dd className="text-sm font-medium text-slate-900 dark:text-slate-100">{form.name || "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">When</dt>
-                  <dd className="text-sm font-mono text-slate-800">
+                  <dd className="text-sm font-mono text-slate-800 dark:text-slate-200">
                     {form.startDate && form.endDate
                       ? `${formatDisplay(form.startDate)} → ${formatDisplay(form.endDate)} (${form.numberOfDays} day${form.numberOfDays > 1 ? "s" : ""})`
                       : "—"}
@@ -300,11 +300,11 @@ export default function NewEventClient() {
                 </div>
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Venue</dt>
-                  <dd className="text-sm text-slate-800">{form.venue || "—"}</dd>
+                  <dd className="text-sm text-slate-800 dark:text-slate-200">{form.venue || "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Invitation window</dt>
-                  <dd className="text-sm font-mono text-slate-800">
+                  <dd className="text-sm font-mono text-slate-800 dark:text-slate-200">
                     {form.invitationOpenDate && form.invitationCloseDate
                       ? `${formatDisplay(form.invitationOpenDate)} → ${formatDisplay(form.invitationCloseDate)}`
                       : "—"}
@@ -312,9 +312,9 @@ export default function NewEventClient() {
                 </div>
               </dl>
 
-              <div className="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-400">
-                After creating, you&apos;ll add <strong className="text-slate-600">sessions</strong> and
-                assign <strong className="text-slate-600">branch quotas</strong> before opening the event.
+              <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400">
+                After creating, you&apos;ll add <strong className="text-slate-600 dark:text-slate-300">sessions</strong> and
+                assign <strong className="text-slate-600 dark:text-slate-300">branch quotas</strong> before opening the event.
               </div>
             </div>
           </div>

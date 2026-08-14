@@ -103,7 +103,7 @@ export default function ClickUpPieChart({
               <text
                 x={s.textX}
                 y={s.textY}
-                fill="#334155"
+                fill="var(--text-strong)"
                 fontSize="9"
                 fontWeight="700"
                 textAnchor={s.textAnchor}
@@ -118,17 +118,17 @@ export default function ClickUpPieChart({
       </div>
 
       {/* Custom Legend */}
-      <div className="flex justify-center gap-x-3 gap-y-1.5 text-[9px] font-bold text-slate-500 mt-2 flex-wrap max-w-xs uppercase tracking-wider">
-        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("PENDING")}>
+      <div className="flex justify-center gap-x-3 gap-y-1.5 text-[9px] font-bold text-slate-500 dark:text-slate-400 mt-2 flex-wrap max-w-xs uppercase tracking-wider">
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" onClick={() => onSliceClick("PENDING")}>
           <span className="w-2 h-2 bg-[#EF4444] rounded-sm" /> PENDING
         </div>
-        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("NOT APPLICABLE")}>
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" onClick={() => onSliceClick("NOT APPLICABLE")}>
           <span className="w-2 h-2 bg-[#EAB308] rounded-sm" /> NOT APPLICABLE
         </div>
-        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("N/A")}>
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" onClick={() => onSliceClick("N/A")}>
           <span className="w-2 h-2 bg-[#F59E0B] rounded-sm" /> N/A
         </div>
-        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800" onClick={() => onSliceClick("COMPLETE")}>
+        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" onClick={() => onSliceClick("COMPLETE")}>
           <span className="w-2 h-2 bg-[#10B981] rounded-sm" /> COMPLETE
         </div>
       </div>

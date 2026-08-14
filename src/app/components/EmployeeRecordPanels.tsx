@@ -13,15 +13,16 @@ import {
   PlaceholderUploadField,
   SalaryRevisionFields,
   EditableField,
+  CurrencyField,
   EditableSelectField,
   SelectWithOtherField,
   EditableTextArea,
-  RealFileField,
   RecordTable,
   RealAttachmentLink,
   FilePickerControl,
   PhoneField,
   EmailField,
+  PayslipHistoryPanel,
   type SalaryRevisionHandle,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
@@ -40,6 +41,7 @@ import type {
   GuardianInfoEntry,
   PerformanceReviewEntry,
   PayslipInfo,
+  PayslipHistoryEntry,
   EmployeeTaskRow,
 } from "@/lib/employeeQueries";
 import { parsePhoneValue, isValidPhoneDigits, isValidEmail } from "@/lib/phoneEmail";
@@ -101,7 +103,7 @@ function AddAnotherGuardianButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-5 px-5 py-2.5 rounded-full border-2 border-[#49a2c6] bg-[#97ecf5] text-sm font-medium text-[#0b43a3] hover:bg-[#7fe3ee]"
+      className="mt-5 px-5 py-2.5 rounded-full border-2 border-[#49a2c6] dark:border-slate-600 bg-[#97ecf5] dark:bg-slate-800 text-sm font-medium text-[#0b43a3] dark:text-slate-100 hover:bg-[#7fe3ee] dark:hover:bg-slate-700"
     >
       Add Another
     </button>
@@ -119,7 +121,7 @@ function RemoveGuardianButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Remove this guardian"
-      className="text-slate-400 hover:text-red-600 text-lg leading-none font-semibold"
+      className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none font-semibold"
     >
       −
     </button>
@@ -160,7 +162,15 @@ const GUARDIAN_RELATIONSHIP_OPTIONS = [
 // guardian_info row for each blank draft added via "Add Another" this
 // session (skipping any draft left completely empty, so clicking Save
 // without filling in a freshly-added block doesn't create a junk row).
-export function GuardianInfoPanel({ userId, data }: { userId: number; data: GuardianInfoEntry[] }) {
+export function GuardianInfoPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: GuardianInfoEntry[];
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [guardians, setGuardians] = useState<GuardianDraft[]>(() => toDrafts(data));
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
@@ -249,7 +259,7 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Guardian Info</PanelHeading>
       {guardians.map((g, i) => (
         <div key={g.id ?? `new-${i}`} className="mb-7 last:mb-0">
@@ -305,9 +315,9 @@ export function GuardianInfoPanel({ userId, data }: { userId: number; data: Guar
 // in EmployeeRecordView's resolvePanel instead of living in the static-panel
 // lookup below since they need real userId/data props the others don't take. ───
 
-export function OfferLetterPanel() {
+export function OfferLetterPanel({ canEdit = true }: { canEdit?: boolean }) {
   return (
-    <EditableSection hasRealBacking={false}>
+    <EditableSection hasRealBacking={false} canEdit={canEdit}>
       <PanelHeading>Offer Letter</PanelHeading>
       <FieldGrid>
         <PlaceholderUploadField label="Offer Letter" />
@@ -316,9 +326,9 @@ export function OfferLetterPanel() {
   );
 }
 
-export function HiringNotesPanel() {
+export function HiringNotesPanel({ canEdit = true }: { canEdit?: boolean }) {
   return (
-    <EditableSection hasRealBacking={false}>
+    <EditableSection hasRealBacking={false} canEdit={canEdit}>
       <PanelHeading>Hiring Notes</PanelHeading>
       <FieldGrid>
         <PlaceholderField label="Interview Date" type="date" />
@@ -358,25 +368,22 @@ export function PayrollPanel({
   employeeId,
   salaryRevisions,
   payslip,
+  payslipHistory,
+  canEdit = true,
 }: {
   employeeId: number;
   salaryRevisions: SalaryRevisionEntry[];
   payslip: PayslipInfo | null;
+  payslipHistory: PayslipHistoryEntry[];
+  canEdit?: boolean;
 }) {
   const salaryRevisionRef = useRef<SalaryRevisionHandle>(null);
   const [basicPay, setBasicPay] = useState(payslip?.basicPay ?? "");
   const [type, setType] = useState(payslip?.type ?? "");
-  const [fileId, setFileId] = useState(payslip?.attachmentFileId ?? null);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-
-  function clearFile() {
-    if (pendingFile) setPendingFile(null);
-    else setFileId(null);
-  }
 
   async function handleSave(): Promise<SaveResult> {
     const [payslipResult, salaryRevisionResult] = await Promise.all([
-      updatePayslip(employeeId, { basicPay, type, attachmentFileId: fileId, attachmentFile: pendingFile }),
+      updatePayslip(employeeId, { basicPay, type }),
       salaryRevisionRef.current?.save() ?? Promise.resolve(undefined),
     ]);
     if (payslipResult && payslipResult.ok === false) return payslipResult;
@@ -385,16 +392,16 @@ export function PayrollPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Payroll/ Payslip</PanelHeading>
       <Subsection heading="Basic Pay">
-        <EditableField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
+        <CurrencyField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
         <EditableSelectField label="Salary Type" value={type} onChange={setType} options={SALARY_TYPE_OPTIONS} />
       </Subsection>
 
-      <Subsection heading="Payslip">
-        <RealFileField label="Payslip" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} full />
-      </Subsection>
+      <div className="mt-7">
+        <PayslipHistoryPanel userId={employeeId} data={payslipHistory} />
+      </div>
 
       <div className="mt-7">
         <SalaryRevisionFields ref={salaryRevisionRef} userId={employeeId} data={salaryRevisions} />
@@ -432,12 +439,12 @@ function PerformanceReviewAttachmentField({
   const editing = useEditMode();
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-xs font-medium text-slate-500">Attachment</span>
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Attachment</span>
       {editing ? (
         editingExistingRecord && existingFileId && !pendingFile ? (
           <div className="flex items-center gap-2 min-w-0">
             <RealAttachmentLink fileId={existingFileId} />
-            <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+            <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
               <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
               Replace
             </label>
@@ -448,7 +455,7 @@ function PerformanceReviewAttachmentField({
       ) : existingFileId ? (
         <RealAttachmentLink fileId={existingFileId} />
       ) : (
-        <span className="text-sm italic text-slate-400">Not provided</span>
+        <span className="text-sm italic text-slate-400">-</span>
       )}
     </div>
   );
@@ -462,7 +469,7 @@ function CancelEditLink({ show, onClick }: { show: boolean; onClick: () => void 
   const editing = useEditMode();
   if (!editing || !show) return null;
   return (
-    <button type="button" onClick={onClick} className="text-xs text-[#4a90e2] hover:underline shrink-0">
+    <button type="button" onClick={onClick} className="text-xs text-[#4a90e2] dark:text-blue-400 hover:underline shrink-0">
       Cancel edit — add new review instead
     </button>
   );
@@ -478,7 +485,15 @@ function CancelEditLink({ show, onClick }: { show: boolean; onClick: () => void 
 // doesn't create a spurious duplicate. Clicking a history row while in edit
 // mode instead loads that row into the form and Save corrects it in place
 // (updatePerformanceReview) rather than appending.
-export function PerformanceReviewPanel({ userId, data }: { userId: number; data: PerformanceReviewEntry[] }) {
+export function PerformanceReviewPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: PerformanceReviewEntry[];
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const latest = data[0] ?? null;
 
@@ -557,11 +572,8 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
   }
 
   return (
-    <EditableSection onSave={handleSave}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
-        <CancelEditLink show={editingId !== null} onClick={() => setEditingId(null)} />
-      </div>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
+      <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
       <FieldGrid>
         <EditableField label="Review Period" value={period} onChange={setPeriod} />
         <EditableField label="Review Date" value={reviewDate} onChange={setReviewDate} type="date" />
@@ -577,7 +589,10 @@ export function PerformanceReviewPanel({ userId, data }: { userId: number; data:
       </FieldGrid>
 
       <div className="mt-7">
-        <PanelHeading>Performance Review History</PanelHeading>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <PanelHeading>Performance Review History</PanelHeading>
+          <CancelEditLink show={editingId !== null} onClick={() => setEditingId(null)} />
+        </div>
         <RecordTable
           columns={[
             { key: "period", label: "Review Period" },
@@ -650,9 +665,9 @@ function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
         { key: "source", label: "Source" },
       ]}
       rows={tasks.map((t) => ({
-        name: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.name}</span>,
-        date: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
-        source: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.source}</span>,
+        name: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.name}</span>,
+        date: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
+        source: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.source}</span>,
       }))}
     />
   );
@@ -677,7 +692,7 @@ const TASK_MONTH_OPTIONS = [
 ];
 
 const taskFilterSelectClass =
-  "h-8 px-2.5 rounded-lg border border-black/15 bg-white text-sm text-black/70 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "h-8 px-2.5 rounded-lg border border-black/15 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-black/70 dark:text-slate-100 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function TaskDateFilters({
   month,
@@ -763,7 +778,7 @@ export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
 // props the rest of this dictionary doesn't take, so they're special-cased
 // in EmployeeRecordView's resolvePanel instead (same convention as Training/
 // Promotion/Transfer/Cert.-Achievement/the 4 Disciplinary sub-tabs).
-export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, () => ReactNode> = {
+export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, (props: { canEdit?: boolean }) => ReactNode> = {
   "hr-info/offer-letter": OfferLetterPanel,
   "hr-info/hiring-notes": HiringNotesPanel,
 };

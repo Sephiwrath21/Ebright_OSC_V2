@@ -6,8 +6,8 @@ const fontStack =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 const card: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "0.5px solid #E5E7EB",
+  background: "var(--surface)",
+  border: "0.5px solid var(--status-track)",
   borderRadius: 12,
 };
 
@@ -381,7 +381,7 @@ export default function DepartmentWidgets({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "10px 14px",
-              borderBottom: "0.5px solid #F1F1F1",
+              borderBottom: "0.5px solid var(--border-subtle)",
             }}
           >
             <span
@@ -393,10 +393,10 @@ export default function DepartmentWidgets({
                 fontWeight: 700,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
-                color: "#374151",
+                color: "var(--text-secondary)",
               }}
             >
-              <i className="ti ti-message-circle" style={{ color: "#6B7280" }} />
+              <i className="ti ti-message-circle" style={{ color: "var(--text-muted-strong)" }} />
               {departmentName} Chat
             </span>
             <button
@@ -407,7 +407,7 @@ export default function DepartmentWidgets({
                 border: "none",
                 background: "transparent",
                 cursor: "pointer",
-                color: "#94A3B8",
+                color: "var(--status-neutral-fg)",
                 display: "inline-flex",
                 fontSize: 16,
               }}
@@ -418,7 +418,7 @@ export default function DepartmentWidgets({
           {/* Active now — who in this department currently has the site open */}
           <div
             style={{
-              borderBottom: "0.5px solid #F1F1F1",
+              borderBottom: "0.5px solid var(--border-subtle)",
               padding: "10px 12px",
               display: "flex",
               flexDirection: "column",
@@ -431,13 +431,13 @@ export default function DepartmentWidgets({
                 fontWeight: 700,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
-                color: "#374151",
+                color: "var(--text-secondary)",
               }}
             >
               Active now · {onlineCount}
             </span>
             {onlineCount === 0 ? (
-              <span style={{ fontSize: 12, color: "#94A3B8" }}>
+              <span style={{ fontSize: 12, color: "var(--status-neutral-fg)" }}>
                 No one from {departmentName} is online right now.
               </span>
             ) : (
@@ -460,8 +460,8 @@ export default function DepartmentWidgets({
                             width: 26,
                             height: 26,
                             borderRadius: 999,
-                            background: "#E2E8F0",
-                            color: "#475569",
+                            background: "var(--border-subtle)",
+                            color: "var(--status-neutral-fg-strong)",
                             fontSize: 11,
                             fontWeight: 700,
                             display: "inline-flex",
@@ -479,7 +479,7 @@ export default function DepartmentWidgets({
                             width: 9,
                             height: 9,
                             borderRadius: 999,
-                            border: "1.5px solid #FFFFFF",
+                            border: "1.5px solid var(--surface)",
                             background: "#22C55E",
                           }}
                         />
@@ -487,14 +487,14 @@ export default function DepartmentWidgets({
                       <span
                         style={{
                           fontSize: 13,
-                          color: "#1F2937",
+                          color: "var(--text-primary)",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                         }}
                       >
                         {m.name}
-                        {isMe && <span style={{ color: "#94A3B8", fontWeight: 600 }}> · you</span>}
+                        {isMe && <span style={{ color: "var(--status-neutral-fg)", fontWeight: 600 }}> · you</span>}
                       </span>
                     </div>
                   );
@@ -539,22 +539,22 @@ export default function DepartmentWidgets({
                   gap: 6,
                   width: "100%",
                   padding: "7px 10px",
-                  border: "0.5px solid #E5E7EB",
+                  border: "0.5px solid var(--status-track)",
                   borderRadius: 8,
-                  background: "#F8FAFC",
+                  background: "var(--surface-sunken)",
                   cursor: "pointer",
                   fontFamily: "inherit",
                   fontSize: 13,
-                  color: "#1F2937",
+                  color: "var(--text-primary)",
                 }}
               >
-                <span style={{ color: "#6B7280" }}>To:</span>
+                <span style={{ color: "var(--text-muted-strong)" }}>To:</span>
                 <i
                   className={convo === EVERYONE ? "ti ti-users" : "ti ti-user"}
                   style={{ color: "#185FA5" }}
                 />
                 <span style={{ fontWeight: 600 }}>{convoLabel}</span>
-                <i className="ti ti-chevron-down" style={{ marginLeft: "auto", color: "#94A3B8" }} />
+                <i className="ti ti-chevron-down" style={{ marginLeft: "auto", color: "var(--status-neutral-fg)" }} />
               </button>
               {pickerOpen && (
                 <div
@@ -564,8 +564,8 @@ export default function DepartmentWidgets({
                     left: 0,
                     right: 0,
                     zIndex: 5,
-                    background: "#FFFFFF",
-                    border: "0.5px solid #E5E7EB",
+                    background: "var(--surface)",
+                    border: "0.5px solid var(--status-track)",
                     borderRadius: 8,
                     boxShadow: "0 10px 24px rgba(15,23,42,0.16)",
                     maxHeight: 220,
@@ -619,7 +619,7 @@ export default function DepartmentWidgets({
             >
               {messages.length === 0 ? (
                 <div
-                  style={{ margin: "auto", fontSize: 13, color: "#94A3B8", textAlign: "center" }}
+                  style={{ margin: "auto", fontSize: 13, color: "var(--status-neutral-fg)", textAlign: "center" }}
                 >
                   {convo === EVERYONE
                     ? `No messages yet — say hello to ${departmentName} 👋`
@@ -638,7 +638,7 @@ export default function DepartmentWidgets({
                       }}
                     >
                       <div
-                        style={{ fontSize: 11, color: "#94A3B8", marginBottom: 2, padding: "0 4px" }}
+                        style={{ fontSize: 11, color: "var(--status-neutral-fg)", marginBottom: 2, padding: "0 4px" }}
                       >
                         {mine ? "You" : m.senderName ?? m.senderEmail} · {formatTime(m.createdAt)}
                         {m.edited && " · edited"}
@@ -650,8 +650,8 @@ export default function DepartmentWidgets({
                           borderRadius: 12,
                           fontSize: 13,
                           lineHeight: 1.4,
-                          background: mine ? "#185FA5" : "#F1F5F9",
-                          color: mine ? "#FFFFFF" : "#1F2937",
+                          background: mine ? "#185FA5" : "var(--status-neutral-bg)",
+                          color: mine ? "#FFFFFF" : "var(--text-primary)",
                           borderTopRightRadius: mine ? 4 : 12,
                           borderTopLeftRadius: mine ? 12 : 4,
                           whiteSpace: "pre-wrap",
@@ -671,7 +671,7 @@ export default function DepartmentWidgets({
                               cursor: "pointer",
                               fontFamily: "inherit",
                               fontSize: 11,
-                              color: "#94A3B8",
+                              color: "var(--status-neutral-fg)",
                               padding: 0,
                             }}
                           >
@@ -686,7 +686,7 @@ export default function DepartmentWidgets({
                               cursor: "pointer",
                               fontFamily: "inherit",
                               fontSize: 11,
-                              color: "#DC2626",
+                              color: "var(--status-red-fg)",
                               padding: 0,
                             }}
                           >
@@ -700,7 +700,7 @@ export default function DepartmentWidgets({
               )}
             </div>
 
-            <div style={{ position: "relative", borderTop: "0.5px solid #F1F1F1", paddingTop: 10 }}>
+            <div style={{ position: "relative", borderTop: "0.5px solid var(--border-subtle)", paddingTop: 10 }}>
               {editingId != null && (
                 <div
                   style={{
@@ -709,7 +709,7 @@ export default function DepartmentWidgets({
                     justifyContent: "space-between",
                     marginBottom: 8,
                     padding: "5px 10px",
-                    background: "#EFF6FF",
+                    background: "var(--tint-blue)",
                     borderRadius: 8,
                     fontSize: 12,
                     color: "#185FA5",
@@ -727,7 +727,7 @@ export default function DepartmentWidgets({
                       cursor: "pointer",
                       fontFamily: "inherit",
                       fontSize: 12,
-                      color: "#64748B",
+                      color: "var(--text-muted-strong)",
                     }}
                   >
                     Cancel
@@ -743,8 +743,8 @@ export default function DepartmentWidgets({
                     left: 0,
                     right: 0,
                     zIndex: 6,
-                    background: "#FFFFFF",
-                    border: "0.5px solid #E5E7EB",
+                    background: "var(--surface)",
+                    border: "0.5px solid var(--status-track)",
                     borderRadius: 10,
                     boxShadow: "0 10px 24px rgba(15,23,42,0.16)",
                     padding: 8,
@@ -784,9 +784,9 @@ export default function DepartmentWidgets({
                   title="Emoji"
                   style={{
                     border: "none",
-                    background: emojiOpen ? "#EFF6FF" : "transparent",
+                    background: emojiOpen ? "var(--tint-blue)" : "transparent",
                     cursor: "pointer",
-                    color: "#64748B",
+                    color: "var(--text-muted-strong)",
                     fontSize: 20,
                     display: "inline-flex",
                     padding: 6,
@@ -815,12 +815,12 @@ export default function DepartmentWidgets({
                   style={{
                     flex: 1,
                     padding: "9px 12px",
-                    border: "0.5px solid #E5E7EB",
+                    border: "0.5px solid var(--status-track)",
                     borderRadius: 8,
                     outline: "none",
                     fontFamily: "inherit",
                     fontSize: 13,
-                    color: "#1F2937",
+                    color: "var(--text-primary)",
                   }}
                 />
                 <button
@@ -834,7 +834,7 @@ export default function DepartmentWidgets({
                     padding: "9px 16px",
                     border: "none",
                     borderRadius: 8,
-                    background: draft.trim() ? "#185FA5" : "#CBD5E1",
+                    background: draft.trim() ? "#185FA5" : "var(--status-border-idle)",
                     color: "#FFFFFF",
                     fontSize: 13,
                     fontWeight: 600,
@@ -868,7 +868,7 @@ export default function DepartmentWidgets({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "10px 14px",
-              borderBottom: "0.5px solid #F1F1F1",
+              borderBottom: "0.5px solid var(--border-subtle)",
             }}
           >
             <span
@@ -880,10 +880,10 @@ export default function DepartmentWidgets({
                 fontWeight: 700,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
-                color: "#374151",
+                color: "var(--text-secondary)",
               }}
             >
-              <i className="ti ti-notes" style={{ color: "#6B7280" }} />
+              <i className="ti ti-notes" style={{ color: "var(--text-muted-strong)" }} />
               Brain Dump
             </span>
             <button
@@ -894,7 +894,7 @@ export default function DepartmentWidgets({
                 border: "none",
                 background: "transparent",
                 cursor: "pointer",
-                color: "#94A3B8",
+                color: "var(--status-neutral-fg)",
                 display: "inline-flex",
                 fontSize: 16,
               }}
@@ -916,7 +916,7 @@ export default function DepartmentWidgets({
               fontFamily: fontStack,
               fontSize: 13,
               lineHeight: 1.5,
-              color: "#1F2937",
+              color: "var(--text-primary)",
               padding: 14,
             }}
           />
@@ -962,7 +962,7 @@ export default function DepartmentWidgets({
           <span
             style={{
               fontSize: 13,
-              color: "#1F2937",
+              color: "var(--text-primary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -1013,7 +1013,7 @@ export default function DepartmentWidgets({
                 width: 12,
                 height: 12,
                 borderRadius: 999,
-                background: "#DC2626",
+                background: "var(--status-red-fg)",
                 border: "2px solid #fff",
               }}
             />
@@ -1074,28 +1074,28 @@ function PickerRow({
         padding: "7px 10px",
         border: "none",
         borderRadius: 6,
-        background: active ? "#EFF6FF" : "transparent",
+        background: active ? "var(--tint-blue)" : "transparent",
         cursor: "pointer",
         fontFamily: "inherit",
         fontSize: 13,
         textAlign: "left",
       }}
     >
-      <i className={icon} style={{ color: active ? "#185FA5" : "#94A3B8" }} />
+      <i className={icon} style={{ color: active ? "#185FA5" : "var(--status-neutral-fg)" }} />
       <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
         <span
           style={{
             width: 8,
             height: 8,
             borderRadius: 999,
-            background: online ? "#22C55E" : "#CBD5E1",
+            background: online ? "#22C55E" : "var(--status-border-idle)",
           }}
         />
       </span>
       <span
         style={{
           flex: 1,
-          color: "#1F2937",
+          color: "var(--text-primary)",
           fontWeight: active ? 600 : 400,
           whiteSpace: "nowrap",
           overflow: "hidden",
@@ -1110,7 +1110,7 @@ function PickerRow({
             width: 9,
             height: 9,
             borderRadius: 999,
-            background: "#DC2626",
+            background: "var(--status-red-fg)",
           }}
         />
       )}

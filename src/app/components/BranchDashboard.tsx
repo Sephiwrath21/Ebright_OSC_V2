@@ -22,8 +22,8 @@ const fontStack =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 const card: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "0.5px solid #E5E7EB",
+  background: "var(--surface)",
+  border: "0.5px solid var(--status-track)",
   borderRadius: 12,
   boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
 };
@@ -72,10 +72,10 @@ function Panel({
           alignItems: "center",
           gap: 8,
           padding: "10px 14px",
-          borderBottom: "0.5px solid #F1F1F1",
+          borderBottom: "0.5px solid var(--border-subtle)",
         }}
       >
-        {icon && <span style={{ color: "#6B7280", display: "inline-flex" }}>{icon}</span>}
+        {icon && <span style={{ color: "var(--text-muted-strong)", display: "inline-flex" }}>{icon}</span>}
         <h2
           style={{
             margin: 0,
@@ -83,7 +83,7 @@ function Panel({
             fontWeight: 700,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
-            color: "#374151",
+            color: "var(--text-secondary)",
           }}
         >
           {title}
@@ -115,12 +115,12 @@ function MetricRow({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#F8FAFC",
-          border: "0.5px solid #EEF1F4",
+          background: "var(--surface-sunken)",
+          border: "0.5px solid var(--border-subtle)",
           borderRadius: 8,
           fontSize: 13,
           fontWeight: 700,
-          color: "#334155",
+          color: "var(--text-strong)",
         }}
       >
         {rowLabel}
@@ -132,11 +132,12 @@ function MetricRow({
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: "0.03em",
-              color: "#94A3B8",
+              color: "var(--status-neutral-fg)",
             }}
           >
             {m.key}
           </div>
+          {/* Brand blue accent (off-table, kept literal). */}
           <div style={{ fontSize: 22, fontWeight: 700, color: "#185FA5", lineHeight: 1.2 }}>
             {m.value}
           </div>
@@ -180,7 +181,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={50}
           textAnchor="middle"
-          style={{ fontSize: 20, fontWeight: 700, fill: "#111827" }}
+          style={{ fontSize: 20, fontWeight: 700, fill: "var(--text-primary)" }}
         >
           {total}
         </text>
@@ -188,7 +189,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={66}
           textAnchor="middle"
-          style={{ fontSize: 9, fill: "#94A3B8", letterSpacing: "0.05em" }}
+          style={{ fontSize: 9, fill: "var(--status-neutral-fg)", letterSpacing: "0.05em" }}
         >
           TASKS
         </text>
@@ -205,8 +206,8 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontSize: 12, color: "#475569" }}>{d.label}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginLeft: "auto" }}>
+            <span style={{ fontSize: 12, color: "var(--status-neutral-fg-strong)" }}>{d.label}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", marginLeft: "auto" }}>
               {d.value}
             </span>
           </div>
@@ -245,7 +246,8 @@ export default function BranchDashboard({
   ]);
   const [revenueRanking, setRevenueRanking] = useState<{ rank: number; name: string; code: string; revenue: number }[]>([]);
 
-  // Clickup status distribution
+  // Clickup status distribution — donut data-series colours, kept FIXED
+  // across themes so each status keeps its identity; not tokenised.
   const clickupData = [
     { label: "Complete", value: 24, color: "#0F6E56" },
     { label: "In Progress", value: 11, color: "#185FA5" },
@@ -410,9 +412,9 @@ export default function BranchDashboard({
     <div
       style={{
         minHeight: "100%",
-        background: "#F3F4F6",
+        background: "var(--surface-sunken)",
         fontFamily: fontStack,
-        color: "#111827",
+        color: "var(--text-primary)",
       }}
     >
       <div
@@ -430,7 +432,7 @@ export default function BranchDashboard({
           <GreetingHeader name={greetName} style={{ padding: "4px 0 0" }} />
           {loading && (
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", background: "#E2E8F0", padding: "3px 6px", borderRadius: 4, letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--status-neutral-fg)", background: "var(--border-subtle)", padding: "3px 6px", borderRadius: 4, letterSpacing: "0.05em" }}>
                 SYNCING BRANCH DATABASE...
               </span>
             </div>
@@ -456,6 +458,11 @@ export default function BranchDashboard({
               }}
             >
               {attendance.map((a) => {
+                // Default/Annual Leave uses a blue tint with no matching
+                // "accent-blue-strong" token in the palette — tokenising the
+                // bg without a paired strong-blue label would break dark-mode
+                // contrast (light text-on-navy), so this branch is left
+                // fully literal (bg+border+iconBg+labelColor together).
                 let bg = "#EFF6FF";
                 let border = "1px solid #DBEAFE";
                 let iconBg = "#3B82F6";
@@ -464,24 +471,26 @@ export default function BranchDashboard({
                 let IconComponent = UserCheck;
 
                 if (a.label === "Present") {
-                  bg = "#ECFDF5";
-                  border = "1px solid #D1FAE5";
-                  iconBg = "#10B981";
-                  labelColor = "#047857";
+                  bg = "var(--tint-green)";
+                  border = "1px solid #D1FAE5"; // off-table green-200, no token — left literal
+                  iconBg = "#10B981"; // solid icon-circle fill — theme-invariant, left literal
+                  labelColor = "var(--accent-green-strong)";
                   IconComponent = UserCheck;
                 } else if (a.label === "Absent") {
-                  bg = "#FEF2F2";
-                  border = "1px solid #FECACA";
-                  iconBg = "#EF4444";
-                  labelColor = "#B91C1C";
+                  bg = "var(--tint-red)";
+                  border = "1px solid var(--tint-red-strong)";
+                  iconBg = "#EF4444"; // solid icon-circle fill — theme-invariant, left literal
+                  labelColor = "var(--accent-red-strong)"; // nearest (#B91C1C -> #991B1B), reported
                   IconComponent = UserX;
                 } else if (a.label === "MC") {
-                  bg = "#FFFBEB";
-                  border = "1px solid #FDE68A";
-                  iconBg = "#F59E0B";
-                  labelColor = "#B45309";
+                  bg = "var(--tint-amber)";
+                  border = "1px solid #FDE68A"; // off-table amber-300, no token — left literal
+                  iconBg = "#F59E0B"; // solid icon-circle fill — theme-invariant, left literal
+                  labelColor = "var(--accent-amber-strong)"; // nearest (#B45309 -> #92400E), reported
                   IconComponent = Activity;
                 } else if (a.label === "Annual Leave") {
+                  // Same blue-tint case as the pre-loop default above — left
+                  // fully literal for the same dark-mode contrast reason.
                   bg = "#EFF6FF";
                   border = "1px solid #DBEAFE";
                   iconBg = "#3B82F6";
@@ -535,7 +544,7 @@ export default function BranchDashboard({
                           margin: "2px 0 0",
                           fontSize: 20,
                           fontWeight: 700,
-                          color: "#1E293B",
+                          color: "var(--text-primary)",
                           lineHeight: 1.1,
                         }}
                       >
@@ -554,7 +563,7 @@ export default function BranchDashboard({
             bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
           >
             <MetricRow rowLabel="CRM" metrics={crmMetrics} />
-            <div style={{ height: 0.5, background: "#EEF1F4" }} />
+            <div style={{ height: 0.5, background: "var(--border-subtle)" }} />
             <MetricRow rowLabel="SMS" metrics={smsMetrics} />
           </Panel>
 
@@ -571,7 +580,8 @@ export default function BranchDashboard({
 
               return (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                  {/* Above the medal: Revenue label */}
+                  {/* Above the medal: Revenue label — brand blue accent
+                      (off-table, kept literal). */}
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#185FA5", textAlign: "center" }}>
                     Rev. {formatRM(revVal)}
                   </div>
@@ -585,11 +595,18 @@ export default function BranchDashboard({
                       gap: 6,
                     }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#475569", letterSpacing: "0.05em" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "var(--status-neutral-fg-strong)", letterSpacing: "0.05em" }}>
                       {currentBranchCode.toUpperCase()}
                     </span>
 
-                    {/* Medal Graphic for Top 10, otherwise Rank Text */}
+                    {/* Medal Graphic for Top 10, otherwise Rank Text.
+                        Decorative gold-medal illustration — a fixed
+                        achievement badge that stays recognisable in both
+                        themes, so its fills (ribbon/body) are left literal.
+                        The rank number inside is pinned to the medal's own
+                        fixed gold circle, so it also stays literal (a
+                        theme-flipping token here would go light-on-light
+                        against the unchanging medal). */}
                     {isTop10 ? (
                       <div style={{ position: "relative", width: 50, height: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
@@ -609,8 +626,8 @@ export default function BranchDashboard({
                         style={{
                           fontSize: 20,
                           fontWeight: 800,
-                          color: "#64748B",
-                          background: "#E2E8F0",
+                          color: "var(--text-muted-strong)",
+                          background: "var(--border-subtle)",
                           borderRadius: 8,
                           padding: "4px 10px",
                           letterSpacing: "-0.02em",
@@ -625,7 +642,7 @@ export default function BranchDashboard({
                   <div
                     style={{
                       width: "100%",
-                      borderTop: "0.5px solid #EEF1F4",
+                      borderTop: "0.5px solid var(--border-subtle)",
                       paddingTop: 10,
                       marginTop: 4,
                       display: "flex",
@@ -635,22 +652,22 @@ export default function BranchDashboard({
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Revenue:</span>
-                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(revVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Revenue:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>{formatRM(revVal)}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Expense:</span>
-                      <span style={{ color: "#1E293B", fontWeight: 700 }}>{formatRM(expenseVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Expense:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>{formatRM(expenseVal)}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#64748B", fontWeight: 500 }}>Profit:</span>
-                      <span style={{ color: "#0F6E56", fontWeight: 700 }}>{formatRM(profitVal)}</span>
+                      <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Profit:</span>
+                      <span style={{ color: "var(--cat-green-fg)", fontWeight: 700 }}>{formatRM(profitVal)}</span>
                     </div>
                   </div>
                 </div>
               );
             })() : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "#94A3B8", fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "var(--status-neutral-fg)", fontSize: 13 }}>
                 No ranking data available
               </div>
             )}
@@ -683,13 +700,15 @@ export default function BranchDashboard({
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 style={{
                   flex: 1,
-                  border: "1px solid #E2E8F0",
+                  border: "1px solid var(--border-subtle)",
                   borderRadius: 6,
                   padding: "4px 8px",
                   fontSize: 12,
                   outline: "none",
                 }}
               />
+              {/* Solid brand-blue fill with white text — theme-invariant,
+                  left literal. */}
               <button
                 type="submit"
                 style={{
@@ -722,12 +741,13 @@ export default function BranchDashboard({
                     type="checkbox"
                     checked={t.done}
                     onChange={() => toggleTask(t.id)}
+                    // Brand blue accent-color (off-table, kept literal).
                     style={{ width: 14, height: 14, accentColor: "#185FA5", flexShrink: 0 }}
                   />
                   <span
                     style={{
                       fontSize: 12,
-                      color: t.done ? "#9CA3AF" : "#1F2937",
+                      color: t.done ? "var(--text-muted)" : "var(--text-primary)",
                       textDecoration: t.done ? "line-through" : "none",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -760,7 +780,7 @@ export default function BranchDashboard({
                 fontFamily: fontStack,
                 fontSize: 13,
                 lineHeight: 1.5,
-                color: "#1F2937",
+                color: "var(--text-primary)",
               }}
             />
           </Panel>
@@ -774,14 +794,14 @@ export default function BranchDashboard({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: "#94A3B8",
+                  color: "var(--status-neutral-fg)",
                   letterSpacing: "0.04em",
                   marginBottom: 8,
                 }}
               >
                 EVENT TRACKER
               </div>
-              
+
               {/* Event Add Form */}
               <form onSubmit={addEvent} style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 <input
@@ -791,7 +811,7 @@ export default function BranchDashboard({
                   onChange={(e) => setNewEventName(e.target.value)}
                   style={{
                     flex: 1,
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid var(--border-subtle)",
                     borderRadius: 8,
                     padding: "5px 10px",
                     fontSize: 12,
@@ -802,18 +822,20 @@ export default function BranchDashboard({
                   value={newEventStatus}
                   onChange={(e) => setNewEventStatus(e.target.value as "upcoming" | "ongoing" | "completed")}
                   style={{
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid var(--border-subtle)",
                     borderRadius: 8,
                     padding: "5px 6px",
                     fontSize: 11,
                     outline: "none",
-                    background: "#FFFFFF",
+                    background: "var(--surface)",
                   }}
                 >
                   <option value="upcoming">Upcoming</option>
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
                 </select>
+                {/* Solid brand-blue fill with white text — theme-invariant,
+                    left literal. */}
                 <button
                   type="submit"
                   style={{
@@ -839,33 +861,39 @@ export default function BranchDashboard({
                 {(["upcoming", "ongoing", "completed"] as const).map((col) => {
                   const filtered = events.filter((ev) => ev.status === col);
                   const title = col === "upcoming" ? "Upcoming" : col === "ongoing" ? "Ongoing" : "Completed";
-                  const borderCol = col === "upcoming" ? "0.5px solid #E2E8F0" : col === "ongoing" ? "0.5px solid #FDE68A" : "0.5px solid #A7F3D0";
-                  const bgCol = col === "upcoming" ? "#F8FAFC" : col === "ongoing" ? "#FFFBEB" : "#ECFDF5";
-                  const textCol = col === "upcoming" ? "#475569" : col === "ongoing" ? "#B45309" : "#047857";
+                  // "ongoing"/"completed" border colours (amber-300/emerald-200)
+                  // are off-table with no close token — left literal.
+                  const borderCol = col === "upcoming" ? "0.5px solid var(--border-subtle)" : col === "ongoing" ? "0.5px solid #FDE68A" : "0.5px solid #A7F3D0";
+                  const bgCol = col === "upcoming" ? "var(--surface-sunken)" : col === "ongoing" ? "var(--tint-amber)" : "var(--tint-green)";
+                  const textCol = col === "upcoming" ? "var(--status-neutral-fg-strong)" : col === "ongoing" ? "var(--accent-amber-strong)" : "var(--accent-green-strong)";
 
                   return (
                     <div key={col} style={{ border: borderCol, background: bgCol, borderRadius: 10, padding: 8 }}>
+                      {/* Divider sits on a bg that now flips dark (tint-amber/
+                          tint-green) — the 5%-black hairline may read very
+                          faint there; left as-is per the opacity-overlay
+                          rule (theme-invariant on coloured surfaces). */}
                       <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", borderBottom: "0.5px solid rgba(0,0,0,0.05)", paddingBottom: 4, color: textCol }}>
                         {title}
                       </p>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", paddingRight: 2 }}>
                         {filtered.map((ev) => (
-                          <div key={ev.id} style={{ padding: 8, background: "#FFFFFF", border: "0.5px solid #E2E8F0", borderRadius: 8, fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-                            <span style={{ fontWeight: 600, color: "#334155", wordBreak: "break-all", lineHeight: 1.25 }}>{ev.name}</span>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #F1F5F9", paddingTop: 6, marginTop: 2 }}>
+                          <div key={ev.id} style={{ padding: 8, background: "var(--surface)", border: "0.5px solid var(--border-subtle)", borderRadius: 8, fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: "var(--text-strong)", wordBreak: "break-all", lineHeight: 1.25 }}>{ev.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid var(--status-neutral-bg)", paddingTop: 6, marginTop: 2 }}>
                               {col !== "completed" ? (
                                 <button
                                   onClick={() => moveEvent(ev.id, col === "upcoming" ? "ongoing" : "completed")}
-                                  style={{ background: "none", border: "none", color: "#2563EB", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                                  style={{ background: "none", border: "none", color: "var(--accent-blue)", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}
                                 >
                                   Move ➔
                                 </button>
                               ) : (
-                                <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700 }}>Done</span>
+                                <span style={{ fontSize: 9, color: "var(--status-neutral-fg)", fontWeight: 700 }}>Done</span>
                               )}
                               <button
                                 onClick={() => deleteEvent(ev.id)}
-                                style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                                style={{ background: "none", border: "none", color: "var(--status-neutral-fg)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
                               >
                                 <Trash2 style={{ width: 13, height: 13 }} />
                               </button>
@@ -883,13 +911,17 @@ export default function BranchDashboard({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: "#94A3B8",
+                  color: "var(--status-neutral-fg)",
                   letterSpacing: "0.04em",
                   marginBottom: 8,
                 }}
               >
                 ANNOUNCEMENTS
               </div>
+              {/* Blue-tint card: no "accent-blue-strong" token exists to pair
+                  with a tokenised tint-blue bg without breaking dark-mode
+                  contrast (see the Annual Leave attendance card above for the
+                  same reasoning) — left fully literal. */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto", paddingRight: 2 }}>
                 {DEFAULT_ANNOUNCEMENTS.map((a) => (
                   <div

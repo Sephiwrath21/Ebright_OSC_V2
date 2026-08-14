@@ -51,7 +51,7 @@ export function DailyDatePicker({
   };
   const unit = step === "month" ? "month" : "day";
   const arrowClass =
-    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600";
+    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -63,7 +63,7 @@ export function DailyDatePicker({
         value={value}
         onChange={(e) => e.target.value && navigate(e.target.value)}
         aria-label={`${unit === "month" ? "Monthly" : "Daily"} date`}
-        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <button type="button" aria-label={`Next ${unit}`} onClick={() => shift(1)} className={arrowClass}>
         ▶
@@ -102,7 +102,7 @@ const YEAR_DROPDOWN_PAST = 5;
 const YEAR_DROPDOWN_FUTURE = 10;
 
 const selectClass =
-  "rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none";
+  "rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 /** Custom single-select dropdown (2026-08-05, replacing a native <select>
  *  for Year/Month) — NOT a native <select>: those hand the open dropdown
@@ -169,7 +169,7 @@ function CompactDropdown<T extends string | number>({
         <div
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute z-20 mt-1 max-h-56 w-max min-w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-56 w-max min-w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         >
           {options.map((o) => {
             const isSelected = o.value === value;
@@ -185,8 +185,8 @@ function CompactDropdown<T extends string | number>({
                 }}
                 className={`block w-full px-3 py-1.5 text-left text-xs ${
                   isSelected
-                    ? "bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
               >
                 {o.label}
@@ -322,12 +322,12 @@ export function EntityPicker({
   };
 
   return (
-    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700">
+    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-300">
       {label}
       <select
         value={value}
         onChange={(e) => navigate(e.target.value)}
-        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       >
         {groups.map((g, i) =>
           g.label ? (

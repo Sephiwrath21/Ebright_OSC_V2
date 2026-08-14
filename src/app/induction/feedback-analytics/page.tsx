@@ -61,7 +61,7 @@ export default async function FeedbackAnalyticsPage() {
       <div className="space-y-8 p-6">
         <div>
           <h1 className="text-3xl font-bold">Induction Feedback & Analytics</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Surveys, health metrics, and continuous improvement
           </p>
         </div>

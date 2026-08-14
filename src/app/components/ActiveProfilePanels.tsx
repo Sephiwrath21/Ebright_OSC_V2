@@ -12,6 +12,7 @@ import {
   updateReferenceCheck,
   updateMedicalCheck,
   updateProbationInfo,
+  decideProbationOutcome,
   updateDocuments,
   updatePayroll,
   updateBankDetails,
@@ -30,6 +31,8 @@ import {
   addTraining,
   updateTraining,
   deleteTraining,
+  addPayslipHistory,
+  deletePayslipHistory,
   updateNda,
   updateNonCompete,
   addDomesticInquiry,
@@ -47,6 +50,21 @@ import {
   updateResignation,
   updateReferenceLetter,
   updateExitInterviewNote,
+  addKnowledgeTransferItem,
+  toggleKnowledgeTransferItem,
+  renameKnowledgeTransferItem,
+  deleteKnowledgeTransferItem,
+  addAssetRecoveryItem,
+  toggleAssetRecoveryItem,
+  renameAssetRecoveryItem,
+  deleteAssetRecoveryItem,
+  addSystemRevocationItem,
+  toggleSystemRevocationItem,
+  renameSystemRevocationItem,
+  deleteSystemRevocationItem,
+  updateFinancialSettlement,
+  type AddExitChecklistItemInput,
+  type ActionResult,
 } from "@/lib/employeeRecordActions";
 import type {
   EmployeeDetailFull,
@@ -63,6 +81,7 @@ import type {
   PromotionEntry,
   TransferEntry,
   TrainingEntry,
+  PayslipHistoryEntry,
   NdaInfo,
   NonCompeteInfo,
   DomesticInquiryEntry,
@@ -73,7 +92,11 @@ import type {
   ResignationInfo,
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
+  ExitChecklistItem,
+  FinancialSettlementInfo,
 } from "@/lib/employeeQueries";
+import type { ProbationDisplayInfo } from "@/lib/probationDecision";
+import { profileUrlForStage } from "@/lib/stageProfileConfig";
 import {
   COUNTRY_CODES,
   parsePhoneValue,
@@ -88,7 +111,7 @@ import {
 // cross-cutting Employee Record page: bold section title (rendered by
 // EditableSection's own Edit/Save button, top-right), optional bold
 // subsection headers, and fields laid out label-above/value-below — italic
-// gray "Not provided" when empty, plain dark text when filled, swapping to an
+// gray "-" when empty, plain dark text when filled, swapping to an
 // underlined input only while editing. Record-table/checklist content (MC/
 // Leave, Achievement's own history, Exit's clearance checklists, etc.) is
 // left alone — those are genuinely lists, not single-value fields, so this
@@ -100,11 +123,11 @@ import {
 // column is full-width on mobile, not sharing space with the sidebar/nav
 // rail) visually collides with the button text.
 function PanelHeading({ children }: { children: ReactNode }) {
-  return <h2 className="text-2xl font-semibold text-[#4b4949d6] mb-6 pr-24 sm:pr-0">{children}</h2>;
+  return <h2 className="text-2xl font-semibold text-[#4b4949d6] dark:text-slate-200 mb-6 pr-24 sm:pr-0">{children}</h2>;
 }
 
 function SubsectionHeading({ children }: { children: ReactNode }) {
-  return <h3 className="text-lg font-semibold text-[#4b4949d6] mb-4">{children}</h3>;
+  return <h3 className="text-lg font-semibold text-[#4b4949d6] dark:text-slate-200 mb-4">{children}</h3>;
 }
 
 function FieldGrid({ children }: { children: ReactNode }) {
@@ -123,11 +146,11 @@ function Subsection({ heading, children }: { heading: string; children: ReactNod
   );
 }
 
-const valueClass = "text-sm text-[#4b4949] truncate";
+const valueClass = "text-sm text-[#4b4949] dark:text-slate-300 truncate";
 const emptyClass = "text-sm italic text-slate-400";
-const labelClass = "text-xs font-medium text-slate-500";
+const labelClass = "text-xs font-medium text-slate-500 dark:text-slate-400";
 const inputClass =
-  "text-sm text-[#4b4949] bg-transparent border-0 border-b border-slate-300 p-0 pb-0.5 focus:outline-none focus:border-blue-500";
+  "text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border-0 border-b border-slate-300 dark:border-slate-500 p-0 pb-0.5 focus:outline-none focus:border-blue-500";
 
 // Read-only, non-editable field (e.g. Full Name/Email — real data the user
 // isn't allowed to change here for a business reason, not a missing column).
@@ -135,7 +158,7 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
   return (
     <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
       <span className={labelClass}>{label}</span>
-      {value ? <span className={valueClass}>{value}</span> : <span className={emptyClass}>Not provided</span>}
+      {value ? <span className={valueClass}>{value}</span> : <span className={emptyClass}>-</span>}
     </div>
   );
 }
@@ -146,8 +169,8 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
 function SidebarField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="w-full">
-      <span className="block text-xs text-[#4b4949]">{label}</span>
-      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
+      <span className="block text-xs text-[#4b4949] dark:text-slate-300">{label}</span>
+      <span className="block text-sm text-[#4b4949] dark:text-slate-300 truncate">{children}</span>
     </div>
   );
 }
@@ -177,7 +200,7 @@ function EditableField({
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -222,7 +245,7 @@ function PhoneField({
       {editing ? (
         <>
           <div
-            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 ${
+            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 overflow-hidden focus-within:outline focus-within:outline-2 ${
               invalid ? "outline outline-2 outline-red-500" : "focus-within:outline-blue-500"
             }`}
           >
@@ -230,7 +253,7 @@ function PhoneField({
               value={countryCode}
               onChange={(e) => commit(e.target.value, digits)}
               aria-label={`${label} country code`}
-              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 pl-3 pr-1 text-sm text-[#4b4949] focus:outline-none"
+              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 dark:border-white/10 pl-3 pr-1 text-sm text-[#4b4949] dark:text-slate-100 focus:outline-none"
             >
               {COUNTRY_CODES.map((c) => (
                 <option key={c.code} value={c.code} title={c.name}>
@@ -244,15 +267,15 @@ function PhoneField({
               value={formatLocalDigits(digits)}
               onChange={(e) => commit(countryCode, e.target.value.replace(/\D/g, "").slice(0, 11))}
               onBlur={() => setTouched(true)}
-              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent focus:outline-none"
             />
           </div>
-          {invalid && <span className="text-xs text-red-600">Enter a valid phone number.</span>}
+          {invalid && <span className="text-xs text-red-600 dark:text-red-400">Enter a valid phone number.</span>}
         </>
       ) : value ? (
         <span className={valueClass}>{composePhoneValue(parsed.countryCode, parsed.digits)}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -287,12 +310,12 @@ function EmailField({
             onBlur={() => setTouched(true)}
             className={`${inputClass} ${invalid ? "outline outline-2 outline-red-500" : ""}`}
           />
-          {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+          {invalid && <span className="text-xs text-red-600 dark:text-red-400">Enter a valid email address.</span>}
         </>
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -328,7 +351,7 @@ function EditableSelectField({
       ) : value ? (
         <span className={valueClass}>{displayLabel}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -381,7 +404,7 @@ function SelectWithOtherField({
         ) : displayText ? (
           <span className={valueClass}>{displayText}</span>
         ) : (
-          <span className={emptyClass}>Not provided</span>
+          <span className={emptyClass}>-</span>
         )}
       </div>
       {editing && isOther && (
@@ -414,12 +437,12 @@ function EditableTextArea({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className="text-sm text-[#4b4949] bg-transparent border border-slate-300 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
+          className="text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border border-slate-300 dark:border-slate-500 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
         />
       ) : value ? (
-        <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
+        <span className="text-sm text-[#4b4949] dark:text-slate-300 whitespace-pre-wrap">{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -442,7 +465,7 @@ function PlaceholderField({ label, type = "text", full = false }: { label: strin
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -466,7 +489,7 @@ function PlaceholderSelectField({ label, options, full = false }: { label: strin
       ) : value ? (
         <span className={valueClass}>{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -483,12 +506,12 @@ function PlaceholderTextArea({ label, full = true }: { label: string; full?: boo
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={3}
-          className="text-sm text-[#4b4949] bg-transparent border border-slate-300 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
+          className="text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border border-slate-300 dark:border-slate-500 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
         />
       ) : value ? (
-        <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
+        <span className="text-sm text-[#4b4949] dark:text-slate-300 whitespace-pre-wrap">{value}</span>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -533,7 +556,7 @@ export function FilePickerControl({
             type="button"
             onClick={() => onChange(null)}
             aria-label={`Remove ${file.name}`}
-            className="shrink-0 p-2 text-slate-400 hover:text-red-600 text-sm leading-none"
+            className="shrink-0 p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
           >
             ×
           </button>
@@ -542,10 +565,10 @@ export function FilePickerControl({
     );
   }
 
-  if (!editing) return <span className={emptyClass}>Not provided</span>;
+  if (!editing) return <span className={emptyClass}>-</span>;
 
   return (
-    <label className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] bg-[#f7f9fc] px-4 py-2 text-sm text-[#6b7280] cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd]">
+    <label className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] dark:border-slate-600 bg-[#f7f9fc] dark:bg-slate-800 px-4 py-2 text-sm text-[#6b7280] dark:text-slate-400 cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd] dark:hover:bg-slate-700">
       <input type="file" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
       Click to upload
     </label>
@@ -563,7 +586,7 @@ export function FileLink({ file }: { file: File }) {
     return () => URL.revokeObjectURL(url);
   }, [url]);
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline">
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       {file.name}
     </a>
   );
@@ -581,7 +604,7 @@ export function FileLink({ file }: { file: File }) {
 export function RealAttachmentLink({ fileId }: { fileId: string | null }) {
   if (!fileId) return <span className="text-slate-400">—</span>;
   return (
-    <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline">
+    <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       View
     </a>
   );
@@ -632,7 +655,7 @@ export function RealFileField({
               type="button"
               onClick={onClear}
               aria-label={`Remove ${pendingFile.name}`}
-              className="shrink-0 text-slate-400 hover:text-red-600 text-sm leading-none"
+              className="shrink-0 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
             >
               ×
             </button>
@@ -653,19 +676,19 @@ export function RealFileField({
               type="button"
               onClick={onClear}
               aria-label="Remove file"
-              className="shrink-0 text-slate-400 hover:text-red-600 text-sm leading-none"
+              className="shrink-0 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
             >
               ×
             </button>
           )}
         </div>
       ) : editing ? (
-        <label className="inline-flex w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] bg-[#f7f9fc] px-3 py-1.5 text-xs text-[#6b7280] cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd]">
+        <label className="inline-flex w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] dark:border-slate-600 bg-[#f7f9fc] dark:bg-slate-800 px-3 py-1.5 text-xs text-[#6b7280] dark:text-slate-400 cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd] dark:hover:bg-slate-700">
           <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
           Click to upload
         </label>
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -678,10 +701,12 @@ export function ResumePanel({
   userId,
   resumeFileId: initialResumeFileId,
   cvFileId: initialCvFileId,
+  canEdit = true,
 }: {
   userId: number;
   resumeFileId: string | null;
   cvFileId: string | null;
+  canEdit?: boolean;
 }) {
   const [resumeFileId, setResumeFileId] = useState(initialResumeFileId);
   const [resumePending, setResumePending] = useState<File | null>(null);
@@ -702,6 +727,7 @@ export function ResumePanel({
       onSave={() =>
         updateResume(userId, { resumeFileId, resumeFile: resumePending, cvFileId, cvFile: cvPending })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Resume/CV</PanelHeading>
       <FieldGrid>
@@ -736,9 +762,11 @@ const RECOMMENDATION_OPTIONS = [
 export function InterviewAssessmentPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: InterviewAssessmentInfo | null;
+  canEdit?: boolean;
 }) {
   const [intDate, setIntDate] = useState(data?.intDate ?? "");
   const [overallRate, setOverallRate] = useState(data?.overallRate != null ? String(data.overallRate) : "");
@@ -752,6 +780,7 @@ export function InterviewAssessmentPanel({
       onSave={() =>
         updateInterviewAssessment(userId, { intDate, overallRate, recommendation, strength, weakness, hiringNote })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Interview Assessment</PanelHeading>
       <FieldGrid>
@@ -772,9 +801,11 @@ export function InterviewAssessmentPanel({
 export function ReferenceCheckPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: ReferenceCheckInfo | null;
+  canEdit?: boolean;
 }) {
   const [refName, setRefName] = useState(data?.refName ?? "");
   const [company, setCompany] = useState(data?.company ?? "");
@@ -794,7 +825,7 @@ export function ReferenceCheckPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Reference Check</PanelHeading>
       <FieldGrid>
         <EditableField label="Reference Name" value={refName} onChange={setRefName} full />
@@ -823,9 +854,11 @@ const MEDICAL_RESULT_OPTIONS = [
 export function MedicalCheckPanel({
   userId,
   data,
+  canEdit = true,
 }: {
   userId: number;
   data: MedicalCheckInfo | null;
+  canEdit?: boolean;
 }) {
   const [fileId, setFileId] = useState(data?.medicalReportFileId ?? null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -839,6 +872,7 @@ export function MedicalCheckPanel({
   return (
     <EditableSection
       onSave={() => updateMedicalCheck(userId, { medicalReportFileId: fileId, medicalReportFile: pendingFile, result })}
+      canEdit={canEdit}
     >
       <PanelHeading>Medical Check</PanelHeading>
       <FieldGrid>
@@ -856,33 +890,129 @@ export function MedicalCheckPanel({
   );
 }
 
-const PROBATION_STATUS_OPTIONS = [
-  { value: "In Progress", label: "In Progress" },
-  { value: "Confirmed", label: "Confirmed" },
-  { value: "Extended", label: "Extended" },
-  { value: "Stopped", label: "Stopped" },
-];
+// Always-read-only field (unlike EditableField, ignores the panel's own
+// edit-mode toggle) — for values sourced from ebright_hrfs (BranchStaff/
+// career_applications) that must never become editable just because the
+// panel's other, still-local fields (Confirmation Date, letters) are being
+// edited. Same visual shape as EditableField's own read view.
+function StaticField({ label, value, full = false }: { label: string; value: string | null; full?: boolean }) {
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {value ? <span className={`${valueClass} whitespace-pre-wrap`}>{value}</span> : <span className={emptyClass}>-</span>}
+    </div>
+  );
+}
+
+const PROBATION_STATUS_PILL_CLASSES: Record<string, string> = {
+  Confirm: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  Stop: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Extended: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  "In Progress": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
+
+// Confirm/Extend/Stop only render once Edit is clicked (per explicit
+// decision — see conversation), same "everything's gated by the panel's own
+// Edit/Save toggle" convention as every other field here. A private child
+// of ProbationPanel's own <EditableSection> so useEditMode() reads that
+// section's real state, same reason SalaryRevisionAttachmentField/
+// ExitChecklistAddItemRow above are their own small components rather than
+// a plain read in the parent body.
+function ProbationDecisionSection({
+  canDecide,
+  display,
+  onPick,
+  decideError,
+}: {
+  canDecide: boolean;
+  display: ProbationDisplayInfo;
+  onPick: (outcome: "Confirmed" | "Extended" | "Stopped") => void;
+  decideError: string | null;
+}) {
+  const editing = useEditMode();
+  if (!editing || !canDecide) return null;
+  return (
+    <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
+      <SubsectionHeading>Probation Decision</SubsectionHeading>
+      {display.decidedByName && (
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Last decided by {display.decidedByName}
+          {display.decidedAt ? ` on ${new Date(display.decidedAt).toLocaleDateString()}` : ""}.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => onPick("Confirmed")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+        >
+          Confirm
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("Extended")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+        >
+          Extend
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("Stopped")}
+          className="min-h-10 rounded-lg px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+        >
+          Stop
+        </button>
+      </div>
+      {decideError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{decideError}</p>}
+    </div>
+  );
+}
 
 // Real probation table — Probation stage's own tab only (no Employee Record
 // equivalent in the mock). confirmationLetter*/extensionLetter* are
 // independent Google Drive file fields, same pattern as resume.resume_file_id.
+// Start Date/End Date/Probation Status are read-only here (see
+// probationDecision.ts) — sourced from ebright_hrfs, not this panel's own
+// editable form; Confirmation Date/Extension End Date and the two letters
+// stay locally editable as before. canDecide (HR/Superadmin only, per
+// explicit decision — see conversation) gates the Confirm/Extend/Stop
+// buttons; the actual restriction is enforced server-side in
+// decideProbationOutcome regardless of what this prop says.
+//
+// Feedback is a hybrid source now, per explicit decision (see conversation):
+// display.hasCareerApplicationMatch true -> feedback2 (external, read-only,
+// unchanged); false -> probation.local_feedback (HR-editable — the field
+// only exists at all for someone with no recruitment-pipeline footprint,
+// who has nothing for feedback2 to ever source from). Confirm/Stop both
+// require whichever of the two applies to be non-empty first — checked here
+// (before opening the confirm dialog, for immediate feedback) AND again
+// server-side in decideProbationOutcome (the actual enforcement — this
+// client check is just UX, a direct call could otherwise skip it).
 export function ProbationPanel({
   userId,
   data,
+  display,
+  canDecide,
+  canEdit = true,
 }: {
   userId: number;
   data: ProbationInfo | null;
+  display: ProbationDisplayInfo;
+  canDecide: boolean;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState(data?.probationStatus ?? "");
-  const [startDate, setStartDate] = useState(data?.startDate ?? "");
-  const [endDate, setEndDate] = useState(data?.endDate ?? "");
   const [confirmDate, setConfirmDate] = useState(data?.confirmDate ?? "");
   const [extEndDate, setExtEndDate] = useState(data?.extEndDate ?? "");
   const [confirmationLetterFileId, setConfirmationLetterFileId] = useState(data?.confirmationLetterFileId ?? null);
   const [confirmationLetterPending, setConfirmationLetterPending] = useState<File | null>(null);
   const [extensionLetterFileId, setExtensionLetterFileId] = useState(data?.extensionLetterFileId ?? null);
   const [extensionLetterPending, setExtensionLetterPending] = useState<File | null>(null);
+  const [localFeedback, setLocalFeedback] = useState(data?.localFeedback ?? "");
+
+  const [pendingOutcome, setPendingOutcome] = useState<"Confirmed" | "Extended" | "Stopped" | null>(null);
+  const [deciding, setDeciding] = useState(false);
+  const [decideError, setDecideError] = useState<string | null>(null);
 
   function clearConfirmationLetter() {
     if (confirmationLetterPending) setConfirmationLetterPending(null);
@@ -893,55 +1023,123 @@ export function ProbationPanel({
     else setExtensionLetterFileId(null);
   }
 
+  function pickOutcome(outcome: "Confirmed" | "Extended" | "Stopped") {
+    if (outcome !== "Extended") {
+      const effectiveFeedback = display.hasCareerApplicationMatch ? display.feedback2 : localFeedback;
+      if (!effectiveFeedback || !effectiveFeedback.trim()) {
+        setDecideError("Feedback must be filled in before Confirm or Stop.");
+        return;
+      }
+    }
+    setDecideError(null);
+    setPendingOutcome(outcome);
+  }
+
+  async function confirmOutcome() {
+    if (!pendingOutcome) return;
+    const outcome = pendingOutcome;
+    setDeciding(true);
+    setDecideError(null);
+    const result = await decideProbationOutcome(
+      userId,
+      outcome,
+      display.hasCareerApplicationMatch ? undefined : localFeedback,
+    );
+    setDeciding(false);
+    setPendingOutcome(null);
+    if (!result.ok) {
+      setDecideError(result.error ?? "Failed to record probation decision.");
+      return;
+    }
+    // Confirmed moves this person to Active — isEffectivelyConfirmed now
+    // makes the live-computed override for this URL resolve to "active",
+    // not "probation", so refreshing the SAME /probation/employee/[id] page
+    // 404s (its own dual-listing guard no longer allows it — see
+    // conversation, live bug report). Navigate to their new Active profile
+    // instead, same reason StageProfileView's own Proceed handlers push
+    // rather than refresh after a real stage move. Extended/Stopped both
+    // keep them on this same Probation page, so refresh is still correct
+    // there.
+    if (outcome === "Confirmed") router.push(profileUrlForStage("active", userId));
+    else router.refresh();
+  }
+
+  const OUTCOME_MESSAGE: Record<"Confirmed" | "Extended" | "Stopped", string> = {
+    Confirmed: "Confirm this employee's probation? Full-Time employees move straight to Active, out of Probation and Onboarding.",
+    Extended: "Extend this employee's probation?",
+    Stopped: "Stop this employee's probation? They stay in Probation stage, shown as \"Stop\".",
+  };
+
   return (
-    <EditableSection
-      onSave={async () => {
-        const result = await updateProbationInfo(userId, {
-          probationStatus: status,
-          startDate,
-          endDate,
-          confirmDate,
-          extEndDate,
-          confirmationLetterFileId,
-          confirmationLetterFile: confirmationLetterPending,
-          extensionLetterFileId,
-          extensionLetterFile: extensionLetterPending,
-        });
-        // StageProfileView's own "Next" button gates on this same Probation
-        // Status (probationInfo prop, from the server) — without a refresh
-        // here, that prop stays stale after a save (it's a server-fetched
-        // prop, not something this panel's own local state feeds), so the
-        // button would keep reading the pre-save value even though this
-        // panel already shows the freshly-saved one.
-        if (!result || result.ok !== false) router.refresh();
-        return result;
-      }}
-    >
-      <PanelHeading>Probation</PanelHeading>
-      <FieldGrid>
-        <EditableSelectField label="Probation Status" value={status} onChange={setStatus} options={PROBATION_STATUS_OPTIONS} full />
-        <EditableField label="Start Date" value={startDate} onChange={setStartDate} type="date" />
-        <EditableField label="End Date" value={endDate} onChange={setEndDate} type="date" />
-        <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
-        <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
-        <RealFileField
-          label="Confirmation Letter"
-          existingFileId={confirmationLetterFileId}
-          pendingFile={confirmationLetterPending}
-          onPick={setConfirmationLetterPending}
-          onClear={clearConfirmationLetter}
-          full
+    <>
+      <EditableSection
+        onSave={async () => {
+          const result = await updateProbationInfo(userId, {
+            confirmDate,
+            extEndDate,
+            confirmationLetterFileId,
+            confirmationLetterFile: confirmationLetterPending,
+            extensionLetterFileId,
+            extensionLetterFile: extensionLetterPending,
+          });
+          if (!result || result.ok !== false) router.refresh();
+          return result;
+        }}
+        canEdit={canEdit}
+      >
+        <PanelHeading>Probation</PanelHeading>
+        <FieldGrid>
+          <StaticField label="Start Date" value={display.startDate} />
+          <StaticField label="End Date" value={display.endDate} />
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className={labelClass}>Probation Status</span>
+            <span
+              className={`self-start inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                PROBATION_STATUS_PILL_CLASSES[display.displayStatus] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              }`}
+            >
+              {display.displayStatus}
+            </span>
+          </div>
+          <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
+          {display.displayStatus === "Extended" && (
+            <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
+          )}
+          <RealFileField
+            label="Confirmation Letter"
+            existingFileId={confirmationLetterFileId}
+            pendingFile={confirmationLetterPending}
+            onPick={setConfirmationLetterPending}
+            onClear={clearConfirmationLetter}
+            full
+          />
+          <RealFileField
+            label="Extension Letter"
+            existingFileId={extensionLetterFileId}
+            pendingFile={extensionLetterPending}
+            onPick={setExtensionLetterPending}
+            onClear={clearExtensionLetter}
+            full
+          />
+          {display.hasCareerApplicationMatch ? (
+            <StaticField label="Feedback" value={display.feedback2} full />
+          ) : (
+            <EditableTextArea label="Feedback" value={localFeedback} onChange={setLocalFeedback} full />
+          )}
+        </FieldGrid>
+
+        <ProbationDecisionSection canDecide={canDecide} display={display} onPick={pickOutcome} decideError={decideError} />
+      </EditableSection>
+
+      {pendingOutcome && !deciding && (
+        <ConfirmDialog
+          message={OUTCOME_MESSAGE[pendingOutcome]}
+          confirmLabel={pendingOutcome === "Confirmed" ? "Confirm" : pendingOutcome === "Extended" ? "Extend" : "Stop"}
+          onCancel={() => setPendingOutcome(null)}
+          onConfirm={confirmOutcome}
         />
-        <RealFileField
-          label="Extension Letter"
-          existingFileId={extensionLetterFileId}
-          pendingFile={extensionLetterPending}
-          onPick={setExtensionLetterPending}
-          onClear={clearExtensionLetter}
-          full
-        />
-      </FieldGrid>
-    </EditableSection>
+      )}
+    </>
   );
 }
 
@@ -961,10 +1159,12 @@ export function DocumentsPanel({
   userId,
   data,
   showEmploymentContract = true,
+  canEdit = true,
 }: {
   userId: number;
   data: DocumentsInfo | null;
   showEmploymentContract?: boolean;
+  canEdit?: boolean;
 }) {
   const [contractFileId, setContractFileId] = useState(data?.employmentContractFileId ?? null);
   const [contractPending, setContractPending] = useState<File | null>(null);
@@ -990,6 +1190,7 @@ export function DocumentsPanel({
           employeeHandbookFile: handbookPending,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>{showEmploymentContract ? "Documents" : "Employee Handbook"}</PanelHeading>
       <FieldGrid>
@@ -1030,14 +1231,28 @@ const PCB_FORM_OPTIONS = [
 // updateBankDetails — same data Employee Record's own "Payment & Bank Info"
 // tab already reads/writes, saved together with payroll in one Edit/Save
 // cycle since this panel shows both subsections at once.
+//
+// Employee Record's Tax Info instance drops Bank Details entirely (already
+// shown, on its own, under Personal Info > Payment — this panel's copy was
+// a pure duplicate there) and renames the heading to match — Onboarding's
+// own Payroll tab is unaffected, both default to the original combined
+// behavior. showBankDetails=false also skips the updateBankDetails() call
+// on Save, not just the section's visibility — Tax Info never reads or
+// edits bank_details in that mode, so there's nothing for it to write back.
 export function OnboardingPayrollPanel({
   userId,
   data,
   employeeDetail,
+  heading = "Payroll",
+  showBankDetails = true,
+  canEdit = true,
 }: {
   userId: number;
   data: PayrollInfo | null;
   employeeDetail: EmployeeDetailFull;
+  heading?: string;
+  showBankDetails?: boolean;
+  canEdit?: boolean;
 }) {
   const [epfNumber, setEpfNumber] = useState(data?.epfNumber ?? "");
   const [socsoNumber, setSocsoNumber] = useState(data?.socsoNumber ?? "");
@@ -1059,24 +1274,24 @@ export function OnboardingPayrollPanel({
   return (
     <EditableSection
       onSave={async () => {
-        const [payrollResult, bankResult] = await Promise.all([
-          updatePayroll(userId, {
-            epfNumber,
-            socsoNumber,
-            eisNumber,
-            taxNumber,
-            pcbForm,
-            pcbAttachmentFileId: pcbFileId,
-            pcbAttachmentFile: pcbPending,
-          }),
-          updateBankDetails(userId, { bankName, accountName, bankAccount }),
-        ]);
+        const payrollResult = await updatePayroll(userId, {
+          epfNumber,
+          socsoNumber,
+          eisNumber,
+          taxNumber,
+          pcbForm,
+          pcbAttachmentFileId: pcbFileId,
+          pcbAttachmentFile: pcbPending,
+        });
         if (!payrollResult.ok) return payrollResult;
+        if (!showBankDetails) return { ok: true };
+        const bankResult = await updateBankDetails(userId, { bankName, accountName, bankAccount });
         if (!bankResult.ok) return bankResult;
         return { ok: true };
       }}
+      canEdit={canEdit}
     >
-      <PanelHeading>Payroll</PanelHeading>
+      <PanelHeading>{heading}</PanelHeading>
       <Subsection heading="Statutory Information">
         <EditableField label="EPF Number" value={epfNumber} onChange={setEpfNumber} />
         <EditableField label="SOCSO Number" value={socsoNumber} onChange={setSocsoNumber} />
@@ -1094,11 +1309,13 @@ export function OnboardingPayrollPanel({
           full
         />
       </Subsection>
-      <Subsection heading="Bank Details">
-        <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
-        <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
-        <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
-      </Subsection>
+      {showBankDetails && (
+        <Subsection heading="Bank Details">
+          <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
+          <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
+          <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
+        </Subsection>
+      )}
     </EditableSection>
   );
 }
@@ -1111,27 +1328,6 @@ function PlaceholderUploadField({ label, full = false }: { label: string; full?:
       <span className={labelClass}>{label}</span>
       <FilePickerControl file={file} onChange={setFile} editing={editing} />
     </div>
-  );
-}
-
-// Checkbox checklist (Exit's Clearance sub-tabs) — a genuinely different
-// content shape from a single-value field, so it keeps its own look rather
-// than forcing a label/value pattern onto it.
-function Checklist({ items }: { items: string[] }) {
-  const editing = useEditMode();
-  return (
-    <ul className="flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item} className="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            disabled={!editing}
-            className="mt-1 w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
-          />
-          <span className="text-sm text-[#4b4949]">{item}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -1172,7 +1368,7 @@ function RecordTable({
                 <th
                   key={c.key}
                   scope="col"
-                  className={`text-left px-3.5 py-2.5 bg-[#f0f0f0a6] text-sm font-medium text-[#4b4949] whitespace-nowrap ${
+                  className={`text-left px-3.5 py-2.5 bg-[#f0f0f0a6] dark:bg-slate-800 text-sm font-medium text-[#4b4949] dark:text-slate-300 whitespace-nowrap ${
                     i === 0 ? "rounded-l-[10px]" : ""
                   } ${i === columns.length - 1 && !showDeleteColumn ? "rounded-r-[10px]" : ""}`}
                 >
@@ -1180,7 +1376,7 @@ function RecordTable({
                 </th>
               ))}
               {showDeleteColumn && (
-                <th scope="col" className="px-3.5 py-2.5 bg-[#f0f0f0a6] rounded-r-[10px] w-10">
+                <th scope="col" className="px-3.5 py-2.5 bg-[#f0f0f0a6] dark:bg-slate-800 rounded-r-[10px] w-10">
                   <span className="sr-only">Delete</span>
                 </th>
               )}
@@ -1191,7 +1387,7 @@ function RecordTable({
               <tr>
                 <td
                   colSpan={columns.length + (showDeleteColumn ? 1 : 0)}
-                  className="px-3.5 py-6 text-sm text-slate-400 text-center border-b border-black/5"
+                  className="px-3.5 py-6 text-sm text-slate-400 text-center border-b border-black/5 dark:border-white/10"
                 >
                   No records yet.
                 </td>
@@ -1201,15 +1397,15 @@ function RecordTable({
                 <tr
                   key={rowIds?.[i] ?? i}
                   onClick={rowsClickable ? () => onRowClick(i) : undefined}
-                  className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa]" : undefined}
+                  className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa] dark:hover:bg-slate-800" : undefined}
                 >
                   {columns.map((c) => (
-                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5">
+                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] dark:text-slate-300 border-b border-black/5 dark:border-white/10">
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
                   {showDeleteColumn && (
-                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5">
+                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5 dark:border-white/10">
                       {rowIds?.[i] !== undefined && (
                         <button
                           type="button"
@@ -1218,7 +1414,7 @@ function RecordTable({
                             onDeleteRow(rowIds[i]);
                           }}
                           aria-label="Delete record"
-                          className="text-slate-400 hover:text-red-600 text-lg leading-none font-semibold"
+                          className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none font-semibold"
                         >
                           −
                         </button>
@@ -1234,7 +1430,7 @@ function RecordTable({
       {addLabel && editing && (
         <button
           type="button"
-          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] text-sm font-medium text-[#5c6b0a] hover:bg-[#d9fd63]"
+          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] dark:bg-lime-900 text-sm font-medium text-[#5c6b0a] dark:text-lime-300 hover:bg-[#d9fd63] dark:hover:bg-lime-800"
         >
           {addLabel}
         </button>
@@ -1259,7 +1455,13 @@ function RecordTable({
 export interface RecordField {
   key: string;
   label: string;
-  type: "text" | "date" | "textarea" | "file" | "select";
+  /** "year-month" renders YearMonthPicker (a </> year stepper over a
+   *  12-month list, saving "YYYY-MM") instead of a plain <select> — built
+   *  specifically for Payslip History's Month field, per explicit decision
+   *  (see conversation): a flat <select> would need one option per
+   *  month-per-year (26+ entries to scroll through) instead of stepping
+   *  years and picking from a fixed 12. */
+  type: "text" | "date" | "textarea" | "file" | "select" | "year-month";
   full?: boolean;
   /** Flat option list — required when type is "select" unless optionGroups is set. */
   options?: { value: string; label: string }[];
@@ -1287,7 +1489,161 @@ export interface RecordField {
 export type RecordEditValues = Record<string, string>;
 
 const recordModalInputClass =
-  "h-11 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
+  "h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 border-0 px-3.5 text-sm text-[#4b4949] dark:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// Shared "YYYY-MM" -> "Month YYYY" formatter — used by YearMonthPicker's own
+// closed-state label and by PayslipHistoryPanel's table rows, so both stay
+// in sync on how a stored value displays.
+function formatMonthLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  const [year, month] = value.split("-");
+  const name = MONTH_NAMES[Number(month) - 1];
+  return name ? `${name} ${year}` : value;
+}
+
+const YEAR_MONTH_DROPDOWN_MARGIN = 6;
+
+// Year-stepper + 12-month picker — see RecordField.type's own "year-month"
+// comment for why this exists instead of a flat <select>. This trigger
+// lives inside RecordAddModal's own field list, which has overflow-y-auto
+// so the modal itself can scroll when it has many fields — a plain
+// position:absolute dropdown gets clipped to that scrollable ancestor
+// instead of floating free (confirmed live: only a sliver of the month
+// list rendered, per explicit decision/bug report — see conversation).
+// Fixed the same way RowActionMenu already solves this exact problem
+// elsewhere in this app: switch to viewport-relative position:fixed,
+// computed from the trigger's own getBoundingClientRect() after the
+// dropdown mounts (needs its own rendered height first), flipped above the
+// trigger when there's no room below. A fixed-position dropdown would
+// otherwise drift away from its trigger if the modal's field list scrolls
+// underneath it while open, so it just closes on scroll instead of trying
+// to re-track — same choice RowActionMenu makes, for the same reason.
+function YearMonthPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [yearStr, monthStr] = value ? value.split("-") : [undefined, undefined];
+  const selectedYear = yearStr ? Number(yearStr) : undefined;
+  const selectedMonth = monthStr ? Number(monthStr) : undefined;
+  const [displayYear, setDisplayYear] = useState(selectedYear ?? new Date().getFullYear());
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function onScroll(e: Event) {
+      // Unlike RowActionMenu (whose menu is never itself scrollable), this
+      // picker's own month list is — scrolling it dispatches a (non-
+      // bubbling) "scroll" event that this capture-phase listener would
+      // otherwise see too, closing the dropdown on its own internal scroll.
+      // Only close for scrolling OUTSIDE the menu (e.g. the modal's field
+      // list scrolling underneath it).
+      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !btnRef.current || !menuRef.current) return;
+    const btnRect = btnRef.current.getBoundingClientRect();
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const openUp = btnRect.bottom + menuRect.height + YEAR_MONTH_DROPDOWN_MARGIN > window.innerHeight;
+    const top = openUp ? btnRect.top - menuRect.height - YEAR_MONTH_DROPDOWN_MARGIN : btnRect.bottom + YEAR_MONTH_DROPDOWN_MARGIN;
+    setMenuPos({ top, left: btnRect.left, width: btnRect.width });
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => {
+          setDisplayYear(selectedYear ?? new Date().getFullYear());
+          setOpen((o) => !o);
+        }}
+        className={`${recordModalInputClass} w-full text-left flex items-center justify-between`}
+      >
+        <span className={value ? "" : "text-[#4b4949a3] dark:text-slate-400"}>{value ? formatMonthLabel(value) : "Select month"}</span>
+        <span className="text-[#4b4949a3] dark:text-slate-400" aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          style={
+            menuPos
+              ? { position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }
+              : { position: "fixed", top: -9999, left: -9999 }
+          }
+          className="z-[2100] rounded-[10px] border border-black/10 dark:border-white/10 bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-[0_4px_14px_0_#0000001a] overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b border-black/10 dark:border-white/10 bg-[#f0f0f0a6] dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setDisplayYear((y) => y - 1)}
+              aria-label="Previous year"
+              className="px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[#4b4949] dark:text-slate-300 font-medium"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-semibold text-[#4b4949] dark:text-slate-200">{displayYear}</span>
+            <button
+              type="button"
+              onClick={() => setDisplayYear((y) => y + 1)}
+              aria-label="Next year"
+              className="px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[#4b4949] dark:text-slate-300 font-medium"
+            >
+              ›
+            </button>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {MONTH_NAMES.map((name, i) => {
+              const monthNum = i + 1;
+              const isSelected = selectedYear === displayYear && selectedMonth === monthNum;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => {
+                    onChange(`${displayYear}-${String(monthNum).padStart(2, "0")}`);
+                    setOpen(false);
+                  }}
+                  className={`block w-full text-left px-3.5 py-2 text-sm ${
+                    isSelected ? "bg-[#4a90e2] text-white font-medium" : "text-[#4b4949] dark:text-slate-300 hover:bg-[#f0f4fa] dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RecordAddModal({
   title,
@@ -1345,14 +1701,14 @@ function RecordAddModal({
           the title and Save/Cancel stay reachable without hunting through a
           long page-level scroll. max-h matches the overlay's own p-4 so the
           modal never touches the viewport edge on small screens. */}
-      <div className="relative flex w-full max-w-[560px] max-h-[calc(100vh-32px)] flex-col box-border bg-white rounded-2xl shadow-[0_12px_32px_0_#00000026] overflow-hidden">
+      <div className="relative flex w-full max-w-[560px] max-h-[calc(100vh-32px)] flex-col box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl shadow-[0_12px_32px_0_#00000026] overflow-hidden">
         <div className="flex items-start justify-between gap-4 px-5 sm:px-7 pt-6 pb-4">
-          <h3 className="text-lg font-semibold text-[#4b4949d6]">{title}</h3>
+          <h3 className="text-lg font-semibold text-[#4b4949d6] dark:text-slate-200">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[#4b4949a3] hover:bg-[#f0f4fa] hover:text-[#4b4949]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[#4b4949a3] dark:text-slate-400 hover:bg-[#f0f4fa] dark:hover:bg-slate-800 hover:text-[#4b4949] dark:hover:text-slate-200"
           >
             ×
           </button>
@@ -1365,7 +1721,7 @@ function RecordAddModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             {fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true)).map((f) => (
               <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
-                <label className="text-sm font-medium text-[#4b4949]">{f.label}</label>
+                <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>
                 {f.type === "textarea" ? (
                   <textarea
                     value={values[f.key] ?? ""}
@@ -1379,12 +1735,14 @@ function RecordAddModal({
                   ) : (
                     <div className="flex items-center gap-2 min-w-0">
                       <RealAttachmentLink fileId={initialFileIds[f.key]} />
-                      <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+                      <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
                         <input type="file" className="hidden" onChange={(e) => setFileField(f.key, e.target.files?.[0] ?? null)} />
                         Replace
                       </label>
                     </div>
                   )
+                ) : f.type === "year-month" ? (
+                  <YearMonthPicker value={values[f.key] ?? ""} onChange={(v) => setField(f.key, v)} />
                 ) : f.type === "select" ? (
                   <select value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} className={recordModalInputClass}>
                     <option value=""></option>
@@ -1415,14 +1773,14 @@ function RecordAddModal({
               </div>
             ))}
           </div>
-          {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
+          {error && <p className="mt-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
-        <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5">
+        <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5 dark:border-white/10">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/15 hover:bg-[#f0f4fa] disabled:opacity-60 transition-colors"
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-200 bg-white dark:bg-slate-800 border-2 border-black/15 dark:border-white/15 hover:bg-[#f0f4fa] dark:hover:bg-slate-700 disabled:opacity-60 transition-colors"
           >
             Cancel
           </button>
@@ -1558,7 +1916,7 @@ export function RepeatableRecordSection({
             setEditingRowId(null);
             setModalOpen(true);
           }}
-          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] text-sm font-medium text-[#5c6b0a] hover:bg-[#d9fd63]"
+          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] dark:bg-lime-900 text-sm font-medium text-[#5c6b0a] dark:text-lime-300 hover:bg-[#d9fd63] dark:hover:bg-lime-800"
         >
           {addLabel}
         </button>
@@ -1597,9 +1955,9 @@ export function RepeatableRecordSection({
   );
 }
 
-export function AchievementPanel({ userId, data }: { userId: number; data: AchievementEntry[] }) {
+export function AchievementPanel({ userId, data, canEdit = true }: { userId: number; data: AchievementEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Achievement"
         addLabel="+ Add certificate or achievement"
@@ -1629,12 +1987,107 @@ export function AchievementPanel({ userId, data }: { userId: number; data: Achie
   );
 }
 
+// Replaces the old single-upload Payslip widget (payslip.attachment_file_id
+// — see that table's own schema comment) with a repeatable history, one row
+// per month, per explicit decision (see conversation). Same
+// RepeatableRecordSection pattern as Achievement/Training, except Month
+// uses YearMonthPicker (type: "year-month") instead of a flat <select> —
+// see that field type's own comment. Deliberately no EditableSection
+// wrapper of its own here — rendered inside PayrollPanel's existing one
+// (EmployeeRecordPanels.tsx), same as SalaryRevisionFields; its
+// useEditMode() reads that ambient context instead of creating a new one.
+// Add + Delete only, same as Training — no in-place edit.
+export function PayslipHistoryPanel({ userId, data }: { userId: number; data: PayslipHistoryEntry[] }) {
+  return (
+    <RepeatableRecordSection
+      heading="Payslip"
+      addLabel="+ Add Payslip"
+      fields={[
+        { key: "month", label: "Month", type: "year-month" },
+        { key: "attachment", label: "Payslip file", type: "file" },
+      ]}
+      columns={[
+        { key: "month", label: "Month" },
+        { key: "attachment", label: "Payslip file" },
+        { key: "uploadDate", label: "Upload Date" },
+      ]}
+      rows={data.map((r) => ({
+        month: formatMonthLabel(r.month),
+        attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
+        uploadDate: r.uploadDate ?? "—",
+      }))}
+      rowIds={data.map((r) => r.id)}
+      onAdd={(values, files) => addPayslipHistory(userId, { month: values.month ?? "", attachmentFile: files.attachment ?? null })}
+      onDelete={(id) => deletePayslipHistory(userId, id)}
+    />
+  );
+}
+
 function parseAmount(val: string): number | null {
   const n = parseFloat(val.replace(/[^0-9.-]/g, ""));
   return isNaN(n) ? null : n;
 }
+// No space between "RM" and the number — matches CurrencyField's own
+// read-only display exactly (see conversation: unified so Salary Revision's
+// Adjustment field/History table don't show a visually different RM style
+// than the Current/New Salary inputs right next to them).
 function formatAmount(n: number): string {
-  return (n < 0 ? "-RM " : "RM ") + Math.abs(n).toFixed(2);
+  return (n < 0 ? "-RM" : "RM") + Math.abs(n).toFixed(2);
+}
+
+// Editable currency input — RM prefix + fixed 2-decimal display, per
+// explicit spec (see conversation: Financial Settlement's amount fields).
+// No existing editable-currency component to reuse: Salary Revision's
+// Current/New Salary and Payslip's Basic Salary are all plain EditableField
+// (raw text, no prefix/formatting at all) — formatAmount() above is
+// display-only, used for Salary Revision's read-only Adjustment field and
+// its history table rows, never for a live input. Modeled on PhoneField's
+// boxed-prefix layout instead, the closest existing "prefix + input"
+// convention in this file. Note the "RM0.00" (no space) display here is a
+// deliberate divergence from formatAmount()'s "RM 0.00" (with a space) —
+// matches this feature's explicit spec exactly rather than silently
+// reusing the other convention; flagged, not unified, since nothing asked
+// for the two to match. Normalizes to 2 decimals on blur, not on every
+// keystroke, so a half-typed value isn't fought mid-entry.
+function CurrencyField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  function handleBlur() {
+    const n = parseAmount(value);
+    onChange(n !== null ? n.toFixed(2) : "");
+  }
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <div className="flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 overflow-hidden focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+          <span className="flex items-center pl-3 pr-1 text-sm text-[#4b4949a3] dark:text-slate-400 select-none">RM</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={handleBlur}
+            placeholder="0.00"
+            className="flex-1 min-w-0 pr-3 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent focus:outline-none"
+          />
+        </div>
+      ) : value ? (
+        <span className={valueClass}>{`RM${Number.parseFloat(value).toFixed(2)}`}</span>
+      ) : (
+        <span className={emptyClass}>-</span>
+      )}
+    </div>
+  );
 }
 
 const APPROVED_BY_OPTIONS = [
@@ -1673,7 +2126,7 @@ function SalaryRevisionAttachmentField({
         editingExistingRecord && existingFileId && !pendingFile ? (
           <div className="flex items-center gap-2 min-w-0">
             <RealAttachmentLink fileId={existingFileId} />
-            <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+            <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
               <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
               Replace
             </label>
@@ -1684,7 +2137,7 @@ function SalaryRevisionAttachmentField({
       ) : existingFileId ? (
         <RealAttachmentLink fileId={existingFileId} />
       ) : (
-        <span className={emptyClass}>Not provided</span>
+        <span className={emptyClass}>-</span>
       )}
     </div>
   );
@@ -1830,7 +2283,7 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
           <button
             type="button"
             onClick={() => setEditingId(null)}
-            className="text-xs text-[#4a90e2] hover:underline shrink-0"
+            className="text-xs text-[#4a90e2] dark:text-blue-400 hover:underline shrink-0"
           >
             Cancel edit — add new revision instead
           </button>
@@ -1839,8 +2292,8 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
       <FieldGrid>
         <EditableField label="Issue Date" value={issuedDate} onChange={setIssuedDate} type="date" />
         <EditableField label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} type="date" />
-        <EditableField label="Current Salary" value={currentSalary} onChange={setCurrentSalary} />
-        <EditableField label="New Salary" value={newSalary} onChange={setNewSalary} />
+        <CurrencyField label="Current Salary" value={currentSalary} onChange={setCurrentSalary} />
+        <CurrencyField label="New Salary" value={newSalary} onChange={setNewSalary} />
         <FieldDisplay label="Salary Adjustment" value={adjustment !== null ? formatAmount(adjustment) : null} full />
         <EditableTextArea label="Reason" value={reason} onChange={setReason} full />
         <EditableSelectField label="Approved By" value={approvedBy} onChange={setApprovedBy} options={APPROVED_BY_OPTIONS} full />
@@ -1901,10 +2354,18 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
 // SalaryRevisionFields under its own single outer EditableSection instead
 // (see EmployeeRecordPanels.tsx's PayrollPanel) so the whole tab shares one
 // button rather than having two.
-export function SalaryRevisionPanel({ userId, data }: { userId: number; data: SalaryRevisionEntry[] }) {
+export function SalaryRevisionPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: SalaryRevisionEntry[];
+  canEdit?: boolean;
+}) {
   const ref = useRef<SalaryRevisionHandle>(null);
   return (
-    <EditableSection onSave={() => ref.current?.save()}>
+    <EditableSection onSave={() => ref.current?.save()} canEdit={canEdit}>
       <SalaryRevisionFields ref={ref} userId={userId} data={data} />
     </EditableSection>
   );
@@ -1914,15 +2375,17 @@ export function PromotionPanel({
   userId,
   data,
   currentPosition,
+  canEdit = true,
 }: {
   userId: number;
   data: PromotionEntry[];
   /** Employee's actual current position (employment.position) — pre-fills
    *  "Current Position" so it doesn't need manual re-entry every time. */
   currentPosition?: string | null;
+  canEdit?: boolean;
 }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Promotion"
         addLabel="+ Add promotion record"
@@ -2010,6 +2473,7 @@ export function TransferPanel({
   branches,
   departments,
   currentLocation,
+  canEdit = true,
 }: {
   userId: number;
   data: TransferEntry[];
@@ -2020,6 +2484,7 @@ export function TransferPanel({
   /** Employee's current Branch/Department (department-priority display) —
    *  pre-fills "From" so it doesn't need manual re-entry every time. */
   currentLocation?: string | null;
+  canEdit?: boolean;
 }) {
   const locationOptionGroups = [
     { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) },
@@ -2029,7 +2494,7 @@ export function TransferPanel({
     },
   ];
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Transfer"
         addLabel="+ Add transfer record"
@@ -2124,9 +2589,9 @@ const TRAINING_STATUS_OPTIONS = [
   { value: "Others", label: "Others" },
 ];
 
-export function TrainingPanel({ userId, data }: { userId: number; data: TrainingEntry[] }) {
+export function TrainingPanel({ userId, data, canEdit = true }: { userId: number; data: TrainingEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Training"
         addLabel="+ Add training record"
@@ -2184,7 +2649,7 @@ const NDA_STATUS_OPTIONS = [
 
 // Stage-flow's Active > NDA tab shows NDA fields only (active_nda.html) —
 // unlike Employee Record's combined "NDA/ NC" tab (NdaNcPanel below).
-export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | null }) {
+export function NdaPanel({ userId, data, canEdit = true }: { userId: number; data: NdaInfo | null; canEdit?: boolean }) {
   const [signDate, setSignDate] = useState(data?.signDate ?? "");
   const [effectiveDate, setEffectiveDate] = useState(data?.effectiveDate ?? "");
   const [status, setStatus] = useState(data?.status ?? "");
@@ -2199,6 +2664,7 @@ export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | nul
   return (
     <EditableSection
       onSave={() => updateNda(userId, { signDate, effectiveDate, status, attachmentFileId: fileId, attachmentFile: pendingFile })}
+      canEdit={canEdit}
     >
       <PanelHeading>NDA</PanelHeading>
       <FieldGrid>
@@ -2213,7 +2679,7 @@ export function NdaPanel({ userId, data }: { userId: number; data: NdaInfo | nul
 
 // Stage-flow's Active > Non-Compete tab shows NC fields only
 // (active_nonCompete.html) — unlike Employee Record's combined tab below.
-export function NonCompetePanel({ userId, data }: { userId: number; data: NonCompeteInfo | null }) {
+export function NonCompetePanel({ userId, data, canEdit = true }: { userId: number; data: NonCompeteInfo | null; canEdit?: boolean }) {
   const [signDate, setSignDate] = useState(data?.signDate ?? "");
   const [expiryDate, setExpiryDate] = useState(data?.expiryDate ?? "");
   const [duration, setDuration] = useState(data?.duration ?? "");
@@ -2228,6 +2694,7 @@ export function NonCompetePanel({ userId, data }: { userId: number; data: NonCom
   return (
     <EditableSection
       onSave={() => updateNonCompete(userId, { signDate, expiryDate, duration, attachmentFileId: fileId, attachmentFile: pendingFile })}
+      canEdit={canEdit}
     >
       <PanelHeading>Non-Compete</PanelHeading>
       <FieldGrid>
@@ -2248,10 +2715,12 @@ export function NdaNcPanel({
   userId,
   ndaData,
   nonCompeteData,
+  canEdit = true,
 }: {
   userId: number;
   ndaData: NdaInfo | null;
   nonCompeteData: NonCompeteInfo | null;
+  canEdit?: boolean;
 }) {
   const [ndaSignDate, setNdaSignDate] = useState(ndaData?.signDate ?? "");
   const [ndaEffectiveDate, setNdaEffectiveDate] = useState(ndaData?.effectiveDate ?? "");
@@ -2276,6 +2745,7 @@ export function NdaNcPanel({
 
   return (
     <EditableSection
+      canEdit={canEdit}
       onSave={async () => {
         const [ndaResult, ncResult] = await Promise.all([
           updateNda(userId, {
@@ -2332,7 +2802,7 @@ export function DisciplinarySummaryPanel({ data }: { data: DisciplinarySummaryRo
         ]}
         rows={data.map((r) => ({ date: r.date ?? "—", type: r.type, description: r.description ?? "—" }))}
       />
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
         Full disciplinary records (Domestic Inquiry, Suspension, Showcause/Warning, PIP) are added from this
         employee&apos;s Employee Record &gt; Disciplinary section.
       </p>
@@ -2352,9 +2822,17 @@ const DOMESTIC_INQUIRY_DECISION_OPTIONS = [
   { value: "Pending", label: "Pending" },
 ];
 
-export function DomesticInquiryPanel({ userId, data }: { userId: number; data: DomesticInquiryEntry[] }) {
+export function DomesticInquiryPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: DomesticInquiryEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Domestic Inquiry"
         addLabel="+ Add a domestic inquiry record"
@@ -2418,9 +2896,17 @@ const SUSPENSION_TYPE_OPTIONS = [
   { value: "Unpaid Suspension", label: "Unpaid Suspension" },
 ];
 
-export function SuspensionPanel({ userId, data }: { userId: number; data: SuspensionLetterEntry[] }) {
+export function SuspensionPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: SuspensionLetterEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Suspension Letter"
         addLabel="+ Add a suspension letter record"
@@ -2494,9 +2980,17 @@ const SHOWCAUSE_CASE_TYPE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-export function ShowcausePanel({ userId, data }: { userId: number; data: ShowcauseWarningLetterEntry[] }) {
+export function ShowcausePanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ShowcauseWarningLetterEntry[];
+  canEdit?: boolean;
+}) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Showcause/ Warning Letter"
         addLabel="+ Add a showcause/warning letter record"
@@ -2581,9 +3075,9 @@ const PIP_REVIEW_RESULT_OPTIONS = [
   { value: "Terminated", label: "Terminated" },
 ];
 
-export function PipPanel({ userId, data }: { userId: number; data: PipEntry[] }) {
+export function PipPanel({ userId, data, canEdit = true }: { userId: number; data: PipEntry[]; canEdit?: boolean }) {
   return (
-    <EditableSection>
+    <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Performance Improvement Plan"
         addLabel="+ Add a PIP record"
@@ -2656,7 +3150,7 @@ const EXIT_TYPE_OPTIONS = [
   { value: "Termination/Dismissal", label: "Termination/Dismissal" },
 ];
 
-export function ResignationPanel({ userId, data }: { userId: number; data: ResignationInfo | null }) {
+export function ResignationPanel({ userId, data, canEdit = true }: { userId: number; data: ResignationInfo | null; canEdit?: boolean }) {
   const [submissionDate, setSubmissionDate] = useState(data?.submissionDate ?? "");
   const [lastWorkingDate, setLastWorkingDate] = useState(data?.lastWorkingDate ?? "");
   const [reason, setReason] = useState(data?.reason ?? "");
@@ -2689,6 +3183,7 @@ export function ResignationPanel({ userId, data }: { userId: number; data: Resig
           exitType,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Resignation</PanelHeading>
       <FieldGrid>
@@ -2721,7 +3216,15 @@ const REFERENCE_LETTER_TYPE_OPTIONS = [
   { value: "service", label: "Service / Experience Letter" },
 ];
 
-export function ReferenceLetterPanel({ userId, data }: { userId: number; data: ReferenceLetterInfo | null }) {
+export function ReferenceLetterPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ReferenceLetterInfo | null;
+  canEdit?: boolean;
+}) {
   const [requestDate, setRequestDate] = useState(data?.requestDate ?? "");
   const [type, setType] = useState(data?.type ?? "");
   const [issuedDate, setIssuedDate] = useState(data?.issuedDate ?? "");
@@ -2748,6 +3251,7 @@ export function ReferenceLetterPanel({ userId, data }: { userId: number; data: R
           issuedLetterFile: pendingFile,
         })
       }
+      canEdit={canEdit}
     >
       <PanelHeading>Reference Letter</PanelHeading>
       <FieldGrid>
@@ -2770,20 +3274,386 @@ const EXIT_REASON_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function ExitInterviewNotesPanel({ userId, data }: { userId: number; data: ExitInterviewNoteInfo | null }) {
+export function ExitInterviewNotesPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: ExitInterviewNoteInfo | null;
+  canEdit?: boolean;
+}) {
   const [date, setDate] = useState(data?.date ?? "");
   const [interviewer, setInterviewer] = useState(data?.interviewer ?? "");
   const [reason, setReason] = useState(data?.reason ?? "");
   const [note, setNote] = useState(data?.note ?? "");
 
   return (
-    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })}>
+    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })} canEdit={canEdit}>
       <PanelHeading>Exit Interview Notes</PanelHeading>
       <FieldGrid>
         <EditableField label="Interview Date" value={date} onChange={setDate} type="date" />
         <EditableField label="Interviewer" value={interviewer} onChange={setInterviewer} />
         <EditableSelectField label="Primary Reason for Leaving" value={reason} onChange={setReason} options={EXIT_REASON_OPTIONS} full />
         <EditableTextArea label="Feedback / Notes" value={note} onChange={setNote} full />
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+// Exit > Clearance's 3 checklists (Knowledge Transfer/Asset Recovery/System
+// Revocation) — real now, per explicit design (see conversation). ONE
+// Save button total (EditableSection's own top-right one) — checking/
+// unchecking, deleting an item, and typing a new item's label all just
+// accumulate in local state; clicking Save batches everything: toggle calls
+// for changed rows, delete calls for pending-deleted rows, and (if a new
+// label was typed) an add call. Adding/deleting a row is HR/Superadmin-only
+// (canAddItem, resolved server-side from the session role — see the
+// page-level fetch); toggling is open to any in-scope role. If a new label
+// is pending, Save first blocks on AddItemScopeDialog ("Apply to all
+// employees" writes a global item, user_id null; "Only this employee"
+// scopes it to just this one) before the batch actually runs — canceling
+// that dialog voids the WHOLE pending batch, not just the new item: this
+// app's Edit/Save model has no separate Cancel (EditMode.tsx's own button
+// always flips Edit -> Save, no third state), so a half-committed save
+// would be a more confusing outcome than discarding everything.
+function AddItemScopeDialog({ onCancel, onChoose }: { onCancel: () => void; onChoose: (scope: "all" | "employee") => void }) {
+  return (
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm text-[#4b4949] dark:text-slate-300 mb-[22px]">Add this item to:</p>
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={() => onChoose("all")}
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] transition-colors"
+          >
+            Apply to all employees
+          </button>
+          <button
+            type="button"
+            onClick={() => onChoose("employee")}
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-200 bg-white dark:bg-slate-800 border-2 border-black/25 dark:border-white/25 hover:bg-[#f0f4fa] dark:hover:bg-slate-700 transition-colors"
+          >
+            Only this employee
+          </button>
+          <button type="button" onClick={onCancel} className="mt-1 text-xs text-slate-500 dark:text-slate-400 hover:underline">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExitChecklistPanel({
+  heading,
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+  onToggle,
+  onRename,
+  onAdd,
+  onDelete,
+}: {
+  heading: string;
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+  onToggle: (userId: number, itemId: number, checked: boolean) => Promise<ActionResult>;
+  onRename: (userId: number, itemId: number, label: string) => Promise<ActionResult>;
+  onAdd: (userId: number, input: AddExitChecklistItemInput) => Promise<ActionResult>;
+  onDelete: (userId: number, itemId: number) => Promise<ActionResult>;
+}) {
+  const router = useRouter();
+  const [pendingChecked, setPendingChecked] = useState<Record<number, boolean>>({});
+  const [pendingLabels, setPendingLabels] = useState<Record<number, string>>({});
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
+  const [newLabel, setNewLabel] = useState("");
+  const [choosingScope, setChoosingScope] = useState(false);
+  const scopeChoiceRef = useRef<((scope: "all" | "employee" | null) => void) | null>(null);
+
+  function resetPending() {
+    setPendingChecked(Object.fromEntries(items.map((item) => [item.id, item.checked])));
+    setPendingLabels(Object.fromEntries(items.map((item) => [item.id, item.label])));
+    setPendingDeleteIds(new Set());
+    setNewLabel("");
+  }
+
+  // Re-baselines whenever fresh data arrives (mount, and after this panel's
+  // own post-Save router.refresh() below) — items is the source of truth;
+  // pendingChecked/pendingLabels/pendingDeleteIds/newLabel only exist to
+  // hold in-progress edits between here and the next Save.
+  useEffect(() => {
+    resetPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  async function handleSave(): Promise<SaveResult> {
+    let scope: "all" | "employee" | null = null;
+    const label = newLabel.trim();
+    if (label) {
+      scope = await new Promise<"all" | "employee" | null>((resolve) => {
+        scopeChoiceRef.current = resolve;
+        setChoosingScope(true);
+      });
+      setChoosingScope(false);
+      if (scope === null) {
+        resetPending();
+        return { ok: true };
+      }
+    }
+
+    const toggled = items.filter((item) => !pendingDeleteIds.has(item.id) && pendingChecked[item.id] !== item.checked);
+    const renamed = items.filter(
+      (item) => !pendingDeleteIds.has(item.id) && pendingLabels[item.id]?.trim() && pendingLabels[item.id].trim() !== item.label,
+    );
+    const deleted = items.filter((item) => pendingDeleteIds.has(item.id));
+    if (toggled.length === 0 && renamed.length === 0 && deleted.length === 0 && !label) return { ok: true };
+
+    const results = await Promise.all([
+      ...toggled.map((item) => onToggle(userId, item.id, pendingChecked[item.id])),
+      ...renamed.map((item) => onRename(userId, item.id, pendingLabels[item.id].trim())),
+      ...deleted.map((item) => onDelete(userId, item.id)),
+      ...(label ? [onAdd(userId, { label, scope: scope! })] : []),
+    ]);
+    const failed = results.find((r) => r && r.ok === false);
+    if (failed) return failed;
+    router.refresh();
+    return { ok: true };
+  }
+
+  return (
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
+      <PanelHeading>{heading}</PanelHeading>
+      <ExitChecklistItems
+        items={items.filter((item) => !pendingDeleteIds.has(item.id))}
+        pendingChecked={pendingChecked}
+        pendingLabels={pendingLabels}
+        canEditItem={canAddItem}
+        onChange={(id, checked) => setPendingChecked((prev) => ({ ...prev, [id]: checked }))}
+        onLabelChange={(id, label) => setPendingLabels((prev) => ({ ...prev, [id]: label }))}
+        onDelete={(id) => setPendingDeleteIds((prev) => new Set(prev).add(id))}
+      />
+      {canAddItem && <ExitChecklistAddItemRow value={newLabel} onChange={setNewLabel} />}
+      {choosingScope && (
+        <AddItemScopeDialog
+          onCancel={() => scopeChoiceRef.current?.(null)}
+          onChoose={(scope) => scopeChoiceRef.current?.(scope)}
+        />
+      )}
+    </EditableSection>
+  );
+}
+
+// Rename permission mirrors add/delete exactly (canEditItem, HR/Superadmin
+// only — see conversation) — everyone else in Edit mode can still toggle
+// checkboxes but sees static label text, never an input. Like every other
+// field in this app (EditableField/PhoneField/etc.), the label just IS an
+// <input> once editing+canEditItem are both true — "click the text to edit
+// it" is simply what focusing a normal text input looks like, no separate
+// static-to-input toggle step, consistent with the rest of the app.
+function ExitChecklistItems({
+  items,
+  pendingChecked,
+  pendingLabels,
+  canEditItem,
+  onChange,
+  onLabelChange,
+  onDelete,
+}: {
+  items: ExitChecklistItem[];
+  pendingChecked: Record<number, boolean>;
+  pendingLabels: Record<number, string>;
+  canEditItem: boolean;
+  onChange: (itemId: number, checked: boolean) => void;
+  onLabelChange: (itemId: number, label: string) => void;
+  onDelete: (itemId: number) => void;
+}) {
+  const editing = useEditMode();
+  return (
+    <ul className="flex flex-col gap-3">
+      {items.map((item) => (
+        <li key={item.id} className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={pendingChecked[item.id] ?? false}
+            disabled={!editing}
+            onChange={(e) => onChange(item.id, e.target.checked)}
+            className="w-4 h-4 shrink-0 rounded border-slate-300 dark:border-slate-500 disabled:cursor-not-allowed"
+          />
+          {editing && canEditItem ? (
+            <input
+              type="text"
+              value={pendingLabels[item.id] ?? item.label}
+              onChange={(e) => onLabelChange(item.id, e.target.value)}
+              className="flex-1 min-w-0 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border-0 border-b border-slate-300 dark:border-slate-500 px-0 py-0.5 focus:outline-none focus:border-blue-500"
+            />
+          ) : (
+            <span className="text-sm text-[#4b4949] dark:text-slate-300 flex-1">{item.label}</span>
+          )}
+          {editing && canEditItem && (
+            <button
+              type="button"
+              onClick={() => onDelete(item.id)}
+              aria-label={`Delete "${item.label}"`}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 text-sm leading-none"
+            >
+              −
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Gated by useEditMode(), same as every other editable field in this app —
+// only shown once Edit is clicked (canAddItem, the HR/Superadmin role gate,
+// is checked by the caller separately). Save is a single accumulate-locally
+// text field now, not its own button — ExitChecklistPanel's own top-right
+// Save reads this value at commit time (see handleSave's `label` there).
+function ExitChecklistAddItemRow({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const editing = useEditMode();
+  if (!editing) return null;
+  return (
+    <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Add a new checklist item…"
+        className="w-full h-10 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 border-0 px-3.5 text-sm text-[#4b4949] dark:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+      />
+    </div>
+  );
+}
+
+export function KnowledgeTransferPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – Knowledge Transfer"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      canEdit={canEdit}
+      onToggle={toggleKnowledgeTransferItem}
+      onRename={renameKnowledgeTransferItem}
+      onAdd={addKnowledgeTransferItem}
+      onDelete={deleteKnowledgeTransferItem}
+    />
+  );
+}
+
+export function AssetRecoveryPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – Asset Recovery"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      canEdit={canEdit}
+      onToggle={toggleAssetRecoveryItem}
+      onRename={renameAssetRecoveryItem}
+      onAdd={addAssetRecoveryItem}
+      onDelete={deleteAssetRecoveryItem}
+    />
+  );
+}
+
+export function SystemRevocationPanel({
+  userId,
+  items,
+  canAddItem,
+  canEdit = true,
+}: {
+  userId: number;
+  items: ExitChecklistItem[];
+  canAddItem: boolean;
+  canEdit?: boolean;
+}) {
+  return (
+    <ExitChecklistPanel
+      heading="Clearance – System Revocation"
+      userId={userId}
+      items={items}
+      canAddItem={canAddItem}
+      canEdit={canEdit}
+      onToggle={toggleSystemRevocationItem}
+      onRename={renameSystemRevocationItem}
+      onAdd={addSystemRevocationItem}
+      onDelete={deleteSystemRevocationItem}
+    />
+  );
+}
+
+export function FinancialSettlementPanel({
+  userId,
+  data,
+  canEdit = true,
+}: {
+  userId: number;
+  data: FinancialSettlementInfo | null;
+  canEdit?: boolean;
+}) {
+  const [finalPayDate, setFinalPayDate] = useState(data?.finalPayDate ?? "");
+  const [outstandingLeavePayout, setOutstandingLeavePayout] = useState(data?.outstandingLeavePayout ?? "");
+  const [outstandingClaims, setOutstandingClaims] = useState(data?.outstandingClaims ?? "");
+  const [loanAdvanceDeduction, setLoanAdvanceDeduction] = useState(data?.loanAdvanceDeduction ?? "");
+  const [notes, setNotes] = useState(data?.notes ?? "");
+  const [fileId, setFileId] = useState(data?.settlementLetterFileId ?? null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  function clearFile() {
+    if (pendingFile) setPendingFile(null);
+    else setFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() =>
+        updateFinancialSettlement(userId, {
+          finalPayDate,
+          outstandingLeavePayout,
+          outstandingClaims,
+          loanAdvanceDeduction,
+          notes,
+          settlementLetterFileId: fileId,
+          settlementLetterFile: pendingFile,
+        })
+      }
+      canEdit={canEdit}
+    >
+      <PanelHeading>Clearance – Financial Settlement</PanelHeading>
+      <FieldGrid>
+        <EditableField label="Final Pay Date" value={finalPayDate} onChange={setFinalPayDate} type="date" />
+        <CurrencyField label="Outstanding Leave Payout" value={outstandingLeavePayout} onChange={setOutstandingLeavePayout} />
+        <CurrencyField label="Outstanding Claims" value={outstandingClaims} onChange={setOutstandingClaims} />
+        <CurrencyField label="Loan / Advance Deduction" value={loanAdvanceDeduction} onChange={setLoanAdvanceDeduction} />
+        <EditableTextArea label="Notes" value={notes} onChange={setNotes} full />
+        <RealFileField label="Settlement Letter" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} full />
       </FieldGrid>
     </EditableSection>
   );
@@ -2816,10 +3686,12 @@ export function PersonalInfoPanel({
   employee,
   employeeId,
   showOfferLetter = false,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   employeeId: number;
   showOfferLetter?: boolean;
+  canEdit?: boolean;
 }) {
   const [fullName, setFullName] = useState(employee.fullName ?? "");
   const [email, setEmail] = useState(employee.email ?? "");
@@ -2860,7 +3732,7 @@ export function PersonalInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Personal Info</PanelHeading>
       <FieldGrid>
         <EditableField label="Full Name" value={fullName} onChange={setFullName} />
@@ -2906,6 +3778,7 @@ const EMERGENCY_RELATIONSHIP_OPTIONS = [
 export function EmergencyContactPanel({
   employee,
   onSave,
+  canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   onSave: (data: {
@@ -2915,6 +3788,7 @@ export function EmergencyContactPanel({
     email: string;
     address: string;
   }) => Promise<{ ok: boolean; error?: string } | void>;
+  canEdit?: boolean;
 }) {
   const [name, setName] = useState(employee.emergencyName ?? "");
   const [phone, setPhone] = useState(employee.emergencyPhone ?? "");
@@ -2943,7 +3817,7 @@ export function EmergencyContactPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave}>
+    <EditableSection onSave={handleSave} canEdit={canEdit}>
       <PanelHeading>Emergency Contact</PanelHeading>
       <FieldGrid>
         <EditableField label="Contact Name" value={name} onChange={setName} />
@@ -2968,9 +3842,9 @@ export {
   PanelHeading,
   SubsectionHeading,
   FieldGrid,
+  CurrencyField,
   Subsection,
   RecordTable,
-  Checklist,
   FieldDisplay,
   SidebarField,
   EditableField,

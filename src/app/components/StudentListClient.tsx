@@ -137,30 +137,30 @@ export default function StudentListClient() {
 
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
         {/* Breadcrumbs */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors rounded">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/sms" className="hover:text-slate-900 transition-colors rounded">
+          <Link href="/dashboards/sms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded">
             SMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Student</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Student</span>
         </nav>
 
         {/* Header Section */}
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Student Management</h1>
-            <p className="mt-1 text-sm text-slate-500">Manage and monitor students enrolled across programs</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Student Management</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage and monitor students enrolled across programs</p>
           </div>
           <div className="flex gap-3">
-            <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
+            <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
               <Download className="w-4 h-4" />
               <span>Export CSV</span>
             </button>
@@ -174,7 +174,7 @@ export default function StudentListClient() {
 
 
         {/* Filter Controls */}
-        <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <section className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search className="w-5 h-5" />
@@ -184,10 +184,10 @@ export default function StudentListClient() {
               placeholder="Search by ID, Name or Email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+              className="block w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-500 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
             />
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
             {/* Age Group Filter */}
             <div className="flex items-center gap-1.5">
@@ -195,7 +195,7 @@ export default function StudentListClient() {
               <select
                 value={selectedAgeGroup}
                 onChange={(e) => setSelectedAgeGroup(e.target.value)}
-                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {AGE_GROUPS.map((group) => (
                   <option key={group} value={group}>
@@ -209,7 +209,7 @@ export default function StudentListClient() {
             <select
               value={selectedPackage}
               onChange={(e) => setSelectedPackage(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               {PACKAGES.map((pkg) => (
                 <option key={pkg} value={pkg}>
@@ -222,7 +222,7 @@ export default function StudentListClient() {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               {STATUSES.map((status) => (
                 <option key={status} value={status}>
@@ -234,11 +234,11 @@ export default function StudentListClient() {
         </section>
 
         {/* Students Table */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   <th className="px-6 py-4">ID / Student</th>
                   <th className="px-6 py-4">Contact Info</th>
                   <th className="px-6 py-4">Age Group</th>
@@ -248,18 +248,18 @@ export default function StudentListClient() {
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300">
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-slate-50/40 transition-colors group">
+                    <tr key={student.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/40 transition-colors group">
                       {/* Name & Avatar */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900 border border-indigo-100 dark:border-indigo-700 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold shrink-0">
                             {student.name.charAt(0)}
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-900">{student.name}</div>
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">{student.name}</div>
                             <div className="text-xs text-slate-400 font-mono mt-0.5">{student.id}</div>
                           </div>
                         </div>
@@ -267,22 +267,22 @@ export default function StudentListClient() {
                       {/* Contact Details */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-slate-900">{student.email}</div>
+                          <div className="text-slate-900 dark:text-slate-100">{student.email}</div>
                           <div className="text-xs text-slate-400 mt-0.5">{student.phone}</div>
                         </div>
                       </td>
                       {/* Age Group */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                           {student.ageGroup}
                         </span>
                       </td>
                       {/* Package Name */}
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
                         {student.packageName}
                       </td>
                       {/* Enrollment Date */}
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono text-xs">
+                      <td className="px-6 py-4 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono text-xs">
                         {student.enrollmentDate}
                       </td>
                       {/* Status badge */}
@@ -290,10 +290,10 @@ export default function StudentListClient() {
                         <span
                           className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
                             student.status === "Active"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                              ? "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-700"
                               : student.status === "Trial"
-                              ? "bg-amber-50 text-amber-700 border border-amber-100"
-                              : "bg-rose-50 text-rose-700 border border-rose-100"
+                              ? "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-700"
+                              : "bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-700"
                           }`}
                         >
                           {student.status}
@@ -302,10 +302,10 @@ export default function StudentListClient() {
                       {/* Actions */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-slate-400 relative">
                         <div className="inline-flex items-center gap-1 justify-end">
-                          <button className="p-1.5 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                          <button className="p-1.5 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                          <button className="p-1.5 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900 rounded-lg transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -325,16 +325,16 @@ export default function StudentListClient() {
 
           {/* Pagination Footer */}
           {filteredStudents.length > 0 && (
-            <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+            <div className="bg-slate-50/50 dark:bg-slate-800/50 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
               <div>
-                Showing <span className="font-semibold text-slate-700">{filteredStudents.length}</span> of{" "}
-                <span className="font-semibold text-slate-700">{filteredStudents.length}</span> results
+                Showing <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredStudents.length}</span> of{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredStudents.length}</span> results
               </div>
               <div className="flex gap-2">
-                <button disabled className="px-3 py-1.5 border border-slate-200 rounded bg-white text-slate-400 cursor-not-allowed">
+                <button disabled className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded bg-white dark:bg-slate-900 text-slate-400 cursor-not-allowed">
                   Previous
                 </button>
-                <button disabled className="px-3 py-1.5 border border-slate-200 rounded bg-white text-slate-400 cursor-not-allowed">
+                <button disabled className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded bg-white dark:bg-slate-900 text-slate-400 cursor-not-allowed">
                   Next
                 </button>
               </div>

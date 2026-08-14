@@ -25,11 +25,16 @@ import {
   getResignation,
   getReferenceLetter,
   getExitInterviewNote,
+  getKnowledgeTransferChecklist,
+  getAssetRecoveryChecklist,
+  getSystemRevocationChecklist,
+  getFinancialSettlement,
   resolveLocationName,
   listBranches,
   listDepartments,
 } from "@/lib/employeeQueries";
-import { isEligibleForOnboardingDualListing } from "@/lib/careerApplicationSync";
+import { getRealAccountLifecycleOverride, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
+import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
 
 export const dynamic = "force-dynamic";
@@ -55,18 +60,22 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   const employee = await getEmployeeOverviewRowById(numId);
   if (!employee) notFound();
   if (employee.stage !== stage) {
-    // The one allowed mismatch here: a real Probation-stage Full-Time
+    // The allowed mismatches here: (a) a real Probation-stage Full-Time
     // person, or a real Active-stage Full-Time person whose recruitment
     // pipeline still reads "Probation", is also dual-listed on the
     // Onboarding list (see [stage]/page.tsx and
-    // computeOnboardingDualListedRows) and must be reachable at
+    // computeOnboardingDualListedRows); (b) a real Pre-stage person whose
+    // resolved start date has already passed — they've actually started,
+    // per the Pre list's own definition (see computePreStartDatePassedRows)
+    // — is dual-listed there too. Both must be reachable at
     // /onboarding/employee/[id]/... there, rendered with the Onboarding
     // profile template below — not a 404. Visiting them at their real
-    // stage's own URL (e.g. /probation/employee/[id]) still shows that
-    // stage's content, unaffected by this (Probation's profileMode is
-    // "in-page-tabs", handled entirely by [id]/page.tsx, which never
-    // reaches this file).
-    const isDualListedOnboardingView = stage === "onboarding" && (await isEligibleForOnboardingDualListing(employee));
+    // stage's own URL (e.g. /pre/employee/[id]) still shows that stage's
+    // content, unaffected by this.
+    const isDualListedOnboardingView =
+      stage === "onboarding" &&
+      ((await getRealAccountLifecycleOverride(employee))?.extraStages?.includes("onboarding") ||
+        (await computePreStartDatePassedRows()).some((r) => r.id === employee.id));
     if (!isDualListedOnboardingView) notFound();
   }
 
@@ -112,6 +121,7 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     referenceCheck,
     medicalCheck,
     probationInfo,
+    probationDisplay,
     documentsInfo,
     payrollInfo,
     achievements,
@@ -126,6 +136,10 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     resignationInfo,
     referenceLetterInfo,
     exitInterviewNoteInfo,
+    knowledgeTransferChecklist,
+    assetRecoveryChecklist,
+    systemRevocationChecklist,
+    financialSettlement,
   ] = await Promise.all([
     activeOrAfter ? listLeaveHistory(numId) : Promise.resolve(undefined),
     getEmployeeById(numId),
@@ -134,6 +148,14 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     getReferenceCheck(numId),
     getMedicalCheck(numId),
     getProbationInfo(numId),
+    // Only ever reachable here via a Probation history tab (this route is
+    // "separate-pages" stages only — Active/Onboarding/Exit — Probation
+    // itself uses "in-page-tabs", see [stage]/employee/[id]/page.tsx)
+    // decideProbationOutcome is deliberately NOT wired up from this history
+    // view (canDecideProbation is hardcoded false below) — decisions are
+    // only made from the employee's own current-stage Probation view, not a
+    // read-only history glance from a later stage.
+    getProbationDisplayInfo(numId, employee.fullName),
     getDocuments(numId),
     getPayrollInfo(numId),
     activeOrAfter ? listAchievements(numId) : Promise.resolve(undefined),
@@ -148,11 +170,26 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     isExit ? getResignation(numId) : Promise.resolve(undefined),
     isExit ? getReferenceLetter(numId) : Promise.resolve(undefined),
     isExit ? getExitInterviewNote(numId) : Promise.resolve(undefined),
+    isExit ? getKnowledgeTransferChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getAssetRecoveryChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getSystemRevocationChecklist(numId) : Promise.resolve(undefined),
+    isExit ? getFinancialSettlement(numId) : Promise.resolve(undefined),
   ]);
 
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
+  // Gates the "+ Add Item" affordance on Exit's 3 Clearance checklists —
+  // same role check as canDecideProbation above, reused per explicit
+  // instruction (see conversation) rather than a new one. Re-checked
+  // server-side by addKnowledgeTransferItem/etc regardless.
+  const canAddChecklistItem = ["hr", "superadmin"].includes(userRole.toLowerCase());
+  // A CEO account can only edit their OWN employee profile — enforced
+  // server-side in employeeRecordActions.ts via requireNotCeoUnlessOwnProfile
+  // (see requireEmployeeInScope). This is the cosmetic mirror: hide every
+  // panel's Edit/Save toggle when a CEO is looking at someone else's
+  // profile, so they don't see a button that would only ever 403.
+  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -168,6 +205,9 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         referenceCheck={referenceCheck}
         medicalCheck={medicalCheck}
         probationInfo={probationInfo}
+        probationDisplay={probationDisplay}
+        canDecideProbation={false}
+        canEdit={canEdit}
         documentsInfo={documentsInfo}
         payrollInfo={payrollInfo}
         achievements={achievements}
@@ -183,6 +223,11 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         resignationInfo={resignationInfo}
         referenceLetterInfo={referenceLetterInfo}
         exitInterviewNoteInfo={exitInterviewNoteInfo}
+        knowledgeTransferChecklist={knowledgeTransferChecklist}
+        assetRecoveryChecklist={assetRecoveryChecklist}
+        systemRevocationChecklist={systemRevocationChecklist}
+        financialSettlement={financialSettlement}
+        canAddChecklistItem={canAddChecklistItem}
         locationGroup={locationName ? locationGroup : null}
         locationCode={locationName ? locCode ?? null : null}
         locationName={locationName}

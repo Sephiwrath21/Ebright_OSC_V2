@@ -5,8 +5,14 @@ import { prisma } from "@/lib/prisma";
 // here to avoid colliding with this file's own `prisma` (the main hrfs db).
 import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
-import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, positionGroup, type EmployeeStage } from "@/lib/employeeStages";
+import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
+// Type-only — erased at compile time, so this doesn't create the runtime
+// circular dependency a value import would (branchStaffProfile.ts statically
+// imports resolveDepartmentBranch/BranchOpt/DepartmentOpt from this file;
+// the reverse direction always uses dynamic import() for actual function
+// calls — see listEmployeeOverviewRows/getEmployeeOverviewRowById below).
+import type { AmbiguousBranchStaffMatch } from "@/lib/branchStaffProfile";
 
 export { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage };
 export type { EmployeeStage };
@@ -25,11 +31,28 @@ export const STAFF_ROLE_ID = 6;
 // employee, not just plain "staff" — HOD (7) and Branch Manager (8) are also
 // real individual employees with their own position/employment record (e.g.
 // Iqbal Hakim Bin Halim, FT HOD @ Optimisation); the elevated role_id is only
-// for permission scoping, same as "staff" being the baseline. "department"/
-// "branch"/"regional manager"/superadmin/ceo are excluded on purpose — those
-// are shared/administrative scoping-only logins, not individual staff to
-// track through the lifecycle stages.
-const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 7, 8];
+// for permission scoping, same as "staff" being the baseline. CEO (2) is the
+// same case — Kevin Khoo Kuan Xiong has a full personal profile (DOB, NRIC,
+// phone, home address) and a real single employment record (FT CEO,
+// department CEO), same shape as an HOD/Branch Manager account, not a
+// shared/administrative scoping-only login; the CEO department showing 0
+// people on the Active breakdown (see conversation) was this omission, not a
+// branch/department mapping gap. "department"/"branch"/"regional manager"/
+// superadmin are still excluded on purpose — those really are shared,
+// administrative scoping-only logins, not individual staff to track through
+// the lifecycle stages.
+const EMPLOYEE_LIFECYCLE_ROLE_IDS = [STAFF_ROLE_ID, 2, 7, 8];
+
+// Sentinel-id offset for confirmed-hire candidates sourced from
+// ebright_hrfs.career_applications (see computeConfirmedHireCandidateRows in
+// careerApplicationSync.ts) — their EmployeeOverviewRow.id is
+// -(CONFIRMED_HIRE_ID_OFFSET + career_applications.id). onboarding_candidate-
+// sourced candidates use -BranchStaff.id (career_applications.source_id IS
+// BranchStaff.id — see getOnboardingCandidateDetail below), a completely
+// different table's primary key that could realistically collide with a
+// small career_applications.id. The offset is large enough that no real row
+// from either table will ever cross into the other's range.
+export const CONFIRMED_HIRE_ID_OFFSET = 1_000_000;
 
 export interface EmployeeRow {
   id: number;
@@ -186,12 +209,51 @@ export interface EmployeeOverviewRow {
    *  so there's no Employee Record to open. `id` is a negative sentinel
    *  (-source_id) for these, never a real user_id. */
   isCandidate?: boolean;
+  /** Additional stages this row ALSO belongs to concurrently with `stage`
+   *  (e.g. a real Probation-stage Full-Time row whose recruitment pipeline
+   *  also qualifies it for Onboarding — see matchBelongsOnOnboardingList in
+   *  careerApplicationSync.ts; Probation and Onboarding genuinely run
+   *  concurrently for Full-Time hires, neither is "more real" than the
+   *  other). Attached by the Employee Records page only, for its combined-
+   *  badge display on a single row — undefined everywhere else, including
+   *  the dedicated per-stage list pages, which keep showing each
+   *  membership as its own separate row on its own separate page. */
+  extraStages?: EmployeeStage[];
   /** Pre stage list only — the matching career_applications row's current
    *  board_stage (see lookupCareerApplicationsByName), attached by the page,
    *  not this query. Undefined for every other stage and for Pre rows with
    *  no career_applications match (e.g. manually added via
    *  addPreStageEmployee). */
   boardStage?: string | null;
+  /** Pre stage list only (see computePreStageRows in careerApplicationSync.ts)
+   *  — the resolved employment-type, cross-checked between
+   *  career_applications.board_stage and onboarding_candidate.position.
+   *  null when neither source has a usable value. */
+  resolvedPositionType?: PositionGroup | null;
+  /** True when board_stage and onboarding_candidate.position resolve to
+   *  DIFFERENT groups for the same person — flagged rather than silently
+   *  picking a winner, per explicit decision. */
+  positionDiscrepancy?: boolean;
+  /** Human-readable detail for the discrepancy above (e.g. "board_stage:
+   *  Full Time, HRFS: Intern") — only set when positionDiscrepancy is true. */
+  positionDiscrepancyDetail?: string | null;
+  /** Probation stage list only (see computeStoppedProbationIds in
+   *  probationDecision.ts), attached by the page, not this query — true
+   *  when this row's probation decision is effectively Stopped, so the
+   *  namelist's Status column shows "Stop" instead of the page's own
+   *  "Probation" label for just this row. Undefined everywhere else. */
+  probationStopped?: boolean;
+  /** Candidate-only rows past their start_date (see
+   *  computePreStartDatePassedRows in careerApplicationSync.ts) — true once
+   *  they've crossed the threshold to become a real account (Part Timer/
+   *  Intern: 3 days since start; Full Time: status2/feedback2 confirmed —
+   *  see isEffectivelyConfirmed in probationDecision.ts) but no real portal
+   *  account exists yet for computeRealAccountLifecycleOverrides to take
+   *  over. Never promotes stage to "active" on its own — purely a signal
+   *  that HR should create the real account now. Undefined everywhere else
+   *  (including for real accounts, which use their own employment.status
+   *  instead). */
+  readyForRealAccount?: boolean;
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
@@ -202,27 +264,32 @@ export interface EmployeeOverviewRow {
 // archive-status employee with no end_date falls through to active/
 // onboarding/probation like anyone else). "probation" is derived from the
 // probation flag — there's no separate DB stage for it.
-function stageFromEmployment(
-  status: string | null,
-  endIso: string | null,
-  todayIso: string,
-  probation: boolean,
-  position: string | null,
-): EmployeeStage {
-  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status, probation, position);
+function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
+  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status);
   if (status === "inactive") return "exit";
-  return nonExitStage(status, probation, position);
+  return nonExitStage(status);
 }
 
 // status === "pre" means start_date has arrived but the Pre -> Onboarding/
-// Probation transition (proceedFromPreStage, or the automatic sweep in
+// Active transition (proceedFromPreStage, or the automatic sweep in
 // stageTransitionAutomation.ts) hasn't actually run yet — same lag a click-
 // or hourly-sweep-driven transition always has. Rather than display "Active"
-// (the old, wrong fallback) during that gap, compute live what the
-// transition WILL resolve to the instant it runs, mirroring the exact
-// Full-Time/not split proceedFromPreStage itself uses. No field is written
-// here — this is display-only; the actual status/probation write still
-// happens via the click or the sweep.
+// (the old, wrong fallback) during that gap, this shows "Onboarding" as the
+// live-computed placeholder. No field is written here — this is
+// display-only; the actual status/probation write still happens via the
+// click or the sweep. Probation membership itself is never guessed here —
+// nonExitStage used to independently promote a Full-Time "pre" row straight
+// to "probation" (and separately trusted employment.probation directly for
+// "active" rows), both by-position/by-flag guesses that bypassed
+// career_applications.board_stage entirely and produced real false
+// positives (see conversation — Wan Noraina Sofia Binti Mior Rasdi via the
+// position guess; Nurul Athirah Bt Yusri/Siti Amierah Binti Mohd Awaluddin/
+// Demo02 via a stale manual probation flag with board_stage="Rejected").
+// Probation is now decided solely by computeRealAccountLifecycleOverrides
+// (careerApplicationSync.ts) layered on top of whatever this function
+// returns — it treats "onboarding"/"active" as equally eligible for a
+// Probation override, so removing these two guesses doesn't lose real
+// Probation membership for anyone board_stage genuinely matches.
 // Exit falls back to updated_at, everything else falls back to created_at —
 // EXCEPT Pre, where a missing start_date must stay null (not silently
 // backfilled) so the UI can show/sort "no date yet" rows distinctly, e.g.
@@ -233,10 +300,9 @@ function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end
   return emp?.start_date ?? u.created_at;
 }
 
-function nonExitStage(status: string | null, probation: boolean, position: string | null): EmployeeStage {
+function nonExitStage(status: string | null): EmployeeStage {
   if (status === "onboarding") return "onboarding";
-  if (probation) return "probation";
-  if (status === "pre") return positionGroup(position) === "Full Time" ? "probation" : "onboarding";
+  if (status === "pre") return "onboarding";
   return "active";
 }
 
@@ -267,15 +333,23 @@ function stageForRow(
   // status="pre" with no start_date at all (e.g. synced from
   // career_applications with no known start date yet) — still Pre, just
   // without a date to compare against today. Distinct from the "startIso in
-  // the past, sweep hasn't run yet" case below, which nonExitStage predicts
-  // via position instead.
+  // the past, sweep hasn't run yet" case below, which nonExitStage now
+  // simply shows as Onboarding (see its own comment).
   if (!startIso && emp?.status === "pre") return "pre";
   if (usersStatus === "pending") {
     return startIso ? null : "pre";
   }
   const endIso = emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null;
-  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso, emp?.probation ?? false, emp?.position ?? null);
+  return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso);
 }
+
+// Pre-existing test/seed accounts (test-ceo@ebright.my and siblings) — no
+// employment record, never real people, confirmed via investigation (see
+// conversation). Kept in the database untouched per explicit decision; just
+// excluded from every Employee Overview/Folder view so they stop showing up
+// under Active > Unassigned. Exact id list, not an email-pattern match — a
+// future test-*@ebright.my account should still show up unless added here.
+const HIDDEN_TEST_USER_IDS = new Set([305, 306, 308, 324]);
 
 export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
   // One combined population: every staff-role user (any status) plus every
@@ -283,7 +357,12 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // Pre membership (see stageForRow), so both groups have to be considered
   // together rather than as two disjoint queries.
   const users = await prisma.users.findMany({
-    where: { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
+    where: {
+      AND: [
+        { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
+        { user_id: { notIn: Array.from(HIDDEN_TEST_USER_IDS) } },
+      ],
+    },
     include: {
       user_profile: true,
       employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
@@ -291,17 +370,36 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
     orderBy: { created_at: "desc" },
   });
 
+  // Start/end date now come from ebright_hrfs.BranchStaff first, falling
+  // back to this app's own employment.start_date/end_date — per explicit
+  // decision (see conversation), system-wide: this is the SAME
+  // resolveEffectiveEmploymentDates used by getEmployeeOverviewRowById, so
+  // the Employee Records table, every summary card, and every dedicated
+  // stage list page (all of which ultimately call one of these two
+  // functions) agree on the same Pre/Exit classification. Read-only —
+  // BranchStaff is only ever queried, never written to. Fetched once for
+  // this whole call (not per-row) — one BranchStaff table scan, then an
+  // in-memory match per user.
+  const { buildBranchStaffMatchIndex, resolveEffectiveEmploymentDates, logAmbiguousBranchStaffMatches } = await import(
+    "@/lib/branchStaffProfile"
+  );
+  const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+  const bsIndex = await buildBranchStaffMatchIndex();
+  const ambiguous: AmbiguousBranchStaffMatch[] = [];
+
   const todayIso = new Date().toISOString().slice(0, 10);
   const rows: EmployeeOverviewRow[] = [];
   for (const u of users) {
     const emp = u.employment[0];
-    const stage = stageForRow(u.status ?? null, emp, todayIso);
+    const fullName = titleCaseName(u.user_profile?.full_name) || u.email;
+    const effectiveEmp = resolveEffectiveEmploymentDates(emp, fullName, bsIndex, branches, departments, ambiguous);
+    const stage = stageForRow(u.status ?? null, effectiveEmp, todayIso);
     if (!stage) continue;
-    const dateSource = dateSourceFor(stage, emp, u);
+    const dateSource = dateSourceFor(stage, effectiveEmp, u);
     rows.push({
       id: u.user_id,
       employeeId: emp?.employee_id ?? null,
-      fullName: titleCaseName(u.user_profile?.full_name) || u.email,
+      fullName,
       position: emp?.position ?? null,
       branchCode: emp?.branch?.branch_code ?? null,
       branchName: emp?.branch?.branch_name ?? null,
@@ -312,8 +410,27 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       stage,
     });
   }
+  logAmbiguousBranchStaffMatches(ambiguous);
 
-  if (options.skipScopeFilter) return rows;
+  // Rule 3: resolve branch/department via the live BranchStaff fallback
+  // BEFORE scope-filtering below — a scoped (department/branch) viewer must
+  // be able to see rows whose real branch_id/department_id is still null
+  // but resolvable via ebright_hrfs.BranchStaff, same as the Probation/
+  // Onboarding dual-listing pages already display. Filtering ran BEFORE
+  // enrichment here previously, which made the fallback a no-op for every
+  // scoped viewer (a null-branch row was excluded before it ever got a
+  // chance to resolve) — fixed by enriching first. Dynamic import to avoid
+  // a circular dependency (careerApplicationSync.ts already imports several
+  // things from this file); skipped entirely (no extra queries) unless some
+  // row actually has neither field set.
+  const rowsWithLocation = rows.some((r) => !r.branchCode && !r.departmentCode)
+    ? await (async () => {
+        const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+        return enrichRowsWithBranchStaffLocation(rows, branches, departments);
+      })()
+    : rows;
+
+  if (options.skipScopeFilter) return rowsWithLocation;
 
   const scope = await getCurrentEmployeeScope();
   // No session -> the caller's own auth() gate (already required before
@@ -321,7 +438,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // everything unfiltered here would only matter if that gate were ever
   // missing, so fail closed instead.
   if (!scope) return [];
-  return filterRowsByScope(scope, rows);
+  return filterRowsByScope(scope, rowsWithLocation);
 }
 
 // Single-employee counterpart to listEmployeeOverviewRows() above — every
@@ -348,14 +465,31 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
 
   const emp = u.employment[0];
   const todayIso = new Date().toISOString().slice(0, 10);
-  const stage = stageForRow(u.status ?? null, emp, todayIso);
+  const fullName = titleCaseName(u.user_profile?.full_name) || u.email;
+
+  // Same BranchStaff-first date resolution as listEmployeeOverviewRows —
+  // see its own comment for the full rationale. A single-row lookup still
+  // needs the full BranchStaff table + a fresh index (no exact key exists
+  // for real accounts, only name matching), so this reintroduces some of
+  // the per-row cost the comment above once optimized away — accepted per
+  // explicit decision (see conversation) for classification consistency.
+  const { buildBranchStaffMatchIndex, resolveEffectiveEmploymentDates, logAmbiguousBranchStaffMatches } = await import(
+    "@/lib/branchStaffProfile"
+  );
+  const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+  const bsIndex = await buildBranchStaffMatchIndex();
+  const ambiguous: AmbiguousBranchStaffMatch[] = [];
+  const effectiveEmp = resolveEffectiveEmploymentDates(emp, fullName, bsIndex, branches, departments, ambiguous);
+  logAmbiguousBranchStaffMatches(ambiguous);
+
+  const stage = stageForRow(u.status ?? null, effectiveEmp, todayIso);
   if (!stage) return null;
 
-  const dateSource = dateSourceFor(stage, emp, u);
-  const row: EmployeeOverviewRow = {
+  const dateSource = dateSourceFor(stage, effectiveEmp, u);
+  let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
-    fullName: titleCaseName(u.user_profile?.full_name) || u.email,
+    fullName,
     position: emp?.position ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
     branchName: emp?.branch?.branch_name ?? null,
@@ -365,6 +499,15 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
     stage,
   };
+
+  // Rule 3: same live BranchStaff fallback as listEmployeeOverviewRows,
+  // applied before the scope check below for the same reason — a scoped
+  // viewer must be able to reach this row even if its real branch_id/
+  // department_id is still null but resolvable via BranchStaff.
+  if (!row.branchCode && !row.departmentCode) {
+    const { enrichRowsWithBranchStaffLocation } = await import("@/lib/careerApplicationSync");
+    [row] = await enrichRowsWithBranchStaffLocation([row], branches, departments);
+  }
 
   const scope = await getCurrentEmployeeScope();
   if (!scope) return null;
@@ -476,6 +619,17 @@ export async function listUpcomingOnboardingCandidates(existingRows: EmployeeOve
 // source_id (positive) — callers pass `-row.id` since candidate rows use
 // `-source_id` as their EmployeeOverviewRow.id sentinel.
 export async function getOnboardingCandidateDetail(sourceId: number): Promise<EmployeeDetailFull | null> {
+  // A confirmed-hire candidate (see CONFIRMED_HIRE_ID_OFFSET above) — routed
+  // to its own lookup in careerApplicationSync.ts, which owns the
+  // career_applications query and the BranchStaff name-match this candidate
+  // type is built on. Dynamic import to avoid a circular dependency
+  // (careerApplicationSync.ts already imports several things from this
+  // file), same pattern already used elsewhere in this file.
+  if (sourceId >= CONFIRMED_HIRE_ID_OFFSET) {
+    const { getConfirmedHireCandidateDetail } = await import("@/lib/careerApplicationSync");
+    return getConfirmedHireCandidateDetail(sourceId - CONFIRMED_HIRE_ID_OFFSET);
+  }
+
   const [candidate, departments, branches] = await Promise.all([
     prisma.onboarding_candidate.findUnique({ where: { source_id: sourceId } }),
     listDepartments(),
@@ -483,37 +637,54 @@ export async function getOnboardingCandidateDetail(sourceId: number): Promise<Em
   ]);
   if (!candidate) return null;
   const loc = resolveDepartmentBranch(candidate.department_branch, departments, branches);
+
+  // A candidate's source_id IS BranchStaff.id (that's how they got synced
+  // in — see syncOnboardingCandidatesFromEbrightLeads), so unlike a real
+  // account this is an exact key, not a name match — no ambiguity possible.
+  // Per explicit decision (see conversation), falls back to this function's
+  // own local (mostly blank) fields per-field when unmatched or blank.
+  const { buildBranchStaffMatchIndex, matchBranchStaffForCandidate, branchStaffProfileFields } = await import(
+    "@/lib/branchStaffProfile"
+  );
+  const bsIndex = await buildBranchStaffMatchIndex();
+  const bsMatch = matchBranchStaffForCandidate(sourceId, bsIndex);
+  const bs = bsMatch ? branchStaffProfileFields(bsMatch) : null;
+
   return {
     id: -candidate.source_id,
-    email: "",
-    employeeId: null,
+    email: bs?.email ?? "",
+    employeeId: bs?.employeeId ?? null,
     fullName: titleCaseName(candidate.name) || candidate.name,
     nickName: null,
     role: candidate.position || null,
     ...loc,
     status: null,
-    startDate: candidate.start_date.toISOString().slice(0, 10),
+    startDate: bs?.startDate ? bs.startDate.toISOString().slice(0, 10) : candidate.start_date.toISOString().slice(0, 10),
     pendingOnboarding: false,
-    gender: null,
-    dob: null,
-    phone: null,
+    gender: bs?.gender ?? null,
+    dob: bs?.dob ?? null,
+    phone: bs?.phone ?? null,
     nationality: null,
-    nric: null,
-    homeAddress: null,
+    nric: bs?.nric ?? null,
+    homeAddress: bs?.homeAddress ?? null,
     position: candidate.position || null,
-    endDate: candidate.end_date ? candidate.end_date.toISOString().slice(0, 10) : null,
+    endDate: bs?.endDate
+      ? bs.endDate.toISOString().slice(0, 10)
+      : candidate.end_date
+        ? candidate.end_date.toISOString().slice(0, 10)
+        : null,
     employmentType: null,
     probation: false,
     rate: null,
     branchId: null,
     departmentId: null,
     employmentId: null,
-    bankName: null,
-    bankAccount: null,
-    accountName: null,
-    emergencyName: null,
-    emergencyPhone: null,
-    emergencyRelation: null,
+    bankName: bs?.bankName ?? null,
+    bankAccount: bs?.bankAccount ?? null,
+    accountName: bs?.accountName ?? null,
+    emergencyName: bs?.emergencyName ?? null,
+    emergencyPhone: bs?.emergencyPhone ?? null,
+    emergencyRelation: bs?.emergencyRelation ?? null,
     emergencyEmail: null,
     emergencyAddress: null,
     offerLetterFileId: null,
@@ -912,6 +1083,83 @@ export async function getExitInterviewNote(userId: number): Promise<ExitIntervie
   };
 }
 
+// ─── Exit > Clearance: Knowledge Transfer/Asset Recovery/System Revocation
+// checklists + Financial Settlement form — per explicit design (see
+// conversation). Each checklist's items table merges the global master list
+// (user_id null) with this one employee's own custom additions (user_id set
+// to userId); checked state is a separate per-(user, item) table, joined
+// here in application code rather than a single SQL join since a missing
+// state row simply means unchecked (see exit_knowledge_transfer_state's own
+// schema comment) — no LEFT JOIN null-handling needed.
+export interface ExitChecklistItem {
+  id: number;
+  label: string;
+  checked: boolean;
+  /** True for an item added via "Only this employee" — false for a global
+   *  (master list) item, including one added via "Apply to all". Not used
+   *  to gate anything server-side (both are equally real/checkable); purely
+   *  informational for the UI (e.g. to visually distinguish custom items). */
+  isCustom: boolean;
+}
+
+export async function getKnowledgeTransferChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_knowledge_transfer_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_knowledge_transfer_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export async function getAssetRecoveryChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_asset_recovery_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_asset_recovery_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export async function getSystemRevocationChecklist(userId: number): Promise<ExitChecklistItem[]> {
+  const [items, states] = await Promise.all([
+    prisma.exit_system_revocation_item.findMany({
+      where: { OR: [{ user_id: null }, { user_id: userId }] },
+      orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+    }),
+    prisma.exit_system_revocation_state.findMany({ where: { user_id: userId } }),
+  ]);
+  const checkedByItemId = new Map(states.map((s) => [s.item_id, s.checked]));
+  return items.map((item) => ({ id: item.id, label: item.label, checked: checkedByItemId.get(item.id) ?? false, isCustom: item.user_id !== null }));
+}
+
+export interface FinancialSettlementInfo {
+  finalPayDate: string | null;
+  outstandingLeavePayout: string | null;
+  outstandingClaims: string | null;
+  loanAdvanceDeduction: string | null;
+  notes: string | null;
+  settlementLetterFileId: string | null;
+}
+
+export async function getFinancialSettlement(userId: number): Promise<FinancialSettlementInfo | null> {
+  const row = await prisma.exit_financial_settlement.findUnique({ where: { user_id: userId } });
+  if (!row) return null;
+  return {
+    finalPayDate: row.final_pay_date ? row.final_pay_date.toISOString().slice(0, 10) : null,
+    outstandingLeavePayout: row.outstanding_leave_payout?.toString() ?? null,
+    outstandingClaims: row.outstanding_claims?.toString() ?? null,
+    loanAdvanceDeduction: row.loan_advance_deduction?.toString() ?? null,
+    notes: row.notes,
+    settlementLetterFileId: row.settlement_letter_file_id,
+  };
+}
+
 // Exit list's "Exit Type" column/filter follows the Resignation tab's own
 // Exit Type field (resignation.exit_type) — same value the user sets on that
 // profile page, stored as the exact display label ("Resignation"/"End of
@@ -1012,7 +1260,16 @@ export function summarizeStageByBranch(
     });
   if (stage === "onboarding") return byBranch;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
-  return [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
+  // Only shown when non-empty — an "Unassigned: 0" row is dead weight, and
+  // per explicit decision (see conversation, the 4 test accounts that used
+  // to populate this under Active) this bucket should disappear once
+  // nobody's actually in it, not linger as a permanent empty category. Still
+  // reappears automatically if a real employee genuinely ends up with
+  // neither a branch nor a department — that's a real data problem worth
+  // surfacing, not something to hide unconditionally.
+  return unassignedCount > 0
+    ? [...byBranch, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }]
+    : byBranch;
 }
 
 export function summarizeStageByDepartment(
@@ -1027,7 +1284,10 @@ export function summarizeStageByDepartment(
   });
   if (stage === "onboarding") return byDept;
   const unassignedCount = stageRows.filter((r) => !r.branchCode && !r.departmentCode).length;
-  return [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }];
+  // Same "only show when non-empty" rule as summarizeStageByBranch above.
+  return unassignedCount > 0
+    ? [...byDept, { code: UNASSIGNED_LOCATION_CODE, name: UNASSIGNED_LOCATION_NAME, count: unassignedCount }]
+    : byDept;
 }
 
 export function filterStageByLocation(
@@ -1174,7 +1434,7 @@ export interface InterviewAssessmentInfo {
 // feedback1 (then feedback2) when there's no real hiring_note on file yet —
 // applies even when there's no interview_assessment row at all, which is the
 // normal case for a freshly career_applications-synced Pre employee (every
-// other field here still shows "Not provided" via the UI's own null
+// other field here still shows "-" via the UI's own null
 // handling; only hiringNote gets this fallback). `fullName` is optional so
 // existing callers that don't have it handy keep working with no fallback.
 export async function getInterviewAssessment(userId: number, fullName?: string): Promise<InterviewAssessmentInfo | null> {
@@ -1246,6 +1506,10 @@ export interface ProbationInfo {
   extEndDate: string | null;
   confirmationLetterFileId: string | null;
   extensionLetterFileId: string | null;
+  /** HR-editable Feedback — only used/shown for someone with no
+   *  career_applications match (see probation.local_feedback's own schema
+   *  comment); null for a matched person, who reads feedback2 instead. */
+  localFeedback: string | null;
 }
 
 // Real probation table — Probation stage's own tab only (no Employee Record
@@ -1263,6 +1527,7 @@ export async function getProbationInfo(userId: number): Promise<ProbationInfo | 
     extEndDate: row.ext_end_date ? row.ext_end_date.toISOString().slice(0, 10) : null,
     confirmationLetterFileId: row.confirmation_letter_file_id,
     extensionLetterFileId: row.extension_letter_file_id,
+    localFeedback: row.local_feedback,
   };
 }
 
@@ -1338,11 +1603,35 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
   const bank = u.bank_details;
   const em = u.emergency_contact[0];
   const profile = u.user_profile;
+  const fullName = titleCaseName(profile?.full_name) || u.email;
+
+  // Personal Info/Bank Detail/Emergency Contact/Start-End-date/Employee ID —
+  // read-only enrichment from ebright_hrfs.BranchStaff, per explicit
+  // decision (see conversation): rigorous name match (no exact key exists
+  // for real accounts — see matchBranchStaffForRealAccount's own comment on
+  // why this errs toward not matching rather than guessing), falling back
+  // to this app's own local data per-field whenever there's no confident
+  // match or the matched BranchStaff row has that particular field blank.
+  const { buildBranchStaffMatchIndex, matchBranchStaffForRealAccount, branchStaffProfileFields } = await import(
+    "@/lib/branchStaffProfile"
+  );
+  const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+  const bsIndex = await buildBranchStaffMatchIndex();
+  const bsMatch = matchBranchStaffForRealAccount(
+    fullName,
+    emp?.branch?.branch_code ?? null,
+    emp?.department?.department_code ?? null,
+    bsIndex,
+    branches,
+    departments,
+  );
+  const bs = bsMatch ? branchStaffProfileFields(bsMatch) : null;
+
   return {
     id: u.user_id,
-    email: u.email,
-    employeeId: emp?.employee_id ?? null,
-    fullName: titleCaseName(profile?.full_name) || u.email,
+    email: bs?.email ?? u.email,
+    employeeId: bs?.employeeId ?? emp?.employee_id ?? null,
+    fullName,
     nickName: profile?.nick_name ? titleCaseName(profile.nick_name) : null,
     role: emp?.position ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
@@ -1350,28 +1639,36 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     departmentCode: emp?.department?.department_code ?? null,
     departmentName: emp?.department?.department_name ?? null,
     status: emp?.status ?? u.status ?? null,
-    startDate: emp?.start_date ? emp.start_date.toISOString().slice(0, 10) : null,
+    startDate: bs?.startDate
+      ? bs.startDate.toISOString().slice(0, 10)
+      : emp?.start_date
+        ? emp.start_date.toISOString().slice(0, 10)
+        : null,
     pendingOnboarding: !profile,
-    gender: profile?.gender ?? null,
-    dob: profile?.dob ? profile.dob.toISOString().slice(0, 10) : null,
-    phone: profile?.phone ?? null,
+    gender: bs?.gender ?? profile?.gender ?? null,
+    dob: bs?.dob ?? (profile?.dob ? profile.dob.toISOString().slice(0, 10) : null),
+    phone: bs?.phone ?? profile?.phone ?? null,
     nationality: profile?.nationality ?? null,
-    nric: profile?.nric ?? null,
-    homeAddress: profile?.home_address ?? null,
+    nric: bs?.nric ?? profile?.nric ?? null,
+    homeAddress: bs?.homeAddress ?? profile?.home_address ?? null,
     position: emp?.position ?? null,
-    endDate: emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null,
+    endDate: bs?.endDate
+      ? bs.endDate.toISOString().slice(0, 10)
+      : emp?.end_date
+        ? emp.end_date.toISOString().slice(0, 10)
+        : null,
     employmentType: emp?.employment_type ?? null,
     probation: emp?.probation ?? false,
     rate: emp?.rate ?? null,
     branchId: emp?.branch_id ?? null,
     departmentId: emp?.department_id ?? null,
     employmentId: emp?.employment_id ?? null,
-    bankName: bank?.bank_name ?? null,
-    bankAccount: bank?.bank_account ?? null,
-    accountName: bank?.account_name ?? null,
-    emergencyName: em?.name ? titleCaseName(em.name) : null,
-    emergencyPhone: em?.phone ?? null,
-    emergencyRelation: em?.relation ?? null,
+    bankName: bs?.bankName ?? bank?.bank_name ?? null,
+    bankAccount: bs?.bankAccount ?? bank?.bank_account ?? null,
+    accountName: bs?.accountName ?? bank?.account_name ?? null,
+    emergencyName: bs?.emergencyName ?? (em?.name ? titleCaseName(em.name) : null),
+    emergencyPhone: bs?.emergencyPhone ?? em?.phone ?? null,
+    emergencyRelation: bs?.emergencyRelation ?? em?.relation ?? null,
     emergencyEmail: em?.email ?? null,
     emergencyAddress: em?.address ?? null,
     offerLetterFileId: emp?.offer_letter_file_id ?? null,
@@ -1455,9 +1752,12 @@ export async function listPerformanceReviews(userId: number): Promise<Performanc
   }));
 }
 
-// Singleton — Finance > Payroll/Payslip's "Basic Pay" + "Payslip"
-// subsections (deliberately separate from the existing payroll table's
-// EPF/SOCSO/EIS/Tax/PCB fields — no overlap).
+// Singleton — Finance > Payroll/Payslip's "Basic Pay" subsection
+// (deliberately separate from the existing payroll table's EPF/SOCSO/EIS/
+// Tax/PCB fields — no overlap). attachmentFileId is retired (see
+// payslip_history below) but still read here for now rather than dropped
+// from the type outright — see payslip.attachment_file_id's own schema
+// comment.
 export interface PayslipInfo {
   basicPay: string | null;
   type: string | null;
@@ -1472,6 +1772,28 @@ export async function getPayslip(userId: number): Promise<PayslipInfo | null> {
     type: row.type,
     attachmentFileId: row.attachment_file_id,
   };
+}
+
+// Real payslip_history table — Finance > Payroll/Payslip's "Payslip"
+// subsection, replacing the old single-upload attachment (see payslip's
+// own schema comment). Repeatable, add + delete only (same as Training) —
+// no in-place edit action exists for this table (see addPayslipHistory/
+// deletePayslipHistory in employeeRecordActions.ts).
+export interface PayslipHistoryEntry {
+  id: number;
+  month: string | null;
+  attachmentFileId: string | null;
+  uploadDate: string | null;
+}
+
+export async function listPayslipHistory(userId: number): Promise<PayslipHistoryEntry[]> {
+  const rows = await prisma.payslip_history.findMany({ where: { user_id: userId }, orderBy: { month: "desc" } });
+  return rows.map((r) => ({
+    id: r.payslip_history_id,
+    month: r.month,
+    attachmentFileId: r.attachment_file_id,
+    uploadDate: r.upload_date ? r.upload_date.toISOString().slice(0, 10) : null,
+  }));
 }
 
 // ─── Employee Record > Task (Pending/Overdue) ───

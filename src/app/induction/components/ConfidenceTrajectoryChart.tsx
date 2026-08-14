@@ -33,11 +33,11 @@ export function ConfidenceTrajectoryChart({ data }: { data: ConfidencePoint[] })
     .join(" ");
 
   return (
-    <div className="rounded-lg border bg-white p-6 shadow">
+    <div className="rounded-lg border bg-white dark:bg-slate-900 p-6 shadow">
       <h3 className="mb-6 text-lg font-semibold">Confidence Trajectory</h3>
 
       {data.length === 0 || data.every((d) => d.averageScore === 0) ? (
-        <p className="py-8 text-center text-gray-500">
+        <p className="py-8 text-center text-gray-500 dark:text-gray-400">
           No survey responses yet.
         </p>
       ) : (
@@ -51,14 +51,14 @@ export function ConfidenceTrajectoryChart({ data }: { data: ConfidencePoint[] })
                   x2={width - padding.right}
                   y1={y}
                   y2={y}
-                  stroke="#e5e7eb"
+                  stroke="var(--status-track)"
                   strokeDasharray="3 3"
                 />
                 <text
                   x={padding.left - 8}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-gray-500 text-xs"
+                  className="fill-gray-500 dark:fill-gray-400 text-xs"
                 >
                   {tick}
                 </text>
@@ -75,7 +75,7 @@ export function ConfidenceTrajectoryChart({ data }: { data: ConfidencePoint[] })
                 x={p.x}
                 y={height - padding.bottom + 18}
                 textAnchor="middle"
-                className="fill-gray-700 text-xs"
+                className="fill-gray-700 dark:fill-gray-300 text-xs"
               >
                 {p.label}
               </text>
@@ -83,7 +83,7 @@ export function ConfidenceTrajectoryChart({ data }: { data: ConfidencePoint[] })
                 x={p.x}
                 y={p.y - 8}
                 textAnchor="middle"
-                className="fill-gray-700 text-xs font-semibold"
+                className="fill-gray-700 dark:fill-gray-300 text-xs font-semibold"
               >
                 {p.value.toFixed(1)}
               </text>

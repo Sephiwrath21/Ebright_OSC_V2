@@ -97,7 +97,9 @@ export default function RowActionMenu({ name, onDelete, className }: Props) {
         aria-haspopup="true"
         aria-expanded={open}
         className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
-          open ? "bg-[#f0f4fa] text-[#4b4949]" : "text-[#4b4949a3] hover:bg-[#f0f4fa] hover:text-[#4b4949]"
+          open
+            ? "bg-[#f0f4fa] text-[#4b4949] dark:bg-slate-800 dark:text-slate-300"
+            : "text-[#4b4949a3] hover:bg-[#f0f4fa] hover:text-[#4b4949] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300"
         }`}
       >
         <MoreVertical className="w-4 h-4" aria-hidden="true" />
@@ -108,7 +110,7 @@ export default function RowActionMenu({ name, onDelete, className }: Props) {
           ref={menuRef}
           role="menu"
           style={menuPos ? { position: "fixed", top: menuPos.top, left: menuPos.left } : { position: "fixed", top: -9999, left: -9999 }}
-          className="min-w-[130px] bg-white border border-black/10 rounded-[10px] shadow-[0_4px_14px_0_#0000001a] z-20 overflow-hidden"
+          className="min-w-[130px] bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 border border-black/10 rounded-[10px] shadow-[0_4px_14px_0_#0000001a] z-20 overflow-hidden"
         >
           <button
             type="button"
@@ -119,7 +121,7 @@ export default function RowActionMenu({ name, onDelete, className }: Props) {
               setOpen(false);
               setConfirming(true);
             }}
-            className="block w-full text-left px-3.5 py-2.5 text-sm text-[#d0342c] hover:bg-[#fdecec] transition-colors"
+            className="block w-full text-left px-3.5 py-2.5 text-sm text-[#d0342c] hover:bg-[#fdecec] transition-colors dark:text-red-400 dark:hover:bg-red-900 dark:hover:text-red-300"
           >
             Delete
           </button>

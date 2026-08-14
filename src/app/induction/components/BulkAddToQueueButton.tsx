@@ -55,8 +55,8 @@ export function BulkAddToQueueButton({ userIds, accent = "emerald" }: Props) {
   const disabled = userIds.length === 0 || pending || done;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <div className="text-sm text-slate-700">
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+      <div className="text-sm text-slate-700 dark:text-slate-300">
         {userIds.length === 0
           ? "No highlighted employees to queue."
           : `${userIds.length} employee${userIds.length !== 1 ? "s" : ""} highlighted (within 1 week).`}
@@ -65,13 +65,13 @@ export function BulkAddToQueueButton({ userIds, accent = "emerald" }: Props) {
         type="button"
         onClick={handleClick}
         disabled={disabled}
-        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed ${colors.bg} ${colors.hover} ${colors.ring}`}
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-60 disabled:cursor-not-allowed ${colors.bg} ${colors.hover} ${colors.ring}`}
       >
         <UserPlus className="w-4 h-4" aria-hidden="true" />
         {pending ? "Adding…" : done ? "Done" : "Add Highlighted to Queue"}
       </button>
       {message && (
-        <p className="basis-full text-xs text-slate-600">{message}</p>
+        <p className="basis-full text-xs text-slate-600 dark:text-slate-300">{message}</p>
       )}
     </div>
   );

@@ -76,139 +76,139 @@ const TYPE_META: Record<
   sales: {
     label: "Sales Claim",
     Icon: TrendingUp,
-    accent: "#2563EB",
-    accentSoft: "#EFF6FF",
-    accentBorder: "#BFDBFE",
-    accentText: "#1D4ED8",
+    accent: "var(--accent-blue)",
+    accentSoft: "var(--tint-blue)",
+    accentBorder: "var(--status-blue-bg)",
+    accentText: "var(--status-blue-fg)",
   },
   health: {
     label: "Health Claim",
     Icon: HeartPulse,
-    accent: "#059669",
-    accentSoft: "#ECFDF5",
-    accentBorder: "#A7F3D0",
-    accentText: "#047857",
+    accent: "var(--accent-green)",
+    accentSoft: "var(--tint-green)",
+    accentBorder: "var(--status-green-bg)",
+    accentText: "var(--accent-green-strong)",
   },
   transport: {
     label: "Transport Claim",
     Icon: Car,
-    accent: "#EA580C",
-    accentSoft: "#FFF7ED",
-    accentBorder: "#FED7AA",
-    accentText: "#C2410C",
+    accent: "var(--accent-amber)",
+    accentSoft: "var(--tint-amber)",
+    accentBorder: "var(--status-amber-bg)",
+    accentText: "var(--accent-amber-strong)",
   },
   sales_incentive: {
     label: "Salesperson Incentive",
     Icon: UserPlus,
-    accent: "#4F46E5",
-    accentSoft: "#EEF2FF",
-    accentBorder: "#C7D2FE",
-    accentText: "#4338CA",
+    accent: "var(--accent-indigo)",
+    accentSoft: "var(--status-violet-bg)",
+    accentBorder: "var(--border-subtle)",
+    accentText: "var(--accent-violet-strong)",
   },
   renewal_incentive: {
     label: "Renewal Incentive",
     Icon: RefreshCw,
-    accent: "#0891B2",
-    accentSoft: "#ECFEFF",
-    accentBorder: "#A5F3FC",
-    accentText: "#0E7490",
+    accent: "var(--accent-sky)",
+    accentSoft: "var(--status-blue-bg)",
+    accentBorder: "var(--status-track)",
+    accentText: "var(--status-blue-fg)",
   },
   ot: {
     label: "Overtime (OT)",
     Icon: Timer,
-    accent: "#7C3AED",
-    accentSoft: "#F5F3FF",
-    accentBorder: "#DDD6FE",
-    accentText: "#6D28D9",
+    accent: "var(--status-violet-fg)",
+    accentSoft: "var(--status-violet-bg)",
+    accentBorder: "var(--border-subtle)",
+    accentText: "var(--accent-violet-strong)",
   },
   branch_rank_reward: {
     label: "Branch Ranking Reward",
     Icon: Trophy,
-    accent: "#E11D48",
-    accentSoft: "#FFF1F2",
-    accentBorder: "#FECDD3",
-    accentText: "#BE123C",
+    accent: "var(--accent-red)",
+    accentSoft: "var(--tint-red)",
+    accentBorder: "var(--tint-red-strong)",
+    accentText: "var(--accent-red-strong)",
   },
   jackpot: {
     label: "Jackpot",
     Icon: Sparkles,
-    accent: "#D97706",
-    accentSoft: "#FFFBEB",
-    accentBorder: "#FDE68A",
-    accentText: "#B45309",
+    accent: "var(--claim-jackpot-accent)",
+    accentSoft: "var(--claim-jackpot-soft)",
+    accentBorder: "var(--claim-jackpot-border)",
+    accentText: "var(--claim-jackpot-strong)",
   },
   class: {
     label: "Class Claim",
     Icon: GraduationCap,
-    accent: "#6366F1",
-    accentSoft: "#EEF2FF",
-    accentBorder: "#C7D2FE",
-    accentText: "#4338CA",
+    accent: "var(--claim-class-accent)",
+    accentSoft: "var(--claim-class-soft)",
+    accentBorder: "var(--border-subtle)",
+    accentText: "var(--claim-class-strong)",
   },
   roadshow: {
     label: "Roadshow Claim",
     Icon: Megaphone,
-    accent: "#D946EF",
-    accentSoft: "#FDF4FF",
-    accentBorder: "#F5D0FE",
-    accentText: "#A21CAF",
+    accent: "var(--claim-roadshow-accent)",
+    accentSoft: "var(--claim-roadshow-soft)",
+    accentBorder: "var(--border-subtle)",
+    accentText: "var(--claim-roadshow-strong)",
   },
   showcase: {
     label: "Showcase Claim",
     Icon: Store,
-    accent: "#0EA5E9",
-    accentSoft: "#F0F9FF",
-    accentBorder: "#BAE6FD",
-    accentText: "#0369A1",
+    accent: "var(--claim-showcase-accent)",
+    accentSoft: "var(--claim-showcase-soft)",
+    accentBorder: "var(--status-track)",
+    accentText: "var(--claim-showcase-strong)",
   },
   internship: {
     label: "Internship Claim",
     Icon: Backpack,
-    accent: "#84CC16",
-    accentSoft: "#F7FEE7",
-    accentBorder: "#D9F99D",
-    accentText: "#4D7C0F",
+    accent: "var(--status-green-fg)",
+    accentSoft: "var(--status-green-bg)",
+    accentBorder: "var(--tint-green)",
+    accentText: "var(--status-green-fg)",
   },
   part_time: {
     label: "Part Time Claim",
     Icon: Hourglass,
-    accent: "#06B6D4",
-    accentSoft: "#ECFEFF",
-    accentBorder: "#A5F3FC",
-    accentText: "#0E7490",
+    accent: "var(--claim-part-time-accent)",
+    accentSoft: "var(--claim-part-time-soft)",
+    accentBorder: "var(--status-track)",
+    accentText: "var(--claim-part-time-strong)",
   },
   rm_incentive: {
     label: "Regional Manager Incentive",
     Icon: Crown,
-    accent: "#7C3AED",
-    accentSoft: "#F5F3FF",
-    accentBorder: "#DDD6FE",
-    accentText: "#6D28D9",
+    accent: "var(--claim-rm-incentive-accent)",
+    accentSoft: "var(--claim-rm-incentive-soft)",
+    accentBorder: "var(--border-subtle)",
+    accentText: "var(--claim-rm-incentive-strong)",
   },
   trainer: {
     label: "Trainer Claim",
     Icon: Presentation,
-    accent: "#F43F5E",
-    accentSoft: "#FFF1F2",
-    accentBorder: "#FECDD3",
-    accentText: "#BE123C",
+    accent: "var(--claim-trainer-accent)",
+    accentSoft: "var(--claim-trainer-soft)",
+    accentBorder: "var(--claim-trainer-border)",
+    accentText: "var(--claim-trainer-strong)",
   },
   referral: {
     label: "Referral Claim",
     Icon: Share2,
-    accent: "#16A34A",
-    accentSoft: "#F0FDF4",
-    accentBorder: "#BBF7D0",
-    accentText: "#15803D",
+    accent: "var(--claim-referral-fg)",
+    accentSoft: "var(--claim-referral-bg)",
+    accentBorder: "var(--claim-referral-border)",
+    accentText: "var(--claim-referral-fg)",
   },
 };
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
-  approved: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Approved" },
-  rejected: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Rejected" },
-  disbursed: { bg: "#FAF5FF", text: "#6B21A8", dot: "#A855F7", label: "Disbursed" },
-  received: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Received" },
+  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
+  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
+  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "var(--status-violet-fg)", label: "Disbursed" },
+  received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Received" },
 };
 
 // Monthly claim cycle stages, mirrored from the Claims list page but coloured
@@ -245,16 +245,16 @@ const STAGE_PALETTE: Record<
   StageColor,
   { dot: string; bg: string; border: string; text: string; line: string }
 > = {
-  green: { dot: "#10B981", bg: "#ECFDF5", border: "#A7F3D0", text: "#047857", line: "#34D399" },
-  red: { dot: "#EF4444", bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", line: "#F87171" },
-  grey: { dot: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0", text: "#64748B", line: "#E2E8F0" },
+  green: { dot: "var(--accent-green)", bg: "var(--tint-green)", border: "var(--accent-green)", text: "var(--accent-green-strong)", line: "var(--accent-green)" },
+  red: { dot: "var(--accent-red)", bg: "var(--tint-red)", border: "var(--tint-red-strong)", text: "var(--accent-red-strong)", line: "var(--accent-red)" },
+  grey: { dot: "var(--status-neutral-fg)", bg: "var(--surface-sunken)", border: "var(--border-subtle)", text: "var(--text-muted-strong)", line: "var(--border-subtle)" },
 };
 
 function ClaimCycleTimeline({ status }: { status: string }) {
   const colors = claimCycleColors(status);
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
-      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-4">
+    <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-5">
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">
         Claim Progress
       </h2>
       <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
@@ -324,36 +324,36 @@ export default function ClaimDetailView({
 }) {
   const meta = TYPE_META[claim.claimType] ?? TYPE_META.sales;
   const badge = STATUS_BADGE[claim.status] ?? {
-    bg: "#F1F5F9",
-    text: "#334155",
-    dot: "#64748B",
+    bg: "var(--status-neutral-bg)",
+    text: "var(--text-strong)",
+    dot: "var(--text-muted-strong)",
     label: claim.status,
   };
 
   return (
-    <div className="min-h-full" style={{ backgroundColor: "#FAFAFA" }}>
+    <div className="min-h-full" style={{ backgroundColor: "var(--surface-subtle)" }}>
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px 24px 56px" }}>
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500 flex-wrap mb-5"
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 flex-wrap mb-5"
         >
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/claim" className="hover:text-slate-900 transition-colors">Claims</Link>
+          <Link href="/claim" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Claims</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">{claim.displayId}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">{claim.displayId}</span>
         </nav>
 
         {/* Back button */}
         <Link
           href="/claim"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors mb-5"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors mb-5"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           Back to Claims
@@ -362,8 +362,8 @@ export default function ClaimDetailView({
         {/* Main card */}
         <div
           style={{
-            backgroundColor: "#fff",
-            border: "1px solid #E5E7EB",
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--status-track)",
             borderRadius: "20px",
             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
             overflow: "hidden",
@@ -374,8 +374,8 @@ export default function ClaimDetailView({
             style={{
               position: "relative",
               padding: "28px 32px 24px",
-              background: `linear-gradient(135deg, ${meta.accentSoft} 0%, #fff 60%)`,
-              borderBottom: "1px solid #F3F4F6",
+              background: `linear-gradient(135deg, ${meta.accentSoft} 0%, var(--surface) 60%)`,
+              borderBottom: "1px solid var(--border-subtle)",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -386,7 +386,7 @@ export default function ClaimDetailView({
                   borderRadius: "14px",
                   display: "grid",
                   placeItems: "center",
-                  backgroundColor: "#fff",
+                  backgroundColor: "var(--surface-subtle)",
                   border: `1px solid ${meta.accentBorder}`,
                   boxShadow: `0 4px 12px ${meta.accentSoft}`,
                 }}
@@ -404,7 +404,7 @@ export default function ClaimDetailView({
                     style={{
                       fontSize: "22px",
                       fontWeight: 700,
-                      color: "#171717",
+                      color: "var(--text-primary)",
                       lineHeight: 1.15,
                       letterSpacing: "-0.01em",
                     }}
@@ -423,7 +423,7 @@ export default function ClaimDetailView({
                     {badge.label}
                   </span>
                 </div>
-                <p style={{ fontSize: "13.5px", color: "#737373", marginTop: "4px" }}>
+                <p style={{ fontSize: "13.5px", color: "var(--text-neutral)", marginTop: "4px" }}>
                   {meta.label} · Submitted {formatDateTime(claim.submittedOn)}
                 </p>
               </div>
@@ -456,13 +456,13 @@ export default function ClaimDetailView({
                     ? `RM ${claim.approvedAmount.toFixed(2)}`
                     : "—"
                 }
-                accent="#737373"
+                accent="var(--text-neutral)"
               />
               <SummaryCell
                 icon={<Calendar size={16} />}
                 label="Claim Date"
                 value={formatDate(claim.claimDate)}
-                accent="#737373"
+                accent="var(--text-neutral)"
               />
             </div>
 
@@ -501,17 +501,17 @@ export default function ClaimDetailView({
             <Section title="Claim Details">
               <div className="space-y-4">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
                     Description
                   </p>
-                  <p className="text-sm text-slate-800 whitespace-pre-wrap">
+                  <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
                     {claim.description || (
                       <span className="text-slate-400 italic">No description provided.</span>
                     )}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                     {claim.attachments.length > 1 ? "Attachments" : "Attachment"}
                   </p>
                   {claim.attachments.length > 0 ? (
@@ -535,10 +535,10 @@ export default function ClaimDetailView({
                 </div>
                 {claim.remarks && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
                       Remarks (from finance)
                     </p>
-                    <p className="text-sm text-slate-800 whitespace-pre-wrap">{claim.remarks}</p>
+                    <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{claim.remarks}</p>
                   </div>
                 )}
               </div>
@@ -609,7 +609,7 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
         {icon}
         {title}
       </h2>
@@ -619,7 +619,7 @@ function Section({
 }
 
 function Divider() {
-  return <div style={{ height: "1px", backgroundColor: "#F3F4F6" }} />;
+  return <div style={{ height: "1px", backgroundColor: "var(--border-subtle)" }} />;
 }
 
 function SummaryCell({
@@ -637,19 +637,19 @@ function SummaryCell({
     <div
       style={{
         borderRadius: "12px",
-        border: "1px solid #E5E7EB",
+        border: "1px solid var(--status-track)",
         padding: "16px",
-        backgroundColor: "#FAFAFA",
+        backgroundColor: "var(--surface-subtle)",
       }}
     >
       <div
         className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest"
-        style={{ color: "#737373" }}
+        style={{ color: "var(--text-neutral)" }}
       >
         <span style={{ color: accent }}>{icon}</span>
         {label}
       </div>
-      <p className="mt-1.5 text-lg font-bold tabular-nums" style={{ color: "#171717" }}>
+      <p className="mt-1.5 text-lg font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
         {value}
       </p>
     </div>
@@ -690,8 +690,8 @@ function AttachmentCard({
           gap: "14px",
           padding: "14px",
           borderRadius: "14px",
-          border: "1px dashed #FCA5A5",
-          backgroundColor: "#FEF2F2",
+          border: "1px dashed var(--tint-red-strong)",
+          backgroundColor: "var(--tint-red)",
           maxWidth: "520px",
         }}
       >
@@ -702,19 +702,19 @@ function AttachmentCard({
             borderRadius: "10px",
             display: "grid",
             placeItems: "center",
-            backgroundColor: "#fff",
-            border: "1px solid #FECACA",
+            backgroundColor: "var(--surface-subtle)",
+            border: "1px solid var(--tint-red-strong)",
             flexShrink: 0,
           }}
         >
-          <XCircle size={20} strokeWidth={1.75} style={{ color: "#DC2626" }} />
+          <XCircle size={20} strokeWidth={1.75} style={{ color: "var(--status-red-fg)" }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p
             style={{
               fontSize: "13.5px",
               fontWeight: 600,
-              color: "#7F1D1D",
+              color: "var(--accent-red-strong)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -723,7 +723,7 @@ function AttachmentCard({
           >
             {filename}
           </p>
-          <p style={{ fontSize: "12px", color: "#991B1B", marginTop: "2px", lineHeight: 1.4 }}>
+          <p style={{ fontSize: "12px", color: "var(--accent-red-strong)", marginTop: "2px", lineHeight: 1.4 }}>
             File is not available on the server. Please re-upload.
           </p>
         </div>
@@ -751,8 +751,8 @@ function AttachmentCard({
           gap: "14px",
           padding: "14px",
           borderRadius: "14px",
-          border: "1px solid #E5E7EB",
-          backgroundColor: "#fff",
+          border: "1px solid var(--status-track)",
+          backgroundColor: "var(--surface)",
           maxWidth: "520px",
         }}
       >
@@ -819,7 +819,7 @@ function AttachmentCard({
             style={{
               fontSize: "13.5px",
               fontWeight: 600,
-              color: "#171717",
+              color: "var(--text-primary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -831,7 +831,7 @@ function AttachmentCard({
           <p
             style={{
               fontSize: "11.5px",
-              color: "#737373",
+              color: "var(--text-neutral)",
               marginTop: "2px",
               display: "inline-flex",
               alignItems: "center",
@@ -877,7 +877,7 @@ function AttachmentCard({
           <a
             href={`${url}${url.includes("?") ? "&" : "?"}download=1`}
             download={filename}
-            className="hover:bg-neutral-50 transition-colors"
+            className="hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
             style={{
               height: "36px",
               padding: "0 14px",
@@ -885,7 +885,7 @@ function AttachmentCard({
               display: "inline-flex",
               alignItems: "center",
               gap: "6px",
-              backgroundColor: "#fff",
+              backgroundColor: "var(--surface)",
               border: `1px solid ${accentBorder}`,
               color: accentText,
               fontSize: "12.5px",
@@ -974,11 +974,11 @@ function Item({
 }) {
   return (
     <div>
-      <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+      <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
         {icon}
         {label}
       </dt>
-      <dd className="text-sm text-slate-800">{value}</dd>
+      <dd className="text-sm text-slate-800 dark:text-slate-200">{value}</dd>
     </div>
   );
 }
@@ -1033,7 +1033,7 @@ function FinanceReviewPanel({
     e.currentTarget.style.boxShadow = `0 0 0 4px ${meta.accentSoft}`;
   };
   const inputBlur = (e: React.FocusEvent<HTMLElement>) => {
-    e.currentTarget.style.borderColor = "#E5E7EB";
+    e.currentTarget.style.borderColor = "var(--status-track)";
     e.currentTarget.style.boxShadow = "none";
   };
 
@@ -1061,7 +1061,7 @@ function FinanceReviewPanel({
             borderRadius: "8px",
             display: "grid",
             placeItems: "center",
-            backgroundColor: "#fff",
+            backgroundColor: "var(--surface-subtle)",
             border: `1px solid ${meta.accentBorder}`,
           }}
         >
@@ -1095,7 +1095,7 @@ function FinanceReviewPanel({
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#737373",
+              color: "var(--text-neutral)",
               marginBottom: "8px",
             }}
           >
@@ -1111,7 +1111,7 @@ function FinanceReviewPanel({
                 transform: "translateY(-50%)",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "#737373",
+                color: "var(--text-neutral)",
                 pointerEvents: "none",
               }}
             >
@@ -1130,11 +1130,11 @@ function FinanceReviewPanel({
                 height: "44px",
                 padding: "0 16px 0 46px",
                 borderRadius: "10px",
-                border: "1px solid #E5E7EB",
-                backgroundColor: "#fff",
+                border: "1px solid var(--status-track)",
+                backgroundColor: "var(--surface-sunken)",
                 fontSize: "14px",
                 fontWeight: 600,
-                color: "#171717",
+                color: "var(--text-primary)",
                 outline: "none",
                 transition: "border-color 0.15s, box-shadow 0.15s",
               }}
@@ -1144,7 +1144,7 @@ function FinanceReviewPanel({
             style={{
               marginTop: "6px",
               fontSize: "11.5px",
-              color: "#737373",
+              color: "var(--text-neutral)",
               lineHeight: 1.5,
             }}
           >
@@ -1162,7 +1162,7 @@ function FinanceReviewPanel({
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#737373",
+              color: "var(--text-neutral)",
               marginBottom: "8px",
             }}
           >
@@ -1175,7 +1175,7 @@ function FinanceReviewPanel({
                 letterSpacing: "normal",
                 fontSize: "11px",
                 fontWeight: 500,
-                color: "#A3A3A3",
+                color: "var(--text-neutral-faint)",
               }}
             >
               · required to reject
@@ -1193,10 +1193,10 @@ function FinanceReviewPanel({
               width: "100%",
               padding: "12px 16px",
               borderRadius: "10px",
-              border: "1px solid #E5E7EB",
-              backgroundColor: "#fff",
+              border: "1px solid var(--status-track)",
+              backgroundColor: "var(--surface-sunken)",
               fontSize: "14px",
-              color: "#171717",
+              color: "var(--text-primary)",
               outline: "none",
               resize: "none",
               lineHeight: 1.55,
@@ -1214,8 +1214,8 @@ function FinanceReviewPanel({
             gap: "10px",
             alignItems: "flex-start",
             borderRadius: "10px",
-            backgroundColor: "#FEF2F2",
-            border: "1px solid #FECACA",
+            backgroundColor: "var(--tint-red)",
+            border: "1px solid var(--tint-red-strong)",
             padding: "12px 14px",
             marginBottom: "16px",
           }}
@@ -1225,7 +1225,7 @@ function FinanceReviewPanel({
               width: "18px",
               height: "18px",
               borderRadius: "9999px",
-              backgroundColor: "#DC2626",
+              backgroundColor: "var(--status-red-fg)",
               color: "#fff",
               display: "grid",
               placeItems: "center",
@@ -1237,7 +1237,7 @@ function FinanceReviewPanel({
           >
             !
           </div>
-          <p style={{ fontSize: "12.5px", color: "#991B1B", lineHeight: 1.55 }}>{error}</p>
+          <p style={{ fontSize: "12.5px", color: "var(--accent-red-strong)", lineHeight: 1.55 }}>{error}</p>
         </div>
       )}
 
@@ -1262,9 +1262,9 @@ function FinanceReviewPanel({
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            backgroundColor: "#fff",
-            border: "1px solid #FECACA",
-            color: "#B91C1C",
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--tint-red-strong)",
+            color: "var(--status-red-fg)",
             fontSize: "13.5px",
             fontWeight: 600,
             cursor: isPending ? "not-allowed" : "pointer",
@@ -1273,11 +1273,11 @@ function FinanceReviewPanel({
           }}
           onMouseEnter={(e) => {
             if (isPending) return;
-            e.currentTarget.style.backgroundColor = "#FEF2F2";
+            e.currentTarget.style.backgroundColor = "var(--tint-red)";
           }}
           onMouseLeave={(e) => {
             if (isPending) return;
-            e.currentTarget.style.backgroundColor = "#fff";
+            e.currentTarget.style.backgroundColor = "var(--surface)";
           }}
         >
           <XCircle size={15} aria-hidden="true" />
@@ -1294,7 +1294,7 @@ function FinanceReviewPanel({
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            backgroundColor: isPending ? "#D4D4D4" : meta.accent,
+            backgroundColor: isPending ? "var(--border-neutral)" : meta.accent,
             color: "#fff",
             fontSize: "13.5px",
             fontWeight: 600,
@@ -1368,7 +1368,7 @@ function ClaimAdvancePanel({
             borderRadius: "8px",
             display: "grid",
             placeItems: "center",
-            backgroundColor: "#fff",
+            backgroundColor: "var(--surface-subtle)",
             border: `1px solid ${meta.accentBorder}`,
           }}
         >
@@ -1397,8 +1397,8 @@ function ClaimAdvancePanel({
             gap: "10px",
             alignItems: "flex-start",
             borderRadius: "10px",
-            backgroundColor: "#FEF2F2",
-            border: "1px solid #FECACA",
+            backgroundColor: "var(--tint-red)",
+            border: "1px solid var(--tint-red-strong)",
             padding: "12px 14px",
             marginBottom: "16px",
           }}
@@ -1408,7 +1408,7 @@ function ClaimAdvancePanel({
               width: "18px",
               height: "18px",
               borderRadius: "9999px",
-              backgroundColor: "#DC2626",
+              backgroundColor: "var(--status-red-fg)",
               color: "#fff",
               display: "grid",
               placeItems: "center",
@@ -1420,7 +1420,7 @@ function ClaimAdvancePanel({
           >
             !
           </div>
-          <p style={{ fontSize: "12.5px", color: "#991B1B", lineHeight: 1.55 }}>{error}</p>
+          <p style={{ fontSize: "12.5px", color: "var(--accent-red-strong)", lineHeight: 1.55 }}>{error}</p>
         </div>
       )}
 
@@ -1444,7 +1444,7 @@ function ClaimAdvancePanel({
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            backgroundColor: isPending ? "#D4D4D4" : meta.accent,
+            backgroundColor: isPending ? "var(--border-neutral)" : meta.accent,
             color: "#fff",
             fontSize: "13.5px",
             fontWeight: 600,

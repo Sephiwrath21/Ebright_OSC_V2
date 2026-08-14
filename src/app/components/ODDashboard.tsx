@@ -204,18 +204,18 @@ export default function ODDashboard({
 
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-12 space-y-6">
 
         {/* Header */}
         <div className="mb-6 w-full space-y-2">
           <GreetingHeader name={greetName} style={{ padding: "0 0 4px" }} />
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Hi, Optimization Department! Here is your custom executive workspace.
             </p>
             {loading && (
-              <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
+              <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 animate-pulse font-medium">
                 Syncing databases...
               </span>
             )}
@@ -224,71 +224,71 @@ export default function ODDashboard({
 
         {/* --- MAIN GRID SECTION --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* Left Column (Width 7/12) */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* 1. Attendance Tracker */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
                 <Compass className="w-5 h-5 text-blue-500" />
                 Attendance Tracker
               </h2>
               <div className="grid grid-cols-2 gap-4">
                 {/* Onboarding */}
-                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center gap-4">
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-950/40 rounded-2xl border border-blue-100 dark:border-blue-900/50 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white">
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-blue-600/80 uppercase tracking-wider">Onboarding</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.onboarding}</p>
+                    <p className="text-xs font-semibold text-blue-600/80 dark:text-blue-300 uppercase tracking-wider">Onboarding</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attendance.onboarding}</p>
                   </div>
                 </div>
 
                 {/* Offboarding */}
-                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100 flex items-center gap-4">
+                <div className="p-4 bg-orange-50/50 dark:bg-orange-950/40 rounded-2xl border border-orange-100 dark:border-orange-900/50 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white">
                     <UserMinus className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-orange-600/80 uppercase tracking-wider">Offboarding</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.offboarding}</p>
+                    <p className="text-xs font-semibold text-orange-600/80 dark:text-orange-300 uppercase tracking-wider">Offboarding</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attendance.offboarding}</p>
                   </div>
                 </div>
 
                 {/* Annual Leave */}
-                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center gap-4">
+                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
                     <Calendar className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-emerald-600/80 uppercase tracking-wider">Annual Leave</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.al}</p>
+                    <p className="text-xs font-semibold text-emerald-600/80 dark:text-emerald-300 uppercase tracking-wider">Annual Leave</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attendance.al}</p>
                   </div>
                 </div>
 
                 {/* Medical Leave */}
-                <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 flex items-center gap-4">
+                <div className="p-4 bg-rose-50/50 dark:bg-rose-950/40 rounded-2xl border border-rose-100 dark:border-rose-900/50 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white">
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-rose-600/80 uppercase tracking-wider">Medical Leave (MC)</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.mc}</p>
+                    <p className="text-xs font-semibold text-rose-600/80 dark:text-rose-300 uppercase tracking-wider">Medical Leave (MC)</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attendance.mc}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* 2. Project Roll Out / Deadline */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-emerald-500" />
                   Project Roll Out / Deadline
                 </h2>
-                
+
                 {/* Task Add Form */}
                 <form onSubmit={addProjectTask} className="flex gap-2 mb-4">
                   <input
@@ -296,14 +296,14 @@ export default function ODDashboard({
                     placeholder="New task..."
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-slate-200 dark:border-slate-500 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <input
                     type="text"
                     placeholder="e.g. 23/7"
                     value={newTaskDeadline}
                     onChange={(e) => setNewTaskDeadline(e.target.value)}
-                    className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-24 border border-slate-200 dark:border-slate-500 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
                     type="submit"
@@ -322,28 +322,28 @@ export default function ODDashboard({
                       <div
                         key={t.id}
                         className={`flex items-center justify-between p-3 rounded-xl border text-sm transition-all duration-200
-                          ${t.completed ? "bg-slate-50 border-slate-100 opacity-60" : "bg-white border-slate-200 shadow-sm"}`}
+                          ${t.completed ? "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 opacity-60" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm"}`}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <button
                             type="button"
                             onClick={() => toggleProjectTask(t.id)}
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200
-                              ${t.completed ? "border-emerald-500 bg-emerald-50 text-emerald-600" : "border-slate-300 hover:border-blue-500"}`}
+                              ${t.completed ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300" : "border-slate-300 dark:border-slate-600 hover:border-blue-500 dark:hover:border-blue-400"}`}
                           >
                             {t.completed && <CheckCircle2 className="w-4 h-4" />}
                           </button>
-                          <span className={`truncate font-medium ${t.completed ? "line-through text-slate-400" : "text-slate-700"}`}>
+                          <span className={`truncate font-medium ${t.completed ? "line-through text-slate-400" : "text-slate-700 dark:text-slate-300"}`}>
                             {t.text}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 font-bold rounded-lg whitespace-nowrap">
+                          <span className="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-lg whitespace-nowrap">
                             📅 {t.deadline}
                           </span>
                           <button
                             onClick={() => deleteProjectTask(t.id)}
-                            className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
+                            className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -356,9 +356,9 @@ export default function ODDashboard({
             </div>
 
             {/* 3. Braindump Section */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
               <div className="flex-1 flex flex-col">
-                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-purple-500" />
                     Braindump
@@ -375,7 +375,7 @@ export default function ODDashboard({
                     localStorage.setItem("od_braindump", e.target.value);
                   }}
                   placeholder="Write down any notes, thoughts, tasks, ideas or ideas to explore here..."
-                  className="w-full flex-1 min-h-[160px] border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono leading-relaxed"
+                  className="w-full flex-1 min-h-[160px] border border-slate-200 dark:border-slate-500 rounded-xl p-3 text-sm bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono leading-relaxed"
                 />
               </div>
             </div>
@@ -388,17 +388,17 @@ export default function ODDashboard({
             {/* 4. Tickets Counter - DB BACKED */}
             <Link
               href="/crm/ticket/opportunities"
-              className="group bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-indigo-200 transition-all"
+              className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800 transition-all"
             >
               <div>
-                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-indigo-500" />
                     Tickets Counter
-                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                   </span>
                   {tickets.length > 0 && (
-                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase tracking-wide">
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded uppercase tracking-wide">
                       Live
                     </span>
                   )}
@@ -407,14 +407,14 @@ export default function ODDashboard({
                 {loading ? (
                   // Skeleton while the real data loads — never flash demo numbers.
                   <div className="space-y-3">
-                    <div className="h-3 w-40 bg-slate-100 rounded animate-pulse mb-3" />
+                    <div className="h-3 w-40 bg-slate-100 dark:bg-slate-800 rounded animate-pulse mb-3" />
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                      <div key={i} className="flex flex-col gap-1.5 p-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800">
                         <div className="flex justify-between items-center">
-                          <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
-                          <div className="h-3 w-16 bg-slate-100 rounded animate-pulse" />
+                          <div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                          <div className="h-3 w-16 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
                         </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full animate-pulse" />
+                        <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full animate-pulse" />
                       </div>
                     ))}
                   </div>
@@ -427,10 +427,10 @@ export default function ODDashboard({
                       const grandSolved = tickets.reduce((s, t) => s + t.count, 0);
                       const pct = grandTotal > 0 ? Math.round((grandSolved / grandTotal) * 100) : 0;
                       return (
-                        <p className="text-xs text-slate-500 -mt-2 mb-3">
-                          <span className="font-semibold text-slate-700">{grandSolved.toLocaleString()}</span>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2 mb-3">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{grandSolved.toLocaleString()}</span>
                           {" of "}
-                          <span className="font-semibold text-slate-700">{grandTotal.toLocaleString()}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{grandTotal.toLocaleString()}</span>
                           {" tickets solved "}
                           <span className="text-slate-400">({pct}%)</span>
                         </p>
@@ -441,17 +441,17 @@ export default function ODDashboard({
                       {tickets.map((t) => {
                         const percent = t.total > 0 ? Math.round((t.count / t.total) * 100) : 0;
                         return (
-                          <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                          <div key={t.name} className="flex flex-col gap-1.5 p-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-slate-700 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">{t.name === "PS" ? "Process Street" : t.name}</span>
                               <div className="flex items-center gap-2">
-                                <span className="text-slate-500 font-mono">
+                                <span className="text-slate-500 dark:text-slate-400 font-mono">
                                   {t.count}/{t.total} ({percent}%)
                                 </span>
                               </div>
                             </div>
                             {/* Progress Bar */}
-                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full transition-all duration-300"
                                 style={{ width: `${percent}%`, backgroundColor: getTicketColor(t.name) }}

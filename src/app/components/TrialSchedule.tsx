@@ -127,30 +127,30 @@ export default function TrialSchedule() {
   }, [data]);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
       <header className="mb-4 space-y-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Trial Class Schedule</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Trial Class Schedule</h2>
             <span
               title="Read-only — superadmin view"
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
             >
               <Lock className="h-2.5 w-2.5" /> Read-only
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
             Students booked into trial classes for the selected range. Click a count for the branch &amp; source breakdown, then drill into who&apos;s joining.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-1 text-[11px]">
+            <label className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px]">
               <Building2 className="h-3 w-3 text-slate-400" />
               <select
                 value={branchId}
                 onChange={(e) => setBranchId(e.target.value || "all")}
-                className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="all">All Branches</option>
                 {branches.map((b) => (
@@ -159,7 +159,7 @@ export default function TrialSchedule() {
               </select>
             </label>
 
-            <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-0.5 text-[11px]">
+            <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 text-[11px]">
               <CalendarRange className="ml-1.5 h-3 w-3 text-slate-400" />
               {PRESET_OPTIONS.map((p) => (
                 <button
@@ -168,7 +168,7 @@ export default function TrialSchedule() {
                   onClick={() => setPreset(p.key)}
                   className={cn(
                     "rounded-full px-2.5 py-1 font-medium transition",
-                    preset === p.key ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900",
+                    preset === p.key ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm" : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
                   )}
                 >
                   {p.label}
@@ -177,13 +177,13 @@ export default function TrialSchedule() {
             </div>
 
             {preset === "custom" && (
-              <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px]">
+              <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px]">
                 <input
                   type="date"
                   value={customFrom}
                   max={customTo || undefined}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <span className="text-slate-400">→</span>
                 <input
@@ -191,25 +191,25 @@ export default function TrialSchedule() {
                   value={customTo}
                   min={customFrom || undefined}
                   onChange={(e) => setCustomTo(e.target.value)}
-                  className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="rounded-md border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-1.5 py-0.5 text-[11px] font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             )}
 
             {/* Trials total — pushed to the far right end of the filter row */}
-            <div className="ml-auto inline-flex items-baseline gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 ring-1 ring-indigo-100">
-              <span className="text-2xl font-bold leading-none tabular-nums text-indigo-700">
+            <div className="ml-auto inline-flex items-baseline gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900 px-3 py-1.5 ring-1 ring-indigo-100 dark:ring-indigo-700">
+              <span className="text-2xl font-bold leading-none tabular-nums text-indigo-700 dark:text-indigo-300">
                 {loading ? "—" : weekTotal}
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">trials total</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400">trials total</span>
             </div>
         </div>
       </header>
 
       {error && (
-        <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-300">
           Couldn&apos;t load schedule: {error}
-          <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100">
+          <button type="button" onClick={() => void load()} className="ml-3 rounded-md border border-red-300 dark:border-red-700 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800">
             Retry
           </button>
         </div>
@@ -218,7 +218,7 @@ export default function TrialSchedule() {
       {loading ? (
         <div className="grid grid-cols-5 gap-2">
           {Array.from({ length: 15 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-100" />
+            <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
           ))}
         </div>
       ) : !data ? (
@@ -230,14 +230,14 @@ export default function TrialSchedule() {
               <tr>
                 <th className="w-32 text-left text-[10px] font-medium uppercase tracking-wider text-slate-400">Slot</th>
                 {DAY_ORDER.map((d) => (
-                  <th key={d.key} className="text-center text-[11px] font-semibold text-slate-700">{d.label}</th>
+                  <th key={d.key} className="text-center text-[11px] font-semibold text-slate-700 dark:text-slate-300">{d.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {visibleSlots.map((slot) => (
                 <tr key={slot}>
-                  <td className="w-32 text-[11px] font-medium text-slate-500">{slot}</td>
+                  <td className="w-32 text-[11px] font-medium text-slate-500 dark:text-slate-400">{slot}</td>
                   {DAY_ORDER.map((d) => {
                     const dayBucket = data.days.find((x) => x.key === d.key);
                     const cell = dayBucket?.slots.find((s) => s.slot === slot);
@@ -252,8 +252,8 @@ export default function TrialSchedule() {
                           className={cn(
                             "w-full rounded-lg border px-3 py-2 text-center transition",
                             count === 0
-                              ? "cursor-default border-slate-200 bg-slate-50 text-slate-400"
-                              : "cursor-pointer border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 hover:bg-indigo-100",
+                              ? "cursor-default border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400"
+                              : "cursor-pointer border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-800",
                           )}
                         >
                           <span className="block text-xl font-bold tabular-nums">{count}</span>
@@ -269,7 +269,7 @@ export default function TrialSchedule() {
             </tbody>
             <tfoot>
               <tr>
-                <td className="w-32 pt-1 align-bottom text-[10px] font-semibold uppercase tracking-wider text-slate-500">Daily total</td>
+                <td className="w-32 pt-1 align-bottom text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Daily total</td>
                 {DAY_ORDER.map((d) => {
                   const total = dayTotals[d.key] ?? 0;
                   const dayBucket = data.days.find((x) => x.key === d.key);
@@ -284,8 +284,8 @@ export default function TrialSchedule() {
                         className={cn(
                           "w-full rounded-lg border px-3 py-2 text-center transition",
                           total === 0
-                            ? "cursor-default border-slate-200 bg-slate-100 text-slate-400"
-                            : "cursor-pointer border-slate-300 bg-slate-100 text-slate-700 hover:border-indigo-400 hover:bg-indigo-50",
+                            ? "cursor-default border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400"
+                            : "cursor-pointer border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900",
                         )}
                       >
                         <span className="block text-lg font-bold tabular-nums">{total}</span>
@@ -341,17 +341,17 @@ function BranchTotalsModal({ label, students, onClose }: { label: string; studen
   return (
     <ModalShell onClose={onClose} maxW="max-w-md" eyebrow="Trial Class · Daily total" title={label}
       subtitle={`${students.length} trial${students.length === 1 ? "" : "s"} across ${rows.length} branch${rows.length === 1 ? "" : "es"}`}>
-      <ul className="divide-y divide-slate-100 overflow-y-auto px-2 py-1" style={{ maxHeight: "calc(85vh - 100px)" }}>
+      <ul className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto px-2 py-1" style={{ maxHeight: "calc(85vh - 100px)" }}>
         {rows.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No trials booked.</li>}
         {rows.map((r, i) => (
           <li key={r.branch} className="flex items-center gap-3 px-4 py-2.5">
             <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-slate-400">{i + 1}</span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {r.branch}{r.region ? <span className="font-normal text-slate-400"> · Region {r.region}</span> : null}
               </p>
             </div>
-            <span className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 px-2 text-sm font-bold tabular-nums text-indigo-700 ring-1 ring-indigo-100">
+            <span className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900 px-2 text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-100 dark:ring-indigo-700">
               {r.count}
             </span>
           </li>
@@ -386,30 +386,30 @@ function SlotBreakdownModal({ dayLabel, slot, students, onClose, onDrill }: {
         <button
           type="button"
           onClick={() => onDrill("All branches & sources", students)}
-          className="flex w-full items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-left transition hover:bg-slate-50"
+          className="flex w-full items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
         >
-          <span className="text-sm font-semibold text-slate-700">View all students</span>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">View all students</span>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400">
             {students.length}<ExternalLink className="h-3 w-3" />
           </span>
         </button>
-        <div className="my-1 border-t border-slate-100" />
-        <ul className="divide-y divide-slate-100">
+        <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {groups.map((g) => (
             <li key={g.branch}>
               <button
                 type="button"
                 onClick={() => onDrill(g.region ? `${g.branch} · Region ${g.region}` : g.branch, g.students)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-indigo-50/60"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-indigo-50/60 dark:hover:bg-indigo-900/60"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900 text-sm font-bold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-100 dark:ring-indigo-700">
                   {g.students.length}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {g.branch}{g.region ? <span className="font-normal text-slate-400"> · Region {g.region}</span> : null}
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
                     {g.students.length} student{g.students.length === 1 ? "" : "s"}
                   </p>
                 </div>
@@ -431,7 +431,7 @@ function StudentListModal({ dayLabel, slot, students, subtitle, onClose }: {
   return (
     <ModalShell onClose={onClose} maxW="max-w-lg" eyebrow="Trial Class" title={`${dayLabel} · ${slot}`}
       subtitle={`${students.length} student${students.length === 1 ? "" : "s"} joining`} subheading={subtitle}>
-      <ul className="divide-y divide-slate-100 overflow-y-auto px-2" style={{ maxHeight: "calc(85vh - 100px)" }}>
+      <ul className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto px-2" style={{ maxHeight: "calc(85vh - 100px)" }}>
         {students.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No students booked into this slot.</li>}
         {students.map((s) => {
           // startAt is naive KL wall-clock — render as UTC so the browser's local
@@ -439,23 +439,23 @@ function StudentListModal({ dayLabel, slot, students, subtitle, onClose }: {
           const startAt = new Date(`${s.startAt}Z`);
           return (
             <li key={s.appointmentId} className="flex items-center gap-3 px-4 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 text-sm font-bold text-indigo-700 ring-1 ring-indigo-200">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 dark:from-indigo-800 to-indigo-50 dark:to-indigo-900 text-sm font-bold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-200 dark:ring-indigo-700">
                 {(s.name[0] ?? "?").toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{s.name}</p>
                   {s.childAge && (
-                    <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{s.childAge}</span>
+                    <span className="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">{s.childAge}</span>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-slate-500">
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                   {startAt.toLocaleString("en-GB", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })}
                 </p>
                 {(s.branchName || s.phone || s.source) && (
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500">
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                     {s.branchName && (
-                      <span className="truncate font-medium text-slate-600">{s.branchName}{s.region ? ` · Region ${s.region}` : ""}</span>
+                      <span className="truncate font-medium text-slate-600 dark:text-slate-300">{s.branchName}{s.region ? ` · Region ${s.region}` : ""}</span>
                     )}
                     {s.branchName && s.phone && <span className="text-slate-300">·</span>}
                     {s.phone && <span className="tabular-nums">{s.phone}</span>}
@@ -467,7 +467,7 @@ function StudentListModal({ dayLabel, slot, students, subtitle, onClose }: {
               <Link
                 href={`/crm/contacts/${s.contactId}`}
                 onClick={onClose}
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-50"
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 transition hover:bg-indigo-50 dark:hover:bg-indigo-900"
               >
                 Open <ExternalLink className="h-3 w-3" />
               </Link>
@@ -488,15 +488,15 @@ function ModalShell({ onClose, maxW, eyebrow, title, subtitle, subheading, child
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn("relative z-10 w-full max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200", maxW)}>
-        <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+      <div className={cn("relative z-10 w-full max-h-[85vh] overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800", maxW)}>
+        <header className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 px-6 py-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600">{eyebrow}</p>
-            <h3 className="mt-0.5 text-lg font-bold text-slate-900">{title}</h3>
-            {subheading && <p className="mt-0.5 truncate text-[11px] font-medium text-indigo-600">{subheading}</p>}
-            {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">{eyebrow}</p>
+            <h3 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+            {subheading && <p className="mt-0.5 truncate text-[11px] font-medium text-indigo-600 dark:text-indigo-400">{subheading}</p>}
+            {subtitle && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </header>

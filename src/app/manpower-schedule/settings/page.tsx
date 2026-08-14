@@ -612,9 +612,11 @@ function ScheduleSettingsContent() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50 relative pb-16">
-      
-      {/* Toast Notification */}
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950 relative pb-16">
+
+      {/* Toast Notification — bg-slate-900/text-white is already a dark surface
+          in light mode and reads identically once dark mode is active, so it's
+          intentionally left invariant (same treatment as elsewhere in this area). */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-300">
           <Check className="w-5 h-5 text-emerald-500" />
@@ -623,12 +625,12 @@ function ScheduleSettingsContent() {
       )}
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
-        
+
         {/* Breadcrumb Navigation */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-colors focus-visible:outline-none rounded"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none rounded"
           >
             <HomeIcon className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
@@ -636,26 +638,26 @@ function ScheduleSettingsContent() {
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <Link
             href="/dashboards/hrms"
-            className="hover:text-slate-900 transition-colors focus-visible:outline-none rounded"
+            className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none rounded"
           >
             HRMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <Link
             href="/manpower-schedule"
-            className="hover:text-slate-900 transition-colors focus-visible:outline-none rounded"
+            className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none rounded"
           >
             Manpower Planning
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Schedule Settings</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Schedule Settings</span>
         </nav>
 
         {/* Page Header: title (left) + day tabs & branch dropdown on one line (right) */}
         <header className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Schedule Settings</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Schedule Settings</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Configure active hours and recurring timetables for Ebright branches.
             </p>
           </div>
@@ -674,10 +676,10 @@ function ScheduleSettingsContent() {
                     className={`
                       px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all duration-200 shrink-0
                       ${isSelected
-                        ? "border-blue-500 bg-blue-50/50 text-blue-600 shadow-sm"
+                        ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 shadow-sm"
                         : isOpenOnDay
-                          ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                          : "border-slate-100 bg-white text-slate-300 border-dashed hover:text-slate-400"
+                          ? "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-300 dark:text-slate-600 border-dashed hover:text-slate-400"
                       }
                     `}
                   >
@@ -688,13 +690,13 @@ function ScheduleSettingsContent() {
             </div>
 
             <div className="w-40 sm:w-56 shrink-0">
-              <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+              <label className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 block mb-1">
                 Branch
               </label>
               <select
                 value={selectedBranch}
                 onChange={(e) => setSelectedBranch(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 dark:text-slate-100 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               >
                 {ALL_BRANCHES.map(branch => (
                   <option key={branch} value={branch}>
@@ -707,24 +709,24 @@ function ScheduleSettingsContent() {
         </header>
 
         {/* Main Configuration Card */}
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-6">
-          
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden mb-6">
+
           {/* Top Bar inside Card */}
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                <Store className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center">
+                <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800">{selectedBranch}</h3>
-                <p className="text-xs text-slate-500 capitalize">{selectedDay}day schedule settings</p>
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">{selectedBranch}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{selectedDay}day schedule settings</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <button
                 onClick={handleCopyDay}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-all rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 title="Copy current day schedule"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -733,41 +735,41 @@ function ScheduleSettingsContent() {
               {copiedDaySchedule && (
                 <button
                   onClick={handlePasteDay}
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-50 transition-all rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/40 hover:bg-blue-50 dark:hover:bg-blue-900/70 transition-all rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   title="Paste copied schedule onto this day"
                 >
                   <Clipboard className="w-3.5 h-3.5" />
                   Paste Day
                 </button>
               )}
-              <div className="h-5 w-px bg-slate-200 mx-1" />
+              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={currentSchedule.isOpen}
                   onChange={(e) => handleToggleOpen(e.target.checked)}
-                  className="w-4.5 h-4.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-500 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm font-semibold text-slate-700">Open this day</span>
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Open this day</span>
               </label>
             </div>
           </div>
 
           {loading ? (
-            <div className="p-16 text-center bg-white flex flex-col items-center justify-center min-h-[300px]">
+            <div className="p-16 text-center bg-white dark:bg-slate-900 flex flex-col items-center justify-center min-h-[300px]">
               <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm font-medium text-slate-500 animate-pulse">Loading branch schedule...</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 animate-pulse">Loading branch schedule...</p>
             </div>
           ) : currentSchedule.isOpen ? (
             <div className="p-6">
 
               {/* Time Slots Headers */}
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-slate-900">Time slots</h4>
+                <h4 className="font-bold text-slate-900 dark:text-slate-100">Time slots</h4>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReset}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <Undo className="w-3.5 h-3.5" />
                     Reset Defaults
@@ -779,10 +781,10 @@ function ScheduleSettingsContent() {
                     <Save className="w-3.5 h-3.5" />
                     Save Changes
                   </button>
-                  <div className="h-4 w-px bg-slate-200 mx-1.5" />
+                  <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1.5" />
                   <button
                     onClick={handleAddSlot}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors rounded-xl text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add slot
@@ -792,9 +794,9 @@ function ScheduleSettingsContent() {
 
               {/* Dynamic Time Slots List */}
               {currentSchedule.slots.length === 0 ? (
-                <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                  <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No time slots specified yet.</p>
+                <div className="text-center py-10 bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                  <Clock className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No time slots specified yet.</p>
                   <p className="text-xs text-slate-400 mt-1">Click &quot;Add slot&quot; to define active shift times.</p>
                 </div>
               ) : (
@@ -807,8 +809,8 @@ function ScheduleSettingsContent() {
                       <div key={slot.id} className="relative group">
                         
                         {/* Time Slot Row Card */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 transition-shadow hover:shadow-md">
-                          
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 transition-shadow hover:shadow-md">
+
                           {/* Start Time input */}
                           <div className="flex items-center gap-2 w-full md:w-auto">
                             <div className="relative flex-1 md:w-36">
@@ -816,11 +818,11 @@ function ScheduleSettingsContent() {
                                 type="time"
                                 value={slot.startTime}
                                 onChange={(e) => handleUpdateSlot(slot.id, { startTime: e.target.value })}
-                                className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full pl-3 pr-8 py-2 border border-slate-200 dark:border-slate-500 rounded-xl text-sm font-medium text-slate-800 dark:text-slate-100 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500"
                               />
                               <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                             </div>
-                            <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded md:hidden shrink-0">
+                            <span className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-1.5 py-0.5 rounded md:hidden shrink-0">
                               {format24to12(slot.startTime)}
                             </span>
                           </div>
@@ -835,11 +837,11 @@ function ScheduleSettingsContent() {
                                 value={slot.endTime}
                                 onChange={(e) => handleUpdateSlot(slot.id, { endTime: e.target.value })}
                                 disabled={slot.type === "Class"}
-                                className={`w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 ${slot.type === "Class" ? "bg-slate-50 text-slate-400 cursor-not-allowed opacity-90" : ""}`}
+                                className={`w-full pl-3 pr-8 py-2 border border-slate-200 dark:border-slate-500 rounded-xl text-sm font-medium text-slate-800 dark:text-slate-100 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 ${slot.type === "Class" ? "bg-slate-50 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-90" : ""}`}
                               />
                               <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                             </div>
-                            <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded md:hidden shrink-0">
+                            <span className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-1.5 py-0.5 rounded md:hidden shrink-0">
                               {format24to12(slot.endTime)}
                             </span>
                           </div>
@@ -849,7 +851,7 @@ function ScheduleSettingsContent() {
                             <select
                               value={slot.type}
                               onChange={(e) => handleUpdateSlot(slot.id, { type: e.target.value as TimeSlot["type"] })}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-medium focus:outline-none"
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 font-medium focus:outline-none"
                             >
                               {slotTypes.map(t => (
                                 <option key={t} value={t}>
@@ -859,13 +861,14 @@ function ScheduleSettingsContent() {
                             </select>
                           </div>
 
-                          {/* Duration Badge */}
+                          {/* Duration Badge — Opening/Class/Closing keep distinct
+                              blue/emerald/amber hues in dark via -900 fills. */}
                           <div className="shrink-0 flex items-center">
                             <span className={`
                               px-3 py-1 rounded-full text-xs font-semibold shadow-xs
-                              ${slot.type === "Opening" ? "bg-blue-100/70 text-blue-700" : ""}
-                              ${slot.type === "Class"   ? "bg-emerald-100/70 text-emerald-700" : ""}
-                              ${slot.type === "Closing" ? "bg-amber-100/70 text-amber-700" : ""}
+                              ${slot.type === "Opening" ? "bg-blue-100/70 dark:bg-blue-900 text-blue-700 dark:text-blue-200" : ""}
+                              ${slot.type === "Class"   ? "bg-emerald-100/70 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200" : ""}
+                              ${slot.type === "Closing" ? "bg-amber-100/70 dark:bg-amber-900 text-amber-700 dark:text-amber-200" : ""}
                             `}>
                               {duration}
                             </span>
@@ -874,7 +877,7 @@ function ScheduleSettingsContent() {
                           {/* Delete Slot Button */}
                           <button
                             onClick={() => handleDeleteSlot(slot.id)}
-                            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl border border-slate-100 hover:border-rose-100 transition-colors ml-auto md:ml-2 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                            className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/40 p-2 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-rose-100 dark:hover:border-rose-700 transition-colors ml-auto md:ml-2 focus:outline-none focus:ring-2 focus:ring-rose-500"
                             aria-label="Delete slot"
                           >
                             <Trash2 className="w-4.5 h-4.5" />
@@ -885,7 +888,7 @@ function ScheduleSettingsContent() {
                         {/* Centered Connection Down Arrow overlaying the gap between rows */}
                         {!isLast && (
                           <div className="absolute left-1/2 -bottom-5.5 -translate-x-1/2 z-10 flex items-center justify-center">
-                            <div className="w-7 h-7 bg-white border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
+                            <div className="w-7 h-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full flex items-center justify-center shadow-sm">
                               <ArrowDown className="w-3.5 h-3.5 text-slate-400" />
                             </div>
                           </div>
@@ -902,17 +905,17 @@ function ScheduleSettingsContent() {
             </div>
           ) : (
             /* Closed State Container */
-            <div className="p-12 text-center bg-slate-50/50">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+            <div className="p-12 text-center bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
                 <AlertCircle className="w-6 h-6 text-slate-400" />
               </div>
-              <h4 className="font-semibold text-slate-700 mb-1">Branch is closed on {selectedDay}s</h4>
+              <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Branch is closed on {selectedDay}s</h4>
               <p className="text-sm text-slate-400 max-w-sm mx-auto mb-4">
                 Operational schedules, shift hours, and manpower assignments are disabled for closed days.
               </p>
               <button
                 onClick={() => handleToggleOpen(true)}
-                className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold text-xs rounded-xl shadow-xs transition-colors"
+                className="px-4 py-2 bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 font-semibold text-xs rounded-xl shadow-xs transition-colors"
               >
                 Mark day as Open
               </button>
@@ -939,7 +942,7 @@ export default function ManpowerSettingsPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-blue-600 dark:text-blue-400 font-semibold text-lg">
           Loading...
         </div>
       </AppShell>

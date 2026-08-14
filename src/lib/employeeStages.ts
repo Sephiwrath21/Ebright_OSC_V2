@@ -15,20 +15,23 @@ export function isEmployeeStage(value: string): value is EmployeeStage {
 }
 
 // Exact pill colors lifted from the Emp_Folder reference's style.css (card-pill--*/status-*).
+// The light fills are translucent pastels that read as bright patches on a dark
+// card, and their text is near-black, so each carries a dark companion. Five
+// distinct hues either way, so the stages stay tellable apart in both themes.
 export const STAGE_PILL_CLASSES: Record<EmployeeStage, string> = {
-  pre: "bg-[#d8a1fa7d] text-[#621096]",
-  probation: "bg-[#90aeee7d] text-[#390ff2]",
-  onboarding: "bg-[#67eab37d] text-[#307348]",
-  active: "bg-[#d8fc627d] text-[#6b6d02]",
-  exit: "bg-[#f38e8e6b] text-[#961010]",
+  pre: "bg-[#d8a1fa7d] text-[#621096] dark:bg-purple-900 dark:text-purple-200",
+  probation: "bg-[#90aeee7d] text-[#390ff2] dark:bg-blue-900 dark:text-blue-200",
+  onboarding: "bg-[#67eab37d] text-[#307348] dark:bg-emerald-900 dark:text-emerald-200",
+  active: "bg-[#d8fc627d] text-[#6b6d02] dark:bg-lime-900 dark:text-lime-200",
+  exit: "bg-[#f38e8e6b] text-[#961010] dark:bg-red-900 dark:text-red-200",
 };
 
 // Namelist person-card avatar colors — from each stage's own *_selectPP.css
 // (only Onboarding/Active/Exit have a namelist; Pre/Probation skip it).
 export const STAGE_AVATAR_CLASSES: Partial<Record<EmployeeStage, string>> = {
-  onboarding: "bg-[#67eab37d] text-[#307348]",
-  active: "bg-[#d9fd63a8] text-[#5c6e15]",
-  exit: "bg-[#f48e8ea8] text-[#7a1f1f]",
+  onboarding: "bg-[#67eab37d] text-[#307348] dark:bg-emerald-900 dark:text-emerald-200",
+  active: "bg-[#d9fd63a8] text-[#5c6e15] dark:bg-lime-900 dark:text-lime-200",
+  exit: "bg-[#f48e8ea8] text-[#7a1f1f] dark:bg-red-900 dark:text-red-200",
 };
 
 // Namelist Block-view grouping: exactly 3 sections, keyed off employment.position
@@ -40,8 +43,10 @@ export const STAGE_AVATAR_CLASSES: Partial<Record<EmployeeStage, string>> = {
 // people, just relabeled depending on which grouping mode is active (the
 // caller decides the label; this only classifies into the 3 underlying buckets).
 // Everything that isn't Intern or Part-Time-ish falls into Full Time by
-// default (BM, admin, blank position) — confirmed with the user rather than
-// assumed, since forcing e.g. a Branch Manager into Part Time would be wrong.
+// default (BM, CEO, admin, blank position) — confirmed with the user rather
+// than assumed, since forcing e.g. a Branch Manager into Part Time would be
+// wrong. No explicit "CEO"/"BM" branch needed here — they're covered by this
+// same fallthrough, not a special case.
 export type PositionGroup = "Full Time" | "Part Time" | "Intern";
 export const POSITION_GROUPS: readonly PositionGroup[] = ["Full Time", "Part Time", "Intern"];
 
@@ -53,7 +58,7 @@ export function positionGroup(position: string | null): PositionGroup {
   return "Full Time";
 }
 
-// The 6 real position values used for every Position dropdown across the app
+// The 7 real position values used for every Position dropdown across the app
 // (Promotion's Current/New Position, Add Pre-stage Employee's Position) —
 // values match real employment.position casing exactly (e.g. "PT COACH") so
 // positionGroup() classifies them correctly the moment they're saved.
@@ -64,4 +69,5 @@ export const POSITION_OPTIONS: { value: string; label: string }[] = [
   { value: "FT HOD", label: "FT HOD" },
   { value: "INTERN", label: "INTERN" },
   { value: "BM", label: "BM" },
+  { value: "CEO", label: "CEO" },
 ];

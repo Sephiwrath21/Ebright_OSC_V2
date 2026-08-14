@@ -26,8 +26,46 @@ const STAGE_TRANSITION_SWEEP_MS = 60 * 60 * 1000; // hourly — same reasoning a
 // the career-application sync, both of which keep running below regardless.
 const ONBOARDING_PROBATION_SWEEP_ENABLED = false;
 
+// Disabled per explicit decision (see conversation) — syncCareerApplicationsToPreStage()'s
+// create-branch manufactured a real users/user_profile/employment(status="pre")
+// row for every ebright_hrfs.career_applications row (any board_stage,
+// including rejected) not already matched by name, with no way to tell a
+// still-interviewing applicant apart from a real hire. That's what produced
+// the 192 stale placeholder "employees" that had to be identified and
+// cleaned up. Pre stage now reads exclusively from onboarding_candidate
+// (see computePreEligibleRows in careerApplicationSync.ts), which never
+// creates a users/employment row — it only mirrors ebright_hrfs.BranchStaff.
+// Code is left in place (not deleted) in careerApplicationSync.ts's
+// syncCareerApplicationsToPreStage(); flip this back to true to re-enable
+// both its create and its board_stage-driven update behavior.
+const CAREER_APPLICATION_SYNC_ENABLED = false;
+
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  // Local-dev safety valve: when DISABLE_BACKGROUND_JOBS is set, skip ALL the
+  // background sweeps below. These sweeps WRITE to the database (transfer
+  // reverts, stage advances, scanner + career-application sync), so running a
+  // dev instance against the live/production DB would mutate real data from a
+  // laptop. Set DISABLE_BACKGROUND_JOBS=true in that .env to boot the app for
+  // UI/SSO testing without any of the writers firing. Unset in real
+  // deployments — default behaviour is unchanged when the flag is absent.
+  if (process.env.DISABLE_BACKGROUND_JOBS === "true") {
+    console.log(
+      "[instrumentation] DISABLE_BACKGROUND_JOBS=true — skipping all background sweeps (scanner-sync, transfer-revert, stage-transition, career-application-sync).",
+    );
+    return;
+  }
+
+  // Local CRM development: the HR background pollers (scanner-sync every 10s,
+  // hourly sweeps) open extra connections to the portal DB and can exhaust a
+  // connection-limited remote Postgres — which then starves the CRM's own
+  // queries. Set DISABLE_BG_POLLERS=1 in .env to skip them while working on
+  // the CRM. Never set this in production.
+  if (process.env.DISABLE_BG_POLLERS === "1") {
+    console.log("[instrumentation] background pollers disabled via DISABLE_BG_POLLERS");
+    return;
+  }
 
   const { syncScannerToDb } = await import("@/lib/scanner-sync");
 
@@ -132,7 +170,7 @@ export async function register(): Promise<void> {
   );
   const stageTransitionSweep = async () => {
     try {
-      await careerApplicationSweep();
+      if (CAREER_APPLICATION_SYNC_ENABLED) await careerApplicationSweep();
       const fromPre = await advancePreStageEmployees();
       if (fromPre > 0) console.log(`[stage-transition] advanced ${fromPre} employee(s) from Pre to Onboarding/Probation`);
 

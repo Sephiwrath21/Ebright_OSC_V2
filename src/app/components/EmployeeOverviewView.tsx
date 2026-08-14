@@ -18,16 +18,38 @@ interface Props {
   userName?: string | null;
   /** userId -> overdue Task Manager task count, for the red dot next to Name. */
   overdueTaskCounts?: Record<number, number>;
+  /** Full-Time employees whose probation end date is within 3 days (or
+   *  already passed) with no Confirm/Extend/Stop decision made yet — see
+   *  probationDecision.ts's computeProbationReminderCandidates. Drives the
+   *  red dot + tooltip on the Probation summary card, same signal as the
+   *  NotificationBell's own Probation card. One name per line in the
+   *  tooltip when 2+ people are flagged at once, per explicit decision (see
+   *  conversation) — not merged into one sentence. */
+  probationReminderNames?: string[];
 }
 
-export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts }: Props) {
+export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, probationReminderNames }: Props) {
   const router = useRouter();
   // Independent from the summary blocks above — those are navigation links
   // into a stage's Branch/Department drill-down, not a filter for this table.
+  //
+  // Draft vs applied, per explicit decision (see conversation): every field
+  // (search/status/year/month) only updates its own draft state as the user
+  // types/selects — none of them touch the table until Search is clicked or
+  // Enter is pressed in the search box (applyFilters below copies every
+  // draft into its applied counterpart in one go, so all 4 fields commit
+  // together, never some live and some not). `filtered` below reads only
+  // the applied state, never the drafts.
+  const [statusFilterDraft, setStatusFilterDraft] = useState<EmployeeStage | "">("");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [yearDraft, setYearDraft] = useState("");
+  const [monthDraft, setMonthDraft] = useState("");
+
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [dateSort, setDateSort] = useState<DateSortState>("default");
@@ -40,7 +62,12 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const result = rows.filter((r) => {
-      if (statusFilter && r.stage !== statusFilter) return false;
+      // A row can genuinely belong to more than one stage at once (see
+      // extraStages — e.g. a real Probation-stage Full-Time row whose
+      // pipeline also qualifies it for Onboarding), shown as one row with
+      // multiple badges rather than duplicated — so the Status filter must
+      // match on either, not just the row's own primary stage.
+      if (statusFilter && r.stage !== statusFilter && !r.extraStages?.includes(statusFilter)) return false;
       if (q && !r.fullName.toLowerCase().includes(q)) return false;
       if (year && r.date?.slice(0, 4) !== year) return false;
       if (month && r.date?.slice(5, 7) !== month) return false;
@@ -52,7 +79,19 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  function applyFilters() {
+    setStatusFilter(statusFilterDraft);
+    setSearch(searchDraft);
+    setYear(yearDraft);
+    setMonth(monthDraft);
+    setPage(1);
+  }
+
   function resetFilters() {
+    setStatusFilterDraft("");
+    setSearchDraft("");
+    setYearDraft("");
+    setMonthDraft("");
     setStatusFilter("");
     setSearch("");
     setYear("");
@@ -61,30 +100,30 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             HRMS
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Employee Folder</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Employee Folder</span>
         </nav>
 
         <header className="mb-6">
-          <p className="text-slate-500 text-lg">Welcome{userName ? `, ${userName}` : ","}</p>
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+          <p className="text-slate-500 dark:text-slate-400 text-lg">Welcome{userName ? `, ${userName}` : ","}</p>
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
             Employee Overview
           </h1>
         </header>
 
         <section aria-labelledby="employees-summary-heading" className="mb-8">
-          <h2 id="employees-summary-heading" className="text-xl font-semibold text-slate-800 mb-4">
+          <h2 id="employees-summary-heading" className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
             Employees
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -92,12 +131,20 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               <Link
                 key={stage}
                 href={`/employee-folder/${stage}`}
-                className="relative text-left bg-white rounded-[27px] border-2 border-slate-200 p-5 min-h-[143px] flex flex-col justify-end gap-2.5 transition-all hover:border-slate-400 hover:shadow-md"
+                className="relative text-left bg-white dark:bg-slate-900 rounded-[27px] border-2 border-slate-200 dark:border-slate-800 p-5 min-h-[143px] flex flex-col justify-end gap-2.5 transition-all hover:border-slate-400 hover:shadow-md"
               >
-                <span className={`self-start inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
-                  {STAGE_LABELS[stage]}
+                <span className="self-start flex items-center gap-1.5">
+                  <span className={`inline-block px-3.5 py-1 rounded-full text-[13px] font-medium ${STAGE_PILL_CLASSES[stage]}`}>
+                    {STAGE_LABELS[stage]}
+                  </span>
+                  {stage === "probation" && probationReminderNames && probationReminderNames.length > 0 && (
+                    <OverdueDot
+                      count={probationReminderNames.length}
+                      label={probationReminderNames.map((name) => `${name}还有三天就结束probation`).join("\n")}
+                    />
+                  )}
                 </span>
-                <span className="text-4xl font-medium text-slate-900/70">{counts[stage]}</span>
+                <span className="text-4xl font-medium text-slate-900/70 dark:text-slate-100/70">{counts[stage]}</span>
                 <ChevronRight className="absolute top-3.5 right-4 w-5 h-5 text-slate-400" aria-hidden="true" />
               </Link>
             ))}
@@ -105,7 +152,7 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
         </section>
 
         <section aria-labelledby="employees-list-heading">
-          <h2 id="employees-list-heading" className="text-lg font-semibold text-slate-600 mb-4">
+          <h2 id="employees-list-heading" className="text-lg font-semibold text-slate-600 dark:text-slate-300 mb-4">
             Employee Records
           </h2>
 
@@ -116,29 +163,29 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               with no padding/background of its own to lose), so every child
               rejoins the single flex-wrap row that was already here —
               desktop is byte-for-byte unchanged. */}
-          <div className="flex flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 bg-white rounded-2xl p-4 sm:p-5 mb-6">
+          <div className="flex flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 mb-6">
             <div className="flex flex-nowrap items-center gap-2 sm:contents">
               <div className="relative flex-1 min-w-0 sm:flex-1 sm:min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
                 <input
                   type="search"
                   placeholder="Search"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyFilters();
+                    }
                   }}
-                  className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 text-sm text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-11 pl-9 pr-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as EmployeeStage | "");
-                  setPage(1);
-                }}
-                className="shrink-0 w-[100px] sm:w-auto h-11 px-2 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[120px]"
+                value={statusFilterDraft}
+                onChange={(e) => setStatusFilterDraft(e.target.value as EmployeeStage | "")}
+                className="shrink-0 w-[100px] sm:w-auto h-11 px-2 sm:px-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-xs sm:text-sm text-slate-700 dark:text-slate-100 truncate sm:min-w-[120px]"
               >
                 <option value="">status</option>
                 {EMPLOYEE_STAGES.map((stage) => (
@@ -151,12 +198,9 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
             <div className="flex flex-nowrap items-center gap-2 sm:contents">
               <select
-                value={year}
-                onChange={(e) => {
-                  setYear(e.target.value);
-                  setPage(1);
-                }}
-                className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[110px]"
+                value={yearDraft}
+                onChange={(e) => setYearDraft(e.target.value)}
+                className="shrink-0 w-[68px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-xs sm:text-sm text-slate-700 dark:text-slate-100 truncate sm:min-w-[110px]"
               >
                 <option value="">year</option>
                 {years.map((y) => (
@@ -167,12 +211,9 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               </select>
 
               <select
-                value={month}
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  setPage(1);
-                }}
-                className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 text-xs sm:text-sm text-slate-700 truncate sm:min-w-[130px]"
+                value={monthDraft}
+                onChange={(e) => setMonthDraft(e.target.value)}
+                className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-xs sm:text-sm text-slate-700 dark:text-slate-100 truncate sm:min-w-[130px]"
               >
                 <option value="">month</option>
                 {MONTHS.map((m) => (
@@ -184,14 +225,15 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
 
               <button
                 type="button"
-                className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 text-blue-800 font-semibold text-xs sm:text-sm hover:bg-blue-200 transition-colors"
+                onClick={applyFilters}
+                className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-semibold text-xs sm:text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
               >
                 Search
               </button>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="shrink-0 h-11 px-3 sm:px-4 rounded-lg border-2 border-slate-200 text-slate-600 font-medium text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+                className="shrink-0 h-11 px-3 sm:px-4 rounded-lg border-2 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Reset
               </button>
@@ -202,9 +244,9 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               structure on mobile instead of squishing it — the whole table,
               including Name, swipes left/right together as one unit
               (deliberately no sticky column). */}
-          <div className="bg-white rounded-[27px] overflow-x-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-[27px] overflow-x-auto">
             <div className="min-w-[680px]">
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100">
                 <span>Name</span>
                 <span>Branch/ Department</span>
                 <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} />
@@ -213,25 +255,30 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               </div>
 
               {pageRows.length === 0 ? (
-                <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
+                <div className="px-8 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees match these filters.</div>
               ) : (
                 pageRows.map((row) => (
                   <div
                     key={row.id}
-                    className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 last:border-b-0"
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 items-center border-b border-black/10 dark:border-white/10 last:border-b-0"
                   >
                     <Link href={`/employee-record/${row.id}`} className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-lg font-medium text-slate-900 hover:underline min-w-0 truncate">{row.fullName}</span>
+                      <span className="text-lg font-medium text-slate-900 dark:text-slate-100 hover:underline min-w-0 truncate">{row.fullName}</span>
                       <OverdueDot count={overdueTaskCounts?.[row.id]} />
                     </Link>
-                    <span className="text-sm font-medium text-slate-600 truncate">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                       {row.departmentName ?? row.branchName ?? "—"}
                     </span>
-                    <span className="text-sm font-medium text-slate-600">{row.date ?? "—"}</span>
-                    <span>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{row.date ?? "—"}</span>
+                    <span className="flex flex-wrap gap-1.5">
                       <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
                         {STAGE_LABELS[row.stage]}
                       </span>
+                      {row.extraStages?.map((s) => (
+                        <span key={s} className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[s]}`}>
+                          {STAGE_LABELS[s]}
+                        </span>
+                      ))}
                     </span>
                     <div className="flex justify-center">
                       <RowActionMenu

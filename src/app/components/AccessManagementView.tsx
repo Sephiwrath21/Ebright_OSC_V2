@@ -229,12 +229,12 @@ export default function AccessManagementView({
 
   return (
     <Shell>
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex flex-wrap items-center gap-2">
             <Picker
-              icon={<CircleUser className="w-4 h-4 text-slate-500" />}
+              icon={<CircleUser className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
               label="Role"
               value={String(roleId)}
               onChange={(v) => setRoleId(Number(v))}
@@ -254,14 +254,14 @@ export default function AccessManagementView({
               />
             )}
             {subtypeOptions && subtypes.length > 1 && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">
                 <Tags className="w-3.5 h-3.5" />
                 Editing {subtypeOptions.find((o) => o.value === primary)?.label ?? "base"};
                 Save applies to all {subtypes.length} selected
               </span>
             )}
             {roleType === "regional manager" && (
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 Same rules for regions A / B / C
               </span>
             )}
@@ -271,7 +271,7 @@ export default function AccessManagementView({
             {flash && (
               <span
                 className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                  flash.kind === "ok" ? "text-emerald-600" : "text-rose-600"
+                  flash.kind === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                 }`}
               >
                 {flash.kind === "ok" ? (
@@ -283,7 +283,7 @@ export default function AccessManagementView({
               </span>
             )}
             {dirty && !flash && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Unsaved changes
               </span>
@@ -296,7 +296,7 @@ export default function AccessManagementView({
                 type="button"
                 onClick={handleSave}
                 disabled={!dirty || saving}
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -315,8 +315,8 @@ export default function AccessManagementView({
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-100 text-slate-700">
-                  <th className="text-left px-6 py-3 font-semibold sticky left-0 bg-slate-100 z-10 min-w-[240px]">
+                <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  <th className="text-left px-6 py-3 font-semibold sticky left-0 bg-slate-100 dark:bg-slate-800 z-10 min-w-[240px]">
                     Module / Feature
                   </th>
                   {ACTIONS.map((a) => (
@@ -396,10 +396,10 @@ function FeatureGroup({
 }) {
   return (
     <>
-      <tr className="bg-slate-50 border-b border-slate-200">
+      <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
         <td
           colSpan={1 + ACTIONS.length}
-          className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 sticky left-0 bg-slate-50"
+          className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 sticky left-0 bg-slate-50 dark:bg-slate-800"
         >
           {group}
         </td>
@@ -407,10 +407,10 @@ function FeatureGroup({
       {features.map((f) => (
         <tr
           key={f.key}
-          className="bg-white border-b border-slate-100 hover:bg-slate-50/60 transition-colors duration-150"
+          className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors duration-150"
         >
           <td className="px-6 py-2.5 sticky left-0 bg-inherit z-10">
-            <span className="text-sm font-medium text-slate-700">{f.label}</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{f.label}</span>
           </td>
           {ACTIONS.map((a) => (
             <td key={a} className="px-3 py-2.5 text-center">
@@ -447,14 +447,14 @@ function Cell({
 }) {
   if (!applies)
     return (
-      <span className="inline-block w-6 text-center text-slate-300 select-none">
+      <span className="inline-block w-6 text-center text-slate-300 dark:text-slate-600 select-none">
         —
       </span>
     );
   if (locked)
     return (
       <span title="Superadmin only" className="inline-flex justify-center">
-        <Lock className="w-4 h-4 text-slate-300" />
+        <Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" />
       </span>
     );
 
@@ -469,7 +469,7 @@ function Cell({
         className={`inline-flex items-center justify-center w-5 h-5 rounded-md transition-colors duration-150 ${
           allowed
             ? "bg-emerald-500 text-white shadow-sm"
-            : "border border-slate-300 bg-white hover:border-slate-400"
+            : "border border-slate-300 bg-white hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:hover:border-slate-500"
         } ${canEdit ? "cursor-pointer" : "cursor-default opacity-90"}`}
       >
         {allowed && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
@@ -479,7 +479,7 @@ function Cell({
           value={scope}
           disabled={!canEdit}
           onChange={(e) => onScope(e.target.value as Scope)}
-          className="text-[10px] font-semibold text-slate-600 bg-transparent border border-slate-200 rounded px-1 py-0.5 focus:outline-none focus:border-indigo-400 disabled:opacity-70"
+          className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-transparent border border-slate-200 dark:border-slate-600 rounded px-1 py-0.5 focus:outline-none focus:border-indigo-400 disabled:opacity-70"
         >
           {SCOPES.map((s) => (
             <option key={s} value={s}>
@@ -495,15 +495,15 @@ function Cell({
 function ImplicitBanner({ roleType }: { roleType: string }) {
   return (
     <div className="px-6 py-12 text-center">
-      <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+      <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
         <ShieldCheck className="w-6 h-6 text-slate-400" />
       </div>
-      <p className="text-sm font-medium text-slate-700">
+      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
         {roleType === "superadmin"
           ? "Superadmin has full access to everything."
           : "CEO can view everything (read-only)."}
       </p>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         This is fixed in code and can&apos;t be edited here.
       </p>
     </div>
@@ -512,7 +512,7 @@ function ImplicitBanner({ roleType }: { roleType: string }) {
 
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300">
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500 text-white">
           <Check className="w-3.5 h-3.5" strokeWidth={3} />
@@ -520,7 +520,7 @@ function Legend() {
         Allowed (pick a scope)
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block w-5 h-5 rounded-md border border-slate-300 bg-white" />
+        <span className="inline-block w-5 h-5 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900" />
         Not allowed
       </span>
       <span className="inline-flex items-center gap-1.5">
@@ -528,7 +528,7 @@ function Legend() {
         Not applicable
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <Lock className="w-4 h-4 text-slate-300" />
+        <Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" />
         Superadmin only
       </span>
       <span className="text-slate-400">
@@ -552,13 +552,13 @@ function Picker({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200">
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:focus-within:ring-indigo-900/40 transition-all duration-200">
       {icon}
-      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1"
+        className="bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none pr-1"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -627,18 +627,18 @@ function MultiPicker({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`inline-flex items-center h-10 rounded-xl border bg-white px-3 gap-2 text-sm transition-all duration-200 ${
-          open ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200 hover:border-slate-300"
+        className={`inline-flex items-center h-10 rounded-xl border bg-white dark:bg-slate-950 px-3 gap-2 text-sm transition-all duration-200 ${
+          open ? "border-indigo-400 ring-2 ring-indigo-100 dark:ring-indigo-900/40" : "border-slate-200 hover:border-slate-300 dark:border-slate-500 dark:hover:border-slate-400"
         }`}
       >
         {icon}
-        <span className="text-slate-500">{label}</span>
-        <span className="font-semibold text-slate-800 max-w-[160px] truncate">{summary}</span>
+        <span className="text-slate-500 dark:text-slate-400">{label}</span>
+        <span className="font-semibold text-slate-800 dark:text-slate-100 max-w-[160px] truncate">{summary}</span>
         <ChevronDown className="w-4 h-4 text-slate-400" aria-hidden="true" />
       </button>
 
       {open && (
-        <div className="absolute left-0 z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-lg py-1.5">
+        <div className="absolute left-0 z-20 mt-2 w-64 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-lg py-1.5">
           <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Tick to apply together
           </p>
@@ -651,22 +651,22 @@ function MultiPicker({
                   key={o.value}
                   type="button"
                   onClick={() => toggle(o.value)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <span
                     className={`w-4 h-4 rounded-[5px] border flex items-center justify-center shrink-0 ${
-                      checked ? "bg-indigo-600 border-indigo-600" : "border-slate-300"
+                      checked ? "bg-indigo-600 border-indigo-600" : "border-slate-300 dark:border-slate-600"
                     }`}
                   >
                     {checked && (
                       <Check className="w-3 h-3 text-white" strokeWidth={3} aria-hidden="true" />
                     )}
                   </span>
-                  <span className={`flex-1 ${checked ? "text-slate-900 font-medium" : "text-slate-700"}`}>
+                  <span className={`flex-1 ${checked ? "text-slate-900 dark:text-slate-100 font-medium" : "text-slate-700 dark:text-slate-300"}`}>
                     {o.label}
                   </span>
                   {isPrimary && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 shrink-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 shrink-0">
                       editing
                     </span>
                   )}
@@ -682,25 +682,25 @@ function MultiPicker({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-6">
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-sm text-slate-500"
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"
         >
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200"
           >
             <Home className="w-4 h-4" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-900 font-medium">Access Management</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Access Management</span>
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-slate-800">Access Management</h1>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-200">Access Management</h1>
           <AccessTabs />
         </div>
 

@@ -195,7 +195,7 @@ function ClaimTypeCard({ type }: { type: ClaimType }) {
     <li>
       <Link
         href={href}
-        className="group block h-full bg-white border border-slate-200 rounded-2xl p-8 text-center transition-all duration-200 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        className="group block h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
       >
         <div
           className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-200 group-hover:scale-105"
@@ -203,10 +203,10 @@ function ClaimTypeCard({ type }: { type: ClaimType }) {
         >
           <Icon className="w-8 h-8 text-white" aria-hidden="true" />
         </div>
-        <h2 className="mt-5 text-base font-bold uppercase tracking-wide text-slate-900 transition-colors group-hover:text-blue-700">
+        <h2 className="mt-5 text-base font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100 transition-colors group-hover:text-blue-700 dark:group-hover:text-blue-400">
           {title}
         </h2>
-        <p className="mt-2 text-sm text-slate-500 leading-relaxed">{description}</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{description}</p>
       </Link>
     </li>
   );
@@ -215,21 +215,21 @@ function ClaimTypeCard({ type }: { type: ClaimType }) {
 function OtherClaimsCard({ types }: { types: ClaimType[] }) {
   return (
     <li>
-      <div className="h-full bg-white border border-slate-200 rounded-2xl p-6 flex flex-col transition-all duration-200 hover:border-slate-300 hover:shadow-lg">
+      <div className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shrink-0 shadow-sm">
             <LayoutGrid className="w-6 h-6 text-white" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold uppercase tracking-wide text-slate-900">
+              <h2 className="text-base font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
                 Other Claims
               </h2>
-              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 leading-none">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-0.5 leading-none">
                 {types.length}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">More claim categories</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">More claim categories</p>
           </div>
         </div>
         <ul className="flex flex-col gap-2.5">
@@ -237,7 +237,7 @@ function OtherClaimsCard({ types }: { types: ClaimType[] }) {
             <li key={id}>
               <Link
                 href={href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-3 transition-all duration-200 hover:border-transparent hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                className="group flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 px-3.5 py-3 transition-all duration-200 hover:border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <span
                   className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform duration-200 group-hover:scale-105"
@@ -245,11 +245,11 @@ function OtherClaimsCard({ types }: { types: ClaimType[] }) {
                 >
                   <Icon className="w-5 h-5 text-white" aria-hidden="true" />
                 </span>
-                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-900">
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-slate-100">
                   {title}
                 </span>
                 <ChevronRight
-                  className="w-4 h-4 text-slate-300 ml-auto shrink-0 transition-all duration-200 group-hover:text-slate-500 group-hover:translate-x-0.5"
+                  className="w-4 h-4 text-slate-300 dark:text-slate-600 ml-auto shrink-0 transition-all duration-200 group-hover:text-slate-500 dark:group-hover:text-slate-400 group-hover:translate-x-0.5"
                   aria-hidden="true"
                 />
               </Link>
@@ -277,26 +277,26 @@ export default function NewClaimView({
   const visibleOther = otherTypes.filter((t) => canAccessClaimType(t.id, ctx));
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-6 pt-4 pb-10 space-y-6">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/claim" className="hover:text-slate-900 transition-colors">Claims</Link>
+          <Link href="/claim" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Claims</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">New</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">New</span>
         </nav>
 
         <header>
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
             Select Claim Type
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Choose a category to submit your claim.
           </p>
         </header>

@@ -16,9 +16,15 @@ function createClient() {
   //                               a tx and went silent.
   //
   // pg.Pool config (client-side):
-  //   max=15                    — slightly above the default 10 to keep
-  //                               headroom for the scanner-sync background
-  //                               poller + interactive auth/page queries.
+  //   max=25                    — raised from 15 (2026-08-11): concurrent
+  //                               branch/department namelist clicks each
+  //                               hold several connections at once (see
+  //                               listEmployeeOverviewRows' Promise.all
+  //                               fan-out), and the shared Postgres server
+  //                               has confirmed headroom (max_connections=200,
+  //                               ~110 in use across all apps at time of
+  //                               writing) — this only asks for more of an
+  //                               already-available budget.
   //   connectionTimeoutMillis   — fail fast on connect (don't hang the
   //                               request waiting for a free slot forever).
   //   idleTimeoutMillis         — recycle idle conns so a half-dead socket
@@ -35,7 +41,7 @@ function createClient() {
       "-c TimeZone=UTC " +
       "-c statement_timeout=60000 " +
       "-c idle_in_transaction_session_timeout=30000",
-    max: 15,
+    max: 25,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
     keepAlive: true,
