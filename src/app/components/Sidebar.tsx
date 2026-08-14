@@ -175,7 +175,9 @@ export const primaryNav: NavItem[] = [
       { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
     ],
   },
-  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan" },
+  // Opens in a new tab: Flowghan is its own full-page app (no portal sidebar/topbar,
+  // see src/app/flowghan/page.tsx) so it shouldn't replace the current portal tab.
+  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan", external: true },
 ];
 
 export const secondaryNav: NavItem[] = [

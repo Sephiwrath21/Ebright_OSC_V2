@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import AppShell from "@/app/components/AppShell";
 import FlowghanEmbed from "@/app/components/FlowghanEmbed";
 
 export const dynamic = "force-dynamic";
@@ -9,17 +8,13 @@ export const metadata = {
   title: "Flowghan",
 };
 
+// Deliberately no AppShell here: the sidebar link opens this route in a new
+// tab (see Sidebar.tsx's `external: true` on the Flowghan item), so this page
+// is its own standalone full-screen surface rather than a page inside the
+// portal chrome. FlowghanEmbed supplies its own "back to home" affordance.
 export default async function FlowghanPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
-  const userEmail = session.user.email;
-  const userRole = (session.user as { role?: string }).role ?? "";
-  const userName = session.user.name ?? null;
-
-  return (
-    <AppShell email={userEmail} role={userRole} name={userName}>
-      <FlowghanEmbed />
-    </AppShell>
-  );
+  return <FlowghanEmbed />;
 }
