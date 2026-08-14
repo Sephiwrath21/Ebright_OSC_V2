@@ -2,15 +2,17 @@
 // signed-in user's own tasks for the current week, tabbed by weekday.
 // Wiring mirrors /task-manager/package/page.tsx closely — same "use server"
 // action closures, same three-way SetupPendingError/NoAccountError/generic-
-// error card handling — just no initial-load 403 redirect (getFlowDetail's
-// "daily" fetch has no separate View-tier gate the way listTemplateGroups
-// does) and a week's worth of getFlowDetail calls instead of one.
+// error card handling, same pattern of redirecting on a view-access denial
+// from inside the catch block — except the denial here is a direct
+// taskManagerNavAccess().myWeek check (site/shared accounts, gated on the
+// Sidebar too) rather than a 403 surfaced through a data-layer call — and
+// a week's worth of getFlowDetail calls instead of one.
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
-import { resolveViewRole, weekdayRangeOf, thisWeekDatesForRange } from "@/task-manager/role-views";
+import { resolveViewRole, weekdayRangeOf, thisWeekDatesForRange, taskManagerNavAccess } from "@/task-manager/role-views";
 import {
   completeFlowTask,
   getFlowDetail,
@@ -26,6 +28,14 @@ import type { ActionResult, ProofRemoveResult, ProofUploadResult } from "@/task-
 
 export const dynamic = "force-dynamic";
 const FALLBACK_MESSAGE = "Something went wrong — please try again";
+
+// Thrown (and only ever caught) inside this file: a site/shared account
+// (DEPT_SITE/BRANCH_SITE/ELEVATED_DEPT_SITE) reached this URL directly,
+// bypassing the Sidebar's taskManagerNavAccess().myWeek gate. Mirrors
+// package/page.tsx's own 403-redirect-from-catch pattern: redirect() must
+// be called from inside the catch (not the try) or its NEXT_REDIRECT throw
+// would itself be swallowed by this same catch block.
+class MyWeekAccessDeniedError extends Error {}
 
 export default async function TaskManagerMyWeekPage() {
   const session = await auth();
@@ -50,6 +60,9 @@ export default async function TaskManagerMyWeekPage() {
   try {
     const now = new Date();
     const todayResult = await getFlowDetail(email, "daily");
+    if (!taskManagerNavAccess(todayResult.me.me).myWeek) {
+      throw new MyWeekAccessDeniedError();
+    }
     myUserId = todayResult.me.me.userId;
     const view = resolveViewRole(todayResult.me.me);
     const range = weekdayRangeOf(view);
@@ -65,6 +78,7 @@ export default async function TaskManagerMyWeekPage() {
       tasks: resultByDate.get(d.date)?.me.tasks ?? [],
     }));
   } catch (err) {
+    if (err instanceof MyWeekAccessDeniedError) redirect("/task-manager");
     return errorPage(err);
   }
 
