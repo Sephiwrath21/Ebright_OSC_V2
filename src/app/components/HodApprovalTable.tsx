@@ -47,22 +47,22 @@ export default function HodApprovalTable({ items }: { items: HodApprovalItem[] }
 
   if (items.length === 0) {
     return (
-      <section className="bg-white border border-slate-200 rounded-2xl px-6 py-12 text-center">
-        <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-12 text-center">
+        <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
           <Inbox className="w-5 h-5 text-slate-400" aria-hidden="true" />
         </div>
-        <p className="mt-3 text-sm font-medium text-slate-900">Nothing awaiting your approval.</p>
+        <p className="mt-3 text-sm font-medium text-slate-900 dark:text-slate-100">Nothing awaiting your approval.</p>
       </section>
     );
   }
 
   return (
-    <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
       {error && (
-        <div className="px-6 py-3 bg-red-50 text-sm text-red-700 border-b border-red-100">{error}</div>
+        <div className="px-6 py-3 bg-red-50 dark:bg-red-900 text-sm text-red-700 dark:text-red-300 border-b border-red-100 dark:border-red-800">{error}</div>
       )}
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase">
+        <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
           <tr>
             <th className="text-left px-6 py-3">ID</th>
             <th className="text-left px-6 py-3">Employee</th>
@@ -75,13 +75,13 @@ export default function HodApprovalTable({ items }: { items: HodApprovalItem[] }
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.leaveId} className="border-t border-slate-100 align-top">
-              <td className="px-6 py-3 font-medium text-slate-900">{item.displayId}</td>
-              <td className="px-6 py-3 text-slate-700">{item.requesterName}</td>
-              <td className="px-6 py-3 text-slate-700">{item.leaveTypeName}</td>
-              <td className="px-6 py-3 text-slate-500">{item.startDate} → {item.endDate}</td>
-              <td className="px-6 py-3 text-slate-700">{item.totalDays}</td>
-              <td className="px-6 py-3 text-slate-500 max-w-[16rem] truncate">{item.reason ?? "—"}</td>
+            <tr key={item.leaveId} className="border-t border-slate-100 dark:border-slate-800 align-top">
+              <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-100">{item.displayId}</td>
+              <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{item.requesterName}</td>
+              <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{item.leaveTypeName}</td>
+              <td className="px-6 py-3 text-slate-500 dark:text-slate-400">{item.startDate} → {item.endDate}</td>
+              <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{item.totalDays}</td>
+              <td className="px-6 py-3 text-slate-500 dark:text-slate-400 max-w-[16rem] truncate">{item.reason ?? "—"}</td>
               <td className="px-6 py-3">
                 {rejectingId === item.leaveId ? (
                   <div className="flex flex-col gap-2 items-end">
@@ -89,7 +89,7 @@ export default function HodApprovalTable({ items }: { items: HodApprovalItem[] }
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       placeholder="Reason for rejection (required)…"
-                      className="w-64 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="w-64 border border-slate-200 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                       rows={2}
                     />
                     <div className="flex gap-2">
@@ -107,7 +107,7 @@ export default function HodApprovalTable({ items }: { items: HodApprovalItem[] }
                           setRejectingId(null);
                           setReason("");
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                       >
                         Cancel
                       </button>
@@ -127,7 +127,7 @@ export default function HodApprovalTable({ items }: { items: HodApprovalItem[] }
                       type="button"
                       disabled={isPending}
                       onClick={() => setRejectingId(item.leaveId)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       Reject
                     </button>

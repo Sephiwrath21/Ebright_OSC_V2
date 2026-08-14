@@ -48,30 +48,30 @@ export function TrainingChecklist({ steps, token, canMarkComplete }: Props) {
             key={step.id}
             className={`flex items-start gap-3 rounded-lg border p-3 ${
               isCompleted
-                ? "border-emerald-200 bg-emerald-50"
-                : "border-slate-200 bg-white"
+                ? "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900"
+                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             }`}
           >
             <span className="shrink-0 pt-0.5">
               {isCompleted ? (
-                <Check className="w-5 h-5 text-emerald-600" aria-hidden="true" />
+                <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
               ) : (
-                <CircleDashed className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                <CircleDashed className="w-5 h-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
               )}
             </span>
             <div className="min-w-0 flex-1">
               <p
                 className={`text-sm font-medium ${
-                  isCompleted ? "text-emerald-900 line-through" : "text-slate-900"
+                  isCompleted ? "text-emerald-900 dark:text-emerald-200 line-through" : "text-slate-900 dark:text-slate-100"
                 }`}
               >
                 {step.stepNumber}. {step.title}
               </p>
               {step.description && (
-                <p className="mt-0.5 text-xs text-slate-500">{step.description}</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{step.description}</p>
               )}
               {errorMsg && (
-                <p className="mt-1 inline-flex items-center gap-1 text-xs text-red-700">
+                <p className="mt-1 inline-flex items-center gap-1 text-xs text-red-700 dark:text-red-300">
                   <AlertCircle className="w-3 h-3" aria-hidden="true" />
                   {errorMsg}
                 </p>
@@ -87,7 +87,7 @@ export function TrainingChecklist({ steps, token, canMarkComplete }: Props) {
                     ? "Sign in as the employee or an HR/admin user to mark this step."
                     : undefined
                 }
-                className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isPending ? "Marking…" : "Mark Complete"}
               </button>

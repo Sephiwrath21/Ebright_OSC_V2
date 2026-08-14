@@ -10,12 +10,12 @@ export function HealthScoreGauge({ score }: { score: number }) {
   const dash = (safeScore / 100) * circumference;
 
   return (
-    <div className="rounded-lg border bg-white p-6 text-center shadow">
+    <div className="rounded-lg border bg-white dark:bg-slate-900 p-6 text-center shadow">
       <h3 className="mb-6 text-lg font-semibold">Induction Health Score</h3>
 
       <div className="relative mx-auto h-40 w-40">
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+          <circle cx="50" cy="50" r="45" fill="none" stroke="var(--status-track)" strokeWidth="8" />
           <circle
             cx="50"
             cy="50"
@@ -32,7 +32,7 @@ export function HealthScoreGauge({ score }: { score: number }) {
         </div>
       </div>
 
-      <p className="mt-4 text-sm text-gray-600">{label}</p>
+      <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">{label}</p>
     </div>
   );
 }

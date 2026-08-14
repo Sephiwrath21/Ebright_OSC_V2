@@ -137,11 +137,11 @@ const CATEGORIES: ReadonlyArray<{
   textClass: string;
   barClass: string;
 }> = [
-  { key: "Standard",            label: "Intern",            icon: "👤", bgClass: "bg-blue-50",    borderClass: "border-blue-200",    textClass: "text-blue-700",    barClass: "bg-blue-500" },
-  { key: "ProtegeInternBranch", label: "Protege Intern",    icon: "🌱", bgClass: "bg-violet-50",  borderClass: "border-violet-200",  textClass: "text-violet-700",  barClass: "bg-violet-500" },
-  { key: "CoachPartTimer",      label: "Coach (Part-timer)", icon: "🎯", bgClass: "bg-amber-50",   borderClass: "border-amber-200",   textClass: "text-amber-700",   barClass: "bg-amber-500" },
-  { key: "CoachFullTimer",      label: "Coach (Full-timer)", icon: "⭐", bgClass: "bg-emerald-50", borderClass: "border-emerald-200", textClass: "text-emerald-700", barClass: "bg-emerald-500" },
-  { key: "FullTimer",           label: "Full-timer (HQ)",   icon: "🏢", bgClass: "bg-rose-50",    borderClass: "border-rose-200",    textClass: "text-rose-700",    barClass: "bg-rose-500" },
+  { key: "Standard",            label: "Intern",            icon: "👤", bgClass: "bg-blue-50 dark:bg-blue-900",    borderClass: "border-blue-200 dark:border-blue-700",    textClass: "text-blue-700 dark:text-blue-200",    barClass: "bg-blue-500" },
+  { key: "ProtegeInternBranch", label: "Protege Intern",    icon: "🌱", bgClass: "bg-violet-50 dark:bg-violet-900",  borderClass: "border-violet-200 dark:border-violet-700",  textClass: "text-violet-700 dark:text-violet-200",  barClass: "bg-violet-500" },
+  { key: "CoachPartTimer",      label: "Coach (Part-timer)", icon: "🎯", bgClass: "bg-amber-50 dark:bg-amber-900",   borderClass: "border-amber-200 dark:border-amber-700",   textClass: "text-amber-700 dark:text-amber-200",   barClass: "bg-amber-500" },
+  { key: "CoachFullTimer",      label: "Coach (Full-timer)", icon: "⭐", bgClass: "bg-emerald-50 dark:bg-emerald-900", borderClass: "border-emerald-200 dark:border-emerald-700", textClass: "text-emerald-700 dark:text-emerald-200", barClass: "bg-emerald-500" },
+  { key: "FullTimer",           label: "Full-timer (HQ)",   icon: "🏢", bgClass: "bg-rose-50 dark:bg-rose-900",    borderClass: "border-rose-200 dark:border-rose-700",    textClass: "text-rose-700 dark:text-rose-200",    barClass: "bg-rose-500" },
 ];
 
 interface OnboardingStats {
@@ -197,10 +197,10 @@ function formatRelativeTime(iso: string): string {
 }
 
 function statusBadgeClasses(status: string): string {
-  if (status === "Completed") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (status === "In Progress") return "bg-blue-50 text-blue-700 border-blue-200";
-  if (status === "Sent") return "bg-amber-50 text-amber-700 border-amber-200";
-  return "bg-slate-50 text-slate-600 border-slate-200";
+  if (status === "Completed") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700";
+  if (status === "In Progress") return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700";
+  if (status === "Sent") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700";
+  return "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
 }
 
 function categoryLabelForTemplate(templateKey: string): string {
@@ -454,30 +454,30 @@ export default function OnboardingDashboard({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Onboarding Dashboard</span>
+          <span className="text-slate-900 font-medium dark:text-slate-100">Onboarding Dashboard</span>
         </nav>
 
         <header className="flex flex-wrap items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">{heading}</h1>
-            <p className="mt-2 text-sm text-slate-600">{subheading}</p>
+            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">{heading}</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{subheading}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleRefresh}
               disabled={refreshing}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
               Refresh
@@ -530,10 +530,10 @@ export default function OnboardingDashboard({
             {/* ── Completion Alert Strip ── */}
             {stats.completed > 0 && (
               <div
-                className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 dark:border-emerald-700 dark:bg-emerald-900"
                 role="status"
               >
-                <p className="text-sm text-emerald-900 flex items-center gap-2">
+                <p className="text-sm text-emerald-900 flex items-center gap-2 dark:text-emerald-100">
                   <span aria-hidden="true">🎉</span>
                   <span>
                     <strong className="font-semibold">{stats.completed} candidate{stats.completed === 1 ? "" : "s"}</strong>{" "}
@@ -550,17 +550,17 @@ export default function OnboardingDashboard({
             )}
 
             {/* ── Employee Categories Filter ── */}
-            <section aria-labelledby="cat-heading" className="bg-white border border-slate-200 rounded-2xl mb-6">
-              <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200">
+            <section aria-labelledby="cat-heading" className="bg-white border border-slate-200 rounded-2xl mb-6 dark:bg-slate-900 dark:border-slate-800">
+              <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <h2 id="cat-heading" className="text-sm font-semibold text-slate-900">⊞ Employee Categories</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">Click a category to filter the candidate list below.</p>
+                  <h2 id="cat-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">⊞ Employee Categories</h2>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Click a category to filter the candidate list below.</p>
                 </div>
                 {categoryFilter && (
                   <button
                     type="button"
                     onClick={() => setCategoryFilter(null)}
-                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline underline-offset-2 dark:text-slate-300 dark:hover:text-slate-100"
                   >
                     ✕ Clear filter
                   </button>
@@ -579,12 +579,12 @@ export default function OnboardingDashboard({
                       className={`inline-flex items-center gap-2 rounded-full border-2 px-3 py-1 text-xs transition ${
                         active
                           ? `${cat.borderClass} ${cat.bgClass} shadow-sm`
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700"
                       }`}
                     >
-                      <span className={`font-semibold ${active ? cat.textClass : "text-slate-900"}`}>{cat.label}</span>
-                      <span className="text-slate-500">
-                        {counts.total} total · <span className="font-semibold text-emerald-700">{counts.completed} done</span>
+                      <span className={`font-semibold ${active ? cat.textClass : "text-slate-900 dark:text-slate-100"}`}>{cat.label}</span>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {counts.total} total · <span className="font-semibold text-emerald-700 dark:text-emerald-300">{counts.completed} done</span>
                       </span>
                     </button>
                   );
@@ -593,35 +593,35 @@ export default function OnboardingDashboard({
             </section>
 
             {/* ── Pending Induction Requests ── */}
-            <section aria-labelledby="pending-heading" className="bg-white border border-slate-200 rounded-2xl mb-6">
-              <header className="px-5 py-4 border-b border-slate-200">
-                <h2 id="pending-heading" className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <section aria-labelledby="pending-heading" className="bg-white border border-slate-200 rounded-2xl mb-6 dark:bg-slate-900 dark:border-slate-800">
+              <header className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                <h2 id="pending-heading" className="text-sm font-semibold text-slate-900 flex items-center gap-2 dark:text-slate-100">
                   <span aria-hidden="true">📋</span> Pending Induction Requests
                   <span className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-blue-600 text-white text-[11px] font-semibold px-1.5">
                     {requestsForCard.length}
                   </span>
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-500">Queued from HR dashboard. Review and accept to generate an induction link.</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Queued from HR dashboard. Review and accept to generate an induction link.</p>
               </header>
               {requestsForCard.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-500 italic">No pending requests.</p>
+                <p className="px-5 py-8 text-center text-sm text-slate-500 italic dark:text-slate-400">No pending requests.</p>
               ) : (
-                <ul className="divide-y divide-slate-200">
+                <ul className="divide-y divide-slate-200 dark:divide-slate-800">
                   {requestsForCard.map((req) => {
                     const isPending = requestActionPending.has(req.id);
                     const errorMsg = requestActionErrors.get(req.id);
                     return (
                       <li key={req.id} className="px-5 py-3 flex flex-wrap items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0" aria-hidden="true">
+                        <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0 dark:bg-slate-700 dark:text-slate-200" aria-hidden="true">
                           {initialsFromName(req.fullName)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{req.fullName}</p>
-                          <p className="text-xs text-slate-500 truncate">
+                          <p className="text-sm font-semibold text-slate-900 truncate dark:text-slate-100">{req.fullName}</p>
+                          <p className="text-xs text-slate-500 truncate dark:text-slate-400">
                             {req.departmentName ?? "—"} · {req.position ?? "—"} · requested {formatRelativeTime(req.triggeredAt)}
                           </p>
                           {errorMsg && (
-                            <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1">
+                            <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1 dark:text-red-400">
                               <AlertCircle className="w-3 h-3" aria-hidden="true" />
                               {errorMsg}
                             </p>
@@ -640,7 +640,7 @@ export default function OnboardingDashboard({
                             type="button"
                             onClick={() => handleDeclineRequest(req.id)}
                             disabled={isPending}
-                            className="inline-flex items-center rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="inline-flex items-center rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed dark:border-rose-700 dark:bg-rose-900 dark:text-rose-200 dark:hover:bg-rose-800"
                           >
                             {isPending ? "…" : "Decline"}
                           </button>
@@ -653,12 +653,12 @@ export default function OnboardingDashboard({
             </section>
 
             {/* ── Onboarding Candidates Table ── */}
-            <section id="candidates-table" aria-labelledby="cand-heading" className="bg-white border border-slate-200 rounded-2xl mb-6">
-              <header className="px-5 py-4 border-b border-slate-200 space-y-3">
+            <section id="candidates-table" aria-labelledby="cand-heading" className="bg-white border border-slate-200 rounded-2xl mb-6 dark:bg-slate-900 dark:border-slate-800">
+              <header className="px-5 py-4 border-b border-slate-200 space-y-3 dark:border-slate-800">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 id="cand-heading" className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <h2 id="cand-heading" className="text-sm font-semibold text-slate-900 flex items-center gap-2 dark:text-slate-100">
                     Onboarding Candidates
-                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold px-1.5">
+                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold px-1.5 dark:bg-slate-700 dark:text-slate-200">
                       {filteredProfiles.length}
                     </span>
                   </h2>
@@ -666,7 +666,7 @@ export default function OnboardingDashboard({
                     <button
                       type="button"
                       onClick={clearCandidateFilters}
-                      className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                      className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline underline-offset-2 dark:text-slate-300 dark:hover:text-slate-100"
                     >
                       ✕ Clear filters
                     </button>
@@ -682,7 +682,7 @@ export default function OnboardingDashboard({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search by name or email…"
-                      className="w-full h-9 rounded-md border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none"
+                      className="w-full h-9 rounded-md border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:bg-slate-950"
                     />
                   </div>
                   <label className="relative">
@@ -690,7 +690,7 @@ export default function OnboardingDashboard({
                     <select
                       value={branchFilter}
                       onChange={(e) => setBranchFilter(e.target.value)}
-                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px]"
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                     >
                       <option value="">All Branches</option>
                       {branchOptions.map((b) => (
@@ -703,7 +703,7 @@ export default function OnboardingDashboard({
                     <select
                       value={categoryFilter ?? ""}
                       onChange={(e) => setCategoryFilter(e.target.value || null)}
-                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px]"
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                     >
                       <option value="">All Roles</option>
                       {CATEGORIES.map((c) => (
@@ -716,7 +716,7 @@ export default function OnboardingDashboard({
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px]"
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer min-w-[140px] dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                     >
                       <option value="">All Status</option>
                       <option value="Not Started">Pre-Onboarding</option>
@@ -727,7 +727,7 @@ export default function OnboardingDashboard({
                 </div>
               </header>
               {filteredProfiles.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-500 italic">
+                <p className="px-5 py-8 text-center text-sm text-slate-500 italic dark:text-slate-400">
                   {profilesForStats.length === 0
                     ? "No active candidates in the pipeline yet."
                     : "No candidates match the current filter."}
@@ -735,43 +735,43 @@ export default function OnboardingDashboard({
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200">
+                    <thead className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-800">
                       <tr>
-                        <th scope="col" className="px-5 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Department</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Start</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Progress</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider sr-only">Action</th>
+                        <th scope="col" className="px-5 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Employee</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Type</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Branch</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Department</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Start</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Progress</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Status</th>
+                        <th scope="col" className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider sr-only dark:text-slate-400">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                       {filteredProfiles.map((p) => {
                         const pct = p.totalSteps > 0 ? Math.round((p.completedSteps / p.totalSteps) * 100) : 0;
                         const branchName = branchByUserId?.[p.userId] ?? "—";
                         const isCompleted = p.status === "Completed";
                         return (
-                          <tr key={p.id} className="hover:bg-slate-50">
+                          <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0" aria-hidden="true">
+                                <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0 dark:bg-slate-700 dark:text-slate-200" aria-hidden="true">
                                   {initialsFromName(p.employeeName)}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-slate-900 truncate">{p.employeeName}</p>
-                                  <p className="text-xs text-slate-500 truncate">{p.employeeEmail}</p>
+                                  <p className="text-sm font-semibold text-slate-900 truncate dark:text-slate-100">{p.employeeName}</p>
+                                  <p className="text-xs text-slate-500 truncate dark:text-slate-400">{p.employeeEmail}</p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 py-3 text-xs text-slate-700">{categoryLabelForTemplate(p.workflowTemplate)}</td>
-                            <td className="px-3 py-3 text-xs font-mono text-slate-700">{branchName}</td>
-                            <td className="px-3 py-3 text-xs text-slate-700">{departmentByUserId?.[p.userId] ?? "—"}</td>
-                            <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">{formatDateShort(p.startDate)}</td>
+                            <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300">{categoryLabelForTemplate(p.workflowTemplate)}</td>
+                            <td className="px-3 py-3 text-xs font-mono text-slate-700 dark:text-slate-300">{branchName}</td>
+                            <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300">{departmentByUserId?.[p.userId] ?? "—"}</td>
+                            <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap dark:text-slate-300">{formatDateShort(p.startDate)}</td>
                             <td className="px-3 py-3 min-w-[140px]">
-                              <p className="text-[11px] text-slate-600 mb-1">{p.completedSteps}/{p.totalSteps} steps</p>
-                              <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                              <p className="text-[11px] text-slate-600 mb-1 dark:text-slate-300">{p.completedSteps}/{p.totalSteps} steps</p>
+                              <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden dark:bg-slate-800">
                                 <div className="h-full bg-blue-500" style={{ width: `${pct}%` }} />
                               </div>
                             </td>
@@ -792,7 +792,7 @@ export default function OnboardingDashboard({
                               ) : (
                                 <Link
                                   href={`/induction/onboarding-dashboard/${p.id}`}
-                                  className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700"
+                                  className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                                   title="Open candidate detail view"
                                 >
                                   View →
@@ -842,32 +842,32 @@ export default function OnboardingDashboard({
         <div className={`grid grid-cols-1 ${view === "both" ? "lg:grid-cols-2" : ""} gap-6 mb-8`}>
           {showOnboarding && !showHRLayout && (
           /* Onboarding card */
-          <article className="bg-white border border-slate-200 rounded-2xl p-6">
+          <article className="bg-white border border-slate-200 rounded-2xl p-6 dark:bg-slate-900 dark:border-slate-800">
             <header className="flex items-start justify-between gap-4 mb-5">
               <div className="flex items-start gap-3">
                 <div className="bg-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
                   <UserPlus className="w-6 h-6 text-white" aria-hidden="true" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">Onboarding</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Onboarding</h2>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     ±1 week of start date
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none">
+                <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none dark:text-slate-100">
                   {hires.length}
                 </div>
                 <div className="mt-1 text-xs">
-                  <span className="font-semibold text-emerald-700">{hiresUrgent}</span>
-                  <span className="text-slate-500"> within 1 week</span>
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">{hiresUrgent}</span>
+                  <span className="text-slate-500 dark:text-slate-400"> within 1 week</span>
                 </div>
               </div>
             </header>
 
             {hires.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-500 italic">
+              <p className="py-6 text-center text-sm text-slate-500 italic dark:text-slate-400">
                 No upcoming hires.
               </p>
             ) : (
@@ -879,8 +879,8 @@ export default function OnboardingDashboard({
                   const hasInduction = row.inductionProfileStatus !== null;
                   const errorMsg = errors.get(row.key);
                   const rowBg = row.isWithin7Days
-                    ? "bg-rose-50 border-rose-200"
-                    : "bg-slate-50 border-slate-200";
+                    ? "bg-rose-50 border-rose-200 dark:bg-rose-900 dark:border-rose-700"
+                    : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
                   return (
                     <li
                       key={row.key}
@@ -888,42 +888,42 @@ export default function OnboardingDashboard({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-sm text-slate-900 truncate">{row.fullName}</p>
+                          <p className="font-medium text-sm text-slate-900 truncate dark:text-slate-100">{row.fullName}</p>
                           <span
                             className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
                               row.isWithin7Days
-                                ? "bg-rose-100 text-rose-800"
-                                : "bg-slate-100 text-slate-700"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-800 dark:text-rose-100"
+                                : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
                             }`}
                           >
                             {dayLabel(row.daysUntilStart)}
                           </span>
                           {isEbright && (
-                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-800 dark:text-blue-100">
                               ebrightleads
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 truncate">
+                        <p className="text-xs text-slate-500 truncate dark:text-slate-400">
                           {row.email ?? row.departmentName ?? "—"} · {row.position ?? "—"} · {row.departmentName ?? "—"}
                         </p>
-                        <p className="text-xs text-slate-500 mt-0.5">Starts {row.startDate}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">Starts {row.startDate}</p>
                         {errorMsg && (
-                          <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1">
+                          <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1 dark:text-red-400">
                             <AlertCircle className="w-3 h-3" aria-hidden="true" />
                             {errorMsg}
                           </p>
                         )}
                       </div>
                       {hasInduction ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100">
                           <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                           {row.inductionProfileStatus === "Completed"
                             ? "Induction Completed"
                             : "In Induction"}
                         </span>
                       ) : isQueued ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                           <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                           Requested
                         </span>
@@ -949,32 +949,32 @@ export default function OnboardingDashboard({
 
           {showOffboarding && (
           /* Offboarding card */
-          <article className="bg-white border border-slate-200 rounded-2xl p-6">
+          <article className="bg-white border border-slate-200 rounded-2xl p-6 dark:bg-slate-900 dark:border-slate-800">
             <header className="flex items-start justify-between gap-4 mb-5">
               <div className="flex items-start gap-3">
                 <div className="bg-rose-600 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
                   <UserMinus className="w-6 h-6 text-white" aria-hidden="true" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">Offboarding</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Offboarding</h2>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     Leaving in the next 2 weeks
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none">
+                <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none dark:text-slate-100">
                   {exits.length}
                 </div>
                 <div className="mt-1 text-xs">
-                  <span className="font-semibold text-rose-700">{exitsUrgent}</span>
-                  <span className="text-slate-500"> within 1 week</span>
+                  <span className="font-semibold text-rose-700 dark:text-rose-300">{exitsUrgent}</span>
+                  <span className="text-slate-500 dark:text-slate-400"> within 1 week</span>
                 </div>
               </div>
             </header>
 
             {exits.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-500 italic">
+              <p className="py-6 text-center text-sm text-slate-500 italic dark:text-slate-400">
                 No upcoming exits.
               </p>
             ) : (
@@ -986,8 +986,8 @@ export default function OnboardingDashboard({
                   const hasInduction = row.inductionProfileStatus !== null;
                   const errorMsg = errors.get(row.key);
                   const rowBg = row.isWithin7Days
-                    ? "bg-rose-50 border-rose-200"
-                    : "bg-slate-50 border-slate-200";
+                    ? "bg-rose-50 border-rose-200 dark:bg-rose-900 dark:border-rose-700"
+                    : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
                   return (
                     <li
                       key={row.key}
@@ -995,42 +995,42 @@ export default function OnboardingDashboard({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-sm text-slate-900 truncate">{row.fullName}</p>
+                          <p className="font-medium text-sm text-slate-900 truncate dark:text-slate-100">{row.fullName}</p>
                           <span
                             className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
                               row.isWithin7Days
-                                ? "bg-rose-100 text-rose-800"
-                                : "bg-slate-100 text-slate-700"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-800 dark:text-rose-100"
+                                : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
                             }`}
                           >
                             {dayLabel(row.daysUntilEnd)}
                           </span>
                           {isEbright && (
-                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-800 dark:text-blue-100">
                               ebrightleads
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 truncate">
+                        <p className="text-xs text-slate-500 truncate dark:text-slate-400">
                           {row.email ?? row.departmentName ?? "—"} · {row.position ?? "—"} · {row.departmentName ?? "—"}
                         </p>
-                        <p className="text-xs text-slate-500 mt-0.5">Leaves {row.endDate}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">Leaves {row.endDate}</p>
                         {errorMsg && (
-                          <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1">
+                          <p className="text-xs text-red-700 mt-1 inline-flex items-center gap-1 dark:text-red-400">
                             <AlertCircle className="w-3 h-3" aria-hidden="true" />
                             {errorMsg}
                           </p>
                         )}
                       </div>
                       {hasInduction ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100">
                           <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                           {row.inductionProfileStatus === "Completed"
                             ? "Induction Completed"
                             : "In Induction"}
                         </span>
                       ) : isQueued ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                           <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                           Requested
                         </span>
@@ -1167,12 +1167,12 @@ function InteractiveWorkflowSection({
       : `Onboarding workflow — ${activeTemplateMeta.short}`;
 
     return (
-      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         {/* Template + department switcher — only shown in manager / preview mode */}
         {!showInteractiveChecklist && (
-          <div className="space-y-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+          <div className="space-y-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/60">
             <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 View workflow by employee type
               </p>
               <div className="flex flex-wrap gap-2">
@@ -1185,8 +1185,8 @@ function InteractiveWorkflowSection({
                       onClick={() => setSelectedTemplateKey(t.key)}
                       className={
                         isActive
-                          ? `inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${t.accent} px-3 py-1.5 text-xs font-bold text-white shadow ring-2 ring-white`
-                          : "inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                          ? `inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${t.accent} px-3 py-1.5 text-xs font-bold text-white shadow ring-2 ring-white dark:ring-slate-900`
+                          : "inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700"
                       }
                       title={workflowTemplateLabel(t.key)}
                     >
@@ -1203,7 +1203,7 @@ function InteractiveWorkflowSection({
               <div>
                 <label
                   htmlFor="dept-switcher"
-                  className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+                  className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
                 >
                   🏢 Department Training is for…
                 </label>
@@ -1213,7 +1213,7 @@ function InteractiveWorkflowSection({
                   onChange={(e) =>
                     setSelectedDepartmentId(e.target.value ? Number(e.target.value) : null)
                   }
-                  className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 >
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -1221,7 +1221,7 @@ function InteractiveWorkflowSection({
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-500">
+                <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
                   Inductees in this department will auto-load this sub-workflow when they
                   reach the Department Training step.
                 </p>
@@ -1256,10 +1256,10 @@ function InteractiveWorkflowSection({
     : templateToPreviewSteps(templateSteps);
 
   return (
-    <article className="bg-white border border-slate-200 rounded-2xl p-6">
+    <article className="bg-white border border-slate-200 rounded-2xl p-6 dark:bg-slate-900 dark:border-slate-800">
       <header className="mb-4">
-        <h2 className="text-base font-semibold text-slate-900">{kind} workflow</h2>
-        <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{kind} workflow</h2>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1274,11 +1274,11 @@ function InteractiveWorkflowSection({
               canMarkComplete
             />
           ) : (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-medium text-slate-700">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Read-only reference
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {isManager
                   ? `This is the reference ${kind.toLowerCase()} workflow. To mark steps complete, open a specific employee's induction link from the Control Centre.`
                   : `This is the reference ${kind.toLowerCase()} workflow. ${
@@ -1314,25 +1314,25 @@ function StatCard({
   const body = (
     <>
       <div className={`absolute top-0 left-0 right-0 h-1 ${accentClass}`} aria-hidden="true" />
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      <p className="mt-1.5 text-[11px] text-slate-500">{subtitle}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-900 tabular-nums leading-none dark:text-slate-100">{value}</p>
+      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{subtitle}</p>
     </>
   );
-  const base = "relative bg-white border rounded-2xl p-4 overflow-hidden transition";
+  const base = "relative bg-white border rounded-2xl p-4 overflow-hidden transition dark:bg-slate-900";
   if (typeof onClick === "function") {
     return (
       <button
         type="button"
         onClick={onClick}
         aria-pressed={isActive}
-        className={`${base} w-full text-left cursor-pointer hover:border-slate-300 hover:shadow-md ${
-          isActive ? "border-slate-400 shadow-md ring-2 ring-slate-200" : "border-slate-200"
+        className={`${base} w-full text-left cursor-pointer hover:border-slate-300 hover:shadow-md dark:hover:border-slate-600 ${
+          isActive ? "border-slate-400 shadow-md ring-2 ring-slate-200 dark:border-slate-500 dark:ring-slate-700" : "border-slate-200 dark:border-slate-800"
         }`}
       >
         {body}
       </button>
     );
   }
-  return <div className={`${base} border-slate-200`}>{body}</div>;
+  return <div className={`${base} border-slate-200 dark:border-slate-800`}>{body}</div>;
 }

@@ -24,10 +24,10 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  onboarding: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  inactive: "bg-slate-100 text-slate-600 ring-slate-500/20",
-  archive: "bg-zinc-100 text-zinc-600 ring-zinc-500/20",
+  active: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 ring-emerald-600/20 dark:ring-emerald-700/40",
+  onboarding: "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200 ring-amber-600/20 dark:ring-amber-700/40",
+  inactive: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20 dark:ring-slate-600/40",
+  archive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 ring-zinc-500/20 dark:ring-zinc-600/40",
 };
 const STATUS_DOT: Record<string, string> = {
   active: "bg-emerald-500",
@@ -63,38 +63,38 @@ export default function EmployeeDetail({ employee }: { employee: EmployeeDetailF
       : "—";
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboard-employee-management" className="hover:text-slate-900 transition-colors">Employees</Link>
+          <Link href="/dashboard-employee-management" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Employees</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium truncate max-w-[220px]">{employee.fullName}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium truncate max-w-[220px]">{employee.fullName}</span>
         </nav>
 
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
-              <span className="w-14 h-14 rounded-full bg-slate-100 text-slate-700 font-semibold text-lg flex items-center justify-center shrink-0">
+              <span className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-lg flex items-center justify-center shrink-0">
                 {getInitials(employee.fullName)}
               </span>
               <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-semibold text-slate-900 tracking-tight truncate">{employee.fullName}</h1>
-                <div className="mt-1 flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight truncate">{employee.fullName}</h1>
+                <div className="mt-1 flex items-center gap-2 flex-wrap text-sm text-slate-500 dark:text-slate-400">
                   <span className="tabular-nums">{employee.employeeId ?? "No ID"}</span>
-                  {employee.nickName && (<><span className="text-slate-300">·</span><span>{employee.nickName}</span></>)}
-                  <span className="text-slate-300">·</span>
+                  {employee.nickName && (<><span className="text-slate-300 dark:text-slate-600">·</span><span>{employee.nickName}</span></>)}
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span>{employee.email}</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                   {employee.role && (
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
+                    <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300 ring-1 ring-inset ring-slate-200 dark:ring-slate-700">
                       {employee.role}
                     </span>
                   )}
@@ -110,7 +110,7 @@ export default function EmployeeDetail({ employee }: { employee: EmployeeDetailF
 
             <Link
               href={`/dashboard-employee-management/${employee.id}/edit`}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <Pencil className="w-4 h-4" aria-hidden="true" />
               Edit
@@ -187,7 +187,7 @@ export default function EmployeeDetail({ employee }: { employee: EmployeeDetailF
         <div className="mt-8">
           <Link
             href="/dashboard-employee-management"
-            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
             Back to Employees
@@ -203,7 +203,7 @@ function TabNav({ active, onChange }: { active: TabKey; onChange: (key: TabKey) 
     <div
       role="tablist"
       aria-label="Employee detail sections"
-      className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100"
+      className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800"
     >
       {TABS.map((t) => {
         const isActive = t.key === active;
@@ -214,10 +214,10 @@ function TabNav({ active, onChange }: { active: TabKey; onChange: (key: TabKey) 
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(t.key)}
-            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
               isActive
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
             {t.label}
@@ -242,14 +242,14 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl border border-slate-200 shadow-sm">
-      <header className="flex items-center gap-3 px-6 py-5 border-b border-slate-100">
-        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-blue-600" aria-hidden="true" />
+    <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <header className="flex items-center gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 flex items-center justify-center shrink-0">
+          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-300" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-500">{description}</p>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
       </header>
@@ -274,8 +274,8 @@ function Item({
   const display = value && String(value).trim() ? String(value) : "—";
   return (
     <div className={span === 2 ? "md:col-span-2" : ""}>
-      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</dt>
-      <dd className={`mt-1 text-sm text-slate-900 ${mono ? "tabular-nums" : ""} break-words`}>
+      <dt className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</dt>
+      <dd className={`mt-1 text-sm text-slate-900 dark:text-slate-100 ${mono ? "tabular-nums" : ""} break-words`}>
         {display}
       </dd>
     </div>

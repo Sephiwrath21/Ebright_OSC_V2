@@ -35,12 +35,12 @@ const STAGE_LABEL: Record<OffboardingStage, string> = {
 };
 
 const STAGE_PILL: Record<OffboardingStage, string> = {
-  Trigger: "bg-slate-100 text-slate-700",
-  HRReview: "bg-blue-50 text-blue-700",
-  ExitInterview: "bg-violet-50 text-violet-700",
-  Checklist: "bg-amber-50 text-amber-700",
-  SignOff: "bg-rose-50 text-rose-700",
-  Done: "bg-emerald-50 text-emerald-700",
+  Trigger: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+  HRReview: "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200",
+  ExitInterview: "bg-violet-50 text-violet-700 dark:bg-violet-900 dark:text-violet-200",
+  Checklist: "bg-amber-50 text-amber-700 dark:bg-amber-900 dark:text-amber-200",
+  SignOff: "bg-rose-50 text-rose-700 dark:bg-rose-900 dark:text-rose-200",
+  Done: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
 };
 
 function formatLongDate(iso: string | null): string {
@@ -64,27 +64,27 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
   });
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         {/* ── BREADCRUMB ── */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Offboarding</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Offboarding</span>
         </nav>
 
         {/* ── HEADER ── */}
         <header className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               Offboarding
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Manage employee exits — resignations and contract endings.
             </p>
           </div>
@@ -92,7 +92,7 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
             type="button"
             disabled
             title="Create flow coming in Phase 2"
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-300 px-4 py-2 text-xs font-semibold text-slate-500 cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-300 px-4 py-2 text-xs font-semibold text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-400"
           >
             ＋ New Offboarding
           </button>
@@ -131,12 +131,12 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
         </div>
 
         {/* ── ASSIGNMENT FILTER (All / My Cases) ── */}
-        <div className="mb-3 inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold">
+        <div className="mb-3 inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900">
           <button
             type="button"
             onClick={() => setAssignment("all")}
             className={`rounded-md px-3 py-1.5 transition ${
-              assignment === "all" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900"
+              assignment === "all" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
             }`}
           >
             All Cases
@@ -145,7 +145,7 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
             type="button"
             onClick={() => setAssignment("mine")}
             className={`rounded-md px-3 py-1.5 transition ${
-              assignment === "mine" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900"
+              assignment === "mine" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
             }`}
           >
             My Cases
@@ -153,19 +153,19 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
         </div>
 
         {/* ── FILTER TABS ── */}
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-0">
+        <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-0">
           <TabButton label="All" active={filter === "all"} onClick={() => setFilter("all")} count={cases.length} />
           <TabButton label="Active" active={filter === "active"} onClick={() => setFilter("active")} count={cases.filter((c) => c.status !== "Completed").length} />
           <TabButton label="Completed" active={filter === "completed"} onClick={() => setFilter("completed")} count={stats.completed} />
         </div>
 
         {/* ── CASE TABLE ── */}
-        <section aria-labelledby="cases-heading" className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <header className="px-5 py-4 border-b border-slate-200">
-            <h2 id="cases-heading" className="text-sm font-semibold text-slate-900">
+        <section aria-labelledby="cases-heading" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          <header className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 id="cases-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {filter === "all" ? "All offboarding cases" : filter === "active" ? "Active cases" : "Completed cases"}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {filtered.length} case{filtered.length === 1 ? "" : "s"}
             </p>
           </header>
@@ -175,57 +175,57 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-800">
                   <tr>
-                    <th className="px-5 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Department</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Last Day</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stage</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">HR Officer</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Supervisor</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider sr-only">View</th>
+                    <th className="px-5 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Employee</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Department</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Last Day</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Stage</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">HR Officer</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervisor</th>
+                    <th className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider sr-only">View</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {filtered.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50">
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0"
+                            className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0 dark:bg-slate-700 dark:text-slate-200"
                             aria-hidden="true"
                           >
                             {initialsFromName(c.employeeName)}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{c.employeeName}</p>
-                            <p className="text-xs text-slate-500 truncate">{c.employeeEmail}</p>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.employeeName}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{c.employeeEmail}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-3 py-3">
                         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                           c.caseType === "Resign"
-                            ? "bg-violet-50 text-violet-700 border-violet-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
+                            ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900 dark:text-violet-200 dark:border-violet-700"
+                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700"
                         }`}>
                           {c.caseType === "Resign" ? "Resign" : "Contract Ended"}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-700">{c.departmentName ?? "—"}</td>
-                      <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                      <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300">{c.departmentName ?? "—"}</td>
+                      <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         <div>{formatLongDate(c.lastWorkingDay)}</div>
                         {c.daysUntilLastDay !== null && c.status !== "Completed" && (
                           <div className={`text-[10px] mt-0.5 ${
                             c.daysUntilLastDay < 0
                               ? "text-slate-400"
                               : c.daysUntilLastDay <= 7
-                                ? "text-rose-600 font-semibold"
+                                ? "text-rose-600 font-semibold dark:text-rose-400"
                                 : c.daysUntilLastDay <= 30
-                                  ? "text-amber-600"
-                                  : "text-slate-500"
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-slate-500 dark:text-slate-400"
                           }`}>
                             {c.daysUntilLastDay < 0
                               ? `${Math.abs(c.daysUntilLastDay)}d ago`
@@ -243,12 +243,12 @@ export function OffboardingDashboardView({ cases, stats, currentUserId }: Props)
                       <td className="px-3 py-3">
                         <StatusPill status={c.status} />
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">{c.assignedHrName ?? "—"}</td>
-                      <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">{c.supervisorName ?? "—"}</td>
+                      <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{c.assignedHrName ?? "—"}</td>
+                      <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{c.supervisorName ?? "—"}</td>
                       <td className="px-3 py-3 text-right">
                         <Link
                           href={`/dashboards/offboarding/${c.id}`}
-                          className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap"
+                          className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 whitespace-nowrap"
                         >
                           View →
                         </Link>
@@ -287,12 +287,12 @@ function StatCard({
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
 }) {
   return (
-    <div className="relative bg-white border border-slate-200 rounded-2xl p-4 overflow-hidden">
+    <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 overflow-hidden">
       <div className={`absolute top-0 left-0 right-0 h-[3px] ${accentClass}`} aria-hidden="true" />
-      <Icon className="absolute top-3 right-3 w-10 h-10 text-slate-200 pointer-events-none" aria-hidden="true" />
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      <p className="mt-1.5 text-[11px] text-slate-500">{subtitle}</p>
+      <Icon className="absolute top-3 right-3 w-10 h-10 text-slate-200 dark:text-slate-700 pointer-events-none" aria-hidden="true" />
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-none">{value}</p>
+      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{subtitle}</p>
     </div>
   );
 }
@@ -314,13 +314,13 @@ function TabButton({
       onClick={onClick}
       className={`px-3 py-2 text-xs font-semibold rounded-t-md transition flex items-center gap-2 ${
         active
-          ? "bg-white text-blue-700 border border-slate-200 border-b-white -mb-px"
-          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          ? "bg-white text-blue-700 border border-slate-200 border-b-white -mb-px dark:bg-slate-900 dark:text-blue-400 dark:border-slate-800 dark:border-b-slate-900"
+          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800"
       }`}
     >
       <span>{label}</span>
       <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-        active ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600"
+        active ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
       }`}>
         {count}
       </span>
@@ -331,7 +331,7 @@ function TabButton({
 function StatusPill({ status }: { status: string }) {
   if (status === "Completed") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
         <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
         Completed
       </span>
@@ -339,14 +339,14 @@ function StatusPill({ status }: { status: string }) {
   }
   if (status === "InProgress") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-blue-700">
+      <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300">
         <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
         In Progress
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-amber-700">
+    <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
       <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
       Pending
     </span>
@@ -357,8 +357,8 @@ function EmptyState() {
   return (
     <div className="px-5 py-16 text-center">
       <p className="text-4xl mb-3" aria-hidden="true">📋</p>
-      <p className="text-sm font-semibold text-slate-700">No offboarding cases yet</p>
-      <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No offboarding cases yet</p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
         Cases will appear here once the create flow is wired up (Phase 2). Two trigger types
         will be supported: staff resignation (uploads a letter) and contract-end auto-flagging
         (30 days before end date).

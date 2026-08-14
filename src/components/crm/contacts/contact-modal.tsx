@@ -102,7 +102,7 @@ function Field({
 }) {
   return (
     <div className={cn('space-y-1', className)}>
-      <Label className="text-xs font-medium text-slate-600">{label}</Label>
+      <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</Label>
       {children}
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
@@ -258,13 +258,13 @@ export function ContactModal({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Duplicate warning */}
           {duplicate?.duplicate && duplicate.contact && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-200">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 Duplicate detected:{' '}
                 <Link
                   href={`/crm/contacts/${duplicate.contact.id}`}
-                  className="font-medium underline hover:text-amber-900"
+                  className="font-medium underline hover:text-amber-900 dark:hover:text-amber-100"
                   target="_blank"
                 >
                   {duplicate.contact.name}
@@ -275,12 +275,12 @@ export function ContactModal({
           )}
 
           <Tabs defaultValue="basic">
-            <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-transparent p-0 border-b border-slate-200 rounded-none">
+            <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-transparent p-0 border-b border-slate-200 dark:border-slate-800 rounded-none">
               {['basic', 'children', 'preferences', 'tags'].map((tab) => (
                 <TabsTrigger
                   key={tab}
                   value={tab}
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 pb-2 capitalize"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 pb-2 capitalize"
                 >
                   {tab === 'basic' ? 'Basic Info' : tab === 'children' ? 'Child Info' : tab}
                 </TabsTrigger>
@@ -309,7 +309,7 @@ export function ContactModal({
                 </Field>
                 <Field label="Phone (MY)" error={errors.phone?.message}>
                   <div className="flex gap-1">
-                    <span className="inline-flex items-center rounded-l-md border border-r-0 border-slate-200 bg-slate-50 px-2 text-xs text-slate-500">
+                    <span className="inline-flex items-center rounded-l-md border border-r-0 border-slate-200 bg-slate-50 px-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                       🇲🇾 +60
                     </span>
                     <Input
@@ -428,7 +428,7 @@ export function ContactModal({
 
             {/* ── Tags ── */}
             <TabsContent value="tags" className="mt-4 space-y-3">
-              <p className="text-sm text-slate-500">Select tags to apply to this contact.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Select tags to apply to this contact.</p>
               {tags.length === 0 && (
                 <p className="text-sm text-slate-400">No tags available. Create tags in Settings.</p>
               )}
@@ -444,7 +444,7 @@ export function ContactModal({
                         'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-all',
                         selected
                           ? 'border-transparent text-white shadow-sm'
-                          : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50',
+                          : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:bg-slate-900 dark:hover:bg-slate-800',
                       )}
                       style={selected ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
                     >
@@ -457,7 +457,7 @@ export function ContactModal({
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="pt-4 border-t border-slate-100">
+          <DialogFooter className="pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

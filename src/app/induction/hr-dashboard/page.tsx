@@ -130,22 +130,22 @@ export default async function HrDashboardPage() {
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
           {/* Breadcrumb */}
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-5">
-            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-5">
+            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
               <Home className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+            <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <span className="text-slate-900 font-medium">HR Dashboard</span>
+            <span className="text-slate-900 dark:text-slate-100 font-medium">HR Dashboard</span>
           </nav>
 
           <header className="mb-5">
-            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               HR Dashboard
             </h1>
           </header>

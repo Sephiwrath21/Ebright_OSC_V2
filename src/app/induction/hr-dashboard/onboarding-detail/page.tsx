@@ -48,7 +48,7 @@ export default async function OnboardingDetailPage() {
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
           <header className="bg-emerald-600 text-white px-4 sm:px-6 lg:px-8 py-5">
             <div className="w-full mx-auto">
               <Link
@@ -66,9 +66,9 @@ export default async function OnboardingDetailPage() {
           </header>
 
           <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto shadow-sm">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   <tr>
                     <th scope="col" className="px-4 py-3 text-left font-medium">#</th>
                     <th scope="col" className="px-4 py-3 text-left font-medium">Name</th>
@@ -78,7 +78,7 @@ export default async function OnboardingDetailPage() {
                     <th scope="col" className="px-4 py-3 text-left font-medium">Source</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   <HiresTableBody
                     rows={hires.map<HireRow>((h) => ({
                       key: h.key,

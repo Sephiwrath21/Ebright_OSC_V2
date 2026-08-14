@@ -67,7 +67,7 @@ export function EditableSection({ onSave, hasRealBacking = true, canEdit = true,
             type="button"
             onClick={handleClick}
             disabled={saving}
-            className="absolute top-0 right-0 z-10 min-h-11 rounded-full border-2 border-[#4a90e2] bg-white px-5 py-2 text-sm font-medium text-[#4a90e2] hover:bg-[#eef4fd] disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            className="absolute top-0 right-0 z-10 min-h-11 rounded-full border-2 border-[#4a90e2] bg-white dark:bg-slate-900 px-5 py-2 text-sm font-medium text-[#4a90e2] hover:bg-[#eef4fd] dark:hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {saving ? "Saving…" : editing ? "Save" : "Edit"}
           </button>
@@ -75,7 +75,7 @@ export function EditableSection({ onSave, hasRealBacking = true, canEdit = true,
         {notice && (
           <div
             role="status"
-            className="absolute top-11 right-0 z-10 max-w-[260px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg"
+            className="absolute top-11 right-0 z-10 max-w-[260px] rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 shadow-lg"
           >
             {notice}
           </div>

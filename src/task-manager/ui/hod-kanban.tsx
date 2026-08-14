@@ -60,13 +60,13 @@ export interface HodKanbanActions {
 /** Column title color treatment — text-only per the design (the column
  *  body/background stays neutral, just the label picks up the accent). */
 const COLUMN_TITLE_COLOR: Record<FlowKanbanColumnColor, string> = {
-  blue: "text-blue-600",
-  indigo: "text-indigo-600",
-  violet: "text-violet-600",
-  pink: "text-pink-600",
-  orange: "text-orange-600",
-  teal: "text-teal-600",
-  rose: "text-rose-600",
+  blue: "text-blue-600 dark:text-blue-400",
+  indigo: "text-indigo-600 dark:text-indigo-400",
+  violet: "text-violet-600 dark:text-violet-400",
+  pink: "text-pink-600 dark:text-pink-400",
+  orange: "text-orange-600 dark:text-orange-400",
+  teal: "text-teal-600 dark:text-teal-400",
+  rose: "text-rose-600 dark:text-rose-400",
 };
 
 const COLUMN_SWATCH_DOT: Record<FlowKanbanColumnColor, string> = {
@@ -120,11 +120,11 @@ function ColumnColorPicker({
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => setOpen((o) => !o)}
         className={`size-3 rounded-full ${
-          color ? COLUMN_SWATCH_DOT[color] : "border border-dashed border-gray-300"
+          color ? COLUMN_SWATCH_DOT[color] : "border border-dashed border-gray-300 dark:border-slate-600"
         }`}
       />
       {open && (
-        <div className="absolute left-0 top-5 z-20 flex w-max flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-white p-2 shadow-md">
+        <div className="absolute left-0 top-5 z-20 flex w-max flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-white p-2 shadow-md dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
           <button
             type="button"
             title="Default"
@@ -133,7 +133,7 @@ function ColumnColorPicker({
               onPick(null);
               setOpen(false);
             }}
-            className="flex size-5 items-center justify-center rounded-full border border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400"
+            className="flex size-5 items-center justify-center rounded-full border border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400 dark:border-slate-600 dark:hover:border-slate-500"
           >
             ×
           </button>
@@ -148,7 +148,7 @@ function ColumnColorPicker({
                 setOpen(false);
               }}
               className={`size-5 rounded-full ${COLUMN_SWATCH_DOT[c]} ${
-                color === c ? "ring-2 ring-offset-1 ring-gray-400" : ""
+                color === c ? "ring-2 ring-offset-1 ring-gray-400 dark:ring-offset-slate-900" : ""
               }`}
             />
           ))}
@@ -191,21 +191,21 @@ const KanbanCardView = React.memo(function KanbanCardView({
       }}
       {...attributes}
       {...listeners}
-      className={`group flex cursor-grab items-start gap-2 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing ${
+      className={`group flex cursor-grab items-start gap-2 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing dark:border-slate-700 dark:bg-slate-900 ${
         isDragging ? "z-10 opacity-60" : ""
       }`}
     >
-      <span aria-hidden="true" className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-gray-300">
+      <span aria-hidden="true" className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-gray-300 dark:text-slate-600">
         ⠿
       </span>
-      <p className="min-w-0 flex-1 break-words text-sm font-medium text-gray-800">{card.title}</p>
+      <p className="min-w-0 flex-1 break-words text-sm font-medium text-gray-800 dark:text-slate-200">{card.title}</p>
       <button
         type="button"
         title="Remove card"
         aria-label="Remove card"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onRemove(card.id)}
-        className="shrink-0 rounded-full text-gray-300 opacity-0 hover:text-red-500 group-hover:opacity-100"
+        className="shrink-0 rounded-full text-gray-300 opacity-0 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:text-red-400"
       >
         ×
       </button>
@@ -287,18 +287,18 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
         transition,
         willChange: isDragging ? "transform" : undefined,
       }}
-      className={`flex min-w-0 flex-1 flex-col gap-2.5 rounded-2xl border border-gray-100 bg-gray-50 p-3.5 ${
+      className={`flex min-w-0 flex-1 flex-col gap-2.5 rounded-2xl border border-gray-100 bg-gray-50 p-3.5 dark:border-slate-700 dark:bg-slate-800 ${
         isDragging ? "z-10 opacity-60" : ""
       }`}
     >
-      <div className="flex items-center gap-2 border-b border-gray-200 px-1 pb-2">
+      <div className="flex items-center gap-2 border-b border-gray-200 px-1 pb-2 dark:border-slate-700">
         <button
           type="button"
           title="Drag to reorder"
           aria-label="Drag to reorder"
           {...attributes}
           {...listeners}
-          className="flex size-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-gray-300 hover:bg-gray-200 hover:text-gray-600 active:cursor-grabbing"
+          className="flex size-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-gray-300 hover:bg-gray-200 hover:text-gray-600 active:cursor-grabbing dark:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
         >
           ⠿
         </button>
@@ -316,20 +316,20 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
               }
             }}
             onBlur={submitRename}
-            className="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-semibold text-gray-700 focus:outline-none"
+            className="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-semibold text-gray-700 focus:outline-none dark:border-blue-600 dark:bg-slate-950 dark:text-slate-100"
           />
         ) : (
           <h4
             title="Click to rename"
             onClick={() => setEditingLabel(true)}
-            className={`cursor-text truncate text-sm font-semibold hover:text-gray-700 ${
-              color ? COLUMN_TITLE_COLOR[color] : "text-gray-500"
+            className={`cursor-text truncate text-sm font-semibold hover:text-gray-700 dark:hover:text-slate-300 ${
+              color ? COLUMN_TITLE_COLOR[color] : "text-gray-500 dark:text-slate-400"
             }`}
           >
             {label}
           </h4>
         )}
-        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 text-xs text-gray-600">
+        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 text-xs text-gray-600 dark:bg-slate-700 dark:text-slate-300">
           {cards.length}
         </span>
         <button
@@ -337,12 +337,12 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
           title="Delete column"
           aria-label="Delete column"
           onClick={handleDelete}
-          className="ml-auto shrink-0 rounded-full px-1 text-gray-300 hover:text-red-500"
+          className="ml-auto shrink-0 rounded-full px-1 text-gray-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400"
         >
           ×
         </button>
       </div>
-      {deleteError && <p className="px-1 text-xs text-red-600">{deleteError}</p>}
+      {deleteError && <p className="px-1 text-xs text-red-600 dark:text-red-400">{deleteError}</p>}
       <div ref={setDroppableRef} className="flex min-h-[60px] flex-col gap-2.5">
         <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           {cards.map((c) => (
@@ -356,7 +356,7 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="+ Add a card"
-          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
     </div>
@@ -383,14 +383,14 @@ function AddColumnControl({ onAdd }: { onAdd: (label: string) => void }) {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex min-h-[60px] min-w-40 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-gray-200 p-3 text-sm text-gray-400 hover:border-gray-300 hover:text-gray-600 sm:self-start"
+        className="flex min-h-[60px] min-w-40 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-gray-200 p-3 text-sm text-gray-400 hover:border-gray-300 hover:text-gray-600 sm:self-start dark:border-slate-700 dark:hover:border-slate-600 dark:hover:text-slate-300"
       >
         + Add column
       </button>
     );
   }
   return (
-    <div className="flex min-w-40 flex-col gap-2 rounded-2xl bg-gray-50 p-3">
+    <div className="flex min-w-40 flex-col gap-2 rounded-2xl bg-gray-50 p-3 dark:bg-slate-800">
       <input
         autoFocus
         value={draft}
@@ -403,7 +403,7 @@ function AddColumnControl({ onAdd }: { onAdd: (label: string) => void }) {
           }
         }}
         placeholder="Column name"
-        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
       />
       <div className="flex gap-1.5">
         <button
@@ -419,7 +419,7 @@ function AddColumnControl({ onAdd }: { onAdd: (label: string) => void }) {
             setDraft("");
             setEditing(false);
           }}
-          className="rounded-lg px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100"
+          className="rounded-lg px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
         >
           Cancel
         </button>
@@ -629,19 +629,19 @@ export function HodKanban({
   );
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           My Board
         </h3>
         {boardError && (
-          <p className="flex items-center gap-1.5 text-xs text-red-600">
+          <p className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
             {boardError}
             <button
               type="button"
               onClick={() => setBoardError(null)}
               aria-label="Dismiss"
-              className="text-red-400 hover:text-red-600"
+              className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
             >
               ×
             </button>

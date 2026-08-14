@@ -60,14 +60,14 @@ export default function ToDoList({
   const remaining = todos.filter((t) => !t.done).length;
 
   return (
-    <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 flex flex-col">
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <ListTodo className="w-4 h-4 text-slate-500" aria-hidden="true" />
-          <h2 className="text-sm font-semibold text-slate-900">To-Do List</h2>
+          <ListTodo className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">To-Do List</h2>
         </div>
         {todos.length > 0 && (
-          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-0.5">
             {remaining} left
           </span>
         )}
@@ -82,14 +82,14 @@ export default function ToDoList({
             if (e.key === "Enter") add();
           }}
           placeholder="Add a task…"
-          className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <button
           type="button"
           onClick={add}
           disabled={!text.trim()}
           aria-label="Add task"
-          className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+          className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400"
         >
           <Plus className="w-5 h-5" aria-hidden="true" />
         </button>
@@ -104,7 +104,7 @@ export default function ToDoList({
           {todos.map((td) => (
             <li
               key={td.id}
-              className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 transition-colors"
+              className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               <button
                 type="button"
@@ -121,7 +121,7 @@ export default function ToDoList({
               </button>
               <span
                 className={`flex-1 min-w-0 text-sm break-words ${
-                  td.done ? "text-slate-400 line-through" : "text-slate-700"
+                  td.done ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-300"
                 }`}
               >
                 {td.text}
@@ -130,7 +130,7 @@ export default function ToDoList({
                 type="button"
                 onClick={() => remove(td.id)}
                 aria-label="Remove task"
-                className="shrink-0 w-7 h-7 rounded-lg grid place-items-center text-slate-300 opacity-0 group-hover:opacity-100 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                className="shrink-0 w-7 h-7 rounded-lg grid place-items-center text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-all"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>

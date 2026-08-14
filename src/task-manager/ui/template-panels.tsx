@@ -25,7 +25,7 @@ import { compressImageFile } from "./image-compress";
 import { SubtaskListEditor } from "./subtask-list-editor";
 
 const selectClass =
-  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
+  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 function TemplateSelect({
   templates,
@@ -39,7 +39,7 @@ function TemplateSelect({
   disabled?: boolean;
 }) {
   return (
-    <label className="block text-sm text-gray-600">
+    <label className="block text-sm text-gray-600 dark:text-slate-300">
       Task (template)
       <select
         value={value}
@@ -61,7 +61,11 @@ function TemplateSelect({
 function Feedback({ message }: { message: { ok: boolean; text: string } | null }) {
   if (!message) return null;
   return (
-    <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>{message.text}</p>
+    <p
+      className={`text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+    >
+      {message.text}
+    </p>
   );
 }
 
@@ -186,13 +190,13 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
       <TemplateSelect templates={templates} value={templateId} onChange={(id) => void pick(id)} disabled={busy} />
       {loaded && (
         <>
-          <label className="block text-sm text-gray-600">
+          <label className="block text-sm text-gray-600 dark:text-slate-300">
             Task title
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
-              className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>
           <SubtaskListEditor
@@ -201,25 +205,25 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
             onChange={setSubtasks}
             showMaxMessage={false}
           />
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-600">Guidelines</p>
-            <label className="mt-2 block text-sm text-gray-600">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Guidelines</p>
+            <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
               Link
               <input
                 value={guidelineUrl}
                 onChange={(e) => setGuidelineUrl(e.target.value)}
                 placeholder="https://…"
-                className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               />
             </label>
-            <label className="mt-2 block text-sm text-gray-600">
+            <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
               Image <span className="text-xs text-gray-400">(PNG / JPG / WebP, ≤ 2 MB)</span>
               <input
                 ref={imageRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => onImagePick(e.target.files?.[0])}
-                className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100"
+                className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
               />
             </label>
             {guidelineImage && (
@@ -228,7 +232,7 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
                 <img
                   src={guidelineImage.previewUrl}
                   alt="Guideline preview"
-                  className="max-h-28 rounded-lg border border-gray-200 object-contain"
+                  className="max-h-28 rounded-lg border border-gray-200 object-contain dark:border-slate-700"
                 />
                 <button
                   type="button"
@@ -236,7 +240,7 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
                     setGuidelineImage(null);
                     if (imageRef.current) imageRef.current.value = "";
                   }}
-                  className="text-xs font-medium text-gray-400 hover:text-red-600"
+                  className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                 >
                   ✕ remove image
                 </button>
@@ -307,7 +311,7 @@ export function TemplateRemovePanel({ templates }: { templates: FlowTemplateCont
       <TemplateSelect templates={templates} value={templateId} onChange={(id) => void pick(id)} disabled={busy} />
       {impact && (
         <>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-200">
             {impact.pendingTasks > 0 ? (
               <>
                 Removing this task affects <strong>{impact.pendingEmployees}</strong> employee
@@ -320,12 +324,12 @@ export function TemplateRemovePanel({ templates }: { templates: FlowTemplateCont
               <>No pending assignments — {impact.completedKept} completed record{impact.completedKept === 1 ? "" : "s"} stay untouched.</>
             )}
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
             <input
               type="checkbox"
               checked={alsoDelete}
               onChange={(e) => setAlsoDelete(e.target.checked)}
-              className="size-4 rounded border-gray-300 accent-blue-600"
+              className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
             />
             Also delete the template itself
           </label>
@@ -439,7 +443,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
               className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                 scope === "template"
                   ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-400"
               }`}
             >
               Entire task (all employees)
@@ -452,14 +456,14 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
               className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                 scope === "employee"
                   ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-400"
               }`}
             >
               One employee
             </button>
           </div>
           {scope === "employee" && (
-            <label className="block text-sm text-gray-600">
+            <label className="block text-sm text-gray-600 dark:text-slate-300">
               Employee
               <select value={userId} onChange={(e) => setUserId(e.target.value)} className={`mt-1 ${selectClass}`}>
                 <option value="">Select an employee…</option>
@@ -485,7 +489,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
       )}
       <Feedback message={message} />
 
-      <div className="mt-2 border-t border-gray-100 pt-3">
+      <div className="mt-2 border-t border-gray-100 pt-3 dark:border-slate-800">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Archived</p>
         {archived === null && <p className="mt-2 text-sm text-gray-400">Loading…</p>}
         {archived && archived.templates.length === 0 && archived.instances.length === 0 && (
@@ -496,7 +500,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
             {archived.templates.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               >
                 <span className="min-w-0 flex-1 truncate">
                   {t.name}
@@ -508,7 +512,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
                   type="button"
                   disabled={busy}
                   onClick={() => void doUnarchive(t.id)}
-                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40 dark:text-blue-400"
                 >
                   Unarchive
                 </button>
@@ -517,7 +521,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
             {archived.instances.map((i) => (
               <li
                 key={`${i.templateId}:${i.userId}`}
-                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               >
                 <span className="min-w-0 flex-1 truncate">
                   {i.templateName}
@@ -529,7 +533,7 @@ export function TemplateArchivePanel({ templates }: { templates: FlowTemplateCon
                   type="button"
                   disabled={busy}
                   onClick={() => void doUnarchive(i.templateId, i.userId)}
-                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:opacity-40 dark:text-blue-400"
                 >
                   Unarchive
                 </button>
@@ -604,7 +608,7 @@ export function TemplateReassignPanel({
       )}
       {assignees && assignees.length > 0 && (
         <>
-          <label className="block text-sm text-gray-600">
+          <label className="block text-sm text-gray-600 dark:text-slate-300">
             From (current assignee)
             <select
               value={fromUserId}
@@ -623,10 +627,10 @@ export function TemplateReassignPanel({
               scrolling a giant select. Same search-input + one-click-pick
               pieces as the drill modal's "Assign to Others" picker, so the
               two person-pickers can't drift apart visually. */}
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 dark:text-slate-300">
             To (new assignee)
             {toUserId ? (
-              <div className="mt-1 flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+              <div className="mt-1 flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-200">
                 <span className="min-w-0 flex-1 truncate">
                   {(() => {
                     const s = staff.find((m) => m.id === toUserId);
@@ -639,7 +643,7 @@ export function TemplateReassignPanel({
                     setToUserId("");
                     setToSearch("");
                   }}
-                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
                 >
                   change
                 </button>

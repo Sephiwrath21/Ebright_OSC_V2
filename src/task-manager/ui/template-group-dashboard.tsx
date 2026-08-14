@@ -22,7 +22,7 @@ type ViewMode = "grid" | "list";
 
 function viewToggleButtonClass(active: boolean): string {
   return `flex size-8 items-center justify-center rounded-full ${
-    active ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"
+    active ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
   }`;
 }
 
@@ -64,14 +64,14 @@ function GroupActions({
       <button
         type="button"
         onClick={onViewAssignees}
-        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
       >
         View Assignees
       </button>
       <button
         type="button"
         onClick={onEdit}
-        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600"
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
       >
         Edit
       </button>
@@ -79,7 +79,7 @@ function GroupActions({
         type="button"
         disabled={busyId === group.id}
         onClick={onRemove}
-        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-red-500 dark:hover:text-red-400"
       >
         {busyId === group.id ? "Removing…" : "Delete"}
       </button>
@@ -170,7 +170,7 @@ export function TemplateGroupDashboard({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-slate-400">
           {control.list.length} {labelLower}
           {control.list.length === 1 ? "" : "s"}
         </p>
@@ -178,7 +178,7 @@ export function TemplateGroupDashboard({
           <div
             role="radiogroup"
             aria-label="View"
-            className="flex items-center gap-0.5 rounded-full border border-gray-300 bg-white p-0.5"
+            className="flex items-center gap-0.5 rounded-full border border-gray-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
           >
             <button
               type="button"
@@ -214,23 +214,23 @@ export function TemplateGroupDashboard({
       </div>
 
       {message && (
-        <p className={`mt-3 text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>{message.text}</p>
+        <p className={`mt-3 text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{message.text}</p>
       )}
 
       {control.list.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+        <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
           No {labelLower}s yet — create one to bundle several tasks together for reuse.
         </div>
       ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {control.list.map((g) => (
-            <div key={g.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">{g.name}</p>
+            <div key={g.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <p className="font-semibold text-gray-900 dark:text-slate-100">{g.name}</p>
               <p className="mt-1 text-xs text-gray-400">
                 {g.taskCount} task{g.taskCount === 1 ? "" : "s"}
               </p>
               {g.previewTitles.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-sm text-gray-600">
+                <ul className="mt-2 space-y-0.5 text-sm text-gray-600 dark:text-slate-300">
                   {g.previewTitles.map((t, i) => (
                     <li key={i} className="truncate">
                       · {t}
@@ -242,7 +242,7 @@ export function TemplateGroupDashboard({
                 </ul>
               )}
               {canEdit && (
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-slate-800">
                   <GroupActions
                     group={g}
                     busyId={busyId}
@@ -258,10 +258,10 @@ export function TemplateGroupDashboard({
           ))}
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-900">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Tasks</th>
                 <th className="px-4 py-3">Last Updated</th>
@@ -270,10 +270,10 @@ export function TemplateGroupDashboard({
             </thead>
             <tbody>
               {control.list.map((g) => (
-                <tr key={g.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{g.taskCount}</td>
-                  <td className="px-4 py-3 text-gray-600">{g.updatedAt.slice(0, 10)}</td>
+                <tr key={g.id} className="border-b border-gray-100 last:border-0 dark:border-slate-800">
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{g.name}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{g.taskCount}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{g.updatedAt.slice(0, 10)}</td>
                   {canEdit && (
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">

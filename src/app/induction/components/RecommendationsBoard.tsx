@@ -7,9 +7,9 @@ import type { RecommendationRow } from "@/app/induction/queries";
 const STATUSES = ["New", "In Progress", "Implemented", "Verified"] as const;
 
 const PRIORITY_CLASSES: Record<string, string> = {
-  High: "bg-red-200 text-red-800",
-  Medium: "bg-yellow-200 text-yellow-800",
-  Low: "bg-green-200 text-green-800",
+  High: "bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-200",
+  Medium: "bg-yellow-200 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
+  Low: "bg-green-200 dark:bg-green-900 text-green-800 dark:text-green-200",
 };
 
 export function RecommendationsBoard({
@@ -37,12 +37,12 @@ export function RecommendationsBoard({
   };
 
   return (
-    <div className="rounded-lg border bg-white p-6 shadow">
+    <div className="rounded-lg border bg-white dark:bg-slate-900 p-6 shadow">
       <h3 className="mb-6 text-lg font-semibold">Recommendations Board</h3>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STATUSES.map((status) => (
-          <div key={status} className="rounded-lg bg-gray-50 p-4">
+          <div key={status} className="rounded-lg bg-gray-50 dark:bg-slate-800 p-4">
             <p className="mb-4 text-sm font-semibold">{status}</p>
             <div className="space-y-3">
               {recs
@@ -50,15 +50,15 @@ export function RecommendationsBoard({
                 .map((rec) => (
                   <div
                     key={rec.id}
-                    className={`rounded-lg border bg-white p-3 ${
+                    className={`rounded-lg border bg-white dark:bg-slate-900 p-3 ${
                       pendingId === rec.id ? "opacity-60" : ""
                     }`}
                   >
                     <p className="text-sm font-semibold">{rec.title}</p>
-                    <p className="mt-1 text-xs text-gray-600">{rec.evidence}</p>
+                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{rec.evidence}</p>
                     <span
                       className={`mt-2 inline-block rounded px-2 py-1 text-xs font-semibold ${
-                        PRIORITY_CLASSES[rec.priority] ?? "bg-gray-200 text-gray-800"
+                        PRIORITY_CLASSES[rec.priority] ?? "bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200"
                       }`}
                     >
                       {rec.priority}
@@ -73,7 +73,7 @@ export function RecommendationsBoard({
                           className={`rounded px-2 py-1 text-xs ${
                             rec.status === s
                               ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-300 dark:hover:bg-slate-600"
                           } disabled:cursor-not-allowed`}
                         >
                           {s}

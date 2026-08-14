@@ -97,51 +97,51 @@ export default async function ProfilePage({
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
-      <div className="min-h-full bg-slate-50">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
         <div className="max-w-5xl mx-auto px-6 pt-4 pb-10">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
               <Home className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <span className="text-slate-900 font-medium">My Profile</span>
+            <span className="text-slate-900 dark:text-slate-100 font-medium">My Profile</span>
           </nav>
 
           {justChanged && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-sm text-emerald-800">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Password changed successfully.</span>
             </div>
           )}
 
           {emailChanged && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-sm text-emerald-800">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Email updated. Sign out and sign in again with your new email to refresh your session.</span>
             </div>
           )}
 
           {profileUpdated && (
-            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-sm text-emerald-800">
+            <div role="status" className="mb-5 flex items-start gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900 text-sm text-emerald-800 dark:text-emerald-200">
               <CircleCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>Profile updated.</span>
             </div>
           )}
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex items-start justify-between gap-4 flex-wrap">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
               <span className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 text-white font-semibold text-lg flex items-center justify-center shrink-0">
                 {initials}
               </span>
               <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-semibold text-slate-900 tracking-tight truncate">
+                <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight truncate">
                   {displayName}
                 </h1>
                 <div className="mt-1 flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="text-sm text-slate-500 truncate">{me.email}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{me.email}</span>
                   {roleType !== "staff" && (
-                    <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-200 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-blue-50 dark:bg-blue-900 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200 dark:ring-blue-700 uppercase tracking-wider">
                       <Shield className="w-3 h-3" aria-hidden="true" />
                       {roleLabel}
                     </span>
@@ -153,7 +153,7 @@ export default async function ProfilePage({
               {roleType === "staff" && (
                 <Link
                   href="/profile/edit"
-                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 shadow-sm"
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 shadow-sm"
                 >
                   <Pencil className="w-4 h-4" aria-hidden="true" />
                   Edit My Profile
@@ -161,7 +161,7 @@ export default async function ProfilePage({
               )}
               <Link
                 href="/profile/change-password"
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <KeyRound className="w-4 h-4" aria-hidden="true" />
                 Change Password
@@ -172,16 +172,16 @@ export default async function ProfilePage({
           <div className="space-y-6 mt-6">
             <Section Icon={Shield} title="Account" description="Login credentials and sign-in activity.">
               <div>
-                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center justify-between gap-2">
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between gap-2">
                   <span>Email</span>
                   <Link
                     href="/profile/edit-email"
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline normal-case tracking-normal"
+                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline normal-case tracking-normal"
                   >
                     Edit
                   </Link>
                 </dt>
-                <dd className="mt-1 text-sm text-slate-900 break-words">{me.email}</dd>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">{me.email}</dd>
               </div>
               <Item label="Role" value={roleLabel} />
               <Item label="Password" value="••••••••" mono />
@@ -191,14 +191,14 @@ export default async function ProfilePage({
             </Section>
 
             {roleType === "superadmin" && (
-              <section className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <header className="flex items-start gap-3 px-6 py-5 border-b border-slate-100">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                    <User className="w-5 h-5 text-blue-600" aria-hidden="true" />
+              <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <header className="flex items-start gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                    <User className="w-5 h-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold text-slate-900">Profile</h2>
-                    <p className="text-sm text-slate-500">Department profile and team members.</p>
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Profile</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Department profile and team members.</p>
                   </div>
                 </header>
                 <dl className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -206,35 +206,35 @@ export default async function ProfilePage({
                   <Item label="Department" value={superadminDeptName} />
                 </dl>
                 <div className="px-6 pb-6">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
                     Team members {team.length > 0 && <span className="text-slate-400 normal-case tracking-normal font-normal">({team.length})</span>}
                   </h3>
                   {team.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                    <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                       No other members in the {superadminDeptName ?? "same"} department yet.
                     </div>
                   ) : (
-                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
                       {team.map((m) => {
                         const initials = getAvatarInitials(m.fullName ?? m.email);
                         const name = m.fullName ?? m.email.split("@")[0];
                         return (
                           <li key={m.id} className="flex items-center gap-3 px-4 py-3">
-                            <span className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0">
+                            <span className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center shrink-0">
                               {initials}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <div className="font-medium text-slate-900 truncate">{name}</div>
-                              <div className="text-xs text-slate-500 truncate">{m.email}</div>
+                              <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{name}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{m.email}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {m.position && (
-                                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 whitespace-nowrap">
+                                <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300 ring-1 ring-inset ring-slate-200 dark:ring-slate-700 whitespace-nowrap">
                                   {m.position}
                                 </span>
                               )}
                               {m.status && (
-                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.status === "active" ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20" : "bg-slate-100 text-slate-600 ring-slate-500/20"}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.status === "active" ? "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-500/30" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20 dark:ring-slate-500/30"}`}>
                                   <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-emerald-500" : "bg-slate-400"}`} aria-hidden="true" />
                                   {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
                                 </span>
@@ -323,14 +323,14 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl border border-slate-200 shadow-sm">
-      <header className="flex items-start gap-3 px-6 py-5 border-b border-slate-100">
-        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-blue-600" aria-hidden="true" />
+    <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <header className="flex items-start gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 flex items-center justify-center shrink-0">
+          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-500">{description}</p>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
         </div>
       </header>
       <dl className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -354,8 +354,8 @@ function Item({
   const display = value && String(value).trim() ? String(value) : "—";
   return (
     <div className={span === 2 ? "md:col-span-2" : ""}>
-      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</dt>
-      <dd className={`mt-1 text-sm text-slate-900 ${mono ? "tabular-nums" : ""} break-words`}>
+      <dt className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</dt>
+      <dd className={`mt-1 text-sm text-slate-900 dark:text-slate-100 ${mono ? "tabular-nums" : ""} break-words`}>
         {display}
       </dd>
     </div>

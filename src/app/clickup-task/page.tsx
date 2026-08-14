@@ -24,9 +24,9 @@ export default async function ClickUpTaskPage() {
       <div
         style={{
           minHeight: "100%",
-          background: "#F3F4F6",
+          background: "var(--status-neutral-bg)",
           fontFamily: fontStack,
-          color: "#111827",
+          color: "var(--text-primary)",
         }}
       >
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
@@ -38,10 +38,10 @@ export default async function ClickUpTaskPage() {
                 alignItems: "center",
                 gap: 6,
                 padding: "7px 12px",
-                border: "0.5px solid #E5E7EB",
+                border: "0.5px solid var(--status-track)",
                 borderRadius: 8,
-                background: "#FFFFFF",
-                color: "#374151",
+                background: "var(--surface)",
+                color: "var(--text-secondary)",
                 fontSize: 13,
                 fontWeight: 600,
                 textDecoration: "none",
@@ -52,7 +52,7 @@ export default async function ClickUpTaskPage() {
               Back
             </Link>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>ClickUp Task</h1>
-            <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6B7280" }}>
+            <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--text-muted-strong)" }}>
               Choose a department to open its dashboard.
             </p>
           </header>
@@ -60,12 +60,12 @@ export default async function ClickUpTaskPage() {
           {departments.length === 0 ? (
             <div
               style={{
-                background: "#FFFFFF",
-                border: "0.5px solid #E5E7EB",
+                background: "var(--surface)",
+                border: "0.5px solid var(--status-track)",
                 borderRadius: 12,
                 padding: 24,
                 fontSize: 14,
-                color: "#6B7280",
+                color: "var(--text-muted-strong)",
               }}
             >
               You don&apos;t have a department assigned, so there&apos;s nothing to show here.
@@ -87,8 +87,8 @@ export default async function ClickUpTaskPage() {
                 >
                   <div
                     style={{
-                      background: "#FFFFFF",
-                      border: "0.5px solid #E5E7EB",
+                      background: "var(--surface)",
+                      border: "0.5px solid var(--status-track)",
                       borderRadius: 12,
                       padding: 18,
                       display: "flex",
@@ -113,7 +113,7 @@ export default async function ClickUpTaskPage() {
                     >
                       {d.icon}
                     </div>
-                    <div style={{ minWidth: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                    <div style={{ minWidth: 0, fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
                       {d.name}
                     </div>
                   </div>

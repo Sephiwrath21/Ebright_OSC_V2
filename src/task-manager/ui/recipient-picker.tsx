@@ -24,12 +24,12 @@ import {
 } from "./types";
 
 const selectClass =
-  "w-full appearance-none rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-blue-500 focus:outline-none";
+  "w-full appearance-none rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 /** The picker's search-input style — exported so other person pickers (e.g.
  *  the drill modal's "Assign to Others") reuse the exact same look. */
 export const pickerSearchClass =
-  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none";
+  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 /** "Name · Role" in one truncated span — THE person-row text format, shared
  *  by every list this file renders and by SinglePersonPickList below. */
@@ -55,14 +55,14 @@ export function SinglePersonPickList({
     return <p className="py-2 text-center text-xs text-gray-400">{emptyLabel}</p>;
   }
   return (
-    <div className="max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
       {members.map((m) => (
         <button
           key={m.id}
           type="button"
           disabled={disabled}
           onClick={() => onPick(m.id)}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <span className="truncate">{personRowLabel(m)}</span>
         </button>
@@ -73,7 +73,9 @@ export function SinglePersonPickList({
 
 function chipClass(active: boolean): string {
   return `rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-    active ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+    active
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
   }`;
 }
 
@@ -149,18 +151,18 @@ function MemberDropdown({
         onClick={() => setOpen((o) => !o)}
         className={`${selectClass} flex items-center justify-between gap-2`}
       >
-        <span className={selectedCount > 0 ? "text-gray-700" : "text-gray-400"}>
+        <span className={selectedCount > 0 ? "text-gray-700 dark:text-slate-100" : "text-gray-400"}>
           {selectedCount > 0 ? `${selectedCount} selected` : "Select people…"}
         </span>
         <span className="text-gray-400">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
           <button
             type="button"
             onClick={() => onToggleAll(members.map((m) => m.id))}
-            className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50"
+            className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900"
           >
             {allSelected ? "Deselect all" : (selectAllLabel ?? `Select all (${members.length})`)}
           </button>
@@ -171,13 +173,13 @@ function MemberDropdown({
                 key={m.id}
                 type="button"
                 onClick={() => onToggle(m.id)}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${
-                  isSelected ? "bg-blue-50 text-blue-700" : "text-gray-700"
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-slate-800 ${
+                  isSelected ? "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200" : "text-gray-700 dark:text-slate-300"
                 }`}
               >
                 <span
                   className={`flex size-3.5 shrink-0 items-center justify-center rounded border ${
-                    isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300"
+                    isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 dark:border-slate-500"
                   }`}
                 >
                   {isSelected && <CheckIcon />}
@@ -189,7 +191,7 @@ function MemberDropdown({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="block w-full border-t border-gray-100 px-3 py-1.5 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50"
+            className="block w-full border-t border-gray-100 px-3 py-1.5 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Done
           </button>
@@ -212,9 +214,9 @@ function MenuCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50"
+      className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-600 dark:hover:bg-blue-900"
     >
-      <p className="text-sm font-semibold text-gray-700">{label}</p>
+      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">{label}</p>
       <p className="mt-0.5 text-xs text-gray-400">{hint}</p>
     </button>
   );
@@ -225,7 +227,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mb-3 text-xs font-medium text-blue-600 hover:text-blue-700"
+      className="mb-3 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
     >
       ← Back
     </button>
@@ -311,13 +313,13 @@ export function RecipientPicker({
       : [];
 
   const selectedSummary = selected.length > 0 && (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-1.5 flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500">Selected ({selected.length})</p>
+        <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Selected ({selected.length})</p>
         <button
           type="button"
           onClick={() => onChange([])}
-          className="text-xs font-medium text-gray-400 hover:text-gray-600"
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
         >
           Clear all
         </button>
@@ -339,7 +341,7 @@ export function RecipientPicker({
   if (restrictToGroup) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           {quickSelfId && (
             <button
               type="button"
@@ -392,7 +394,7 @@ export function RecipientPicker({
       )}
 
       {view === "person" && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           <BackButton onClick={() => setView("menu")} />
           <input
             value={search}
@@ -412,7 +414,7 @@ export function RecipientPicker({
       )}
 
       {view === "group" && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           <BackButton onClick={() => setView("menu")} />
           <select
             value={group}

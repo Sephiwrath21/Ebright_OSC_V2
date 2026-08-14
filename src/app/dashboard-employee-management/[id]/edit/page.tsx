@@ -40,10 +40,10 @@ export default async function EditEmployeePage({
           action={updateEmployee}
         />
       ) : (
-        <div className="min-h-full bg-slate-50">
+        <div className="min-h-full bg-slate-50 dark:bg-slate-950">
           <div className="max-w-xl mx-auto px-6 py-24 text-center">
-            <h1 className="text-2xl font-semibold text-slate-900">Employee not found</h1>
-            <p className="mt-2 text-sm text-slate-600">The employee you&apos;re trying to edit doesn&apos;t exist.</p>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Employee not found</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">The employee you&apos;re trying to edit doesn&apos;t exist.</p>
             <Link
               href="/dashboard-employee-management"
               className="mt-6 inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"

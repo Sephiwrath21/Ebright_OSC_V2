@@ -92,12 +92,12 @@ function toInvitations(data: PCMDataBundle): PCMInvitation[] {
 }
 
 const STATUS_BADGE: Record<InvitationStatus, string> = {
-  invited:     "bg-blue-50 text-blue-700",
-  confirmed:   "bg-emerald-50 text-emerald-700",
-  attended:    "bg-teal-100 text-teal-800",
-  rescheduled: "bg-amber-50 text-amber-700",
-  declined:    "bg-rose-50 text-rose-700",
-  no_show:     "bg-slate-100 text-slate-500",
+  invited:     "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  confirmed:   "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  attended:    "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
+  rescheduled: "bg-amber-50 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  declined:    "bg-rose-50 text-rose-700 dark:bg-rose-900 dark:text-rose-300",
+  no_show:     "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
 };
 
 const STATUS_LABELS: Record<InvitationStatus, string> = {
@@ -296,40 +296,40 @@ export default function PCMInvitationsClient() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 md:px-6 py-8 space-y-6">
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Link href="/dashboards" className="hover:text-slate-900 flex items-center gap-1">
+        <nav className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <Link href="/dashboards" className="hover:text-slate-900 dark:hover:text-slate-100 flex items-center gap-1">
             <Home className="w-3.5 h-3.5" /> Home
           </Link>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <Link href="/dashboards/pcm" className="hover:text-slate-900">PCM System</Link>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-slate-900 font-medium">Invitations</span>
+          <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+          <Link href="/dashboards/pcm" className="hover:text-slate-900 dark:hover:text-slate-100">PCM System</Link>
+          <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Invitations</span>
         </nav>
 
         {/* Masthead */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">PCM System</p>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
               <ListOrdered className="w-6 h-6 text-slate-400" aria-hidden="true" />
               Invitation List
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">Filter, copy for WhatsApp, or download as CSV.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Filter, copy for WhatsApp, or download as CSV.</p>
           </div>
         </div>
 
         {/* Filter card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
           {/* Row 1: event + day + session */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Event</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Event</label>
               <select
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px]"
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px] dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                 value={eventId}
                 onChange={e => { setEventId(e.target.value); setDayFilter("all"); setSessionFilter("all"); }}
               >
@@ -340,9 +340,9 @@ export default function PCMInvitationsClient() {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Day</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Day</label>
               <select
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                 value={dayFilter === "all" ? "all" : String(dayFilter)}
                 onChange={e => { const v = e.target.value; setDayFilter(v === "all" ? "all" : Number(v)); setSessionFilter("all"); }}
               >
@@ -354,7 +354,7 @@ export default function PCMInvitationsClient() {
             </div>
 
             <select
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               value={sessionFilter}
               onChange={e => setSessionFilter(e.target.value)}
             >
@@ -372,7 +372,7 @@ export default function PCMInvitationsClient() {
           {/* Row 2: branch + status + type + search */}
           <div className="flex flex-wrap items-center gap-3">
             <select
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               value={branchFilter}
               onChange={e => setBranchFilter(e.target.value)}
             >
@@ -381,7 +381,7 @@ export default function PCMInvitationsClient() {
             </select>
 
             <select
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
@@ -395,7 +395,7 @@ export default function PCMInvitationsClient() {
             </select>
 
             <select
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value)}
             >
@@ -407,7 +407,7 @@ export default function PCMInvitationsClient() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
-                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm placeholder:text-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm placeholder:text-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                 placeholder="Search name, ID, coach…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -416,35 +416,35 @@ export default function PCMInvitationsClient() {
           </div>
 
           {/* Stats strip */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 border-t border-slate-100 text-xs text-slate-500">
-            <span><strong className="text-slate-900">{counts.invited}</strong> rows</span>
-            <span><strong className="text-emerald-700">{counts.confirmed}</strong> confirmed</span>
-            <span><strong className="text-teal-700">{counts.attended}</strong> attended</span>
-            <span><strong className="text-rose-600">{counts.absent}</strong> absent</span>
-            <span><strong className="text-amber-700">{counts.rescheduled}</strong> rescheduled</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-violet-700">{counts.progress}</strong> progress</span>
-            <span><strong className="text-cyan-700">{counts.renewal}</strong> renewal</span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+            <span><strong className="text-slate-900 dark:text-slate-100">{counts.invited}</strong> rows</span>
+            <span><strong className="text-emerald-700 dark:text-emerald-300">{counts.confirmed}</strong> confirmed</span>
+            <span><strong className="text-teal-700 dark:text-teal-300">{counts.attended}</strong> attended</span>
+            <span><strong className="text-rose-600 dark:text-rose-300">{counts.absent}</strong> absent</span>
+            <span><strong className="text-amber-700 dark:text-amber-300">{counts.rescheduled}</strong> rescheduled</span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span><strong className="text-violet-700 dark:text-violet-300">{counts.progress}</strong> progress</span>
+            <span><strong className="text-cyan-700 dark:text-cyan-300">{counts.renewal}</strong> renewal</span>
           </div>
         </div>
 
         {/* Export bar */}
-        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mr-1">Export</span>
           <button
             type="button"
             onClick={handleCopy}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:border-violet-700 dark:bg-violet-900 dark:text-violet-300 dark:hover:bg-violet-800"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? "Copied!" : "Copy as text"}
           </button>
           <button
             type="button"
             onClick={() => handleDownload("text")}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 text-xs font-semibold hover:bg-cyan-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 text-xs font-semibold hover:bg-cyan-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:border-cyan-700 dark:bg-cyan-900 dark:text-cyan-300 dark:hover:bg-cyan-800"
           >
             <Download className="w-3.5 h-3.5" /> Download .txt
           </button>
@@ -452,7 +452,7 @@ export default function PCMInvitationsClient() {
             type="button"
             onClick={() => handleDownload("csv")}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-800"
           >
             <Download className="w-3.5 h-3.5" /> Download .csv
           </button>
@@ -462,10 +462,10 @@ export default function PCMInvitationsClient() {
         </div>
 
         {/* Table card */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {currentEvent ? currentEvent.name : "Pick an event above"}
               </h2>
               {currentEvent && (
@@ -480,22 +480,22 @@ export default function PCMInvitationsClient() {
           {loading ? (
             <div className="p-12 flex flex-col items-center text-center">
               <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
-              <p className="text-sm text-slate-500">Loading invitations…</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Loading invitations…</p>
             </div>
           ) : error ? (
-            <div className="p-8 text-center"><p className="text-sm font-medium text-red-600">{error}</p></div>
+            <div className="p-8 text-center"><p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p></div>
           ) : rows.length === 0 ? (
             <div className="p-12 text-center">
-              <div className="w-12 h-12 rounded-full bg-slate-100 mx-auto mb-3 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 mx-auto mb-3 flex items-center justify-center">
                 <Users className="w-5 h-5 text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500">No invitations match these filters.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">No invitations match these filters.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100">
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
                     {["#", "Branch", "Day · Session", "Time", "Student", "Grade", "Type", "Status", "Coach"].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                         {h}
@@ -503,28 +503,28 @@ export default function PCMInvitationsClient() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((inv, idx) => {
                     const sess = SESSIONS_BY_ID.get(inv.sessionId);
                     return (
-                      <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
+                      <tr key={inv.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/70 transition-colors">
                         <td className="px-4 py-3 font-mono text-xs text-slate-400">{idx + 1}</td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold tracking-wide font-mono">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold tracking-wide font-mono dark:bg-violet-900 dark:text-violet-300">
                             {inv.branch}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
                           {sess ? `${sess.dayLabel.split(" ")[0]} · S${sess.sessionNumber}` : "—"}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                           {sess ? `${sess.startTime}–${sess.endTime}` : "—"}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{inv.studentName}</div>
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{inv.studentName}</div>
                           <div className="text-xs text-slate-400">#{inv.studentId}</div>
                         </td>
-                        <td className="px-4 py-3 font-mono text-sm font-semibold text-slate-700">
+                        <td className="px-4 py-3 font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
                           {gradeLabel(inv.targetGrade)}
                         </td>
                         <td className="px-4 py-3">
@@ -541,7 +541,7 @@ export default function PCMInvitationsClient() {
                             {STATUS_LABELS[inv.status]}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">
+                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                           {inv.coachName ?? <span className="text-slate-400 italic">—</span>}
                         </td>
                       </tr>
