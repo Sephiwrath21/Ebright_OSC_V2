@@ -83,7 +83,7 @@ export function PublicFormClient({ slug, schema: rawSchema }: PublicFormClientPr
       style={{
         width: '100%',
         maxWidth: 520,
-        background: '#fff',
+        background: 'var(--surface)',
         borderRadius: 22,
         boxShadow: '0 18px 45px rgba(0,0,0,.20)',
         overflow: 'hidden',
@@ -186,8 +186,8 @@ export function PublicFormClient({ slug, schema: rawSchema }: PublicFormClientPr
                 cursor: 'pointer',
                 textTransform: 'uppercase',
                 marginTop: 12,
-                background: '#e6e6e6',
-                color: '#6b6b6b',
+                background: 'var(--status-track)',
+                color: 'var(--text-neutral)',
               }}
             >
               BACK
@@ -224,7 +224,7 @@ function FieldRenderer({
     display: 'block',
     fontWeight: 800,
     fontSize: 18,
-    color: '#2a2a2a',
+    color: 'var(--text-primary)',
     marginBottom: 10,
   }
 
@@ -236,12 +236,12 @@ function FieldRenderer({
       ? '3px solid #ed1c24'
       : filled
         ? '3px solid #ffb000'
-        : '3px solid #e6e6e6',
+        : '3px solid var(--status-track)',
     borderRadius: 16,
     fontSize: 16,
-    color: '#333',
+    color: 'var(--text-strong)',
     outline: 'none',
-    background: filled ? '#fff9e6' : '#fff',
+    background: filled ? '#fff9e6' : 'var(--surface)',
     fontFamily: 'Arial,sans-serif',
     transition: 'border-color .2s, box-shadow .2s, background .2s',
   }
@@ -315,14 +315,14 @@ function FieldRenderer({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      border: selected ? `3px solid ${color}` : '3px solid #e7e7e7',
+                      border: selected ? `3px solid ${color}` : '3px solid var(--status-track)',
                       borderRadius: 16,
                       background: selected
                         ? `linear-gradient(135deg, ${color} 0%, ${shade(color, 20)} 100%)`
-                        : '#fff',
+                        : 'var(--surface)',
                       fontSize: 26,
                       fontWeight: 900,
-                      color: selected ? '#fff' : '#666',
+                      color: selected ? '#fff' : 'var(--text-neutral)',
                       cursor: 'pointer',
                       transition: 'transform .15s ease, border-color .2s, box-shadow .2s',
                       userSelect: 'none',
@@ -362,7 +362,7 @@ function FieldRenderer({
           style={{
             marginTop: 10,
             fontSize: 14,
-            color: '#666',
+            color: 'var(--text-neutral)',
             fontStyle: 'italic',
             lineHeight: 1.35,
           }}
@@ -383,7 +383,7 @@ function SuccessScreen({ color, title, message }: { color: string; title?: strin
       style={{
         width: '100%',
         maxWidth: 520,
-        background: '#fff',
+        background: 'var(--surface)',
         borderRadius: 22,
         boxShadow: '0 18px 45px rgba(0,0,0,.20)',
         overflow: 'hidden',
@@ -397,11 +397,11 @@ function SuccessScreen({ color, title, message }: { color: string; title?: strin
         }}
       />
       <div style={{ padding: '56px 40px', textAlign: 'center' }}>
-        <div style={{ fontSize: 96, lineHeight: 1, color: '#22c55e', marginBottom: 12 }}>✓</div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1a1a', marginBottom: 14 }}>
+        <div style={{ fontSize: 96, lineHeight: 1, color: 'var(--accent-green)', marginBottom: 12 }}>✓</div>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 14 }}>
           {title ?? 'Registration Successful!'}
         </h1>
-        <p style={{ fontSize: 16, color: '#555', lineHeight: 1.5, maxWidth: 380, margin: '0 auto' }}>
+        <p style={{ fontSize: 16, color: 'var(--text-neutral)', lineHeight: 1.5, maxWidth: 380, margin: '0 auto' }}>
           {message ?? 'Thank you for registering. We will contact you shortly.'}
         </p>
       </div>
