@@ -18,8 +18,11 @@ async function main() {
   console.log('Diagnostic Output:\n', output);
 
   // Update claim_id 14 description with the diagnostic output
+  const PG_PASSWORD = process.env.PG_PASSWORD;
+  if (!PG_PASSWORD) throw new Error('PG_PASSWORD is required — run: set -a; . /home/staff1/.pg_env; set +a');
+
   const client = new Client({
-    connectionString: "postgresql://optidept:ebrightoptidept2025@103.209.156.174:5433/hrfs?schema=public"
+    connectionString: `postgresql://optidept:${PG_PASSWORD}@103.209.156.174:5433/hrfs?schema=public`
   });
   await client.connect();
   await client.query("UPDATE claim SET claim_description = $1 WHERE claim_id = 14;", [output]);
