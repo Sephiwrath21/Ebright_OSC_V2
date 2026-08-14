@@ -203,67 +203,76 @@ describe("canManageTaskTemplateGroups", () => {
 });
 
 describe("taskManagerNavAccess", () => {
-  it("Super Admin (ADMIN): all three true", () => {
+  it("Super Admin (ADMIN): all three true, personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "ADMIN", department: null })).toEqual({
       template: true,
       package: true,
       packageTable: true,
+      myWeek: true,
     });
   });
-  it("Operation (elevated dept-site): all three true", () => {
+  it("Operation (elevated dept-site): all three true, but a shared/site account so myWeek false", () => {
     expect(taskManagerNavAccess({ role: "DEPT_SITE", department: "Operations" })).toEqual({
       template: true,
       package: true,
       packageTable: true,
+      myWeek: false,
     });
   });
-  it("HOD: all three true (view-only, but sidebar-visible)", () => {
+  it("HOD: all three true (view-only, but sidebar-visible), personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "HOD", department: null })).toEqual({
       template: true,
       package: true,
       packageTable: true,
+      myWeek: true,
     });
   });
-  it("CEO: all three true (view-only, but sidebar-visible)", () => {
+  it("CEO: all three true (view-only, but sidebar-visible), personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "CEO", department: null })).toEqual({
       template: true,
       package: true,
       packageTable: true,
+      myWeek: true,
     });
   });
-  it("Branch Manager (BRANCH): all three true (2026-08-11 — Template added, same tier as HOD)", () => {
+  it("Branch Manager (BRANCH): all three true (2026-08-11 — Template added, same tier as HOD), personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "BRANCH", department: null })).toEqual({
       template: true,
       package: true,
       packageTable: true,
+      myWeek: true,
     });
   });
-  it("OPS role: all three false (not in the matrix)", () => {
+  it("OPS role: all three false (not in the matrix), personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "OPS", department: null })).toEqual({
       template: false,
       package: false,
       packageTable: false,
+      myWeek: true,
     });
   });
-  it("non-elevated dept-site (Department): all three false", () => {
+  it("non-elevated dept-site (Department): all three false, shared/site account so myWeek false", () => {
     expect(taskManagerNavAccess({ role: "DEPT_SITE", department: "Finance" })).toEqual({
       template: false,
       package: false,
       packageTable: false,
+      myWeek: false,
     });
   });
-  it("BRANCH_SITE (Branch): all three false", () => {
+  it("BRANCH_SITE (Branch): all three false, shared/site account so myWeek false", () => {
     expect(taskManagerNavAccess({ role: "BRANCH_SITE", department: null })).toEqual({
       template: false,
       package: false,
       packageTable: false,
+      myWeek: false,
     });
   });
-  it("MEMBER (Intern/HQ Exec/Branch Exec/Coach/unspecified): all three false", () => {
+  it("MEMBER (Intern/HQ Exec/Branch Exec/Coach/unspecified): all three false, personal account so myWeek true", () => {
     expect(taskManagerNavAccess({ role: "MEMBER", department: null })).toEqual({
       template: false,
       package: false,
       packageTable: false,
+      myWeek: true,
     });
   });
 });
