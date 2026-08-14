@@ -394,8 +394,9 @@ model TaskCategory {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  runBlocks RunBlock[]
-  templates TaskTemplate[]
+  runBlocks      RunBlock[]
+  templates      TaskTemplate[]
+  templateGroups TaskTemplateGroup[]
 
   @@index([createdById])
 }
@@ -422,12 +423,22 @@ model TaskTemplateGroup {
   archivedAt  DateTime?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  // Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+  // this group (unlike TaskTemplate.categoryId, which is per-task and used
+  // only by the single-task "+ Task" flow's own Type dropdown). Set on
+  // create/edit; applyTemplateGroup passes this SAME categoryId to every
+  // fanned-out assignment. SetNull on category delete, same as every other
+  // categoryId relation — an archived/deleted category never blocks or
+  // orphans a template/package, it just falls back to "Uncategorized".
+  categoryId  String?
+  category    TaskCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   templates       TaskTemplate[]
   branchSchedules BranchPackageSchedule[]
 
   @@index([createdById])
   @@index([scope])
+  @@index([categoryId])
 }
 
 enum PackageScheduleWeekday {

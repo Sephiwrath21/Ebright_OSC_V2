@@ -105,16 +105,6 @@ const groupTaskSchema = z.object({
   id: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(200),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
-  /** Task Category ("Type", 2026-08-15) — same field TaskTemplate already
-   *  carries for the single-task "+ Task" form's own Type dropdown. Stored
-   *  on the TaskTemplate row as a PRE-FILL default only (not authoritative
-   *  — the authoritative per-assignment value lives on RunBlock.categoryId,
-   *  same as every other template), so it's threaded into
-   *  createTemplateGroup/editTemplateGroup's TaskTemplate writes and into
-   *  applyTemplateGroup/the new-member-task fan-out's assignFlowTaskCore
-   *  calls, but never propagated to already-created pending instances the
-   *  way title/subtasks edits are. */
-  categoryId: z.string().min(1).optional(),
 });
 
 /** Validates a submitted categoryId against a real, non-archived
@@ -150,14 +140,24 @@ async function resolveStoredCategoryId(categoryId: string | null): Promise<strin
   return category?.id;
 }
 
+// Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+// the group (a sibling of `name`, not a per-task field — see
+// TaskTemplateGroup.categoryId's schema comment). Stored on the group row
+// as a PRE-FILL default only for applyTemplateGroup's fan-out (not
+// authoritative — the authoritative per-assignment value lives on
+// RunBlock.categoryId, same as every other categoryId path in this app).
+const categoryIdSchema = z.string().min(1).optional();
+
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  categoryId: categoryIdSchema,
   tasks: z.array(groupTaskSchema.omit({ id: true })).min(1).max(GROUP_TASK_MAX),
 });
 export type CreateTemplateGroupInput = z.input<typeof createGroupSchema>;
 
 const editGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  categoryId: categoryIdSchema,
   tasks: z.array(groupTaskSchema).min(1).max(GROUP_TASK_MAX),
 });
 export type EditTemplateGroupInput = z.input<typeof editGroupSchema>;
@@ -175,13 +175,13 @@ export interface TemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
-  categoryId: string | null;
 }
 
 export interface TemplateGroupDetail {
   id: string;
   name: string;
   tasks: TemplateGroupTask[];
+  categoryId: string | null;
 }
 
 /** Cards data for the /task-manager/template or /task-manager/package
@@ -235,11 +235,11 @@ export function getTemplateGroup(
     return {
       id: group.id,
       name: group.name,
+      categoryId: group.categoryId,
       tasks: group.templates.map((t) => ({
         id: t.id,
         title: t.title,
         subtasks: Array.isArray(t.subtasks) ? (t.subtasks as string[]) : [],
-        categoryId: t.categoryId,
       })),
     };
   }, "getTemplateGroup");
@@ -255,12 +255,12 @@ export function createTemplateGroup(
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const body = createGroupSchema.parse(input);
+    const categoryId = await resolveCategoryId(body.categoryId);
     const group = await prisma.$transaction(async (tx) => {
       const g = await tx.taskTemplateGroup.create({
-        data: { createdById: user.id, name: body.name, scope },
+        data: { createdById: user.id, name: body.name, scope, categoryId },
       });
       for (const [index, t] of body.tasks.entries()) {
-        const categoryId = await resolveCategoryId(t.categoryId);
         await tx.taskTemplate.create({
           data: {
             createdById: user.id,
@@ -269,7 +269,6 @@ export function createTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: g.id,
             groupPosition: index,
-            categoryId,
           },
         });
       }
@@ -435,8 +434,9 @@ export function editTemplateGroup(
       select: { id: true },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
+    const categoryId = await resolveCategoryId(body.categoryId);
 
-    await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name } });
+    await prisma.taskTemplateGroup.update({ where: { id }, data: { name: body.name, categoryId } });
 
     const existing = await prisma.taskTemplate.findMany({
       where: { templateGroupId: id },
@@ -484,18 +484,11 @@ export function editTemplateGroup(
     let newTaskAssignedTo = 0;
     let newTaskSkipped = 0;
     for (const [index, t] of body.tasks.entries()) {
-      const categoryId = await resolveCategoryId(t.categoryId);
       if (t.id && existingIds.has(t.id)) {
         const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
         updatedTasks += result.updatedTasks;
         employees += result.employees;
-        // Category is a pre-fill default only (see groupTaskSchema's own
-        // comment) — updated directly here rather than threaded through
-        // editTaskTemplateCore, which propagates title/subtasks to already-
-        // pending instances; a category "edit" has no such propagation
-        // target (the authoritative per-assignment value already lives on
-        // each instance's own RunBlock.categoryId, set at assignment time).
-        await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index, categoryId } });
+        await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
       } else {
         const newTask = await prisma.taskTemplate.create({
           data: {
@@ -505,7 +498,6 @@ export function editTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: id,
             groupPosition: index,
-            categoryId,
           },
         });
         createdTasks += 1;
@@ -662,6 +654,11 @@ export function applyTemplateGroup(
     if (group.templates.length === 0) {
       throw new ApiHttpError(400, `This ${NOUN[scope]} has no tasks to assign`);
     }
+    // The group's ONE shared Type (see TaskTemplateGroup.categoryId's
+    // schema comment) — resolved once and applied to every fanned-out
+    // task, not read per-TaskTemplate (TaskTemplate itself carries no
+    // categoryId at all since the per-task design was superseded).
+    const categoryId = await resolveStoredCategoryId(group.categoryId);
 
     let created = 0;
     for (const t of group.templates) {
@@ -674,7 +671,7 @@ export function applyTemplateGroup(
         dueDate: body.dueDate,
         cadence: body.cadence,
         fromTemplateId: t.id,
-        categoryId: await resolveStoredCategoryId(t.categoryId),
+        categoryId,
       } satisfies FlowAssignInput);
       created += result.created;
     }

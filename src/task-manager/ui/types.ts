@@ -459,16 +459,17 @@ export interface FlowTemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
-  /** Task Category ("Type", 2026-08-15) — set per task within the group,
-   *  same field TaskTemplate already carries for the single-task "+ Task"
-   *  form's own Type dropdown; null = uncategorized. */
-  categoryId: string | null;
 }
 
 export interface FlowTemplateGroupDetail {
   id: string;
   name: string;
   tasks: FlowTemplateGroupTask[];
+  /** Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+   *  the group (a sibling of `name`, not a per-task field) — distinct from
+   *  TaskTemplate.categoryId, which is per-task and only used by the
+   *  single-task "+ Task" form's own Type dropdown. null = uncategorized. */
+  categoryId: string | null;
 }
 
 /** Task shape submitted from the Create/Edit form — `id` present only for
@@ -477,9 +478,6 @@ export interface FlowTemplateGroupTaskInput {
   id?: string;
   title: string;
   subtasks: string[];
-  /** Task Category ("Type", 2026-08-15) — see FlowTemplateGroupTask's own
-   *  doc comment. Absent/empty string = uncategorized. */
-  categoryId?: string;
 }
 
 export type TemplateGroupLoadResult =
@@ -542,11 +540,12 @@ export interface FlowTemplateGroupControl {
   load: (groupId: string) => Promise<TemplateGroupLoadResult>;
   create: (input: {
     name: string;
-    tasks: { title: string; subtasks: string[]; categoryId?: string }[];
+    categoryId?: string;
+    tasks: { title: string; subtasks: string[] }[];
   }) => Promise<TemplateGroupSaveResult>;
   edit: (
     groupId: string,
-    input: { name: string; tasks: FlowTemplateGroupTaskInput[] },
+    input: { name: string; categoryId?: string; tasks: FlowTemplateGroupTaskInput[] },
   ) => Promise<TemplateGroupEditResult>;
   impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
   remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;

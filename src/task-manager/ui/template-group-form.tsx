@@ -31,9 +31,11 @@ export function TemplateGroupFormModal({
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
   label?: "Template" | "Package";
-  /** Task Category ("Type", 2026-08-15) — active categories for each task's
-   *  own Type dropdown, same prop shape as AssignTaskForm's. Omit or pass an
-   *  empty array to hide every dropdown (e.g. before any category exists). */
+  /** Task Category ("Type", 2026-08-15) — active categories for this
+   *  template/package's own Type dropdown (ONE per group, a sibling of
+   *  `name` — not per-task), same prop shape as AssignTaskForm's. Omit or
+   *  pass an empty array to hide the dropdown entirely (e.g. before any
+   *  category exists). */
   categories?: FlowCategoryOption[];
   /** Inline "+ Add new type" — see AssignTaskForm's own doc comment; same
    *  gate (canManageTaskTemplateGroups), passed by both pages identically. */
@@ -42,15 +44,15 @@ export function TemplateGroupFormModal({
   const isEdit = Boolean(groupId);
   const labelLower = label.toLowerCase();
   const [name, setName] = React.useState("");
+  const [categoryId, setCategoryId] = React.useState("");
   const [tasks, setTasks] = React.useState<FlowTemplateGroupTaskInput[]>([{ title: "", subtasks: [] }]);
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [loading, setLoading] = React.useState(isEdit);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
-  // Lifted here, not inside CategoryPicker (2026-08-15) — this form renders
-  // ONE picker per task, so a category created from any task's "+ Add new
-  // type" needs to show up in every OTHER task's dropdown too; see
-  // category-picker.tsx's own header comment.
+  // Inline "+ Add new type" (2026-08-12): categories start from the prop,
+  // then grow locally as this session creates new ones — no page refresh
+  // needed to pick a category you just added.
   const [localCategories, setLocalCategories] = React.useState(categories ?? []);
 
   React.useEffect(() => {
@@ -64,14 +66,8 @@ export function TemplateGroupFormModal({
         return;
       }
       setName(result.group.name);
-      setTasks(
-        result.group.tasks.map((t) => ({
-          id: t.id,
-          title: t.title,
-          subtasks: t.subtasks,
-          categoryId: t.categoryId ?? undefined,
-        })),
-      );
+      setCategoryId(result.group.categoryId ?? "");
+      setTasks(result.group.tasks.map((t) => ({ id: t.id, title: t.title, subtasks: t.subtasks })));
       setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
     });
     return () => {
@@ -94,9 +90,6 @@ export function TemplateGroupFormModal({
   };
   const updateSubtasks = (index: number, subtasks: string[]) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, subtasks } : t)));
-  };
-  const updateCategory = (index: number, categoryId: string) => {
-    setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, categoryId: categoryId || undefined } : t)));
   };
 
   const save = () => {
@@ -130,8 +123,8 @@ export function TemplateGroupFormModal({
         }
       }
       const result = isEdit
-        ? await control.edit(groupId as string, { name: trimmedName, tasks: cleanTasks })
-        : await control.create({ name: trimmedName, tasks: cleanTasks });
+        ? await control.edit(groupId as string, { name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks })
+        : await control.create({ name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks });
       if (result.ok) {
         onClose();
       } else {
@@ -173,33 +166,33 @@ export function TemplateGroupFormModal({
               />
             </label>
 
+            <CategoryPicker
+              value={categoryId}
+              onChange={setCategoryId}
+              categories={localCategories}
+              onCreateCategory={onCreateCategory}
+              onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+            />
+
             {tasks.map((task, index) => (
               <div key={taskKeys[index]} className="rounded-2xl border border-gray-200 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 space-y-2">
-                    <p className="text-sm text-gray-600">Task {index + 1}</p>
-                    <CategoryPicker
-                      value={task.categoryId ?? ""}
-                      onChange={(categoryId) => updateCategory(index, categoryId)}
-                      categories={localCategories}
-                      onCreateCategory={onCreateCategory}
-                      onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
-                    />
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex-1 text-sm text-gray-600">
+                    Task {index + 1}
                     <input
                       value={task.title}
                       onChange={(e) => updateTitle(index, e.target.value)}
                       placeholder="Task title"
-                      aria-label={`Task ${index + 1} title`}
                       maxLength={200}
-                      className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                      className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
                     />
-                  </div>
+                  </label>
                   {tasks.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeTask(index)}
                       aria-label={`Remove task ${index + 1}`}
-                      className="mt-6 shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                      className="mt-5 shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                     >
                       ✕
                     </button>

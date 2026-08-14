@@ -3540,11 +3540,13 @@ export namespace Prisma {
   export type TaskCategoryCountOutputType = {
     runBlocks: number
     templates: number
+    templateGroups: number
   }
 
   export type TaskCategoryCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runBlocks?: boolean | TaskCategoryCountOutputTypeCountRunBlocksArgs
     templates?: boolean | TaskCategoryCountOutputTypeCountTemplatesArgs
+    templateGroups?: boolean | TaskCategoryCountOutputTypeCountTemplateGroupsArgs
   }
 
   // Custom InputTypes
@@ -3570,6 +3572,13 @@ export namespace Prisma {
    */
   export type TaskCategoryCountOutputTypeCountTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: TaskTemplateWhereInput
+  }
+
+  /**
+   * TaskCategoryCountOutputType without action
+   */
+  export type TaskCategoryCountOutputTypeCountTemplateGroupsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateGroupWhereInput
   }
 
 
@@ -18007,6 +18016,7 @@ export namespace Prisma {
     updatedAt?: boolean
     runBlocks?: boolean | TaskCategory$runBlocksArgs<ExtArgs>
     templates?: boolean | TaskCategory$templatesArgs<ExtArgs>
+    templateGroups?: boolean | TaskCategory$templateGroupsArgs<ExtArgs>
     _count?: boolean | TaskCategoryCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskCategory"]>
 
@@ -18044,6 +18054,7 @@ export namespace Prisma {
   export type TaskCategoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     runBlocks?: boolean | TaskCategory$runBlocksArgs<ExtArgs>
     templates?: boolean | TaskCategory$templatesArgs<ExtArgs>
+    templateGroups?: boolean | TaskCategory$templateGroupsArgs<ExtArgs>
     _count?: boolean | TaskCategoryCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type TaskCategoryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -18054,6 +18065,7 @@ export namespace Prisma {
     objects: {
       runBlocks: Prisma.$RunBlockPayload<ExtArgs>[]
       templates: Prisma.$TaskTemplatePayload<ExtArgs>[]
+      templateGroups: Prisma.$TaskTemplateGroupPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -18459,6 +18471,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     runBlocks<T extends TaskCategory$runBlocksArgs<ExtArgs> = {}>(args?: Subset<T, TaskCategory$runBlocksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RunBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     templates<T extends TaskCategory$templatesArgs<ExtArgs> = {}>(args?: Subset<T, TaskCategory$templatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    templateGroups<T extends TaskCategory$templateGroupsArgs<ExtArgs> = {}>(args?: Subset<T, TaskCategory$templateGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -18936,6 +18949,30 @@ export namespace Prisma {
   }
 
   /**
+   * TaskCategory.templateGroups
+   */
+  export type TaskCategory$templateGroupsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateGroup
+     */
+    select?: TaskTemplateGroupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateGroup
+     */
+    omit?: TaskTemplateGroupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupInclude<ExtArgs> | null
+    where?: TaskTemplateGroupWhereInput
+    orderBy?: TaskTemplateGroupOrderByWithRelationInput | TaskTemplateGroupOrderByWithRelationInput[]
+    cursor?: TaskTemplateGroupWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: TaskTemplateGroupScalarFieldEnum | TaskTemplateGroupScalarFieldEnum[]
+  }
+
+  /**
    * TaskCategory without action
    */
   export type TaskCategoryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -18972,6 +19009,7 @@ export namespace Prisma {
     archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
+    categoryId: string | null
   }
 
   export type TaskTemplateGroupMaxAggregateOutputType = {
@@ -18982,6 +19020,7 @@ export namespace Prisma {
     archivedAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
+    categoryId: string | null
   }
 
   export type TaskTemplateGroupCountAggregateOutputType = {
@@ -18992,6 +19031,7 @@ export namespace Prisma {
     archivedAt: number
     createdAt: number
     updatedAt: number
+    categoryId: number
     _all: number
   }
 
@@ -19004,6 +19044,7 @@ export namespace Prisma {
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
+    categoryId?: true
   }
 
   export type TaskTemplateGroupMaxAggregateInputType = {
@@ -19014,6 +19055,7 @@ export namespace Prisma {
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
+    categoryId?: true
   }
 
   export type TaskTemplateGroupCountAggregateInputType = {
@@ -19024,6 +19066,7 @@ export namespace Prisma {
     archivedAt?: true
     createdAt?: true
     updatedAt?: true
+    categoryId?: true
     _all?: true
   }
 
@@ -19107,6 +19150,7 @@ export namespace Prisma {
     archivedAt: Date | null
     createdAt: Date
     updatedAt: Date
+    categoryId: string | null
     _count: TaskTemplateGroupCountAggregateOutputType | null
     _min: TaskTemplateGroupMinAggregateOutputType | null
     _max: TaskTemplateGroupMaxAggregateOutputType | null
@@ -19134,6 +19178,8 @@ export namespace Prisma {
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    categoryId?: boolean
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
     templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
     branchSchedules?: boolean | TaskTemplateGroup$branchSchedulesArgs<ExtArgs>
     _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
@@ -19147,6 +19193,8 @@ export namespace Prisma {
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    categoryId?: boolean
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateGroup"]>
 
   export type TaskTemplateGroupSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -19157,6 +19205,8 @@ export namespace Prisma {
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    categoryId?: boolean
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateGroup"]>
 
   export type TaskTemplateGroupSelectScalar = {
@@ -19167,20 +19217,27 @@ export namespace Prisma {
     archivedAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    categoryId?: boolean
   }
 
-  export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "scope" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskTemplateGroup"]>
+  export type TaskTemplateGroupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdById" | "name" | "scope" | "archivedAt" | "createdAt" | "updatedAt" | "categoryId", ExtArgs["result"]["taskTemplateGroup"]>
   export type TaskTemplateGroupInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
     templates?: boolean | TaskTemplateGroup$templatesArgs<ExtArgs>
     branchSchedules?: boolean | TaskTemplateGroup$branchSchedulesArgs<ExtArgs>
     _count?: boolean | TaskTemplateGroupCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type TaskTemplateGroupIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
-  export type TaskTemplateGroupIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type TaskTemplateGroupIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
+  }
+  export type TaskTemplateGroupIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | TaskTemplateGroup$categoryArgs<ExtArgs>
+  }
 
   export type $TaskTemplateGroupPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "TaskTemplateGroup"
     objects: {
+      category: Prisma.$TaskCategoryPayload<ExtArgs> | null
       templates: Prisma.$TaskTemplatePayload<ExtArgs>[]
       branchSchedules: Prisma.$BranchPackageSchedulePayload<ExtArgs>[]
     }
@@ -19192,6 +19249,7 @@ export namespace Prisma {
       archivedAt: Date | null
       createdAt: Date
       updatedAt: Date
+      categoryId: string | null
     }, ExtArgs["result"]["taskTemplateGroup"]>
     composites: {}
   }
@@ -19586,6 +19644,7 @@ export namespace Prisma {
    */
   export interface Prisma__TaskTemplateGroupClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    category<T extends TaskTemplateGroup$categoryArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$categoryArgs<ExtArgs>>): Prisma__TaskCategoryClient<$Result.GetResult<Prisma.$TaskCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     templates<T extends TaskTemplateGroup$templatesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$templatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     branchSchedules<T extends TaskTemplateGroup$branchSchedulesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateGroup$branchSchedulesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BranchPackageSchedulePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -19624,6 +19683,7 @@ export namespace Prisma {
     readonly archivedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
     readonly createdAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
     readonly updatedAt: FieldRef<"TaskTemplateGroup", 'DateTime'>
+    readonly categoryId: FieldRef<"TaskTemplateGroup", 'String'>
   }
     
 
@@ -19878,6 +19938,10 @@ export namespace Prisma {
      */
     data: TaskTemplateGroupCreateManyInput | TaskTemplateGroupCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -19948,6 +20012,10 @@ export namespace Prisma {
      * Limit how many TaskTemplateGroups to update.
      */
     limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateGroupIncludeUpdateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -20014,6 +20082,25 @@ export namespace Prisma {
      * Limit how many TaskTemplateGroups to delete.
      */
     limit?: number
+  }
+
+  /**
+   * TaskTemplateGroup.category
+   */
+  export type TaskTemplateGroup$categoryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskCategory
+     */
+    select?: TaskCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskCategory
+     */
+    omit?: TaskCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskCategoryInclude<ExtArgs> | null
+    where?: TaskCategoryWhereInput
   }
 
   /**
@@ -32235,7 +32322,8 @@ export namespace Prisma {
     scope: 'scope',
     archivedAt: 'archivedAt',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    categoryId: 'categoryId'
   };
 
   export type TaskTemplateGroupScalarFieldEnum = (typeof TaskTemplateGroupScalarFieldEnum)[keyof typeof TaskTemplateGroupScalarFieldEnum]
@@ -33656,6 +33744,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"TaskCategory"> | Date | string
     runBlocks?: RunBlockListRelationFilter
     templates?: TaskTemplateListRelationFilter
+    templateGroups?: TaskTemplateGroupListRelationFilter
   }
 
   export type TaskCategoryOrderByWithRelationInput = {
@@ -33668,6 +33757,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     runBlocks?: RunBlockOrderByRelationAggregateInput
     templates?: TaskTemplateOrderByRelationAggregateInput
+    templateGroups?: TaskTemplateGroupOrderByRelationAggregateInput
   }
 
   export type TaskCategoryWhereUniqueInput = Prisma.AtLeast<{
@@ -33683,6 +33773,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"TaskCategory"> | Date | string
     runBlocks?: RunBlockListRelationFilter
     templates?: TaskTemplateListRelationFilter
+    templateGroups?: TaskTemplateGroupListRelationFilter
   }, "id">
 
   export type TaskCategoryOrderByWithAggregationInput = {
@@ -33724,6 +33815,8 @@ export namespace Prisma {
     archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    categoryId?: StringNullableFilter<"TaskTemplateGroup"> | string | null
+    category?: XOR<TaskCategoryNullableScalarRelationFilter, TaskCategoryWhereInput> | null
     templates?: TaskTemplateListRelationFilter
     branchSchedules?: BranchPackageScheduleListRelationFilter
   }
@@ -33736,6 +33829,8 @@ export namespace Prisma {
     archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    categoryId?: SortOrderInput | SortOrder
+    category?: TaskCategoryOrderByWithRelationInput
     templates?: TaskTemplateOrderByRelationAggregateInput
     branchSchedules?: BranchPackageScheduleOrderByRelationAggregateInput
   }
@@ -33751,6 +33846,8 @@ export namespace Prisma {
     archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    categoryId?: StringNullableFilter<"TaskTemplateGroup"> | string | null
+    category?: XOR<TaskCategoryNullableScalarRelationFilter, TaskCategoryWhereInput> | null
     templates?: TaskTemplateListRelationFilter
     branchSchedules?: BranchPackageScheduleListRelationFilter
   }, "id">
@@ -33763,6 +33860,7 @@ export namespace Prisma {
     archivedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    categoryId?: SortOrderInput | SortOrder
     _count?: TaskTemplateGroupCountOrderByAggregateInput
     _max?: TaskTemplateGroupMaxOrderByAggregateInput
     _min?: TaskTemplateGroupMinOrderByAggregateInput
@@ -33779,6 +33877,7 @@ export namespace Prisma {
     archivedAt?: DateTimeNullableWithAggregatesFilter<"TaskTemplateGroup"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplateGroup"> | Date | string
+    categoryId?: StringNullableWithAggregatesFilter<"TaskTemplateGroup"> | string | null
   }
 
   export type BranchPackageScheduleWhereInput = {
@@ -35593,6 +35692,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     runBlocks?: RunBlockCreateNestedManyWithoutCategoryInput
     templates?: TaskTemplateCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryUncheckedCreateInput = {
@@ -35605,6 +35705,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     runBlocks?: RunBlockUncheckedCreateNestedManyWithoutCategoryInput
     templates?: TaskTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupUncheckedCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryUpdateInput = {
@@ -35617,6 +35718,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlocks?: RunBlockUpdateManyWithoutCategoryNestedInput
     templates?: TaskTemplateUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUpdateManyWithoutCategoryNestedInput
   }
 
   export type TaskCategoryUncheckedUpdateInput = {
@@ -35629,6 +35731,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlocks?: RunBlockUncheckedUpdateManyWithoutCategoryNestedInput
     templates?: TaskTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUncheckedUpdateManyWithoutCategoryNestedInput
   }
 
   export type TaskCategoryCreateManyInput = {
@@ -35669,6 +35772,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    category?: TaskCategoryCreateNestedOneWithoutTemplateGroupsInput
     templates?: TaskTemplateCreateNestedManyWithoutGroupInput
     branchSchedules?: BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput
   }
@@ -35681,6 +35785,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    categoryId?: string | null
     templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
     branchSchedules?: BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput
   }
@@ -35693,6 +35798,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: TaskCategoryUpdateOneWithoutTemplateGroupsNestedInput
     templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
     branchSchedules?: BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput
   }
@@ -35705,6 +35811,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
     branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
   }
@@ -35717,6 +35824,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    categoryId?: string | null
   }
 
   export type TaskTemplateGroupUpdateManyMutationInput = {
@@ -35737,6 +35845,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type BranchPackageScheduleCreateInput = {
@@ -37616,7 +37725,17 @@ export namespace Prisma {
     none?: TaskTemplateWhereInput
   }
 
+  export type TaskTemplateGroupListRelationFilter = {
+    every?: TaskTemplateGroupWhereInput
+    some?: TaskTemplateGroupWhereInput
+    none?: TaskTemplateGroupWhereInput
+  }
+
   export type TaskTemplateOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type TaskTemplateGroupOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -37683,6 +37802,7 @@ export namespace Prisma {
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    categoryId?: SortOrder
   }
 
   export type TaskTemplateGroupMaxOrderByAggregateInput = {
@@ -37693,6 +37813,7 @@ export namespace Prisma {
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    categoryId?: SortOrder
   }
 
   export type TaskTemplateGroupMinOrderByAggregateInput = {
@@ -37703,6 +37824,7 @@ export namespace Prisma {
     archivedAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    categoryId?: SortOrder
   }
 
   export type EnumTemplateGroupScopeWithAggregatesFilter<$PrismaModel = never> = {
@@ -39110,6 +39232,13 @@ export namespace Prisma {
     connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
   }
 
+  export type TaskTemplateGroupCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput> | TaskTemplateGroupCreateWithoutCategoryInput[] | TaskTemplateGroupUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutCategoryInput | TaskTemplateGroupCreateOrConnectWithoutCategoryInput[]
+    createMany?: TaskTemplateGroupCreateManyCategoryInputEnvelope
+    connect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+  }
+
   export type RunBlockUncheckedCreateNestedManyWithoutCategoryInput = {
     create?: XOR<RunBlockCreateWithoutCategoryInput, RunBlockUncheckedCreateWithoutCategoryInput> | RunBlockCreateWithoutCategoryInput[] | RunBlockUncheckedCreateWithoutCategoryInput[]
     connectOrCreate?: RunBlockCreateOrConnectWithoutCategoryInput | RunBlockCreateOrConnectWithoutCategoryInput[]
@@ -39122,6 +39251,13 @@ export namespace Prisma {
     connectOrCreate?: TaskTemplateCreateOrConnectWithoutCategoryInput | TaskTemplateCreateOrConnectWithoutCategoryInput[]
     createMany?: TaskTemplateCreateManyCategoryInputEnvelope
     connect?: TaskTemplateWhereUniqueInput | TaskTemplateWhereUniqueInput[]
+  }
+
+  export type TaskTemplateGroupUncheckedCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput> | TaskTemplateGroupCreateWithoutCategoryInput[] | TaskTemplateGroupUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutCategoryInput | TaskTemplateGroupCreateOrConnectWithoutCategoryInput[]
+    createMany?: TaskTemplateGroupCreateManyCategoryInputEnvelope
+    connect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
   }
 
   export type RunBlockUpdateManyWithoutCategoryNestedInput = {
@@ -39152,6 +39288,20 @@ export namespace Prisma {
     deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
   }
 
+  export type TaskTemplateGroupUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput> | TaskTemplateGroupCreateWithoutCategoryInput[] | TaskTemplateGroupUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutCategoryInput | TaskTemplateGroupCreateOrConnectWithoutCategoryInput[]
+    upsert?: TaskTemplateGroupUpsertWithWhereUniqueWithoutCategoryInput | TaskTemplateGroupUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: TaskTemplateGroupCreateManyCategoryInputEnvelope
+    set?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    disconnect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    delete?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    connect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    update?: TaskTemplateGroupUpdateWithWhereUniqueWithoutCategoryInput | TaskTemplateGroupUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: TaskTemplateGroupUpdateManyWithWhereWithoutCategoryInput | TaskTemplateGroupUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: TaskTemplateGroupScalarWhereInput | TaskTemplateGroupScalarWhereInput[]
+  }
+
   export type RunBlockUncheckedUpdateManyWithoutCategoryNestedInput = {
     create?: XOR<RunBlockCreateWithoutCategoryInput, RunBlockUncheckedCreateWithoutCategoryInput> | RunBlockCreateWithoutCategoryInput[] | RunBlockUncheckedCreateWithoutCategoryInput[]
     connectOrCreate?: RunBlockCreateOrConnectWithoutCategoryInput | RunBlockCreateOrConnectWithoutCategoryInput[]
@@ -39178,6 +39328,26 @@ export namespace Prisma {
     update?: TaskTemplateUpdateWithWhereUniqueWithoutCategoryInput | TaskTemplateUpdateWithWhereUniqueWithoutCategoryInput[]
     updateMany?: TaskTemplateUpdateManyWithWhereWithoutCategoryInput | TaskTemplateUpdateManyWithWhereWithoutCategoryInput[]
     deleteMany?: TaskTemplateScalarWhereInput | TaskTemplateScalarWhereInput[]
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput> | TaskTemplateGroupCreateWithoutCategoryInput[] | TaskTemplateGroupUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutCategoryInput | TaskTemplateGroupCreateOrConnectWithoutCategoryInput[]
+    upsert?: TaskTemplateGroupUpsertWithWhereUniqueWithoutCategoryInput | TaskTemplateGroupUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: TaskTemplateGroupCreateManyCategoryInputEnvelope
+    set?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    disconnect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    delete?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    connect?: TaskTemplateGroupWhereUniqueInput | TaskTemplateGroupWhereUniqueInput[]
+    update?: TaskTemplateGroupUpdateWithWhereUniqueWithoutCategoryInput | TaskTemplateGroupUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: TaskTemplateGroupUpdateManyWithWhereWithoutCategoryInput | TaskTemplateGroupUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: TaskTemplateGroupScalarWhereInput | TaskTemplateGroupScalarWhereInput[]
+  }
+
+  export type TaskCategoryCreateNestedOneWithoutTemplateGroupsInput = {
+    create?: XOR<TaskCategoryCreateWithoutTemplateGroupsInput, TaskCategoryUncheckedCreateWithoutTemplateGroupsInput>
+    connectOrCreate?: TaskCategoryCreateOrConnectWithoutTemplateGroupsInput
+    connect?: TaskCategoryWhereUniqueInput
   }
 
   export type TaskTemplateCreateNestedManyWithoutGroupInput = {
@@ -39210,6 +39380,16 @@ export namespace Prisma {
 
   export type EnumTemplateGroupScopeFieldUpdateOperationsInput = {
     set?: $Enums.TemplateGroupScope
+  }
+
+  export type TaskCategoryUpdateOneWithoutTemplateGroupsNestedInput = {
+    create?: XOR<TaskCategoryCreateWithoutTemplateGroupsInput, TaskCategoryUncheckedCreateWithoutTemplateGroupsInput>
+    connectOrCreate?: TaskCategoryCreateOrConnectWithoutTemplateGroupsInput
+    upsert?: TaskCategoryUpsertWithoutTemplateGroupsInput
+    disconnect?: TaskCategoryWhereInput | boolean
+    delete?: TaskCategoryWhereInput | boolean
+    connect?: TaskCategoryWhereUniqueInput
+    update?: XOR<XOR<TaskCategoryUpdateToOneWithWhereWithoutTemplateGroupsInput, TaskCategoryUpdateWithoutTemplateGroupsInput>, TaskCategoryUncheckedUpdateWithoutTemplateGroupsInput>
   }
 
   export type TaskTemplateUpdateManyWithoutGroupNestedInput = {
@@ -41553,6 +41733,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     templates?: TaskTemplateCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryUncheckedCreateWithoutRunBlocksInput = {
@@ -41564,6 +41745,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     templates?: TaskTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupUncheckedCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryCreateOrConnectWithoutRunBlocksInput = {
@@ -41927,6 +42109,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     templates?: TaskTemplateUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUpdateManyWithoutCategoryNestedInput
   }
 
   export type TaskCategoryUncheckedUpdateWithoutRunBlocksInput = {
@@ -41938,6 +42121,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     templates?: TaskTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUncheckedUpdateManyWithoutCategoryNestedInput
   }
 
   export type RunBlockCreateWithoutGuidelineInput = {
@@ -42128,6 +42312,40 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type TaskTemplateGroupCreateWithoutCategoryInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateCreateNestedManyWithoutGroupInput
+    branchSchedules?: BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput
+  }
+
+  export type TaskTemplateGroupUncheckedCreateWithoutCategoryInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
+    branchSchedules?: BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput
+  }
+
+  export type TaskTemplateGroupCreateOrConnectWithoutCategoryInput = {
+    where: TaskTemplateGroupWhereUniqueInput
+    create: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type TaskTemplateGroupCreateManyCategoryInputEnvelope = {
+    data: TaskTemplateGroupCreateManyCategoryInput | TaskTemplateGroupCreateManyCategoryInput[]
+    skipDuplicates?: boolean
+  }
+
   export type RunBlockUpsertWithWhereUniqueWithoutCategoryInput = {
     where: RunBlockWhereUniqueInput
     update: XOR<RunBlockUpdateWithoutCategoryInput, RunBlockUncheckedUpdateWithoutCategoryInput>
@@ -42179,6 +42397,65 @@ export namespace Prisma {
     categoryId?: StringNullableFilter<"TaskTemplate"> | string | null
     createdAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
+  }
+
+  export type TaskTemplateGroupUpsertWithWhereUniqueWithoutCategoryInput = {
+    where: TaskTemplateGroupWhereUniqueInput
+    update: XOR<TaskTemplateGroupUpdateWithoutCategoryInput, TaskTemplateGroupUncheckedUpdateWithoutCategoryInput>
+    create: XOR<TaskTemplateGroupCreateWithoutCategoryInput, TaskTemplateGroupUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type TaskTemplateGroupUpdateWithWhereUniqueWithoutCategoryInput = {
+    where: TaskTemplateGroupWhereUniqueInput
+    data: XOR<TaskTemplateGroupUpdateWithoutCategoryInput, TaskTemplateGroupUncheckedUpdateWithoutCategoryInput>
+  }
+
+  export type TaskTemplateGroupUpdateManyWithWhereWithoutCategoryInput = {
+    where: TaskTemplateGroupScalarWhereInput
+    data: XOR<TaskTemplateGroupUpdateManyMutationInput, TaskTemplateGroupUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type TaskTemplateGroupScalarWhereInput = {
+    AND?: TaskTemplateGroupScalarWhereInput | TaskTemplateGroupScalarWhereInput[]
+    OR?: TaskTemplateGroupScalarWhereInput[]
+    NOT?: TaskTemplateGroupScalarWhereInput | TaskTemplateGroupScalarWhereInput[]
+    id?: StringFilter<"TaskTemplateGroup"> | string
+    createdById?: StringFilter<"TaskTemplateGroup"> | string
+    name?: StringFilter<"TaskTemplateGroup"> | string
+    scope?: EnumTemplateGroupScopeFilter<"TaskTemplateGroup"> | $Enums.TemplateGroupScope
+    archivedAt?: DateTimeNullableFilter<"TaskTemplateGroup"> | Date | string | null
+    createdAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    updatedAt?: DateTimeFilter<"TaskTemplateGroup"> | Date | string
+    categoryId?: StringNullableFilter<"TaskTemplateGroup"> | string | null
+  }
+
+  export type TaskCategoryCreateWithoutTemplateGroupsInput = {
+    id?: string
+    name: string
+    order?: number
+    archivedAt?: Date | string | null
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    runBlocks?: RunBlockCreateNestedManyWithoutCategoryInput
+    templates?: TaskTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type TaskCategoryUncheckedCreateWithoutTemplateGroupsInput = {
+    id?: string
+    name: string
+    order?: number
+    archivedAt?: Date | string | null
+    createdById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    runBlocks?: RunBlockUncheckedCreateNestedManyWithoutCategoryInput
+    templates?: TaskTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type TaskCategoryCreateOrConnectWithoutTemplateGroupsInput = {
+    where: TaskCategoryWhereUniqueInput
+    create: XOR<TaskCategoryCreateWithoutTemplateGroupsInput, TaskCategoryUncheckedCreateWithoutTemplateGroupsInput>
   }
 
   export type TaskTemplateCreateWithoutGroupInput = {
@@ -42255,6 +42532,41 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type TaskCategoryUpsertWithoutTemplateGroupsInput = {
+    update: XOR<TaskCategoryUpdateWithoutTemplateGroupsInput, TaskCategoryUncheckedUpdateWithoutTemplateGroupsInput>
+    create: XOR<TaskCategoryCreateWithoutTemplateGroupsInput, TaskCategoryUncheckedCreateWithoutTemplateGroupsInput>
+    where?: TaskCategoryWhereInput
+  }
+
+  export type TaskCategoryUpdateToOneWithWhereWithoutTemplateGroupsInput = {
+    where?: TaskCategoryWhereInput
+    data: XOR<TaskCategoryUpdateWithoutTemplateGroupsInput, TaskCategoryUncheckedUpdateWithoutTemplateGroupsInput>
+  }
+
+  export type TaskCategoryUpdateWithoutTemplateGroupsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    order?: IntFieldUpdateOperationsInput | number
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runBlocks?: RunBlockUpdateManyWithoutCategoryNestedInput
+    templates?: TaskTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type TaskCategoryUncheckedUpdateWithoutTemplateGroupsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    order?: IntFieldUpdateOperationsInput | number
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runBlocks?: RunBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    templates?: TaskTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
   export type TaskTemplateUpsertWithWhereUniqueWithoutGroupInput = {
     where: TaskTemplateWhereUniqueInput
     update: XOR<TaskTemplateUpdateWithoutGroupInput, TaskTemplateUncheckedUpdateWithoutGroupInput>
@@ -42309,6 +42621,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    category?: TaskCategoryCreateNestedOneWithoutTemplateGroupsInput
     templates?: TaskTemplateCreateNestedManyWithoutGroupInput
   }
 
@@ -42320,6 +42633,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    categoryId?: string | null
     templates?: TaskTemplateUncheckedCreateNestedManyWithoutGroupInput
   }
 
@@ -42347,6 +42661,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: TaskCategoryUpdateOneWithoutTemplateGroupsNestedInput
     templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
   }
 
@@ -42358,6 +42673,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
   }
 
@@ -42369,6 +42685,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    category?: TaskCategoryCreateNestedOneWithoutTemplateGroupsInput
     branchSchedules?: BranchPackageScheduleCreateNestedManyWithoutPackageGroupInput
   }
 
@@ -42380,6 +42697,7 @@ export namespace Prisma {
     archivedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    categoryId?: string | null
     branchSchedules?: BranchPackageScheduleUncheckedCreateNestedManyWithoutPackageGroupInput
   }
 
@@ -42397,6 +42715,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     runBlocks?: RunBlockCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryUncheckedCreateWithoutTemplatesInput = {
@@ -42408,6 +42727,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     runBlocks?: RunBlockUncheckedCreateNestedManyWithoutCategoryInput
+    templateGroups?: TaskTemplateGroupUncheckedCreateNestedManyWithoutCategoryInput
   }
 
   export type TaskCategoryCreateOrConnectWithoutTemplatesInput = {
@@ -42434,6 +42754,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: TaskCategoryUpdateOneWithoutTemplateGroupsNestedInput
     branchSchedules?: BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput
   }
 
@@ -42445,6 +42766,7 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
   }
 
@@ -42468,6 +42790,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlocks?: RunBlockUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUpdateManyWithoutCategoryNestedInput
   }
 
   export type TaskCategoryUncheckedUpdateWithoutTemplatesInput = {
@@ -42479,6 +42802,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlocks?: RunBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    templateGroups?: TaskTemplateGroupUncheckedUpdateManyWithoutCategoryNestedInput
   }
 
   export type RunBlockCreateWithoutProofsInput = {
@@ -43702,6 +44026,16 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type TaskTemplateGroupCreateManyCategoryInput = {
+    id?: string
+    createdById: string
+    name: string
+    scope?: $Enums.TemplateGroupScope
+    archivedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type RunBlockUpdateWithoutCategoryInput = {
     id?: StringFieldUpdateOperationsInput | string
     blockId?: StringFieldUpdateOperationsInput | string
@@ -43826,6 +44160,40 @@ export namespace Prisma {
     archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     templateGroupId?: NullableStringFieldUpdateOperationsInput | string | null
     groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateGroupUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUpdateManyWithoutGroupNestedInput
+    branchSchedules?: BranchPackageScheduleUpdateManyWithoutPackageGroupNestedInput
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    templates?: TaskTemplateUncheckedUpdateManyWithoutGroupNestedInput
+    branchSchedules?: BranchPackageScheduleUncheckedUpdateManyWithoutPackageGroupNestedInput
+  }
+
+  export type TaskTemplateGroupUncheckedUpdateManyWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    scope?: EnumTemplateGroupScopeFieldUpdateOperationsInput | $Enums.TemplateGroupScope
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

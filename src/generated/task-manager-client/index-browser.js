@@ -280,7 +280,8 @@ exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
   scope: 'scope',
   archivedAt: 'archivedAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  categoryId: 'categoryId'
 };
 
 exports.Prisma.BranchPackageScheduleScalarFieldEnum = {
