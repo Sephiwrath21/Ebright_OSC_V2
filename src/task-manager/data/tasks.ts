@@ -24,6 +24,7 @@ import { isPastDueDay, isFutureDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
+import { protectRecurringSeries } from "../engine/recurrence";
 import { isElevatedDeptSite } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
@@ -96,6 +97,14 @@ export function reassignFlowTask(
     }
     if (next.id === block.assigneeId) return;
 
+    // Lock in the CURRENT (pre-handoff) assignee's next weekly occurrence
+    // BEFORE flipping this one — see protectRecurringSeries's own doc
+    // comment for why this is needed (there's no template-level "series
+    // owner", so without this the reassignment would otherwise leak
+    // forward into future recurring occurrences once this block's due day
+    // passes). A no-op for non-recurring tasks (Monthly/Ad hoc/Manpower-
+    // synced) or a block that's already locked in.
+    await protectRecurringSeries(block.id);
     await prisma.runBlock.update({
       where: { id: block.id },
       data: { assigneeId: next.id },
