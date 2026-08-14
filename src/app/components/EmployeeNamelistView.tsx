@@ -80,23 +80,23 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
   }, [filteredRows]);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href={`/employee-folder/${stage}?by=${groupBy}`} className="hover:text-slate-900 transition-colors">
+          <Link href={`/employee-folder/${stage}?by=${groupBy}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             {STAGE_LABELS[stage]}
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">{locationName}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">{locationName}</span>
         </nav>
 
         {/* search-bar: search input + type filter + search button, all on
@@ -105,7 +105,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
             button are shrink-0 with deliberately narrow fixed widths/padding
             on mobile so the three together never need to wrap. sm+ reverts
             to the original sizing unchanged. */}
-        <div className="flex flex-nowrap items-center gap-2 sm:gap-4 bg-white rounded-[20px] p-4 sm:p-5 mb-3">
+        <div className="flex flex-nowrap items-center gap-2 sm:gap-4 bg-white dark:bg-slate-900 rounded-[20px] p-4 sm:p-5 mb-3">
           <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
             <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
@@ -113,13 +113,13 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
               placeholder="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 pl-8 sm:pl-9 pr-2 sm:pr-3 rounded-lg border-2 border-black/25 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 pl-8 sm:pl-9 pr-2 sm:pr-3 rounded-lg border-2 border-black/25 dark:border-slate-500 text-sm text-black/67 dark:text-slate-100 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as PositionGroup | "")}
-            className="shrink-0 w-[84px] sm:w-auto sm:min-w-[130px] h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate"
+            className="shrink-0 w-[84px] sm:w-auto sm:min-w-[130px] h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 dark:border-slate-500 text-xs sm:text-sm text-black/67 dark:text-slate-100 truncate"
           >
             <option value="">All types</option>
             {POSITION_GROUPS.map((g) => (
@@ -136,14 +136,14 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
 
         {/* view-toggle-row: list/grid view */}
         <div className="flex justify-end items-center gap-3 mb-3">
-          <div className="inline-flex gap-1 bg-[#eef3fb] rounded-full p-1">
+          <div className="inline-flex gap-1 bg-[#eef3fb] dark:bg-slate-800 rounded-full p-1">
             <button
               type="button"
               onClick={() => setViewMode("list")}
               aria-pressed={viewMode === "list"}
               aria-label="List view"
               className={`flex items-center justify-center w-9 h-8 rounded-full transition-colors ${
-                viewMode === "list" ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+                viewMode === "list" ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
               }`}
             >
               <List className="w-[18px] h-[18px]" aria-hidden="true" />
@@ -154,7 +154,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
               aria-pressed={viewMode === "grid"}
               aria-label="Grid view"
               className={`flex items-center justify-center w-9 h-8 rounded-full transition-colors ${
-                viewMode === "grid" ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+                viewMode === "grid" ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
               }`}
             >
               <LayoutGrid className="w-[18px] h-[18px]" aria-hidden="true" />
@@ -162,12 +162,12 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
           </div>
         </div>
 
-        <h1 className="text-xl font-medium text-black mb-4">{STAGE_LABELS[stage]}</h1>
+        <h1 className="text-xl font-medium text-black dark:text-slate-100 mb-4">{STAGE_LABELS[stage]}</h1>
 
         {viewMode === "grid" ? (
-          <div className="bg-white rounded-[20px] px-7 py-6 shadow-[0_1px_4px_0_#0000000f]">
+          <div className="bg-white dark:bg-slate-900 rounded-[20px] px-7 py-6 shadow-[0_1px_4px_0_#0000000f]">
             {POSITION_GROUPS.filter((g) => grouped[g].length > 0).length === 0 ? (
-              <p className="text-center text-sm text-slate-500 py-10">No employees match these filters.</p>
+              <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-10">No employees match these filters.</p>
             ) : (
               POSITION_GROUPS.filter((g) => grouped[g].length > 0).map((group) => (
                 <CategorySection
@@ -215,18 +215,18 @@ function PersonCard({
   return (
     <Link
       href={`/employee-folder/${stage}/employee/${row.id}${profileQuery}`}
-      className="relative flex-1 basis-[130px] max-w-[150px] min-w-0 box-border bg-white border border-[#807d7d73] rounded-[15px] py-4 px-3 flex flex-col items-center text-center gap-1.5 hover:border-[#ee5f5f] hover:shadow-md transition-all"
+      className="relative flex-1 basis-[130px] max-w-[150px] min-w-0 box-border bg-white dark:bg-slate-900 border border-[#807d7d73] dark:border-slate-700 rounded-[15px] py-4 px-3 flex flex-col items-center text-center gap-1.5 hover:border-[#ee5f5f] hover:shadow-md transition-all"
     >
       <RowActionMenu name={row.fullName} className="absolute top-1.5 right-1.5" onDelete={() => onDelete(row.id)} />
       <div
         className={`w-[60px] h-[60px] rounded-full flex items-center justify-center font-medium text-lg shrink-0 ${
-          STAGE_AVATAR_CLASSES[stage] ?? "bg-emerald-100 text-emerald-800"
+          STAGE_AVATAR_CLASSES[stage] ?? "bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300"
         }`}
       >
         {initialsFromName(row.fullName)}
       </div>
-      <div className="text-base font-medium text-black/67 w-full truncate">{row.fullName}</div>
-      <div className="text-sm font-medium text-black/67 w-full truncate">{row.position ?? "—"}</div>
+      <div className="text-base font-medium text-black/67 dark:text-slate-300 w-full truncate">{row.fullName}</div>
+      <div className="text-sm font-medium text-black/67 dark:text-slate-300 w-full truncate">{row.position ?? "—"}</div>
     </Link>
   );
 }
@@ -249,7 +249,7 @@ function CategorySection({
   const shown = rows.slice(0, CARD_CAP);
   return (
     <section className="mb-7 last:mb-0">
-      <h2 className="text-xl font-medium text-black/77 mb-4">{label}</h2>
+      <h2 className="text-xl font-medium text-black/77 dark:text-slate-200 mb-4">{label}</h2>
       <div className="flex justify-center">
         <div className="flex flex-col items-end w-full max-w-[1000px]">
           <div className="flex flex-wrap gap-4 self-stretch">
@@ -261,7 +261,7 @@ function CategorySection({
             <button
               type="button"
               onClick={onShowMore}
-              className="mt-4 shrink-0 inline-block px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white text-sm font-medium text-[#7a1f1f] hover:bg-[#f48e8e24]"
+              className="mt-4 shrink-0 inline-block px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white dark:bg-slate-900 text-sm font-medium text-[#7a1f1f] dark:text-red-300 hover:bg-[#f48e8e24] dark:hover:bg-red-900/40"
             >
               Show More
             </button>
@@ -314,13 +314,13 @@ function ShowMoreModal({
   return (
     <div className="fixed inset-0 z-[1000]">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40 cursor-pointer" />
-      <div className="relative w-[min(1040px,calc(100vw-32px))] max-h-[min(720px,calc(100vh-32px))] mx-auto my-4 sm:my-8 bg-white rounded-3xl p-4 sm:p-7 box-border flex flex-col gap-4">
+      <div className="relative w-[min(1040px,calc(100vw-32px))] max-h-[min(720px,calc(100vh-32px))] mx-auto my-4 sm:my-8 bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-3xl p-4 sm:p-7 box-border flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3 shrink-0">
-          <h3 className="text-xl font-semibold text-black">{label}</h3>
+          <h3 className="text-xl font-semibold text-black dark:text-slate-100">{label}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 min-h-11 px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white text-sm font-medium text-[#7a1f1f] hover:bg-[#f48e8e24]"
+            className="shrink-0 min-h-11 px-5 py-2 rounded-[10px] border-2 border-[#ee5f5f] bg-white dark:bg-slate-900 text-sm font-medium text-[#7a1f1f] dark:text-red-300 hover:bg-[#f48e8e24] dark:hover:bg-red-900/40"
           >
             Show Less
           </button>
@@ -340,7 +340,7 @@ function ShowMoreModal({
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="flex-1 min-w-0 sm:min-w-[180px] h-11 rounded-lg border-2 border-black/25 px-2.5 sm:px-3.5 text-sm text-black/67 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-0 sm:min-w-[180px] h-11 rounded-lg border-2 border-black/25 dark:border-slate-500 px-2.5 sm:px-3.5 text-sm text-black/67 dark:text-slate-100 truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={year}
@@ -348,7 +348,7 @@ function ShowMoreModal({
               setYear(e.target.value);
               setPage(1);
             }}
-            className="shrink-0 w-[64px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[100px]"
+            className="shrink-0 w-[64px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 dark:border-slate-500 text-xs sm:text-sm text-black/67 dark:text-slate-100 truncate sm:min-w-[100px]"
           >
             <option value="">year</option>
             {years.map((y) => (
@@ -361,7 +361,7 @@ function ShowMoreModal({
               setMonth(e.target.value);
               setPage(1);
             }}
-            className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 text-xs sm:text-sm text-black/67 truncate sm:min-w-[120px]"
+            className="shrink-0 w-[74px] sm:w-auto h-11 px-1.5 sm:px-3 rounded-lg border-2 border-black/25 dark:border-slate-500 text-xs sm:text-sm text-black/67 dark:text-slate-100 truncate sm:min-w-[120px]"
           >
             <option value="">month</option>
             {MONTHS.map((m) => (
@@ -372,7 +372,7 @@ function ShowMoreModal({
 
         <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-6 max-[900px]:grid-cols-3 max-[560px]:grid-cols-2 gap-4 p-1">
           {visible.length === 0 ? (
-            <p className="col-span-full text-center text-sm text-slate-500 py-8">No matches.</p>
+            <p className="col-span-full text-center text-sm text-slate-500 dark:text-slate-400 py-8">No matches.</p>
           ) : (
             visible.map((row) => (
               <PersonCard key={row.id} row={row} stage={stage} profileQuery={profileQuery} onDelete={onDelete} />
@@ -426,7 +426,7 @@ function ListViewTable({
           on mobile instead of the whole page overflowing. The whole table
           (including Name) scrolls together as one unit — deliberately no
           sticky column. */}
-      <div className="bg-white rounded-[20px] overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-[20px] overflow-x-auto">
         {/* Opaque #d1f0f9 (the same #a4e2f480-over-white blend every other
             header row uses) rather than the translucent color directly —
             translucent backgrounds on a wide grid inside overflow-x-auto are
@@ -434,7 +434,7 @@ function ListViewTable({
             some browsers, which is what was actually showing as "Position"
             losing its background. Visually identical against this card's
             white background either way. */}
-        <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#d1f0f9] text-[15px] font-medium text-black`}>
+        <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#d1f0f9] dark:bg-slate-800 text-[15px] font-medium text-black dark:text-slate-100`}>
           <span>Name</span>
           <span>Employment Type</span>
           <span>Position</span>
@@ -442,17 +442,17 @@ function ListViewTable({
         </div>
 
         {visible.length === 0 ? (
-          <div className="px-8 py-10 text-center text-sm text-slate-500">No employees match these filters.</div>
+          <div className="px-8 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees match these filters.</div>
         ) : (
           visible.map((row) => {
             return (
               <div
                 key={row.id}
-                className={`grid ${gridColsClass} gap-4 px-8 h-14 items-center border-b border-black/10 last:border-b-0`}
+                className={`grid ${gridColsClass} gap-4 px-8 h-14 items-center border-b border-black/10 dark:border-white/10 last:border-b-0`}
               >
                 <Link
                   href={`/employee-folder/${stage}/employee/${row.id}${profileQuery}`}
-                  className="text-base font-medium text-black hover:underline truncate min-w-0"
+                  className="text-base font-medium text-black dark:text-slate-100 hover:underline truncate min-w-0"
                 >
                   {row.fullName}
                 </Link>
@@ -465,13 +465,13 @@ function ListViewTable({
                     same classifier the Block view's Full Time/Part Time/
                     Protege-or-Intern grouping already uses) gives a real
                     answer for every row instead. */}
-                <span className="text-[15px] text-black/67 truncate">
+                <span className="text-[15px] text-black/67 dark:text-slate-300 truncate">
                   {(() => {
                     const g = positionGroup(row.position);
                     return g === "Intern" ? thirdGroupLabel : g;
                   })()}
                 </span>
-                <span className="text-[15px] text-black/67 truncate">{row.position ?? "—"}</span>
+                <span className="text-[15px] text-black/67 dark:text-slate-300 truncate">{row.position ?? "—"}</span>
                 <div className="flex justify-center">
                   <RowActionMenu name={row.fullName} onDelete={() => onDelete(row.id)} />
                 </div>
