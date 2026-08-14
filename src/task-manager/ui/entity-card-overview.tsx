@@ -497,23 +497,19 @@ export function EntityCardOverview({
               className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300" : "border-gray-200"}`}
             >
               <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
-              <div className="px-3 py-2">
+              <div className="max-h-80 overflow-auto px-3 py-2">
                 {card.tasks.length === 0 ? (
                   <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
                 ) : (
-                  <table className="w-full table-fixed text-sm">
+                  <table className="w-max min-w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs text-gray-500">
-                        {/* Draggable, same shared width/handle as the
-                            Person-sort card above (2026-08-15) — table-fixed
-                            on the <table> (added above) so an explicit <th>
-                            width is actually respected by the browser,
-                            matching auto-layout's Assignee column taking
-                            whatever's left via its own unset width. */}
-                        <th className="relative pb-1 font-medium" style={{ width: taskColWidth }}>
-                          Task
-                          <HeaderResizeHandle onPointerDown={onResizeStart} />
-                        </th>
+                        {/* No column resize here (2026-08-15) — long content
+                            scrolls (the card body above is the scroll
+                            container, both axes) instead of being resized
+                            or truncated. The Person-sort "My Tasks" card
+                            keeps its own resize handle unchanged. */}
+                        <th className="pb-1 pr-4 font-medium">Task</th>
                         {/* Only Me (2026-08-15): every row already belongs to
                             the viewer, so naming them per-row is redundant —
                             View All still needs it to tell people apart.
@@ -534,10 +530,10 @@ export function EntityCardOverview({
                         return (
                           <React.Fragment key={t.runBlockId}>
                             <tr className="border-t border-dashed border-gray-100">
-                              <td className="truncate py-1.5 pr-2">{t.blockTitle}</td>
+                              <td className="whitespace-nowrap py-1.5 pr-4">{t.blockTitle}</td>
                               <td className="py-1.5 text-gray-500">
                                 <div className="flex items-center justify-between gap-2">
-                                  {!onlyMe && <span className="truncate">{t.assigneeName}</span>}
+                                  {!onlyMe && <span className="whitespace-nowrap">{t.assigneeName}</span>}
                                   {canReassignRow && (
                                     <button
                                       type="button"
