@@ -186,7 +186,7 @@ export function TaskManagerView({
       myWeek?: MyWeekConfig;
     };
     monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
-    hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
+    hodAssigned?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
     ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
   /** Weekday-tab view for the own card (2026-08-15) — Department/Branch

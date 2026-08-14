@@ -159,6 +159,7 @@ export default async function TaskManagerPage({
     date?: string;
     mdate?: string;
     mrange?: string;
+    hdate?: string;
   }>;
 }) {
   const session = await auth();
@@ -179,6 +180,12 @@ export default async function TaskManagerPage({
   // selector redesign) — undefined = Full month.
   const monthlyRange = parseMonthRange(sp.mrange);
   const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
+  // "HOD Assigned Task" date filter (2026-08-15, individual staff only —
+  // see myOverviewData.hodAssigned below) — independent of ?date=: you can
+  // look at a different day's HOD-assigned tasks without changing what the
+  // Daily section above it shows, same as Monthly's ?mdate= is independent
+  // of Daily's ?date=.
+  const hodAssignedDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
   // so changing one date never resets the others. (Ad hoc is deliberately
   // NOT date-filtered — 2026-07-29 simplification: one-off tasks, plain
@@ -187,6 +194,7 @@ export default async function TaskManagerPage({
     date: dailyDate,
     mdate: monthlyDate,
     mrange: monthlyRangeParam,
+    hdate: hodAssignedDate,
   };
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
@@ -194,6 +202,7 @@ export default async function TaskManagerPage({
     ) as Record<string, string>;
   const monthlyCarry = carryTM("date");
   const dailyCarry = carryTM("mdate", "mrange");
+  const hodAssignedCarry = carryTM("hdate");
 
   // Self-scoped sections (2026-08-12 stacked-sections redesign): a role
   // with no owned entity (OPS, CEO, and Monthly for every MEMBER-role
@@ -999,6 +1008,29 @@ export default async function TaskManagerPage({
         />
       </div>
     );
+    // "HOD Assigned Task" for individual staff (2026-08-15) — its own
+    // independent date filter (?hdate=, defaults to today), fetched
+    // separately from Daily/Monthly since it needs to window to a
+    // DIFFERENT date than either of them. getFlowOverview + strictWindow:
+    // true (not getFlowDetail) for the same reason the weekday-tab fetch
+    // uses it — personal-only, correctly windowed, without the wasted
+    // org/department/branch payloads getFlowDetail's role branches would
+    // otherwise pull for nothing. Only fetched for the 3 roles that
+    // actually get this section.
+    const isIndividualStaff =
+      viewRole === "DEPT_MEMBER" || viewRole === "BRANCH_MEMBER" || viewRole === "COACH";
+    const hodAssignedResult = isIndividualStaff
+      ? await getFlowOverview(email, "daily", hodAssignedDate, { strictWindow: true })
+      : null;
+    const personalHodAssignedControl = hodAssignedResult && (
+      <DailyDatePicker
+        key="personal-hod-assigned-picker"
+        value={hodAssignedResult.date}
+        basePath="/task-manager"
+        param="hdate"
+        extraParams={hodAssignedCarry}
+      />
+    );
     // Branch Manager's personal Ad hoc card + list (2026-07-29
     // simplification: NO date filter — ad hoc tasks are one-off/irregular,
     // so both the card and the always-rendered list show the plain ALL-TIME
@@ -1065,29 +1097,31 @@ export default async function TaskManagerPage({
       // Monthly — TaskOverviewStack's own stacking order already puts it
       // there) — DEPT_MEMBER/BRANCH_MEMBER/COACH only (Intern/Full Time
       // Exec/HQ Exec/Branch Exec/Coach), not OPS/CEO (managers, no "my
-      // own HOD" to be assigned by). Reuses daily.me.streamsAll — the
-      // SAME all-time, assigner-role-grouped data Home's own per-person
-      // "HOD assigned" card already reads (scoped-overview-section.tsx) —
-      // rather than a new query: no owned entity to scope a
-      // department/branch-wide hodAssigned fetch to, unlike HOD's/BRANCH's
-      // own Department/Branch Overview sections below. Always present
-      // (never omitted) even with zero tasks, same as Daily/Monthly — an
-      // individual simply never having had an HOD-assigned task is a
-      // normal empty state, not a fetch failure like the entity-wide
-      // sections' undefined-on-403 case.
-      hodAssigned:
-        viewRole === "DEPT_MEMBER" || viewRole === "BRANCH_MEMBER" || viewRole === "COACH"
-          ? {
-              entity: toSelfEntityDetail(
-                daily.me.me,
-                daily.me.streamsAll.find((s) => s.key === "HOD") ?? {
-                  totals: { completed: 0, pending: 0, na: 0 },
-                  tasks: [],
-                },
-              ),
-              showViewToggle: false,
-            }
-          : undefined,
+      // own HOD" to be assigned by). Windowed to its own independent
+      // ?hdate= (hodAssignedResult, fetched above) rather than
+      // daily.me.streamsAll's all-time data — the SAME per-person
+      // assigner-role grouping Home's own "HOD assigned" card reads
+      // (scoped-overview-section.tsx), just date-windowed here instead of
+      // all-time. No owned entity to scope a department/branch-wide
+      // hodAssigned fetch to, unlike HOD's/BRANCH's own Department/Branch
+      // Overview sections below (which stay all-time, unchanged). Always
+      // present (never omitted) even with zero tasks, same as Daily/
+      // Monthly — an individual simply having no HOD-assigned task on a
+      // given day is a normal empty state, not a fetch failure like the
+      // entity-wide sections' undefined-on-403 case.
+      hodAssigned: hodAssignedResult
+        ? {
+            entity: toSelfEntityDetail(
+              daily.me.me,
+              hodAssignedResult.streams.find((s) => s.key === "HOD") ?? {
+                totals: { completed: 0, pending: 0, na: 0 },
+                tasks: [],
+              },
+            ),
+            dateControl: personalHodAssignedControl,
+            showViewToggle: false,
+          }
+        : undefined,
     };
 
     body = (
