@@ -28,7 +28,7 @@ export function MyWeekView({
 
   return (
     <div className="flex gap-6">
-      <div className="w-48 shrink-0">
+      <div role="tablist" className="w-48 shrink-0">
         {days.map((d) => {
           const pendingCount = d.tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED").length;
           const active = d.date === selectedDay?.date;
@@ -36,13 +36,17 @@ export function MyWeekView({
             <button
               key={d.date}
               type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setSelectedDate(d.date)}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium ${
                 active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
               }`}
             >
               <span>{d.weekday}</span>
-              <span className={active ? "text-blue-100" : "text-gray-400"}>{pendingCount}</span>
+              <span className={active ? "text-blue-100" : "text-gray-400"} aria-label={`${pendingCount} pending`}>
+                {pendingCount}
+              </span>
             </button>
           );
         })}
