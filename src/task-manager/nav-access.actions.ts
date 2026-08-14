@@ -18,14 +18,12 @@ export interface TaskManagerNavAccess {
   template: boolean;
   package: boolean;
   packageTable: boolean;
-  myWeek: boolean;
 }
 
 const NO_ACCESS: TaskManagerNavAccess = {
   template: false,
   package: false,
   packageTable: false,
-  myWeek: false,
 };
 
 /** Fail-closed: any error (no Task Manager account, DB not configured,

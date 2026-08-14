@@ -264,29 +264,25 @@ export function isElevatedDeptSite(user: {
  *  exclusively inline from the Assign Task form's Type dropdown, gated by
  *  canManageTaskTemplateGroups on that dropdown's "+ Add new type" option
  *  directly — see assign-task-form.tsx and createTaskCategory — so there's
- *  no separate sidebar surface or nav-access key for it anymore.) */
+ *  no separate sidebar surface or nav-access key for it anymore.)
+ *
+ *  (2026-08-13 added, then removed 2026-08-15: a standalone /task-manager/
+ *  my-week page + "myWeek" nav key briefly existed; the same weekday-tab
+ *  view is now embedded directly in the Overview page's own "My Tasks"
+ *  Daily card instead — see entity-card-overview.tsx — so there's no
+ *  separate sidebar surface or nav-access key for it anymore either.) */
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
-  branch?: string | null;
-  employmentType?: string | null;
-}): { template: boolean; package: boolean; packageTable: boolean; myWeek: boolean } {
+}): { template: boolean; package: boolean; packageTable: boolean } {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
   const branchManagerViewer = user.role === "BRANCH";
   const viewer = manage || orgViewer || branchManagerViewer;
-  // "My Week" (2026-08-13): personal-account roles only, same personal-vs-
-  // site distinction isPersonalAccountView already encodes elsewhere (the
-  // Department/Branch Overview default View toggle). branch/employmentType
-  // are optional here since some callers (e.g. this file's own tests) only
-  // pass role/department — real callers (requireUserByEmail's User) DO have
-  // both, and are forwarded through rather than forced null.
-  const myWeek = isPersonalAccountView(resolveViewRole({ ...user, branch: user.branch ?? null }));
   return {
     template: viewer,
     package: viewer,
     packageTable: viewer,
-    myWeek,
   };
 }
 
