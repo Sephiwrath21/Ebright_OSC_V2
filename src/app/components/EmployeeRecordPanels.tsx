@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useMemo, useRef, type ReactNode } from "react";
+import { startTransition, useState, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   PanelHeading,
   SubsectionHeading,
   Subsection,
   FieldGrid,
-  PlaceholderField,
-  PlaceholderSelectField,
-  PlaceholderTextArea,
   PlaceholderUploadField,
   SalaryRevisionFields,
   EditableField,
@@ -26,6 +23,7 @@ import {
   type SalaryRevisionHandle,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
+import type { ValidationResult } from "@/app/components/PageEditMode";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   addGuardianInfo,
@@ -230,6 +228,24 @@ export function GuardianInfoPanel({
     }
   }
 
+  // Same per-row checks as handleSave's own inline guard — see
+  // PersonalInfoPanel's validate() in ActiveProfilePanels.tsx for why this
+  // is a separate function rather than a dry-run flag on handleSave itself.
+  function validate(): ValidationResult {
+    const errors: string[] = [];
+    guardians.forEach((g, i) => {
+      const isBlankNewDraft = g.id === null && !g.name && !g.relationship && !g.gender && !g.email && !g.phone && !g.address;
+      if (isBlankNewDraft) return;
+      if (g.phone && !isValidPhoneDigits(parsePhoneValue(g.phone).digits)) {
+        errors.push(`Guardian ${i + 1}: enter a valid phone number.`);
+      }
+      if (g.email && !isValidEmail(g.email)) {
+        errors.push(`Guardian ${i + 1}: enter a valid email address.`);
+      }
+    });
+    return errors.length > 0 ? { valid: false, error: errors.join("\n") } : { valid: true };
+  }
+
   async function handleSave(): Promise<SaveResult> {
     for (const g of guardians) {
       const isBlankNewDraft =
@@ -259,7 +275,7 @@ export function GuardianInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} validate={validate} canEdit={canEdit} sectionLabel="Guardian Info">
       <PanelHeading>Guardian Info</PanelHeading>
       {guardians.map((g, i) => (
         <div key={g.id ?? `new-${i}`} className="mb-7 last:mb-0">
@@ -306,14 +322,17 @@ export function GuardianInfoPanel({
   );
 }
 
-// ─── HR Info (7 sub-tabs) — no schema backing; would need candidate-intake
-// tables (offer-letter/hiring-notes/nda). Resume/CV, Reference, Medical
-// Check, and Handbook are real now — see ActiveProfilePanels.ResumePanel/
-// ReferenceCheckPanel/MedicalCheckPanel/DocumentsPanel (Handbook shares
-// DocumentsPanel with the stage-flow's Onboarding "Documents" tab — same
-// single "Employee Handbook Acknowledge" field in both mocks), special-cased
-// in EmployeeRecordView's resolvePanel instead of living in the static-panel
-// lookup below since they need real userId/data props the others don't take. ───
+// ─── HR Info (7 sub-tabs) — Resume/CV, Reference, Medical Check, Handbook,
+// and Hiring Notes are real now — see ActiveProfilePanels.ResumePanel/
+// ReferenceCheckPanel/MedicalCheckPanel/DocumentsPanel/InterviewAssessmentPanel
+// (Handbook shares DocumentsPanel with the stage-flow's Onboarding
+// "Documents" tab, Hiring Notes shares InterviewAssessmentPanel with Pre
+// stage's own "Interview Assessment" tab — same interview_assessment record
+// either way, see that component's own comment), special-cased in
+// EmployeeRecordView's resolvePanel instead of living in the static-panel
+// lookup below since they need real userId/data props the others don't
+// take. Offer Letter alone still has no schema backing (would need its own
+// candidate-intake table). ───
 
 export function OfferLetterPanel({ canEdit = true }: { canEdit?: boolean }) {
   return (
@@ -321,22 +340,6 @@ export function OfferLetterPanel({ canEdit = true }: { canEdit?: boolean }) {
       <PanelHeading>Offer Letter</PanelHeading>
       <FieldGrid>
         <PlaceholderUploadField label="Offer Letter" />
-      </FieldGrid>
-    </EditableSection>
-  );
-}
-
-export function HiringNotesPanel({ canEdit = true }: { canEdit?: boolean }) {
-  return (
-    <EditableSection hasRealBacking={false} canEdit={canEdit}>
-      <PanelHeading>Hiring Notes</PanelHeading>
-      <FieldGrid>
-        <PlaceholderField label="Interview Date" type="date" />
-        <PlaceholderSelectField label="Overall Rating" options={["Excellent", "Good", "Average", "Below Average"]} />
-        <PlaceholderSelectField label="Recommendation" options={["Hire", "Hold", "Reject"]} full />
-        <PlaceholderTextArea label="Strengths" />
-        <PlaceholderTextArea label="Weaknesses" />
-        <PlaceholderTextArea label="Hiring Notes" />
       </FieldGrid>
     </EditableSection>
   );
@@ -392,7 +395,7 @@ export function PayrollPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} canEdit={canEdit} sectionLabel="Payroll/ Payslip">
       <PanelHeading>Payroll/ Payslip</PanelHeading>
       <Subsection heading="Basic Pay">
         <CurrencyField label="Basic Salary" value={basicPay} onChange={setBasicPay} />
@@ -497,8 +500,14 @@ export function PerformanceReviewPanel({
   const router = useRouter();
   const latest = data[0] ?? null;
 
+  // Deliberately NOT defaulting to `latest` when editingId is unset (fixed
+  // 2026-08-13, see conversation — same fix as SalaryRevisionFields in
+  // ActiveProfilePanels.tsx) — a brand-new review should start blank, not
+  // pre-filled with the previous review's own values; `latest` is still
+  // used on its own for the unchanged-vs-latest no-op guard below, not to
+  // seed the form.
   const [editingId, setEditingId] = useState<number | null>(null);
-  const loaded = editingId !== null ? data.find((r) => r.id === editingId) ?? null : latest;
+  const loaded = editingId !== null ? data.find((r) => r.id === editingId) ?? null : null;
 
   const [period, setPeriod] = useState(loaded?.period ?? "");
   const [reviewDate, setReviewDate] = useState(loaded?.reviewDate ?? "");
@@ -538,7 +547,11 @@ export function PerformanceReviewPanel({
       });
       if (!result || result.ok !== false) {
         setEditingId(null);
-        router.refresh();
+        // Wrapped in startTransition (2026-08-13, see conversation — same
+        // fix as SalaryRevisionFields/RepeatableRecordSection in
+        // ActiveProfilePanels.tsx: a bare router.refresh() here races
+        // against this same PageEditProvider Save cycle's own state updates).
+        startTransition(() => router.refresh());
       }
       return result;
     }
@@ -546,7 +559,21 @@ export function PerformanceReviewPanel({
       return { ok: true };
     }
     const result = await addPerformanceReview(userId, { period, reviewDate, reviewer, overallRating, comment, attachmentFile: pendingFile });
-    if (!result || result.ok !== false) router.refresh();
+    if (!result || result.ok !== false) {
+      startTransition(() => router.refresh());
+      // Reset the form back to blank after a successful add (2026-08-13, see
+      // conversation, same reason as SalaryRevisionFields) — loaded/
+      // syncedLoadedId both stay null throughout a plain "add new" flow, so
+      // the resync effect above never re-fires on its own here; without
+      // this, adding a second new review in the same session would start
+      // pre-filled with whatever was just submitted.
+      setPeriod("");
+      setReviewDate("");
+      setReviewer("");
+      setOverallRating("");
+      setComment("");
+      setPendingFile(null);
+    }
     return result;
   }
 
@@ -564,7 +591,7 @@ export function PerformanceReviewPanel({
       setDeleting(false);
       setPendingDeleteId(null);
       if (editingId === pendingDeleteId) setEditingId(null);
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Delete failed.");
       setDeleting(false);
@@ -572,7 +599,7 @@ export function PerformanceReviewPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} canEdit={canEdit} sectionLabel="Performance Review">
       <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
       <FieldGrid>
         <EditableField label="Review Period" value={period} onChange={setPeriod} />
@@ -780,5 +807,4 @@ export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
 // Promotion/Transfer/Cert.-Achievement/the 4 Disciplinary sub-tabs).
 export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, (props: { canEdit?: boolean }) => ReactNode> = {
   "hr-info/offer-letter": OfferLetterPanel,
-  "hr-info/hiring-notes": HiringNotesPanel,
 };

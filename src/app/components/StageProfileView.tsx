@@ -36,6 +36,10 @@ import type {
   NdaInfo,
   NonCompeteInfo,
   DisciplinarySummaryRow,
+  DomesticInquiryEntry,
+  SuspensionLetterEntry,
+  ShowcauseWarningLetterEntry,
+  PipEntry,
   ResignationInfo,
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
@@ -73,6 +77,7 @@ import {
   SystemRevocationPanel,
   FinancialSettlementPanel,
 } from "@/app/components/ActiveProfilePanels";
+import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog } from "@/app/components/PageEditMode";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
 import {
   updateEmergencyContact,
@@ -120,6 +125,13 @@ interface Props {
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  /** Raw per-type rows behind disciplinarySummary — only fetched alongside
+   *  it (2026-08-13, see conversation) so clicking a summary row can open
+   *  that record's own real edit modal (DisciplinarySummaryPanel). */
+  domesticInquiries?: DomesticInquiryEntry[];
+  suspensionLetters?: SuspensionLetterEntry[];
+  showcauseWarningLetters?: ShowcauseWarningLetterEntry[];
+  pips?: PipEntry[];
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
@@ -178,6 +190,10 @@ export default function StageProfileView({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  domesticInquiries,
+  suspensionLetters,
+  showcauseWarningLetters,
+  pips,
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
@@ -193,8 +209,21 @@ export default function StageProfileView({
   locationName,
 }: Props) {
   const config = STAGE_PROFILE_CONFIG[stage];
-  const [inPageActive, setInPageActive] = useState(config.sections[0].key);
-  const currentKey = config.profileMode === "in-page-tabs" ? inPageActive : activeSection ?? config.sections[0].key;
+  // PageEditProvider rollout (2026-08-13, see conversation) — Onboarding's
+  // own top-level tabs switch via this same client-side state as Pre/
+  // Probation's in-page-tabs, despite their profileMode staying
+  // "separate-pages" (Active, which shares that profileMode, is explicitly
+  // NOT converted yet — held per the confirmed batch order). Seeded from
+  // activeSection (the URL's own section param) rather than always
+  // defaulting to the first section, so landing directly on e.g.
+  // .../onboarding/employee/5/payroll still opens on Payroll —
+  // activeSection is always null for genuine in-page-tabs stages
+  // (Pre/Probation have no section segment in their URL at all, see
+  // [id]/page.tsx), so this seed is a no-op there, unchanged from before.
+  const usesClientTabs =
+    config.profileMode === "in-page-tabs" || stage === "onboarding" || stage === "exit" || stage === "active";
+  const [inPageActive, setInPageActive] = useState(activeSection ?? config.sections[0].key);
+  const currentKey = usesClientTabs ? inPageActive : activeSection ?? config.sections[0].key;
   const currentSection = config.sections.find((s) => s.key === currentKey) ?? config.sections[0];
 
   const [history, setHistory] = useState<HistorySelection | null>(null);
@@ -256,7 +285,7 @@ export default function StageProfileView({
         const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
           isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
         }`;
-        if (config.profileMode === "in-page-tabs") {
+        if (usesClientTabs) {
           return (
             <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={className}>
               {section.label}
@@ -291,16 +320,20 @@ export default function StageProfileView({
               <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
                 {groupSections.map((s) => {
                   const isCurrent = !history && s.key === currentKey;
+                  const className = `w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
+                    isCurrent
+                      ? config.navRail.clearanceCurrent ?? config.navRail.current
+                      : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
+                  }`;
+                  if (usesClientTabs) {
+                    return (
+                      <button key={s.key} type="button" onClick={() => goToCurrentSection(s.key)} className={className}>
+                        {s.label}
+                      </button>
+                    );
+                  }
                   return (
-                    <Link
-                      key={s.key}
-                      href={sectionHref(s.key)}
-                      className={`w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
-                        isCurrent
-                          ? config.navRail.clearanceCurrent ?? config.navRail.current
-                          : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
-                      }`}
-                    >
+                    <Link key={s.key} href={sectionHref(s.key)} className={className}>
                       {s.label}
                     </Link>
                   );
@@ -380,7 +413,7 @@ export default function StageProfileView({
     const pillClassName = `shrink-0 rounded-full border-2 font-normal whitespace-nowrap transition-colors px-3 py-1.5 text-xs sm:text-sm ${
       isActive ? config.navRail.current : `${config.navRail.base} hover:brightness-95`
     }`;
-    if (config.profileMode === "in-page-tabs") {
+    if (usesClientTabs) {
       return (
         <button
           key={section.key}
@@ -432,7 +465,7 @@ export default function StageProfileView({
             : `${config.navRail.clearanceBase ?? config.navRail.base} hover:brightness-95`
         }`;
         mobileRowTwoTopLevel.push(
-          config.profileMode === "in-page-tabs" ? (
+          usesClientTabs ? (
             <button key={section.key} type="button" onClick={() => goToCurrentSection(section.key)} className={pillClassName}>
               {section.label}
             </button>
@@ -548,7 +581,7 @@ export default function StageProfileView({
                 selected={history}
                 currentStyle={config.navRail.current}
                 onSelect={(sel) => setHistory(sel)}
-                className="mb-0"
+                className="mb-0 ml-4 sm:ml-6"
               />
             ) : (
               <HistoryTabStrip
@@ -557,7 +590,7 @@ export default function StageProfileView({
                 selected={history}
                 currentStyle={config.navRail.current}
                 onSelect={(sel) => setHistory(sel)}
-                className="mb-0"
+                className="mb-0 ml-4 sm:ml-6"
               />
             )}
           </div>
@@ -594,6 +627,9 @@ export default function StageProfileView({
 
         {/* Card + vertical nav-pill rail as flex siblings — same side-by-side
             structure as desktop at every breakpoint (never stacks below).
+            No gap between them (fixed 2026-08-13, see conversation) — the
+            rail sits flush against the card's right edge; same fix applied
+            to EmployeeRecordView.tsx's own separate copy of this layout.
             Below lg, the aside and rail fluidly narrow on small viewports
             (see their own width styles) instead of wrapping under the
             content, and content keeps a real minimum width so its fields
@@ -604,7 +640,7 @@ export default function StageProfileView({
             to their exact original pixel widths there (see their own
             lg:w-[...] overrides), so there is nothing left for it to ever
             need to catch. */}
-        <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto lg:overflow-visible">
+        <div className="flex items-start overflow-x-auto lg:overflow-visible">
           <div className="relative flex-1 min-w-0 bg-white rounded-[24px] lg:rounded-[35px] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10">
             {/* Left column: avatar/name/status/Branch-Dept/Position/Phone/Email + proceed button */}
             <aside
@@ -655,41 +691,285 @@ export default function StageProfileView({
 
             {/* Middle column: tab content */}
             <div className="flex-1 min-w-[130px]">
-              {resolvePanel({
-                originStage: displayStage,
-                section: displaySection,
-                leaveHistory,
-                employeeDetail,
-                resumeInfo,
-                interviewAssessment,
-                referenceCheck,
-                medicalCheck,
-                probationInfo,
-                probationDisplay,
-                canDecideProbation,
-                canEdit,
-                documentsInfo,
-                payrollInfo,
-                achievements,
-                salaryRevisions,
-                promotions,
-                transfers,
-                trainings,
-                ndaInfo,
-                nonCompeteInfo,
-                disciplinarySummary,
-                resignationInfo,
-                referenceLetterInfo,
-                exitInterviewNoteInfo,
-                knowledgeTransferChecklist,
-                assetRecoveryChecklist,
-                systemRevocationChecklist,
-                financialSettlement,
-                canAddChecklistItem,
-                branches,
-                departments,
-                employeeId,
-              })}
+              {stage === "pre" && employeeDetail ? (
+                // Pre stage rollout batch 1 (2026-08-13, see conversation) —
+                // all 5 of Pre's own tabs render together, wrapped in one
+                // PageEditProvider, each hidden via CSS instead of switched
+                // via resolvePanel() below, so an edit in progress on one
+                // survives clicking to another. No route/Link conversion
+                // needed here — Pre's tab-switching (inPageActive/currentKey
+                // above) was already client-side state, never a real
+                // navigation, unlike Employee Record's route-based
+                // sub-nav. history is always null for Pre (STAGE_HISTORY_GROUPS.pre
+                // is empty — there's no earlier stage to view history of),
+                // so displayStage/displaySection always equal stage/
+                // currentSection here — safe to key visibility off
+                // currentKey directly rather than displaySection.key.
+                <PageEditProvider>
+                  <PageEditMessageDialog />
+                  <div className="mb-4 flex justify-end">
+                    <PageEditToggleButton />
+                  </div>
+                  <div className={currentKey === "personal-info" ? "" : "hidden"}>
+                    <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />
+                  </div>
+                  {resumeInfo && (
+                    <div className={currentKey === "resume" ? "" : "hidden"}>
+                      <ResumePanel
+                        userId={employeeId}
+                        resumeFileId={resumeInfo.resumeFileId}
+                        cvFileId={resumeInfo.cvFileId}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                  )}
+                  {interviewAssessment !== undefined && (
+                    <div className={currentKey === "interview" ? "" : "hidden"}>
+                      <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} canEdit={canEdit} />
+                    </div>
+                  )}
+                  {referenceCheck !== undefined && (
+                    <div className={currentKey === "reference" ? "" : "hidden"}>
+                      <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />
+                    </div>
+                  )}
+                  {medicalCheck !== undefined && (
+                    <div className={currentKey === "medical" ? "" : "hidden"}>
+                      <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />
+                    </div>
+                  )}
+                </PageEditProvider>
+              ) : stage === "onboarding" && !history && employeeDetail ? (
+                // Onboarding rollout Batch 4 (2026-08-13, see conversation) —
+                // same shape as Pre above: all 3 of Onboarding's own tabs
+                // render together under one PageEditProvider, each hidden via
+                // CSS. Unlike Pre, Onboarding's tabs were previously real
+                // routes (profileMode "separate-pages", shared with the
+                // still-held Active) — usesClientTabs/inPageActive above
+                // special-case Onboarding specifically so its own top-level
+                // pills switch via client state without touching Active's
+                // still-route-based ones. Guarded on !history — this
+                // block is only Onboarding's OWN current tabs; a Pre/
+                // Probation history tab selected from this same page still
+                // falls through to resolvePanel below, unaffected.
+                <PageEditProvider>
+                  <PageEditMessageDialog />
+                  <div className="mb-4 flex justify-end">
+                    <PageEditToggleButton />
+                  </div>
+                  <div className={currentKey === "documents" ? "" : "hidden"}>
+                    <DocumentsPanel userId={employeeId} data={documentsInfo ?? null} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "payroll" ? "" : "hidden"}>
+                    <OnboardingPayrollPanel
+                      userId={employeeId}
+                      data={payrollInfo ?? null}
+                      employeeDetail={employeeDetail}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                  <div className={currentKey === "emergency-contact" ? "" : "hidden"}>
+                    <EmergencyContactPanel
+                      employee={employeeDetail}
+                      onSave={(data) => updateEmergencyContact(employeeId, data)}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                </PageEditProvider>
+              ) : stage === "exit" &&
+                !history &&
+                resignationInfo !== undefined &&
+                referenceLetterInfo !== undefined &&
+                exitInterviewNoteInfo !== undefined &&
+                knowledgeTransferChecklist !== undefined &&
+                assetRecoveryChecklist !== undefined &&
+                systemRevocationChecklist !== undefined &&
+                financialSettlement !== undefined ? (
+                // Exit rollout Batch 5 (2026-08-13, see conversation) — same
+                // shape as Onboarding above: all 7 of Exit's own tabs
+                // (Resignation/Reference Letter/Exit Interview Notes plus the
+                // 4-item Clearance group) render together under one
+                // PageEditProvider, each hidden via CSS. usesClientTabs also
+                // covers Exit's group-toggle/group-children rendering (see
+                // navSections/mobileRowTwoTopLevel above) so the Clearance
+                // group's own 4 pills switch via client state too, not just
+                // Exit's 3 ungrouped top-level tabs. Guarded on !history —
+                // this block is only Exit's OWN current tabs; a Pre/
+                // Probation/Onboarding/Active history tile selected from this
+                // same page still falls through to resolvePanel below,
+                // unaffected.
+                <PageEditProvider>
+                  <PageEditMessageDialog />
+                  <div className="mb-4 flex justify-end">
+                    <PageEditToggleButton />
+                  </div>
+                  <div className={currentKey === "resignation" ? "" : "hidden"}>
+                    <ResignationPanel userId={employeeId} data={resignationInfo} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "knowledge-transfer" ? "" : "hidden"}>
+                    <KnowledgeTransferPanel
+                      userId={employeeId}
+                      items={knowledgeTransferChecklist}
+                      canAddItem={canAddChecklistItem ?? false}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                  <div className={currentKey === "asset-recovery" ? "" : "hidden"}>
+                    <AssetRecoveryPanel
+                      userId={employeeId}
+                      items={assetRecoveryChecklist}
+                      canAddItem={canAddChecklistItem ?? false}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                  <div className={currentKey === "system-revocation" ? "" : "hidden"}>
+                    <SystemRevocationPanel
+                      userId={employeeId}
+                      items={systemRevocationChecklist}
+                      canAddItem={canAddChecklistItem ?? false}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                  <div className={currentKey === "financial-settlement" ? "" : "hidden"}>
+                    <FinancialSettlementPanel userId={employeeId} data={financialSettlement} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "reference-letter" ? "" : "hidden"}>
+                    <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "exit-interview-notes" ? "" : "hidden"}>
+                    <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} canEdit={canEdit} />
+                  </div>
+                </PageEditProvider>
+              ) : stage === "active" &&
+                !history &&
+                leaveHistory !== undefined &&
+                achievements !== undefined &&
+                salaryRevisions !== undefined &&
+                promotions !== undefined &&
+                transfers !== undefined &&
+                trainings !== undefined &&
+                ndaInfo !== undefined &&
+                nonCompeteInfo !== undefined &&
+                disciplinarySummary !== undefined &&
+                domesticInquiries !== undefined &&
+                suspensionLetters !== undefined &&
+                showcauseWarningLetters !== undefined &&
+                pips !== undefined ? (
+                // Active rollout Batch 6 (2026-08-13, see conversation) — same
+                // shape as Exit above, but only 3 of Active's 9 tabs (Salary
+                // Revision/NDA/Non-Compete) are actually EditableSection-
+                // backed and register with the provider. MC/Leave is a
+                // read-only summary with no Edit/Save concept at all;
+                // Disciplinary is ALSO a read-only summary at the page level
+                // (no Add/bulk-Save here either — that stays exclusive to
+                // Employee Record's Disciplinary category, per explicit
+                // decision) but its own rows are individually clickable to
+                // edit that one record in place (2026-08-13, see
+                // conversation — DisciplinarySummaryPanel's own click-to-edit,
+                // gated on the SAME page-level Edit toggle via
+                // usePageEditContext(), not a registered section of its own).
+                // Achievement/Promotion/Transfer/Training are the same
+                // RepeatableRecordSection panels excluded from this whole
+                // rollout (their outer EditableSection has no onSave —
+                // real saves already happen atomically per-row via their own
+                // "+ Add" modal, independent of any Edit toggle) — they still
+                // render here, CSS-hidden like every other tab, so switching
+                // to/from them no longer loses an in-progress "+ Add" draft,
+                // but they don't participate in the page-level Save (no
+                // sectionLabel passed) since there's nothing pending for it
+                // to commit. Guarded on !history — this block is only
+                // Active's OWN current tabs; a Pre/Probation/Onboarding
+                // history tile selected from this same page still falls
+                // through to resolvePanel below, unaffected.
+                <PageEditProvider>
+                  <PageEditMessageDialog />
+                  <div className="mb-4 flex justify-end">
+                    <PageEditToggleButton />
+                  </div>
+                  <div className={currentKey === "salary-revision" ? "" : "hidden"}>
+                    <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "mc-leave" ? "" : "hidden"}>
+                    <LeaveHistoryPanel rows={leaveHistory} />
+                  </div>
+                  <div className={currentKey === "achievement" ? "" : "hidden"}>
+                    <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "promotion" ? "" : "hidden"}>
+                    <PromotionPanel userId={employeeId} data={promotions} currentPosition={employeeDetail?.position} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "transfer" ? "" : "hidden"}>
+                    <TransferPanel
+                      userId={employeeId}
+                      data={transfers}
+                      branches={branches ?? []}
+                      departments={departments ?? []}
+                      currentLocation={employeeDetail?.departmentName ?? employeeDetail?.branchName}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                  <div className={currentKey === "training" ? "" : "hidden"}>
+                    <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "nda" ? "" : "hidden"}>
+                    <NdaPanel userId={employeeId} data={ndaInfo} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "non-compete" ? "" : "hidden"}>
+                    <NonCompetePanel userId={employeeId} data={nonCompeteInfo} canEdit={canEdit} />
+                  </div>
+                  <div className={currentKey === "disciplinary" ? "" : "hidden"}>
+                    <DisciplinarySummaryPanel
+                      userId={employeeId}
+                      data={disciplinarySummary}
+                      domesticInquiries={domesticInquiries}
+                      suspensionLetters={suspensionLetters}
+                      showcauseWarningLetters={showcauseWarningLetters}
+                      pips={pips}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                </PageEditProvider>
+              ) : (
+                resolvePanel({
+                  originStage: displayStage,
+                  section: displaySection,
+                  leaveHistory,
+                  employeeDetail,
+                  resumeInfo,
+                  interviewAssessment,
+                  referenceCheck,
+                  medicalCheck,
+                  probationInfo,
+                  probationDisplay,
+                  canDecideProbation,
+                  canEdit,
+                  documentsInfo,
+                  payrollInfo,
+                  achievements,
+                  salaryRevisions,
+                  promotions,
+                  transfers,
+                  trainings,
+                  ndaInfo,
+                  nonCompeteInfo,
+                  disciplinarySummary,
+                  domesticInquiries,
+                  suspensionLetters,
+                  showcauseWarningLetters,
+                  pips,
+                  resignationInfo,
+                  referenceLetterInfo,
+                  exitInterviewNoteInfo,
+                  knowledgeTransferChecklist,
+                  assetRecoveryChecklist,
+                  systemRevocationChecklist,
+                  financialSettlement,
+                  canAddChecklistItem,
+                  branches,
+                  departments,
+                  employeeId,
+                })
+              )}
             </div>
           </div>
 
@@ -708,7 +988,7 @@ export default function StageProfileView({
               the mobile sub-tab row above replaces this there instead. */}
           <nav
             aria-label={`${STAGE_LABELS[stage]} sections`}
-            className="flex-none flex flex-col w-[var(--rail-width)] lg:w-[var(--rail-width-lg)] [@media(hover:none)]:hidden"
+            className="flex-none flex flex-col mt-4 sm:mt-6 w-[var(--rail-width)] lg:w-[var(--rail-width-lg)] [@media(hover:none)]:hidden"
             style={{ gap: config.navRail.gapPx }}
           >
             {navSections}
@@ -793,6 +1073,10 @@ function resolvePanel({
   ndaInfo,
   nonCompeteInfo,
   disciplinarySummary,
+  domesticInquiries,
+  suspensionLetters,
+  showcauseWarningLetters,
+  pips,
   resignationInfo,
   referenceLetterInfo,
   exitInterviewNoteInfo,
@@ -827,6 +1111,10 @@ function resolvePanel({
   ndaInfo?: NdaInfo | null;
   nonCompeteInfo?: NonCompeteInfo | null;
   disciplinarySummary?: DisciplinarySummaryRow[];
+  domesticInquiries?: DomesticInquiryEntry[];
+  suspensionLetters?: SuspensionLetterEntry[];
+  showcauseWarningLetters?: ShowcauseWarningLetterEntry[];
+  pips?: PipEntry[];
   resignationInfo?: ResignationInfo | null;
   referenceLetterInfo?: ReferenceLetterInfo | null;
   exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
@@ -941,8 +1229,25 @@ function resolvePanel({
   if (section.key === "non-compete" && nonCompeteInfo !== undefined) {
     return <NonCompetePanel userId={employeeId} data={nonCompeteInfo} canEdit={canEdit} />;
   }
-  if (section.key === "disciplinary" && disciplinarySummary !== undefined) {
-    return <DisciplinarySummaryPanel data={disciplinarySummary} />;
+  if (
+    section.key === "disciplinary" &&
+    disciplinarySummary !== undefined &&
+    domesticInquiries !== undefined &&
+    suspensionLetters !== undefined &&
+    showcauseWarningLetters !== undefined &&
+    pips !== undefined
+  ) {
+    return (
+      <DisciplinarySummaryPanel
+        userId={employeeId}
+        data={disciplinarySummary}
+        domesticInquiries={domesticInquiries}
+        suspensionLetters={suspensionLetters}
+        showcauseWarningLetters={showcauseWarningLetters}
+        pips={pips}
+        canEdit={canEdit}
+      />
+    );
   }
   // Exit stage's own tabs — Resignation/Reference Letter/Exit Interview
   // Notes, plus its 4 Clearance sub-tabs (real now — see

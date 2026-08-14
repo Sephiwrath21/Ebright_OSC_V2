@@ -1,8 +1,9 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
+import { forwardRef, startTransition, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EditableSection, useEditMode, type SaveResult } from "@/app/components/EditMode";
+import { usePageEditContext, type ValidationResult } from "@/app/components/PageEditMode";
 import { POSITION_OPTIONS } from "@/lib/employeeStages";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
@@ -89,6 +90,7 @@ import type {
   ShowcauseWarningLetterEntry,
   PipEntry,
   DisciplinarySummaryRow,
+  DisciplinarySourceType,
   ResignationInfo,
   ReferenceLetterInfo,
   ExitInterviewNoteInfo,
@@ -728,6 +730,7 @@ export function ResumePanel({
         updateResume(userId, { resumeFileId, resumeFile: resumePending, cvFileId, cvFile: cvPending })
       }
       canEdit={canEdit}
+      sectionLabel="Resume/CV"
     >
       <PanelHeading>Resume/CV</PanelHeading>
       <FieldGrid>
@@ -752,20 +755,27 @@ const RECOMMENDATION_OPTIONS = [
   { value: "reject", label: "Reject" },
 ];
 
-// Real interview_assessment table — Pre stage's own Interview Assessment tab
-// only. Deliberately NOT shared with Employee Record's HR Info > Hiring
-// Notes tab — same field labels, but that page uses different dropdown
-// vocabularies in the mock (Excellent/Good/Average/Below Average and Hire/
-// Hold/Reject vs. this table's 1-5 rating and Proceed/Hire/Hold/Reject) —
-// confirmed by reading both mock pages directly rather than assuming they're
-// the same form.
+// Real interview_assessment table — Pre stage's own Interview Assessment tab,
+// AND (as of 2026-08-13, see conversation) Employee Record's HR Info >
+// Hiring Notes tab — same underlying record, shown twice across the
+// lifecycle. These were kept deliberately unlinked at first because Hiring
+// Notes' old placeholder mock used a different dropdown vocabulary
+// (Excellent/Good/Average/Below Average and Hire/Hold/Reject vs. this
+// table's real 1-5 rating and Proceed/Hire/Hold/Reject) — resolved by
+// dropping the placeholder's vocabulary entirely and standardizing on this
+// table's real one everywhere it's shown, per explicit decision. `heading`
+// lets Hiring Notes override the panel title/registration label without a
+// second copy of this component (same convention as DocumentsPanel's
+// showEmploymentContract-driven heading).
 export function InterviewAssessmentPanel({
   userId,
   data,
+  heading = "Interview Assessment",
   canEdit = true,
 }: {
   userId: number;
   data: InterviewAssessmentInfo | null;
+  heading?: string;
   canEdit?: boolean;
 }) {
   const [intDate, setIntDate] = useState(data?.intDate ?? "");
@@ -781,8 +791,9 @@ export function InterviewAssessmentPanel({
         updateInterviewAssessment(userId, { intDate, overallRate, recommendation, strength, weakness, hiringNote })
       }
       canEdit={canEdit}
+      sectionLabel={heading}
     >
-      <PanelHeading>Interview Assessment</PanelHeading>
+      <PanelHeading>{heading}</PanelHeading>
       <FieldGrid>
         <EditableField label="Interview Date" value={intDate} onChange={setIntDate} type="date" full />
         <EditableSelectField label="Overall Rating" value={overallRate} onChange={setOverallRate} options={OVERALL_RATE_OPTIONS} />
@@ -814,6 +825,16 @@ export function ReferenceCheckPanel({
   const [contactNumber, setContactNumber] = useState(data?.contactNumber ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
 
+  // Same checks as handleSave's own inline guard — see PersonalInfoPanel's
+  // validate() above for why this is a separate function rather than a
+  // dry-run flag on handleSave itself.
+  function validate(): ValidationResult {
+    const errors: string[] = [];
+    if (contactNumber && !isValidPhoneDigits(parsePhoneValue(contactNumber).digits)) errors.push("Enter a valid phone number.");
+    if (email && !isValidEmail(email)) errors.push("Enter a valid email address.");
+    return errors.length > 0 ? { valid: false, error: errors.join("\n") } : { valid: true };
+  }
+
   function handleSave() {
     if (contactNumber && !isValidPhoneDigits(parsePhoneValue(contactNumber).digits)) {
       return { ok: false, error: "Enter a valid phone number." };
@@ -825,7 +846,7 @@ export function ReferenceCheckPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} validate={validate} canEdit={canEdit} sectionLabel="Reference Check">
       <PanelHeading>Reference Check</PanelHeading>
       <FieldGrid>
         <EditableField label="Reference Name" value={refName} onChange={setRefName} full />
@@ -873,6 +894,7 @@ export function MedicalCheckPanel({
     <EditableSection
       onSave={() => updateMedicalCheck(userId, { medicalReportFileId: fileId, medicalReportFile: pendingFile, result })}
       canEdit={canEdit}
+      sectionLabel="Medical Check"
     >
       <PanelHeading>Medical Check</PanelHeading>
       <FieldGrid>
@@ -979,15 +1001,19 @@ function ProbationDecisionSection({
 // buttons; the actual restriction is enforced server-side in
 // decideProbationOutcome regardless of what this prop says.
 //
-// Feedback is a hybrid source now, per explicit decision (see conversation):
-// display.hasCareerApplicationMatch true -> feedback2 (external, read-only,
-// unchanged); false -> probation.local_feedback (HR-editable — the field
-// only exists at all for someone with no recruitment-pipeline footprint,
-// who has nothing for feedback2 to ever source from). Confirm/Stop both
-// require whichever of the two applies to be non-empty first — checked here
-// (before opening the confirm dialog, for immediate feedback) AND again
-// server-side in decideProbationOutcome (the actual enforcement — this
-// client check is just UX, a direct call could otherwise skip it).
+// Feedback is always editable now, per explicit decision (see conversation,
+// 2026-08-13) — this replaces the earlier hybrid design (external feedback2
+// read-only vs. local_feedback editable, gated on
+// display.hasCareerApplicationMatch). localFeedback below is seeded from
+// feedback2 when present (else from the locally-saved value), but from that
+// point on it's just the field's own current text — HR can freely overwrite
+// it either way. Always saved to probation.local_feedback; the external
+// ebright_hrfs.career_applications.feedback2 column is never written to,
+// from here or anywhere else — read-only always. Confirm/Stop both require
+// the field to be non-empty first — checked here (before opening the
+// confirm dialog, for immediate feedback) AND again server-side in
+// decideProbationOutcome (the actual enforcement — this client check is
+// just UX, a direct call could otherwise skip it).
 export function ProbationPanel({
   userId,
   data,
@@ -1008,7 +1034,10 @@ export function ProbationPanel({
   const [confirmationLetterPending, setConfirmationLetterPending] = useState<File | null>(null);
   const [extensionLetterFileId, setExtensionLetterFileId] = useState(data?.extensionLetterFileId ?? null);
   const [extensionLetterPending, setExtensionLetterPending] = useState<File | null>(null);
-  const [localFeedback, setLocalFeedback] = useState(data?.localFeedback ?? "");
+  // feedback2 (external, when present) seeds the initial value; from there
+  // it's just this field's own current text, freely editable either way —
+  // see the doc comment above.
+  const [localFeedback, setLocalFeedback] = useState(display.feedback2 ?? data?.localFeedback ?? "");
 
   const [pendingOutcome, setPendingOutcome] = useState<"Confirmed" | "Extended" | "Stopped" | null>(null);
   const [deciding, setDeciding] = useState(false);
@@ -1024,12 +1053,9 @@ export function ProbationPanel({
   }
 
   function pickOutcome(outcome: "Confirmed" | "Extended" | "Stopped") {
-    if (outcome !== "Extended") {
-      const effectiveFeedback = display.hasCareerApplicationMatch ? display.feedback2 : localFeedback;
-      if (!effectiveFeedback || !effectiveFeedback.trim()) {
-        setDecideError("Feedback must be filled in before Confirm or Stop.");
-        return;
-      }
+    if (outcome !== "Extended" && !localFeedback.trim()) {
+      setDecideError("Feedback must be filled in before Confirm or Stop.");
+      return;
     }
     setDecideError(null);
     setPendingOutcome(outcome);
@@ -1040,11 +1066,7 @@ export function ProbationPanel({
     const outcome = pendingOutcome;
     setDeciding(true);
     setDecideError(null);
-    const result = await decideProbationOutcome(
-      userId,
-      outcome,
-      display.hasCareerApplicationMatch ? undefined : localFeedback,
-    );
+    const result = await decideProbationOutcome(userId, outcome, localFeedback);
     setDeciding(false);
     setPendingOutcome(null);
     if (!result.ok) {
@@ -1081,6 +1103,7 @@ export function ProbationPanel({
             confirmationLetterFile: confirmationLetterPending,
             extensionLetterFileId,
             extensionLetterFile: extensionLetterPending,
+            localFeedback,
           });
           if (!result || result.ok !== false) router.refresh();
           return result;
@@ -1121,11 +1144,7 @@ export function ProbationPanel({
             onClear={clearExtensionLetter}
             full
           />
-          {display.hasCareerApplicationMatch ? (
-            <StaticField label="Feedback" value={display.feedback2} full />
-          ) : (
-            <EditableTextArea label="Feedback" value={localFeedback} onChange={setLocalFeedback} full />
-          )}
+          <EditableTextArea label="Feedback" value={localFeedback} onChange={setLocalFeedback} full />
         </FieldGrid>
 
         <ProbationDecisionSection canDecide={canDecide} display={display} onPick={pickOutcome} decideError={decideError} />
@@ -1191,6 +1210,7 @@ export function DocumentsPanel({
         })
       }
       canEdit={canEdit}
+      sectionLabel={showEmploymentContract ? "Documents" : "Employee Handbook"}
     >
       <PanelHeading>{showEmploymentContract ? "Documents" : "Employee Handbook"}</PanelHeading>
       <FieldGrid>
@@ -1290,6 +1310,7 @@ export function OnboardingPayrollPanel({
         return { ok: true };
       }}
       canEdit={canEdit}
+      sectionLabel={heading}
     >
       <PanelHeading>{heading}</PanelHeading>
       <Subsection heading="Statutory Information">
@@ -1350,14 +1371,15 @@ function RecordTable({
   rowIds?: number[];
   addLabel?: string;
   onDeleteRow?: (id: number) => void;
-  /** Opens that row for editing (index into `rows`/`rowIds`) — only wired
-   *  while in edit mode (see RepeatableRecordSection), so rows aren't
-   *  clickable while just viewing. */
+  /** Opens that row (index into `rows`/`rowIds`) — always clickable when
+   *  provided, regardless of edit mode (2026-08-13, see conversation): the
+   *  row itself decides whether it opens read-only or editable (see
+   *  RecordAddModal's own startReadOnly/canEdit), not this table. */
   onRowClick?: (index: number) => void;
 }) {
   const editing = useEditMode();
   const showDeleteColumn = !!onDeleteRow && editing;
-  const rowsClickable = !!onRowClick && editing;
+  const rowsClickable = !!onRowClick;
   return (
     <div>
       <div className="overflow-x-auto">
@@ -1400,7 +1422,10 @@ function RecordTable({
                   className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa]" : undefined}
                 >
                   {columns.map((c) => (
-                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5">
+                    <td
+                      key={c.key}
+                      className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5 whitespace-nowrap"
+                    >
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
@@ -1469,6 +1494,12 @@ export interface RecordField {
    *  `options` when both are set (e.g. Transfer's From/To: Branch group +
    *  Department group, instead of one flattened list). */
   optionGroups?: { label: string; options: { value: string; label: string }[] }[];
+  /** Computes optionGroups from the modal's current values instead of a
+   *  fixed list — takes priority over both `optionGroups` and `options`
+   *  when set (e.g. Transfer's "To", whose valid Branch/Department groups
+   *  depend on the currently-picked Type). Re-evaluated on every render, so
+   *  it always reflects the latest values as the user fills in the form. */
+  optionGroupsFor?: (values: Record<string, string>) => { label: string; options: { value: string; label: string }[] }[];
   /** Pre-fills the field on modal open (e.g. Promotion's "Current Position"
    *  auto-populated from the employee's position on record) — only applies
    *  once, when the modal's own local values state is first initialized. */
@@ -1652,6 +1683,8 @@ function RecordAddModal({
   error,
   initialValues,
   initialFileIds,
+  startReadOnly = false,
+  canEdit = true,
   onClose,
   onSave,
 }: {
@@ -1667,6 +1700,18 @@ function RecordAddModal({
    *  (e.g. { attachment: "abc123" }) — shown as a "View file" link until
    *  replaced with a new pick. Omit for the "add new" case. */
   initialFileIds?: Record<string, string | null>;
+  /** Opens showing plain read-only text instead of inputs, with an "Edit"
+   *  button in place of Save (2026-08-13, see conversation — clicking an
+   *  existing row now always opens this modal, regardless of the page's own
+   *  Edit toggle; only clicking Edit *inside* the modal switches this one
+   *  record to editable). Only meaningful for the "edit existing" case — a
+   *  brand-new add always opens directly editable regardless of this prop,
+   *  since there's nothing to view yet. */
+  startReadOnly?: boolean;
+  /** false hides the in-modal Edit button (view-only, e.g. a CEO looking at
+   *  someone else's profile) — viewing still works regardless, only
+   *  switching to editable is gated. Defaults true. */
+  canEdit?: boolean;
   onClose: () => void;
   onSave: (values: Record<string, string>, files: Record<string, File>) => void;
 }) {
@@ -1675,6 +1720,7 @@ function RecordAddModal({
     ...initialValues,
   }));
   const [files, setFiles] = useState<Record<string, File>>({});
+  const [readOnly, setReadOnly] = useState(startReadOnly);
 
   function setField(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -1722,7 +1768,19 @@ function RecordAddModal({
             {fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true)).map((f) => (
               <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
                 <label className="text-sm font-medium text-[#4b4949]">{f.label}</label>
-                {f.type === "textarea" ? (
+                {readOnly ? (
+                  f.type === "file" ? (
+                    initialFileIds?.[f.key] ? (
+                      <RealAttachmentLink fileId={initialFileIds[f.key]} />
+                    ) : (
+                      <span className="text-sm italic text-slate-400">-</span>
+                    )
+                  ) : values[f.key] ? (
+                    <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{values[f.key]}</span>
+                  ) : (
+                    <span className="text-sm italic text-slate-400">-</span>
+                  )
+                ) : f.type === "textarea" ? (
                   <textarea
                     value={values[f.key] ?? ""}
                     onChange={(e) => setField(f.key, e.target.value)}
@@ -1746,8 +1804,8 @@ function RecordAddModal({
                 ) : f.type === "select" ? (
                   <select value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} className={recordModalInputClass}>
                     <option value=""></option>
-                    {f.optionGroups
-                      ? f.optionGroups.map((g) => (
+                    {f.optionGroupsFor || f.optionGroups
+                      ? (f.optionGroupsFor ? f.optionGroupsFor(values) : f.optionGroups!).map((g) => (
                           <optgroup key={g.label} label={g.label}>
                             {g.options.map((o) => (
                               <option key={o.value} value={o.value}>
@@ -1782,16 +1840,28 @@ function RecordAddModal({
             disabled={saving}
             className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/15 hover:bg-[#f0f4fa] disabled:opacity-60 transition-colors"
           >
-            Cancel
+            {readOnly ? "Close" : "Cancel"}
           </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => onSave(values, files)}
-            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] disabled:opacity-60 transition-colors"
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
+          {readOnly ? (
+            canEdit && (
+              <button
+                type="button"
+                onClick={() => setReadOnly(false)}
+                className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] transition-colors"
+              >
+                Edit
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onSave(values, files)}
+              className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-white bg-[#4a90e2] hover:bg-[#3a7bc8] disabled:opacity-60 transition-colors"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1810,6 +1880,7 @@ export function RepeatableRecordSection({
   onAdd,
   onDelete,
   onUpdate,
+  canEdit = true,
 }: {
   heading: string;
   addLabel: string;
@@ -1838,6 +1909,11 @@ export function RepeatableRecordSection({
    *  instead of onAdd(...). Omit to keep a given table add-and-delete-only,
    *  no in-place editing of existing rows. */
   onUpdate?: (id: number, values: Record<string, string>, files: Record<string, File>) => Promise<SaveResult>;
+  /** false hides the in-modal Edit button when an existing row is clicked
+   *  (view-only, e.g. a CEO looking at someone else's profile) — viewing
+   *  still works regardless. Does NOT affect the separate "+ Add" button,
+   *  which stays gated on the page's own edit-mode toggle as before. */
+  canEdit?: boolean;
 }) {
   const editing = useEditMode();
   const router = useRouter();
@@ -1863,7 +1939,14 @@ export function RepeatableRecordSection({
       setModalOpen(false);
       setEditingRowId(null);
       setSaving(false);
-      router.refresh();
+      // Wrapped in startTransition (2026-08-13, see conversation — Payslip
+      // rows not appearing after Save) — a bare router.refresh() called here
+      // races against this same function's own setSaving/setModalOpen calls
+      // just above; startTransition tells React to treat the resulting
+      // Server Component re-render as a deferred update it can properly wait
+      // for and merge, rather than risking it getting dropped/superseded by
+      // those synchronous state updates landing in the same tick.
+      startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
       setSaving(false);
@@ -1883,7 +1966,7 @@ export function RepeatableRecordSection({
       }
       setDeleting(false);
       setPendingDeleteId(null);
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Delete failed.");
       setDeleting(false);
@@ -1933,6 +2016,15 @@ export function RepeatableRecordSection({
           initialFileIds={
             editingRowId !== null && rowIds ? editFileIds?.[rowIds.indexOf(editingRowId)] : undefined
           }
+          // Read-only-first only when the page isn't already in edit mode
+          // (2026-08-13, see conversation — reverted from "always opens
+          // read-only" per explicit correction): with the page's own Edit
+          // toggle already on, clicking an existing row now skips the
+          // read-only step and opens straight into the editable form, no
+          // in-modal toggle needed. A brand-new "+ Add" always opens
+          // editable regardless (editingRowId is null there).
+          startReadOnly={editingRowId !== null && !editing}
+          canEdit={canEdit}
           onClose={() => {
             setModalOpen(false);
             setEditingRowId(null);
@@ -1982,6 +2074,7 @@ export function AchievementPanel({ userId, data, canEdit = true }: { userId: num
           updateAchievement(userId, id, { name: values.name ?? "", date: values.date ?? "", attachmentFile: files.attachment ?? null })
         }
         onDelete={(id) => deleteAchievement(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2178,10 +2271,14 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
   const latest = data[0] ?? null;
 
   // When set, the form is loaded with an older history row (clicked while in
-  // edit mode) instead of defaulting to latest — Save then corrects that row
-  // in place (updateSalaryRevision) instead of appending a new one.
+  // edit mode) — Save then corrects that row in place (updateSalaryRevision)
+  // instead of appending a new one. Deliberately NOT defaulting to `latest`
+  // when unset (fixed 2026-08-13, see conversation) — a brand-new revision
+  // should start blank, not pre-filled with the previous revision's own
+  // values; `latest` is still used on its own below, just for the
+  // unchanged-vs-latest no-op guard, not to seed the form.
   const [editingId, setEditingId] = useState<number | null>(null);
-  const loaded = editingId !== null ? data.find((r) => r.id === editingId) ?? null : latest;
+  const loaded = editingId !== null ? data.find((r) => r.id === editingId) ?? null : null;
 
   const [issuedDate, setIssuedDate] = useState(loaded?.issuedDate ?? "");
   const [effectiveDate, setEffectiveDate] = useState(loaded?.effectiveDate ?? "");
@@ -2231,7 +2328,12 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
       });
       if (!result || result.ok !== false) {
         setEditingId(null);
-        router.refresh();
+        // Wrapped in startTransition (2026-08-13, see conversation — new
+        // Salary Revision rows not appearing in History after Save) — see
+        // RepeatableRecordSection's own handleSave for why a bare
+        // router.refresh() here races against this same PageEditProvider
+        // Save cycle's own state updates.
+        startTransition(() => router.refresh());
       }
       return result;
     }
@@ -2248,7 +2350,23 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
       approvedBy,
       attachmentFile: pendingFile,
     });
-    if (!result || result.ok !== false) router.refresh();
+    if (!result || result.ok !== false) {
+      startTransition(() => router.refresh());
+      // Reset the form back to blank after a successful add (2026-08-13, see
+      // conversation) — loaded/syncedLoadedId both stay null throughout a
+      // plain "add new" flow (editingId never gets set), so the resync
+      // effect above never re-fires on its own here; without this, adding a
+      // second new revision in the same session would start pre-filled with
+      // whatever was just submitted, the same "should always start empty"
+      // bug this fix targets, just one save later.
+      setIssuedDate("");
+      setEffectiveDate("");
+      setCurrentSalary("");
+      setNewSalary("");
+      setReason("");
+      setApprovedBy("");
+      setPendingFile(null);
+    }
     return result;
   }
 
@@ -2268,7 +2386,7 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
       setDeleting(false);
       setPendingDeleteId(null);
       if (editingId === pendingDeleteId) setEditingId(null);
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Delete failed.");
       setDeleting(false);
@@ -2365,7 +2483,7 @@ export function SalaryRevisionPanel({
 }) {
   const ref = useRef<SalaryRevisionHandle>(null);
   return (
-    <EditableSection onSave={() => ref.current?.save()} canEdit={canEdit}>
+    <EditableSection onSave={() => ref.current?.save()} canEdit={canEdit} sectionLabel="Salary Revision">
       <SalaryRevisionFields ref={ref} userId={userId} data={data} />
     </EditableSection>
   );
@@ -2451,6 +2569,7 @@ export function PromotionPanel({
           })
         }
         onDelete={(id) => deletePromotion(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2486,13 +2605,23 @@ export function TransferPanel({
   currentLocation?: string | null;
   canEdit?: boolean;
 }) {
-  const locationOptionGroups = [
-    { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) },
-    {
-      label: "Department",
-      options: departments.map((d) => ({ value: d.name, label: d.name })),
-    },
-  ];
+  const branchOptionGroup = { label: "Branch", options: branches.map((b) => ({ value: b.name, label: b.name })) };
+  const departmentOptionGroup = { label: "Department", options: departments.map((d) => ({ value: d.name, label: d.name })) };
+  const locationOptionGroups = [branchOptionGroup, departmentOptionGroup];
+  // "To"'s valid location groups depend on the picked Type (2026-08-13, see
+  // conversation): a transfer landing at HQ (...TO HQ) only makes sense as a
+  // Department pick, one landing at a Branch (...TO BRANCH) only as a Branch
+  // pick, and Temporary Transfer — the one type not modeling a permanent
+  // HQ/Branch move — keeps both groups combined, same as before this change.
+  // Empty (no options at all) until Type is picked, same "pick the
+  // constraining field first" convention as Add Pre-stage Employee's own
+  // Branch/Department-scoped Position field.
+  function toLocationGroupsForType(type: string | undefined) {
+    if (type === "HQ TO HQ" || type === "BRANCH TO HQ") return [departmentOptionGroup];
+    if (type === "BRANCH TO BRANCH" || type === "HQ TO BRANCH") return [branchOptionGroup];
+    if (type === "Temporary Transfer") return locationOptionGroups;
+    return [];
+  }
   return (
     <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
@@ -2508,7 +2637,7 @@ export function TransferPanel({
             optionGroups: locationOptionGroups,
             defaultValue: currentLocation ?? undefined,
           },
-          { key: "toLocation", label: "To", type: "select", optionGroups: locationOptionGroups },
+          { key: "toLocation", label: "To", type: "select", optionGroupsFor: (values) => toLocationGroupsForType(values.type) },
           {
             key: "endDate",
             label: "End Date",
@@ -2575,6 +2704,7 @@ export function TransferPanel({
           });
         }}
         onDelete={(id) => deleteTransfer(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2636,6 +2766,7 @@ export function TrainingPanel({ userId, data, canEdit = true }: { userId: number
           return updateTraining(userId, id, { name: values.name ?? "", date: values.date ?? "", status });
         }}
         onDelete={(id) => deleteTraining(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2665,6 +2796,7 @@ export function NdaPanel({ userId, data, canEdit = true }: { userId: number; dat
     <EditableSection
       onSave={() => updateNda(userId, { signDate, effectiveDate, status, attachmentFileId: fileId, attachmentFile: pendingFile })}
       canEdit={canEdit}
+      sectionLabel="NDA"
     >
       <PanelHeading>NDA</PanelHeading>
       <FieldGrid>
@@ -2695,6 +2827,7 @@ export function NonCompetePanel({ userId, data, canEdit = true }: { userId: numb
     <EditableSection
       onSave={() => updateNonCompete(userId, { signDate, expiryDate, duration, attachmentFileId: fileId, attachmentFile: pendingFile })}
       canEdit={canEdit}
+      sectionLabel="Non-Compete"
     >
       <PanelHeading>Non-Compete</PanelHeading>
       <FieldGrid>
@@ -2746,6 +2879,7 @@ export function NdaNcPanel({
   return (
     <EditableSection
       canEdit={canEdit}
+      sectionLabel="NDA/ NC"
       onSave={async () => {
         const [ndaResult, ncResult] = await Promise.all([
           updateNda(userId, {
@@ -2785,12 +2919,138 @@ export function NdaNcPanel({
   );
 }
 
-// Stage-flow's Active > Disciplinary tab is a single read-only combined
-// summary (Date/Type/Description) per active_disciplinary.html — no add
-// form here; the 4 specific record types (Domestic Inquiry/Suspension/
-// Showcause/PIP) each get their own real add-form under Employee Record's
-// Disciplinary category instead (see EmployeeRecordPanels.tsx).
-export function DisciplinarySummaryPanel({ data }: { data: DisciplinarySummaryRow[] }) {
+// Stage-flow's Active > Disciplinary tab is a single combined summary
+// (Date/Type/Description) per active_disciplinary.html — still no ADD form
+// here (that stays exclusive to Employee Record's Disciplinary category,
+// per explicit decision). A row is always clickable, regardless of the
+// page's own Edit toggle (2026-08-13, see conversation, same shared
+// RecordTable/RecordAddModal pattern every other repeatable table now
+// uses) — opens read-only by default, with an in-modal Edit button (gated
+// on `canEdit` — e.g. a CEO viewing someone else's profile still gets a
+// view, just no Edit button) switching to the same real update actions
+// each type's own dedicated Employee Record panel uses, reusing the exact
+// same field configs (DOMESTIC_INQUIRY_FIELDS/SUSPENSION_FIELDS/
+// SHOWCAUSE_FIELDS/PIP_FIELDS + their own *EditValues functions) rather
+// than duplicating them.
+export function DisciplinarySummaryPanel({
+  userId,
+  data,
+  domesticInquiries,
+  suspensionLetters,
+  showcauseWarningLetters,
+  pips,
+  canEdit = true,
+}: {
+  userId: number;
+  data: DisciplinarySummaryRow[];
+  domesticInquiries: DomesticInquiryEntry[];
+  suspensionLetters: SuspensionLetterEntry[];
+  showcauseWarningLetters: ShowcauseWarningLetterEntry[];
+  pips: PipEntry[];
+  canEdit?: boolean;
+}) {
+  const router = useRouter();
+  // Not wrapped in its own EditableSection (unlike Achievement/Promotion/
+  // etc, each of which reads this via useEditMode() from their own
+  // wrapper) — this panel renders directly inside Active's own
+  // PageEditProvider, so its "is the page already in edit mode" signal
+  // has to come from that context directly instead. null (no provider —
+  // e.g. viewed as history from Exit) reads as "not editing", same as
+  // every other page this panel could be viewed from that has no Edit
+  // toggle of its own.
+  const pageEdit = usePageEditContext();
+  const editing = pageEdit?.isEditing ?? false;
+
+  const [editingRow, setEditingRow] = useState<DisciplinarySummaryRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function close() {
+    setEditingRow(null);
+    setError(null);
+  }
+
+  async function handleSave(values: Record<string, string>, files: Record<string, File>) {
+    if (!editingRow) return;
+    setSaving(true);
+    setError(null);
+    try {
+      let result: SaveResult;
+      if (editingRow.sourceType === "domestic-inquiry") {
+        result = await updateDomesticInquiry(userId, editingRow.id, {
+          date: values.date ?? "",
+          panel: values.panel ?? "",
+          caseSummary: values.caseSummary ?? "",
+          decision: values.decision ?? "",
+          attachmentFile: files.attachment ?? null,
+        });
+      } else if (editingRow.sourceType === "suspension") {
+        result = await updateSuspensionLetter(userId, editingRow.id, {
+          startDate: values.startDate ?? "",
+          endDate: values.endDate ?? "",
+          type: values.type ?? "",
+          reason: values.reason ?? "",
+          issuedBy: values.issuedBy ?? "",
+          attachmentFile: files.attachment ?? null,
+        });
+      } else if (editingRow.sourceType === "showcause") {
+        const type = values.type === "Other" ? values.typeOther ?? "" : values.type ?? "";
+        result = await updateShowcauseWarningLetter(userId, editingRow.id, {
+          type,
+          date: values.date ?? "",
+          issuedBy: values.issuedBy ?? "",
+          status: values.status ?? "",
+          reason: values.reason ?? "",
+          empResponse: values.empResponse ?? "",
+          attachmentFile: files.attachment ?? null,
+        });
+      } else {
+        result = await updatePip(userId, editingRow.id, {
+          startDate: values.startDate ?? "",
+          endDate: values.endDate ?? "",
+          supervisor: values.supervisor ?? "",
+          reviewResult: values.reviewResult ?? "",
+          improvementGoal: values.improvementGoal ?? "",
+          remark: values.remark ?? "",
+        });
+      }
+      if (result && result.ok === false) {
+        setError(result.error ?? "Save failed.");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+      close();
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed.");
+      setSaving(false);
+    }
+  }
+
+  // Looks up the clicked row's own full raw record (the merged summary row
+  // itself only carries Date/Type/Description) and pairs it with that
+  // type's own field config — undefined (renders nothing) for the brief
+  // window between a row click and this resolving, or if the row's own
+  // array hasn't caught up yet after a save elsewhere.
+  const modalConfig = (() => {
+    if (!editingRow) return undefined;
+    if (editingRow.sourceType === "domestic-inquiry") {
+      const raw = domesticInquiries.find((r) => r.id === editingRow.id);
+      return raw && { title: "Domestic Inquiry", fields: DOMESTIC_INQUIRY_FIELDS, initialValues: domesticInquiryEditValues(raw), initialFileIds: { attachment: raw.attachmentFileId } };
+    }
+    if (editingRow.sourceType === "suspension") {
+      const raw = suspensionLetters.find((r) => r.id === editingRow.id);
+      return raw && { title: "Suspension Letter", fields: SUSPENSION_FIELDS, initialValues: suspensionEditValues(raw), initialFileIds: { attachment: raw.attachmentFileId } };
+    }
+    if (editingRow.sourceType === "showcause") {
+      const raw = showcauseWarningLetters.find((r) => r.id === editingRow.id);
+      return raw && { title: "Showcause/ Warning Letter", fields: SHOWCAUSE_FIELDS, initialValues: showcauseEditValues(raw), initialFileIds: { attachment: raw.attachmentFileId } };
+    }
+    const raw = pips.find((r) => r.id === editingRow.id);
+    return raw && { title: "Performance Improvement Plan", fields: PIP_FIELDS, initialValues: pipEditValues(raw), initialFileIds: undefined };
+  })();
+
   return (
     <div>
       <PanelHeading>Disciplinary</PanelHeading>
@@ -2801,11 +3061,26 @@ export function DisciplinarySummaryPanel({ data }: { data: DisciplinarySummaryRo
           { key: "description", label: "Description" },
         ]}
         rows={data.map((r) => ({ date: r.date ?? "—", type: r.type, description: r.description ?? "—" }))}
+        onRowClick={(i) => setEditingRow(data[i])}
       />
       <p className="mt-3 text-xs text-slate-500">
         Full disciplinary records (Domestic Inquiry, Suspension, Showcause/Warning, PIP) are added from this
         employee&apos;s Employee Record &gt; Disciplinary section.
       </p>
+      {modalConfig && (
+        <RecordAddModal
+          title={`Edit ${modalConfig.title}`}
+          fields={modalConfig.fields}
+          saving={saving}
+          error={error}
+          initialValues={modalConfig.initialValues}
+          initialFileIds={modalConfig.initialFileIds}
+          startReadOnly={!editing}
+          canEdit={canEdit}
+          onClose={close}
+          onSave={handleSave}
+        />
+      )}
     </div>
   );
 }
@@ -2822,6 +3097,26 @@ const DOMESTIC_INQUIRY_DECISION_OPTIONS = [
   { value: "Pending", label: "Pending" },
 ];
 
+// Shared with DisciplinarySummaryPanel's own click-to-edit modal (Active
+// stage, 2026-08-13, see conversation) — one definition per type, reused
+// rather than duplicated, so a future field change here doesn't silently
+// drift out of sync between the two places it's edited from.
+const DOMESTIC_INQUIRY_FIELDS: RecordField[] = [
+  { key: "date", label: "Inquiry Date", type: "date", full: true },
+  { key: "panel", label: "Panel", type: "text", full: true },
+  { key: "caseSummary", label: "Case Summary", type: "textarea", full: true },
+  { key: "decision", label: "Decision", type: "select", options: DOMESTIC_INQUIRY_DECISION_OPTIONS, full: true },
+  { key: "attachment", label: "Attachment", type: "file", full: true },
+];
+function domesticInquiryEditValues(r: DomesticInquiryEntry): RecordEditValues {
+  return {
+    date: r.date ?? "",
+    panel: r.panel ?? "",
+    caseSummary: r.caseSummary ?? "",
+    decision: r.decision ?? "",
+  };
+}
+
 export function DomesticInquiryPanel({
   userId,
   data,
@@ -2836,13 +3131,7 @@ export function DomesticInquiryPanel({
       <RepeatableRecordSection
         heading="Domestic Inquiry"
         addLabel="+ Add a domestic inquiry record"
-        fields={[
-          { key: "date", label: "Inquiry Date", type: "date", full: true },
-          { key: "panel", label: "Panel", type: "text", full: true },
-          { key: "caseSummary", label: "Case Summary", type: "textarea", full: true },
-          { key: "decision", label: "Decision", type: "select", options: DOMESTIC_INQUIRY_DECISION_OPTIONS, full: true },
-          { key: "attachment", label: "Attachment", type: "file", full: true },
-        ]}
+        fields={DOMESTIC_INQUIRY_FIELDS}
         columns={[
           { key: "date", label: "Date" },
           { key: "panel", label: "Panel" },
@@ -2856,12 +3145,7 @@ export function DomesticInquiryPanel({
           attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
         }))}
         rowIds={data.map((r) => r.id)}
-        editValues={data.map((r) => ({
-          date: r.date ?? "",
-          panel: r.panel ?? "",
-          caseSummary: r.caseSummary ?? "",
-          decision: r.decision ?? "",
-        }))}
+        editValues={data.map(domesticInquiryEditValues)}
         editFileIds={data.map((r) => ({ attachment: r.attachmentFileId }))}
         onAdd={(values, files) =>
           addDomesticInquiry(userId, {
@@ -2882,6 +3166,7 @@ export function DomesticInquiryPanel({
           })
         }
         onDelete={(id) => deleteDomesticInquiry(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2895,6 +3180,25 @@ const SUSPENSION_TYPE_OPTIONS = [
   { value: "Paid Suspension", label: "Paid Suspension" },
   { value: "Unpaid Suspension", label: "Unpaid Suspension" },
 ];
+
+// Shared with DisciplinarySummaryPanel — see DOMESTIC_INQUIRY_FIELDS' own comment.
+const SUSPENSION_FIELDS: RecordField[] = [
+  { key: "startDate", label: "Suspension Start", type: "date" },
+  { key: "endDate", label: "Suspension End", type: "date" },
+  { key: "type", label: "Suspension Type", type: "select", options: SUSPENSION_TYPE_OPTIONS, full: true },
+  { key: "reason", label: "Reason", type: "textarea", full: true },
+  { key: "issuedBy", label: "Issued by", type: "text", full: true },
+  { key: "attachment", label: "Attachment", type: "file", full: true },
+];
+function suspensionEditValues(r: SuspensionLetterEntry): RecordEditValues {
+  return {
+    startDate: r.startDate ?? "",
+    endDate: r.endDate ?? "",
+    type: r.type ?? "",
+    reason: r.reason ?? "",
+    issuedBy: r.issuedBy ?? "",
+  };
+}
 
 export function SuspensionPanel({
   userId,
@@ -2910,14 +3214,7 @@ export function SuspensionPanel({
       <RepeatableRecordSection
         heading="Suspension Letter"
         addLabel="+ Add a suspension letter record"
-        fields={[
-          { key: "startDate", label: "Suspension Start", type: "date" },
-          { key: "endDate", label: "Suspension End", type: "date" },
-          { key: "type", label: "Suspension Type", type: "select", options: SUSPENSION_TYPE_OPTIONS, full: true },
-          { key: "reason", label: "Reason", type: "textarea", full: true },
-          { key: "issuedBy", label: "Issued by", type: "text", full: true },
-          { key: "attachment", label: "Attachment", type: "file", full: true },
-        ]}
+        fields={SUSPENSION_FIELDS}
         columns={[
           { key: "start", label: "Suspension Start" },
           { key: "end", label: "Suspension End" },
@@ -2933,13 +3230,7 @@ export function SuspensionPanel({
           attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
         }))}
         rowIds={data.map((r) => r.id)}
-        editValues={data.map((r) => ({
-          startDate: r.startDate ?? "",
-          endDate: r.endDate ?? "",
-          type: r.type ?? "",
-          reason: r.reason ?? "",
-          issuedBy: r.issuedBy ?? "",
-        }))}
+        editValues={data.map(suspensionEditValues)}
         editFileIds={data.map((r) => ({ attachment: r.attachmentFileId }))}
         onAdd={(values, files) =>
           addSuspensionLetter(userId, {
@@ -2962,6 +3253,7 @@ export function SuspensionPanel({
           })
         }
         onDelete={(id) => deleteSuspensionLetter(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -2980,6 +3272,46 @@ const SHOWCAUSE_CASE_TYPE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
+// Status was a bare free-text field until now (2026-08-13, see conversation)
+// — showcause_warning_letter.status already exists as a plain varchar
+// column (no schema change needed), just never had fixed options in the UI.
+const SHOWCAUSE_STATUS_OPTIONS = [
+  { value: "Draft", label: "Draft" },
+  { value: "Issued", label: "Issued" },
+  { value: "Under Review", label: "Under Review" },
+  { value: "Action Taken", label: "Action Taken" },
+  { value: "Closed", label: "Closed" },
+];
+
+// Shared with DisciplinarySummaryPanel — see DOMESTIC_INQUIRY_FIELDS' own comment.
+const SHOWCAUSE_FIELDS: RecordField[] = [
+  { key: "type", label: "Case Type", type: "select", options: SHOWCAUSE_CASE_TYPE_OPTIONS },
+  { key: "typeOther", label: "Please specify", type: "text", visibleWhen: (values) => values.type === "Other" },
+  { key: "date", label: "Issued Date", type: "date" },
+  { key: "issuedBy", label: "Issued by", type: "text" },
+  { key: "status", label: "Status", type: "select", options: SHOWCAUSE_STATUS_OPTIONS },
+  { key: "reason", label: "Reason", type: "textarea", full: true },
+  { key: "empResponse", label: "Employee Responses", type: "textarea", full: true },
+  { key: "attachment", label: "Attachment", type: "file", full: true },
+];
+// Older rows (or ones entered before this dropdown existed) may hold a case
+// type string that isn't one of the fixed options — treat those the same as
+// a fresh "Other" pick so the existing free text still shows up instead of
+// silently not matching any option (same convention as Training's Status
+// dropdown).
+function showcauseEditValues(r: ShowcauseWarningLetterEntry): RecordEditValues {
+  const isKnown = SHOWCAUSE_CASE_TYPE_OPTIONS.some((o) => o.value === r.type);
+  return {
+    type: r.type && !isKnown ? "Other" : r.type ?? "",
+    typeOther: r.type && !isKnown ? r.type : "",
+    date: r.date ?? "",
+    issuedBy: r.issuedBy ?? "",
+    status: r.status ?? "",
+    reason: r.reason ?? "",
+    empResponse: r.empResponse ?? "",
+  };
+}
+
 export function ShowcausePanel({
   userId,
   data,
@@ -2994,16 +3326,7 @@ export function ShowcausePanel({
       <RepeatableRecordSection
         heading="Showcause/ Warning Letter"
         addLabel="+ Add a showcause/warning letter record"
-        fields={[
-          { key: "type", label: "Case Type", type: "select", options: SHOWCAUSE_CASE_TYPE_OPTIONS },
-          { key: "typeOther", label: "Please specify", type: "text", visibleWhen: (values) => values.type === "Other" },
-          { key: "date", label: "Issued Date", type: "date" },
-          { key: "issuedBy", label: "Issued by", type: "text" },
-          { key: "status", label: "Status", type: "text" },
-          { key: "reason", label: "Reason", type: "textarea", full: true },
-          { key: "empResponse", label: "Employee Responses", type: "textarea", full: true },
-          { key: "attachment", label: "Attachment", type: "file", full: true },
-        ]}
+        fields={SHOWCAUSE_FIELDS}
         columns={[
           { key: "date", label: "Issued Date" },
           { key: "type", label: "Case Type" },
@@ -3019,23 +3342,7 @@ export function ShowcausePanel({
           attachment: <RealAttachmentLink fileId={r.attachmentFileId} />,
         }))}
         rowIds={data.map((r) => r.id)}
-        editValues={data.map((r) => {
-          // Older rows (or ones entered before this dropdown existed) may
-          // hold a case type string that isn't one of the fixed options —
-          // treat those the same as a fresh "Other" pick so the existing
-          // free text still shows up instead of silently not matching any
-          // option (same convention as Training's Status dropdown).
-          const isKnown = SHOWCAUSE_CASE_TYPE_OPTIONS.some((o) => o.value === r.type);
-          return {
-            type: r.type && !isKnown ? "Other" : r.type ?? "",
-            typeOther: r.type && !isKnown ? r.type : "",
-            date: r.date ?? "",
-            issuedBy: r.issuedBy ?? "",
-            status: r.status ?? "",
-            reason: r.reason ?? "",
-            empResponse: r.empResponse ?? "",
-          };
-        })}
+        editValues={data.map(showcauseEditValues)}
         editFileIds={data.map((r) => ({ attachment: r.attachmentFileId }))}
         onAdd={(values, files) => {
           const type = values.type === "Other" ? values.typeOther ?? "" : values.type ?? "";
@@ -3062,6 +3369,7 @@ export function ShowcausePanel({
           });
         }}
         onDelete={(id) => deleteShowcauseWarningLetter(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -3075,20 +3383,33 @@ const PIP_REVIEW_RESULT_OPTIONS = [
   { value: "Terminated", label: "Terminated" },
 ];
 
+// Shared with DisciplinarySummaryPanel — see DOMESTIC_INQUIRY_FIELDS' own comment.
+const PIP_FIELDS: RecordField[] = [
+  { key: "startDate", label: "Start Date", type: "date" },
+  { key: "endDate", label: "End Date", type: "date" },
+  { key: "supervisor", label: "Supervisor", type: "text" },
+  { key: "reviewResult", label: "Review Result", type: "select", options: PIP_REVIEW_RESULT_OPTIONS },
+  { key: "improvementGoal", label: "Improvement Goals", type: "textarea", full: true },
+  { key: "remark", label: "Remarks", type: "text", full: true },
+];
+function pipEditValues(r: PipEntry): RecordEditValues {
+  return {
+    startDate: r.startDate ?? "",
+    endDate: r.endDate ?? "",
+    supervisor: r.supervisor ?? "",
+    reviewResult: r.reviewResult ?? "",
+    improvementGoal: r.improvementGoal ?? "",
+    remark: r.remark ?? "",
+  };
+}
+
 export function PipPanel({ userId, data, canEdit = true }: { userId: number; data: PipEntry[]; canEdit?: boolean }) {
   return (
     <EditableSection canEdit={canEdit}>
       <RepeatableRecordSection
         heading="Performance Improvement Plan"
         addLabel="+ Add a PIP record"
-        fields={[
-          { key: "startDate", label: "Start Date", type: "date" },
-          { key: "endDate", label: "End Date", type: "date" },
-          { key: "supervisor", label: "Supervisor", type: "text" },
-          { key: "reviewResult", label: "Review Result", type: "select", options: PIP_REVIEW_RESULT_OPTIONS },
-          { key: "improvementGoal", label: "Improvement Goals", type: "textarea", full: true },
-          { key: "remark", label: "Remarks", type: "text", full: true },
-        ]}
+        fields={PIP_FIELDS}
         columns={[
           { key: "start", label: "Start Date" },
           { key: "end", label: "End Date" },
@@ -3102,14 +3423,7 @@ export function PipPanel({ userId, data, canEdit = true }: { userId: number; dat
           result: r.reviewResult ?? "—",
         }))}
         rowIds={data.map((r) => r.id)}
-        editValues={data.map((r) => ({
-          startDate: r.startDate ?? "",
-          endDate: r.endDate ?? "",
-          supervisor: r.supervisor ?? "",
-          reviewResult: r.reviewResult ?? "",
-          improvementGoal: r.improvementGoal ?? "",
-          remark: r.remark ?? "",
-        }))}
+        editValues={data.map(pipEditValues)}
         onAdd={(values) =>
           addPip(userId, {
             startDate: values.startDate ?? "",
@@ -3131,6 +3445,7 @@ export function PipPanel({ userId, data, canEdit = true }: { userId: number; dat
           })
         }
         onDelete={(id) => deletePip(userId, id)}
+        canEdit={canEdit}
       />
     </EditableSection>
   );
@@ -3184,6 +3499,7 @@ export function ResignationPanel({ userId, data, canEdit = true }: { userId: num
         })
       }
       canEdit={canEdit}
+      sectionLabel="Resignation"
     >
       <PanelHeading>Resignation</PanelHeading>
       <FieldGrid>
@@ -3252,6 +3568,7 @@ export function ReferenceLetterPanel({
         })
       }
       canEdit={canEdit}
+      sectionLabel="Reference Letter"
     >
       <PanelHeading>Reference Letter</PanelHeading>
       <FieldGrid>
@@ -3286,15 +3603,34 @@ export function ExitInterviewNotesPanel({
   const [date, setDate] = useState(data?.date ?? "");
   const [interviewer, setInterviewer] = useState(data?.interviewer ?? "");
   const [reason, setReason] = useState(data?.reason ?? "");
+  const [reasonOther, setReasonOther] = useState(data?.reasonOther ?? "");
   const [note, setNote] = useState(data?.note ?? "");
 
   return (
-    <EditableSection onSave={() => updateExitInterviewNote(userId, { date, interviewer, reason, note })} canEdit={canEdit}>
+    <EditableSection
+      onSave={() =>
+        updateExitInterviewNote(userId, {
+          date,
+          interviewer,
+          reason,
+          // Only persisted when reason is actually "other" — same convention
+          // as Showcause's Case Type/Training's Status own *Other fields, so
+          // a stale answer left over from a since-changed reason never lingers.
+          reasonOther: reason === "other" ? reasonOther : "",
+          note,
+        })
+      }
+      canEdit={canEdit}
+      sectionLabel="Exit Interview Notes"
+    >
       <PanelHeading>Exit Interview Notes</PanelHeading>
       <FieldGrid>
         <EditableField label="Interview Date" value={date} onChange={setDate} type="date" />
         <EditableField label="Interviewer" value={interviewer} onChange={setInterviewer} />
         <EditableSelectField label="Primary Reason for Leaving" value={reason} onChange={setReason} options={EXIT_REASON_OPTIONS} full />
+        {reason === "other" && (
+          <EditableField label="Please specify" value={reasonOther} onChange={setReasonOther} full />
+        )}
         <EditableTextArea label="Feedback / Notes" value={note} onChange={setNote} full />
       </FieldGrid>
     </EditableSection>
@@ -3426,7 +3762,7 @@ function ExitChecklistPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} canEdit={canEdit} sectionLabel={heading}>
       <PanelHeading>{heading}</PanelHeading>
       <ExitChecklistItems
         items={items.filter((item) => !pendingDeleteIds.has(item.id))}
@@ -3436,6 +3772,9 @@ function ExitChecklistPanel({
         onChange={(id, checked) => setPendingChecked((prev) => ({ ...prev, [id]: checked }))}
         onLabelChange={(id, label) => setPendingLabels((prev) => ({ ...prev, [id]: label }))}
         onDelete={(id) => setPendingDeleteIds((prev) => new Set(prev).add(id))}
+        userId={userId}
+        onToggle={onToggle}
+        canEdit={canEdit}
       />
       {canAddItem && <ExitChecklistAddItemRow value={newLabel} onChange={setNewLabel} />}
       {choosingScope && (
@@ -3455,6 +3794,22 @@ function ExitChecklistPanel({
 // <input> once editing+canEditItem are both true — "click the text to edit
 // it" is simply what focusing a normal text input looks like, no separate
 // static-to-input toggle step, consistent with the rest of the app.
+//
+// Checking/unchecking is deliberately NOT gated on `editing` (fixed
+// 2026-08-13, see conversation — was gated the same as rename/delete/add
+// until now) — it works at any time, still respecting canEdit (the
+// panel-level permission, e.g. a CEO viewing someone else's profile) as its
+// only gate. Rename/delete/add are UNCHANGED — still require both editing
+// AND canEditItem (HR/Superadmin), exactly as before. The mechanism differs
+// by mode: while editing, a toggle still just stages into pendingChecked
+// (unchanged), batched into whatever ExitChecklistPanel's own Save
+// eventually submits; outside edit mode there is no page-level Save to
+// batch with at all, so the toggle calls onToggle directly and refreshes
+// immediately, in addition to (not instead of) the same optimistic
+// pendingChecked update — so the checkbox reflects the click instantly
+// either way, and there's nothing left to submit if the user later does
+// enter edit mode (items itself will already reflect the saved value by
+// then, so handleSave's own toggled-vs-item.checked diff comes up empty).
 function ExitChecklistItems({
   items,
   pendingChecked,
@@ -3463,6 +3818,9 @@ function ExitChecklistItems({
   onChange,
   onLabelChange,
   onDelete,
+  userId,
+  onToggle,
+  canEdit,
 }: {
   items: ExitChecklistItem[];
   pendingChecked: Record<number, boolean>;
@@ -3471,17 +3829,45 @@ function ExitChecklistItems({
   onChange: (itemId: number, checked: boolean) => void;
   onLabelChange: (itemId: number, label: string) => void;
   onDelete: (itemId: number) => void;
+  userId: number;
+  onToggle: (userId: number, itemId: number, checked: boolean) => Promise<ActionResult>;
+  canEdit: boolean;
 }) {
   const editing = useEditMode();
+  const router = useRouter();
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  async function handleImmediateToggle(itemId: number, checked: boolean) {
+    setSavingId(itemId);
+    setToggleError(null);
+    try {
+      const result = await onToggle(userId, itemId, checked);
+      if (result && result.ok === false) {
+        setToggleError(result.error ?? "Failed to save.");
+      } else {
+        startTransition(() => router.refresh());
+      }
+    } catch (e) {
+      setToggleError(e instanceof Error ? e.message : "Failed to save.");
+    }
+    setSavingId(null);
+  }
+
   return (
+    <>
     <ul className="flex flex-col gap-3">
       {items.map((item) => (
         <li key={item.id} className="flex items-center gap-2.5">
           <input
             type="checkbox"
             checked={pendingChecked[item.id] ?? false}
-            disabled={!editing}
-            onChange={(e) => onChange(item.id, e.target.checked)}
+            disabled={!canEdit || savingId === item.id}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onChange(item.id, checked);
+              if (!editing && canEdit) handleImmediateToggle(item.id, checked);
+            }}
             className="w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
           />
           {editing && canEditItem ? (
@@ -3507,6 +3893,8 @@ function ExitChecklistItems({
         </li>
       ))}
     </ul>
+    {toggleError && <p className="mt-2 text-xs text-red-600">{toggleError}</p>}
+    </>
   );
 }
 
@@ -3645,6 +4033,7 @@ export function FinancialSettlementPanel({
         })
       }
       canEdit={canEdit}
+      sectionLabel="Clearance – Financial Settlement"
     >
       <PanelHeading>Clearance – Financial Settlement</PanelHeading>
       <FieldGrid>
@@ -3708,6 +4097,19 @@ export function PersonalInfoPanel({
     else setOfferLetterFileId(null);
   }
 
+  // Same checks as handleSave's own inline guard below, extracted so a
+  // PageEditProvider (see PageEditMode.tsx) can validate this section
+  // without attempting the actual save — handleSave's own checks stay as
+  // they are (untouched) so standalone usage (e.g. Pre stage's own Personal
+  // Info tab) keeps validating exactly as before this existed.
+  function validate(): ValidationResult {
+    const errors: string[] = [];
+    if (!fullName.trim()) errors.push("Full Name cannot be empty.");
+    if (!isValidEmail(email)) errors.push("Enter a valid email address.");
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) errors.push("Enter a valid phone number.");
+    return errors.length > 0 ? { valid: false, error: errors.join("\n") } : { valid: true };
+  }
+
   function handleSave() {
     if (!fullName.trim()) {
       return { ok: false, error: "Full Name cannot be empty." };
@@ -3732,7 +4134,7 @@ export function PersonalInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} validate={validate} canEdit={canEdit} sectionLabel="Personal Info">
       <PanelHeading>Personal Info</PanelHeading>
       <FieldGrid>
         <EditableField label="Full Name" value={fullName} onChange={setFullName} />
@@ -3806,6 +4208,16 @@ export function EmergencyContactPanel({
   const [email, setEmail] = useState(employee.emergencyEmail ?? "");
   const [address, setAddress] = useState(employee.emergencyAddress ?? "");
 
+  // Same checks as handleSave's own inline guard — see PersonalInfoPanel's
+  // validate() above for why this is a separate function rather than a
+  // dry-run flag on handleSave itself.
+  function validate(): ValidationResult {
+    const errors: string[] = [];
+    if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) errors.push("Enter a valid phone number.");
+    if (email && !isValidEmail(email)) errors.push("Enter a valid email address.");
+    return errors.length > 0 ? { valid: false, error: errors.join("\n") } : { valid: true };
+  }
+
   function handleSave() {
     if (phone && !isValidPhoneDigits(parsePhoneValue(phone).digits)) {
       return Promise.resolve({ ok: false, error: "Enter a valid phone number." });
@@ -3817,7 +4229,7 @@ export function EmergencyContactPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} validate={validate} canEdit={canEdit} sectionLabel="Emergency Contact">
       <PanelHeading>Emergency Contact</PanelHeading>
       <FieldGrid>
         <EditableField label="Contact Name" value={name} onChange={setName} />

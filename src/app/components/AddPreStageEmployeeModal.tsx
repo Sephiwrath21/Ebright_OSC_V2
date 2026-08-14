@@ -9,6 +9,18 @@ import type { BranchOpt, DepartmentOpt } from "@/lib/employeeQueries";
 const inputClass =
   "h-11 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50";
 
+// Position options are scoped by whether Branch or Department was picked
+// (2026-08-13, see conversation) — a Branch hire is always operational
+// (Coach/BM), a Department hire is always HQ-side (Exec/HOD), and Intern is
+// the one position both sides share. CEO is its own department_code (real
+// row, confirmed via direct query — not a placeholder) with no other valid
+// position, so it's handled as its own locked case below rather than a
+// third options list.
+const BRANCH_POSITION_VALUES = ["PT COACH", "FT COACH", "INTERN", "BM"];
+const DEPARTMENT_POSITION_VALUES = ["FT EXEC", "FT HOD", "INTERN"];
+const BRANCH_POSITION_OPTIONS = POSITION_OPTIONS.filter((o) => BRANCH_POSITION_VALUES.includes(o.value));
+const DEPARTMENT_POSITION_OPTIONS = POSITION_OPTIONS.filter((o) => DEPARTMENT_POSITION_VALUES.includes(o.value));
+
 interface Props {
   branches: BranchOpt[];
   departments: DepartmentOpt[];
@@ -28,6 +40,15 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
   const [startDate, setStartDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isCeoDepartment = departmentCode === "CEO";
+  const positionOptions = isCeoDepartment
+    ? POSITION_OPTIONS.filter((o) => o.value === "CEO")
+    : branchCode
+      ? BRANCH_POSITION_OPTIONS
+      : departmentCode
+        ? DEPARTMENT_POSITION_OPTIONS
+        : [];
 
   function reset() {
     setFullName("");
@@ -94,25 +115,21 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                   <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-[#4b4949]">Position</label>
-                  <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputClass}>
-                    <option value=""></option>
-                    {POSITION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-slate-500 -mb-2">Branch and Department — select only one; choosing one clears the other.</p>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-[#4b4949]">Branch</label>
                   <select
                     value={branchCode}
                     onChange={(e) => {
-                      setBranchCode(e.target.value);
-                      if (e.target.value) setDepartmentCode("");
+                      const value = e.target.value;
+                      setBranchCode(value);
+                      if (value) setDepartmentCode("");
+                      // Position resets whenever Branch/Department switches
+                      // (2026-08-13, see conversation) — the valid option set
+                      // is different for each side, so a previously-picked
+                      // Position may no longer be valid.
+                      setPosition("");
                     }}
                     disabled={Boolean(departmentCode)}
                     className={inputClass}
@@ -131,8 +148,15 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                   <select
                     value={departmentCode}
                     onChange={(e) => {
-                      setDepartmentCode(e.target.value);
-                      if (e.target.value) setBranchCode("");
+                      const value = e.target.value;
+                      setDepartmentCode(value);
+                      if (value) setBranchCode("");
+                      // CEO is a real department_code (confirmed via direct
+                      // query, not a placeholder) with no other valid
+                      // position — auto-lock Position to it instead of
+                      // clearing to blank, same as every other Dept pick
+                      // resets Position for its own (different) option set.
+                      setPosition(value === "CEO" ? "CEO" : "");
                     }}
                     disabled={Boolean(branchCode)}
                     className={inputClass}
@@ -141,6 +165,23 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                     {departments.map((d) => (
                       <option key={d.code} value={d.code}>
                         {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-[#4b4949]">Position</label>
+                  <select
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    disabled={isCeoDepartment}
+                    className={inputClass}
+                  >
+                    <option value=""></option>
+                    {positionOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
                       </option>
                     ))}
                   </select>

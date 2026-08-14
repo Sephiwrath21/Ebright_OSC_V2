@@ -8,7 +8,6 @@ import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
 import { STAFF_ROLE_ID, getEmployeeOverviewRowById, listBranches, listDepartments, resolveDepartmentBranch } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
 import { resolveNewProbationEndDate } from "@/lib/probationDecision";
-import { lookupCareerApplicationsByName, normalizeName } from "@/lib/careerApplicationSync";
 
 export interface ActionResult {
   ok: boolean;
@@ -452,6 +451,13 @@ export interface UpdateProbationInput {
   confirmationLetterFile: File | null;
   extensionLetterFileId: string | null;
   extensionLetterFile: File | null;
+  /** Feedback is now always editable regardless of career_applications match
+   *  status, per explicit decision (see conversation, 2026-08-13) — this
+   *  replaces the earlier hybrid design (external feedback2 read-only vs.
+   *  local_feedback editable). Always written to local_feedback; the
+   *  external ebright_hrfs.career_applications.feedback2 column is never
+   *  written to from here or anywhere else — read-only always. */
+  localFeedback: string;
 }
 
 export async function updateProbationInfo(userId: number, input: UpdateProbationInput): Promise<ActionResult> {
@@ -491,6 +497,7 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
       ext_end_date: input.extEndDate ? new Date(`${input.extEndDate}T00:00:00Z`) : null,
       confirmation_letter_file_id: confirmationLetterFileId,
       extension_letter_file_id: extensionLetterFileId,
+      local_feedback: input.localFeedback || null,
     };
     await prisma.probation.upsert({
       where: { user_id: userId },
@@ -519,19 +526,26 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
 // write. Extended/Stopped only ever write the decision either way — Stopped
 // stays in Probation with its display flipped to "Stop", Extended just
 // keeps the existing timeline.
-// localFeedback: the CURRENTLY-TYPED Feedback field value, passed by the
-// caller only when this person has no career_applications match (see
-// ProbationDisplayInfo.hasCareerApplicationMatch) — undefined for a matched
-// person, whose Feedback stays external/read-only. Folded into this same
-// action (rather than requiring a separate Save of the outer form first) so
+// localFeedback: the CURRENTLY-TYPED Feedback field value, per explicit
+// decision (see conversation, 2026-08-13) — Feedback is now always editable
+// regardless of career_applications match status (replaces the earlier
+// hybrid design where a matched person's Feedback was external/read-only,
+// sourced straight from feedback2). The caller seeds its own local state
+// from feedback2 when present, so this param already reflects that starting
+// value plus whatever HR has since typed — always written to local_feedback,
+// never back to the external feedback2 column. Folded into this same action
+// (rather than requiring a separate Save of the outer form first) so
 // there's no ordering question between "did they save the typed Feedback"
 // and "is Feedback present" — both happen atomically here. Confirmed/Stopped
-// both require Feedback to be present first, per explicit decision (see
-// conversation): checks feedback2 for a matched person, local_feedback
-// (this call's own localFeedback param) for an unmatched one — Extended has
-// no such requirement. Confirmed also auto-stamps confirm_date to today;
-// decideProbationOutcome remains the only write path this whole feature
-// introduces, now covering three fields instead of two.
+// both require Feedback to be present first, per explicit decision — checked
+// against this param directly now, not re-derived from feedback2 (that used
+// to mean clearing a pre-filled Feedback field while feedback2 still held
+// its original value would silently pass this check against the stale
+// external text instead of what the field currently shows — fixed
+// 2026-08-13). Extended has no such requirement. Confirmed also
+// auto-stamps confirm_date to today; decideProbationOutcome remains the
+// only write path this whole feature introduces, now covering three fields
+// instead of two.
 export async function decideProbationOutcome(
   userId: number,
   outcome: "Confirmed" | "Extended" | "Stopped",
@@ -546,11 +560,7 @@ export async function decideProbationOutcome(
 
   try {
     if (outcome === "Confirmed" || outcome === "Stopped") {
-      const profile = await prisma.user_profile.findUnique({ where: { user_id: userId }, select: { full_name: true } });
-      const careerApplications = await lookupCareerApplicationsByName();
-      const match = careerApplications.get(normalizeName(profile?.full_name ?? ""));
-      const effectiveFeedback = match ? match.feedback2 : localFeedback;
-      if (!effectiveFeedback || !effectiveFeedback.trim()) {
+      if (!localFeedback || !localFeedback.trim()) {
         return { ok: false, error: "Feedback must be filled in before Confirm or Stop." };
       }
     }
@@ -1132,6 +1142,12 @@ export interface UpdateExitInterviewNoteInput {
   date: string;
   interviewer: string;
   reason: string;
+  /** Free-text "please specify" answer — only meaningful when reason is
+   *  "other". The panel itself clears this to "" before calling in when
+   *  reason isn't "other" (same convention as Showcause's Case
+   *  Type/Training's Status own *Other fields), so a stale answer left over
+   *  from a since-changed reason never lingers. */
+  reasonOther: string;
   note: string;
 }
 
@@ -1145,6 +1161,7 @@ export async function updateExitInterviewNote(userId: number, input: UpdateExitI
       date: input.date ? new Date(`${input.date}T00:00:00Z`) : null,
       interviewer: input.interviewer || null,
       reason: input.reason || null,
+      reason_other: input.reason === "other" ? input.reasonOther || null : null,
       note: input.note || null,
     };
     await prisma.exit_interview_note.upsert({ where: { user_id: userId }, update: fields, create: { user_id: userId, ...fields } });

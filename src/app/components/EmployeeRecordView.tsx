@@ -17,6 +17,7 @@ import {
   ResumePanel,
   ReferenceCheckPanel,
   MedicalCheckPanel,
+  InterviewAssessmentPanel,
   DocumentsPanel,
   OnboardingPayrollPanel,
   AchievementPanel,
@@ -31,6 +32,8 @@ import {
   RealAttachmentLink,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection } from "@/app/components/EditMode";
+import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog, type ValidationResult } from "@/app/components/PageEditMode";
+import { RAIL_PILL_PADDING_CLASS, RAIL_PILL_FONT_SIZE_CLASS } from "@/lib/stageProfileConfig";
 import {
   EMPLOYEE_RECORD_STATIC_PANELS,
   PayrollPanel,
@@ -38,6 +41,7 @@ import {
   PerformanceReviewPanel,
   TaskPendingPanel,
   TaskOverduePanel,
+  OfferLetterPanel,
 } from "@/app/components/EmployeeRecordPanels";
 import { updateBankDetails, updateEmergencyContact, updatePaymentInfo } from "@/lib/employeeRecordActions";
 import type {
@@ -46,6 +50,7 @@ import type {
   DepartmentOpt,
   LeaveHistoryRow,
   ResumeInfo,
+  InterviewAssessmentInfo,
   ReferenceCheckInfo,
   MedicalCheckInfo,
   DocumentsInfo,
@@ -79,6 +84,16 @@ const RAIL_GAP_PX = 10;
 const RAIL_BASE = "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
 
+// PageEditProvider rollout (2026-08-13, see conversation) — categories
+// whose sub-sections switch via client-side state instead of route
+// navigation, so a single page-level Edit/Save can span all of them. Grows
+// one entry per rollout batch (Personal Info was the pilot, then HR Info,
+// Finance, and Active Employment). Disciplinary is deliberately excluded —
+// all 4 of its sections are RepeatableRecordSection panels (see the
+// excluded-8 list in ActiveProfilePanels.tsx), so wrapping it would add a
+// page-level Edit/Save button with nothing real to register.
+const CLIENT_TAB_CATEGORIES = new Set(["personal-info", "hr-info", "finance", "active-employment"]);
+
 interface Props {
   employeeId: number;
   employeeName: string;
@@ -100,6 +115,10 @@ interface Props {
   leaveHistory?: LeaveHistoryRow[];
   /** Real resume table data — only fetched for HR Info > Resume/CV. */
   resumeInfo?: ResumeInfo | null;
+  /** Real interview_assessment table data — only fetched for HR Info >
+   *  Hiring Notes (shares this table with Pre stage's own Interview
+   *  Assessment tab — see InterviewAssessmentPanel's own comment). */
+  interviewAssessment?: InterviewAssessmentInfo | null;
   /** Real reference_check table data — only fetched for HR Info > Reference. */
   referenceCheck?: ReferenceCheckInfo | null;
   /** Real medical_check table data — only fetched for HR Info > Medical Check. */
@@ -160,6 +179,7 @@ export default function EmployeeRecordView({
   employeeDetail,
   leaveHistory,
   resumeInfo,
+  interviewAssessment,
   referenceCheck,
   medicalCheck,
   documentsInfo,
@@ -185,7 +205,21 @@ export default function EmployeeRecordView({
   tasks,
   canEdit = true,
 }: Props) {
-  const currentSection = category.sections.find((s) => s.key === sectionKey) ?? category.sections[0];
+  // Rollout categories (2026-08-13, see conversation) — each one's
+  // sub-sections switch via this client-side state instead of navigating,
+  // so an edit in progress on one survives visiting the others. Seeded from
+  // the URL's own section param so a direct link/bookmark to e.g.
+  // .../hr-info/reference still opens on that one; from there, the section
+  // buttons below just update this state instead of the URL. Personal Info
+  // was the pilot batch; HR Info is Batch 2 (Finance/Onboarding/Exit follow
+  // in later batches — see conversation for the confirmed order). Every
+  // OTHER category is unaffected — still real route navigation between
+  // sections, one panel mounted at a time, same as before this rollout.
+  const isClientTabCategory = CLIENT_TAB_CATEGORIES.has(category.key);
+  const [clientSection, setClientSection] = useState(sectionKey);
+  const currentSection = isClientTabCategory
+    ? (category.sections.find((s) => s.key === clientSection) ?? category.sections[0])
+    : (category.sections.find((s) => s.key === sectionKey) ?? category.sections[0]);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -252,7 +286,7 @@ export default function EmployeeRecordView({
             overflow-x-auto), never wrapped to a second row, either way. */}
         <nav
           aria-label="Employee record categories"
-          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
+          className="flex flex-nowrap items-center gap-1 mb-0 ml-4 sm:ml-6 overflow-x-auto w-auto [@media(hover:none)]:w-full [@media(hover:none)]:ml-0 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
         >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
@@ -295,14 +329,21 @@ export default function EmployeeRecordView({
           >
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
+              const className = `shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                isActive ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+              }`;
+              // Rollout categories — client-side tab state, not navigation
+              // (see clientSection above); every other category keeps the
+              // original route-Link behavior unchanged.
+              if (isClientTabCategory) {
+                return (
+                  <button key={section.key} type="button" onClick={() => setClientSection(section.key)} className={className}>
+                    {section.label}
+                  </button>
+                );
+              }
               return (
-                <Link
-                  key={section.key}
-                  href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
-                  className={`shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
-                  }`}
-                >
+                <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
                   {section.label}
                 </Link>
               );
@@ -312,106 +353,227 @@ export default function EmployeeRecordView({
 
         {/* Card + vertical sub-nav rail as flex siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
-            breakpoint (never stacks). The rail's own width fluidly shrinks
-            on narrow viewports (see its own style below) so both columns
-            keep fitting side by side instead of the rail getting pushed
-            below the content. */}
-        <div className="flex items-start gap-3 sm:gap-4">
+            breakpoint (never stacks). No gap between them (fixed
+            2026-08-13, see conversation) — the rail sits flush against the
+            card's right edge; same fix applied to StageProfileView.tsx's
+            own separate copy of this layout. The rail's own width fluidly
+            shrinks on narrow viewports (see its own style below) so both
+            columns keep fitting side by side instead of the rail getting
+            pushed below the content. */}
+        <div className="flex items-start">
           <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
-              if (sectionKey === "personal-info" && employeeDetail)
-                return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />;
-              if (sectionKey === "guardian-info" && guardianInfo !== undefined)
-                return <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />;
-              if (sectionKey === "payment" && employeeDetail && paymentInfo !== undefined)
+              // Personal Info pilot — all 4 sub-panels render together,
+              // wrapped in one PageEditProvider (see PageEditMode.tsx), each
+              // hidden via CSS rather than unmounted so an edit in progress
+              // on one survives switching to another (clientSection above).
+              // Guardian Info has no equivalent on the stage-profile flow,
+              // but PersonalInfoPanel/EmergencyContactPanel are shared with
+              // it (e.g. Pre stage's own Personal Info tab) — those render
+              // standalone there, with no PageEditProvider above them, so
+              // this pilot doesn't affect that usage at all.
+              if (category.key === "personal-info" && employeeDetail && guardianInfo !== undefined && paymentInfo !== undefined) {
                 return (
-                  <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
+                  <PageEditProvider>
+                    <PageEditMessageDialog />
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                    <div className={clientSection === "personal-info" ? "" : "hidden"}>
+                      <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "guardian-info" ? "" : "hidden"}>
+                      <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "payment" ? "" : "hidden"}>
+                      <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "emergency-contact" ? "" : "hidden"}>
+                      <EmergencyContactPanel
+                        employee={employeeDetail}
+                        onSave={(data) => updateEmergencyContact(employeeId, data)}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                  </PageEditProvider>
                 );
-              if (sectionKey === "emergency-contact" && employeeDetail)
+              }
+              // HR Info rollout Batch 2 (2026-08-13, see conversation) — same
+              // shape as Personal Info above: all 7 sub-panels render
+              // together under one PageEditProvider, hidden via CSS. Offer
+              // Letter (OfferLetterPanel) deliberately has no sectionLabel
+              // passed through — it has no real DB backing at all
+              // (hasRealBacking={false}, mock fields only), so it simply
+              // doesn't register with the provider; a page-level Save skips
+              // it entirely, same as before (its own individual Save
+              // previously no-opped with a "not persisted" notice — that
+              // per-section notice no longer shows once wrapped in a
+              // page-level provider, since EditableSection's own notice is
+              // standalone-only; the page-level Save's aggregated message
+              // doesn't mention it either, since it never registered in the
+              // first place). Hiring Notes now shares InterviewAssessmentPanel
+              // with Pre stage's own Interview Assessment tab (fixed
+              // 2026-08-13, see conversation — was a disconnected mock with
+              // no real backing at all, so Pre-stage-entered data never
+              // showed up here) — real sectionLabel="Hiring Notes",
+              // registers and saves like any other real panel now. Resume/CV,
+              // Reference, Medical Check are shared with the Pre stage flow
+              // (see ActiveProfilePanels.tsx) and already got sectionLabel
+              // there in Batch 1 — reused as-is here.
+              if (
+                category.key === "hr-info" &&
+                resumeInfo !== undefined &&
+                interviewAssessment !== undefined &&
+                referenceCheck !== undefined &&
+                medicalCheck !== undefined &&
+                documentsInfo !== undefined &&
+                ndaInfo !== undefined &&
+                nonCompeteInfo !== undefined
+              ) {
                 return (
-                  <EmergencyContactPanel
-                    employee={employeeDetail}
-                    onSave={(data) => updateEmergencyContact(employeeId, data)}
-                    canEdit={canEdit}
-                  />
+                  <PageEditProvider>
+                    <PageEditMessageDialog />
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                    <div className={clientSection === "resume" ? "" : "hidden"}>
+                      <ResumePanel
+                        userId={employeeId}
+                        resumeFileId={resumeInfo?.resumeFileId ?? null}
+                        cvFileId={resumeInfo?.cvFileId ?? null}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={clientSection === "offer-letter" ? "" : "hidden"}>
+                      <OfferLetterPanel canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "hiring-notes" ? "" : "hidden"}>
+                      <InterviewAssessmentPanel
+                        userId={employeeId}
+                        data={interviewAssessment}
+                        heading="Hiring Notes"
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={clientSection === "reference" ? "" : "hidden"}>
+                      <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "medical-check" ? "" : "hidden"}>
+                      <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "nda-nc" ? "" : "hidden"}>
+                      <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "handbook" ? "" : "hidden"}>
+                      <DocumentsPanel
+                        userId={employeeId}
+                        data={documentsInfo}
+                        showEmploymentContract={false}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                  </PageEditProvider>
                 );
-              if (sectionKey === "leave" && leaveHistory) return <LeavePanel rows={leaveHistory} />;
-              if (category.key === "hr-info" && sectionKey === "resume" && resumeInfo)
-                return (
-                  <ResumePanel
-                    userId={employeeId}
-                    resumeFileId={resumeInfo.resumeFileId}
-                    cvFileId={resumeInfo.cvFileId}
-                    canEdit={canEdit}
-                  />
-                );
-              if (category.key === "hr-info" && sectionKey === "reference" && referenceCheck !== undefined)
-                return <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />;
-              if (category.key === "hr-info" && sectionKey === "medical-check" && medicalCheck !== undefined)
-                return <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />;
-              if (category.key === "hr-info" && sectionKey === "handbook" && documentsInfo !== undefined)
-                return (
-                  <DocumentsPanel
-                    userId={employeeId}
-                    data={documentsInfo}
-                    showEmploymentContract={false}
-                    canEdit={canEdit}
-                  />
-                );
-              if (category.key === "finance" && sectionKey === "tax-info" && payrollInfo !== undefined && employeeDetail)
-                return (
-                  <OnboardingPayrollPanel
-                    userId={employeeId}
-                    data={payrollInfo}
-                    employeeDetail={employeeDetail}
-                    heading="Tax Info"
-                    showBankDetails={false}
-                    canEdit={canEdit}
-                  />
-                );
+              }
+              // Finance rollout Batch 3 (2026-08-13, see conversation) — same
+              // shape as Personal Info/HR Info above: both sub-panels render
+              // together under one PageEditProvider, hidden via CSS.
               if (
                 category.key === "finance" &&
-                sectionKey === "payroll" &&
                 salaryRevisions !== undefined &&
                 payslip !== undefined &&
-                payslipHistory !== undefined
-              )
+                payslipHistory !== undefined &&
+                payrollInfo !== undefined &&
+                employeeDetail
+              ) {
                 return (
-                  <PayrollPanel
-                    employeeId={employeeId}
-                    salaryRevisions={salaryRevisions}
-                    payslip={payslip}
-                    payslipHistory={payslipHistory}
-                    canEdit={canEdit}
-                  />
+                  <PageEditProvider>
+                    <PageEditMessageDialog />
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                    <div className={clientSection === "payroll" ? "" : "hidden"}>
+                      <PayrollPanel
+                        employeeId={employeeId}
+                        salaryRevisions={salaryRevisions}
+                        payslip={payslip}
+                        payslipHistory={payslipHistory}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={clientSection === "tax-info" ? "" : "hidden"}>
+                      <OnboardingPayrollPanel
+                        userId={employeeId}
+                        data={payrollInfo}
+                        employeeDetail={employeeDetail}
+                        heading="Tax Info"
+                        showBankDetails={false}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                  </PageEditProvider>
                 );
-              if (category.key === "hr-info" && sectionKey === "nda-nc" && ndaInfo !== undefined && nonCompeteInfo !== undefined)
+              }
+              // Active Employment rollout Batch 7 (2026-08-13, see
+              // conversation) — same shape as Finance above, but only
+              // Performance Review is actually EditableSection-backed and
+              // registers with the provider (sectionLabel="Performance
+              // Review"). Leave is read-only (no Edit/Save concept at all);
+              // Training/Promotion/Transfer/Cert are the same
+              // RepeatableRecordSection panels excluded from this whole
+              // rollout (their outer EditableSection has no onSave — real
+              // saves already happen atomically per-row via their own
+              // "+ Add" modal). They still render here, CSS-hidden like every
+              // other tab, so switching to/from them no longer loses an
+              // in-progress "+ Add" draft, but they don't participate in the
+              // page-level Save since there's nothing pending for it to
+              // commit. Disciplinary is deliberately NOT wrapped this way —
+              // see CLIENT_TAB_CATEGORIES' own comment.
+              if (
+                category.key === "active-employment" &&
+                leaveHistory !== undefined &&
+                performanceReview !== undefined &&
+                trainings !== undefined &&
+                promotions !== undefined &&
+                transfers !== undefined &&
+                achievements !== undefined
+              ) {
                 return (
-                  <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                  <PageEditProvider>
+                    <PageEditMessageDialog />
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                    <div className={clientSection === "leave" ? "" : "hidden"}>
+                      <LeavePanel rows={leaveHistory} />
+                    </div>
+                    <div className={clientSection === "performance-review" ? "" : "hidden"}>
+                      <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "training" ? "" : "hidden"}>
+                      <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "promotion" ? "" : "hidden"}>
+                      <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
+                    </div>
+                    <div className={clientSection === "transfer" ? "" : "hidden"}>
+                      <TransferPanel
+                        userId={employeeId}
+                        data={transfers}
+                        branches={branches ?? []}
+                        departments={departments ?? []}
+                        currentLocation={departmentName ?? branchName}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={clientSection === "cert" ? "" : "hidden"}>
+                      <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />
+                    </div>
+                  </PageEditProvider>
                 );
-              if (category.key === "active-employment" && sectionKey === "cert" && achievements !== undefined)
-                return <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />;
-              if (category.key === "active-employment" && sectionKey === "performance-review" && performanceReview !== undefined)
-                return <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />;
-              if (category.key === "active-employment" && sectionKey === "promotion" && promotions !== undefined)
-                return (
-                  <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
-                );
-              if (category.key === "active-employment" && sectionKey === "transfer" && transfers !== undefined)
-                return (
-                  <TransferPanel
-                    userId={employeeId}
-                    data={transfers}
-                    branches={branches ?? []}
-                    departments={departments ?? []}
-                    currentLocation={departmentName ?? branchName}
-                    canEdit={canEdit}
-                  />
-                );
-              if (category.key === "active-employment" && sectionKey === "training" && trainings !== undefined)
-                return <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />;
+              }
               if (category.key === "disciplinary" && sectionKey === "domestic-inquiry" && domesticInquiries !== undefined)
                 return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={canEdit} />;
               if (category.key === "disciplinary" && sectionKey === "suspension" && suspensionLetters !== undefined)
@@ -451,19 +613,27 @@ export default function EmployeeRecordView({
               or rendered at its one fixed desktop size, nothing in between. */}
           <nav
             aria-label={`${category.label} sections`}
-            className="flex flex-none w-[210px] flex-col [@media(hover:none)]:hidden"
+            className="flex flex-none w-[210px] flex-col mt-4 sm:mt-6 [@media(hover:none)]:hidden"
             style={{ gap: RAIL_GAP_PX }}
           >
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
+              // Same size as StageProfileView.tsx's own rail pills (shared
+              // RAIL_PILL_PADDING_CLASS/RAIL_PILL_FONT_SIZE_CLASS constants,
+              // see stageProfileConfig.ts) — only the colors differ here.
+              const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${RAIL_PILL_PADDING_CLASS} ${RAIL_PILL_FONT_SIZE_CLASS} ${
+                isActive ? RAIL_CURRENT : `${RAIL_BASE} hover:brightness-95`
+              }`;
+              // Rollout categories — see the mobile nav's own comment above.
+              if (isClientTabCategory) {
+                return (
+                  <button key={section.key} type="button" onClick={() => setClientSection(section.key)} className={className}>
+                    {section.label}
+                  </button>
+                );
+              }
               return (
-                <Link
-                  key={section.key}
-                  href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
-                  className={`w-full min-h-11 flex items-center box-border rounded-r-[20px] border-2 py-[11px] px-2.5 sm:px-4 text-xs sm:text-sm font-semibold leading-tight transition-colors ${
-                    isActive ? RAIL_CURRENT : `${RAIL_BASE} hover:brightness-95`
-                  }`}
-                >
+                <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
                   {section.label}
                 </Link>
               );
@@ -511,6 +681,17 @@ function PaymentInfoPanel({
   const [payDate, setPayDate] = useState(data?.payDate ?? "");
   const [remark, setRemark] = useState(data?.remark ?? "");
 
+  // Catches a pre-existing saved value that contains non-digit characters
+  // (entered before this restriction existed) and was never retyped this
+  // session — the live keystroke filter below only strips characters as the
+  // user types, so it can't fix a stale value nobody touched.
+  function validate(): ValidationResult {
+    if (bankAccount && !/^\d+$/.test(bankAccount)) {
+      return { valid: false, error: "Account Number must contain digits only." };
+    }
+    return { valid: true };
+  }
+
   async function handleSave() {
     const [bankResult, paymentResult] = await Promise.all([
       updateBankDetails(employeeId, { bankName, accountName, bankAccount }),
@@ -522,12 +703,21 @@ function PaymentInfoPanel({
   }
 
   return (
-    <EditableSection onSave={handleSave} canEdit={canEdit}>
+    <EditableSection onSave={handleSave} validate={validate} canEdit={canEdit} sectionLabel="Payment & Bank Info">
       <PanelHeading>Payment &amp; Bank Info</PanelHeading>
       <Subsection heading="Bank Details">
         <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
         <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
-        <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
+        {/* Digits only, filtered live as typed — same pattern PhoneField
+            already uses for phone digits (see ActiveProfilePanels.tsx).
+            validate() above still catches a pre-existing non-digit value
+            that was never retyped. */}
+        <EditableField
+          label="Account Number"
+          value={bankAccount}
+          onChange={(v) => setBankAccount(v.replace(/\D/g, ""))}
+          full
+        />
       </Subsection>
       <Subsection heading="Payment">
         <EditableSelectField label="Payment Method" value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_METHOD_OPTIONS} />

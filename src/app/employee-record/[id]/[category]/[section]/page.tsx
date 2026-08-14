@@ -9,6 +9,7 @@ import {
   type EmployeeStage,
   listLeaveHistory,
   getResumeInfo,
+  getInterviewAssessment,
   getReferenceCheck,
   getMedicalCheck,
   getDocuments,
@@ -41,7 +42,6 @@ interface Props {
   params: Promise<{ id: string; category: string; section: string }>;
 }
 
-const PERSONAL_INFO_SECTIONS = new Set(["personal-info", "payment", "emergency-contact"]);
 
 export default async function EmployeeRecordSectionPage({ params }: Props) {
   const session = await auth();
@@ -82,18 +82,39 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     employeeStage = found.stage;
   }
 
-  // Personal Info's own 3 data sections (not Guardian Info) map cleanly onto
-  // user_profile/bank_details/emergency_contact, already assembled by
-  // getEmployeeById elsewhere in the app. Active Employment > Leave reuses
-  // the same leave_request source as the Active-stage MC/Leave tab. Finance >
-  // Tax Info also needs employeeDetail — its Bank Details subsection reuses
-  // bank_details (already assembled onto EmployeeDetailFull), same as
-  // Payment & Bank Info. Skipped entirely for a candidate — candidateDetail
-  // above already covers it, and there's no real users row to query anyway.
-  const needsEmployeeDetail =
-    !isCandidate &&
-    ((category === "personal-info" && PERSONAL_INFO_SECTIONS.has(section)) || (category === "finance" && section === "tax-info"));
-  const needsLocationOptions = category === "active-employment" && section === "transfer";
+  // Personal Info's 4 sub-sections (Personal Info/Guardian Info/Payment/
+  // Emergency Contact), HR Info's 7 (Resume/CV, Offer Letter, Hiring Notes,
+  // Reference, Medical Check, NDA/NC, Employee Handbook), and Finance's 2
+  // (Payroll/Payslip, Tax Info) all render together now, regardless of
+  // which one is in the URL — see the PageEditProvider rollout (2026-08-13,
+  // conversation): EmployeeRecordView manages its own client-side "which
+  // sub-tab is visible" state for these categories instead of navigating
+  // between routes, so every section's data needs to be fetched together
+  // whenever the category is open, not just the one the URL happens to
+  // name. Personal Info was the pilot, HR Info was Batch 2, Finance is
+  // Batch 3 (Onboarding/Exit follow in later batches). Active Employment >
+  // Leave reuses the same leave_request source as the Active-stage MC/Leave
+  // tab. Finance also needs employeeDetail unconditionally now (not just
+  // for Tax Info specifically) — OnboardingPayrollPanel's showBankDetails
+  // subsection reuses bank_details (already assembled onto
+  // EmployeeDetailFull), same as Payment & Bank Info; Payroll/Payslip
+  // itself doesn't read employeeDetail, but the two now share one fetch
+  // batch. Skipped entirely for a candidate — candidateDetail above already
+  // covers it, and there's no real users row to query anyway.
+  const isPersonalInfoCategory = category === "personal-info";
+  const isHrInfoCategory = category === "hr-info";
+  const isFinanceCategory = category === "finance";
+  // Active Employment rollout Batch 7 (2026-08-13, see conversation) — only
+  // Performance Review actually registers with the page-level PageEditProvider
+  // (Leave is read-only; Training/Promotion/Transfer/Cert are the same
+  // RepeatableRecordSection panels excluded from this whole rollout), but all
+  // 6 of its sections still render together now so switching between them
+  // doesn't lose an in-progress edit/draft on any of them — same reasoning as
+  // Personal Info/HR Info/Finance above, so all 6 need their data fetched
+  // together too, not just the one the URL happens to name.
+  const isActiveEmploymentCategory = category === "active-employment";
+  const needsEmployeeDetail = !isCandidate && (isPersonalInfoCategory || isFinanceCategory);
+  const needsLocationOptions = isActiveEmploymentCategory;
 
   // Every section's data fetch is independent (keyed only by numId, at most
   // one or two are ever real queries on a given page — the rest resolve
@@ -105,6 +126,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     employeeDetailFetched,
     leaveHistory,
     resumeInfo,
+    interviewAssessment,
     referenceCheck,
     medicalCheck,
     documentsInfo,
@@ -129,29 +151,30 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
     tasks,
   ] = await Promise.all([
     needsEmployeeDetail ? getEmployeeById(numId) : Promise.resolve(null),
-    category === "active-employment" && section === "leave" ? listLeaveHistory(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "resume" ? getResumeInfo(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "reference" ? getReferenceCheck(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "medical-check" ? getMedicalCheck(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "handbook" ? getDocuments(numId) : Promise.resolve(undefined),
-    category === "finance" && section === "tax-info" ? getPayrollInfo(numId) : Promise.resolve(undefined),
-    category === "active-employment" && section === "cert" ? listAchievements(numId) : Promise.resolve(undefined),
-    category === "finance" && section === "payroll" ? listSalaryRevisions(numId) : Promise.resolve(undefined),
-    category === "active-employment" && section === "promotion" ? listPromotions(numId) : Promise.resolve(undefined),
+    isActiveEmploymentCategory ? listLeaveHistory(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getResumeInfo(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getInterviewAssessment(numId, employee.fullName) : Promise.resolve(undefined),
+    isHrInfoCategory ? getReferenceCheck(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getMedicalCheck(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getDocuments(numId) : Promise.resolve(undefined),
+    isFinanceCategory ? getPayrollInfo(numId) : Promise.resolve(undefined),
+    isActiveEmploymentCategory ? listAchievements(numId) : Promise.resolve(undefined),
+    isFinanceCategory ? listSalaryRevisions(numId) : Promise.resolve(undefined),
+    isActiveEmploymentCategory ? listPromotions(numId) : Promise.resolve(undefined),
     needsLocationOptions ? listTransfers(numId) : Promise.resolve(undefined),
     needsLocationOptions ? Promise.all([listBranches(), listDepartments()]) : Promise.resolve([undefined, undefined] as const),
-    category === "active-employment" && section === "training" ? listTrainings(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "nda-nc" ? getNda(numId) : Promise.resolve(undefined),
-    category === "hr-info" && section === "nda-nc" ? getNonCompete(numId) : Promise.resolve(undefined),
+    isActiveEmploymentCategory ? listTrainings(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getNda(numId) : Promise.resolve(undefined),
+    isHrInfoCategory ? getNonCompete(numId) : Promise.resolve(undefined),
     category === "disciplinary" && section === "domestic-inquiry" ? listDomesticInquiries(numId) : Promise.resolve(undefined),
     category === "disciplinary" && section === "suspension" ? listSuspensionLetters(numId) : Promise.resolve(undefined),
     category === "disciplinary" && section === "showcause" ? listShowcauseWarningLetters(numId) : Promise.resolve(undefined),
     category === "disciplinary" && section === "pip" ? listPips(numId) : Promise.resolve(undefined),
-    category === "personal-info" && section === "guardian-info" ? listGuardianInfo(numId) : Promise.resolve(undefined),
-    category === "personal-info" && section === "payment" ? getPaymentInfo(numId) : Promise.resolve(undefined),
-    category === "active-employment" && section === "performance-review" ? listPerformanceReviews(numId) : Promise.resolve(undefined),
-    category === "finance" && section === "payroll" ? getPayslip(numId) : Promise.resolve(undefined),
-    category === "finance" && section === "payroll" ? listPayslipHistory(numId) : Promise.resolve(undefined),
+    isPersonalInfoCategory ? listGuardianInfo(numId) : Promise.resolve(undefined),
+    isPersonalInfoCategory ? getPaymentInfo(numId) : Promise.resolve(undefined),
+    isActiveEmploymentCategory ? listPerformanceReviews(numId) : Promise.resolve(undefined),
+    isFinanceCategory ? getPayslip(numId) : Promise.resolve(undefined),
+    isFinanceCategory ? listPayslipHistory(numId) : Promise.resolve(undefined),
     category === "task" ? listEmployeeTasks(numId) : Promise.resolve(undefined),
   ]);
 
@@ -181,6 +204,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
         resumeInfo={resumeInfo}
+        interviewAssessment={interviewAssessment}
         referenceCheck={referenceCheck}
         medicalCheck={medicalCheck}
         documentsInfo={documentsInfo}

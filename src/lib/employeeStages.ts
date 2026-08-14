@@ -50,7 +50,13 @@ export const POSITION_GROUPS: readonly PositionGroup[] = ["Full Time", "Part Tim
 export function positionGroup(position: string | null): PositionGroup {
   if (!position) return "Full Time";
   const p = position.trim().toUpperCase();
-  if (p.includes("INTERN")) return "Intern";
+  // "INT" is BranchStaff's own bare-abbreviation role value for interns
+  // (seen live — e.g. role="INT" with employment_type left blank) — same
+  // abbreviation-handling gap the "PT" branch below already covers for Part
+  // Time, just missing for Intern until now (2026-08-13, see conversation:
+  // Muhammad Amir Danial Bin Fazleesham fell through to the Full Time
+  // default and was wrongly granted Probation membership as a result).
+  if (p === "INT" || p.startsWith("INT ") || p.includes("INTERN")) return "Intern";
   if (p.startsWith("PT") || p.includes("PART")) return "Part Time";
   return "Full Time";
 }

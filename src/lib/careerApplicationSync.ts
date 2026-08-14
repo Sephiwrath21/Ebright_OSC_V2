@@ -547,9 +547,9 @@ export async function computeRealAccountLifecycleOverrides<
     const match = careerApplications.get(normalizeName(r.fullName));
     if (matchIsProbationPipeline(match)) return true;
     // Second, independent path into Probation, per explicit decision (see
-    // conversation): a Full-Time real account with NO career_applications/
-    // rec_recruit footprint AT ALL (not "has an entry with some other
-    // board_stage" — that's `match` being truthy but not Probation, which
+    // conversation): a Full-Time real account with NO board_stage footprint
+    // (not "has an entry with some other board_stage" — that's `match.
+    // boardStage` being set to something other than "Probation", which
     // stays excluded here, same as before) has no pipeline to check in the
     // first place — addPreStageEmployee's manual "+ Add" is exactly this
     // shape. Once their start_date has arrived, Full Time + started is
@@ -558,7 +558,17 @@ export async function computeRealAccountLifecycleOverrides<
     // below (start_date + 3 months) is what keeps a long-standing employee
     // in this bucket (e.g. Ng Ying Chen, started 2020) from getting stuck
     // here instead of Active — see that function's own comment.
-    if (match) return false;
+    //
+    // Checks match.boardStage specifically, NOT match's mere existence —
+    // fixed 2026-08-13, was `if (match) return false`, which incorrectly
+    // treated a rec_recruit/rec_stage-only match (board_stage itself null)
+    // as disqualifying "footprint", wrongly excluding a Full-Time account
+    // whose only career_applications trace was an unrelated rec_stage value
+    // (e.g. "Hired (HRD)") with no board_stage at all — confirmed live via
+    // two test accounts (user_id 2256, 2260) that should have qualified via
+    // this fallback path but silently got neither Probation membership nor
+    // this loop's own dual-listing, 404ing their own Probation profile page.
+    if (match?.boardStage != null) return false;
     const emp = empByUserId.get(r.id);
     return Boolean(emp?.start_date && emp.start_date.toISOString().slice(0, 10) <= todayIso);
   });
@@ -1282,7 +1292,15 @@ async function computePreEligibleRows(
         ...real,
         stage: "pre",
         isCandidate: false,
-        resolvedPositionType: real.position?.trim() ? positionGroup(real.position) : null,
+        // Prefer bsPositionGroups (employment_type-first, see
+        // lookupBranchStaffPositionGroupByName's own comment) over
+        // positionGroup(real.position) directly — real.position may now be
+        // a BranchStaff role abbreviation (e.g. "INT", see
+        // resolveEffectivePosition in branchStaffProfile.ts), which
+        // positionGroup() alone would misclassify as Full Time. Already
+        // fetched above, no extra query.
+        resolvedPositionType:
+          bsPositionGroups.get(normalizeName(real.fullName)) ?? (real.position?.trim() ? positionGroup(real.position) : null),
       },
       startDatePassed: Boolean(real.date && real.date <= todayIso),
     });

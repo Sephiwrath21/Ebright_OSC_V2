@@ -2,6 +2,7 @@ import "server-only";
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
 import { normalizeName } from "@/lib/careerApplicationSync";
 import { resolveDepartmentBranch, type BranchOpt, type DepartmentOpt } from "@/lib/employeeQueries";
+import { positionGroup, type PositionGroup } from "@/lib/employeeStages";
 
 // Read-only enrichment source for specific Personal Info/Bank Detail/
 // Emergency Contact/Start-End-date/Employee ID fields on every profile page
@@ -37,6 +38,18 @@ interface RawBranchStaffProfileRow {
    *  date); this one specifically holds the probation period's own end
    *  date, when HR has entered one. */
   probation: string | null;
+  /** Job title/position — e.g. "PT Coach", "INT" — same column
+   *  lookupBranchStaffPositionGroupByName() already reads for the coarse
+   *  Full Time/Part Time/Intern grouping; exposed here as the raw string
+   *  for direct Position display (see resolveEffectivePosition below). */
+  role: string | null;
+  /** Coarser employment-type free text (e.g. "INTERN PROTEGE", "Part Time")
+   *  — often spells out what `role`'s abbreviation doesn't ("INT" alone
+   *  doesn't contain "INTERN", so positionGroup(role) alone misclassifies
+   *  it as Full Time). lookupBranchStaffPositionGroupByName() already
+   *  prefers this field over role for exactly that reason; see
+   *  resolveEffectivePositionGroup below for the equivalent per-row logic. */
+  employment_type: string | null;
 }
 
 export interface BranchStaffProfileFields {
@@ -65,6 +78,10 @@ export interface BranchStaffProfileFields {
    *  endDate above). Null only when there's no start_date to fall back
    *  from either. */
   probationEndDate: Date | null;
+  /** Raw job title/position from BranchStaff.role — see
+   *  resolveEffectivePosition's own comment for the display rule this
+   *  feeds. */
+  role: string | null;
 }
 
 function blank(s: string | null | undefined): string | null {
@@ -124,7 +141,7 @@ async function fetchAllBranchStaffProfileRows(): Promise<RawBranchStaffProfileRo
   const { rows } = await queryEbrightHrfs<RawBranchStaffProfileRow>(
     `SELECT id, name, gender, dob, nric, email, phone, home_address, bank, bank_name, bank_account,
             emergency_name, emergency_relation, emergency_phone, start_date, "endDate", "employeeId",
-            branch, department, probation
+            branch, department, probation, role, employment_type
        FROM public."BranchStaff"`,
   );
   return rows;
@@ -273,6 +290,66 @@ export function resolveEffectiveEmploymentDates<
   };
 }
 
+// Position display, per explicit decision (see conversation, 2026-08-12) —
+// simplified version of the rule above, applied to the raw position STRING
+// rather than dates: BranchStaff's own `role` column wins live whenever a
+// confident name match exists, falling back to this app's local
+// employment.position only when there's no BranchStaff row at all (the
+// manually-added "+ Add" population, which structurally can never match).
+// A confident match with a blank role still falls back to local position —
+// same "blank BranchStaff field defers to local data" rule
+// resolveEffectiveEmploymentDates and every other BranchStaff-sourced field
+// already follows. Deliberately a separate function rather than folding
+// into resolveEffectiveEmploymentDates above — that function's own doc
+// comment explicitly promises every field but start_date/end_date "passes
+// through untouched", and changing that contract would silently affect
+// every existing caller relying on it, not just the ones being updated for
+// Position display now.
+export function resolveEffectivePosition(
+  localPosition: string | null,
+  fullName: string,
+  branchCode: string | null,
+  departmentCode: string | null,
+  index: BranchStaffMatchIndex,
+  branches: BranchOpt[],
+  departments: DepartmentOpt[],
+  ambiguousOut?: AmbiguousBranchStaffMatch[],
+): string | null {
+  const match = matchBranchStaffForRealAccount(fullName, branchCode, departmentCode, index, branches, departments, ambiguousOut);
+  if (!match) return localPosition;
+  return branchStaffProfileFields(match).role ?? localPosition;
+}
+
+// Full Time/Part Time/Intern GROUP classification, live-BranchStaff-first —
+// per explicit decision (see conversation, 2026-08-12), found necessary
+// after resolveEffectivePosition above started surfacing BranchStaff's raw
+// `role` abbreviations (e.g. "INT") as the display text: positionGroup()
+// only recognizes the full word "INTERN", so positionGroup("INT") silently
+// misclassifies as Full Time. lookupBranchStaffPositionGroupByName() (used
+// elsewhere for this exact grouping problem) already resolves this by
+// preferring BranchStaff's `employment_type` free text (e.g. "INTERN
+// PROTEGE", which DOES contain "INTERN") over `role`, falling back to
+// `role` only when employment_type is blank — same priority applied here,
+// per-row, reusing the same already-matched BranchStaff row
+// resolveEffectivePosition just used (no extra query). Falls back to
+// positionGroup(localPosition) — the pre-existing behavior — only when
+// there's no BranchStaff match at all (manually-added "+ Add" people).
+export function resolveEffectivePositionGroup(
+  localPosition: string | null,
+  fullName: string,
+  branchCode: string | null,
+  departmentCode: string | null,
+  index: BranchStaffMatchIndex,
+  branches: BranchOpt[],
+  departments: DepartmentOpt[],
+  ambiguousOut?: AmbiguousBranchStaffMatch[],
+): PositionGroup {
+  const match = matchBranchStaffForRealAccount(fullName, branchCode, departmentCode, index, branches, departments, ambiguousOut);
+  if (!match) return positionGroup(localPosition);
+  const signal = blank(match.employment_type) ?? blank(match.role);
+  return signal ? positionGroup(signal) : positionGroup(localPosition);
+}
+
 // No dedicated admin UI exists for this yet — server-log visibility only.
 // Kept as its own function (rather than inlined at each call site) so every
 // caller logs identically, and so a future UI just has to replace this one
@@ -303,6 +380,7 @@ export function branchStaffProfileFields(row: RawBranchStaffProfileRow): BranchS
     startDate: parseHrfsTextDate(row.start_date),
     endDate: parseHrfsTextDate(row.endDate),
     probationEndDate: resolveProbationEndDate(row),
+    role: blank(row.role),
   };
 }
 

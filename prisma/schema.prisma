@@ -451,6 +451,12 @@ model exit_interview_note {
   date                   DateTime? @db.Date
   interviewer            String?   @db.VarChar(100)
   reason                 String?   @db.VarChar(20)
+  // Free-text "please specify" answer, only meaningful when reason="other" —
+  // kept as its own column rather than reused from reason itself (unlike
+  // Showcause's Case Type/Training's Status, which merge free text back into
+  // their own single column) so `reason` stays a clean, always-one-of-5-
+  // values field for reporting/filtering (2026-08-13, see conversation).
+  reason_other            String?   @db.VarChar(255)
   note                   String?
   users                  users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exit_interview_note_user")
 }

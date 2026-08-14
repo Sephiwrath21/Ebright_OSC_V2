@@ -60,10 +60,22 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
   const thirdGroupLabel = groupBy === "branch" ? "Protege" : "Intern";
   const groupLabel = (g: PositionGroup) => (g === "Intern" ? thirdGroupLabel : g);
 
+  // Group/filter by row.resolvedPositionType when present (live BranchStaff
+  // employment_type-first classification — see resolveEffectivePositionGroup
+  // in branchStaffProfile.ts) rather than positionGroup(row.position)
+  // directly — since Position now displays BranchStaff's raw `role` (e.g.
+  // "INT"), and positionGroup() only recognizes the full word "INTERN",
+  // feeding it the display text directly would misclassify abbreviations as
+  // Full Time. Falls back to positionGroup(row.position) only when
+  // resolvedPositionType is unset (manually-added people with no
+  // BranchStaff match, same population that keeps local position for
+  // display too).
+  const effectiveGroup = (row: EmployeeOverviewRow): PositionGroup => row.resolvedPositionType ?? positionGroup(row.position);
+
   const matchesFilters = (row: EmployeeOverviewRow) => {
     const q = search.trim().toLowerCase();
     if (q && !row.fullName.toLowerCase().includes(q) && !(row.position ?? "").toLowerCase().includes(q)) return false;
-    if (typeFilter && positionGroup(row.position) !== typeFilter) return false;
+    if (typeFilter && effectiveGroup(row) !== typeFilter) return false;
     return true;
   };
 
@@ -75,7 +87,7 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
       "Part Time": [],
       Intern: [],
     };
-    for (const r of filteredRows) out[positionGroup(r.position)].push(r);
+    for (const r of filteredRows) out[effectiveGroup(r)].push(r);
     return out;
   }, [filteredRows]);
 

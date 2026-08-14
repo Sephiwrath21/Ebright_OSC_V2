@@ -7,6 +7,15 @@ export interface ProfileSection {
   group?: string;
 }
 
+// Unified rail-pill size (padding + font) — every stage's rail, plus
+// EmployeeRecordView.tsx's own separate rail, share these two constants so
+// pill dimensions can never drift apart again (2026-08-13, see conversation
+// — Onboarding's pills were visibly larger than Active's before this).
+// Colors still vary per stage (see each navRail.base/current below); only
+// size is unified.
+export const RAIL_PILL_PADDING_CLASS = "py-2 px-2 sm:py-[11px] sm:px-[16px]";
+export const RAIL_PILL_FONT_SIZE_CLASS = "text-xs sm:text-sm";
+
 /** Exact colors/spacing for the vertical .tab-nav/.nav-pill rail, per stage — lifted from each stage's own CSS in Emp_Folder (every stage reuses the same rail *mechanics*, only color/spacing differs). */
 export interface NavRailStyle {
   widthPx: number;
@@ -48,8 +57,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     navRail: {
       widthPx: 220,
       gapPx: 12,
-      paddingClass: "py-2 px-2.5 sm:py-[13px] sm:px-[18px]",
-      fontSizeClass: "text-xs sm:text-[15px]",
+      paddingClass: RAIL_PILL_PADDING_CLASS,
+      fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6]",
       current: "bg-[#d9a2fb] border-[#621096] text-[#4b4949d6]",
     },
@@ -61,8 +70,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     navRail: {
       widthPx: 220,
       gapPx: 12,
-      paddingClass: "py-2 px-2.5 sm:py-[13px] sm:px-[18px]",
-      fontSizeClass: "text-xs sm:text-[15px]",
+      paddingClass: RAIL_PILL_PADDING_CLASS,
+      fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6]",
       current: "bg-[#6fa3f0d0] border-[#1f5fce] text-[#4b4949d6]",
     },
@@ -78,8 +87,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     navRail: {
       widthPx: 200,
       gapPx: 12,
-      paddingClass: "py-2 px-2.5 sm:py-[13px] sm:px-[18px]",
-      fontSizeClass: "text-xs sm:text-[18px]",
+      paddingClass: RAIL_PILL_PADDING_CLASS,
+      fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]",
       current: "bg-[#7ef293] border-[#0a6e03] text-[#4b4949d6]",
     },
@@ -101,8 +110,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     navRail: {
       widthPx: 200,
       gapPx: 10,
-      paddingClass: "py-2 px-2 sm:py-[11px] sm:px-[16px]",
-      fontSizeClass: "text-xs sm:text-sm",
+      paddingClass: RAIL_PILL_PADDING_CLASS,
+      fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6]",
       current: "bg-[#c8e94a] border-[#7a9c1f] text-[#4b4949d6]",
     },
@@ -122,8 +131,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     navRail: {
       widthPx: 210,
       gapPx: 10,
-      paddingClass: "py-2 px-2 sm:py-[11px] sm:px-[16px]",
-      fontSizeClass: "text-xs sm:text-sm",
+      paddingClass: RAIL_PILL_PADDING_CLASS,
+      fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6]",
       current: "bg-[#ee5f5f] border-[#961010] text-white",
       clearanceBase: "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6]",

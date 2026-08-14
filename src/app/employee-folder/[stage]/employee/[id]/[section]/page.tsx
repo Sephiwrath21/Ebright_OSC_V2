@@ -22,6 +22,10 @@ import {
   getNda,
   getNonCompete,
   listDisciplinarySummary,
+  listDomesticInquiries,
+  listSuspensionLetters,
+  listShowcauseWarningLetters,
+  listPips,
   getResignation,
   getReferenceLetter,
   getExitInterviewNote,
@@ -133,6 +137,10 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     ndaInfo,
     nonCompeteInfo,
     disciplinarySummary,
+    domesticInquiries,
+    suspensionLetters,
+    showcauseWarningLetters,
+    pips,
     resignationInfo,
     referenceLetterInfo,
     exitInterviewNoteInfo,
@@ -167,6 +175,13 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
     activeOrAfter ? getNda(numId) : Promise.resolve(undefined),
     activeOrAfter ? getNonCompete(numId) : Promise.resolve(undefined),
     activeOrAfter ? listDisciplinarySummary(numId) : Promise.resolve(undefined),
+    // Raw per-type rows, alongside the merged summary above — needed so
+    // clicking a summary row can open that record's own real edit modal
+    // (2026-08-13, see conversation), not just display it read-only.
+    activeOrAfter ? listDomesticInquiries(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listSuspensionLetters(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listShowcauseWarningLetters(numId) : Promise.resolve(undefined),
+    activeOrAfter ? listPips(numId) : Promise.resolve(undefined),
     isExit ? getResignation(numId) : Promise.resolve(undefined),
     isExit ? getReferenceLetter(numId) : Promise.resolve(undefined),
     isExit ? getExitInterviewNote(numId) : Promise.resolve(undefined),
@@ -220,6 +235,10 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
         ndaInfo={ndaInfo}
         nonCompeteInfo={nonCompeteInfo}
         disciplinarySummary={disciplinarySummary}
+        domesticInquiries={domesticInquiries}
+        suspensionLetters={suspensionLetters}
+        showcauseWarningLetters={showcauseWarningLetters}
+        pips={pips}
         resignationInfo={resignationInfo}
         referenceLetterInfo={referenceLetterInfo}
         exitInterviewNoteInfo={exitInterviewNoteInfo}

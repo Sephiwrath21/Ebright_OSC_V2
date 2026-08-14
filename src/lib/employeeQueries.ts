@@ -380,9 +380,13 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
   // BranchStaff is only ever queried, never written to. Fetched once for
   // this whole call (not per-row) — one BranchStaff table scan, then an
   // in-memory match per user.
-  const { buildBranchStaffMatchIndex, resolveEffectiveEmploymentDates, logAmbiguousBranchStaffMatches } = await import(
-    "@/lib/branchStaffProfile"
-  );
+  const {
+    buildBranchStaffMatchIndex,
+    resolveEffectiveEmploymentDates,
+    resolveEffectivePosition,
+    resolveEffectivePositionGroup,
+    logAmbiguousBranchStaffMatches,
+  } = await import("@/lib/branchStaffProfile");
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
   const bsIndex = await buildBranchStaffMatchIndex();
   const ambiguous: AmbiguousBranchStaffMatch[] = [];
@@ -396,18 +400,54 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
     const stage = stageForRow(u.status ?? null, effectiveEmp, todayIso);
     if (!stage) continue;
     const dateSource = dateSourceFor(stage, effectiveEmp, u);
+    // Position — BranchStaff's own `role` column wins live, falling back to
+    // employment.position only when there's no BranchStaff match at all
+    // (manually-added "+ Add" people) — see resolveEffectivePosition's own
+    // comment. Same bsIndex/branches/departments already fetched above, no
+    // extra query.
+    const branchCode = emp?.branch?.branch_code ?? null;
+    const departmentCode = emp?.department?.department_code ?? null;
+    const position = resolveEffectivePosition(
+      emp?.position ?? null,
+      fullName,
+      branchCode,
+      departmentCode,
+      bsIndex,
+      branches,
+      departments,
+      ambiguous,
+    );
+    // Group classification (Full Time/Part Time/Intern) — separate resolver
+    // from the display text above: positionGroup("INT") alone misclassifies
+    // as Full Time, so this prefers BranchStaff's employment_type over role
+    // — see resolveEffectivePositionGroup's own comment. Populated for every
+    // row (not just Pre-stage, which computes its own separately in
+    // computePreEligibleRows for a different reason — board_stage/candidate
+    // cross-checking) so grouped views like EmployeeNamelistView's card
+    // layout classify consistently with the displayed Position text.
+    const resolvedPositionType = resolveEffectivePositionGroup(
+      emp?.position ?? null,
+      fullName,
+      branchCode,
+      departmentCode,
+      bsIndex,
+      branches,
+      departments,
+      ambiguous,
+    );
     rows.push({
       id: u.user_id,
       employeeId: emp?.employee_id ?? null,
       fullName,
-      position: emp?.position ?? null,
-      branchCode: emp?.branch?.branch_code ?? null,
+      position,
+      branchCode,
       branchName: emp?.branch?.branch_name ?? null,
-      departmentCode: emp?.department?.department_code ?? null,
+      departmentCode,
       departmentName: emp?.department?.department_name ?? null,
       employmentType: emp?.employment_type ?? null,
       date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
       stage,
+      resolvedPositionType,
     });
   }
   logAmbiguousBranchStaffMatches(ambiguous);
@@ -473,9 +513,13 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
   // for real accounts, only name matching), so this reintroduces some of
   // the per-row cost the comment above once optimized away — accepted per
   // explicit decision (see conversation) for classification consistency.
-  const { buildBranchStaffMatchIndex, resolveEffectiveEmploymentDates, logAmbiguousBranchStaffMatches } = await import(
-    "@/lib/branchStaffProfile"
-  );
+  const {
+    buildBranchStaffMatchIndex,
+    resolveEffectiveEmploymentDates,
+    resolveEffectivePosition,
+    resolveEffectivePositionGroup,
+    logAmbiguousBranchStaffMatches,
+  } = await import("@/lib/branchStaffProfile");
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
   const bsIndex = await buildBranchStaffMatchIndex();
   const ambiguous: AmbiguousBranchStaffMatch[] = [];
@@ -486,18 +530,44 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
   if (!stage) return null;
 
   const dateSource = dateSourceFor(stage, effectiveEmp, u);
+  const branchCode = emp?.branch?.branch_code ?? null;
+  const departmentCode = emp?.department?.department_code ?? null;
+  // Position — same live-BranchStaff-role-first rule as listEmployeeOverviewRows.
+  const position = resolveEffectivePosition(
+    emp?.position ?? null,
+    fullName,
+    branchCode,
+    departmentCode,
+    bsIndex,
+    branches,
+    departments,
+    ambiguous,
+  );
+  // Group classification — same resolveEffectivePositionGroup rule as
+  // listEmployeeOverviewRows, see its own comment.
+  const resolvedPositionType = resolveEffectivePositionGroup(
+    emp?.position ?? null,
+    fullName,
+    branchCode,
+    departmentCode,
+    bsIndex,
+    branches,
+    departments,
+    ambiguous,
+  );
   let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
     fullName,
-    position: emp?.position ?? null,
-    branchCode: emp?.branch?.branch_code ?? null,
+    position,
+    branchCode,
     branchName: emp?.branch?.branch_name ?? null,
-    departmentCode: emp?.department?.department_code ?? null,
+    departmentCode,
     departmentName: emp?.department?.department_name ?? null,
     employmentType: emp?.employment_type ?? null,
     date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
     stage,
+    resolvedPositionType,
   };
 
   // Rule 3: same live BranchStaff fallback as listEmployeeOverviewRows,
@@ -990,7 +1060,15 @@ export async function listPips(userId: number): Promise<PipEntry[]> {
   }));
 }
 
+export type DisciplinarySourceType = "domestic-inquiry" | "suspension" | "showcause" | "pip";
+
 export interface DisciplinarySummaryRow {
+  /** The underlying row's own real id (domestic_inquiry_id/suspension_letter_id/
+   *  showcause_warning_letter_id/pip_id) — NOT unique across types alone, only
+   *  combined with sourceType (2026-08-13, see conversation — added so the
+   *  Active-stage summary can open the right record's own edit modal). */
+  id: number;
+  sourceType: DisciplinarySourceType;
   date: string | null;
   type: string;
   description: string | null;
@@ -998,8 +1076,10 @@ export interface DisciplinarySummaryRow {
 
 // Merges all 4 disciplinary tables into one read-only Date/Type/Description
 // list, newest first — matches active_disciplinary.html's combined summary
-// table exactly (the stage-flow's Disciplinary tab has no per-type add form;
-// those live in Employee Record's Disciplinary category instead).
+// table exactly (the stage-flow's Disciplinary tab has no per-type ADD form;
+// those still live in Employee Record's Disciplinary category only — but
+// clicking an existing row here DOES open that record's own edit modal, see
+// DisciplinarySummaryPanel/ActiveProfilePanels.tsx).
 export async function listDisciplinarySummary(userId: number): Promise<DisciplinarySummaryRow[]> {
   const [inquiries, suspensions, showcauses, pips] = await Promise.all([
     listDomesticInquiries(userId),
@@ -1008,10 +1088,10 @@ export async function listDisciplinarySummary(userId: number): Promise<Disciplin
     listPips(userId),
   ]);
   const rows: DisciplinarySummaryRow[] = [
-    ...inquiries.map((r) => ({ date: r.date, type: "Domestic Inquiry", description: r.caseSummary })),
-    ...suspensions.map((r) => ({ date: r.startDate, type: "Suspension Letter", description: r.reason })),
-    ...showcauses.map((r) => ({ date: r.date, type: "Showcause/ Warning Letter", description: r.reason })),
-    ...pips.map((r) => ({ date: r.startDate, type: "Performance Improvement Plan", description: r.reviewResult })),
+    ...inquiries.map((r) => ({ id: r.id, sourceType: "domestic-inquiry" as const, date: r.date, type: "Domestic Inquiry", description: r.caseSummary })),
+    ...suspensions.map((r) => ({ id: r.id, sourceType: "suspension" as const, date: r.startDate, type: "Suspension Letter", description: r.reason })),
+    ...showcauses.map((r) => ({ id: r.id, sourceType: "showcause" as const, date: r.date, type: "Showcause/ Warning Letter", description: r.reason })),
+    ...pips.map((r) => ({ id: r.id, sourceType: "pip" as const, date: r.startDate, type: "Performance Improvement Plan", description: r.reviewResult })),
   ];
   rows.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return rows;
@@ -1069,6 +1149,9 @@ export interface ExitInterviewNoteInfo {
   date: string | null;
   interviewer: string | null;
   reason: string | null;
+  /** Free-text "please specify" answer — only meaningful when reason is
+   *  "other", see ExitInterviewNotesPanel. */
+  reasonOther: string | null;
   note: string | null;
 }
 
@@ -1079,6 +1162,7 @@ export async function getExitInterviewNote(userId: number): Promise<ExitIntervie
     date: row.date ? row.date.toISOString().slice(0, 10) : null,
     interviewer: row.interviewer,
     reason: row.reason,
+    reasonOther: row.reason_other,
     note: row.note,
   };
 }
@@ -1633,7 +1717,7 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     employeeId: bs?.employeeId ?? emp?.employee_id ?? null,
     fullName,
     nickName: profile?.nick_name ? titleCaseName(profile.nick_name) : null,
-    role: emp?.position ?? null,
+    role: bs?.role ?? emp?.position ?? null,
     branchCode: emp?.branch?.branch_code ?? null,
     branchName: emp?.branch?.branch_name ?? null,
     departmentCode: emp?.department?.department_code ?? null,
@@ -1651,7 +1735,7 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     nationality: profile?.nationality ?? null,
     nric: bs?.nric ?? profile?.nric ?? null,
     homeAddress: bs?.homeAddress ?? profile?.home_address ?? null,
-    position: emp?.position ?? null,
+    position: bs?.role ?? emp?.position ?? null,
     endDate: bs?.endDate
       ? bs.endDate.toISOString().slice(0, 10)
       : emp?.end_date
