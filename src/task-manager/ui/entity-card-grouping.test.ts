@@ -87,6 +87,30 @@ describe("groupTasksByCategory", () => {
     expect(result.find((r) => r.id === "c1")?.tasks).toHaveLength(1);
   });
 
+  it("hides category cards (including Uncategorized) that have nothing for me when onlyMe is given", () => {
+    const categories = [
+      { id: "c1", name: "Flowghan" },
+      { id: "c2", name: "SMS" },
+    ];
+    const tasks = [
+      task({ categoryId: "c1", categoryName: "Flowghan", assigneeId: "u1" }),
+      task({ categoryId: "c2", categoryName: "SMS", assigneeId: "u2" }),
+      task({ categoryId: null, assigneeId: "u2" }),
+    ];
+    const result = groupTasksByCategory(categories, tasks, "u1");
+    expect(result.map((r) => r.id)).toEqual(["c1"]);
+  });
+
+  it("still shows every active category (even zero-task ones) plus Uncategorized when onlyMe is omitted", () => {
+    const categories = [
+      { id: "c1", name: "Flowghan" },
+      { id: "c2", name: "SMS" },
+    ];
+    const tasks = [task({ categoryId: "c1", categoryName: "Flowghan" })];
+    const result = groupTasksByCategory(categories, tasks);
+    expect(result.map((r) => r.id)).toEqual(["c1", "c2", "uncategorized"]);
+  });
+
   it("routes a task with an unknown/archived categoryId into Uncategorized instead of dropping it", () => {
     const categories = [{ id: "c1", name: "Flowghan" }];
     const tasks = [

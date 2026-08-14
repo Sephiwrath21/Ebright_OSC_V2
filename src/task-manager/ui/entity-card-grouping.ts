@@ -35,13 +35,15 @@ export interface CategoryCard {
   tasks: FlowDrillTask[];
 }
 
-/** One card per active category (even zero-task ones), plus exactly one
- *  trailing "Uncategorized" catch-all card (always present, even when
- *  empty) — every task is visible somewhere, per the confirmed spec.
- *  `onlyMe` scopes each card's task LIST to one person, without hiding
- *  empty-for-them categories (unlike groupTasksByPerson, which drops whole
- *  cards for onlyMe — Type-sort's "Only Me" means "my tasks broken down by
- *  category", not "just my one category"). */
+/** One card per active category, plus exactly one trailing "Uncategorized"
+ *  catch-all card — every task is visible somewhere, per the confirmed
+ *  spec. Without `onlyMe` (View All), every active category gets a card
+ *  even with zero tasks, plus Uncategorized even when nothing's
+ *  uncategorized — a full org-wide picture of the category structure.
+ *  `onlyMe` scopes each card's task LIST to one person AND (2026-08-15)
+ *  drops any card with nothing for them — Type-sort's "Only Me" means "MY
+ *  tasks broken down by category," and a category/Uncategorized card with
+ *  zero of my own tasks in it is just noise, not part of that picture. */
 export function groupTasksByCategory(
   categories: FlowCategoryOption[],
   tasks: FlowDrillTask[],
@@ -68,5 +70,6 @@ export function groupTasksByCategory(
     // disappear from every card.
     tasks: scopedTasks.filter((t) => t.categoryId === null || !knownIds.has(t.categoryId)),
   };
-  return [...categoryCards, uncategorized];
+  const allCards = [...categoryCards, uncategorized];
+  return onlyMe ? allCards.filter((c) => c.tasks.length > 0) : allCards;
 }
