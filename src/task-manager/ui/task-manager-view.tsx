@@ -71,6 +71,7 @@ import {
 } from "./types";
 import { isPersonalAccountView, resolveViewRole, shows } from "../role-views";
 import { TaskOverviewStack } from "./task-overview-stack";
+import type { MyWeekDay } from "./entity-card-overview";
 import { HodKanban, type HodKanbanActions } from "./hod-kanban";
 import {
   PageSectionHeading,
@@ -105,6 +106,7 @@ export function TaskManagerView({
   ceoAssignedBranch,
   categoryList,
   myOverview,
+  myWeek,
   personalDailyControl,
   personalMonthlyControl,
   personalAdhoc,
@@ -177,11 +179,21 @@ export function TaskManagerView({
    *  BRANCH_MEMBER/COACH, no hodAssigned/ceoAssigned for OPS/CEO). */
   myOverview?: {
     entityName: string;
-    daily?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    daily?: {
+      entity: FlowEntityDetail;
+      dateControl?: React.ReactNode;
+      showViewToggle: boolean;
+      myWeek?: { days: MyWeekDay[]; todayDate: string };
+    };
     monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
     hodAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
     ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
+  /** Weekday-tab view for the own card (2026-08-15) — Department/Branch
+   *  Overview's OWN Daily section only (myOverview's Daily gets it via
+   *  myOverview.daily.myWeek instead, since that section is built entirely
+   *  by the caller). See EntityCardOverview's `myWeek` prop doc comment. */
+  myWeek?: { days: MyWeekDay[]; todayDate: string };
   /** Personal date filters (2026-07-28, ?date=/?mdate=; repurposed
    *  2026-08-12 as TaskOverviewStack's dateControl): feed the Daily/Monthly
    *  section headings inside myOverview/departmentOverview/branchOverview's
@@ -375,6 +387,7 @@ export function TaskManagerView({
               dateControl: departmentDailyControl,
               showViewToggle: true,
               defaultOnlyMe,
+              myWeek,
             }}
             monthly={{ entity: monthly.department, showViewToggle: true, defaultOnlyMe }}
             hodAssigned={
@@ -410,7 +423,13 @@ export function TaskManagerView({
             entityName={daily.branch.name}
             categories={categoryList ?? []}
             myUserId={me.me.userId}
-            daily={{ entity: daily.branch, dateControl: personalDailyControl, showViewToggle: true, defaultOnlyMe }}
+            daily={{
+              entity: daily.branch,
+              dateControl: personalDailyControl,
+              showViewToggle: true,
+              defaultOnlyMe,
+              myWeek,
+            }}
             monthly={{
               entity: monthly.branch,
               dateControl: personalMonthlyControl,

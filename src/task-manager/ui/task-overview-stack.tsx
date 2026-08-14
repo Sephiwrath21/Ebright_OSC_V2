@@ -9,7 +9,7 @@
 // roles get which sections).
 import * as React from "react";
 import type { FlowCategoryOption, FlowEntityDetail } from "./types";
-import { EntityCardOverview } from "./entity-card-overview";
+import { EntityCardOverview, type MyWeekDay } from "./entity-card-overview";
 import type { ReassignControl } from "./bits";
 
 interface SectionData {
@@ -19,6 +19,11 @@ interface SectionData {
   /** Initial View-toggle state when showViewToggle is true (2026-08-15) —
    *  see EntityCardOverview's own doc comment. */
   defaultOnlyMe?: boolean;
+  /** Weekday-tab view for the own card (2026-08-15) — see
+   *  EntityCardOverview's own `myWeek` prop doc comment. Only ever set on
+   *  the "daily" SectionData; Monthly/HOD/CEO Assigned have no per-weekday
+   *  concept, so callers never build this for those. */
+  myWeek?: { days: MyWeekDay[]; todayDate: string };
 }
 
 export function TaskOverviewStack({
@@ -74,6 +79,7 @@ export function TaskOverviewStack({
               dateControl={data.dateControl}
               showViewToggle={data.showViewToggle}
               defaultOnlyMe={data.defaultOnlyMe}
+              myWeek={data.myWeek}
               onComplete={onComplete}
               onSkip={onSkip}
               onReopen={onReopen}

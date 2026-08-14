@@ -1727,6 +1727,12 @@ const ASSIGNER_COL_WIDTH = 180;
  *  (2026-08-15) — same reuse rationale as PROOF_COL_WIDTH above. */
 export const DUE_COL_WIDTH = 120;
 
+/** "Assign to Others" column width (2026-08-15) — sized to match the button
+ *  it sits above. Exported so both EntityCardOverview's own column header
+ *  and ResizableTaskList's (when given a `reassign` control) share one
+ *  number, same reuse rationale as PROOF_COL_WIDTH/DUE_COL_WIDTH above. */
+export const REASSIGN_COL_WIDTH = 112;
+
 /** The Task header's drag handle — same visual as TaskRowLine's in-row
  *  handle (thin divider that thickens/blues on hover). Exported (2026-08-15)
  *  — EntityCardOverview's card tables reuse this exact handle rather than
@@ -1914,6 +1920,9 @@ export function ResizableTaskList({
   hideCompleted,
   assigneeColumnLabel,
   hideRowResizeDivider,
+  hideAssignee,
+  blankDueDate,
+  reassign,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1942,6 +1951,21 @@ export function ResizableTaskList({
    *  so the column stays resizable from there. Defaults to shown
    *  (unchanged) everywhere this isn't explicitly set. */
   hideRowResizeDivider?: boolean;
+  /** Drop the Assignee column entirely and show "Assign to Others" instead
+   *  when `reassign` is provided (2026-08-15, EntityCardOverview's embedded
+   *  Daily card) — every row in that context is already the viewer's own
+   *  task, so "who assigned this to me" is redundant. See TaskRowLine's own
+   *  hideAssignee doc comment. */
+  hideAssignee?: boolean;
+  /** Keep the Due Date column but blank its per-row value (2026-08-15,
+   *  same EntityCardOverview Daily-card motivation as TaskRowLine's own
+   *  blankDueDate — the date is implied by the section itself). */
+  blankDueDate?: boolean;
+  /** "Assign to Others" self-service handoff (2026-08-15) — passed straight
+   *  through to every row via TaskRowLine's own `reassign` prop; renders a
+   *  header column for it (replacing Assignee's slot when hideAssignee is
+   *  also set, otherwise appended) only when provided. */
+  reassign?: ReassignControl;
 }) {
   // All three default to ON — nothing is hidden until the viewer toggles one
   // off. Mirrors the status donut's own three buckets (Completed/Pending/
@@ -2324,13 +2348,21 @@ export function ResizableTaskList({
               the run's starter — assignerName — but the user explicitly
               chose this label over "Assigned by"). Label overridable
               (2026-08-05) via assigneeColumnLabel — e.g. "Assigned To" for
-              a "tasks I assigned" list. */}
-          <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
-            {assigneeColumnLabel ?? "Assignee"}
-          </span>
+              a "tasks I assigned" list. Dropped entirely (2026-08-15) when
+              hideAssignee is set — see its own doc comment. */}
+          {!hideAssignee && (
+            <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
+              {assigneeColumnLabel ?? "Assignee"}
+            </span>
+          )}
           <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
             Due Date
           </span>
+          {reassign && (
+            <span className="shrink-0 text-center" style={{ width: REASSIGN_COL_WIDTH }}>
+              Assign to Others
+            </span>
+          )}
         </div>
       )}
       <div className="divide-y divide-gray-100">
@@ -2348,6 +2380,9 @@ export function ResizableTaskList({
             proofWidth: PROOF_COL_WIDTH,
             assignerWidth: ASSIGNER_COL_WIDTH,
             hideCompleted,
+            hideAssignee,
+            blankDueDate,
+            reassign,
           };
           return (
             <React.Fragment key={t.runBlockId}>

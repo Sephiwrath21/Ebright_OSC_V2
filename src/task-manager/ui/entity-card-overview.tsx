@@ -49,7 +49,9 @@ import {
   DUE_COL_WIDTH,
   HeaderResizeHandle,
   PROOF_COL_WIDTH,
+  REASSIGN_COL_WIDTH,
   ReassignPicker,
+  ResizableTaskList,
   RESIZABLE_TASK_NAME_DEFAULT,
   RESIZABLE_TASK_NAME_MAX,
   RESIZABLE_TASK_NAME_MIN,
@@ -66,11 +68,6 @@ type SortMode = "person" | "type";
  *  Me") — starving the card's task titles of width they don't need to
  *  share with anyone (2026-08-15). Literal class strings (not a template
  *  string) so Tailwind's static scanner can still find them. */
-/** "Assign to Others" column header's width (2026-08-15) — sized to match
- *  the button it sits above (own card, pending own task only); other rows'
- *  cells in that column are simply empty, same as Proof/Due date can be. */
-const REASSIGN_COL_WIDTH = 112;
-
 function cardGridClass(count: number): string {
   if (count <= 1) return "grid grid-cols-1 gap-4";
   if (count === 2) return "grid grid-cols-1 gap-4 sm:grid-cols-2";
@@ -79,6 +76,14 @@ function cardGridClass(count: number): string {
 
 function flattenTasks(entity: FlowEntityDetail) {
   return [...entity.tasks.completed, ...entity.tasks.pending, ...entity.tasks.na];
+}
+
+/** One weekday's worth of the viewer's own tasks (2026-08-15, embedded
+ *  weekday-tab view — see EntityCardOverview's `myWeek` prop doc comment). */
+export interface MyWeekDay {
+  weekday: string;
+  date: string;
+  tasks: FlowTaskRow[];
 }
 
 /** View toggle persistence (2026-08-14) — ONE shared preference per user,
@@ -119,6 +124,7 @@ export function EntityCardOverview({
   onUploadProof,
   onRemoveProof,
   reassign,
+  myWeek,
 }: {
   /** The section's own heading, e.g. "Daily" / "Monthly" / "HOD Assigned
    *  Task" / "CEO Assigned Task" — TaskOverviewStack renders it above this
@@ -170,6 +176,23 @@ export function EntityCardOverview({
    *  viewer's own pending task, regardless of which card/row it appears
    *  in. Omit to disable the action everywhere in this section. */
   reassign?: ReassignControl;
+  /** Weekday-tab view for the viewer's OWN card (2026-08-15) — Daily
+   *  section only (the caller only ever builds this for the "Daily"
+   *  SectionData; Monthly/HOD/CEO Assigned have no per-weekday concept).
+   *  When provided, the own card renders a weekday-tab column beside its
+   *  task list instead of the single globally-selected date's `card.tasks`
+   *  — the rest of the section (other people's cards, Type-sort, the
+   *  existing `dateControl` date-arrow picker) is completely unaffected,
+   *  since this only replaces what the OWN card shows. Only rendered when
+   *  the own card is the ONLY card on screen (Sort: Person, "Only Me" —
+   *  the reference design's actual layout); a "View All" grid with several
+   *  narrow cards per row keeps the own card's plain single-date list, to
+   *  avoid squeezing the wider tab+list layout into a cramped grid cell.
+   *  `todayDate` is the server-computed "today" (YYYY-MM-DD, local) —
+   *  passed down rather than computed client-side via `new Date()` to stay
+   *  hydration-safe (same reasoning as this file's other stored-preference
+   *  state). */
+  myWeek?: { days: MyWeekDay[]; todayDate: string };
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
@@ -227,6 +250,14 @@ export function EntityCardOverview({
   const personCards = sortMode === "person" ? groupTasksByPerson(entity.members, tasks, scopeId) : [];
   const categoryCards = sortMode === "type" ? groupTasksByCategory(categories, tasks, scopeId) : [];
 
+  // Weekday-tab selection for the own card's myWeek view (2026-08-15) —
+  // defaults to "today" (server-computed, see the prop's own doc comment).
+  // Only ever rendered when the own card is the section's sole card (see
+  // showMyWeek below), so one selection is unambiguous — no per-card keying
+  // needed the way onlyMe/sortMode aren't per-card either.
+  const [myWeekDate, setMyWeekDate] = React.useState(myWeek?.todayDate);
+  const selectedMyWeekDay = myWeek?.days.find((d) => d.date === myWeekDate) ?? myWeek?.days[0];
+
   return (
     <div
       ref={resizeContainerRef}
@@ -276,6 +307,10 @@ export function EntityCardOverview({
           ) : (
             personCards.map((card) => {
               const isOwnCard = card.userId === myUserId;
+              // Weekday-tab view (2026-08-15) — see the `myWeek` prop's own
+              // doc comment for why this is scoped to "own card, alone on
+              // screen" rather than every own-card appearance.
+              const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1;
               return (
                 <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
                   <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
@@ -286,6 +321,57 @@ export function EntityCardOverview({
                         the only way to tell whose tasks a card holds. */}
                     {isOwnCard ? "My Tasks" : card.name}
                   </div>
+                  {showMyWeek && myWeek ? (
+                    <div className="flex gap-3 p-3">
+                      <div role="tablist" className="w-32 shrink-0 space-y-0.5">
+                        {myWeek.days.map((d) => {
+                          const pendingCount = d.tasks.filter(
+                            (t) => t.status !== "DONE" && t.status !== "SKIPPED",
+                          ).length;
+                          const active = d.date === selectedMyWeekDay?.date;
+                          return (
+                            <button
+                              key={d.date}
+                              type="button"
+                              role="tab"
+                              aria-selected={active}
+                              onClick={() => setMyWeekDate(d.date)}
+                              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                              }`}
+                            >
+                              <span>{d.weekday}</span>
+                              <span
+                                className={active ? "text-blue-100" : "text-gray-400"}
+                                aria-label={`${pendingCount} pending`}
+                              >
+                                {pendingCount}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {selectedMyWeekDay && (
+                          <ResizableTaskList
+                            key={selectedMyWeekDay.date}
+                            tasks={selectedMyWeekDay.tasks}
+                            myUserId={myUserId}
+                            onComplete={onComplete}
+                            onSkip={onSkip}
+                            onReopen={onReopen}
+                            onUploadProof={onUploadProof}
+                            onRemoveProof={onRemoveProof}
+                            emptyLabel={`No tasks for ${selectedMyWeekDay.weekday}.`}
+                            hideCompleted
+                            hideAssignee
+                            blankDueDate
+                            reassign={reassign}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
                   <div className="px-3 py-1">
                     {card.tasks.length === 0 ? (
                       <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
@@ -372,6 +458,7 @@ export function EntityCardOverview({
                       </>
                     )}
                   </div>
+                  )}
                 </div>
               );
             })
