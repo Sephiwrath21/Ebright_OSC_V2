@@ -268,6 +268,8 @@ export function isElevatedDeptSite(user: {
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
+  branch?: string | null;
+  employmentType?: string | null;
 }): { template: boolean; package: boolean; packageTable: boolean; myWeek: boolean } {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
@@ -276,13 +278,10 @@ export function taskManagerNavAccess(user: {
   // "My Week" (2026-08-13): personal-account roles only, same personal-vs-
   // site distinction isPersonalAccountView already encodes elsewhere (the
   // Department/Branch Overview default View toggle). branch/employmentType
-  // are forced null here — taskManagerNavAccess only receives role/
-  // department — but that's harmless: resolveViewRole's branch-dependent
-  // split (DEPT_MEMBER vs BRANCH_MEMBER/COACH) only matters for the MEMBER
-  // role, and isPersonalAccountView returns true for all three of those
-  // views alike, so collapsing them to DEPT_MEMBER here never changes the
-  // answer.
-  const myWeek = isPersonalAccountView(resolveViewRole({ ...user, branch: null, employmentType: null }));
+  // are optional here since some callers (e.g. this file's own tests) only
+  // pass role/department — real callers (requireUserByEmail's User) DO have
+  // both, and are forwarded through rather than forced null.
+  const myWeek = isPersonalAccountView(resolveViewRole({ ...user, branch: user.branch ?? null }));
   return {
     template: viewer,
     package: viewer,
