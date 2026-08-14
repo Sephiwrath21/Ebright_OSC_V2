@@ -32,18 +32,18 @@ export default async function JustificationApprovalsPage() {
   if (!ALLOWED_ROLES.has(roleType)) {
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
-        <div className="min-h-full bg-slate-50 flex items-center justify-center p-8">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-5">
-              <ShieldAlert className="w-7 h-7 text-rose-600" aria-hidden="true" />
+        <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-8">
+          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center dark:bg-slate-900 dark:border-slate-800 dark:ring-1 dark:ring-white/10">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-5 dark:bg-rose-900">
+              <ShieldAlert className="w-7 h-7 text-rose-600 dark:text-rose-300" aria-hidden="true" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900">Restricted Access</h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Restricted Access</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Attendance justifications are available to HR, HOD and admin roles only.
             </p>
             <Link
               href="/home"
-              className="mt-6 inline-flex items-center h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-all duration-200"
+              className="mt-6 inline-flex items-center h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-all duration-200 dark:bg-slate-700 dark:hover:bg-slate-600"
             >
               Back to Home
             </Link>

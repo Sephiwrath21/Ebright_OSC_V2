@@ -96,16 +96,16 @@ export function TemplateGroupAssigneesModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3">
-          <p className="text-sm font-semibold text-gray-900">Assignees — &ldquo;{group.name}&rdquo;</p>
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3 dark:border-slate-800">
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Assignees — &ldquo;{group.name}&rdquo;</p>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             ✕
           </button>
@@ -121,9 +121,9 @@ export function TemplateGroupAssigneesModal({
               {assignees.map((a) => (
                 <li
                   key={a.userId}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-800"
                 >
-                  <span className="min-w-0 flex-1 truncate text-gray-700">
+                  <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-slate-300">
                     {a.name}
                     <span className="ml-1.5 text-xs text-gray-400">
                       {a.pendingTasks} pending task{a.pendingTasks === 1 ? "" : "s"}
@@ -133,7 +133,7 @@ export function TemplateGroupAssigneesModal({
                     type="button"
                     disabled={busyUserId === a.userId}
                     onClick={() => removeOne(a.userId, a.name)}
-                    className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40"
+                    className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-40 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-red-500 dark:hover:text-red-400"
                   >
                     {busyUserId === a.userId ? "Removing…" : "Remove"}
                   </button>
@@ -144,7 +144,7 @@ export function TemplateGroupAssigneesModal({
         </div>
 
         {message && (
-          <p className={`mt-3 shrink-0 text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`mt-3 shrink-0 text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {message.text}
           </p>
         )}

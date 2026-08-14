@@ -22,15 +22,15 @@ export default function ConfirmDialog({
       }}
     >
       <div
-        className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center"
+        className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-sm text-[#4b4949] mb-[22px]">{message}</p>
+        <p className="text-sm text-[#4b4949] dark:text-slate-300 mb-[22px]">{message}</p>
         <div className="flex justify-center gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/25 hover:bg-[#f0f4fa] transition-colors"
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-300 bg-white dark:bg-slate-900 border-2 border-black/25 dark:border-white/20 hover:bg-[#f0f4fa] dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
