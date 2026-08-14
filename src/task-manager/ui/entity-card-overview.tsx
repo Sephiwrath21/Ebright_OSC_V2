@@ -336,6 +336,16 @@ export function EntityCardOverview({
               // doc comment for why this is scoped to "own card, alone on
               // screen" rather than every own-card appearance.
               const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1;
+              // Type sub-grouping within each card (2026-08-15) — reuses
+              // Sort: Type's own grouping function (entity-card-grouping.ts)
+              // on this ONE person's already-scoped task list, so "Sort:
+              // Person" cards show a Flowghan/SMS/Uncategorized breakdown
+              // per person instead of needing to switch to Sort: Type to
+              // see it. Groups with nothing for this person are dropped
+              // (unlike the Type-sort card grid itself, which always shows
+              // every active category) — a person-card subheading for a
+              // type they have zero tasks in is just noise.
+              const typeGroups = groupTasksByCategory(categories, card.tasks).filter((g) => g.tasks.length > 0);
               return (
                 <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
                   <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
@@ -403,12 +413,16 @@ export function EntityCardOverview({
                     </div>
                   ) : (
                   <div
-                    // Scrollable body (2026-08-15) — OTHER people's cards
-                    // only, same treatment as the Type-sort card grid: a
-                    // capped height with both-axis scroll instead of an
-                    // ever-growing card in a "View All" grid. The own card
-                    // (checkboxes/resize/weekday-tabs) is unaffected.
-                    className={`px-3 py-1 ${isOwnCard ? "" : "max-h-80 overflow-auto"}`}
+                    // Scrollable body (2026-08-15) — a capped height with
+                    // both-axis scroll instead of an ever-growing/overflowing
+                    // card, same treatment as the Type-sort card grid; own
+                    // card included now too (a long task title was
+                    // overflowing past the card's edge with no way to see
+                    // the rest of it). The resize handle below is unrelated
+                    // and still works alongside this — resize to size the
+                    // Task column intentionally, scroll as the fallback for
+                    // whatever still doesn't fit.
+                    className="max-h-80 overflow-auto px-3 py-1"
                   >
                     {card.tasks.length === 0 ? (
                       <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
@@ -423,7 +437,9 @@ export function EntityCardOverview({
                             populate those cells). Spacers mirror the rows'
                             leading checkbox slot (w-4) + status circle/
                             StatusDropdown (size-3) — same convention as
-                            ResizableTaskList's own header in bits.tsx. */}
+                            ResizableTaskList's own header in bits.tsx. Sits
+                            above every type group below, not repeated per
+                            group — it's labeling columns, not group data. */}
                         {isOwnCard && (
                           <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                             <span className="w-4 shrink-0" aria-hidden />
@@ -443,54 +459,61 @@ export function EntityCardOverview({
                             </span>
                           </div>
                         )}
-                        {card.tasks.map((t: FlowTaskRow) => (
-                          <TaskRowLine
-                            key={t.runBlockId}
-                            task={t}
-                            myUserId={myUserId}
-                            onComplete={onComplete}
-                            onSkip={onSkip}
-                            onReopen={onReopen}
-                            onUploadProof={onUploadProof}
-                            onRemoveProof={onRemoveProof}
-                            hideCompleted={isOwnCard}
-                            hideStatusChip
-                            // Draggable Task column (2026-08-15) — OWN CARD
-                            // ONLY (2026-08-15 fix): the resize header above
-                            // only renders for isOwnCard, but this prop was
-                            // applied unconditionally, giving every OTHER
-                            // person's card the same fixed shrink-0 width
-                            // too. In a 3-per-row "View All" grid those
-                            // cards are much narrower than that fixed width,
-                            // so the row overflowed and the card's own
-                            // overflow-hidden (for its rounded corners)
-                            // clipped the title mid-word — a regression, not
-                            // the intended "wrap normally" behavior
-                            // established earlier. Other cards now go back
-                            // to undefined (TaskRowLine's flex-1 fallback),
-                            // matching their pre-resize-feature behavior.
-                            nameWidth={isOwnCard ? taskColWidth : undefined}
-                            onResizeStart={isOwnCard ? onResizeStart : undefined}
-                            // No Assignee column (2026-08-15) — every row
-                            // here is the CARD OWNER's own task, so an
-                            // "assigned by" column is redundant with the
-                            // card header; Due date is back (was suppressed
-                            // 2026-08-13) per the new 4-column header above.
-                            hideAssignee
-                            // Matches the header's PROOF_COL_WIDTH exactly
-                            // (2026-08-15 fix) — without this the row cell
-                            // defaulted to 40px while the header used 96px,
-                            // so the centered "+" button sat under the
-                            // header's left portion instead of its center.
-                            proofWidth={PROOF_COL_WIDTH}
-                            // Daily's date is implied by the section itself
-                            // (2026-08-15) — keep the column/header (layout
-                            // consistency with Monthly/HOD/CEO Assigned
-                            // Task, which DO show a real date), just don't
-                            // populate a redundant per-row value under it.
-                            blankDueDate={sectionLabel === "Daily"}
-                            reassign={reassign}
-                          />
+                        {typeGroups.map((group) => (
+                          <div key={group.id}>
+                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0">
+                              {group.name}
+                            </p>
+                            {group.tasks.map((t: FlowTaskRow) => (
+                              <TaskRowLine
+                                key={t.runBlockId}
+                                task={t}
+                                myUserId={myUserId}
+                                onComplete={onComplete}
+                                onSkip={onSkip}
+                                onReopen={onReopen}
+                                onUploadProof={onUploadProof}
+                                onRemoveProof={onRemoveProof}
+                                hideCompleted={isOwnCard}
+                                hideStatusChip
+                                // Draggable Task column (2026-08-15) — OWN CARD
+                                // ONLY (2026-08-15 fix): the resize header above
+                                // only renders for isOwnCard, but this prop was
+                                // applied unconditionally, giving every OTHER
+                                // person's card the same fixed shrink-0 width
+                                // too. In a 3-per-row "View All" grid those
+                                // cards are much narrower than that fixed width,
+                                // so the row overflowed and the card's own
+                                // overflow-hidden (for its rounded corners)
+                                // clipped the title mid-word — a regression, not
+                                // the intended "wrap normally" behavior
+                                // established earlier. Other cards now go back
+                                // to undefined (TaskRowLine's flex-1 fallback),
+                                // matching their pre-resize-feature behavior.
+                                nameWidth={isOwnCard ? taskColWidth : undefined}
+                                onResizeStart={isOwnCard ? onResizeStart : undefined}
+                                // No Assignee column (2026-08-15) — every row
+                                // here is the CARD OWNER's own task, so an
+                                // "assigned by" column is redundant with the
+                                // card header; Due date is back (was suppressed
+                                // 2026-08-13) per the new 4-column header above.
+                                hideAssignee
+                                // Matches the header's PROOF_COL_WIDTH exactly
+                                // (2026-08-15 fix) — without this the row cell
+                                // defaulted to 40px while the header used 96px,
+                                // so the centered "+" button sat under the
+                                // header's left portion instead of its center.
+                                proofWidth={PROOF_COL_WIDTH}
+                                // Daily's date is implied by the section itself
+                                // (2026-08-15) — keep the column/header (layout
+                                // consistency with Monthly/HOD/CEO Assigned
+                                // Task, which DO show a real date), just don't
+                                // populate a redundant per-row value under it.
+                                blankDueDate={sectionLabel === "Daily"}
+                                reassign={reassign}
+                              />
+                            ))}
+                          </div>
                         ))}
                       </>
                     )}
