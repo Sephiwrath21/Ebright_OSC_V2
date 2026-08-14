@@ -1061,11 +1061,33 @@ export default async function TaskManagerPage({
       // Monthly self-scoped, per the confirmed correction. Omitted
       // entirely for BRANCH_MEMBER/COACH (Daily-only) — see below.
       monthly: { entity: toSelfEntityDetail(monthly.me.me, monthly.me), dateControl: personalMonthlyControl, showViewToggle: false },
-      // No HOD/CEO Assigned Task section for OPS/CEO (no owned entity) —
-      // DEPT_MEMBER/BRANCH_MEMBER/COACH don't get these either per the
-      // confirmed correction, so this stays omitted for every myOverview
-      // role. If a future role needs it, wire hodAssigned/ceoAssigned here
-      // the same way departmentOverview/branchOverview do (a later task).
+      // "HOD Assigned Task" for individual staff (2026-08-15, after
+      // Monthly — TaskOverviewStack's own stacking order already puts it
+      // there) — DEPT_MEMBER/BRANCH_MEMBER/COACH only (Intern/Full Time
+      // Exec/HQ Exec/Branch Exec/Coach), not OPS/CEO (managers, no "my
+      // own HOD" to be assigned by). Reuses daily.me.streamsAll — the
+      // SAME all-time, assigner-role-grouped data Home's own per-person
+      // "HOD assigned" card already reads (scoped-overview-section.tsx) —
+      // rather than a new query: no owned entity to scope a
+      // department/branch-wide hodAssigned fetch to, unlike HOD's/BRANCH's
+      // own Department/Branch Overview sections below. Always present
+      // (never omitted) even with zero tasks, same as Daily/Monthly — an
+      // individual simply never having had an HOD-assigned task is a
+      // normal empty state, not a fetch failure like the entity-wide
+      // sections' undefined-on-403 case.
+      hodAssigned:
+        viewRole === "DEPT_MEMBER" || viewRole === "BRANCH_MEMBER" || viewRole === "COACH"
+          ? {
+              entity: toSelfEntityDetail(
+                daily.me.me,
+                daily.me.streamsAll.find((s) => s.key === "HOD") ?? {
+                  totals: { completed: 0, pending: 0, na: 0 },
+                  tasks: [],
+                },
+              ),
+              showViewToggle: false,
+            }
+          : undefined,
     };
 
     body = (
@@ -1102,6 +1124,7 @@ export default async function TaskManagerPage({
           // range, which exists for a different purpose (picking sidebar
           // days) and isn't guaranteed to stay coupled to Daily-only-ness.
           monthly: viewRole === "BRANCH_MEMBER" || viewRole === "COACH" ? undefined : myOverviewData.monthly,
+          hodAssigned: myOverviewData.hodAssigned,
         }}
         personalDailyControl={personalDailyControl}
         personalMonthlyControl={personalMonthlyControl}
