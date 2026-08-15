@@ -115,6 +115,14 @@ export interface MyMonthChunk {
 export interface MyMonthConfig {
   chunks: MyMonthChunk[];
   selectedRange: string; // current ?mrange= value, e.g. "1-7"
+  /** The resolved Monthly anchor month (YYYY-MM-DD, same shape MonthDropdown's
+   *  own `value` prop takes) — carried explicitly by selectMyMonthRange below
+   *  since `nav.extraParams` deliberately EXCLUDES both mdate/mrange (the
+   *  same "caller re-adds whichever one it owns" convention MonthDropdown's
+   *  and MonthRangeDropdown's own navigate functions already follow), so a
+   *  tab click must re-add mdate itself or the month silently resets to
+   *  current-month on navigation. */
+  anchorMonth: string;
   nav: { basePath: string; extraParams?: Record<string, string> };
 }
 
@@ -316,7 +324,7 @@ export function EntityCardOverview({
     myMonth?.chunks.find((c) => c.range === myMonth.selectedRange) ?? myMonth?.chunks[0];
   const selectMyMonthRange = (range: string) => {
     if (!myMonth) return;
-    const qs = new URLSearchParams({ ...myMonth.nav.extraParams, mrange: range });
+    const qs = new URLSearchParams({ ...myMonth.nav.extraParams, mdate: myMonth.anchorMonth, mrange: range });
     router.push(`${myMonth.nav.basePath}?${qs.toString()}`);
   };
 

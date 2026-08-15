@@ -182,6 +182,23 @@ export async function HomeScopedOverviewSection({
         />
       </div>
     );
+    // Personal Monthly sections use My Month's tab strip for range
+    // selection instead of a dropdown — MonthRangeDropdown's "Full month"
+    // option has no equivalent in the tabbed view (My Month always shows
+    // one specific chunk, same "no combined view" rule myWeek follows for
+    // weekdays), so offering it here would silently contradict what the
+    // card body actually shows. Personal Monthly's dateControl is Year/
+    // Month only; every OTHER Monthly usage (department/branch pairs,
+    // ceoDashboards, HomeRegionOverview) keeps the full monthlyPicker,
+    // unchanged.
+    const personalMonthlyPicker = (
+      <MonthDropdown
+        key="home-personal-monthly-picker"
+        value={monthly.date}
+        basePath="/home"
+        extraParams={dateExtraParams("mdate", "mrange")}
+      />
+    );
     // Consumed directly by the branchRegionOverview block below (passed to
     // HomeRegionOverview); the orgGrids branch's HomeTaskOverview builds its
     // own adhoc picker internally from adhocDate instead of using this one.
@@ -341,6 +358,7 @@ export async function HomeScopedOverviewSection({
             tasks: myMonthResults[i].tasks,
           })),
           selectedRange: monthlyRangeParam || `${monthChunks[0].from}-${monthChunks[0].to}`,
+          anchorMonth: monthly.date,
           nav: { basePath: "/home", extraParams: dateExtraParams("mdate", "mrange") },
         };
       }
@@ -465,7 +483,7 @@ export async function HomeScopedOverviewSection({
               monthly={
                 personalMonthlyEntity && {
                   entity: personalMonthlyEntity,
-                  dateControl: monthlyPicker,
+                  dateControl: personalMonthlyPicker,
                   showViewToggle: false,
                   myMonth: personalMyMonth,
                 }
@@ -554,7 +572,7 @@ export async function HomeScopedOverviewSection({
               monthly={
                 personalMonthlyEntity && {
                   entity: personalMonthlyEntity,
-                  dateControl: monthlyPicker,
+                  dateControl: personalMonthlyPicker,
                   showViewToggle: false,
                   myMonth: personalMyMonth,
                 }
@@ -800,7 +818,7 @@ export async function HomeScopedOverviewSection({
             monthly={
               personalMonthlyEntity && {
                 entity: personalMonthlyEntity,
-                dateControl: monthlyPicker,
+                dateControl: personalMonthlyPicker,
                 showViewToggle: false,
                 myMonth: personalMyMonth,
               }
