@@ -784,6 +784,27 @@ export function flowBucketize<T extends FlowTaskRow>(
   return out;
 }
 
+/** Wraps the viewer's own totals/tasks into a synthetic one-member
+ *  FlowEntityDetail, for roles/sections with no owned department or
+ *  branch entity (OPS, CEO, every self-scoped Monthly section, and
+ *  Home's personal Daily/Monthly/third-card sections). `done`/`notDone`
+ *  on the synthetic member are unused placeholders — no current consumer
+ *  (groupTasksByPerson, entity-card-overview.tsx) reads a single-member
+ *  roster's per-member counts; `totals` above is what drives the card. */
+export function toSelfEntityDetail(
+  me: { userId: string; name: string },
+  personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+): FlowEntityDetail {
+  return {
+    name: me.name,
+    totals: personal.totals,
+    tasks: flowBucketize(personal.tasks),
+    members: [
+      { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
+    ],
+  };
+}
+
 /** Human label for an assigner stream ("CEO assigned tasks" per the mockups). */
 export function flowStreamLabel(key: FlowRole | "self"): string {
   if (key === "self") return "Started by me";
