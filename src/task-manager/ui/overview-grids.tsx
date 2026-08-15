@@ -23,47 +23,17 @@ const EMPTY_DRILL_TASKS: Record<BucketKey, FlowDrillTask[]> = {
   na: [],
 };
 
-/** One collapsed-or-expanded rollup card. The name row is itself the
- *  expand/collapse toggle (a chevron + click anywhere on the name), navigating
- *  with an updated ?expand= — same client-push navigation pattern as
- *  DailyDatePicker/EntityPicker. Bucket-count buttons still open the drill
- *  modal, unrelated to expand/collapse. */
-function EntityRollupCard({
-  entity,
-  kind,
-  expanded,
-  expandParam,
-  basePath,
-  extraParams,
-}: {
-  entity: FlowEntityRollup;
-  kind: "dept" | "branch";
-  expanded: boolean;
-  expandParam?: string;
-  basePath: string;
-  extraParams: Record<string, string>;
-}) {
-  const router = useRouter();
+/** Shared stats body for a rollup card: the % line, the bucket dot/count
+ *  row (drillable when the entity carries per-bucket task lists, plain
+ *  otherwise), and the drill modal it opens. Used by both EntityRollupCard
+ *  (dept/branch, with expand/collapse) and AdhocEntityCard (ad hoc, no
+ *  expand/collapse) — identical stats presentation, different name row. */
+function RollupStats({ entity }: { entity: FlowEntityRollup }) {
   const [drill, setDrill] = React.useState<"completed" | "pending" | "na" | null>(null);
   const drillable = Boolean(entity.tasks);
 
-  const toggle = () => {
-    const nextExpand = toggleExpandEntry(expandParam, kind, entity.name);
-    const qs = new URLSearchParams({ ...extraParams, ...(nextExpand ? { expand: nextExpand } : {}) });
-    router.push(`${basePath}?${qs.toString()}`);
-  };
-
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={expanded}
-        className="flex w-full items-center justify-center gap-1.5 truncate text-center text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
-      >
-        <span className={`text-[10px] transition-transform ${expanded ? "rotate-90" : ""}`}>▶</span>
-        {entity.name}
-      </button>
+    <>
       <span className="text-sm font-bold text-gray-900 dark:text-slate-100">{flowCompletionPct(entity)}%</span>
       <div className="flex gap-3 text-xs text-gray-500 dark:text-slate-400">
         {BUCKET_META.map((b) =>
@@ -93,6 +63,52 @@ function EntityRollupCard({
           onClose={() => setDrill(null)}
         />
       )}
+    </>
+  );
+}
+
+/** One collapsed-or-expanded rollup card. The name row is itself the
+ *  expand/collapse toggle (a chevron + click anywhere on the name), navigating
+ *  with an updated ?expand= — same client-push navigation pattern as
+ *  DailyDatePicker/EntityPicker. Bucket-count buttons still open the drill
+ *  modal, unrelated to expand/collapse. */
+function EntityRollupCard({
+  entity,
+  kind,
+  expanded,
+  expandParam,
+  basePath,
+  extraParams,
+}: {
+  entity: FlowEntityRollup;
+  kind: "dept" | "branch";
+  expanded: boolean;
+  expandParam?: string;
+  basePath: string;
+  extraParams: Record<string, string>;
+}) {
+  const router = useRouter();
+
+  const toggle = () => {
+    const nextExpand = toggleExpandEntry(expandParam, kind, entity.name);
+    const qs = new URLSearchParams({ ...extraParams, ...(nextExpand ? { expand: nextExpand } : {}) });
+    router.push(`${basePath}?${qs.toString()}`);
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-center gap-1.5 truncate text-center text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
+      >
+        <span aria-hidden="true" className={`text-[10px] transition-transform ${expanded ? "rotate-90" : ""}`}>
+          ▶
+        </span>
+        {entity.name}
+      </button>
+      <RollupStats entity={entity} />
     </div>
   );
 }
@@ -247,42 +263,12 @@ export function RegionRollupGrid({
  *  since no per-person ad hoc data source exists yet (spec's explicit
  *  scope decision). Plain name, not a button. */
 function AdhocEntityCard({ entity }: { entity: FlowEntityRollup }) {
-  const [drill, setDrill] = React.useState<"completed" | "pending" | "na" | null>(null);
-  const drillable = Boolean(entity.tasks);
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
       <p className="w-full truncate text-center text-sm font-semibold text-gray-900 dark:text-slate-100">
         {entity.name}
       </p>
-      <span className="text-sm font-bold text-gray-900 dark:text-slate-100">{flowCompletionPct(entity)}%</span>
-      <div className="flex gap-3 text-xs text-gray-500 dark:text-slate-400">
-        {BUCKET_META.map((b) =>
-          drillable ? (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setDrill(b.key)}
-              className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-800"
-            >
-              <span className={`size-2 rounded-full ${b.dot}`} />
-              {entity[b.key]}
-            </button>
-          ) : (
-            <span key={b.key} className="flex items-center gap-1">
-              <span className={`size-2 rounded-full ${b.dot}`} />
-              {entity[b.key]}
-            </span>
-          ),
-        )}
-      </div>
-      {drill && (
-        <EntityDrillModal
-          name={entity.name}
-          tasks={entity.tasks ?? EMPTY_DRILL_TASKS}
-          bucketKey={drill}
-          onClose={() => setDrill(null)}
-        />
-      )}
+      <RollupStats entity={entity} />
     </div>
   );
 }
