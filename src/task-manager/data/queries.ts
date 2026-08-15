@@ -51,7 +51,9 @@ export function getFlowOverview(
     /** Clamp a MONTHLY window to these days of the anchor month (e.g.
      *  {from:1,to:7}) — same option getFlowDetail already exposes,
      *  threaded through here too for Home's "My Month" tab fetches
-     *  (2026-08-15). Ignored when period is "daily". */
+     *  (2026-08-15). Ignored when period is "daily". Has no filtering
+     *  effect on cadence-tagged blocks unless `strictWindow: true` is
+     *  also set — see `fetchPeriodBlocks`. */
     monthDays?: { from: number; to: number };
   },
 ): Promise<FlowOverviewResponse> {
