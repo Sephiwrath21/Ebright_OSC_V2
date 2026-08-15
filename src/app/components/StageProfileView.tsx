@@ -509,7 +509,7 @@ export default function StageProfileView({
   const mobileRowTwoSections = displayStage === stage ? mobileRowTwoTopLevel : historicalSubTabSections;
 
   return (
-    <div className="min-h-full bg-[#f9fbff]">
+    <div className="min-h-full bg-[#f9fbff] dark:bg-slate-950">
       {/* --rail-width (fluid, below lg) and --rail-width-lg (the exact
           original per-stage pixel value, pinned at lg+ via the className's
           own lg:w-[var(--rail-width-lg)]) are both declared once here so the
@@ -682,7 +682,7 @@ export default function StageProfileView({
                     {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
                   {proceedNotice && (
-                    <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+                    <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-600 shadow-sm">
                       {proceedNotice}
                     </div>
                   )}
