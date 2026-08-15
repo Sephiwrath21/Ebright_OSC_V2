@@ -286,11 +286,7 @@ export default function EmployeeRecordView({
             overflow-x-auto), never wrapped to a second row, either way. */}
         <nav
           aria-label="Employee record categories"
-<<<<<<< HEAD
-          className="flex flex-nowrap items-center gap-1 mb-0 ml-4 sm:ml-6 overflow-x-auto w-auto [@media(hover:none)]:w-full [@media(hover:none)]:ml-0 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
-=======
-          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
+          className="flex flex-nowrap items-center gap-1 mb-0 ml-4 sm:ml-6 overflow-x-auto w-auto [@media(hover:none)]:w-full [@media(hover:none)]:ml-0 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
         >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
@@ -334,7 +330,7 @@ export default function EmployeeRecordView({
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
               const className = `shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                isActive ? "bg-[#a9d3f7bd] text-[#004386c9]" : "text-black/65 hover:bg-[#dde8f7]"
+                isActive ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
               }`;
               // Rollout categories — client-side tab state, not navigation
               // (see clientSection above); every other category keeps the
@@ -347,17 +343,7 @@ export default function EmployeeRecordView({
                 );
               }
               return (
-<<<<<<< HEAD
                 <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
-=======
-                <Link
-                  key={section.key}
-                  href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
-                  className={`shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
-                  }`}
-                >
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                   {section.label}
                 </Link>
               );
@@ -367,7 +353,6 @@ export default function EmployeeRecordView({
 
         {/* Card + vertical sub-nav rail as flex siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
-<<<<<<< HEAD
             breakpoint (never stacks). No gap between them (fixed
             2026-08-13, see conversation) — the rail sits flush against the
             card's right edge; same fix applied to StageProfileView.tsx's
@@ -376,15 +361,7 @@ export default function EmployeeRecordView({
             columns keep fitting side by side instead of the rail getting
             pushed below the content. */}
         <div className="flex items-start">
-          <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
-=======
-            breakpoint (never stacks). The rail's own width fluidly shrinks
-            on narrow viewports (see its own style below) so both columns
-            keep fitting side by side instead of the rail getting pushed
-            below the content. */}
-        <div className="flex items-start gap-3 sm:gap-4">
           <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];

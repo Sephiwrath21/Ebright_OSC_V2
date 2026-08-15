@@ -1422,14 +1422,10 @@ function RecordTable({
                   className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa] dark:hover:bg-slate-800" : undefined}
                 >
                   {columns.map((c) => (
-<<<<<<< HEAD
                     <td
                       key={c.key}
-                      className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5 whitespace-nowrap"
+                      className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] dark:text-slate-300 border-b border-black/5 dark:border-white/10 whitespace-nowrap"
                     >
-=======
-                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] dark:text-slate-300 border-b border-black/5 dark:border-white/10">
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
@@ -1771,8 +1767,7 @@ function RecordAddModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             {fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true)).map((f) => (
               <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
-<<<<<<< HEAD
-                <label className="text-sm font-medium text-[#4b4949]">{f.label}</label>
+                <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>
                 {readOnly ? (
                   f.type === "file" ? (
                     initialFileIds?.[f.key] ? (
@@ -1786,10 +1781,6 @@ function RecordAddModal({
                     <span className="text-sm italic text-slate-400">-</span>
                   )
                 ) : f.type === "textarea" ? (
-=======
-                <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>
-                {f.type === "textarea" ? (
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                   <textarea
                     value={values[f.key] ?? ""}
                     onChange={(e) => setField(f.key, e.target.value)}
@@ -3871,19 +3862,13 @@ function ExitChecklistItems({
           <input
             type="checkbox"
             checked={pendingChecked[item.id] ?? false}
-<<<<<<< HEAD
             disabled={!canEdit || savingId === item.id}
             onChange={(e) => {
               const checked = e.target.checked;
               onChange(item.id, checked);
               if (!editing && canEdit) handleImmediateToggle(item.id, checked);
             }}
-            className="w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
-=======
-            disabled={!editing}
-            onChange={(e) => onChange(item.id, e.target.checked)}
             className="w-4 h-4 shrink-0 rounded border-slate-300 dark:border-slate-500 disabled:cursor-not-allowed"
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
           />
           {editing && canEditItem ? (
             <input

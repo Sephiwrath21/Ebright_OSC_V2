@@ -115,21 +115,7 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                   <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
                 </div>
 
-<<<<<<< HEAD
-                <p className="text-xs text-slate-500 -mb-2">Branch and Department — select only one; choosing one clears the other.</p>
-=======
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">Position</label>
-                  <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputClass}>
-                    <option value=""></option>
-                    {POSITION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
+                <p className="text-xs text-slate-500 dark:text-slate-400 -mb-2">Branch and Department — select only one; choosing one clears the other.</p>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">Branch</label>
@@ -185,8 +171,7 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                 </div>
 
                 <div className="flex flex-col gap-2">
-<<<<<<< HEAD
-                  <label className="text-sm font-medium text-[#4b4949]">Position</label>
+                  <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">Position</label>
                   <select
                     value={position}
                     onChange={(e) => setPosition(e.target.value)}
@@ -203,10 +188,7 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-[#4b4949]">Date</label>
-=======
                   <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">Date</label>
->>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
                 </div>
               </div>
