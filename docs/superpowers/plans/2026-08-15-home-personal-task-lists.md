@@ -16,7 +16,7 @@
 
 - **Modify** `src/task-manager/ui/types.ts` — export `toSelfEntityDetail` (extracted from `task-manager/page.tsx`, currently private there).
 - **Modify** `src/app/task-manager/page.tsx` — remove its private `toSelfEntityDetail`, import the shared one instead.
-- **Modify** `src/task-manager/ui/entity-picker.tsx` — export `monthDayChunks` and `chunkLabel` (currently private).
+- **Modify** `src/task-manager/ui/types.ts` / `src/task-manager/ui/entity-picker.tsx` — relocate `monthDayChunks` and `chunkLabel` from `entity-picker.tsx` (currently private there) into `types.ts`, exported (Task 2 originally exported them in place, but `entity-picker.tsx` is a `"use client"` module — any export of a client module becomes an unusable client-reference proxy when called as a plain function from a Server Component, which is exactly how Task 6 needs to call them from `scoped-overview-section.tsx`; relocating to `types.ts`, which has no `"use client"` boundary, is the fix, matching Task 1's `toSelfEntityDetail` precedent).
 - **Modify** `src/task-manager/data/queries.ts` — add `monthDays` to `getFlowOverview`'s options.
 - **Modify** `src/task-manager/ui/entity-card-overview.tsx` — add `MyMonthChunk`/`MyMonthConfig` types, `myMonth` prop, and its render block (mirrors the existing `myWeek` block).
 - **Modify** `src/task-manager/ui/task-overview-stack.tsx` — thread a new `myMonth?: MyMonthConfig` field through `SectionData` to `EntityCardOverview`.
@@ -99,50 +99,15 @@ git commit -m "refactor(task-manager): extract toSelfEntityDetail into types.ts"
 
 ---
 
-### Task 2: Export `monthDayChunks` and `chunkLabel` from `entity-picker.tsx`
+### Task 2: Relocate `monthDayChunks`/`chunkLabel` into `types.ts` (DONE — revised after code review)
 
-**Files:**
-- Modify: `src/task-manager/ui/entity-picker.tsx`
+**As originally written, this task exported both functions in place inside `entity-picker.tsx`. Code review caught a real bug in that plan: `entity-picker.tsx` has `"use client"` at the top, and Next.js turns every export of a `"use client"` module into a client-reference proxy for any Server Component importer — calling one as a plain function (not rendering it as JSX, which is exactly how Task 6 needs to call `monthDayChunks`/`chunkLabel` from `scoped-overview-section.tsx`) throws at runtime. Fixed by relocating both into `types.ts` instead (no `"use client"` boundary there), matching Task 1's `toSelfEntityDetail` precedent. This section is left here for the historical record — Task 6 (below) already reflects the corrected import path.**
 
-- [ ] **Step 1: Add `export` to both**
+**Files (as actually done):**
+- Modified: `src/task-manager/ui/types.ts` — added `monthDayChunks`/`chunkLabel`, byte-identical bodies, placed near `flowBucketize`/`toSelfEntityDetail`.
+- Modified: `src/task-manager/ui/entity-picker.tsx` — removed both function bodies; `MonthRangeDropdown` now imports them from `./types` instead.
 
-Find (search for `function monthDayChunks`):
-
-```ts
-function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
-```
-
-Change to:
-
-```ts
-export function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
-```
-
-Find (search for `const chunkLabel`):
-
-```ts
-const chunkLabel = (c: { from: number; to: number }) =>
-  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
-```
-
-Change to:
-
-```ts
-export const chunkLabel = (c: { from: number; to: number }) =>
-  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
-```
-
-- [ ] **Step 2: Typecheck**
-
-Run: `npx tsc --noEmit`
-Expected: only the 3 known pre-existing baseline errors.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add src/task-manager/ui/entity-picker.tsx
-git commit -m "refactor(task-manager): export monthDayChunks/chunkLabel for reuse"
-```
+Verified: `npx tsc --noEmit` → only the 3 known pre-existing baseline errors. `npx vitest run` → 340 passing, 1 known pre-existing unrelated failure. Committed as `e94f912`.
 
 ---
 
@@ -242,7 +207,7 @@ Add right after it:
  *  Home's "My Month" tab view — the Monthly sibling of MyWeekDay/myWeek
  *  above). */
 export interface MyMonthChunk {
-  label: string; // "1–7" / "22–31" etc — entity-picker.tsx's chunkLabel
+  label: string; // "1–7" / "22–31" etc — types.ts's chunkLabel
   range: string; // "1-7" — the ?mrange= value this chunk represents
   tasks: FlowTaskRow[];
 }
@@ -642,17 +607,7 @@ Add `thisWeekDatesForRange`/`weekdayRangeOf` to the existing `@/task-manager/rol
 import { resolveViewRole, shows, thisWeekDatesForRange, weekdayRangeOf } from "@/task-manager/role-views";
 ```
 
-Add `monthDayChunks`/`chunkLabel` to the existing `@/task-manager/ui/entity-picker` import:
-
-```ts
-import {
-  DailyDatePicker,
-  MonthDropdown,
-  MonthRangeDropdown,
-  chunkLabel,
-  monthDayChunks,
-} from "@/task-manager/ui/entity-picker";
-```
+The `@/task-manager/ui/entity-picker` import (`DailyDatePicker`/`MonthDropdown`/`MonthRangeDropdown`) stays as-is — do NOT add `monthDayChunks`/`chunkLabel` to it. Those two now live in `types.ts` (relocated during Task 2's review fix, since `entity-picker.tsx` is a `"use client"` module and these need to be called as plain server-side logic here, not rendered as JSX) — add them to the `@/task-manager/ui/types` import instead, alongside `toSelfEntityDetail` (see Step 2's next block below).
 
 Add a new import for `TaskOverviewStack` and the `MyMonthConfig`/`MyWeekConfig` types:
 
@@ -661,12 +616,14 @@ import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
 import type { MyMonthConfig, MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
 ```
 
-Add `toSelfEntityDetail` and `FlowCategoryOption`/`FlowEntityDetail` to the existing `@/task-manager/ui/types` import:
+Add `toSelfEntityDetail`, `monthDayChunks`, `chunkLabel`, and `FlowCategoryOption`/`FlowEntityDetail` to the existing `@/task-manager/ui/types` import:
 
 ```ts
 import {
+  chunkLabel,
   flowBucketize,
   flowStreamLabel,
+  monthDayChunks,
   toSelfEntityDetail,
   visibleAssignerStreams,
   FLOW_DEPARTMENTS,
