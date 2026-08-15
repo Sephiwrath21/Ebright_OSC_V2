@@ -98,6 +98,26 @@ export interface MyWeekConfig {
   nav: { basePath: string; extraParams?: Record<string, string> };
 }
 
+/** One day-range chunk's worth of the viewer's own tasks (2026-08-15,
+ *  Home's "My Month" tab view — the Monthly sibling of MyWeekDay/myWeek
+ *  above). */
+export interface MyMonthChunk {
+  label: string; // "1–7" / "22–31" etc — types.ts's chunkLabel
+  range: string; // "1-7" — the ?mrange= value this chunk represents
+  tasks: FlowTaskRow[];
+}
+
+/** EntityCardOverview's `myMonth` prop shape — same idea as MyWeekConfig,
+ *  generalized from weekdays to the 4 day-range chunks MonthRangeDropdown
+ *  already offers (Full month itself has no tab — same "no combined tab"
+ *  precedent myWeek already sets for the whole week). Exported for the
+ *  same reason MyWeekConfig is: one shared shape for every caller. */
+export interface MyMonthConfig {
+  chunks: MyMonthChunk[];
+  selectedRange: string; // current ?mrange= value, e.g. "1-7"
+  nav: { basePath: string; extraParams?: Record<string, string> };
+}
+
 /** View toggle persistence (2026-08-14) — ONE shared preference per user,
  *  covering every section (Daily/Monthly/HOD/CEO Assigned Task) this
  *  component renders, not four independent memories: "remember the user's
@@ -137,6 +157,7 @@ export function EntityCardOverview({
   onRemoveProof,
   reassign,
   myWeek,
+  myMonth,
 }: {
   /** The section's own heading, e.g. "Daily" / "Monthly" / "HOD Assigned
    *  Task" / "CEO Assigned Task" — TaskOverviewStack renders it above this
@@ -212,6 +233,15 @@ export function EntityCardOverview({
    *  than owning separate client state, keeping the picker's displayed
    *  value and the highlighted tab from ever drifting apart. */
   myWeek?: MyWeekConfig;
+  /** Month-range-chunk tab view for the viewer's OWN card (2026-08-15) —
+   *  Monthly section only, Home's "My Month" (the Monthly sibling of
+   *  `myWeek` above — same "own card, alone on screen" gate, same
+   *  two-way sync with the section's own dateControl, just tabbed by day-
+   *  range chunk instead of weekday). `/task-manager` never sets this —
+   *  its own Monthly section keeps the dropdown-based range picker,
+   *  unchanged (2026-08-15 product decision: My Month is Home-only for
+   *  now). */
+  myMonth?: MyMonthConfig;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
@@ -282,6 +312,13 @@ export function EntityCardOverview({
     const qs = new URLSearchParams({ ...myWeek.nav.extraParams, date });
     router.push(`${myWeek.nav.basePath}?${qs.toString()}`);
   };
+  const selectedMyMonthChunk =
+    myMonth?.chunks.find((c) => c.range === myMonth.selectedRange) ?? myMonth?.chunks[0];
+  const selectMyMonthRange = (range: string) => {
+    if (!myMonth) return;
+    const qs = new URLSearchParams({ ...myMonth.nav.extraParams, mrange: range });
+    router.push(`${myMonth.nav.basePath}?${qs.toString()}`);
+  };
 
   return (
     <div
@@ -336,6 +373,7 @@ export function EntityCardOverview({
               // doc comment for why this is scoped to "own card, alone on
               // screen" rather than every own-card appearance.
               const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1;
+              const showMyMonth = isOwnCard && Boolean(myMonth) && personCards.length === 1;
               // Type sub-grouping within each card (2026-08-15) — reuses
               // Sort: Type's own grouping function (entity-card-grouping.ts)
               // on this ONE person's already-scoped task list, so "Sort:
@@ -403,6 +441,56 @@ export function EntityCardOverview({
                             onUploadProof={onUploadProof}
                             onRemoveProof={onRemoveProof}
                             emptyLabel={`No tasks for ${selectedMyWeekDay.weekday}.`}
+                            hideCompleted
+                            hideAssignee
+                            blankDueDate
+                            reassign={reassign}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : showMyMonth && myMonth ? (
+                    <div className="flex gap-3 p-3">
+                      <div role="tablist" className="w-32 shrink-0 space-y-0.5">
+                        {myMonth.chunks.map((c) => {
+                          const pendingCount = c.tasks.filter(
+                            (t) => t.status !== "DONE" && t.status !== "SKIPPED",
+                          ).length;
+                          const active = c.range === myMonth.selectedRange;
+                          return (
+                            <button
+                              key={c.range}
+                              type="button"
+                              role="tab"
+                              aria-selected={active}
+                              onClick={() => selectMyMonthRange(c.range)}
+                              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                              }`}
+                            >
+                              <span>{c.label}</span>
+                              <span
+                                className={active ? "text-blue-100" : "text-gray-400"}
+                                aria-label={`${pendingCount} pending`}
+                              >
+                                {pendingCount}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {selectedMyMonthChunk && (
+                          <ResizableTaskList
+                            key={selectedMyMonthChunk.range}
+                            tasks={selectedMyMonthChunk.tasks}
+                            myUserId={myUserId}
+                            onComplete={onComplete}
+                            onSkip={onSkip}
+                            onReopen={onReopen}
+                            onUploadProof={onUploadProof}
+                            onRemoveProof={onRemoveProof}
+                            emptyLabel={`No tasks for ${selectedMyMonthChunk.label}.`}
                             hideCompleted
                             hideAssignee
                             blankDueDate
