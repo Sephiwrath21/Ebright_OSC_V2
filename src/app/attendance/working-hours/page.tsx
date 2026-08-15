@@ -36,13 +36,13 @@ export default async function WorkingHoursPage({ searchParams }: PageProps) {
   if (!allowed) {
     return (
       <AppShell email={userEmail} role={userRole} name={userName}>
-        <div className="min-h-full bg-slate-50 flex items-center justify-center p-8">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-5">
-              <ShieldAlert className="w-7 h-7 text-rose-600" aria-hidden="true" />
+        <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-8">
+          <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-900 flex items-center justify-center mb-5">
+              <ShieldAlert className="w-7 h-7 text-rose-600 dark:text-rose-300" aria-hidden="true" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900">Restricted Access</h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Restricted Access</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               The working-hours editor is available to HR, CEO, and superadmin roles only.
             </p>
             <Link

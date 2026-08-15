@@ -104,32 +104,32 @@ const ACCENTS: Record<string, Accent> = {
   blue: {
     ring: "focus-visible:ring-blue-500",
     border: "border-blue-500",
-    tile: "bg-blue-50",
-    icon: "text-blue-600",
+    tile: "bg-blue-50 dark:bg-blue-900",
+    icon: "text-blue-600 dark:text-blue-400",
   },
   emerald: {
     ring: "focus-visible:ring-emerald-500",
     border: "border-emerald-500",
-    tile: "bg-emerald-50",
-    icon: "text-emerald-600",
+    tile: "bg-emerald-50 dark:bg-emerald-900",
+    icon: "text-emerald-600 dark:text-emerald-400",
   },
   amber: {
     ring: "focus-visible:ring-amber-500",
     border: "border-amber-500",
-    tile: "bg-amber-50",
-    icon: "text-amber-600",
+    tile: "bg-amber-50 dark:bg-amber-900",
+    icon: "text-amber-600 dark:text-amber-400",
   },
   violet: {
     ring: "focus-visible:ring-violet-500",
     border: "border-violet-500",
-    tile: "bg-violet-50",
-    icon: "text-violet-600",
+    tile: "bg-violet-50 dark:bg-violet-900",
+    icon: "text-violet-600 dark:text-violet-400",
   },
   slate: {
     ring: "focus-visible:ring-slate-500",
     border: "border-slate-500",
-    tile: "bg-slate-100",
-    icon: "text-slate-600",
+    tile: "bg-slate-100 dark:bg-slate-800",
+    icon: "text-slate-600 dark:text-slate-300",
   },
 };
 
@@ -241,33 +241,33 @@ export default function LeaveFormView({
 
   // ── Wizard ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       {/* Breadcrumb — left-aligned to match other pages */}
       <div className="max-w-7xl mx-auto px-6 pt-4">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <HomeIcon className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/attendance/leave" className="hover:text-slate-900 transition-colors">Leave</Link>
+          <Link href="/attendance/leave" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Leave</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Apply</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Apply</span>
         </nav>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-12">
         {/* Heading */}
         <header className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">Apply for Leave</h1>
-          <p className="mt-1 text-sm text-slate-500">Step {step} of 4</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">Apply for Leave</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Step {step} of 4</p>
         </header>
 
         {/* Progress bar */}
         <ProgressBar currentStep={step} />
 
         {/* Step content */}
-        <div className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
+        <div className="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5 sm:p-6">
           {step === 1 && (
             <Step1 leaveTypes={leaveTypes} typeId={typeId} onSelect={setTypeId} />
           )}
@@ -314,12 +314,12 @@ export default function LeaveFormView({
         {errorMsg && (
           <div
             role="alert"
-            className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 px-4 py-3"
           >
-            <CircleAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <CircleAlert className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
-              <p className="text-sm font-semibold text-red-800">Could not submit request</p>
-              <p className="text-xs text-red-700 leading-relaxed">{errorMsg}</p>
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200">Could not submit request</p>
+              <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">{errorMsg}</p>
             </div>
           </div>
         )}
@@ -330,7 +330,7 @@ export default function LeaveFormView({
             <button
               type="button"
               onClick={() => setStep((s) => (s - 1) as Step)}
-              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
               Back
@@ -338,7 +338,7 @@ export default function LeaveFormView({
           ) : (
             <Link
               href="/attendance/leave"
-              className="inline-flex items-center justify-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               Cancel
             </Link>
@@ -400,22 +400,22 @@ function ProgressBar({ currentStep }: { currentStep: Step }) {
                   isCompleted
                     ? "bg-blue-600 border-blue-600 text-white"
                     : isCurrent
-                      ? "border-blue-600 bg-white text-blue-600"
-                      : "border-slate-300 bg-white text-slate-400"
+                      ? "border-blue-600 bg-white dark:bg-slate-900 text-blue-600"
+                      : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-400"
                 }`}
               >
                 {isCompleted ? <Check className="w-4 h-4" aria-hidden="true" /> : s.num}
               </span>
               <span
                 className={`text-xs sm:text-sm font-medium truncate ${
-                  isCompleted || isCurrent ? "text-slate-900" : "text-slate-400"
+                  isCompleted || isCurrent ? "text-slate-900 dark:text-slate-100" : "text-slate-400"
                 }`}
               >
                 {s.label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={`flex-1 h-0.5 rounded ${currentStep > s.num ? "bg-blue-600" : "bg-slate-200"}`} />
+              <div className={`flex-1 h-0.5 rounded ${currentStep > s.num ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-800"}`} />
             )}
           </li>
         );
@@ -437,8 +437,8 @@ function Step1({
 }) {
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Choose a leave type</h2>
-      <p className="text-sm text-slate-500 mb-5">Select the type of leave you&apos;re applying for.</p>
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Choose a leave type</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Select the type of leave you&apos;re applying for.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {leaveTypes.length === 0 ? (
@@ -460,10 +460,10 @@ function Step1({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 aria-pressed={isSelected}
-                className={`text-left bg-white border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.ring} ${
+                className={`text-left bg-white dark:bg-slate-900 border-2 rounded-xl p-4 transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${accent.ring} ${
                   isSelected
                     ? `${accent.border} shadow-sm`
-                    : "border-slate-200 hover:border-slate-300"
+                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -471,8 +471,8 @@ function Step1({
                     <Icon className={`w-5 h-5 ${accent.icon}`} aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{t.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{balance}</div>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">{t.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{balance}</div>
                   </div>
                 </div>
               </button>
@@ -539,8 +539,8 @@ function Step2({
 
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Pick your dates</h2>
-      <p className="text-sm text-slate-500 mb-4">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Pick your dates</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
         Tap a start date, then tap an end date. Weekends are not selectable.
       </p>
 
@@ -555,8 +555,8 @@ function Step2({
         />
       </div>
 
-      <div className="mt-4 max-w-sm mx-auto bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
-        <span className={startISO ? "text-slate-900 font-medium" : "text-slate-400"}>
+      <div className="mt-4 max-w-sm mx-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm">
+        <span className={startISO ? "text-slate-900 dark:text-slate-100 font-medium" : "text-slate-400"}>
           {summary}
         </span>
       </div>
@@ -568,9 +568,9 @@ function Step2({
             type="checkbox"
             checked={halfDay}
             onChange={(e) => setHalfDay(e.target.checked)}
-            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+            className="w-4 h-4 text-blue-600 border-slate-300 dark:border-slate-500 dark:bg-slate-950 rounded focus:ring-blue-500 cursor-pointer"
           />
-          <label htmlFor="half-day-checkbox" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+          <label htmlFor="half-day-checkbox" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
             Apply as half day leave (0.5 days)
           </label>
         </div>
@@ -610,17 +610,17 @@ function Calendar({
   const today = isoDate(new Date());
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5">
       <div className="flex items-center justify-between mb-2">
         <button
           type="button"
           onClick={() => onShiftMonth(-1)}
           aria-label="Previous month"
-          className="p-1 rounded-md text-slate-600 hover:bg-slate-100"
+          className="p-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
         >
           <ChevronLeft className="w-4 h-4" aria-hidden="true" />
         </button>
-        <div className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+        <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
           <CalendarIcon className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
           {monthLabel}
         </div>
@@ -628,7 +628,7 @@ function Calendar({
           type="button"
           onClick={() => onShiftMonth(1)}
           aria-label="Next month"
-          className="p-1 rounded-md text-slate-600 hover:bg-slate-100"
+          className="p-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
         >
           <ChevronRight className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -655,14 +655,14 @@ function Calendar({
           let cls =
             "aspect-square flex items-center justify-center text-xs rounded-md transition-colors select-none";
           if (weekend || isPast) {
-            cls += " text-slate-300 cursor-not-allowed bg-slate-50";
+            cls += " text-slate-300 dark:text-slate-600 cursor-not-allowed bg-slate-50 dark:bg-slate-900";
           } else if (isStart || isEnd) {
             cls += " bg-blue-600 text-white font-semibold";
           } else if (inRange) {
-            cls += " bg-blue-100 text-blue-700";
+            cls += " bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300";
           } else {
-            cls += " text-slate-700 hover:bg-slate-100 cursor-pointer";
-            if (isToday) cls += " ring-1 ring-blue-300";
+            cls += " text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer";
+            if (isToday) cls += " ring-1 ring-blue-300 dark:ring-blue-500";
           }
 
           return (
@@ -703,12 +703,12 @@ function Step3({
   return (
     <section className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">Reason</h2>
-        <p className="text-sm text-slate-500">Optional — a short note for your manager.</p>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Reason</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Optional — a short note for your manager.</p>
       </div>
 
       <div>
-        <label htmlFor="reason" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+        <label htmlFor="reason" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
           Reason
         </label>
         <textarea
@@ -717,7 +717,7 @@ function Step3({
           onChange={(e) => setReason(e.target.value)}
           rows={4}
           placeholder="A short note for your manager…"
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-500 rounded-lg text-sm text-slate-900 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
 
@@ -751,23 +751,23 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-3 py-3 rounded-xl border border-slate-200">
+    <div className="flex items-start justify-between gap-4 px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-800">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-900">{label}</div>
-        <div className="text-xs text-slate-500">{description}</div>
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">{description}</div>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${
-          checked ? "bg-blue-600" : "bg-slate-300"
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-500 ${
+          checked ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"
         }`}
       >
         <span
           aria-hidden="true"
-          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-white shadow transition-transform ${
             checked ? "translate-x-5" : "translate-x-0.5"
           }`}
         />
@@ -810,10 +810,10 @@ function Step4({
 
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Review your request</h2>
-      <p className="text-sm text-slate-500 mb-5">Check the details before submitting.</p>
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Review your request</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Check the details before submitting.</p>
 
-      <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+      <dl className="divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         <ReviewRow label="Leave type" value={type?.name ?? "—"} />
         <ReviewRow
           label="Dates"
@@ -838,11 +838,11 @@ function Step4({
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3 bg-white">
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 shrink-0 pt-0.5">
+    <div className="flex items-start justify-between gap-4 px-4 py-3 bg-white dark:bg-slate-900">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0 pt-0.5">
         {label}
       </dt>
-      <dd className="text-sm text-slate-900 text-right break-words">{value}</dd>
+      <dd className="text-sm text-slate-900 dark:text-slate-100 text-right break-words">{value}</dd>
     </div>
   );
 }
@@ -863,19 +863,19 @@ function SuccessScreen({
   onAnother: () => void;
 }) {
   return (
-    <div className="min-h-full bg-slate-50 flex items-center justify-center px-6 py-20">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center px-6 py-20">
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 rounded-full bg-emerald-50 grid place-items-center mx-auto mb-5">
-          <CheckCircle2 className="w-8 h-8 text-emerald-500" strokeWidth={1.75} aria-hidden="true" />
+        <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-900 grid place-items-center mx-auto mb-5">
+          <CheckCircle2 className="w-8 h-8 text-emerald-500 dark:text-emerald-400" strokeWidth={1.75} aria-hidden="true" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Leave Request Submitted</h2>
-        <p className="text-sm text-slate-500 leading-relaxed mb-1">
-          Your <span className="font-semibold text-slate-800">{typeName}</span> of{" "}
-          <span className="font-semibold text-slate-800">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Leave Request Submitted</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-1">
+          Your <span className="font-semibold text-slate-800 dark:text-slate-200">{typeName}</span> of{" "}
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
             {formatDays(days)} {days === 1 ? "day" : "days"}
           </span>{" "}
-          from <span className="font-semibold text-slate-800">{fmt(startISO)}</span> to{" "}
-          <span className="font-semibold text-slate-800">{fmt(endISO ?? startISO)}</span> has been
+          from <span className="font-semibold text-slate-800 dark:text-slate-200">{fmt(startISO)}</span> to{" "}
+          <span className="font-semibold text-slate-800 dark:text-slate-200">{fmt(endISO ?? startISO)}</span> has been
           sent for approval.
         </p>
         <p className="text-xs text-slate-400 mb-8">
@@ -884,7 +884,7 @@ function SuccessScreen({
         <div className="flex items-center justify-center gap-3">
           <Link
             href="/attendance/leave"
-            className="inline-flex items-center h-11 px-5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center h-11 px-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Back to Leaves
           </Link>

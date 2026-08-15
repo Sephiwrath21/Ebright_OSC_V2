@@ -31,9 +31,9 @@ export interface ApprovalRow {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700",
-  approved: "bg-emerald-100 text-emerald-700",
-  rejected: "bg-rose-100 text-rose-700",
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200",
+  approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
+  rejected: "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-200",
 };
 
 type Filter = "pending" | "all";
@@ -63,51 +63,51 @@ export default function JustificationApprovalsView({ rows }: { rows: ApprovalRow
   }, [rows, filter, query]);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 space-y-6">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Attendance Justifications</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Attendance Justifications</span>
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Attendance Justifications</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-200">Attendance Justifications</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Review staff-submitted reasons for absent or late days.
             </p>
           </div>
           {pendingCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-sm font-semibold">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200 px-3 py-1 text-sm font-semibold">
               <ShieldCheck className="w-4 h-4" aria-hidden="true" />
               {pendingCount} pending
             </span>
           )}
         </div>
 
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-4 sm:px-6 py-4 flex flex-wrap items-center gap-2">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-4 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, emp no, branch, reason…"
-                className="h-10 w-full pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                className="h-10 w-full pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-900/40 transition-all duration-200"
               />
             </div>
-            <div className="inline-flex rounded-xl border border-slate-200 overflow-hidden">
+            <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
               {(["pending", "all"] as Filter[]).map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setFilter(f)}
                   className={`h-10 px-4 text-sm font-semibold capitalize transition-colors ${
-                    filter === f ? "bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"
+                    filter === f ? "bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   }`}
                 >
                   {f}
@@ -119,7 +119,7 @@ export default function JustificationApprovalsView({ rows }: { rows: ApprovalRow
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-100 text-sm font-semibold text-slate-700">
+                <tr className="bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <th className="text-left px-6 py-3">Employee</th>
                   <th className="text-left px-6 py-3">Date</th>
                   <th className="text-left px-6 py-3">Reason</th>
@@ -182,22 +182,22 @@ function ApprovalRowView({ row, zebra }: { row: ApprovalRow; zebra: boolean }) {
   };
 
   return (
-    <tr className={`${zebra ? "bg-slate-50/50" : "bg-white"} border-b border-slate-100 last:border-b-0 align-top`}>
+    <tr className={`${zebra ? "bg-slate-50/50 dark:bg-slate-800/50" : "bg-white dark:bg-slate-900"} border-b border-slate-100 dark:border-slate-800 last:border-b-0 align-top`}>
       <td className="px-6 py-4">
-        <div className="font-semibold text-slate-800">{row.emp_name ?? "—"}</div>
-        <div className="text-[12px] text-slate-500">
+        <div className="font-semibold text-slate-800 dark:text-slate-200">{row.emp_name ?? "—"}</div>
+        <div className="text-[12px] text-slate-500 dark:text-slate-400">
           <span className="font-mono">{row.emp_no ?? "—"}</span>
           {row.branch && <span> · {row.branch}</span>}
         </div>
         {row.source === "staff" && (
-          <span className="mt-1 inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+          <span className="mt-1 inline-flex items-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
             Self-submitted
           </span>
         )}
       </td>
-      <td className="px-6 py-4 tabular-nums text-slate-700">{row.just_date}</td>
+      <td className="px-6 py-4 tabular-nums text-slate-700 dark:text-slate-300">{row.just_date}</td>
       <td className="px-6 py-4 max-w-[320px]">
-        <p className="text-slate-700 whitespace-pre-wrap">{row.reason ?? "—"}</p>
+        <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{row.reason ?? "—"}</p>
         {row.reviewed_by && (
           <p className="mt-1 text-[11px] text-slate-400">
             {status === "approved" ? "Approved" : "Reviewed"} by {row.reviewed_by}
@@ -206,14 +206,14 @@ function ApprovalRowView({ row, zebra }: { row: ApprovalRow; zebra: boolean }) {
           </p>
         )}
         {error && (
-          <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
+          <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 dark:text-rose-400">
             <AlertCircle className="w-3 h-3" aria-hidden="true" />
             {error}
           </p>
         )}
       </td>
       <td className="px-6 py-4 text-center">
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600"}`}>
+        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
           {status}
         </span>
       </td>
@@ -225,14 +225,14 @@ function ApprovalRowView({ row, zebra }: { row: ApprovalRow; zebra: boolean }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Reason for rejection (optional)"
-                className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-rose-900/40"
               />
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => { setRejecting(false); setNote(""); }}
                   disabled={pending}
-                  className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   Cancel
                 </button>
@@ -253,7 +253,7 @@ function ApprovalRowView({ row, zebra }: { row: ApprovalRow; zebra: boolean }) {
                 type="button"
                 onClick={() => setRejecting(true)}
                 disabled={pending}
-                className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60 dark:border-slate-500 dark:text-slate-300 dark:hover:border-rose-700 dark:hover:bg-rose-900 dark:hover:text-rose-200"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
                 Reject
@@ -275,7 +275,7 @@ function ApprovalRowView({ row, zebra }: { row: ApprovalRow; zebra: boolean }) {
               type="button"
               onClick={() => submit(status === "approved" ? "reject" : "approve")}
               disabled={pending}
-              className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-60"
+              className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               {pending ? "…" : status === "approved" ? "Revoke" : "Approve"}
             </button>

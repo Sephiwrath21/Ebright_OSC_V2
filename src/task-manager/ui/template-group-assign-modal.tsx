@@ -34,7 +34,9 @@ const CADENCE_LABELS: Record<CadenceOption, string> = {
 
 function dayChipClass(active: boolean): string {
   return `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-    active ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+    active
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
   }`;
 }
 
@@ -112,16 +114,16 @@ export function TemplateGroupAssignModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3">
-          <p className="text-sm font-semibold text-gray-900">Assign &ldquo;{group.name}&rdquo;</p>
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3 dark:border-slate-800">
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Assign &ldquo;{group.name}&rdquo;</p>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             ✕
           </button>
@@ -139,7 +141,7 @@ export function TemplateGroupAssignModal({
             groupOptions={groupOptions}
           />
           {!hideCadence && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-slate-300">
               Cadence
               <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
                 {visibleCadences.map((value) => {
@@ -154,7 +156,7 @@ export function TemplateGroupAssignModal({
                       className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                         active
                           ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-400"
                       }`}
                     >
                       {CADENCE_LABELS[value]}
@@ -166,7 +168,7 @@ export function TemplateGroupAssignModal({
           )}
           {showDay && (
             <div className="max-w-md">
-              <p className="text-sm text-gray-600">Day</p>
+              <p className="text-sm text-gray-600 dark:text-slate-300">Day</p>
               <div className="mt-1 flex flex-wrap gap-2">
                 {FLOW_DAYS.map((d) => (
                   <button
@@ -182,18 +184,18 @@ export function TemplateGroupAssignModal({
               </div>
             </div>
           )}
-          <label className="max-w-xs text-sm text-gray-600">
+          <label className="max-w-xs text-sm text-gray-600 dark:text-slate-300">
             Due Date (optional)
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+              className="mt-1 w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>
         </div>
 
-        <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3">
+        <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3 dark:border-slate-800">
           <button
             type="button"
             onClick={submit}
@@ -203,7 +205,7 @@ export function TemplateGroupAssignModal({
             {pending ? "Assigning…" : "Assign"}
           </button>
           {message && (
-            <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>{message.text}</p>
+            <p className={`text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{message.text}</p>
           )}
         </div>
       </div>

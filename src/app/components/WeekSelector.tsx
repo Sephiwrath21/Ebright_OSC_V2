@@ -73,16 +73,16 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-7">
-      <h2 className="text-center text-xl font-bold tracking-wide text-slate-900 uppercase">
+    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-7">
+      <h2 className="text-center text-xl font-bold tracking-wide text-slate-900 dark:text-slate-100 uppercase">
         Select a Week
       </h2>
 
-      <div className="mt-6 flex gap-2 bg-slate-50 rounded-xl p-1.5">
-        <div className="flex-1 h-11 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm font-semibold text-slate-700">
+      <div className="mt-6 flex gap-2 bg-slate-50 dark:bg-slate-950 rounded-xl p-1.5">
+        <div className="flex-1 h-11 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-sm font-semibold text-slate-700 dark:text-slate-300">
           {format(weekStart, "dd MMM yyyy")}
         </div>
-        <div className="flex-1 h-11 rounded-lg bg-white border-2 border-blue-500 flex items-center justify-center text-sm font-semibold text-slate-900 shadow-sm shadow-blue-100">
+        <div className="flex-1 h-11 rounded-lg bg-white dark:bg-slate-900 border-2 border-blue-500 flex items-center justify-center text-sm font-semibold text-slate-900 dark:text-slate-100 shadow-sm shadow-blue-100">
           {format(weekEnd, "dd MMM yyyy")}
         </div>
       </div>
@@ -91,7 +91,7 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
         <button
           type="button"
           onClick={() => setViewDate(addMonths(viewDate, -1))}
-          className="w-9 h-9 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
           aria-label="Previous month"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -102,7 +102,7 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
             <select
               value={viewDate.getMonth()}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="appearance-none bg-transparent text-sm font-semibold text-slate-800 pr-1 pl-1 py-1.5 cursor-pointer focus:outline-none"
+              className="appearance-none bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-200 pr-1 pl-1 py-1.5 cursor-pointer focus:outline-none"
             >
               {MONTHS.map((m, i) => (
                 <option key={m} value={i}>{m}</option>
@@ -113,7 +113,7 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
             <select
               value={viewDate.getFullYear()}
               onChange={(e) => setYear(Number(e.target.value))}
-              className="appearance-none bg-transparent text-sm font-semibold text-slate-800 pr-1 pl-1 py-1.5 cursor-pointer focus:outline-none"
+              className="appearance-none bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-200 pr-1 pl-1 py-1.5 cursor-pointer focus:outline-none"
             >
               {yearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -125,7 +125,7 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
         <button
           type="button"
           onClick={() => setViewDate(addMonths(viewDate, 1))}
-          className="w-9 h-9 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
           aria-label="Next month"
         >
           <ChevronRight className="w-4 h-4" />
@@ -162,13 +162,13 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
                 cellStyle.borderBottomRightRadius = "9999px";
               }
             } else if (!inMonth) {
-              cellCls += " text-slate-300 hover:text-slate-400";
+              cellCls += " text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-400";
               cellStyle.borderRadius = "9999px";
             } else if (dow === 5 || dow === 6) {
-              cellCls += " text-orange-500 hover:bg-orange-50 font-medium";
+              cellCls += " text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900 font-medium";
               cellStyle.borderRadius = "9999px";
             } else {
-              cellCls += " text-slate-700 hover:bg-slate-100 font-medium";
+              cellCls += " text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium";
               cellStyle.borderRadius = "9999px";
             }
 
@@ -205,9 +205,9 @@ export default function WeekSelector({ onConfirm }: WeekSelectorProps) {
 
 function DropdownPill({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative inline-flex items-center gap-1 px-2 rounded-lg hover:bg-slate-50 transition-colors">
+    <div className="relative inline-flex items-center gap-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
       {children}
-      <ChevronDown className="w-3.5 h-3.5 text-slate-500 pointer-events-none flex-shrink-0" />
+      <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 pointer-events-none flex-shrink-0" />
     </div>
   );
 }

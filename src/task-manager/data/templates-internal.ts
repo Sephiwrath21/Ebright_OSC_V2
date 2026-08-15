@@ -310,6 +310,7 @@ export async function editTaskTemplateCore(
           cadence: parent.cadence,
           parentId: parent.id,
           templateId: id,
+          categoryId: parent.categoryId,
           subtaskOrder: subtaskIndex,
           runItems: {
             create: parent.runItems.map((it) => ({

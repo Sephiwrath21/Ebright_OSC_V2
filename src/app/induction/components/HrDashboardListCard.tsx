@@ -37,79 +37,79 @@ interface AccentTheme {
 
 const THEMES: Record<DashboardCardAccent, AccentTheme> = {
   emerald: {
-    border: "border-slate-200",
-    titleText: "text-emerald-700",
-    labelText: "text-slate-500",
-    totalText: "text-emerald-700",
-    totalBg: "bg-emerald-50",
-    totalBorder: "border-emerald-200",
+    border: "border-slate-200 dark:border-slate-800",
+    titleText: "text-emerald-700 dark:text-emerald-300",
+    labelText: "text-slate-500 dark:text-slate-400",
+    totalText: "text-emerald-700 dark:text-emerald-300",
+    totalBg: "bg-emerald-50 dark:bg-emerald-900",
+    totalBorder: "border-emerald-200 dark:border-emerald-700",
     rowAccentBar: "before:bg-emerald-500",
-    rowAccentBg: "bg-emerald-50/50",
-    chipBg: "bg-emerald-50",
-    chipText: "text-emerald-700",
-    chipBorder: "border-emerald-200",
-    footer: "text-emerald-600 hover:text-emerald-800",
-    hoverRow: "hover:bg-emerald-50/30",
+    rowAccentBg: "bg-emerald-50/50 dark:bg-emerald-900/30",
+    chipBg: "bg-emerald-50 dark:bg-emerald-900",
+    chipText: "text-emerald-700 dark:text-emerald-300",
+    chipBorder: "border-emerald-200 dark:border-emerald-700",
+    footer: "text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300",
+    hoverRow: "hover:bg-emerald-50/30 dark:hover:bg-emerald-900/30",
   },
   rose: {
-    border: "border-slate-200",
-    titleText: "text-rose-700",
-    labelText: "text-slate-500",
-    totalText: "text-rose-700",
-    totalBg: "bg-rose-50",
-    totalBorder: "border-rose-200",
+    border: "border-slate-200 dark:border-slate-800",
+    titleText: "text-rose-700 dark:text-rose-300",
+    labelText: "text-slate-500 dark:text-slate-400",
+    totalText: "text-rose-700 dark:text-rose-300",
+    totalBg: "bg-rose-50 dark:bg-rose-900",
+    totalBorder: "border-rose-200 dark:border-rose-700",
     rowAccentBar: "before:bg-rose-500",
-    rowAccentBg: "bg-rose-50/50",
-    chipBg: "bg-rose-50",
-    chipText: "text-rose-700",
-    chipBorder: "border-rose-200",
-    footer: "text-rose-600 hover:text-rose-800",
-    hoverRow: "hover:bg-rose-50/30",
+    rowAccentBg: "bg-rose-50/50 dark:bg-rose-900/30",
+    chipBg: "bg-rose-50 dark:bg-rose-900",
+    chipText: "text-rose-700 dark:text-rose-300",
+    chipBorder: "border-rose-200 dark:border-rose-700",
+    footer: "text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300",
+    hoverRow: "hover:bg-rose-50/30 dark:hover:bg-rose-900/30",
   },
   violet: {
-    border: "border-slate-200",
-    titleText: "text-violet-700",
-    labelText: "text-slate-500",
-    totalText: "text-violet-700",
-    totalBg: "bg-violet-50",
-    totalBorder: "border-violet-200",
+    border: "border-slate-200 dark:border-slate-800",
+    titleText: "text-violet-700 dark:text-violet-300",
+    labelText: "text-slate-500 dark:text-slate-400",
+    totalText: "text-violet-700 dark:text-violet-300",
+    totalBg: "bg-violet-50 dark:bg-violet-900",
+    totalBorder: "border-violet-200 dark:border-violet-700",
     rowAccentBar: "before:bg-violet-500",
-    rowAccentBg: "bg-violet-50/50",
-    chipBg: "bg-violet-50",
-    chipText: "text-violet-700",
-    chipBorder: "border-violet-200",
-    footer: "text-violet-600 hover:text-violet-800",
-    hoverRow: "hover:bg-violet-50/30",
+    rowAccentBg: "bg-violet-50/50 dark:bg-violet-900/30",
+    chipBg: "bg-violet-50 dark:bg-violet-900",
+    chipText: "text-violet-700 dark:text-violet-300",
+    chipBorder: "border-violet-200 dark:border-violet-700",
+    footer: "text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-300",
+    hoverRow: "hover:bg-violet-50/30 dark:hover:bg-violet-900/30",
   },
   amber: {
-    border: "border-slate-200",
-    titleText: "text-amber-700",
-    labelText: "text-slate-500",
-    totalText: "text-amber-700",
-    totalBg: "bg-amber-50",
-    totalBorder: "border-amber-200",
+    border: "border-slate-200 dark:border-slate-800",
+    titleText: "text-amber-700 dark:text-amber-300",
+    labelText: "text-slate-500 dark:text-slate-400",
+    totalText: "text-amber-700 dark:text-amber-300",
+    totalBg: "bg-amber-50 dark:bg-amber-900",
+    totalBorder: "border-amber-200 dark:border-amber-700",
     rowAccentBar: "before:bg-amber-500",
-    rowAccentBg: "bg-amber-50/50",
-    chipBg: "bg-amber-50",
-    chipText: "text-amber-700",
-    chipBorder: "border-amber-200",
-    footer: "text-amber-600 hover:text-amber-800",
-    hoverRow: "hover:bg-amber-50/30",
+    rowAccentBg: "bg-amber-50/50 dark:bg-amber-900/30",
+    chipBg: "bg-amber-50 dark:bg-amber-900",
+    chipText: "text-amber-700 dark:text-amber-300",
+    chipBorder: "border-amber-200 dark:border-amber-700",
+    footer: "text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300",
+    hoverRow: "hover:bg-amber-50/30 dark:hover:bg-amber-900/30",
   },
   sky: {
-    border: "border-slate-200",
-    titleText: "text-sky-700",
-    labelText: "text-slate-500",
-    totalText: "text-sky-700",
-    totalBg: "bg-sky-50",
-    totalBorder: "border-sky-200",
+    border: "border-slate-200 dark:border-slate-800",
+    titleText: "text-sky-700 dark:text-sky-300",
+    labelText: "text-slate-500 dark:text-slate-400",
+    totalText: "text-sky-700 dark:text-sky-300",
+    totalBg: "bg-sky-50 dark:bg-sky-900",
+    totalBorder: "border-sky-200 dark:border-sky-700",
     rowAccentBar: "before:bg-sky-500",
-    rowAccentBg: "bg-sky-50/50",
-    chipBg: "bg-sky-50",
-    chipText: "text-sky-700",
-    chipBorder: "border-sky-200",
-    footer: "text-sky-600 hover:text-sky-800",
-    hoverRow: "hover:bg-sky-50/30",
+    rowAccentBg: "bg-sky-50/50 dark:bg-sky-900/30",
+    chipBg: "bg-sky-50 dark:bg-sky-900",
+    chipText: "text-sky-700 dark:text-sky-300",
+    chipBorder: "border-sky-200 dark:border-sky-700",
+    footer: "text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300",
+    hoverRow: "hover:bg-sky-50/30 dark:hover:bg-sky-900/30",
   },
 };
 
@@ -162,9 +162,9 @@ export function HrDashboardListCard({
   const t = THEMES[accent];
   const totalLabel = viewAllLabel ?? `View All ${items.length} Records`;
   return (
-    <div className={`bg-white rounded-2xl border ${t.border} shadow-sm overflow-hidden flex flex-col max-h-[400px]`}>
+    <div className={`bg-white dark:bg-slate-900 rounded-2xl border ${t.border} shadow-sm overflow-hidden flex flex-col max-h-[400px]`}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-slate-100">
+      <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-slate-100 dark:border-slate-800">
         <div className="min-w-0">
           <h3 className={`text-sm font-extrabold uppercase tracking-wider ${t.titleText}`}>
             {title}
@@ -193,7 +193,7 @@ export function HrDashboardListCard({
                 key={i}
                 className="inline-flex flex-col items-center justify-center min-w-[32px] px-1.5 py-1"
               >
-                <span className="text-sm font-bold leading-none tabular-nums text-slate-800">
+                <span className="text-sm font-bold leading-none tabular-nums text-slate-800 dark:text-slate-200">
                   {s.value}
                 </span>
                 <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">
@@ -206,7 +206,7 @@ export function HrDashboardListCard({
       </div>
 
       {/* Items list — scrollable */}
-      <ul className="flex-1 overflow-y-auto divide-y divide-slate-100">
+      <ul className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
         {items.length === 0 ? (
           <li className="px-5 py-8 text-center text-xs font-medium italic text-slate-400">
             {emptyText}
@@ -219,7 +219,7 @@ export function HrDashboardListCard({
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[13px] font-bold text-slate-900 truncate">
+                  <span className="text-[13px] font-bold text-slate-900 dark:text-slate-100 truncate">
                     {row.name}
                   </span>
                   {row.statusChip && (
@@ -229,7 +229,7 @@ export function HrDashboardListCard({
                   )}
                 </div>
                 {row.meta && (
-                  <p className="mt-0.5 text-[11px] font-medium text-slate-500 truncate">
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
                     {row.meta}
                   </p>
                 )}
@@ -237,7 +237,7 @@ export function HrDashboardListCard({
               {(row.date || row.relative) && (
                 <div className="text-right shrink-0">
                   {row.date && (
-                    <p className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+                    <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {row.date}
                     </p>
                   )}
@@ -257,7 +257,7 @@ export function HrDashboardListCard({
       {viewAllHref && items.length > 0 && (
         <Link
           href={viewAllHref}
-          className={`border-t border-slate-100 px-5 py-2.5 text-center text-xs font-bold tracking-wide ${t.footer} transition-colors`}
+          className={`border-t border-slate-100 dark:border-slate-800 px-5 py-2.5 text-center text-xs font-bold tracking-wide ${t.footer} transition-colors`}
         >
           {totalLabel} →
         </Link>

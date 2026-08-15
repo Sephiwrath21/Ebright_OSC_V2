@@ -163,10 +163,10 @@ export function NavigationBlockerProvider({ children }: { children: React.ReactN
             }}
           >
             <div
-              className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center"
+              className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-sm text-[#4b4949] mb-[22px]">
+              <p className="text-sm text-[#4b4949] dark:text-slate-300 mb-[22px]">
                 You have unsaved changes on this page. Save them before leaving, or discard them?
               </p>
               <div className="flex flex-col gap-2">
@@ -183,7 +183,7 @@ export function NavigationBlockerProvider({ children }: { children: React.ReactN
                   type="button"
                   disabled={saving}
                   onClick={handleDiscardAndGo}
-                  className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/25 hover:bg-[#f0f4fa] transition-colors disabled:opacity-50"
+                  className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-300 bg-white dark:bg-slate-900 border-2 border-black/25 dark:border-white/20 hover:bg-[#f0f4fa] dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
                   Discard
                 </button>

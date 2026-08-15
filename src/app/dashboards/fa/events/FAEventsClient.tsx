@@ -126,11 +126,11 @@ const STATUS_FILTERS: { label: string; value: EventStatus | "all" }[] = [
 ];
 
 const STATUS_STYLES: Record<EventStatus, { dot: string; text: string; bg: string }> = {
-  draft:     { dot: "bg-slate-400",  text: "text-slate-600",  bg: "bg-slate-100"  },
-  open:      { dot: "bg-blue-500",   text: "text-blue-700",   bg: "bg-blue-50"    },
-  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700",   bg: "bg-teal-50"    },
-  closed:    { dot: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50"   },
-  completed: { dot: "bg-green-500",  text: "text-green-700",  bg: "bg-green-50"   },
+  draft:     { dot: "bg-slate-400",  text: "text-slate-600 dark:text-slate-300",  bg: "bg-slate-100 dark:bg-slate-800"  },
+  open:      { dot: "bg-blue-500",   text: "text-blue-700 dark:text-blue-300",   bg: "bg-blue-50 dark:bg-blue-900"    },
+  ongoing:   { dot: "bg-teal-500",   text: "text-teal-700 dark:text-teal-300",   bg: "bg-teal-50 dark:bg-teal-900"    },
+  closed:    { dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 dark:bg-amber-900"   },
+  completed: { dot: "bg-green-500",  text: "text-green-700 dark:text-green-300",  bg: "bg-green-50 dark:bg-green-900"   },
 };
 
 function StatusBadge({ status }: { status: EventStatus }) {
@@ -226,10 +226,10 @@ function HoverPreview({ children, preview, width = 320 }: {
                                    "center top";
 
   const arrowStyle: CSSProperties | null = !coords ? null :
-    coords.placement === "right" ? { left: 0, top: "50%", transform: "translate(-50%,-50%) rotate(45deg)", borderLeft: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" } :
-    coords.placement === "left"  ? { right: 0, top: "50%", transform: "translate(50%,-50%) rotate(45deg)", borderTop: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0" } :
-    coords.placement === "above" ? { left: "50%", bottom: 0, transform: "translate(-50%,50%) rotate(45deg)", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" } :
-                                   { left: "50%", top: 0, transform: "translate(-50%,-50%) rotate(45deg)", borderTop: "1px solid #e2e8f0", borderLeft: "1px solid #e2e8f0" };
+    coords.placement === "right" ? { left: 0, top: "50%", transform: "translate(-50%,-50%) rotate(45deg)", borderLeft: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)" } :
+    coords.placement === "left"  ? { right: 0, top: "50%", transform: "translate(50%,-50%) rotate(45deg)", borderTop: "1px solid var(--border-subtle)", borderRight: "1px solid var(--border-subtle)" } :
+    coords.placement === "above" ? { left: "50%", bottom: 0, transform: "translate(-50%,50%) rotate(45deg)", borderRight: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)" } :
+                                   { left: "50%", top: 0, transform: "translate(-50%,-50%) rotate(45deg)", borderTop: "1px solid var(--border-subtle)", borderLeft: "1px solid var(--border-subtle)" };
 
   return (
     <>
@@ -254,7 +254,7 @@ function HoverPreview({ children, preview, width = 320 }: {
           role="tooltip"
         >
           {arrowStyle && (
-            <div className="absolute bg-white" style={{ width: 10, height: 10, ...arrowStyle }} />
+            <div className="absolute bg-white dark:bg-slate-900" style={{ width: 10, height: 10, ...arrowStyle }} />
           )}
           {preview}
         </div>,
@@ -287,7 +287,7 @@ function EventPopover({ event }: { event: FAEvent }) {
 
   return (
     <div
-      className="bg-white border border-slate-200 rounded-2xl p-5"
+      className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 border border-slate-200 dark:border-slate-800 rounded-2xl p-5"
       style={{ boxShadow: "0 20px 40px -12px rgba(15,23,42,0.18), 0 4px 12px -4px rgba(15,23,42,0.08)" }}
     >
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -297,14 +297,14 @@ function EventPopover({ event }: { event: FAEvent }) {
         </span>
       </div>
 
-      <h3 className="text-base font-semibold text-slate-900 mb-3 leading-snug">{event.name}</h3>
+      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3 leading-snug">{event.name}</h3>
 
-      <div className="border-t border-slate-100 mb-3" />
+      <div className="border-t border-slate-100 dark:border-slate-800 mb-3" />
 
       <div className="space-y-2.5 mb-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">When</p>
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
             {event.startDate === event.endDate
               ? event.startDate
               : `${event.startDate} – ${event.endDate}`} · {event.days} {event.days === 1 ? "day" : "days"}
@@ -312,31 +312,31 @@ function EventPopover({ event }: { event: FAEvent }) {
         </div>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Venue</p>
-          <p className="text-sm text-slate-700">{event.venue}</p>
+          <p className="text-sm text-slate-700 dark:text-slate-300">{event.venue}</p>
         </div>
         {event.invitationOpen && event.invitationClose && (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
               Invitation Window
             </p>
-            <p className="text-sm text-slate-700 font-mono">
+            <p className="text-sm text-slate-700 dark:text-slate-300 font-mono">
               {event.invitationOpen} → {event.invitationClose}
             </p>
           </div>
         )}
       </div>
 
-      <div className="border-t border-slate-100 pt-3 grid grid-cols-3 divide-x divide-slate-100">
+      <div className="border-t border-slate-100 dark:border-slate-800 pt-3 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800">
         <div className="text-center pr-3">
-          <div className="text-xl font-bold text-slate-800 leading-none">{event.sessions}</div>
+          <div className="text-xl font-bold text-slate-800 dark:text-slate-200 leading-none">{event.sessions}</div>
           <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Sessions</div>
         </div>
         <div className="text-center px-3">
-          <div className="text-xl font-bold text-slate-800 leading-none">{event.invited}</div>
+          <div className="text-xl font-bold text-slate-800 dark:text-slate-200 leading-none">{event.invited}</div>
           <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Invited</div>
         </div>
         <div className="text-center pl-3">
-          <div className={`text-xl font-bold leading-none ${event.confirmed > 0 ? "text-green-600" : "text-slate-800"}`}>
+          <div className={`text-xl font-bold leading-none ${event.confirmed > 0 ? "text-green-600 dark:text-green-400" : "text-slate-800 dark:text-slate-200"}`}>
             {event.confirmed}
           </div>
           <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">Confirmed</div>
@@ -351,36 +351,36 @@ function EventCard({ event, featured = false }: { event: FAEvent; featured?: boo
     <HoverPreview preview={<EventPopover event={event} />}>
     <Link
       href={`/dashboards/fa/events/${event.id}`}
-      className={`flex gap-5 items-center bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all ${featured ? "shadow-sm" : ""}`}
+      className={`flex gap-5 items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all ${featured ? "shadow-sm" : ""}`}
     >
       <div className="flex flex-col items-center justify-center min-w-[56px] text-center">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider leading-none">
           {event.month}
         </span>
-        <span className={`font-bold leading-none mt-0.5 ${featured ? "text-5xl text-slate-900" : "text-3xl text-slate-800"}`}>
+        <span className={`font-bold leading-none mt-0.5 ${featured ? "text-5xl text-slate-900 dark:text-slate-100" : "text-3xl text-slate-800 dark:text-slate-200"}`}>
           {event.day}
         </span>
         <span className="text-xs text-slate-400 mt-0.5">{event.year}</span>
       </div>
 
-      <div className="w-px h-full self-stretch bg-slate-200 shrink-0" />
+      <div className="w-px h-full self-stretch bg-slate-200 dark:bg-slate-800 shrink-0" />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <StatusBadge status={event.status} />
             {event.multiGrade && (
-              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <Key className="w-3 h-3" />
                 Multi-grade
               </span>
             )}
           </div>
         </div>
-        <h3 className={`font-semibold text-slate-900 mt-2 ${featured ? "text-xl" : "text-base"}`}>
+        <h3 className={`font-semibold text-slate-900 dark:text-slate-100 mt-2 ${featured ? "text-xl" : "text-base"}`}>
           {event.name}
         </h3>
-        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-1.5 text-sm text-slate-500">
+        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-1.5 text-sm text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1.5">
             <CalendarDays className="w-3.5 h-3.5 shrink-0" />
             {event.startDate === event.endDate
@@ -396,9 +396,9 @@ function EventCard({ event, featured = false }: { event: FAEvent; featured?: boo
 
       <div className="hidden sm:flex items-center gap-6 shrink-0">
         <Stat label="Sessions" value={event.sessions} />
-        <div className="w-px h-8 bg-slate-200" />
+        <div className="w-px h-8 bg-slate-200 dark:bg-slate-800" />
         <Stat label="Invited" value={event.invited} />
-        <div className="w-px h-8 bg-slate-200" />
+        <div className="w-px h-8 bg-slate-200 dark:bg-slate-800" />
         <Stat label="Confirmed" value={event.confirmed} highlight={event.confirmed > 0} />
       </div>
     </Link>
@@ -409,7 +409,7 @@ function EventCard({ event, featured = false }: { event: FAEvent; featured?: boo
 function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
     <div className="text-center">
-      <div className={`text-2xl font-bold leading-none ${highlight ? "text-green-600" : "text-slate-800"}`}>
+      <div className={`text-2xl font-bold leading-none ${highlight ? "text-green-600 dark:text-green-400" : "text-slate-800 dark:text-slate-200"}`}>
         {value}
       </div>
       <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">{label}</div>
@@ -422,22 +422,22 @@ function ArchiveRow({ event }: { event: FAEvent }) {
     <HoverPreview preview={<EventPopover event={event} />}>
     <Link
       href={`/dashboards/fa/events/${event.id}`}
-      className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors group rounded-xl"
+      className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group rounded-xl"
     >
       <span className="text-sm text-slate-400 w-28 shrink-0">{event.archiveDate}</span>
 
-      <span className="flex-1 text-sm font-medium text-slate-700 group-hover:text-slate-900 truncate">
+      <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 truncate">
         {event.name}
       </span>
 
       <div className="hidden sm:flex items-center gap-5 shrink-0">
         <StatusBadge status={event.status} />
-        <span className="text-sm text-slate-500 w-20 text-right">{event.sessions} sessions</span>
-        <span className="text-sm text-slate-500 w-20 text-right">{event.invited} invited</span>
-        <span className={`text-sm font-medium w-24 text-right ${event.confirmed > 0 ? "text-green-600" : "text-slate-400"}`}>
+        <span className="text-sm text-slate-500 dark:text-slate-400 w-20 text-right">{event.sessions} sessions</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400 w-20 text-right">{event.invited} invited</span>
+        <span className={`text-sm font-medium w-24 text-right ${event.confirmed > 0 ? "text-green-600 dark:text-green-400" : "text-slate-400"}`}>
           {event.confirmed} confirmed
         </span>
-        <span className={`text-sm font-medium w-22 text-right ${(event.attended ?? 0) > 0 ? "text-violet-600" : "text-slate-400"}`}>
+        <span className={`text-sm font-medium w-22 text-right ${(event.attended ?? 0) > 0 ? "text-violet-600 dark:text-violet-400" : "text-slate-400"}`}>
           {event.attended ?? 0} attended
         </span>
       </div>
@@ -504,28 +504,28 @@ export default function FAEventsClient() {
   const [nextEvent, ...upcoming] = filteredActive;
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <Link href="/dashboards/fa" className="hover:text-slate-900 transition-colors">FA System</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-          <span className="text-slate-800 font-medium">Events</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <Link href="/dashboards/fa" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">FA System</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium">Events</span>
         </nav>
 
         {/* Page header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">FA Events</h1>
+          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">FA Events</h1>
           <button
             type="button"
             onClick={() => router.push("/dashboards/fa/events/new")}
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
             New event
@@ -534,7 +534,7 @@ export default function FAEventsClient() {
       </div>
 
       {/* Sticky search + filters bar */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200/80 dark:border-slate-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative">
@@ -544,11 +544,11 @@ export default function FAEventsClient() {
                 placeholder="Search events or venues..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+                className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1">
               {STATUS_FILTERS.map((f) => (
                 <button
                   key={f.value}
@@ -557,7 +557,7 @@ export default function FAEventsClient() {
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     statusFilter === f.value
                       ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
                   {f.label}
@@ -569,7 +569,7 @@ export default function FAEventsClient() {
           {multiGradeCount > 0 && (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors uppercase tracking-wide shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-slate-300 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors uppercase tracking-wide shrink-0"
             >
               <Key className="w-3.5 h-3.5" />
               Multi-grade
@@ -583,23 +583,23 @@ export default function FAEventsClient() {
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10">
         {loading && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center text-center mb-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-16 flex flex-col items-center text-center mb-6">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin mb-3" />
-            <p className="text-sm text-slate-500">Loading events…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading events…</p>
           </div>
         )}
         {error && !loading && (
-          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center mb-6">
-            <p className="text-sm font-medium text-red-600">{error}</p>
+          <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900 rounded-2xl p-8 text-center mb-6">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
         {/* Active events list */}
         {!loading && !error && statusFilter !== "completed" && (
           <>
             {filteredActive.length === 0 && statusFilter !== "all" ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-                <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />
-                <p className="text-sm font-medium text-slate-500">No events match your filters.</p>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center text-center">
+                <CalendarDays className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No events match your filters.</p>
               </div>
             ) : (
               <>
@@ -635,7 +635,7 @@ export default function FAEventsClient() {
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
               Archive
             </p>
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
               {filteredArchive.map((e) => (
                 <ArchiveRow key={e.id} event={e} />
               ))}
@@ -645,9 +645,9 @@ export default function FAEventsClient() {
 
         {/* Empty state when completed filter + no archive results */}
         {!loading && !error && statusFilter === "completed" && filteredArchive.length === 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center text-center">
-            <CalendarDays className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-medium text-slate-500">No completed events match your search.</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center text-center">
+            <CalendarDays className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No completed events match your search.</p>
           </div>
         )}
       </div>

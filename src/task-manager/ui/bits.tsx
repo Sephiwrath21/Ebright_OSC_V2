@@ -1338,6 +1338,11 @@ export function TaskRowLine({
   selected,
   onToggleSelect,
   tree,
+  hideDueDate,
+  blankDueDate,
+  hideStatusChip,
+  hideAssignee,
+  reassign,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -1382,11 +1387,44 @@ export function TaskRowLine({
     | { kind: "parent"; count: number; expanded: boolean; onToggle: () => void }
     | { kind: "flat" }
     | { kind: "child" };
+  /** Suppress the Due Date display entirely, both the fixed hideCompleted
+   *  column and the free-form badge (2026-08-13, EntityCardOverview's card
+   *  rows — a plain checklist shouldn't show a due-date column). */
+  hideDueDate?: boolean;
+  /** Keep the fixed-width Due Date column (and its header, rendered by the
+   *  caller) but show no date value in it — a blank cell, not even a dash
+   *  (2026-08-15, EntityCardOverview's Daily section: the date is implied
+   *  by the section itself, so showing it per-row is redundant, but the
+   *  column still needs to reserve its width for the header above to align
+   *  with). Distinct from hideDueDate, which drops the column entirely
+   *  (used where there's no Due Date header at all). Ignored when
+   *  hideDueDate is also set (that one wins — no column, nothing to blank). */
+  blankDueDate?: boolean;
+  /** Suppress the status text badge (Completed/Pending/In progress/etc.) —
+   *  only relevant outside hideCompleted mode, which never renders it
+   *  anyway (2026-08-13, same EntityCardOverview motivation as
+   *  hideDueDate). */
+  hideStatusChip?: boolean;
+  /** Suppress the Assignee column entirely (2026-08-15, EntityCardOverview's
+   *  card rows) — only relevant in hideCompleted mode, which is the only
+   *  mode that renders it at all. Every row in one of these cards is
+   *  already the CARD's owner's own task, so an "assigned by" column is
+   *  redundant with the card header. */
+  hideAssignee?: boolean;
+  /** "Assign to Others" self-service handoff (2026-08-13): when provided
+   *  and this row is the viewer's own pending task, renders a trigger that
+   *  opens the same inline ReassignPicker the manager-oversight
+   *  EntityDrillModal already uses. reassignFlowTask itself re-checks
+   *  authorization (self-service is scoped server-side to same department/
+   *  branch) — this prop only controls whether the trigger renders. */
+  reassign?: ReassignControl;
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedDueDay(task);
+  const canReassign = Boolean(reassign) && isOwned && task.status !== "DONE" && task.status !== "SKIPPED";
+  const [reassignOpen, setReassignOpen] = React.useState(false);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1403,6 +1441,7 @@ export function TaskRowLine({
         : nameWidth;
 
   return (
+    <div>
     <div
       className={`group flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
         hideCompleted && (task.status === "DONE" || task.status === "SKIPPED") ? "opacity-60" : ""
@@ -1477,7 +1516,7 @@ export function TaskRowLine({
       >
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
-            className={`min-w-0 truncate text-sm font-semibold ${
+            className={`min-w-0 text-sm font-semibold ${
               task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
             }`}
           >
@@ -1498,11 +1537,6 @@ export function TaskRowLine({
             <GuidelineIndicator guideline={task.guideline} title={task.blockTitle} />
           )}
         </div>
-        {!hideCompleted && (
-          <p className="truncate pr-2 text-xs text-gray-500">
-            {task.runName} · {task.flowName}
-          </p>
-        )}
         {onResizeStart && (
           <div
             onPointerDown={onResizeStart}
@@ -1524,7 +1558,7 @@ export function TaskRowLine({
       {/* "Assignee" column (2026-07-30) — personal My Tasks lists only
           (hideCompleted mode). Plain name only — the column header gives
           the context, so no per-row prefix. */}
-      {hideCompleted && (
+      {hideCompleted && !hideAssignee && (
         <span
           className={`truncate text-xs text-gray-500 ${
             assignerWidth === undefined ? "min-w-0 flex-1" : "shrink-0"
@@ -1536,34 +1570,151 @@ export function TaskRowLine({
       )}
       {/* Due Date: in table mode a FIXED column (constant width/position,
           always rendered — dash when no due date); outside the table the
-          original content-sized badge. */}
-      {hideCompleted ? (
-        <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
-          {dueDisplay ? (
-            <span className={dueDisplay.className}>{dueDisplay.text}</span>
-          ) : (
-            <span className="text-gray-300">—</span>
-          )}
-        </span>
-      ) : (
-        dueDisplay && (
-          <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
-        )
+          original content-sized badge. Suppressed entirely by hideDueDate
+          (2026-08-13, EntityCardOverview's plain-checklist cards). Value
+          blanked by blankDueDate instead (2026-08-15, same caller's Daily
+          section — a date filter already sits at the top of the page, so a
+          per-row date is redundant there): in hideCompleted mode the fixed-
+          width cell stays (empty) for column/header alignment; in the
+          free-form-badge mode (read-only OTHER-person cards, 2026-08-15
+          fix — this branch was missed the first time blankDueDate was
+          added, so those cards kept showing the badge) there's no column
+          to preserve, so the badge just doesn't render at all. */}
+      {!hideDueDate &&
+        !blankDueDate &&
+        (hideCompleted ? (
+          <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+            {dueDisplay ? (
+              <span className={dueDisplay.className}>{dueDisplay.text}</span>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )}
+          </span>
+        ) : (
+          dueDisplay && (
+            <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+          )
+        ))}
+      {!hideDueDate && blankDueDate && hideCompleted && (
+        <span className="shrink-0" style={{ width: DUE_COL_WIDTH }} aria-hidden />
       )}
-      {!hideCompleted && <StatusChip status={task.status} />}
+      {!hideCompleted && !hideStatusChip && <StatusChip status={task.status} />}
+      {canReassign && (
+        <button
+          type="button"
+          onClick={() => setReassignOpen((o) => !o)}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            reassignOpen
+              ? "border-blue-400 bg-blue-50 text-blue-700"
+              : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+          }`}
+        >
+          Assign to Others
+        </button>
+      )}
+    </div>
+    {canReassign && reassign && reassignOpen && (
+      <ReassignPicker
+        staff={reassign.staff}
+        currentAssigneeId={task.assigneeId}
+        onPick={async (userId) => {
+          const r = await reassign.action(task.runBlockId, userId);
+          if (r.ok) setReassignOpen(false);
+          return r;
+        }}
+      />
+    )}
     </div>
   );
 }
 
-const RESIZABLE_TASK_NAME_MIN = 120;
-const RESIZABLE_TASK_NAME_MAX = 480;
-const RESIZABLE_TASK_NAME_DEFAULT = 220;
+/** Exported (2026-08-15) — EntityCardOverview's card tables reuse the same
+ *  min/max/default the "My Tasks" page's Task column already uses. */
+export const RESIZABLE_TASK_NAME_MIN = 120;
+export const RESIZABLE_TASK_NAME_MAX = 480;
+export const RESIZABLE_TASK_NAME_DEFAULT = 220;
+
+/** Drag-to-resize mechanic for a table's Task/Name column (2026-08-15,
+ *  extracted from ResizableTaskList below so EntityCardOverview's card
+ *  tables can reuse the identical mechanism instead of reimplementing it).
+ *  Writes the width DIRECTLY to a CSS variable on `containerRef`'s node
+ *  during the drag — zero React re-renders per pointer move, which is what
+ *  keeps dragging smooth (re-rendering every row on every pixel of
+ *  movement is what made an earlier version visibly lag) — and commits to
+ *  React state (so later re-renders keep it) only once, on pointerup.
+ *
+ *  `storageKey` is optional: omit it for ResizableTaskList's original
+ *  behavior (resets to `defaultWidth` every mount, unchanged by this
+ *  extraction). Pass one to persist the chosen width in localStorage,
+ *  restored on the next visit. Hydration-safe the same way
+ *  EntityCardOverview's onlyMe persistence is: `widthPx` starts at
+ *  `defaultWidth` on BOTH the server and the client's first render (never
+ *  reading localStorage in the initializer), and the stored value is
+ *  applied in an effect that only ever runs client-side after hydration
+ *  has already reconciled — so there's nothing for React to catch a
+ *  mismatch on. */
+export function useResizableColumn({
+  cssVar,
+  defaultWidth,
+  min,
+  max,
+  storageKey,
+}: {
+  cssVar: string;
+  defaultWidth: number;
+  min: number;
+  max: number;
+  storageKey?: string;
+}) {
+  const [widthPx, setWidthPx] = React.useState(defaultWidth);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!storageKey) return;
+    const stored = Number(window.localStorage.getItem(storageKey));
+    if (Number.isFinite(stored) && stored >= min && stored <= max) setWidthPx(stored);
+    // Deliberately storageKey/min/max only — re-syncing on every
+    // defaultWidth/render would stomp an in-progress local drag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, min, max]);
+
+  const containerStyle = { [cssVar]: `${widthPx}px` } as React.CSSProperties;
+
+  const onResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragRef.current = { x: e.clientX, width: widthPx, latest: widthPx };
+    const onMove = (ev: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const next = Math.min(max, Math.max(min, drag.width + (ev.clientX - drag.x)));
+      drag.latest = next;
+      containerRef.current?.style.setProperty(cssVar, `${next}px`);
+    };
+    const onUp = () => {
+      const drag = dragRef.current;
+      dragRef.current = null;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      if (!drag) return;
+      setWidthPx(drag.latest);
+      if (storageKey) window.localStorage.setItem(storageKey, String(drag.latest));
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  };
+
+  return { containerRef, containerStyle, onResizeStart };
+}
 
 /** Fixed widths for the non-resizable My Tasks columns (2026-07-30 final:
  *  ONLY Task is draggable — long names are the one thing worth revealing;
  *  Proof / Assigned by / Due date keep constant size, no handles). Proof
- *  is 96px so its two-line "Proof of Completion" header label fits. */
-const PROOF_COL_WIDTH = 96;
+ *  is 96px so its two-line "Proof of Completion" header label fits.
+ *  Exported (2026-08-15) — EntityCardOverview's own column header reuses
+ *  the exact same widths so its columns line up with TaskRowLine's actual
+ *  rendered cells, rather than duplicating these numbers. */
+export const PROOF_COL_WIDTH = 96;
 
 /** localStorage key for the unresolved-subtasks completion warning —
  *  "off" suppresses the modal (per browser; default on). */
@@ -1572,12 +1723,21 @@ const ASSIGNER_COL_WIDTH = 180;
 /** Due Date is a true fixed column too (2026-07-30 final spec) — constant
  *  width at a constant position right after Assignee, NOT pinned to the
  *  container's right edge (ml-auto made its position drift with screen
- *  width). Wide enough for the longest value ("29/7 Yesterday"). */
-const DUE_COL_WIDTH = 120;
+ *  width). Wide enough for the longest value ("29/7 Yesterday"). Exported
+ *  (2026-08-15) — same reuse rationale as PROOF_COL_WIDTH above. */
+export const DUE_COL_WIDTH = 120;
+
+/** "Assign to Others" column width (2026-08-15) — sized to match the button
+ *  it sits above. Exported so both EntityCardOverview's own column header
+ *  and ResizableTaskList's (when given a `reassign` control) share one
+ *  number, same reuse rationale as PROOF_COL_WIDTH/DUE_COL_WIDTH above. */
+export const REASSIGN_COL_WIDTH = 112;
 
 /** The Task header's drag handle — same visual as TaskRowLine's in-row
- *  handle (thin divider that thickens/blues on hover). */
-function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
+ *  handle (thin divider that thickens/blues on hover). Exported (2026-08-15)
+ *  — EntityCardOverview's card tables reuse this exact handle rather than
+ *  building their own. */
+export function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
   return (
     <span
       onPointerDown={onPointerDown}
@@ -1760,6 +1920,9 @@ export function ResizableTaskList({
   hideCompleted,
   assigneeColumnLabel,
   hideRowResizeDivider,
+  hideAssignee,
+  blankDueDate,
+  reassign,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1788,8 +1951,22 @@ export function ResizableTaskList({
    *  so the column stays resizable from there. Defaults to shown
    *  (unchanged) everywhere this isn't explicitly set. */
   hideRowResizeDivider?: boolean;
+  /** Drop the Assignee column entirely and show "Assign to Others" instead
+   *  when `reassign` is provided (2026-08-15, EntityCardOverview's embedded
+   *  Daily card) — every row in that context is already the viewer's own
+   *  task, so "who assigned this to me" is redundant. See TaskRowLine's own
+   *  hideAssignee doc comment. */
+  hideAssignee?: boolean;
+  /** Keep the Due Date column but blank its per-row value (2026-08-15,
+   *  same EntityCardOverview Daily-card motivation as TaskRowLine's own
+   *  blankDueDate — the date is implied by the section itself). */
+  blankDueDate?: boolean;
+  /** "Assign to Others" self-service handoff (2026-08-15) — passed straight
+   *  through to every row via TaskRowLine's own `reassign` prop; renders a
+   *  header column for it (replacing Assignee's slot when hideAssignee is
+   *  also set, otherwise appended) only when provided. */
+  reassign?: ReassignControl;
 }) {
-  const [nameWidthPx, setNameWidthPx] = React.useState(RESIZABLE_TASK_NAME_DEFAULT);
   // All three default to ON — nothing is hidden until the viewer toggles one
   // off. Mirrors the status donut's own three buckets (Completed/Pending/
   // N-A) so "My Tasks" can be decluttered down to any combination of them,
@@ -1822,40 +1999,15 @@ export function ResizableTaskList({
   const [warnEnabled, setWarnEnabled] = React.useState(() =>
     typeof window === "undefined" ? true : window.localStorage.getItem(SUBTASK_WARNING_KEY) !== "off",
   );
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const dragRef = React.useRef<{ x: number; width: number; latest: number } | null>(null);
-
-  // Header and rows read the Task column's width from a CSS variable on
-  // the list container, NOT from React state directly. During a drag the
-  // pointermove handler writes the variable straight onto the DOM node —
-  // zero React re-renders per mouse move (re-rendering every TaskRowLine
-  // per move is what made dragging visibly lag) — and the width is
-  // committed to state ONCE on pointerup so later re-renders keep it.
-  const containerStyle = { "--tm-col-name": `${nameWidthPx}px` } as React.CSSProperties;
-
-  const onResizeStart = (e: React.PointerEvent) => {
-    e.preventDefault();
-    dragRef.current = { x: e.clientX, width: nameWidthPx, latest: nameWidthPx };
-    const onMove = (ev: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const next = Math.min(
-        RESIZABLE_TASK_NAME_MAX,
-        Math.max(RESIZABLE_TASK_NAME_MIN, drag.width + (ev.clientX - drag.x)),
-      );
-      drag.latest = next;
-      containerRef.current?.style.setProperty("--tm-col-name", `${next}px`);
-    };
-    const onUp = () => {
-      const drag = dragRef.current;
-      dragRef.current = null;
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      if (drag) setNameWidthPx(drag.latest);
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
-  };
+  // No storageKey — preserves the original behavior exactly (resets to
+  // RESIZABLE_TASK_NAME_DEFAULT every mount); see useResizableColumn's own
+  // doc comment for the extraction rationale.
+  const { containerRef, containerStyle, onResizeStart } = useResizableColumn({
+    cssVar: "--tm-col-name",
+    defaultWidth: RESIZABLE_TASK_NAME_DEFAULT,
+    min: RESIZABLE_TASK_NAME_MIN,
+    max: RESIZABLE_TASK_NAME_MAX,
+  });
   const nameWidth = "var(--tm-col-name)";
 
   const completedCount = hideCompleted ? tasks.filter((t) => t.status === "DONE").length : 0;
@@ -2196,13 +2348,21 @@ export function ResizableTaskList({
               the run's starter — assignerName — but the user explicitly
               chose this label over "Assigned by"). Label overridable
               (2026-08-05) via assigneeColumnLabel — e.g. "Assigned To" for
-              a "tasks I assigned" list. */}
-          <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
-            {assigneeColumnLabel ?? "Assignee"}
-          </span>
+              a "tasks I assigned" list. Dropped entirely (2026-08-15) when
+              hideAssignee is set — see its own doc comment. */}
+          {!hideAssignee && (
+            <span className="shrink-0 truncate" style={{ width: ASSIGNER_COL_WIDTH }}>
+              {assigneeColumnLabel ?? "Assignee"}
+            </span>
+          )}
           <span className="shrink-0 truncate" style={{ width: DUE_COL_WIDTH }}>
             Due Date
           </span>
+          {reassign && (
+            <span className="shrink-0 text-center" style={{ width: REASSIGN_COL_WIDTH }}>
+              Assign to Others
+            </span>
+          )}
         </div>
       )}
       <div className="divide-y divide-gray-100">
@@ -2220,6 +2380,9 @@ export function ResizableTaskList({
             proofWidth: PROOF_COL_WIDTH,
             assignerWidth: ASSIGNER_COL_WIDTH,
             hideCompleted,
+            hideAssignee,
+            blankDueDate,
+            reassign,
           };
           return (
             <React.Fragment key={t.runBlockId}>
@@ -2472,8 +2635,11 @@ export interface ReassignControl {
  *  one new assignee). Built from the + Task picker's OWN exported pieces
  *  (pickerSearchClass + SinglePersonPickList — same search input, same
  *  "Name · Role" rows), so the two pickers share one styling source and
- *  can't drift apart. Renders under the task row inside EntityDrillModal. */
-function ReassignPicker({
+ *  can't drift apart. Renders under the task row inside EntityDrillModal
+ *  and TaskRowLine; exported (2026-08-13) so EntityCardOverview's Type-sort
+ *  table can reuse it directly too, rather than each caller re-implementing
+ *  the same picker. */
+export function ReassignPicker({
   staff,
   currentAssigneeId,
   onPick,

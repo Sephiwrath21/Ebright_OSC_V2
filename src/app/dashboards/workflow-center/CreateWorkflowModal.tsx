@@ -134,15 +134,15 @@ export function CreateWorkflowModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3">
+        <header className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
           <div>
-            <h2 id="create-workflow-title" className="text-base font-bold text-slate-900">
+            <h2 id="create-workflow-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
               Create Workflow
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               Define the workflow shell. You can add steps after it&rsquo;s created.
             </p>
           </div>
@@ -150,7 +150,7 @@ export function CreateWorkflowModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-slate-400 hover:text-slate-700 text-lg leading-none px-2"
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-lg leading-none px-2"
           >
             ×
           </button>
@@ -164,7 +164,7 @@ export function CreateWorkflowModal({
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="e.g. Academy Induction — Tutor Track"
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </Field>
 
@@ -176,8 +176,8 @@ export function CreateWorkflowModal({
               required
               className={`w-full rounded-md border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                 lockedDepartmentId !== null
-                  ? "bg-slate-50 text-slate-600 border-slate-200 cursor-not-allowed"
-                  : "bg-white border-slate-300"
+                  ? "bg-slate-50 text-slate-600 border-slate-200 cursor-not-allowed dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                  : "bg-white border-slate-300 text-slate-900 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               }`}
             >
               {departments.map((d) => (
@@ -189,7 +189,7 @@ export function CreateWorkflowModal({
           <Field label="Category" required hint={categoryHelper}>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
                   <input
                     type="radio"
                     name="cat-mode"
@@ -198,7 +198,7 @@ export function CreateWorkflowModal({
                   />
                   Pick from list
                 </label>
-                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
                   <input
                     type="radio"
                     name="cat-mode"
@@ -212,7 +212,7 @@ export function CreateWorkflowModal({
                 <select
                   value={categoryPreset}
                   onChange={(e) => setCategoryPreset(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {mergedKnownCategories.map((c) => (
                     <option key={c} value={c}>{c}</option>
@@ -224,7 +224,7 @@ export function CreateWorkflowModal({
                   value={categoryCustom}
                   onChange={(e) => setCategoryCustom(e.target.value)}
                   placeholder="e.g. Probation"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               )}
             </div>
@@ -240,8 +240,8 @@ export function CreateWorkflowModal({
                   return (
                     <label key={t} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs cursor-pointer ${
                       checked
-                        ? "bg-blue-50 border-blue-300 text-blue-700"
-                        : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-600 dark:text-blue-200"
+                        : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                     }`}>
                       <input
                         type="checkbox"
@@ -261,18 +261,18 @@ export function CreateWorkflowModal({
           )}
 
           {error && (
-            <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-200">
               {error}
             </div>
           )}
         </div>
 
-        <footer className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-2 bg-slate-50">
+        <footer className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-2 bg-slate-50 dark:border-slate-800 dark:bg-slate-800">
           <button
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-60"
           >
             Cancel
           </button>
@@ -280,7 +280,7 @@ export function CreateWorkflowModal({
             type="button"
             onClick={() => handleSubmit(false)}
             disabled={pending}
-            className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-60"
           >
             {pending ? "Saving…" : "Save as Draft"}
           </button>
@@ -311,11 +311,11 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-semibold text-slate-700 mb-1.5">
-        {label} {required && <span className="text-red-600">*</span>}
+      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+        {label} {required && <span className="text-red-600 dark:text-red-400">*</span>}
       </span>
       {children}
-      {hint && <span className="block mt-1 text-[11px] text-slate-500">{hint}</span>}
+      {hint && <span className="block mt-1 text-[11px] text-slate-500 dark:text-slate-400">{hint}</span>}
     </label>
   );
 }

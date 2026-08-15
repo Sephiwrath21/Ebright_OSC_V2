@@ -45,6 +45,8 @@ export default function ClickUpPieModal({
   const pendingMembers = membersWith((s) => s.pending);
   const naMembers = membersWith((s) => s.notApplicable);
 
+  // Donut data-series colours — kept FIXED across themes so each category
+  // (complete/pending/N-A) keeps its visual identity; not tokenised.
   const segments = [
     { key: "complete" as Seg, label: "Complete", value: totals.done, pct: pct(totals.done), color: "#0F6E56" },
     { key: "pending" as Seg, label: "Pending", value: totals.pending, pct: pct(totals.pending), color: "#DC2626" },
@@ -92,8 +94,9 @@ export default function ClickUpPieModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="dark:ring-1 dark:ring-white/10"
         style={{
-          background: "#FFFFFF",
+          background: "var(--surface)",
           borderRadius: 16,
           width: "min(740px, 100%)",
           maxHeight: "90vh",
@@ -107,10 +110,10 @@ export default function ClickUpPieModal({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "0.5px solid #E5E7EB",
+            borderBottom: "0.5px solid var(--status-track)",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
             Weekly ClickUp · {departmentName}
           </h2>
           <button
@@ -121,7 +124,7 @@ export default function ClickUpPieModal({
               border: "none",
               background: "transparent",
               cursor: "pointer",
-              color: "#94A3B8",
+              color: "var(--status-neutral-fg)",
               fontSize: 18,
               display: "inline-flex",
             }}
@@ -167,7 +170,7 @@ export default function ClickUpPieModal({
                 x={c}
                 y={c - 4}
                 textAnchor="middle"
-                style={{ fontSize: 34, fontWeight: 700, fill: activeSeg ? activeSeg.color : "#111827" }}
+                style={{ fontSize: 34, fontWeight: 700, fill: activeSeg ? activeSeg.color : "var(--text-primary)" }}
               >
                 {activeSeg ? `${activeSeg.pct}%` : total}
               </text>
@@ -175,7 +178,7 @@ export default function ClickUpPieModal({
                 x={c}
                 y={c + 20}
                 textAnchor="middle"
-                style={{ fontSize: 12, fill: "#94A3B8", letterSpacing: "0.05em" }}
+                style={{ fontSize: 12, fill: "var(--status-neutral-fg)", letterSpacing: "0.05em" }}
               >
                 {activeSeg ? activeSeg.label.toUpperCase() : "TASKS"}
               </text>
@@ -200,8 +203,8 @@ export default function ClickUpPieModal({
                   }}
                 >
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
-                  <span style={{ fontWeight: 600, color: "#1F2937" }}>{s.label}</span>
-                  <span style={{ color: "#6B7280" }}>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{s.label}</span>
+                  <span style={{ color: "var(--text-muted-strong)" }}>
                     {s.value} ({s.pct}%)
                   </span>
                 </button>
@@ -211,7 +214,7 @@ export default function ClickUpPieModal({
 
           {/* Member list for the selected segment */}
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10 }}>
               {selected === "pending"
                 ? "Members with pending tasks"
                 : selected === "complete"
@@ -244,7 +247,7 @@ export default function ClickUpPieModal({
                         justifyContent: "space-between",
                         gap: 8,
                         padding: "7px 12px",
-                        background: "#F8FAFC",
+                        background: "var(--surface-sunken)",
                         border: "none",
                         borderRadius: 8,
                         cursor: "pointer",
@@ -253,8 +256,10 @@ export default function ClickUpPieModal({
                         textAlign: "left",
                       }}
                     >
-                      <span style={{ fontSize: 13, color: "#1F2937" }}>{x.name}</span>
+                      <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{x.name}</span>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {/* Count reuses the segment's category colour (fixed,
+                            matches the donut's pending/complete series). */}
                         <span
                           style={{
                             fontSize: 12,
@@ -264,16 +269,16 @@ export default function ClickUpPieModal({
                         >
                           {x.count}
                         </span>
-                        <i className="ti ti-chevron-right" style={{ color: "#94A3B8", fontSize: 14 }} />
+                        <i className="ti ti-chevron-right" style={{ color: "var(--status-neutral-fg)", fontSize: 14 }} />
                       </span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 13, color: "#94A3B8" }}>None.</div>
+                <div style={{ fontSize: 13, color: "var(--status-neutral-fg)" }}>None.</div>
               )
             ) : (
-              <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: "var(--status-neutral-fg)", lineHeight: 1.5 }}>
                 Click the <strong style={{ color: "#0F6E56" }}>Complete</strong> or{" "}
                 <strong style={{ color: "#854F0B" }}>Pending</strong> part of the chart to see its
                 percentage and the members involved.
@@ -288,12 +293,14 @@ export default function ClickUpPieModal({
             justifyContent: "flex-end",
             gap: 8,
             padding: "12px 20px",
-            borderTop: "0.5px solid #E5E7EB",
+            borderTop: "0.5px solid var(--status-track)",
           }}
         >
           <button
             type="button"
             onClick={onViewMembers}
+            // Solid brand-blue fill with white text — theme-invariant,
+            // left literal.
             style={{
               display: "inline-flex",
               alignItems: "center",

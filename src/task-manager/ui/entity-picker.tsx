@@ -51,7 +51,7 @@ export function DailyDatePicker({
   };
   const unit = step === "month" ? "month" : "day";
   const arrowClass =
-    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600";
+    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -63,7 +63,7 @@ export function DailyDatePicker({
         value={value}
         onChange={(e) => e.target.value && navigate(e.target.value)}
         aria-label={`${unit === "month" ? "Monthly" : "Daily"} date`}
-        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <button type="button" aria-label={`Next ${unit}`} onClick={() => shift(1)} className={arrowClass}>
         ▶
@@ -72,112 +72,7 @@ export function DailyDatePicker({
   );
 }
 
-/** Business-week day lists, as offsets from the week's Monday (getDay():
- *  Sun=0). Three ranges per the 2026-07-29 final role spec: department-side
- *  Tue–Sat; Branch Manager + Branch Exec Tue–SUN; Coaches Wed–SUN. The
- *  range comes from role-views.ts (weekdayRangeOf). */
-const TUE_SAT = [
-  { label: "Tuesday", offset: 1 },
-  { label: "Wednesday", offset: 2 },
-  { label: "Thursday", offset: 3 },
-  { label: "Friday", offset: 4 },
-  { label: "Saturday", offset: 5 },
-];
-const SIDEBAR_RANGES: Record<
-  "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun",
-  { label: string; offset: number }[]
-> = {
-  // Full week (2026-08-01): the CEO's range.
-  "mon-sun": [{ label: "Monday", offset: 0 }, ...TUE_SAT, { label: "Sunday", offset: 6 }],
-  "tue-sat": TUE_SAT,
-  "tue-sun": [...TUE_SAT, { label: "Sunday", offset: 6 }],
-  "wed-sun": [...TUE_SAT.slice(1), { label: "Sunday", offset: 6 }],
-};
-
 const pad2 = (n: number) => String(n).padStart(2, "0");
-
-/** Count badge for the sidebar rows (ClickUp-reference, 2026-07-29):
- *  right-aligned number, HIDDEN when zero/undefined. */
-function CountBadge({ count, active }: { count?: number; active: boolean }) {
-  if (!count) return null;
-  return (
-    <span className={active ? "text-xs font-semibold text-white/80" : "text-xs font-medium text-gray-400"}>
-      {count}
-    </span>
-  );
-}
-
-/** Vertical weekday sidebar for "My Tasks — Daily" (2026-07-28 ClickUp-
- *  reference redesign): the business week's day NAMES only (Tue–Sat, no
- *  dates) with per-day pending-count badges, listed vertically beside the
- *  task list. The top date filter is the MASTER — it picks the exact
- *  calendar date, which sets both the week and the highlighted day here;
- *  clicking a day navigates the SAME shared date param to that weekday
- *  WITHIN the anchored week. Selection updates OPTIMISTICALLY (instant
- *  highlight while the server round-trip runs — the 2026-07-29 lag fix),
- *  then re-syncs from the echoed value. */
-export function WeekdaySidebar({
-  value,
-  basePath,
-  extraParams = {},
-  param = "date",
-  counts = {},
-  range = "tue-sat",
-}: {
-  /** The resolved date currently shown, YYYY-MM-DD. */
-  value: string;
-  basePath: string;
-  extraParams?: Record<string, string>;
-  param?: string;
-  /** Per-day NOT-YET-COMPLETED counts (Pending only, N/A excluded), keyed
-   *  YYYY-MM-DD — getMySidebarCounts().weekdays. Zero/absent = no badge. */
-  counts?: Record<string, number>;
-  /** Which days to list — from role-views.ts weekdayRangeOf(). */
-  range?: "mon-sun" | "tue-sat" | "tue-sun" | "wed-sun";
-}) {
-  const router = useRouter();
-  // Optimistic selection: highlight instantly on click; cleared when the
-  // server's echoed `value` catches up (or changes for any other reason).
-  const [pendingDate, setPendingDate] = React.useState<string | null>(null);
-  React.useEffect(() => setPendingDate(null), [value]);
-  const shown = pendingDate ?? value;
-
-  const [y, m, d] = value.split("-").map(Number);
-  const anchor = new Date(y, m - 1, d);
-  // Monday of the anchored week (getDay(): Sun=0 … Sat=6).
-  const monday = new Date(y, m - 1, d - ((anchor.getDay() + 6) % 7));
-  const navigate = (v: string) => {
-    setPendingDate(v);
-    const qs = new URLSearchParams({ ...extraParams, [param]: v });
-    router.push(`${basePath}?${qs.toString()}`);
-  };
-
-  return (
-    <nav aria-label="Weekday" className="flex flex-col gap-1">
-      {SIDEBAR_RANGES[range].map((day) => {
-        const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day.offset);
-        const date = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
-        const active = date === shown;
-        return (
-          <button
-            key={day.label}
-            type="button"
-            onClick={() => navigate(date)}
-            aria-current={active ? "date" : undefined}
-            className={
-              active
-                ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
-                : "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }
-          >
-            {day.label}
-            <CountBadge count={counts[date]} active={active} />
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -197,89 +92,6 @@ function monthDayChunks(year: number, month: number): { from: number; to: number
 const chunkLabel = (c: { from: number; to: number }) =>
   c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
 
-/** Vertical range sidebar for "My Tasks — Monthly" (2026-07-30 layout):
- *  "Full month" + the selected month's four range chunks, same visual
- *  style/position as the Daily weekday sidebar, each with a pending-count
- *  badge. The MONTH itself is picked by the compact MonthDropdown in the
- *  section heading — no 12-month list here. Selection updates
- *  OPTIMISTICALLY (instant highlight while the server round-trip runs),
- *  then re-syncs from the echoed values. Callers must pass extraParams
- *  WITHOUT mdate/mrange. */
-export function MonthRangeSidebar({
-  value,
-  range,
-  basePath,
-  extraParams = {},
-  fullCount,
-  chunkCounts = {},
-}: {
-  /** The resolved Monthly anchor, YYYY-MM-DD (decides the month length). */
-  value: string;
-  /** The raw ?mrange= currently active ("" / undefined = Full month). */
-  range?: string;
-  basePath: string;
-  extraParams?: Record<string, string>;
-  /** The anchor month's total pending count (the "Full month" badge) —
-   *  getMySidebarCounts().months[anchor month]. */
-  fullCount?: number;
-  /** The anchor month's per-chunk pending counts, keyed "from-to" —
-   *  getMySidebarCounts().monthChunks. Zero/absent = no badge. */
-  chunkCounts?: Record<string, number>;
-}) {
-  const router = useRouter();
-  // Optimistic selection: highlight instantly on click; cleared when the
-  // server's echoed value/range catches up. `undefined` = no pending pick;
-  // "" = Full month picked.
-  const [pending, setPending] = React.useState<string | undefined>(undefined);
-  React.useEffect(() => setPending(undefined), [value, range]);
-  const shown = pending !== undefined ? pending : (range ?? "");
-
-  const [y, m] = value.split("-").map(Number);
-  const navigate = (v: string) => {
-    setPending(v);
-    const qs = new URLSearchParams({
-      ...extraParams,
-      mdate: value,
-      ...(v ? { mrange: v } : {}),
-    });
-    router.push(`${basePath}?${qs.toString()}`);
-  };
-  const itemClass = (active: boolean) =>
-    active
-      ? "flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-left text-sm font-semibold text-white"
-      : "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900";
-
-  return (
-    <nav aria-label="Day range" className="flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={() => navigate("")}
-        aria-current={shown === "" ? "true" : undefined}
-        className={itemClass(shown === "")}
-      >
-        Full month
-        <CountBadge count={fullCount} active={shown === ""} />
-      </button>
-      {monthDayChunks(y, m).map((c) => {
-        const v = `${c.from}-${c.to}`;
-        const active = shown === v;
-        return (
-          <button
-            key={v}
-            type="button"
-            onClick={() => navigate(v)}
-            aria-current={active ? "true" : undefined}
-            className={itemClass(active)}
-          >
-            {chunkLabel(c)}
-            <CountBadge count={chunkCounts[v]} active={active} />
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
 /** How far the Year dropdown spans around the REAL current year (2026-08-05
  *  redesign — was a single combined "Jul 2026 ▾" select spanning only the
  *  anchor's ±1 year, which couldn't reach further back/forward without
@@ -290,7 +102,7 @@ const YEAR_DROPDOWN_PAST = 5;
 const YEAR_DROPDOWN_FUTURE = 10;
 
 const selectClass =
-  "rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none";
+  "rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 /** Custom single-select dropdown (2026-08-05, replacing a native <select>
  *  for Year/Month) — NOT a native <select>: those hand the open dropdown
@@ -357,7 +169,7 @@ function CompactDropdown<T extends string | number>({
         <div
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute z-20 mt-1 max-h-56 w-max min-w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-56 w-max min-w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         >
           {options.map((o) => {
             const isSelected = o.value === value;
@@ -373,8 +185,8 @@ function CompactDropdown<T extends string | number>({
                 }}
                 className={`block w-full px-3 py-1.5 text-left text-xs ${
                   isSelected
-                    ? "bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
               >
                 {o.label}
@@ -510,12 +322,12 @@ export function EntityPicker({
   };
 
   return (
-    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700">
+    <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-300">
       {label}
       <select
         value={value}
         onChange={(e) => navigate(e.target.value)}
-        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none"
+        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       >
         {groups.map((g, i) =>
           g.label ? (

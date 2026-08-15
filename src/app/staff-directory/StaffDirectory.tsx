@@ -201,9 +201,9 @@ const TIER_BG: Record<Tier, string> = {
 };
 
 const TIER_BADGE: Record<Tier, string> = {
-  Lead: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Senior: "bg-blue-50 text-blue-700 border-blue-200",
-  Junior: "bg-slate-100 text-slate-700 border-slate-200",
+  Lead: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700",
+  Senior: "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700",
+  Junior: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
 const TIER_AVATAR: Record<Tier, string> = {
@@ -548,18 +548,18 @@ export default function StaffDirectory({
   );
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
               <Home className="w-4 h-4" aria-hidden="true" />
               <span>Home</span>
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+            <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
             <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <span className="text-slate-900 font-medium">Staff Directory</span>
+            <span className="text-slate-900 dark:text-slate-100 font-medium">Staff Directory</span>
           </nav>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -570,13 +570,13 @@ export default function StaffDirectory({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or role…"
-                className="bg-white border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-56"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl pl-9 pr-9 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-56"
               />
               {query && (
                 <button
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors duration-200 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -620,12 +620,12 @@ export default function StaffDirectory({
 
         <div className="flex gap-5">
           <div
-            className="flex-1 min-w-0 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col"
+            className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col"
             style={{ minHeight: 600 }}
           >
             <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Staff Directory</h1>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Staff Directory</h1>
               </div>
               <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
@@ -643,7 +643,7 @@ export default function StaffDirectory({
               style={{ touchAction: viewMode === "chart" ? "none" : "auto" }}
             >
             {scope.length === 0 ? (
-              <div className="p-12 text-center text-sm text-slate-500">
+              <div className="p-12 text-center text-sm text-slate-500 dark:text-slate-400">
                 No active employees in this scope.
               </div>
             ) : viewMode === "chart" ? (
@@ -731,24 +731,24 @@ export default function StaffDirectory({
                       aria-current={active ? "true" : undefined}
                       title={`${p.name} — ${p.position}`}
                       className={[
-                        "absolute group flex flex-col items-center gap-2 p-3 rounded-2xl bg-white transition-all duration-300 cursor-pointer",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                        "absolute group flex flex-col items-center gap-2 p-3 rounded-2xl bg-white dark:bg-slate-900 transition-all duration-300 cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
                         active
                           ? "border-2 border-emerald-500 shadow-xl scale-[1.04] z-20"
                           : matched
                             ? "border-2 border-amber-400 shadow-md scale-[1.02] z-10"
                             : hovered
-                              ? "border border-slate-200 shadow-lg scale-[1.03] z-10"
-                              : "border border-slate-200 hover:shadow-md z-0",
+                              ? "border border-slate-200 dark:border-slate-700 shadow-lg scale-[1.03] z-10"
+                              : "border border-slate-200 dark:border-slate-800 hover:shadow-md z-0",
                         dimmed ? "opacity-30" : "opacity-100",
                       ].join(" ")}
                       style={{ left, top, width: NODE_W, height: NODE_H }}
                     >
-                      <div className={`relative ${TIER_AVATAR[tier]} w-14 h-14 rounded-full flex items-center justify-center text-white font-semibold shadow-md ring-4 ring-white`}>
+                      <div className={`relative ${TIER_AVATAR[tier]} w-14 h-14 rounded-full flex items-center justify-center text-white font-semibold shadow-md ring-4 ring-white dark:ring-slate-900`}>
                         <span className="text-base">{initials(p.name)}</span>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${TIER_BG[tier]} ring-2 ring-white`} aria-hidden="true" />
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${TIER_BG[tier]} ring-2 ring-white dark:ring-slate-900`} aria-hidden="true" />
                       </div>
-                      <p className="text-[13px] font-semibold text-slate-900 leading-tight text-center line-clamp-1 w-full px-1">
+                      <p className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 leading-tight text-center line-clamp-1 w-full px-1">
                         {p.name}
                       </p>
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${TIER_BADGE[tier]} truncate max-w-full`}>
@@ -784,12 +784,12 @@ export default function StaffDirectory({
             {selected && (
               <div key={selected.id} className="flex flex-col gap-4">
                 {viewMode === "card" ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                         Selected
                       </p>
-                      <p className="text-sm font-semibold text-slate-900 truncate">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                         {selected.name}
                       </p>
                     </div>
@@ -797,7 +797,7 @@ export default function StaffDirectory({
                       type="button"
                       onClick={() => setSelectedId(null)}
                       aria-label="Clear selection"
-                      className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors duration-200 cursor-pointer"
+                      className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
                     >
                       <X className="w-4 h-4" aria-hidden="true" />
                     </button>
@@ -818,7 +818,7 @@ export default function StaffDirectory({
         </div>
 
         {!selected && viewMode === "chart" && (
-          <p className="mt-4 text-center text-xs text-slate-500">
+          <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
             Click any team member to see their profile.
           </p>
         )}
@@ -839,13 +839,13 @@ function FilterSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <label className="relative inline-flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent">
-      <span className="text-slate-500 mr-1.5 whitespace-nowrap">{label}:</span>
+    <label className="relative inline-flex items-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent">
+      <span className="text-slate-500 dark:text-slate-400 mr-1.5 whitespace-nowrap">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="appearance-none bg-transparent text-slate-900 font-medium pr-5 focus:outline-none cursor-pointer max-w-[170px]"
+        className="appearance-none bg-transparent text-slate-900 dark:text-slate-100 font-medium pr-5 focus:outline-none cursor-pointer max-w-[170px]"
       >
         {options.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -866,7 +866,7 @@ function IDCard({
   const tier = tierFromRank(positionRank(person.position));
   const isLead = tier === "Lead";
   const sidebarColor = isLead ? "bg-emerald-600" : "bg-rose-600";
-  const accentColor = isLead ? "text-emerald-600" : "text-rose-600";
+  const accentColor = isLead ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
   const photoBorder = isLead ? "border-emerald-600" : "border-rose-600";
 
   const idLabel = person.employeeId ?? `EB-${String(person.id).padStart(5, "0")}`;
@@ -874,7 +874,7 @@ function IDCard({
 
   return (
     <div
-      className="relative bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-[slideIn_0.45s_cubic-bezier(0.22,1,0.36,1)]"
+      className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-[slideIn_0.45s_cubic-bezier(0.22,1,0.36,1)]"
       style={{ width: 300, minHeight: 460 }}
     >
       <style jsx>{`
@@ -888,13 +888,18 @@ function IDCard({
             linear-gradient(to bottom, rgba(15,23,42,0.04) 1px, transparent 1px);
           background-size: 18px 18px;
         }
+        :global(.dark) .grid-bg {
+          background-image:
+            linear-gradient(to right, rgba(226,232,240,0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(226,232,240,0.06) 1px, transparent 1px);
+        }
       `}</style>
 
       {onClose && (
         <button
           onClick={onClose}
           aria-label="Close profile"
-          className="absolute top-2.5 right-12 z-20 p-1.5 rounded-md bg-white/80 backdrop-blur text-slate-500 hover:text-slate-900 hover:bg-white transition-colors duration-200 cursor-pointer"
+          className="absolute top-2.5 right-12 z-20 p-1.5 rounded-md bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -914,13 +919,13 @@ function IDCard({
           <div className={`w-7 h-7 rounded-md ${sidebarColor} flex items-center justify-center text-white`}>
             <IdCard className="w-4 h-4" aria-hidden="true" />
           </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 leading-tight">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 dark:text-slate-300 leading-tight">
             Ebright<br />
-            <span className="text-slate-500 font-medium">Staff Card</span>
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Staff Card</span>
           </p>
         </div>
 
-        <div className={`relative w-[150px] h-[170px] mx-auto mb-4 border-[3px] ${photoBorder} bg-slate-100 overflow-hidden flex items-center justify-center`}>
+        <div className={`relative w-[150px] h-[170px] mx-auto mb-4 border-[3px] ${photoBorder} bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center`}>
           <div className={`${TIER_AVATAR[tier]} w-full h-full flex items-center justify-center text-white font-bold text-5xl`}>
             {initials(person.name)}
           </div>
@@ -946,7 +951,7 @@ function IDCard({
             return (
               <span
                 key={i}
-                className="bg-slate-900"
+                className="bg-slate-900 dark:bg-slate-300"
                 style={{ width: w, height: i % 7 === 0 ? 22 : 28 }}
               />
             );
@@ -963,9 +968,9 @@ function IDCard({
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="font-bold text-slate-900 w-12 shrink-0 uppercase tracking-wide">{label}</span>
-      <span className="text-slate-500">:</span>
-      <span className={`text-slate-700 truncate ${mono ? "font-mono" : ""}`} title={value}>
+      <span className="font-bold text-slate-900 dark:text-slate-100 w-12 shrink-0 uppercase tracking-wide">{label}</span>
+      <span className="text-slate-500 dark:text-slate-400">:</span>
+      <span className={`text-slate-700 dark:text-slate-300 truncate ${mono ? "font-mono" : ""}`} title={value}>
         {value}
       </span>
     </div>
@@ -1019,7 +1024,7 @@ function WorkingHoursCard({
 
   return (
     <div
-      className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-[slideInLater_0.55s_cubic-bezier(0.22,1,0.36,1)]"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden animate-[slideInLater_0.55s_cubic-bezier(0.22,1,0.36,1)]"
       style={{ width: 300 }}
     >
       <style jsx>{`
@@ -1029,16 +1034,16 @@ function WorkingHoursCard({
           100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white">
+      <div className="px-4 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md bg-emerald-600 flex items-center justify-center text-white shrink-0">
             <Clock className="w-4 h-4" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 leading-tight">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 leading-tight">
               Working Hours
             </p>
-            <p className="text-xs text-slate-700 font-medium">
+            <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
               {totalHours.toFixed(0)} hrs / week
             </p>
           </div>
@@ -1047,7 +1052,7 @@ function WorkingHoursCard({
               type="button"
               onClick={() => setEditing(true)}
               aria-label="Edit working hours"
-              className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900 transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
               <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -1058,7 +1063,7 @@ function WorkingHoursCard({
                 onClick={handleCancel}
                 disabled={saving}
                 aria-label="Cancel editing"
-                className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
@@ -1077,12 +1082,12 @@ function WorkingHoursCard({
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-rose-50 border-b border-rose-100 text-[11px] text-rose-700">
+        <div className="px-4 py-2 bg-rose-50 dark:bg-rose-900 border-b border-rose-100 dark:border-rose-800 text-[11px] text-rose-700 dark:text-rose-300">
           {error}
         </div>
       )}
 
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
         {DAYS_ORDER.map(d => {
           const slot = draft[d];
           const isToday = d === today;
@@ -1092,16 +1097,16 @@ function WorkingHoursCard({
               key={d}
               className={[
                 "flex items-center gap-3 px-4 py-2.5",
-                isToday && !editing ? "bg-emerald-50/40" : "",
+                isToday && !editing ? "bg-emerald-50/40 dark:bg-emerald-900/20" : "",
               ].join(" ")}
             >
               <div className={[
                 "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
                 isOff
-                  ? "bg-slate-100 text-slate-400"
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-400"
                   : isToday
                     ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-600",
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
               ].join(" ")}>
                 <CalendarDays className="w-4 h-4" aria-hidden="true" />
               </div>
@@ -1109,15 +1114,15 @@ function WorkingHoursCard({
                 <div className="flex items-center justify-between gap-2">
                   <p className={[
                     "text-xs font-semibold leading-tight",
-                    isOff ? "text-slate-400" : "text-slate-900",
+                    isOff ? "text-slate-400" : "text-slate-900 dark:text-slate-100",
                   ].join(" ")}>
                     {DAY_LABEL[d]}
                     {isToday && !editing && (
-                      <span className="ml-1.5 text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Today</span>
+                      <span className="ml-1.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Today</span>
                     )}
                   </p>
                   {editing && (
-                    <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer select-none">
+                    <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={isOff}
@@ -1139,21 +1144,21 @@ function WorkingHoursCard({
                         type="time"
                         value={slot.start}
                         onChange={(e) => updateDay(d, { ...slot, start: e.target.value })}
-                        className="bg-white border border-slate-200 rounded-md px-1.5 py-0.5 text-[11px] text-slate-900 tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-transparent w-[88px]"
+                        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-md px-1.5 py-0.5 text-[11px] text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-transparent w-[88px]"
                       />
                       <span className="text-slate-400 text-[11px]">–</span>
                       <input
                         type="time"
                         value={slot.end}
                         onChange={(e) => updateDay(d, { ...slot, end: e.target.value })}
-                        className="bg-white border border-slate-200 rounded-md px-1.5 py-0.5 text-[11px] text-slate-900 tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-transparent w-[88px]"
+                        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-md px-1.5 py-0.5 text-[11px] text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-transparent w-[88px]"
                       />
                     </div>
                   )
                 ) : (
                   <p className={[
                     "text-[11px] mt-0.5",
-                    isOff ? "text-slate-400 italic" : "text-slate-600 tabular-nums",
+                    isOff ? "text-slate-400 italic" : "text-slate-600 dark:text-slate-300 tabular-nums",
                   ].join(" ")}>
                     {isOff ? "Day off" : `${format12h(slot.start)} – ${format12h(slot.end)}`}
                   </p>
@@ -1180,7 +1185,7 @@ function ViewModeToggle({
     { value: "timeline" as const, label: "Timeline", Icon: History },
   ];
   return (
-    <div className="inline-flex items-center bg-slate-100 rounded-xl p-1 shrink-0" role="tablist" aria-label="View mode">
+    <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shrink-0" role="tablist" aria-label="View mode">
       {options.map(o => {
         const active = value === o.value;
         return (
@@ -1193,8 +1198,8 @@ function ViewModeToggle({
             className={[
               "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer",
               active
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900",
+                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
             ].join(" ")}
           >
             <o.Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1217,7 +1222,7 @@ function CardGridView({
 }) {
   if (people.length === 0) {
     return (
-      <div className="p-12 text-center text-sm text-slate-500">
+      <div className="p-12 text-center text-sm text-slate-500 dark:text-slate-400">
         No team members match this search.
       </div>
     );
@@ -1254,9 +1259,9 @@ function CardGridView({
             aria-pressed={active}
             className={[
               "rounded-2xl transition-all duration-300 cursor-pointer outline-none",
-              "focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+              "focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
               active
-                ? "ring-2 ring-emerald-500 ring-offset-2 scale-[1.02]"
+                ? "ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 scale-[1.02]"
                 : "hover:scale-[1.01]",
             ].join(" ")}
           >
@@ -1313,7 +1318,7 @@ function TimelineView({
 
   if (yearKeys.length === 0) {
     return (
-      <div className="p-12 text-center text-sm text-slate-500">
+      <div className="p-12 text-center text-sm text-slate-500 dark:text-slate-400">
         No team members in this scope.
       </div>
     );
@@ -1322,20 +1327,20 @@ function TimelineView({
   return (
     <div className="relative px-6 py-6">
       {/* Vertical rail. Width 2px so its center sits on x=89, matching the dot center. */}
-      <div className="absolute top-8 bottom-8 left-[88px] w-0.5 bg-slate-200" aria-hidden="true" />
+      <div className="absolute top-8 bottom-8 left-[88px] w-0.5 bg-slate-200 dark:bg-slate-800" aria-hidden="true" />
       <div className="flex flex-col gap-8">
         {yearKeys.map(year => {
           const peopleOfYear = grouped.get(year)!;
           return (
             <div key={year} className="relative flex items-start gap-6">
               <div className="w-16 shrink-0 pt-1.5 text-right">
-                <span className="text-xl font-semibold text-slate-900 tabular-nums">
+                <span className="text-xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
                   {year}
                 </span>
               </div>
               {/* Dot at left=84,w=10 → center x=89; top tuned to match year text vertical center. */}
               <div
-                className="absolute top-[15px] left-[84px] w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50 z-10"
+                className="absolute top-[15px] left-[84px] w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50 dark:ring-emerald-900 z-10"
                 aria-hidden="true"
               />
               <div className="flex-1 min-w-0 pl-6 flex flex-wrap gap-2.5">
@@ -1405,12 +1410,12 @@ function PersonTenureChip({
       aria-pressed={active}
       className={[
         "inline-flex items-center gap-2.5 border rounded-xl pl-2 pr-2.5 py-2 transition-all duration-200 cursor-pointer min-w-0 text-left",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
         active
-          ? "bg-white border-emerald-500 shadow-md scale-[1.02]"
+          ? "bg-white dark:bg-slate-900 border-emerald-500 shadow-md scale-[1.02]"
           : isDeparted
-            ? "bg-rose-50 border-rose-300 hover:border-rose-400 hover:shadow-md"
-            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md",
+            ? "bg-rose-50 dark:bg-rose-900 border-rose-300 dark:border-rose-700 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md"
+            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md",
       ].join(" ")}
     >
       <div
@@ -1425,7 +1430,7 @@ function PersonTenureChip({
         <p
           className={[
             "text-xs font-semibold truncate max-w-[140px]",
-            isDeparted ? "text-rose-900" : "text-slate-900",
+            isDeparted ? "text-rose-900 dark:text-rose-200" : "text-slate-900 dark:text-slate-100",
           ].join(" ")}
         >
           {person.name}
@@ -1433,7 +1438,7 @@ function PersonTenureChip({
         <p
           className={[
             "text-[10px] truncate max-w-[140px]",
-            isDeparted ? "text-rose-700/80" : "text-slate-500",
+            isDeparted ? "text-rose-700/80 dark:text-rose-300/80" : "text-slate-500 dark:text-slate-400",
           ].join(" ")}
         >
           {person.position}
@@ -1444,7 +1449,7 @@ function PersonTenureChip({
           "shrink-0 ml-1 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wide border tabular-nums",
           isDeparted
             ? "bg-rose-600 text-white border-rose-700"
-            : "bg-emerald-50 text-emerald-700 border-emerald-200",
+            : "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700",
         ].join(" ")}
       >
         {tenureLabel}

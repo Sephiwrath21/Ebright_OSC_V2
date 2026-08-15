@@ -13,7 +13,9 @@
 import * as React from "react";
 import type {
   AssignActionResult,
+  CreateCategoryResult,
   FlowAssignInput,
+  FlowCategoryOption,
   FlowGroup,
   FlowStaffMember,
   FlowTemplateControl,
@@ -43,6 +45,8 @@ export function AddTaskButton({
   staff,
   action,
   templates,
+  categories,
+  onCreateCategory,
   recipientGroup,
   quickSelfId,
   hideCadence,
@@ -52,6 +56,13 @@ export function AddTaskButton({
   /** Task Templates (2026-07-31) — saved list + load/rename/delete
    *  actions, passed straight through to the form. */
   templates?: FlowTemplateControl;
+  /** Task Categories (2026-08-12) — active-category list, passed straight
+   *  through to AssignTaskForm's Category dropdown. */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12) — passed straight through to
+   *  AssignTaskForm; omitted entirely for viewers who can't manage
+   *  categories (the caller decides, via canManageTaskTemplateGroups). */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Restrict the recipient picker to one group (2026-08-01: the CEO
    *  assigns to HODs only) — passed straight through to AssignTaskForm;
    *  the server re-enforces regardless. */
@@ -87,17 +98,17 @@ export function AddTaskButton({
           onClick={() => setOpen(false)}
         >
           <div
-            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 shrink-0 border-b border-gray-100 pb-3">
+            <div className="mb-4 shrink-0 border-b border-gray-100 pb-3 dark:border-slate-800">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">Tasks</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Tasks</p>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
                   aria-label="Close"
-                  className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                 >
                   ✕
                 </button>
@@ -114,7 +125,7 @@ export function AddTaskButton({
                       className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${
                         tab === t.key
                           ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                       }`}
                     >
                       {t.label}
@@ -128,6 +139,8 @@ export function AddTaskButton({
                 staff={staff}
                 action={action}
                 templates={templates}
+                categories={categories}
+                onCreateCategory={onCreateCategory}
                 recipientGroup={recipientGroup}
                 quickSelfId={quickSelfId}
                 hideCadence={hideCadence}

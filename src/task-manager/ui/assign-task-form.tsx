@@ -17,7 +17,9 @@ import {
   visibleCadenceOptions,
   type AssignActionResult,
   type CadenceOption,
+  type CreateCategoryResult,
   type FlowAssignInput,
+  type FlowCategoryOption,
   type FlowGroup,
   type FlowStaffMember,
   type FlowTemplateControl,
@@ -25,6 +27,7 @@ import {
 import { RecipientPicker } from "./recipient-picker";
 import { compressImageFile } from "./image-compress";
 import { SubtaskListEditor } from "./subtask-list-editor";
+import { CategoryPicker } from "./category-picker";
 
 const CADENCE_LABELS: Record<CadenceOption, string> = {
   daily: "Daily",
@@ -33,11 +36,13 @@ const CADENCE_LABELS: Record<CadenceOption, string> = {
 };
 
 const selectClass =
-  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
+  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
 
 function dayChipClass(active: boolean): string {
   return `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-    active ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+    active
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
   }`;
 }
 
@@ -48,6 +53,8 @@ export function AssignTaskForm({
   quickSelfId,
   hideCadence = false,
   templates,
+  categories,
+  onCreateCategory,
   bare = false,
 }: {
   staff: FlowStaffMember[];
@@ -74,6 +81,19 @@ export function AssignTaskForm({
    *  — drives "Start from a template", the Manage panel, and pairs with
    *  the "Save as Template" checkbox below. Omit to hide all of it. */
   templates?: FlowTemplateControl;
+  /** Task Categories ("Type", 2026-08-12): active categories for the new
+   *  Category dropdown. Omit or pass an empty array to hide the dropdown
+   *  entirely — e.g. before any category has ever been created. */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12): creates a category without
+   *  leaving the assign form — the ONLY way to create one (2026-08-15: the
+   *  standalone /task-manager/categories admin page was removed). Omit to
+   *  hide the option entirely — the caller only passes this for viewers who
+   *  pass canManageTaskTemplateGroups (Super Admin + elevated Operations/
+   *  Optimisation dept-sites); everyone else sees a plain dropdown of
+   *  existing active categories. The server re-enforces the same gate
+   *  regardless. */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
   /** Skip the outer card border/padding and the "Assign Task" heading — for
    *  embedding inside a caller-supplied modal/card instead of this form's
    *  own standalone box (used inline in the Details section). */
@@ -105,9 +125,18 @@ export function AssignTaskForm({
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   // Task Templates (2026-07-31)
   const [templateId, setTemplateId] = React.useState("");
+  const [categoryId, setCategoryId] = React.useState("");
   const [templateBusy, setTemplateBusy] = React.useState(false);
   const [saveTemplate, setSaveTemplate] = React.useState(false);
   const [templateName, setTemplateName] = React.useState("");
+  // Inline "+ Add new type" (2026-08-12): categories start from the prop,
+  // then grow locally as this session creates new ones — no page refresh
+  // needed to pick a category you just added. Lifted here (rather than
+  // living inside CategoryPicker) since this form only ever renders one
+  // instance — see category-picker.tsx's own header comment for why a
+  // multi-instance caller (Template/Package's per-task pickers) needs to
+  // lift it too.
+  const [localCategories, setLocalCategories] = React.useState(categories ?? []);
 
   /** "Start from a template": load the full template and pre-fill the
    *  structure fields. Recipients/days/due date are untouched (they're
@@ -128,6 +157,7 @@ export function AssignTaskForm({
     setSubtasks(t.subtasks);
     setSubtaskEditorKey((k) => k + 1);
     setCadence(hideCadence ? "daily" : t.cadence);
+    setCategoryId(t.categoryId ?? "");
     setGuidelineUrl(t.guidelineUrl ?? "");
     if (t.guidelineImage) {
       setGuidelineImage({
@@ -232,6 +262,7 @@ export function AssignTaskForm({
           ? { name: templateName.trim() || title.trim() }
           : undefined,
         fromTemplateId: templateId || undefined,
+        categoryId: categoryId || undefined,
       });
       if (result.ok) {
         setMessage({ ok: true, text: saveTemplate ? "Task Assigned · Template saved" : "Task Assigned" });
@@ -245,6 +276,7 @@ export function AssignTaskForm({
         setSubtasks([]);
         setSubtaskEditorKey((k) => k + 1);
         setTemplateId("");
+        setCategoryId("");
         setSaveTemplate(false);
         setTemplateName("");
       } else {
@@ -258,9 +290,9 @@ export function AssignTaskForm({
     // scroll independently while the submit footer below stays pinned —
     // the modal card caps the height (max-h), this fills it. Non-bare
     // (inline card) has no height cap, so the same markup just flows.
-    <div className={bare ? "flex min-h-0 flex-1 flex-col" : "rounded-2xl border border-gray-200 bg-white p-5"}>
+    <div className={bare ? "flex min-h-0 flex-1 flex-col" : "rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"}>
       {!bare && (
-        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           Assign Task
         </h3>
       )}
@@ -272,8 +304,8 @@ export function AssignTaskForm({
             The old Manage link is gone (2026-07-31): rename/delete/archive
             live in the hub's Edit/Remove/Archive tabs now. */}
         {templates && templates.list.length > 0 && (
-          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-600">Template</p>
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Template</p>
             <select
               value={templateId}
               onChange={(e) => void applyTemplate(e.target.value)}
@@ -292,13 +324,21 @@ export function AssignTaskForm({
           </div>
         )}
 
-        <label className="max-w-xl text-sm text-gray-600">
+        <CategoryPicker
+          value={categoryId}
+          onChange={setCategoryId}
+          categories={localCategories}
+          onCreateCategory={onCreateCategory}
+          onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
+        />
+
+        <label className="max-w-xl text-sm text-gray-600 dark:text-slate-300">
           Task title
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Type here..."
-            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
           />
         </label>
 
@@ -309,7 +349,7 @@ export function AssignTaskForm({
             status/proof/due, completion independent of the main task)
             for every recipient × day. Empty = a normal single task;
             nothing here ever blocks submission. */}
-        <div className="ml-4 max-w-xl border-l-2 border-gray-200 pl-3">
+        <div className="ml-4 max-w-xl border-l-2 border-gray-200 pl-3 dark:border-slate-700">
           <SubtaskListEditor key={subtaskEditorKey} subtasks={subtasks} onChange={setSubtasks} />
         </div>
 
@@ -322,7 +362,7 @@ export function AssignTaskForm({
         />
 
         {!hideCadence && (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 dark:text-slate-300">
             Cadence
             <div role="radiogroup" aria-label="Cadence" className="mt-1 flex gap-2">
               {visibleCadences.map((value) => {
@@ -337,7 +377,7 @@ export function AssignTaskForm({
                     className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                       active
                         ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-400"
                     }`}
                   >
                     {CADENCE_LABELS[value]}
@@ -353,7 +393,7 @@ export function AssignTaskForm({
             engine/recurrence.ts. */}
         {showDay && (
           <div className="max-w-md">
-            <p className="text-sm text-gray-600">Day</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Day</p>
             <div className="mt-1 flex flex-wrap gap-2">
               {FLOW_DAYS.map((d) => (
                 <button
@@ -368,13 +408,13 @@ export function AssignTaskForm({
               ))}
             </div>
             {days.length > 0 && (
-              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                 <div className="mb-1.5 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-500">Selected ({days.length})</p>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Selected ({days.length})</p>
                   <button
                     type="button"
                     onClick={() => setDays([])}
-                    className="text-xs font-medium text-gray-400 hover:text-gray-600"
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
                   >
                     Clear all
                   </button>
@@ -390,7 +430,7 @@ export function AssignTaskForm({
             )}
           </div>
         )}
-        <label className="max-w-xs text-sm text-gray-600">
+        <label className="max-w-xs text-sm text-gray-600 dark:text-slate-300">
           Due Date (optional)
           <input
             type="date"
@@ -403,26 +443,26 @@ export function AssignTaskForm({
         {/* Guideline (optional, 2026-07-30): SOP link and/or reference
             image. Leaving both empty is fine — routine tasks need no
             guidance; nothing here ever blocks submission. */}
-        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm font-medium text-gray-600">Guidelines</p>
-          <label className="mt-2 block text-sm text-gray-600">
+        <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+          <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Guidelines</p>
+          <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
             Link
             <input
               type="url"
               value={guidelineUrl}
               onChange={(e) => setGuidelineUrl(e.target.value)}
               placeholder="https://… (SOP document, Google Doc, …)"
-              className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+              className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>
-          <label className="mt-2 block text-sm text-gray-600">
+          <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
             Image <span className="text-xs text-gray-400">(PNG / JPG / WebP, ≤ 2 MB)</span>
             <input
               ref={imageInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
               onChange={(e) => onGuidelineImagePick(e.target.files?.[0])}
-              className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100"
+              className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
             />
           </label>
           {guidelineImage && (
@@ -431,12 +471,12 @@ export function AssignTaskForm({
               <img
                 src={guidelineImage.previewUrl}
                 alt="Guideline preview"
-                className="max-h-28 rounded-lg border border-gray-200 object-contain"
+                className="max-h-28 rounded-lg border border-gray-200 object-contain dark:border-slate-700"
               />
               <button
                 type="button"
                 onClick={clearGuidelineImage}
-                className="text-xs font-medium text-gray-400 hover:text-red-600"
+                className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400"
               >
                 ✕ remove {guidelineImage.name}
               </button>
@@ -449,13 +489,13 @@ export function AssignTaskForm({
             date) for reuse. Saving under an existing template's name
             overwrites it — that's the intended "edit template" path. */}
         {templates && (
-          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-600">
+          <div className="max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={saveTemplate}
                 onChange={(e) => setSaveTemplate(e.target.checked)}
-                className="size-4 rounded border-gray-300 accent-blue-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
               />
               Save as Template
             </label>
@@ -466,7 +506,7 @@ export function AssignTaskForm({
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder={title.trim() ? `Template name (default: ${title.trim()})` : "Template name"}
                   maxLength={100}
-                  className="mt-2 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
+                  className="mt-2 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 />
                 <p className="mt-1.5 text-xs text-gray-400">
                   Saves the task structure (title, subtasks, guideline) — not the recipients or dates.
@@ -483,7 +523,7 @@ export function AssignTaskForm({
           (10 selected people + day chips + due date) or how short the
           viewport is — the 2026-07-25 mobile/tablet bug was this button
           rendering off-screen with no scroll path. All screen sizes. */}
-      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3">
+      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-3 dark:border-slate-800">
         <button
           type="button"
           onClick={submit}
@@ -493,7 +533,7 @@ export function AssignTaskForm({
           {pending ? "Assigning…" : "Assign task"}
         </button>
         {message && (
-          <p className={`text-sm ${message.ok ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {message.text}
           </p>
         )}

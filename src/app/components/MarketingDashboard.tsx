@@ -120,18 +120,18 @@ export default function MarketingDashboard({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12 space-y-6">
-        
+
         {/* Header */}
         <div className="mb-6 w-full space-y-2">
           <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Hi, Marketing Department! Here is your custom executive workspace.
             </p>
             {loading && (
-              <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium">
+              <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 animate-pulse font-medium dark:bg-slate-800 dark:border-slate-700">
                 Syncing databases...
               </span>
             )}
@@ -140,67 +140,67 @@ export default function MarketingDashboard({
 
         {/* --- MAIN GRID SECTION --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* Left Column (Width 7/12) */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* 1. Attendance Tracker */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm dark:bg-slate-900 dark:border-slate-800">
+              <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2 dark:text-slate-100">
                 <Compass className="w-5 h-5 text-blue-500" />
                 Attendance Tracker
               </h2>
               <div className="grid grid-cols-2 gap-4">
                 {/* Onboarding */}
-                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center gap-4">
+                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center gap-4 dark:bg-blue-900/40 dark:border-blue-700">
                   <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white">
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-blue-600/80 uppercase tracking-wider">Onboarding</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.onboarding}</p>
+                    <p className="text-xs font-semibold text-blue-600/80 uppercase tracking-wider dark:text-blue-300">Onboarding</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-0.5 dark:text-slate-200">{attendance.onboarding}</p>
                   </div>
                 </div>
 
                 {/* Offboarding */}
-                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100 flex items-center gap-4">
+                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100 flex items-center gap-4 dark:bg-orange-900/40 dark:border-orange-700">
                   <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white">
                     <UserMinus className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-orange-600/80 uppercase tracking-wider">Offboarding</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.offboarding}</p>
+                    <p className="text-xs font-semibold text-orange-600/80 uppercase tracking-wider dark:text-orange-300">Offboarding</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-0.5 dark:text-slate-200">{attendance.offboarding}</p>
                   </div>
                 </div>
 
                 {/* Annual Leave */}
-                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center gap-4">
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center gap-4 dark:bg-emerald-900/40 dark:border-emerald-700">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
                     <Calendar className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-emerald-600/80 uppercase tracking-wider">Annual Leave</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.al}</p>
+                    <p className="text-xs font-semibold text-emerald-600/80 uppercase tracking-wider dark:text-emerald-300">Annual Leave</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-0.5 dark:text-slate-200">{attendance.al}</p>
                   </div>
                 </div>
 
                 {/* Medical Leave */}
-                <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 flex items-center gap-4">
+                <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 flex items-center gap-4 dark:bg-rose-900/40 dark:border-rose-700">
                   <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white">
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-rose-600/80 uppercase tracking-wider">Medical Leave (MC)</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-0.5">{attendance.mc}</p>
+                    <p className="text-xs font-semibold text-rose-600/80 uppercase tracking-wider dark:text-rose-300">Medical Leave (MC)</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-0.5 dark:text-slate-200">{attendance.mc}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* 2. Event Tracker Kanban */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between dark:bg-slate-900 dark:border-slate-800">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2 dark:text-slate-100">
                   <TrendingUp className="w-5 h-5 text-orange-500" />
                   Event Tracker
                 </h2>
@@ -212,12 +212,12 @@ export default function MarketingDashboard({
                     placeholder="New event name..."
                     value={newEventName}
                     onChange={(e) => setNewEventName(e.target.value)}
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <select
                     value={newEventStatus}
                     onChange={(e) => setNewEventStatus(e.target.value as "upcoming" | "ongoing" | "completed")}
-                    className="border border-slate-200 rounded-xl px-2 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 animate-none"
+                    className="border border-slate-200 rounded-xl px-2 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 animate-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                   >
                     <option value="upcoming">Upcoming</option>
                     <option value="ongoing">Ongoing</option>
@@ -236,8 +236,8 @@ export default function MarketingDashboard({
                   {(["upcoming", "ongoing", "completed"] as const).map((col) => {
                     const filtered = events.filter((ev) => ev.status === col);
                     const title = col === "upcoming" ? "Upcoming" : col === "ongoing" ? "Ongoing" : "Completed";
-                    const borderCol = col === "upcoming" ? "border-slate-100 bg-slate-50" : col === "ongoing" ? "border-amber-100 bg-amber-50/20" : "border-emerald-100 bg-emerald-50/20";
-                    const textCol = col === "upcoming" ? "text-slate-500" : col === "ongoing" ? "text-amber-700" : "text-emerald-700";
+                    const borderCol = col === "upcoming" ? "border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50" : col === "ongoing" ? "border-amber-100 bg-amber-50/20 dark:border-amber-700 dark:bg-amber-900/30" : "border-emerald-100 bg-emerald-50/20 dark:border-emerald-700 dark:bg-emerald-900/30";
+                    const textCol = col === "upcoming" ? "text-slate-500 dark:text-slate-400 dark:border-slate-700" : col === "ongoing" ? "text-amber-700 dark:text-amber-300 dark:border-amber-700" : "text-emerald-700 dark:text-emerald-300 dark:border-emerald-700";
 
                     return (
                       <div key={col} className={`p-2 rounded-xl border ${borderCol}`}>
@@ -246,13 +246,13 @@ export default function MarketingDashboard({
                         </p>
                         <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
                           {filtered.map((ev) => (
-                            <div key={ev.id} className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-xs flex flex-col gap-1.5">
-                              <span className="font-semibold text-slate-700 break-words leading-tight">{ev.name}</span>
-                              <div className="flex items-center justify-between border-t border-slate-100 pt-1.5 mt-0.5">
+                            <div key={ev.id} className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-xs flex flex-col gap-1.5 dark:bg-slate-900 dark:border-slate-700">
+                              <span className="font-semibold text-slate-700 break-words leading-tight dark:text-slate-300">{ev.name}</span>
+                              <div className="flex items-center justify-between border-t border-slate-100 pt-1.5 mt-0.5 dark:border-slate-800">
                                 {col !== "completed" ? (
                                   <button
                                     onClick={() => moveEvent(ev.id, col === "upcoming" ? "ongoing" : "completed")}
-                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
+                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 dark:text-blue-400 dark:hover:text-blue-300"
                                   >
                                     Move ➔
                                   </button>
@@ -261,7 +261,7 @@ export default function MarketingDashboard({
                                 )}
                                 <button
                                   onClick={() => deleteEvent(ev.id)}
-                                  className="text-slate-400 hover:text-rose-500 transition-colors"
+                                  className="text-slate-400 hover:text-rose-500 transition-colors dark:hover:text-rose-400"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -282,9 +282,9 @@ export default function MarketingDashboard({
           <div className="lg:col-span-5 space-y-6">
 
             {/* 4. Braindump Section */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between dark:bg-slate-900 dark:border-slate-800">
               <div className="flex-1 flex flex-col">
-                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900 mb-4 flex items-center justify-between dark:text-slate-100">
                   <span className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-purple-500" />
                     Braindump
@@ -301,7 +301,7 @@ export default function MarketingDashboard({
                     localStorage.setItem("marketing_braindump", e.target.value);
                   }}
                   placeholder="Write down any campaign notes, ad ideas, newsletter topics or goals here..."
-                  className="w-full flex-1 min-h-[160px] border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono leading-relaxed"
+                  className="w-full flex-1 min-h-[160px] border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono leading-relaxed dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
             </div>

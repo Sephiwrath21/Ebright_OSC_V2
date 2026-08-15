@@ -75,12 +75,18 @@ const TYPE_COLORS: Record<string, string> = {
   referral: "#16A34A",
 };
 
+// bg/text use theme-aware CSS vars (globals.css) so the badge flips with
+// dark mode; `dot` colours are the fixed pending/approved/rejected/disbursed
+// series-identity colours (kept literal, matching STATUS_META/DonutChart).
+// "disbursed" has no exact off-table match for its pale violet tint — mapped
+// to the nearest --status-violet-* pair (reported: not byte-identical to the
+// original #FAF5FF/#6B21A8, but same hue family).
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  pending: { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Pending" },
-  approved: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Approved" },
-  rejected: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Rejected" },
-  disbursed: { bg: "#FAF5FF", text: "#6B21A8", dot: "#A855F7", label: "Disbursed" },
-  received: { bg: "#ECFDF5", text: "#047857", dot: "#10B981", label: "Received" },
+  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "#F59E0B", label: "Pending" },
+  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "#10B981", label: "Approved" },
+  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "#EF4444", label: "Rejected" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "#A855F7", label: "Disbursed" },
+  received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "#10B981", label: "Received" },
 };
 
 const rm = (n: number) =>
@@ -119,15 +125,15 @@ export default function FinanceDashboard({
 
   if (error) {
     return (
-      <div className="min-h-full bg-slate-50 flex items-center justify-center p-10">
-        <p className="text-sm text-slate-500">Could not load the finance dashboard.</p>
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-10">
+        <p className="text-sm text-slate-500 dark:text-slate-400">Could not load the finance dashboard.</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-full bg-slate-50 flex items-center justify-center text-blue-600 font-semibold">
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold">
         Loading dashboard…
       </div>
     );
@@ -203,14 +209,14 @@ export default function FinanceDashboard({
   ];
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10 space-y-6">
         {/* Header */}
         <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
-        
+
         {/* Sub-header */}
-        <div className="border-b border-slate-200 pb-4">
-          <p className="text-sm text-slate-500">
+        <div className="border-b border-slate-200 pb-4 dark:border-slate-800">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Overview of all expense claims.
           </p>
         </div>
@@ -250,8 +256,8 @@ export default function FinanceDashboard({
         {/* Status donut (wide) + pending review (narrow) — swapped */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Status donut */}
-          <section className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl px-6 py-6">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5">
+          <section className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
               Claims by Status
             </h2>
             {counts.total > 0 ? (
@@ -266,18 +272,18 @@ export default function FinanceDashboard({
                     return (
                       <li
                         key={s.key}
-                        className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3"
+                        className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800"
                       >
                         <span
                           className="w-3 h-3 rounded-full shrink-0"
                           style={{ backgroundColor: s.color }}
                           aria-hidden="true"
                         />
-                        <span className="text-sm font-medium text-slate-600 truncate">
+                        <span className="text-sm font-medium text-slate-600 truncate dark:text-slate-300">
                           {s.label}
                         </span>
                         <span className="ml-auto flex items-baseline gap-1.5 shrink-0">
-                          <span className="text-lg font-bold text-slate-900">{counts[s.key]}</span>
+                          <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{counts[s.key]}</span>
                           <span className="text-xs text-slate-400 tabular-nums">{pct}%</span>
                         </span>
                       </li>
@@ -291,50 +297,50 @@ export default function FinanceDashboard({
           </section>
 
           {/* Pending review queue */}
-          <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200">
+          <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-500" aria-hidden="true" />
-                  <h2 className="text-sm font-semibold text-slate-900">Awaiting Review</h2>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Awaiting Review</h2>
                 </div>
                 <Link
                   href="/claim?status=pending"
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   View all
                 </Link>
               </div>
-              <p className="mt-1 text-xs font-semibold text-amber-700">
+              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
                 {counts.pending} pending · {rm(data.pendingAmount)}
               </p>
             </div>
             {data.pending.length === 0 ? (
               <div className="flex flex-col items-center gap-2 text-center py-12">
-                <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center dark:bg-slate-800">
                   <Inbox className="w-5 h-5 text-slate-400" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-semibold text-slate-700">All caught up</p>
-                <p className="text-xs text-slate-500">Nothing waiting for review.</p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">All caught up</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Nothing waiting for review.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+              <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto dark:divide-slate-800">
                 {data.pending.map((c) => (
                   <li key={c.claimId}>
                     <Link
                       href={`/claim/${c.claimId}`}
-                      className="group block px-5 py-3 hover:bg-slate-50/70 transition-colors"
+                      className="group block px-5 py-3 hover:bg-slate-50/70 transition-colors dark:hover:bg-slate-800/70"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-800 truncate">
+                        <span className="text-sm font-semibold text-slate-800 truncate dark:text-slate-200">
                           {c.employeeName}
                         </span>
-                        <span className="text-sm font-bold text-slate-900 tabular-nums shrink-0">
+                        <span className="text-sm font-bold text-slate-900 tabular-nums shrink-0 dark:text-slate-100">
                           {rm(c.amount)}
                         </span>
                       </div>
                       <div className="mt-0.5 flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-blue-600">{c.displayId}</span>
+                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{c.displayId}</span>
                         <span className="text-[11px] text-slate-400 truncate">
                           {typeLabel(c.claimType)}
                         </span>
@@ -351,8 +357,8 @@ export default function FinanceDashboard({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <ToDoList storageKey="finance-dashboard-todos" />
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5">
+          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
               Approved Amount by Type
             </h2>
             {typeBars.length > 0 ? (
@@ -362,8 +368,8 @@ export default function FinanceDashboard({
             )}
           </section>
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5">
+          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
               Claims Made by Month
             </h2>
             {monthBars.length > 0 ? (
@@ -378,19 +384,19 @@ export default function FinanceDashboard({
         </div>
 
         {/* Recent claims */}
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-slate-500" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-slate-900">Recent Claims</h2>
+              <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent Claims</h2>
             </div>
-            <Link href="/claim" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+            <Link href="/claim" className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
               View all
             </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase">
+              <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400">
                 <tr>
                   <th className="text-left px-6 py-3">Claim ID</th>
                   <th className="text-left px-6 py-3">Employee</th>
@@ -411,23 +417,23 @@ export default function FinanceDashboard({
                 ) : (
                   data.recent.map((c) => {
                     const badge = STATUS_BADGE[c.status] ?? {
-                      bg: "#F1F5F9",
-                      text: "#334155",
-                      dot: "#64748B",
+                      bg: "var(--status-neutral-bg)",
+                      text: "var(--text-strong)",
+                      dot: "var(--text-muted-strong)",
                       label: c.status,
                     };
                     return (
                       <tr
                         key={c.claimId}
-                        className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors"
+                        className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors dark:border-slate-800 dark:hover:bg-slate-800/60"
                       >
-                        <td className="px-6 py-2.5 font-semibold text-blue-600">{c.displayId}</td>
-                        <td className="px-6 py-2.5 text-slate-800">{c.employeeName}</td>
-                        <td className="px-6 py-2.5 text-slate-700">{typeLabel(c.claimType)}</td>
-                        <td className="px-6 py-2.5 font-semibold text-slate-900 tabular-nums">
+                        <td className="px-6 py-2.5 font-semibold text-blue-600 dark:text-blue-400">{c.displayId}</td>
+                        <td className="px-6 py-2.5 text-slate-800 dark:text-slate-200">{c.employeeName}</td>
+                        <td className="px-6 py-2.5 text-slate-700 dark:text-slate-300">{typeLabel(c.claimType)}</td>
+                        <td className="px-6 py-2.5 font-semibold text-slate-900 tabular-nums dark:text-slate-100">
                           {rm(c.amount)}
                         </td>
-                        <td className="px-6 py-2.5 text-slate-600 tabular-nums">
+                        <td className="px-6 py-2.5 text-slate-600 tabular-nums dark:text-slate-300">
                           {new Date(c.claimDate).toLocaleDateString("en-GB")}
                         </td>
                         <td className="px-6 py-2.5">
@@ -447,7 +453,7 @@ export default function FinanceDashboard({
                           <Link
                             href={`/claim/${c.claimId}`}
                             aria-label={`View ${c.displayId}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
                           >
                             <Eye className="w-4 h-4" aria-hidden="true" />
                           </Link>
@@ -463,9 +469,9 @@ export default function FinanceDashboard({
 
         {/* Headcount */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6">
+          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase">
+              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
                 Headcount by Department
               </h2>
               <span className="text-xs font-semibold text-slate-400 tabular-nums">
@@ -479,9 +485,9 @@ export default function FinanceDashboard({
             )}
           </section>
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6">
+          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase">
+              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
                 Headcount by Branch
               </h2>
               <span className="text-xs font-semibold text-slate-400 tabular-nums">

@@ -52,14 +52,14 @@ function PercentRing({ percent }: { percent: number }) {
   const dash = (percent / 100) * circ;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={c} cy={c} r={r} fill="none" stroke="#EEF1F4" strokeWidth={stroke} />
+      <circle cx={c} cy={c} r={r} fill="none" stroke="var(--status-track)" strokeWidth={stroke} />
       <g transform={`rotate(-90 ${c} ${c})`}>
         <circle
           cx={c}
           cy={c}
           r={r}
           fill="none"
-          stroke="#0F6E56"
+          stroke="var(--cat-green-fg)"
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={`${dash} ${circ - dash}`}
@@ -70,6 +70,7 @@ function PercentRing({ percent }: { percent: number }) {
         y={c}
         textAnchor="middle"
         dominantBaseline="central"
+        // Brand blue accent (off-table, kept literal per the brand-colour rule).
         style={{ fontSize: 18, fontWeight: 700, fill: "#185FA5" }}
       >
         {percent}%
@@ -100,7 +101,7 @@ function StatChip({
       }}
     >
       <div style={{ fontSize: 16, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#94A3B8", marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--status-neutral-fg)", marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -109,6 +110,7 @@ function Accordion({
   label,
   count,
   color,
+  solidColor,
   bg,
   tasks,
   open,
@@ -116,7 +118,14 @@ function Accordion({
 }: {
   label: string;
   count: number;
+  /** Theme-aware — paired with `bg` for the caret icon (both flip together). */
   color: string;
+  /**
+   * Fixed literal — the count pill is a solid fill with white text, so it
+   * must NOT use the theme-aware `color` (which lightens in dark mode and
+   * would break white-on-fill contrast).
+   */
+  solidColor: string;
   bg: string;
   tasks: string[];
   open: boolean;
@@ -142,7 +151,7 @@ function Accordion({
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <i className={open ? "ti ti-caret-down-filled" : "ti ti-caret-right-filled"} style={{ color, fontSize: 12 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#1F2937" }}>{label}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{label}</span>
         </span>
         <span
           style={{
@@ -150,7 +159,7 @@ function Accordion({
             height: 20,
             padding: "0 6px",
             borderRadius: 999,
-            background: color,
+            background: solidColor,
             color: "#fff",
             fontSize: 11,
             fontWeight: 700,
@@ -165,10 +174,10 @@ function Accordion({
       {open && (
         <ul style={{ listStyle: "none", margin: 0, padding: "0 10px 10px 26px", display: "flex", flexDirection: "column", gap: 5 }}>
           {tasks.length === 0 ? (
-            <li style={{ fontSize: 12, color: "#94A3B8" }}>Nothing here.</li>
+            <li style={{ fontSize: 12, color: "var(--status-neutral-fg)" }}>Nothing here.</li>
           ) : (
             tasks.map((t, i) => (
-              <li key={`${t}-${i}`} style={{ fontSize: 12, color: "#475569" }}>
+              <li key={`${t}-${i}`} style={{ fontSize: 12, color: "var(--status-neutral-fg-strong)" }}>
                 • {t}
               </li>
             ))
@@ -187,18 +196,22 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "0.5px solid #E5E7EB",
+        background: "var(--surface)",
+        border: "0.5px solid var(--status-track)",
         borderRadius: 12,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
       }}
     >
+      {/* Decorative brand gradient stripe — vivid/self-contained, no
+          text sits on it, so it's left literal in both themes. */}
       <div style={{ height: 6, background: "linear-gradient(90deg, #4F46E5, #7C3AED)" }} />
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
         {/* Member header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Pale indigo avatar tint — no close token match (no indigo tint
+              in the palette); left literal, reported. */}
           <div
             style={{
               width: 36,
@@ -221,7 +234,7 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: "#111827",
+                color: "var(--text-primary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -229,7 +242,7 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
             >
               {m.name}
             </div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>{m.role}</div>
+            <div style={{ fontSize: 11, color: "var(--status-neutral-fg)" }}>{m.role}</div>
           </div>
         </div>
 
@@ -238,12 +251,14 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
           <PercentRing percent={percent} />
         </div>
 
-        {/* Stats */}
+        {/* Stats. "N/A" is an off-table yellow (#CA8A04/#FEF9C3) with no close
+            token match (distinct hue from --cat-amber/--accent-amber) — left
+            literal; the rest are exact category/status token pairs. */}
         <div style={{ display: "flex", gap: 6 }}>
-          <StatChip value={done} label="Done" color="#0F6E56" bg="#E1F5EE" />
-          <StatChip value={pending} label="Pending" color="#DC2626" bg="#FEE2E2" />
+          <StatChip value={done} label="Done" color="var(--cat-green-fg)" bg="var(--cat-green-bg)" />
+          <StatChip value={pending} label="Pending" color="var(--status-red-fg)" bg="var(--tint-red)" />
           <StatChip value={notApplicable} label="N/A" color="#CA8A04" bg="#FEF9C3" />
-          <StatChip value={total} label="Total" color="#3C3489" bg="#EEEDFE" />
+          <StatChip value={total} label="Total" color="var(--cat-purple-fg)" bg="var(--cat-purple-bg)" />
         </div>
 
         {/* Completed / Pending / Not Applicable */}
@@ -251,8 +266,9 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
           <Accordion
             label="Completed"
             count={tasks.complete.length}
-            color="#0F6E56"
-            bg="#F0FAF6"
+            color="var(--cat-green-fg)"
+            solidColor="#0F6E56"
+            bg="var(--tint-green)"
             tasks={tasks.complete}
             open={open === "completed"}
             onToggle={() => setOpen((o) => (o === "completed" ? null : "completed"))}
@@ -260,16 +276,19 @@ function MemberCard({ m, stats, tasks }: { m: MemberWeek; stats: Stats; tasks: T
           <Accordion
             label="Pending"
             count={tasks.pending.length}
-            color="#DC2626"
-            bg="#FEF2F2"
+            color="var(--status-red-fg)"
+            solidColor="#DC2626"
+            bg="var(--tint-red)"
             tasks={tasks.pending}
             open={open === "pending"}
             onToggle={() => setOpen((o) => (o === "pending" ? null : "pending"))}
           />
+          {/* Off-table yellow — same as the N/A StatChip above, left literal. */}
           <Accordion
             label="Not Applicable"
             count={tasks.notApplicable.length}
             color="#CA8A04"
+            solidColor="#CA8A04"
             bg="#FEFCE8"
             tasks={tasks.notApplicable}
             open={open === "na"}
@@ -326,17 +345,17 @@ export default function DepartmentMembers({
     <div
       style={{
         minHeight: "100%",
-        background: "#F3F4F6",
+        background: "var(--surface-sunken)",
         fontFamily: fontStack,
-        color: "#111827",
+        color: "var(--text-primary)",
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
         {/* Top bar */}
         <div
           style={{
-            background: "#FFFFFF",
-            border: "0.5px solid #E5E7EB",
+            background: "var(--surface)",
+            border: "0.5px solid var(--status-track)",
             borderRadius: 12,
             padding: "12px 16px",
             display: "flex",
@@ -352,10 +371,10 @@ export default function DepartmentMembers({
               alignItems: "center",
               gap: 6,
               padding: "7px 12px",
-              border: "0.5px solid #E5E7EB",
+              border: "0.5px solid var(--status-track)",
               borderRadius: 8,
-              background: "#FFFFFF",
-              color: "#374151",
+              background: "var(--surface)",
+              color: "var(--text-secondary)",
               fontSize: 13,
               fontWeight: 600,
               fontFamily: "inherit",
@@ -372,8 +391,8 @@ export default function DepartmentMembers({
             style={{
               padding: "5px 12px",
               borderRadius: 999,
-              background: "#EEEDFE",
-              color: "#3C3489",
+              background: "var(--cat-purple-bg)",
+              color: "var(--cat-purple-fg)",
               fontSize: 12,
               fontWeight: 600,
               whiteSpace: "nowrap",
@@ -392,13 +411,13 @@ export default function DepartmentMembers({
               display: "flex",
               alignItems: "center",
               gap: 8,
-              background: "#FFFFFF",
-              border: "0.5px solid #E5E7EB",
+              background: "var(--surface)",
+              border: "0.5px solid var(--status-track)",
               borderRadius: 10,
               padding: "8px 12px",
             }}
           >
-            <i className="ti ti-search" style={{ color: "#94A3B8" }} />
+            <i className="ti ti-search" style={{ color: "var(--status-neutral-fg)" }} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -410,23 +429,23 @@ export default function DepartmentMembers({
                 background: "transparent",
                 fontFamily: "inherit",
                 fontSize: 13,
-                color: "#1F2937",
+                color: "var(--text-primary)",
               }}
             />
           </div>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6B7280" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-muted-strong)" }}>
             Sort:
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as typeof sort)}
               style={{
-                border: "0.5px solid #E5E7EB",
+                border: "0.5px solid var(--status-track)",
                 borderRadius: 8,
                 padding: "7px 10px",
-                background: "#FFFFFF",
+                background: "var(--surface)",
                 fontFamily: "inherit",
                 fontSize: 13,
-                color: "#1F2937",
+                color: "var(--text-primary)",
                 cursor: "pointer",
               }}
             >
@@ -451,14 +470,16 @@ export default function DepartmentMembers({
                 style={{
                   height: 38,
                   padding: "0 16px",
-                  border: active ? "none" : "0.5px solid #E5E7EB",
+                  border: active ? "none" : "0.5px solid var(--status-track)",
                   borderRadius: 8,
                   cursor: "pointer",
                   fontFamily: "inherit",
                   fontSize: 13,
                   fontWeight: 600,
-                  background: active ? "#185FA5" : "#FFFFFF",
-                  color: active ? "#FFFFFF" : "#374151",
+                  // Active state is a solid brand-blue fill with white text
+                  // (off-table, theme-invariant — left literal).
+                  background: active ? "#185FA5" : "var(--surface)",
+                  color: active ? "#FFFFFF" : "var(--text-secondary)",
                 }}
               >
                 {label}
@@ -468,7 +489,7 @@ export default function DepartmentMembers({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#94A3B8" }}>
+          <span style={{ fontSize: 12, color: "var(--status-neutral-fg)" }}>
             Showing {members.length} member{members.length !== 1 ? "s" : ""}
           </span>
           {memberId && (
@@ -480,9 +501,10 @@ export default function DepartmentMembers({
                 alignItems: "center",
                 gap: 4,
                 padding: "3px 10px",
-                border: "0.5px solid #E5E7EB",
+                border: "0.5px solid var(--status-track)",
                 borderRadius: 999,
-                background: "#FFFFFF",
+                background: "var(--surface)",
+                // Brand blue accent text (off-table, kept literal).
                 color: "#185FA5",
                 fontSize: 12,
                 fontWeight: 600,

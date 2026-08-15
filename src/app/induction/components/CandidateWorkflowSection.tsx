@@ -29,10 +29,10 @@ const ACTOR_BADGE: Record<string, string> = {
 export function CandidateWorkflowSection({ assignment }: Props) {
   if (!assignment) {
     return (
-      <section className="overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-white p-8 text-center">
+      <section className="overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center">
         <p className="text-3xl mb-2" aria-hidden="true">⚙️</p>
-        <h2 className="text-base font-semibold text-slate-700">Department Workflow</h2>
-        <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+        <h2 className="text-base font-semibold text-slate-700 dark:text-slate-300">Department Workflow</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto leading-relaxed">
           Your department head has not published a workflow yet. Check back soon.
         </p>
       </section>
@@ -44,15 +44,15 @@ export function CandidateWorkflowSection({ assignment }: Props) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="px-6 py-4 border-b border-slate-200">
-        <h2 className="text-base font-semibold text-slate-900">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <header className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
           Department Workflow — {assignment.workflowName}
         </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
           {assignment.departmentName} · {done} of {total} step{total === 1 ? "" : "s"} done ({pct}%)
         </p>
-        <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
           <div
             className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-[width] duration-300"
             style={{ width: `${pct}%` }}
@@ -60,7 +60,7 @@ export function CandidateWorkflowSection({ assignment }: Props) {
         </div>
       </header>
 
-      <ul className="divide-y divide-slate-200">
+      <ul className="divide-y divide-slate-200 dark:divide-slate-800">
         {assignment.steps.map((s) => (
           <WorkflowStepRow key={s.id} step={s} />
         ))}
@@ -105,30 +105,30 @@ function WorkflowStepRow({
           isDone
             ? "bg-emerald-600 border-emerald-600 text-white"
             : isCandidateActor
-              ? "bg-white border-slate-400 hover:border-emerald-500 cursor-pointer"
-              : "bg-slate-50 border-slate-300 cursor-not-allowed opacity-60"
+              ? "bg-white dark:bg-slate-950 border-slate-400 dark:border-slate-500 hover:border-emerald-500 cursor-pointer"
+              : "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 cursor-not-allowed opacity-60"
         } ${pending ? "opacity-50" : ""}`}
       >
         {isDone && <span className="text-[11px] font-bold leading-none">✓</span>}
       </button>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm ${isDone ? "text-slate-500 line-through" : "text-slate-700"}`}>
+        <p className={`text-sm ${isDone ? "text-slate-500 dark:text-slate-400 line-through" : "text-slate-700 dark:text-slate-300"}`}>
           {step.title}
         </p>
         {step.description && (
-          <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">{step.description}</p>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{step.description}</p>
         )}
         <div className="mt-1 flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold ${ACTOR_BADGE[step.actorRole] ?? ACTOR_BADGE.System}`}>
             {step.actorRole}
           </span>
           {!isDone && !isCandidateActor && (
-            <span className="text-[11px] text-amber-700 font-semibold">
+            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold">
               ⏳ Awaiting {step.actorRole}
             </span>
           )}
           {error && (
-            <span className="text-[11px] text-rose-700">{error}</span>
+            <span className="text-[11px] text-rose-700 dark:text-rose-300">{error}</span>
           )}
         </div>
       </div>

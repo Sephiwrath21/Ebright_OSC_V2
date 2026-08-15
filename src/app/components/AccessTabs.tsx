@@ -19,7 +19,7 @@ export default function AccessTabs() {
   return (
     <nav
       aria-label="Account management sections"
-      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 shadow-sm"
     >
       {TABS.map(({ label, href, Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -30,8 +30,8 @@ export default function AccessTabs() {
             aria-current={active ? "page" : undefined}
             className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
               active
-                ? "bg-slate-900 text-white shadow-sm"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                ? "bg-slate-900 text-white shadow-sm dark:bg-slate-700"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800"
             }`}
           >
             <Icon className="w-4 h-4" aria-hidden="true" />

@@ -29,7 +29,7 @@ import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-interface NavItem {
+export interface NavItem {
   name: string;
   /** Leaf items navigate; items with `children` toggle instead. */
   href?: string;
@@ -54,7 +54,7 @@ interface NavItem {
   children?: NavItem[];
 }
 
-const primaryNav: NavItem[] = [
+export const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
   { name: "ClickUp Task", href: "/clickup-task", Icon: ClipboardList },
   {
@@ -125,13 +125,9 @@ const primaryNav: NavItem[] = [
   },
   {
     name: "SMS",
-    href: "/dashboards/sms",
+    href: "https://staging-sms.ebright.my/",
     Icon: BookUser,
-    children: [
-      { name: "Student", href: "/dashboards/sms/student", feature: "sms_student" },
-      { name: "Package", href: "/dashboards/sms/package", feature: "sms_package" },
-      { name: "Age Group", href: "/dashboards/sms/age-group", feature: "sms_age_group" },
-    ],
+    external: true,
   },
   {
     name: "Inventory",
@@ -179,10 +175,12 @@ const primaryNav: NavItem[] = [
       { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
     ],
   },
-  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan" },
+  // Opens in a new tab: Flowghan is its own full-page app (no portal sidebar/topbar,
+  // see src/app/flowghan/page.tsx) so it shouldn't replace the current portal tab.
+  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan", external: true },
 ];
 
-const secondaryNav: NavItem[] = [
+export const secondaryNav: NavItem[] = [
   { name: "Attendance", href: "/attendance", Icon: CalendarCheck, feature: "attendance_overview" },
   { name: "Account Management", href: "/account-management", Icon: ShieldCheck, privileged: true },
   {
@@ -284,14 +282,14 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`bg-white border-r border-slate-200 flex flex-col shrink-0 transition-[width] duration-200 ${
+      className={`bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 transition-[width] duration-200 ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
       <Link
         href="/home"
         aria-label="Ebright Portal — Home"
-        className={`flex items-center h-16 border-b border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+        className={`flex items-center h-16 border-b border-slate-200 dark:border-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
           collapsed ? "justify-center px-0" : "px-5"
         }`}
         onNavigate={(e) => {
@@ -317,7 +315,7 @@ export default function Sidebar({
         <NavSection label="Workspace" items={primaryItems} pathname={pathname} collapsed={collapsed} />
         {secondaryItems.length > 0 && (
           <>
-            <div className="my-3 mx-3 border-t border-slate-100" />
+            <div className="my-3 mx-3 border-t border-slate-100 dark:border-slate-800" />
             <NavSection label="Quick Access" items={secondaryItems} pathname={pathname} collapsed={collapsed} />
           </>
         )}
@@ -466,7 +464,7 @@ function NavNode({
   ) : Icon ? (
     <Icon
       className={`w-5 h-5 shrink-0 ${
-        isActive || hasActiveDescendant ? "text-blue-600" : "text-slate-500"
+        isActive || hasActiveDescendant ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
       }`}
       aria-hidden="true"
     />
@@ -478,8 +476,8 @@ function NavNode({
 
     const iconButtonClass = `relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
       isActive || hasActiveDescendant || flyoutOpen
-        ? "bg-blue-50 text-blue-700"
-        : "text-slate-700 hover:bg-slate-100"
+        ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
     }`;
 
     // Parents with children: clicking the icon opens a flyout listing them.
@@ -504,9 +502,9 @@ function NavNode({
                 ref={popoverRef}
                 data-nav-flyout
                 style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
-                className="z-50 min-w-56 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
+                className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:ring-1 dark:ring-white/10 py-2 shadow-lg"
               >
-                <p className="px-3 pb-2 mb-1 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                <p className="px-3 pb-2 mb-1 border-b border-slate-100 dark:border-slate-700 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   {name}
                 </p>
                 <ul className="px-1 space-y-0.5">
@@ -563,10 +561,10 @@ function NavNode({
     depth === 0 ? "py-2.5" : "py-2"
   } ${
     isActive
-      ? "bg-blue-50 text-blue-700"
+      ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
       : hasActiveDescendant
-        ? "text-blue-700 hover:bg-slate-100"
-        : `${depth === 0 ? "text-slate-700" : "text-slate-600"} hover:bg-slate-100`
+        ? "text-blue-700 dark:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+        : `${depth === 0 ? "text-slate-700" : "text-slate-600"} dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800`
   }`;
 
   // Inside a flyout popover: a nested group cascades into its own side
@@ -594,7 +592,7 @@ function NavNode({
               ref={popoverRef}
               data-nav-flyout
               style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
-              className="z-50 min-w-56 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
+              className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:ring-1 dark:ring-white/10 py-2 shadow-lg"
             >
               <ul className="px-1 space-y-0.5">
                 {children.map((child) => (

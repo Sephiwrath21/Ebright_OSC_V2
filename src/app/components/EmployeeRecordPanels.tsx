@@ -101,7 +101,7 @@ function AddAnotherGuardianButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-5 px-5 py-2.5 rounded-full border-2 border-[#49a2c6] bg-[#97ecf5] text-sm font-medium text-[#0b43a3] hover:bg-[#7fe3ee]"
+      className="mt-5 px-5 py-2.5 rounded-full border-2 border-[#49a2c6] dark:border-slate-600 bg-[#97ecf5] dark:bg-slate-800 text-sm font-medium text-[#0b43a3] dark:text-slate-100 hover:bg-[#7fe3ee] dark:hover:bg-slate-700"
     >
       Add Another
     </button>
@@ -119,7 +119,7 @@ function RemoveGuardianButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Remove this guardian"
-      className="text-slate-400 hover:text-red-600 text-lg leading-none font-semibold"
+      className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none font-semibold"
     >
       −
     </button>
@@ -442,12 +442,12 @@ function PerformanceReviewAttachmentField({
   const editing = useEditMode();
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-xs font-medium text-slate-500">Attachment</span>
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Attachment</span>
       {editing ? (
         editingExistingRecord && existingFileId && !pendingFile ? (
           <div className="flex items-center gap-2 min-w-0">
             <RealAttachmentLink fileId={existingFileId} />
-            <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+            <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
               <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
               Replace
             </label>
@@ -472,7 +472,7 @@ function CancelEditLink({ show, onClick }: { show: boolean; onClick: () => void 
   const editing = useEditMode();
   if (!editing || !show) return null;
   return (
-    <button type="button" onClick={onClick} className="text-xs text-[#4a90e2] hover:underline shrink-0">
+    <button type="button" onClick={onClick} className="text-xs text-[#4a90e2] dark:text-blue-400 hover:underline shrink-0">
       Cancel edit — add new review instead
     </button>
   );
@@ -692,9 +692,9 @@ function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
         { key: "source", label: "Source" },
       ]}
       rows={tasks.map((t) => ({
-        name: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.name}</span>,
-        date: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
-        source: <span className={t.isOverdue ? "text-red-600 font-medium" : undefined}>{t.source}</span>,
+        name: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.name}</span>,
+        date: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
+        source: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.source}</span>,
       }))}
     />
   );
@@ -719,7 +719,7 @@ const TASK_MONTH_OPTIONS = [
 ];
 
 const taskFilterSelectClass =
-  "h-8 px-2.5 rounded-lg border border-black/15 bg-white text-sm text-black/70 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "h-8 px-2.5 rounded-lg border border-black/15 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-black/70 dark:text-slate-100 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function TaskDateFilters({
   month,

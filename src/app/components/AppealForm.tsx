@@ -56,29 +56,29 @@ const ACCENT_STYLES: Record<
   { tile: string; icon: string; ring: string; selectedBorder: string }
 > = {
   amber: {
-    tile: "bg-amber-50",
-    icon: "text-amber-600",
+    tile: "bg-amber-50 dark:bg-amber-900",
+    icon: "text-amber-600 dark:text-amber-300",
     ring: "ring-amber-400",
     selectedBorder: "border-amber-500",
   },
   indigo: {
-    tile: "bg-indigo-50",
-    icon: "text-indigo-600",
+    tile: "bg-indigo-50 dark:bg-indigo-900",
+    icon: "text-indigo-600 dark:text-indigo-300",
     ring: "ring-indigo-400",
     selectedBorder: "border-indigo-500",
   },
   rose: {
-    tile: "bg-rose-50",
-    icon: "text-rose-600",
+    tile: "bg-rose-50 dark:bg-rose-900",
+    icon: "text-rose-600 dark:text-rose-300",
     ring: "ring-rose-400",
     selectedBorder: "border-rose-500",
   },
 };
 
 const STATUS_STYLES: Record<AppealRequest["status"], string> = {
-  Pending: "bg-amber-100 text-amber-700 ring-amber-600/20",
-  Approved: "bg-emerald-100 text-emerald-700 ring-emerald-600/20",
-  Rejected: "bg-rose-100 text-rose-700 ring-rose-600/20",
+  Pending: "bg-amber-100 text-amber-700 ring-amber-600/20 dark:bg-amber-900 dark:text-amber-300 dark:ring-amber-400/30",
+  Approved: "bg-emerald-100 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900 dark:text-emerald-300 dark:ring-emerald-400/30",
+  Rejected: "bg-rose-100 text-rose-700 ring-rose-600/20 dark:bg-rose-900 dark:text-rose-300 dark:ring-rose-400/30",
 };
 
 const INITIAL_FORM = {
@@ -389,20 +389,20 @@ export default function AppealForm() {
   const selectedTypeObj = selectedType ? APPEAL_TYPES.find((t) => t.id === selectedType) : null;
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-6 pt-4 pb-12">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <HomeIcon className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/dashboards/hrms" className="hover:text-slate-900 transition-colors">HRMS</Link>
+          <Link href="/dashboards/hrms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">HRMS</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/attendance" className="hover:text-slate-900 transition-colors">Attendance</Link>
+          <Link href="/attendance" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">Attendance</Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Appeal</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Appeal</span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -410,13 +410,13 @@ export default function AppealForm() {
           <div className="lg:col-span-2 space-y-6">
             {/* Page heading */}
             <header className="mb-6">
-              <h1 className="text-2xl font-bold text-slate-900">File an Appeal</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Compose a warning letter, show-cause letter, or PIP, preview the PDF, and submit the appeal for HR review.</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">File an Appeal</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Compose a warning letter, show-cause letter, or PIP, preview the PDF, and submit the appeal for HR review.</p>
             </header>
 
             {/* Appeal Categories */}
             <section>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
                 Appeal Categories
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -429,17 +429,17 @@ export default function AppealForm() {
                       type="button"
                       onClick={() => setSelectedType(t.id)}
                       aria-pressed={isSelected}
-                      className={`text-left bg-white border-2 rounded-2xl p-5 transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:${accent.ring} ${
+                      className={`text-left bg-white dark:bg-slate-900 border-2 rounded-2xl p-5 transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 focus-visible:${accent.ring} ${
                         isSelected
                           ? `${accent.selectedBorder} shadow-md`
-                          : "border-slate-200 hover:border-slate-300"
+                          : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600"
                       }`}
                     >
                       <div className={`w-11 h-11 rounded-xl ${accent.tile} flex items-center justify-center mb-3`}>
                         <t.Icon className={`w-5 h-5 ${accent.icon}`} aria-hidden="true" />
                       </div>
-                      <h3 className="text-base font-bold text-slate-900 mb-1">{t.name}</h3>
-                      <p className="text-xs text-slate-500 leading-relaxed">{t.description}</p>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">{t.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.description}</p>
                     </button>
                   );
                 })}
@@ -447,15 +447,15 @@ export default function AppealForm() {
             </section>
 
             {/* History */}
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">Appeal History</h2>
-                <span className="text-xs text-slate-500">{appeals.length} record{appeals.length === 1 ? "" : "s"}</span>
+            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Appeal History</h2>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{appeals.length} record{appeals.length === 1 ? "" : "s"}</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <tr className="bg-slate-50 dark:bg-slate-800 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       <th className="px-6 py-3">Type</th>
                       <th className="px-6 py-3">Date</th>
                       <th className="px-6 py-3">Reason</th>
@@ -463,7 +463,7 @@ export default function AppealForm() {
                       <th className="px-6 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {appeals.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
@@ -472,10 +472,10 @@ export default function AppealForm() {
                       </tr>
                     ) : (
                       appeals.map((a) => (
-                        <tr key={a.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-6 py-4 text-slate-800 font-medium">{a.type}</td>
-                          <td className="px-6 py-4 text-slate-600 tabular-nums">{a.date}</td>
-                          <td className="px-6 py-4 text-slate-600 max-w-xs truncate">{a.reason}</td>
+                        <tr key={a.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+                          <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-medium">{a.type}</td>
+                          <td className="px-6 py-4 text-slate-600 dark:text-slate-300 tabular-nums">{a.date}</td>
+                          <td className="px-6 py-4 text-slate-600 dark:text-slate-300 max-w-xs truncate">{a.reason}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLES[a.status]}`}>
                               {a.status}
@@ -486,7 +486,7 @@ export default function AppealForm() {
                               <button
                                 type="button"
                                 onClick={() => setViewingAppeal(a)}
-                                className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium"
+                                className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                               >
                                 <Eye className="w-4 h-4" aria-hidden="true" />
                                 View
@@ -506,14 +506,14 @@ export default function AppealForm() {
           <div className="lg:col-span-1">
             <form
               onSubmit={handleSubmit}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto"
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto"
             >
-              <div className="px-6 py-4 border-b border-slate-200">
-                <h3 className="text-base font-semibold text-slate-900">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   {selectedType ? "Letter Details" : "Submit Appeal"}
                 </h3>
                 {selectedTypeObj && (
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedTypeObj.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{selectedTypeObj.name}</p>
                 )}
               </div>
 
@@ -521,15 +521,15 @@ export default function AppealForm() {
                 {!selectedType ? (
                   <>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                         Appeal Type
                       </label>
-                      <div className="px-3 py-2.5 border border-dashed border-slate-300 rounded-lg bg-slate-50 text-sm text-slate-500">
+                      <div className="px-3 py-2.5 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-sm text-slate-500 dark:text-slate-400">
                         Select a type from the cards on the left.
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                         Reason for Appeal
                       </label>
                       <textarea
@@ -537,7 +537,7 @@ export default function AppealForm() {
                         onChange={(e) => setForm({ ...form, reason: e.target.value })}
                         placeholder="Explain your reason for filing this appeal…"
                         rows={6}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
                       />
                     </div>
                   </>
@@ -681,20 +681,20 @@ export default function AppealForm() {
                 )}
 
                 {error && (
-                  <div role="alert" className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm py-2 px-3 rounded-lg">
+                  <div role="alert" className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm py-2 px-3 rounded-lg dark:bg-rose-900 dark:border-rose-700 dark:text-rose-300">
                     <CircleAlert className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
                     <span>{error}</span>
                   </div>
                 )}
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex flex-col gap-2">
+              <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col gap-2">
                 {selectedType && selectedTypeObj && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => openPdfPreview(buildLetterContent(selectedType, form), selectedTypeObj.name)}
-                      className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       <Eye className="w-4 h-4" aria-hidden="true" />
                       Preview
@@ -708,7 +708,7 @@ export default function AppealForm() {
                           : "PIP_Letter.pdf";
                         downloadPdf(buildLetterContent(selectedType, form), filename);
                       }}
-                      className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       <Download className="w-4 h-4" aria-hidden="true" />
                       Download
@@ -764,7 +764,7 @@ export default function AppealForm() {
               <button
                 type="button"
                 onClick={() => setViewingAppeal(null)}
-                className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Close
               </button>
@@ -788,12 +788,12 @@ export default function AppealForm() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const fieldCls =
-  "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
         {label}
       </label>
       {children}
@@ -814,21 +814,21 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col" style={{ height: "90vh" }}>
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl flex flex-col" style={{ height: "90vh" }}>
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
         {children}
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex justify-end gap-2 shrink-0">
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
             {footer}
           </div>
         )}

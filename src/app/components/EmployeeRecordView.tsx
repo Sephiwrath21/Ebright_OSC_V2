@@ -81,7 +81,7 @@ import type {
 // w-[210px] Tailwind class since it now only ever renders at its one fixed
 // desktop size.
 const RAIL_GAP_PX = 10;
-const RAIL_BASE = "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]";
+const RAIL_BASE = "bg-[#b0ffbfa8] dark:bg-slate-800 border-[#0a6e03] dark:border-emerald-700 text-[#4b4949d6] dark:text-slate-300";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
 
 // PageEditProvider rollout (2026-08-13, see conversation) — categories
@@ -222,39 +222,39 @@ export default function EmployeeRecordView({
     : (category.sections.find((s) => s.key === sectionKey) ?? category.sections[0]);
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       {/* No longer needs a --rail-width custom property: the vertical rail
           is either hidden outright (touch devices, replaced by the mobile
           sub-tab row) or rendered at its one fixed w-[210px] (mouse/
           trackpad-driven browsers) — neither consumer needs a shared fluid
           value anymore. */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-10">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">Employee Record</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">Employee Record</span>
         </nav>
 
         <div className="flex items-start gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-lg flex items-center justify-center shrink-0">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-semibold text-lg flex items-center justify-center shrink-0">
             {initialsFromName(employeeName)}
           </div>
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-xl font-semibold text-slate-900">{employeeName}</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{employeeName}</h1>
             {stage && stage !== "pre" && employeeCode && (
-              <span className="block text-xs text-slate-500">ID: {employeeCode}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">ID: {employeeCode}</span>
             )}
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
               {departmentName ?? branchName ?? "--"} · {position || "--"}
             </span>
-            <span className="block text-xs text-slate-500">{stage ? STAGE_LABELS[stage] : "--"}</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">{stage ? STAGE_LABELS[stage] : "--"}</span>
           </div>
         </div>
 
@@ -286,7 +286,11 @@ export default function EmployeeRecordView({
             overflow-x-auto), never wrapped to a second row, either way. */}
         <nav
           aria-label="Employee record categories"
+<<<<<<< HEAD
           className="flex flex-nowrap items-center gap-1 mb-0 ml-4 sm:ml-6 overflow-x-auto w-auto [@media(hover:none)]:w-full [@media(hover:none)]:ml-0 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
+=======
+          className="flex flex-nowrap items-center gap-1 mb-0 overflow-x-auto w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
         >
           {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
             const isActive = cat.key === category.key;
@@ -296,8 +300,8 @@ export default function EmployeeRecordView({
                 href={`/employee-record/${employeeId}/${cat.key}`}
                 className={`shrink-0 flex items-center px-4 py-2 text-sm font-medium transition-colors rounded-t-[10px] border-2 border-b-0 [@media(hover:none)]:rounded-full [@media(hover:none)]:border-0 ${
                   isActive
-                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] [@media(hover:none)]:text-[#004386c9]"
-                    : "bg-[#68d4ffa8] border-[#49a2c6] text-black hover:bg-[#68d4ff] [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 [@media(hover:none)]:hover:bg-[#dde8f7]"
+                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] dark:[@media(hover:none)]:bg-slate-600 [@media(hover:none)]:text-[#004386c9] dark:[@media(hover:none)]:text-slate-100"
+                    : "bg-[#68d4ffa8] dark:bg-slate-800 border-[#49a2c6] dark:border-slate-600 text-black dark:text-slate-200 hover:bg-[#68d4ff] dark:hover:bg-slate-700 [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 dark:[@media(hover:none)]:text-slate-400 [@media(hover:none)]:hover:bg-[#dde8f7] dark:[@media(hover:none)]:hover:bg-slate-700"
                 }`}
               >
                 {cat.label}
@@ -325,7 +329,7 @@ export default function EmployeeRecordView({
         {category.sections.length > 1 && (
           <nav
             aria-label={`${category.label} sections`}
-            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] rounded-full p-1"
+            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] dark:bg-slate-800 rounded-full p-1"
           >
             {category.sections.map((section) => {
               const isActive = section.key === currentSection.key;
@@ -343,7 +347,17 @@ export default function EmployeeRecordView({
                 );
               }
               return (
+<<<<<<< HEAD
                 <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
+=======
+                <Link
+                  key={section.key}
+                  href={`/employee-record/${employeeId}/${category.key}/${section.key}`}
+                  className={`shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                    isActive ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
+                  }`}
+                >
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                   {section.label}
                 </Link>
               );
@@ -353,6 +367,7 @@ export default function EmployeeRecordView({
 
         {/* Card + vertical sub-nav rail as flex siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
+<<<<<<< HEAD
             breakpoint (never stacks). No gap between them (fixed
             2026-08-13, see conversation) — the rail sits flush against the
             card's right edge; same fix applied to StageProfileView.tsx's
@@ -362,6 +377,14 @@ export default function EmployeeRecordView({
             pushed below the content. */}
         <div className="flex items-start">
           <div className="flex-1 min-w-0 bg-white rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
+=======
+            breakpoint (never stacks). The rail's own width fluidly shrinks
+            on narrow viewports (see its own style below) so both columns
+            keep fitting side by side instead of the rail getting pushed
+            below the content. */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
@@ -588,11 +611,11 @@ export default function EmployeeRecordView({
                 return <TaskOverduePanel tasks={tasks.overdue} />;
               if (StaticPanel) return <StaticPanel canEdit={canEdit} />;
               return (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-                  <p className="text-base font-semibold text-slate-800">
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-6 py-10 text-center">
+                  <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
                     {category.label} — {currentSection.label}
                   </p>
-                  <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                     This section&apos;s fields aren&apos;t wired up yet. Navigation and layout match the reference; the form content
                     is pending a scoping decision.
                   </p>

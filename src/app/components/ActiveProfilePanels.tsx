@@ -125,11 +125,11 @@ import {
 // column is full-width on mobile, not sharing space with the sidebar/nav
 // rail) visually collides with the button text.
 function PanelHeading({ children }: { children: ReactNode }) {
-  return <h2 className="text-2xl font-semibold text-[#4b4949d6] mb-6 pr-24 sm:pr-0">{children}</h2>;
+  return <h2 className="text-2xl font-semibold text-[#4b4949d6] dark:text-slate-200 mb-6 pr-24 sm:pr-0">{children}</h2>;
 }
 
 function SubsectionHeading({ children }: { children: ReactNode }) {
-  return <h3 className="text-lg font-semibold text-[#4b4949d6] mb-4">{children}</h3>;
+  return <h3 className="text-lg font-semibold text-[#4b4949d6] dark:text-slate-200 mb-4">{children}</h3>;
 }
 
 function FieldGrid({ children }: { children: ReactNode }) {
@@ -148,11 +148,11 @@ function Subsection({ heading, children }: { heading: string; children: ReactNod
   );
 }
 
-const valueClass = "text-sm text-[#4b4949] truncate";
+const valueClass = "text-sm text-[#4b4949] dark:text-slate-300 truncate";
 const emptyClass = "text-sm italic text-slate-400";
-const labelClass = "text-xs font-medium text-slate-500";
+const labelClass = "text-xs font-medium text-slate-500 dark:text-slate-400";
 const inputClass =
-  "text-sm text-[#4b4949] bg-transparent border-0 border-b border-slate-300 p-0 pb-0.5 focus:outline-none focus:border-blue-500";
+  "text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border-0 border-b border-slate-300 dark:border-slate-500 p-0 pb-0.5 focus:outline-none focus:border-blue-500";
 
 // Read-only, non-editable field (e.g. Full Name/Email — real data the user
 // isn't allowed to change here for a business reason, not a missing column).
@@ -171,8 +171,8 @@ function FieldDisplay({ label, value, full = false }: { label: string; value: st
 function SidebarField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="w-full">
-      <span className="block text-xs text-[#4b4949]">{label}</span>
-      <span className="block text-sm text-[#4b4949] truncate">{children}</span>
+      <span className="block text-xs text-[#4b4949] dark:text-slate-300">{label}</span>
+      <span className="block text-sm text-[#4b4949] dark:text-slate-300 truncate">{children}</span>
     </div>
   );
 }
@@ -247,7 +247,7 @@ function PhoneField({
       {editing ? (
         <>
           <div
-            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 ${
+            className={`flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 overflow-hidden focus-within:outline focus-within:outline-2 ${
               invalid ? "outline outline-2 outline-red-500" : "focus-within:outline-blue-500"
             }`}
           >
@@ -255,7 +255,7 @@ function PhoneField({
               value={countryCode}
               onChange={(e) => commit(e.target.value, digits)}
               aria-label={`${label} country code`}
-              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 pl-3 pr-1 text-sm text-[#4b4949] focus:outline-none"
+              className="basis-1/4 min-w-0 bg-transparent border-0 border-r border-black/10 dark:border-white/10 pl-3 pr-1 text-sm text-[#4b4949] dark:text-slate-100 focus:outline-none"
             >
               {COUNTRY_CODES.map((c) => (
                 <option key={c.code} value={c.code} title={c.name}>
@@ -269,10 +269,10 @@ function PhoneField({
               value={formatLocalDigits(digits)}
               onChange={(e) => commit(countryCode, e.target.value.replace(/\D/g, "").slice(0, 11))}
               onBlur={() => setTouched(true)}
-              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+              className="basis-3/4 min-w-0 px-3 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent focus:outline-none"
             />
           </div>
-          {invalid && <span className="text-xs text-red-600">Enter a valid phone number.</span>}
+          {invalid && <span className="text-xs text-red-600 dark:text-red-400">Enter a valid phone number.</span>}
         </>
       ) : value ? (
         <span className={valueClass}>{composePhoneValue(parsed.countryCode, parsed.digits)}</span>
@@ -312,7 +312,7 @@ function EmailField({
             onBlur={() => setTouched(true)}
             className={`${inputClass} ${invalid ? "outline outline-2 outline-red-500" : ""}`}
           />
-          {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+          {invalid && <span className="text-xs text-red-600 dark:text-red-400">Enter a valid email address.</span>}
         </>
       ) : value ? (
         <span className={valueClass}>{value}</span>
@@ -439,10 +439,10 @@ function EditableTextArea({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className="text-sm text-[#4b4949] bg-transparent border border-slate-300 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
+          className="text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border border-slate-300 dark:border-slate-500 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
         />
       ) : value ? (
-        <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
+        <span className="text-sm text-[#4b4949] dark:text-slate-300 whitespace-pre-wrap">{value}</span>
       ) : (
         <span className={emptyClass}>-</span>
       )}
@@ -508,10 +508,10 @@ function PlaceholderTextArea({ label, full = true }: { label: string; full?: boo
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={3}
-          className="text-sm text-[#4b4949] bg-transparent border border-slate-300 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
+          className="text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border border-slate-300 dark:border-slate-500 rounded-lg p-2 resize-y focus:outline-none focus:border-blue-500"
         />
       ) : value ? (
-        <span className="text-sm text-[#4b4949] whitespace-pre-wrap">{value}</span>
+        <span className="text-sm text-[#4b4949] dark:text-slate-300 whitespace-pre-wrap">{value}</span>
       ) : (
         <span className={emptyClass}>-</span>
       )}
@@ -558,7 +558,7 @@ export function FilePickerControl({
             type="button"
             onClick={() => onChange(null)}
             aria-label={`Remove ${file.name}`}
-            className="shrink-0 p-2 text-slate-400 hover:text-red-600 text-sm leading-none"
+            className="shrink-0 p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
           >
             ×
           </button>
@@ -570,7 +570,7 @@ export function FilePickerControl({
   if (!editing) return <span className={emptyClass}>-</span>;
 
   return (
-    <label className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] bg-[#f7f9fc] px-4 py-2 text-sm text-[#6b7280] cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd]">
+    <label className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] dark:border-slate-600 bg-[#f7f9fc] dark:bg-slate-800 px-4 py-2 text-sm text-[#6b7280] dark:text-slate-400 cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd] dark:hover:bg-slate-700">
       <input type="file" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
       Click to upload
     </label>
@@ -588,7 +588,7 @@ export function FileLink({ file }: { file: File }) {
     return () => URL.revokeObjectURL(url);
   }, [url]);
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline">
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       {file.name}
     </a>
   );
@@ -606,7 +606,7 @@ export function FileLink({ file }: { file: File }) {
 export function RealAttachmentLink({ fileId }: { fileId: string | null }) {
   if (!fileId) return <span className="text-slate-400">—</span>;
   return (
-    <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline">
+    <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       View
     </a>
   );
@@ -657,7 +657,7 @@ export function RealFileField({
               type="button"
               onClick={onClear}
               aria-label={`Remove ${pendingFile.name}`}
-              className="shrink-0 text-slate-400 hover:text-red-600 text-sm leading-none"
+              className="shrink-0 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
             >
               ×
             </button>
@@ -678,14 +678,14 @@ export function RealFileField({
               type="button"
               onClick={onClear}
               aria-label="Remove file"
-              className="shrink-0 text-slate-400 hover:text-red-600 text-sm leading-none"
+              className="shrink-0 text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-sm leading-none"
             >
               ×
             </button>
           )}
         </div>
       ) : editing ? (
-        <label className="inline-flex w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] bg-[#f7f9fc] px-3 py-1.5 text-xs text-[#6b7280] cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd]">
+        <label className="inline-flex w-fit items-center gap-1.5 rounded-lg border-2 border-dashed border-[#b9c4d6] dark:border-slate-600 bg-[#f7f9fc] dark:bg-slate-800 px-3 py-1.5 text-xs text-[#6b7280] dark:text-slate-400 cursor-pointer hover:border-[#4a90e2] hover:bg-[#eef4fd] dark:hover:bg-slate-700">
           <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
           Click to upload
         </label>
@@ -927,10 +927,10 @@ function StaticField({ label, value, full = false }: { label: string; value: str
 }
 
 const PROBATION_STATUS_PILL_CLASSES: Record<string, string> = {
-  Confirm: "bg-emerald-100 text-emerald-700",
-  Stop: "bg-red-100 text-red-700",
-  Extended: "bg-amber-100 text-amber-700",
-  "In Progress": "bg-slate-100 text-slate-600",
+  Confirm: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  Stop: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Extended: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  "In Progress": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
 
 // Confirm/Extend/Stop only render once Edit is clicked (per explicit
@@ -954,10 +954,10 @@ function ProbationDecisionSection({
   const editing = useEditMode();
   if (!editing || !canDecide) return null;
   return (
-    <div className="mt-6 pt-6 border-t border-black/10">
+    <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
       <SubsectionHeading>Probation Decision</SubsectionHeading>
       {display.decidedByName && (
-        <p className="text-xs text-slate-500 mb-3">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
           Last decided by {display.decidedByName}
           {display.decidedAt ? ` on ${new Date(display.decidedAt).toLocaleDateString()}` : ""}.
         </p>
@@ -985,7 +985,7 @@ function ProbationDecisionSection({
           Stop
         </button>
       </div>
-      {decideError && <p className="mt-2 text-sm text-red-600">{decideError}</p>}
+      {decideError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{decideError}</p>}
     </div>
   );
 }
@@ -1118,7 +1118,7 @@ export function ProbationPanel({
             <span className={labelClass}>Probation Status</span>
             <span
               className={`self-start inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                PROBATION_STATUS_PILL_CLASSES[display.displayStatus] ?? "bg-slate-100 text-slate-600"
+                PROBATION_STATUS_PILL_CLASSES[display.displayStatus] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
               }`}
             >
               {display.displayStatus}
@@ -1390,7 +1390,7 @@ function RecordTable({
                 <th
                   key={c.key}
                   scope="col"
-                  className={`text-left px-3.5 py-2.5 bg-[#f0f0f0a6] text-sm font-medium text-[#4b4949] whitespace-nowrap ${
+                  className={`text-left px-3.5 py-2.5 bg-[#f0f0f0a6] dark:bg-slate-800 text-sm font-medium text-[#4b4949] dark:text-slate-300 whitespace-nowrap ${
                     i === 0 ? "rounded-l-[10px]" : ""
                   } ${i === columns.length - 1 && !showDeleteColumn ? "rounded-r-[10px]" : ""}`}
                 >
@@ -1398,7 +1398,7 @@ function RecordTable({
                 </th>
               ))}
               {showDeleteColumn && (
-                <th scope="col" className="px-3.5 py-2.5 bg-[#f0f0f0a6] rounded-r-[10px] w-10">
+                <th scope="col" className="px-3.5 py-2.5 bg-[#f0f0f0a6] dark:bg-slate-800 rounded-r-[10px] w-10">
                   <span className="sr-only">Delete</span>
                 </th>
               )}
@@ -1409,7 +1409,7 @@ function RecordTable({
               <tr>
                 <td
                   colSpan={columns.length + (showDeleteColumn ? 1 : 0)}
-                  className="px-3.5 py-6 text-sm text-slate-400 text-center border-b border-black/5"
+                  className="px-3.5 py-6 text-sm text-slate-400 text-center border-b border-black/5 dark:border-white/10"
                 >
                   No records yet.
                 </td>
@@ -1419,18 +1419,22 @@ function RecordTable({
                 <tr
                   key={rowIds?.[i] ?? i}
                   onClick={rowsClickable ? () => onRowClick(i) : undefined}
-                  className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa]" : undefined}
+                  className={rowsClickable ? "cursor-pointer hover:bg-[#f0f4fa] dark:hover:bg-slate-800" : undefined}
                 >
                   {columns.map((c) => (
+<<<<<<< HEAD
                     <td
                       key={c.key}
                       className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] border-b border-black/5 whitespace-nowrap"
                     >
+=======
+                    <td key={c.key} className="align-top px-3.5 py-3.5 text-sm text-[#4b4949] dark:text-slate-300 border-b border-black/5 dark:border-white/10">
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                       {row[c.key] ?? "—"}
                     </td>
                   ))}
                   {showDeleteColumn && (
-                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5">
+                    <td className="align-top px-3.5 py-3.5 text-center border-b border-black/5 dark:border-white/10">
                       {rowIds?.[i] !== undefined && (
                         <button
                           type="button"
@@ -1439,7 +1443,7 @@ function RecordTable({
                             onDeleteRow(rowIds[i]);
                           }}
                           aria-label="Delete record"
-                          className="text-slate-400 hover:text-red-600 text-lg leading-none font-semibold"
+                          className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none font-semibold"
                         >
                           −
                         </button>
@@ -1455,7 +1459,7 @@ function RecordTable({
       {addLabel && editing && (
         <button
           type="button"
-          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] text-sm font-medium text-[#5c6b0a] hover:bg-[#d9fd63]"
+          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] dark:bg-lime-900 text-sm font-medium text-[#5c6b0a] dark:text-lime-300 hover:bg-[#d9fd63] dark:hover:bg-lime-800"
         >
           {addLabel}
         </button>
@@ -1520,7 +1524,7 @@ export interface RecordField {
 export type RecordEditValues = Record<string, string>;
 
 const recordModalInputClass =
-  "h-11 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
+  "h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 border-0 px-3.5 text-sm text-[#4b4949] dark:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -1615,8 +1619,8 @@ function YearMonthPicker({ value, onChange }: { value: string; onChange: (value:
         }}
         className={`${recordModalInputClass} w-full text-left flex items-center justify-between`}
       >
-        <span className={value ? "" : "text-[#4b4949a3]"}>{value ? formatMonthLabel(value) : "Select month"}</span>
-        <span className="text-[#4b4949a3]" aria-hidden="true">
+        <span className={value ? "" : "text-[#4b4949a3] dark:text-slate-400"}>{value ? formatMonthLabel(value) : "Select month"}</span>
+        <span className="text-[#4b4949a3] dark:text-slate-400" aria-hidden="true">
           ▾
         </span>
       </button>
@@ -1628,23 +1632,23 @@ function YearMonthPicker({ value, onChange }: { value: string; onChange: (value:
               ? { position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }
               : { position: "fixed", top: -9999, left: -9999 }
           }
-          className="z-[2100] rounded-[10px] border border-black/10 bg-white shadow-[0_4px_14px_0_#0000001a] overflow-hidden"
+          className="z-[2100] rounded-[10px] border border-black/10 dark:border-white/10 bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-[0_4px_14px_0_#0000001a] overflow-hidden"
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-black/10 bg-[#f0f0f0a6]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-black/10 dark:border-white/10 bg-[#f0f0f0a6] dark:bg-slate-800">
             <button
               type="button"
               onClick={() => setDisplayYear((y) => y - 1)}
               aria-label="Previous year"
-              className="px-2 py-0.5 rounded hover:bg-black/10 text-[#4b4949] font-medium"
+              className="px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[#4b4949] dark:text-slate-300 font-medium"
             >
               ‹
             </button>
-            <span className="text-sm font-semibold text-[#4b4949]">{displayYear}</span>
+            <span className="text-sm font-semibold text-[#4b4949] dark:text-slate-200">{displayYear}</span>
             <button
               type="button"
               onClick={() => setDisplayYear((y) => y + 1)}
               aria-label="Next year"
-              className="px-2 py-0.5 rounded hover:bg-black/10 text-[#4b4949] font-medium"
+              className="px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[#4b4949] dark:text-slate-300 font-medium"
             >
               ›
             </button>
@@ -1662,7 +1666,7 @@ function YearMonthPicker({ value, onChange }: { value: string; onChange: (value:
                     setOpen(false);
                   }}
                   className={`block w-full text-left px-3.5 py-2 text-sm ${
-                    isSelected ? "bg-[#4a90e2] text-white font-medium" : "text-[#4b4949] hover:bg-[#f0f4fa]"
+                    isSelected ? "bg-[#4a90e2] text-white font-medium" : "text-[#4b4949] dark:text-slate-300 hover:bg-[#f0f4fa] dark:hover:bg-slate-800"
                   }`}
                 >
                   {name}
@@ -1747,14 +1751,14 @@ function RecordAddModal({
           the title and Save/Cancel stay reachable without hunting through a
           long page-level scroll. max-h matches the overlay's own p-4 so the
           modal never touches the viewport edge on small screens. */}
-      <div className="relative flex w-full max-w-[560px] max-h-[calc(100vh-32px)] flex-col box-border bg-white rounded-2xl shadow-[0_12px_32px_0_#00000026] overflow-hidden">
+      <div className="relative flex w-full max-w-[560px] max-h-[calc(100vh-32px)] flex-col box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl shadow-[0_12px_32px_0_#00000026] overflow-hidden">
         <div className="flex items-start justify-between gap-4 px-5 sm:px-7 pt-6 pb-4">
-          <h3 className="text-lg font-semibold text-[#4b4949d6]">{title}</h3>
+          <h3 className="text-lg font-semibold text-[#4b4949d6] dark:text-slate-200">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[#4b4949a3] hover:bg-[#f0f4fa] hover:text-[#4b4949]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[#4b4949a3] dark:text-slate-400 hover:bg-[#f0f4fa] dark:hover:bg-slate-800 hover:text-[#4b4949] dark:hover:text-slate-200"
           >
             ×
           </button>
@@ -1767,6 +1771,7 @@ function RecordAddModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             {fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true)).map((f) => (
               <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
+<<<<<<< HEAD
                 <label className="text-sm font-medium text-[#4b4949]">{f.label}</label>
                 {readOnly ? (
                   f.type === "file" ? (
@@ -1781,6 +1786,10 @@ function RecordAddModal({
                     <span className="text-sm italic text-slate-400">-</span>
                   )
                 ) : f.type === "textarea" ? (
+=======
+                <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>
+                {f.type === "textarea" ? (
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
                   <textarea
                     value={values[f.key] ?? ""}
                     onChange={(e) => setField(f.key, e.target.value)}
@@ -1793,7 +1802,7 @@ function RecordAddModal({
                   ) : (
                     <div className="flex items-center gap-2 min-w-0">
                       <RealAttachmentLink fileId={initialFileIds[f.key]} />
-                      <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+                      <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
                         <input type="file" className="hidden" onChange={(e) => setFileField(f.key, e.target.files?.[0] ?? null)} />
                         Replace
                       </label>
@@ -1831,14 +1840,14 @@ function RecordAddModal({
               </div>
             ))}
           </div>
-          {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
+          {error && <p className="mt-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
-        <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5">
+        <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5 dark:border-white/10">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/15 hover:bg-[#f0f4fa] disabled:opacity-60 transition-colors"
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-200 bg-white dark:bg-slate-800 border-2 border-black/15 dark:border-white/15 hover:bg-[#f0f4fa] dark:hover:bg-slate-700 disabled:opacity-60 transition-colors"
           >
             {readOnly ? "Close" : "Cancel"}
           </button>
@@ -1999,7 +2008,7 @@ export function RepeatableRecordSection({
             setEditingRowId(null);
             setModalOpen(true);
           }}
-          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] text-sm font-medium text-[#5c6b0a] hover:bg-[#d9fd63]"
+          className="inline-flex min-h-11 items-center gap-1.5 mt-4 px-[18px] py-2 rounded-[10px] border-0 bg-[#d9fd63a8] dark:bg-lime-900 text-sm font-medium text-[#5c6b0a] dark:text-lime-300 hover:bg-[#d9fd63] dark:hover:bg-lime-800"
         >
           {addLabel}
         </button>
@@ -2162,8 +2171,8 @@ function CurrencyField({
     <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
       <span className={labelClass}>{label}</span>
       {editing ? (
-        <div className="flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] overflow-hidden focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
-          <span className="flex items-center pl-3 pr-1 text-sm text-[#4b4949a3] select-none">RM</span>
+        <div className="flex items-stretch h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 overflow-hidden focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+          <span className="flex items-center pl-3 pr-1 text-sm text-[#4b4949a3] dark:text-slate-400 select-none">RM</span>
           <input
             type="text"
             inputMode="decimal"
@@ -2171,7 +2180,7 @@ function CurrencyField({
             onChange={(e) => onChange(e.target.value)}
             onBlur={handleBlur}
             placeholder="0.00"
-            className="flex-1 min-w-0 pr-3 text-sm text-[#4b4949] bg-transparent focus:outline-none"
+            className="flex-1 min-w-0 pr-3 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent focus:outline-none"
           />
         </div>
       ) : value ? (
@@ -2219,7 +2228,7 @@ function SalaryRevisionAttachmentField({
         editingExistingRecord && existingFileId && !pendingFile ? (
           <div className="flex items-center gap-2 min-w-0">
             <RealAttachmentLink fileId={existingFileId} />
-            <label className="shrink-0 text-xs text-[#4a90e2] hover:underline cursor-pointer">
+            <label className="shrink-0 text-xs text-[#4a90e2] dark:text-blue-400 hover:underline cursor-pointer">
               <input type="file" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
               Replace
             </label>
@@ -2401,7 +2410,7 @@ export const SalaryRevisionFields = forwardRef<SalaryRevisionHandle, { userId: n
           <button
             type="button"
             onClick={() => setEditingId(null)}
-            className="text-xs text-[#4a90e2] hover:underline shrink-0"
+            className="text-xs text-[#4a90e2] dark:text-blue-400 hover:underline shrink-0"
           >
             Cancel edit — add new revision instead
           </button>
@@ -3063,7 +3072,7 @@ export function DisciplinarySummaryPanel({
         rows={data.map((r) => ({ date: r.date ?? "—", type: r.type, description: r.description ?? "—" }))}
         onRowClick={(i) => setEditingRow(data[i])}
       />
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
         Full disciplinary records (Domestic Inquiry, Suspension, Showcause/Warning, PIP) are added from this
         employee&apos;s Employee Record &gt; Disciplinary section.
       </p>
@@ -3656,8 +3665,8 @@ export function ExitInterviewNotesPanel({
 function AddItemScopeDialog({ onCancel, onChoose }: { onCancel: () => void; onChoose: (scope: "all" | "employee") => void }) {
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center" onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm text-[#4b4949] mb-[22px]">Add this item to:</p>
+      <div className="w-full max-w-[360px] max-h-full overflow-y-auto box-border bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl px-6 pt-7 pb-6 shadow-[0_12px_32px_0_#00000026] text-center" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm text-[#4b4949] dark:text-slate-300 mb-[22px]">Add this item to:</p>
         <div className="flex flex-col gap-2.5">
           <button
             type="button"
@@ -3669,11 +3678,11 @@ function AddItemScopeDialog({ onCancel, onChoose }: { onCancel: () => void; onCh
           <button
             type="button"
             onClick={() => onChoose("employee")}
-            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] bg-white border-2 border-black/25 hover:bg-[#f0f4fa] transition-colors"
+            className="min-h-11 rounded-[10px] px-6 py-2.5 text-sm font-medium text-[#4b4949] dark:text-slate-200 bg-white dark:bg-slate-800 border-2 border-black/25 dark:border-white/25 hover:bg-[#f0f4fa] dark:hover:bg-slate-700 transition-colors"
           >
             Only this employee
           </button>
-          <button type="button" onClick={onCancel} className="mt-1 text-xs text-slate-500 hover:underline">
+          <button type="button" onClick={onCancel} className="mt-1 text-xs text-slate-500 dark:text-slate-400 hover:underline">
             Cancel
           </button>
         </div>
@@ -3862,6 +3871,7 @@ function ExitChecklistItems({
           <input
             type="checkbox"
             checked={pendingChecked[item.id] ?? false}
+<<<<<<< HEAD
             disabled={!canEdit || savingId === item.id}
             onChange={(e) => {
               const checked = e.target.checked;
@@ -3869,23 +3879,28 @@ function ExitChecklistItems({
               if (!editing && canEdit) handleImmediateToggle(item.id, checked);
             }}
             className="w-4 h-4 shrink-0 rounded border-slate-300 disabled:cursor-not-allowed"
+=======
+            disabled={!editing}
+            onChange={(e) => onChange(item.id, e.target.checked)}
+            className="w-4 h-4 shrink-0 rounded border-slate-300 dark:border-slate-500 disabled:cursor-not-allowed"
+>>>>>>> d7bd6a5c019232b4ce69def6d8ff986567a6c9cf
           />
           {editing && canEditItem ? (
             <input
               type="text"
               value={pendingLabels[item.id] ?? item.label}
               onChange={(e) => onLabelChange(item.id, e.target.value)}
-              className="flex-1 min-w-0 text-sm text-[#4b4949] bg-transparent border-0 border-b border-slate-300 px-0 py-0.5 focus:outline-none focus:border-blue-500"
+              className="flex-1 min-w-0 text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border-0 border-b border-slate-300 dark:border-slate-500 px-0 py-0.5 focus:outline-none focus:border-blue-500"
             />
           ) : (
-            <span className="text-sm text-[#4b4949] flex-1">{item.label}</span>
+            <span className="text-sm text-[#4b4949] dark:text-slate-300 flex-1">{item.label}</span>
           )}
           {editing && canEditItem && (
             <button
               type="button"
               onClick={() => onDelete(item.id)}
               aria-label={`Delete "${item.label}"`}
-              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-600 hover:bg-red-50 text-sm leading-none"
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 text-sm leading-none"
             >
               −
             </button>
@@ -3907,13 +3922,13 @@ function ExitChecklistAddItemRow({ value, onChange }: { value: string; onChange:
   const editing = useEditMode();
   if (!editing) return null;
   return (
-    <div className="mt-4 pt-4 border-t border-black/10">
+    <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10">
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Add a new checklist item…"
-        className="w-full h-10 rounded-[10px] bg-[#f0f0f0a6] border-0 px-3.5 text-sm text-[#4b4949] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        className="w-full h-10 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 border-0 px-3.5 text-sm text-[#4b4949] dark:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
       />
     </div>
   );

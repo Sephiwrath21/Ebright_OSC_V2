@@ -24,15 +24,24 @@ import { isPastDueDay, isFutureDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
+import { protectRecurringSeries } from "../engine/recurrence";
 import { isElevatedDeptSite } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
 import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
 import { GUIDELINE_IMAGE_MIMES, assignInputSchema, assignFlowTaskCore } from "./tasks-internal";
 
-/** "Assign to Others" (2026-07-25): move ONE pending task to a new assignee.
- *  Allowed for the same identities as assignFlowTask; HOD additionally
- *  scoped to their own department on BOTH ends (the task's current assignee
- *  AND the new one must be in the HOD's department). */
+/** "Assign to Others" (2026-07-25, self-service handoff added 2026-08-13):
+ *  move ONE pending task to a new assignee. Two independent ways to be
+ *  authorized:
+ *  1. Manager roles (same identities as assignFlowTask — ADMIN/OPS/HOD/
+ *     elevated dept-site): may reassign ANY pending task org-wide; HOD
+ *     additionally scoped to their own department on BOTH ends (the task's
+ *     current assignee AND the new one must be in the HOD's department).
+ *  2. Self-service: the task's OWN current assignee may hand it off,
+ *     regardless of role, but only to a teammate in the SAME department or
+ *     branch as themselves (confirmed scope, 2026-08-13) — a plain staff
+ *     member can hand off a task they can't complete without needing
+ *     manager involvement, but can't route it outside their own team. */
 export function reassignFlowTask(
   actorEmail: string,
   runBlockId: string,
@@ -40,20 +49,6 @@ export function reassignFlowTask(
 ): Promise<void> {
   return native(async () => {
     const actor = await requireUserByEmail(actorEmail);
-    // The CEO is excluded here (2026-08-01) — view-only on the org-wide/
-    // department/branch drill-downs, bypass-proof alongside the UI gate in
-    // app/task-manager/page.tsx's canReassign.
-    const allowed =
-      actor.role === "ADMIN" ||
-      actor.role === "OPS" ||
-      actor.role === "HOD" ||
-      isElevatedDeptSite(actor);
-    if (!allowed) {
-      throw new ApiHttpError(
-        403,
-        "Only superadmin, operations, HOD, or the Operation/Optimisation department accounts can reassign tasks",
-      );
-    }
 
     const block = await prisma.runBlock.findUnique({ where: { id: runBlockId } });
     if (!block) throw new ApiHttpError(404, "Task not found");
@@ -61,19 +56,55 @@ export function reassignFlowTask(
       throw new ApiHttpError(400, "Only pending tasks can be reassigned");
     }
 
+    // The CEO is excluded from the manager path (2026-08-01) — view-only on
+    // the org-wide/department/branch drill-downs, bypass-proof alongside
+    // the UI gate in app/task-manager/page.tsx's canReassign. The CEO can
+    // still use the self-service path below on their own tasks, same as
+    // any other role.
+    const isManager =
+      actor.role === "ADMIN" ||
+      actor.role === "OPS" ||
+      actor.role === "HOD" ||
+      isElevatedDeptSite(actor);
+    const isOwnTask = actor.id === block.assigneeId;
+    if (!isManager && !isOwnTask) {
+      throw new ApiHttpError(
+        403,
+        "Only the task's own assignee, superadmin, operations, HOD, or the Operation/Optimisation department accounts can reassign tasks",
+      );
+    }
+
     const [current, next] = await Promise.all([
       prisma.user.findUnique({ where: { id: block.assigneeId } }),
       prisma.user.findUnique({ where: { id: newAssigneeId } }),
     ]);
     if (!next) throw new ApiHttpError(404, "New assignee not found");
-    if (actor.role === "HOD") {
-      const dept = actor.department;
-      if (!dept || current?.department !== dept || next.department !== dept) {
-        throw new ApiHttpError(403, "HODs can only reassign tasks within their own department");
+    if (isManager) {
+      if (actor.role === "HOD") {
+        const dept = actor.department;
+        if (!dept || current?.department !== dept || next.department !== dept) {
+          throw new ApiHttpError(403, "HODs can only reassign tasks within their own department");
+        }
+      }
+    } else {
+      // Self-service: same department/branch as the actor (== the task's
+      // current assignee) only — whichever side they're on.
+      const sameDept = Boolean(actor.department) && next.department === actor.department;
+      const sameBranch = Boolean(actor.branch) && next.branch === actor.branch;
+      if (!sameDept && !sameBranch) {
+        throw new ApiHttpError(403, "You can only hand off a task to someone in your own department or branch");
       }
     }
     if (next.id === block.assigneeId) return;
 
+    // Lock in the CURRENT (pre-handoff) assignee's next weekly occurrence
+    // BEFORE flipping this one — see protectRecurringSeries's own doc
+    // comment for why this is needed (there's no template-level "series
+    // owner", so without this the reassignment would otherwise leak
+    // forward into future recurring occurrences once this block's due day
+    // passes). A no-op for non-recurring tasks (Monthly/Ad hoc/Manpower-
+    // synced) or a block that's already locked in.
+    await protectRecurringSeries(block.id);
     await prisma.runBlock.update({
       where: { id: block.id },
       data: { assigneeId: next.id },

@@ -500,6 +500,9 @@ export interface TaskRow {
   /** Assigner-attached SOP reference (2026-07-30) — null when none. The
    *  image itself is served by /api/task-manager/guideline-image/[id]. */
   guideline: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  categoryId: string | null;
+  categoryName: string | null;
   /** Who assigned the task (the run's starter) — id always present;
    *  the display NAME is resolved only by the personal payloads
    *  (getMePayload), which drive the "Assigned by" column (2026-07-30). */
@@ -548,6 +551,8 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     guideline: b.guideline
       ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }
       : null,
+    categoryId: b.category?.id ?? null,
+    categoryName: b.category?.name ?? null,
     assignerId: b.run.startedById,
     proofIds: b.proofs.map((p) => p.id),
     parentId: b.parentId,
@@ -584,6 +589,8 @@ export interface PeriodBlock {
   /** Assigner-attached SOP reference (2026-07-30) — url/mime only, the
    *  image BYTES are never selected here (served by their own route). */
   guideline: { id: string; url: string | null; imageMime: string | null } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  category: { id: string; name: string } | null;
   /** Assignee-uploaded proofs (2026-08-08: multi-photo) — id only, oldest
    *  first, bytes served by their own route. */
   proofs: { id: string }[];
@@ -610,6 +617,10 @@ export interface PeriodBlockFilter {
   startedById?: string;
   /** Drop blocks assigned to this user (delegated view excludes self-work). */
   excludeAssigneeId?: string;
+  /** Scope to a SET of assignees (entity-roster bound for the all-time
+   *  HOD-Assigned payload, 2026-08-12) — distinct from the single-id
+   *  `assigneeId` above. */
+  assigneeIdIn?: string[];
   /** Cadence-TAGGED blocks normally belong to their period UNCONDITIONALLY
    *  (the personal "My Tasks — Daily" weekday tabs need the whole week's
    *  DAILY tasks at once). Date-filtered surfaces (the entity overviews'
@@ -637,6 +648,7 @@ export async function fetchPeriodBlocks(
     where: {
       ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
       ...(filter.excludeAssigneeId ? { assigneeId: { not: filter.excludeAssigneeId } } : {}),
+      ...(filter.assigneeIdIn ? { assigneeId: { in: filter.assigneeIdIn } } : {}),
       run: {
         status: { not: "CANCELLED" },
         // Archived runs (2026-07-31) are hidden from EVERY active view —
@@ -674,6 +686,7 @@ export async function fetchPeriodBlocks(
       scheduleSlotId: true,
       cadence: true,
       guideline: { select: { id: true, url: true, imageMime: true } },
+      category: { select: { id: true, name: true } },
       proofs: { select: { id: true }, orderBy: { createdAt: "asc" } },
       parentId: true,
       subtaskOrder: true,

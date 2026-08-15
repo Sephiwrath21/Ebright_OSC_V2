@@ -249,6 +249,39 @@ app.get('/api/admin/overview', auth, adminOnly, async (req, res) => {
   }
 });
 
+// Admin-only settings read/write for an ARBITRARY department (mirrors
+// /api/settings/:key, but the department comes from the URL instead of the
+// caller's own JWT). Lets an admin create/edit templates on another
+// department's behalf; adminOnly keeps everyone else out.
+app.get('/api/admin/settings/:department/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const dept = (req.params.department || '').trim();
+    if (!dept) return res.status(400).json({ error: 'department is required' });
+    const r = await pool.query('SELECT value FROM doomtracker.settings WHERE department=$1 AND key=$2', [dept, req.params.key]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ key: req.params.key, value: r.rows[0].value });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/settings/:department/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const dept = (req.params.department || '').trim();
+    if (!dept) return res.status(400).json({ error: 'department is required' });
+    const value = typeof req.body.value === 'string' ? req.body.value : JSON.stringify(req.body.value ?? '');
+    await pool.query(
+      `INSERT INTO doomtracker.settings (department, key, value, updated_at)
+       VALUES ($1,$2, to_jsonb($3::text), NOW())
+       ON CONFLICT (department, key) DO UPDATE SET value=to_jsonb($3::text), updated_at=NOW()`,
+      [dept, req.params.key, value]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const result = await pool.query('SELECT * FROM doomtracker.users WHERE email=$1', [email]);
@@ -351,6 +384,30 @@ app.get('/api/people', auth, async (req, res) => {
     const r = dept
       ? await pool.query('SELECT name, email FROM doomtracker.users WHERE department=$1 ORDER BY name', [dept])
       : await pool.query('SELECT name, email FROM doomtracker.users ORDER BY name');
+    res.json(r.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Employee name/email lookup for the "Assignee name" autofill (searches the
+// real HRFS employee directory, unlike /api/people above which only lists
+// people who already have a Flowghan account). Read-only, any authed user —
+// an HOD may need to assign work to someone outside their own department.
+// Short queries are ignored so a stray keystroke doesn't fetch half the company.
+app.get('/api/hrfs/employees', auth, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+  try {
+    const r = await hrfsPool.query(
+      `SELECT p.full_name AS name, u.email
+       FROM user_profile p
+       JOIN users u ON u.user_id = p.user_id
+       WHERE u.status = 'active' AND p.full_name ILIKE $1
+       ORDER BY p.full_name
+       LIMIT 8`,
+      [`%${q}%`]
+    );
     res.json(r.rows);
   } catch (e) {
     res.status(500).json({ error: e.message });

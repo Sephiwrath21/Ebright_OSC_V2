@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "tm:generate": "prisma generate --config prisma.task-manager.config.ts",
     "tm:migrate": "prisma migrate deploy --config prisma.task-manager.config.ts",
     "tm:seed": "tsx --env-file-if-exists=.env prisma/task-manager/seed.ts",
@@ -76,6 +77,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

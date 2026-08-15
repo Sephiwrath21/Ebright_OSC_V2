@@ -37,8 +37,8 @@ const fontStack =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 const card: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "0.5px solid #E5E7EB",
+  background: "var(--surface)",
+  border: "0.5px solid var(--status-track)",
   borderRadius: 12,
 };
 
@@ -83,10 +83,10 @@ function Panel({
           alignItems: "center",
           gap: 8,
           padding: "10px 14px",
-          borderBottom: "0.5px solid #F1F1F1",
+          borderBottom: "0.5px solid var(--border-subtle)",
         }}
       >
-        {icon && <span style={{ color: "#6B7280", display: "inline-flex" }}>{icon}</span>}
+        {icon && <span style={{ color: "var(--text-muted-strong)", display: "inline-flex" }}>{icon}</span>}
         <h2
           style={{
             margin: 0,
@@ -94,7 +94,7 @@ function Panel({
             fontWeight: 700,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
-            color: "#374151",
+            color: "var(--text-secondary)",
           }}
         >
           {title}
@@ -142,7 +142,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={50}
           textAnchor="middle"
-          style={{ fontSize: 20, fontWeight: 700, fill: "#111827" }}
+          style={{ fontSize: 20, fontWeight: 700, fill: "var(--text-primary)" }}
         >
           {total}
         </text>
@@ -150,7 +150,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
           x={55}
           y={66}
           textAnchor="middle"
-          style={{ fontSize: 9, fill: "#94A3B8", letterSpacing: "0.05em" }}
+          style={{ fontSize: 9, fill: "var(--status-neutral-fg)", letterSpacing: "0.05em" }}
         >
           TASKS
         </text>
@@ -167,8 +167,8 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontSize: 12, color: "#475569" }}>{d.label}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginLeft: "auto" }}>
+            <span style={{ fontSize: 12, color: "var(--status-neutral-fg-strong)" }}>{d.label}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", marginLeft: "auto" }}>
               {d.value}
             </span>
           </div>
@@ -244,11 +244,11 @@ function AttendanceCard({
           }}
         >
           {names.length === 0 ? (
-            <div style={{ fontSize: 12, color: "#64748B" }}>None.</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted-strong)" }}>None.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {names.map((n, i) => (
-                <div key={`${n}-${i}`} style={{ fontSize: 12, color: "#1F2937" }}>
+                <div key={`${n}-${i}`} style={{ fontSize: 12, color: "var(--text-primary)" }}>
                   {n}
                 </div>
               ))}
@@ -272,11 +272,16 @@ export default function DepartmentDashboard({
   const router = useRouter();
 
   // HQ attendance today (from HRFS), in the 2×2 card order.
+  // Exact match to globals.css's --cat-* categorical pairs (built for this
+  // kind of light-tint attendance chip and fully theme-aware, dark values
+  // included) — tokenised so these flip with theme instead of the
+  // "off-table brand colour, leave literal" treatment that applies when
+  // #185FA5 is used as a one-off accent elsewhere in this file.
   const attendanceCards = [
-    { label: "Present", value: attendance.present, names: attendance.presentNames, color: "#0F6E56", bg: "#E1F5EE" },
-    { label: "Absent", value: attendance.absent, names: attendance.absentNames, color: "#A32D2D", bg: "#FCEBEB" },
-    { label: "MC", value: attendance.mc, names: attendance.mcNames, color: "#854F0B", bg: "#FAEEDA" },
-    { label: "Annual Leave", value: attendance.annualLeave, names: attendance.annualLeaveNames, color: "#185FA5", bg: "#E6F1FB" },
+    { label: "Present", value: attendance.present, names: attendance.presentNames, color: "var(--cat-green-fg)", bg: "var(--cat-green-bg)" },
+    { label: "Absent", value: attendance.absent, names: attendance.absentNames, color: "var(--cat-red-fg)", bg: "var(--cat-red-bg)" },
+    { label: "MC", value: attendance.mc, names: attendance.mcNames, color: "var(--cat-amber-fg)", bg: "var(--cat-amber-bg)" },
+    { label: "Annual Leave", value: attendance.annualLeave, names: attendance.annualLeaveNames, color: "var(--cat-blue-fg)", bg: "var(--cat-blue-bg)" },
   ];
 
   // ── Events filter ──────────────────────────────────────────────────────────
@@ -289,9 +294,9 @@ export default function DepartmentDashboard({
     <div
       style={{
         minHeight: "100%",
-        background: "#F3F4F6",
+        background: "var(--surface-sunken)",
         fontFamily: fontStack,
-        color: "#111827",
+        color: "var(--text-primary)",
       }}
     >
       <div
@@ -314,10 +319,10 @@ export default function DepartmentDashboard({
               alignItems: "center",
               gap: 6,
               padding: "7px 12px",
-              border: "0.5px solid #E5E7EB",
+              border: "0.5px solid var(--status-track)",
               borderRadius: 8,
-              background: "#FFFFFF",
-              color: "#374151",
+              background: "var(--surface)",
+              color: "var(--text-secondary)",
               fontSize: 13,
               fontWeight: 600,
               fontFamily: "inherit",
@@ -327,7 +332,7 @@ export default function DepartmentDashboard({
             <i className="ti ti-arrow-left" />
             Back
           </button>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#111827" }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>
             {departmentName}
           </h1>
         </div>
@@ -392,7 +397,7 @@ export default function DepartmentDashboard({
               style={{
                 display: "inline-flex",
                 alignSelf: "flex-start",
-                background: "#F1F5F9",
+                background: "var(--status-neutral-bg)",
                 borderRadius: 8,
                 padding: 3,
                 gap: 2,
@@ -413,8 +418,11 @@ export default function DepartmentDashboard({
                       fontSize: 12,
                       fontWeight: 600,
                       fontFamily: "inherit",
-                      background: active ? "#FFFFFF" : "transparent",
-                      color: active ? "#185FA5" : "#64748B",
+                      // #185FA5 is the ebright brand blue (off-table, kept
+                      // literal per the brand-colour rule) — a one-off
+                      // "selected tab" accent, not paired with a category bg.
+                      background: active ? "var(--surface)" : "transparent",
+                      color: active ? "#185FA5" : "var(--status-neutral-fg-strong)",
                       boxShadow: active ? "0 1px 2px rgba(15,23,42,0.08)" : "none",
                     }}
                   >
@@ -436,7 +444,7 @@ export default function DepartmentDashboard({
               }}
             >
               {visibleEvents.length === 0 ? (
-                <div style={{ fontSize: 13, color: "#94A3B8", padding: "4px 0" }}>
+                <div style={{ fontSize: 13, color: "var(--status-neutral-fg)", padding: "4px 0" }}>
                   No {eventTab} events.
                 </div>
               ) : (
@@ -451,13 +459,13 @@ export default function DepartmentDashboard({
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#1F2937" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
                         {e.title}
                       </div>
                       <div
                         style={{
                           fontSize: 11,
-                          color: "#94A3B8",
+                          color: "var(--status-neutral-fg)",
                           marginTop: 2,
                           display: "flex",
                           alignItems: "center",
@@ -499,6 +507,8 @@ export default function DepartmentDashboard({
                 marginTop: 12,
                 fontSize: 12,
                 fontWeight: 600,
+                // Brand blue accent (off-table, kept literal — see the
+                // Events tab comment above).
                 color: "#185FA5",
                 display: "inline-flex",
                 alignItems: "center",

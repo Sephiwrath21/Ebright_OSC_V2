@@ -15,9 +15,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -58,10 +58,26 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
+        # CRM_DATABASE_URL / BETTER_AUTH_SECRET are forwarded as real remote
+        # env vars via `envs:` below, NOT interpolated into `script:` text.
+        # 2026-08-13: a trailing newline on the CRM_DATABASE_URL secret was
+        # getting spliced into the *middle* of a script line by GitHub's own
+        # ${{ }} substitution, before ssh-action ever ran — combined with
+        # script_stop's line-by-line dispatch, that left an unterminated
+        # quote which swallowed ssh-action's own next glue-check line
+        # (`DRONE_SSH_PREV_COMMAND_EXIT_CODE=...`) into the value, which then
+        # got written straight into .env. Passing the secret via `env:`/
+        # `envs:` keeps its raw bytes (newline included) out of the script
+        # text entirely, so this can't recur regardless of whether the
+        # secret itself carries a trailing newline.
+        env:
+          CRM_DATABASE_URL: ${{ secrets.CRM_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
@@ -131,12 +147,17 @@ jobs:
             # character '\"' in variable name"). Also heal any such orphan
             # quote line an earlier deploy already left behind.
             sed -i '/^"$/d' .env || true
-            CRM_URL="$(printf '%s' "${{ secrets.CRM_DATABASE_URL }}" | tr -d '\r\n')"
+            # $CRM_DATABASE_URL / $BETTER_AUTH_SECRET are real shell env vars
+            # here, forwarded by ssh-action's `envs:` (see the step's `env:`
+            # block above) — not spliced into this script's text by GitHub
+            # Actions. tr -d '\r\n' is kept as defensive cleanup in case the
+            # secret's actual value legitimately ends in whitespace.
+            CRM_URL="$(printf '%s' "$CRM_DATABASE_URL" | tr -d '\r\n')"
             if [ -n "$CRM_URL" ]; then
               sed -i '/^CRM_DATABASE_URL=/d' .env || true
               printf 'CRM_DATABASE_URL="%s"\n' "$CRM_URL" >> .env
             fi
-            BA_SECRET="$(printf '%s' "${{ secrets.BETTER_AUTH_SECRET }}" | tr -d '\r\n')"
+            BA_SECRET="$(printf '%s' "$BETTER_AUTH_SECRET" | tr -d '\r\n')"
             if [ -n "$BA_SECRET" ]; then
               sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
               printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env

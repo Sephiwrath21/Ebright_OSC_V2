@@ -45,12 +45,12 @@ export default function Pagination({
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-2.5 text-sm text-black/67 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2.5 text-sm text-black/67 dark:text-slate-300 ${className}`}>
       <span>show</span>
       <select
         value={pageSize}
         onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        className="h-[30px] rounded-lg border border-black/25 px-2 text-sm"
+        className="h-[30px] rounded-lg border border-black/25 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 px-2 text-sm"
       >
         {pageSizeOptions.map((n) => (
           <option key={n} value={n}>
@@ -68,7 +68,7 @@ export default function Pagination({
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
-          className="w-7 h-7 rounded-full border border-black/15 text-slate-500 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-100"
+          className="w-7 h-7 rounded-full border border-black/15 dark:border-white/20 text-slate-500 dark:text-slate-400 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-100 dark:enabled:hover:bg-slate-800"
         >
           ‹
         </button>
@@ -83,12 +83,12 @@ export default function Pagination({
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"
-          className="w-7 h-7 rounded-full border border-black/15 text-slate-500 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-100"
+          className="w-7 h-7 rounded-full border border-black/15 dark:border-white/20 text-slate-500 dark:text-slate-400 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-100 dark:enabled:hover:bg-slate-800"
         >
           ›
         </button>
 
-        <span className="ml-2 text-black/50">Go to page</span>
+        <span className="ml-2 text-black/50 dark:text-slate-400">Go to page</span>
         <input
           type="number"
           min={1}
@@ -102,7 +102,7 @@ export default function Pagination({
             }
           }}
           aria-label="Page number"
-          className="w-16 h-8 rounded-lg border border-black/25 px-2 text-sm"
+          className="w-16 h-8 rounded-lg border border-black/25 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 px-2 text-sm"
         />
         <button
           type="button"

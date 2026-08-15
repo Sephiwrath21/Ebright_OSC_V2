@@ -45,7 +45,7 @@ export interface ManpowerScheduleActions {
 
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
-  return <p className="mt-2 text-xs text-red-600">{error}</p>;
+  return <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>;
 }
 
 function EditableCell({
@@ -75,7 +75,7 @@ function EditableCell({
           });
         }}
         className={`w-full rounded-md border-0 px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          cell.assignedStaffId ? personLightColor(cell.assignedStaffId) : "bg-gray-50 text-gray-400"
+          cell.assignedStaffId ? personLightColor(cell.assignedStaffId) : "bg-gray-50 text-gray-400 dark:bg-slate-800"
         }`}
       >
         <option value="">–</option>
@@ -92,7 +92,7 @@ function EditableCell({
 
 function StaticCell({ cell }: { cell: FlowScheduleCell }) {
   if (!cell.assignedStaffId) {
-    return <span className="text-xs text-gray-300">–</span>;
+    return <span className="text-xs text-gray-300 dark:text-slate-600">–</span>;
   }
   return (
     <span
@@ -122,7 +122,7 @@ function AddRowForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+        className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
       >
         + Add time row
       </button>
@@ -135,21 +135,21 @@ function AddRowForm({
         type="time"
         value={start}
         onChange={(e) => setStart(e.target.value)}
-        className="rounded-full border border-gray-300 px-3 py-1 text-xs"
+        className="rounded-full border border-gray-300 px-3 py-1 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <span className="text-xs text-gray-400">to</span>
       <input
         type="time"
         value={end}
         onChange={(e) => setEnd(e.target.value)}
-        className="rounded-full border border-gray-300 px-3 py-1 text-xs"
+        className="rounded-full border border-gray-300 px-3 py-1 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <input
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Label (e.g. Opening) — optional"
         maxLength={60}
-        className="w-52 rounded-full border border-gray-300 px-3 py-1 text-xs placeholder:text-gray-400"
+        className="w-52 rounded-full border border-gray-300 px-3 py-1 text-xs placeholder:text-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <button
         type="button"
@@ -178,7 +178,7 @@ function AddRowForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="text-xs font-medium text-gray-400 hover:text-gray-600"
+        className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
       >
         Cancel
       </button>
@@ -217,18 +217,18 @@ function RowTimeLabel({
         {/* Row label (2026-08-01, ClickUp-style slot naming) shown above
             the time range — this is the exact title the synced task gets. */}
         {row.rowLabel && (
-          <p className="whitespace-nowrap text-sm font-semibold text-gray-800">{row.rowLabel}</p>
+          <p className="whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-slate-200">{row.rowLabel}</p>
         )}
         <div
           className={`flex items-center gap-1.5 whitespace-nowrap ${
-            row.rowLabel ? "text-xs text-gray-500" : "text-sm font-medium text-gray-700"
+            row.rowLabel ? "text-xs text-gray-500 dark:text-slate-400" : "text-sm font-medium text-gray-700 dark:text-slate-300"
           }`}
         >
           {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-xs text-gray-400 hover:text-blue-600"
+            className="text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
             title="Edit time / label"
           >
             ✎
@@ -237,7 +237,7 @@ function RowTimeLabel({
             type="button"
             onClick={handleDelete}
             disabled={pending}
-            className="text-xs text-gray-400 hover:text-red-600"
+            className="text-xs text-gray-400 hover:text-red-600 dark:hover:text-red-400"
             title="Remove row"
           >
             ×
@@ -255,20 +255,20 @@ function RowTimeLabel({
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Label (e.g. Opening) — optional"
         maxLength={60}
-        className="w-full rounded-full border border-gray-300 px-2 py-0.5 text-xs placeholder:text-gray-400"
+        className="w-full rounded-full border border-gray-300 px-2 py-0.5 text-xs placeholder:text-gray-400 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       />
       <div className="flex items-center gap-1">
         <input
           type="time"
           value={start}
           onChange={(e) => setStart(e.target.value)}
-          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs"
+          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
         <input
           type="time"
           value={end}
           onChange={(e) => setEnd(e.target.value)}
-          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs"
+          className="w-24 rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -289,14 +289,14 @@ function RowTimeLabel({
               }
             })
           }
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+          className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Save
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="text-xs font-medium text-gray-400 hover:text-gray-600"
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
         >
           Cancel
         </button>
@@ -323,8 +323,8 @@ export function ManpowerScheduleGrid({
 
   if (!schedule) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
           Manpower Schedule
         </h3>
         <p className="mb-3 text-sm text-gray-400">No schedule planned for this day yet.</p>
@@ -366,20 +366,20 @@ export function ManpowerScheduleGrid({
   const cellAt = new Map(schedule.cells.map((c) => [`${rowKey(c)}::${c.roleColumn}`, c]));
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
             Manpower Schedule
           </h3>
-          <p className="mt-1 text-sm text-gray-600">{schedule.date}</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">{schedule.date}</p>
         </div>
         <div className="flex items-center gap-3">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
               schedule.status === "PUBLISHED"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200"
             }`}
           >
             {schedule.status}
@@ -406,9 +406,9 @@ export function ManpowerScheduleGrid({
         <table className="w-full min-w-[560px] border-separate border-spacing-y-1.5">
           <thead>
             <tr>
-              <th className="px-2 text-left text-xs font-semibold text-gray-500">Slot</th>
+              <th className="px-2 text-left text-xs font-semibold text-gray-500 dark:text-slate-400">Slot</th>
               {columns.map((col) => (
-                <th key={col} className="px-2 text-left text-xs font-semibold text-gray-500">
+                <th key={col} className="px-2 text-left text-xs font-semibold text-gray-500 dark:text-slate-400">
                   <div className="flex items-center gap-1">
                     {col}
                     {canEdit && col !== "Manager" && (
@@ -420,7 +420,7 @@ export function ManpowerScheduleGrid({
                             if (!result.ok) setError(result.message);
                           })
                         }
-                        className="text-gray-300 hover:text-red-600"
+                        className="text-gray-300 hover:text-red-600 dark:text-slate-600 dark:hover:text-red-400"
                         title="Remove seat"
                       >
                         ×
@@ -444,13 +444,13 @@ export function ManpowerScheduleGrid({
                   ) : (
                     <div>
                       {row.rowLabel && (
-                        <p className="whitespace-nowrap text-sm font-semibold text-gray-800">
+                        <p className="whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-slate-200">
                           {row.rowLabel}
                         </p>
                       )}
                       <span
                         className={`whitespace-nowrap ${
-                          row.rowLabel ? "text-xs text-gray-500" : "text-sm font-medium text-gray-700"
+                          row.rowLabel ? "text-xs text-gray-500 dark:text-slate-400" : "text-sm font-medium text-gray-700 dark:text-slate-300"
                         }`}
                       >
                         {flowFormatTime12h(row.startTime)} – {flowFormatTime12h(row.endTime)}
@@ -463,7 +463,7 @@ export function ManpowerScheduleGrid({
                   return (
                     <td key={col} className="min-w-32 px-2 py-1 align-top">
                       {!cell ? (
-                        <span className="text-xs text-gray-300">–</span>
+                        <span className="text-xs text-gray-300 dark:text-slate-600">–</span>
                       ) : canEdit ? (
                         <EditableCell cell={cell} staff={staff} onAssign={actions.assignCell} />
                       ) : (
@@ -489,7 +489,7 @@ export function ManpowerScheduleGrid({
                 if (!result.ok) setError(result.message);
               })
             }
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             + Add Coach seat
           </button>
@@ -501,7 +501,7 @@ export function ManpowerScheduleGrid({
                 if (!result.ok) setError(result.message);
               })
             }
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             + Add Exec seat
           </button>

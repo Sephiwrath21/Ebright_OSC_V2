@@ -6,11 +6,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   canManageTaskTemplateGroups,
+  isPersonalAccountView,
   ROLE_VIEWS,
   resolveViewRole,
   shows,
   showsAddTaskHeader,
   taskManagerNavAccess,
+  thisWeekDatesForRange,
   weekdayRangeOf,
   type ViewRole,
 } from "./role-views";
@@ -48,7 +50,7 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
   it("Branch Exec and Coaches are Daily ONLY on both pages", () => {
     for (const v of ["BRANCH_MEMBER", "COACH"] as ViewRole[]) {
       expect(ROLE_VIEWS[v].home).toEqual(["personalDaily"]);
-      expect(ROLE_VIEWS[v].taskManager).toEqual(["personalDaily", "myTasksDaily"]);
+      expect(ROLE_VIEWS[v].taskManager).toEqual(["myOverview"]);
     }
   });
 
@@ -71,7 +73,7 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     expect(shows("BRANCH_SITE", "taskManager", "adhocOversight")).toBe(true);
   });
 
-  it("department staff see EXACTLY Daily/Monthly/HOD Assigned — no stream or delegated extras", () => {
+  it("department/branch staff (myOverview roles) have no stream or delegated extras on Task Manager", () => {
     expect(shows("DEPT_MEMBER", "home", "assignerStreams")).toBe(false);
     expect(shows("DEPT_MEMBER", "taskManager", "assignerStreams")).toBe(false);
     expect(shows("DEPT_MEMBER", "taskManager", "delegated")).toBe(false);
@@ -88,9 +90,10 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     ]);
   });
 
-  it("DEPT_MEMBER gets the HOD Assigned card on both pages", () => {
+  it("DEPT_MEMBER gets the HOD Assigned card on Home only (2026-08-12: Task Manager's myOverview replaced it with whole-department Daily visibility instead)", () => {
     expect(shows("DEPT_MEMBER", "home", "hodAssigned")).toBe(true);
-    expect(shows("DEPT_MEMBER", "taskManager", "hodAssigned")).toBe(true);
+    expect(shows("DEPT_MEMBER", "taskManager", "hodAssigned")).toBe(false);
+    expect(shows("DEPT_MEMBER", "taskManager", "myOverview")).toBe(true);
   });
 
   it("Branch Manager: Daily/Monthly/Ad hoc personal + Branch Overview + Manpower link", () => {
@@ -115,48 +118,36 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
 });
 
 describe("cross-page consistency invariants", () => {
-  it("every personal card on HOME also exists on the Task Manager page", () => {
-    // The bug class this module exists to prevent ("CEO Assigned on Home
-    // but missing on Task Manager"). The reverse (TM-only personal cards)
-    // is legitimate for org-home roles like OPS, whose Home shows the org
-    // grids instead of personal cards.
-    const personalKeys = ["personalDaily", "personalMonthly", "personalAdhoc", "ceoAssigned", "hodAssigned"] as const;
+  it("Ad hoc stays identical on both pages (2026-08-12: NOT part of the stacked-sections redesign, unlike the other personal keys below)", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
-      for (const key of personalKeys) {
-        if (shows(v, "home", key)) {
-          expect(
-            shows(v, "taskManager", key),
-            `${v}/${key} is on Home but missing on Task Manager`,
-          ).toBe(true);
-        }
+      expect(
+        shows(v, "home", "personalAdhoc"),
+        `${v}/personalAdhoc: Home=${shows(v, "home", "personalAdhoc")} TM=${shows(v, "taskManager", "personalAdhoc")}`,
+      ).toBe(shows(v, "taskManager", "personalAdhoc"));
+    }
+  });
+
+  it("2026-08-12 stacked-sections redesign: personalDaily/personalMonthly/ceoAssigned/hodAssigned are Home-only now, replaced on Task Manager by myOverview/departmentOverview/branchOverview", () => {
+    // This intentionally REPLACES the pre-2026-08-12 invariant (these keys
+    // used to be required to match on both pages) — the whole point of
+    // this redesign is that Task Manager's personal sections were
+    // subsumed into the new stacked structure while Home's stayed
+    // untouched. Pin exactly which roles now diverge, so an accidental
+    // re-introduction of one of these keys to a taskManager array (instead
+    // of going through myOverview/departmentOverview/branchOverview) is a
+    // conscious, test-breaking decision.
+    const retiredFromTaskManager = ["personalDaily", "personalMonthly", "ceoAssigned", "hodAssigned"] as const;
+    for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
+      for (const key of retiredFromTaskManager) {
+        expect(shows(v, "taskManager", key), `${v}/${key} should no longer appear on Task Manager`).toBe(false);
       }
     }
   });
 
-  it("non-org-home roles have IDENTICAL personal cards on both pages", () => {
-    const personalKeys = ["personalDaily", "personalMonthly", "personalAdhoc", "ceoAssigned", "hodAssigned"] as const;
-    const orgHome = (v: ViewRole) => shows(v, "home", "orgGrids");
-    for (const v of (Object.keys(ROLE_VIEWS) as ViewRole[]).filter((v) => !orgHome(v))) {
-      for (const key of personalKeys) {
-        expect(
-          shows(v, "home", key),
-          `${v}/${key}: Home=${shows(v, "home", key)} TM=${shows(v, "taskManager", key)}`,
-        ).toBe(shows(v, "taskManager", key));
-      }
-    }
-  });
-
-  it("a My Tasks list implies its personal card (and vice versa for Daily)", () => {
+  it("myTasksDaily/myTasksMonthly no longer appear in any taskManager array (2026-08-12: subsumed into myOverview/departmentOverview/branchOverview — this invariant used to be checked implicitly via the old personalDaily/myTasksDaily pairing test, which became vacuous once neither key remained)", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
-      // CEO exception (2026-08-01 redesign): Home shows the ONE combined
-      // "My Tasks" card (ceoCombinedList) while Task Manager shows the
-      // standard Daily table WITHOUT a separate personal donut card.
-      if (shows(v, "home", "ceoCombinedList") || shows(v, "taskManager", "ceoCombinedList")) continue;
-      expect(shows(v, "taskManager", "myTasksDaily")).toBe(shows(v, "taskManager", "personalDaily"));
-      // Monthly list implies the Monthly card (not necessarily the reverse).
-      if (shows(v, "taskManager", "myTasksMonthly")) {
-        expect(shows(v, "taskManager", "personalMonthly")).toBe(true);
-      }
+      expect(shows(v, "taskManager", "myTasksDaily"), `${v} should not show myTasksDaily on Task Manager`).toBe(false);
+      expect(shows(v, "taskManager", "myTasksMonthly"), `${v} should not show myTasksMonthly on Task Manager`).toBe(false);
     }
   });
 
@@ -166,14 +157,27 @@ describe("cross-page consistency invariants", () => {
   // this pins exactly which roles get it, so adding a personal-staff role
   // without the Daily table (or giving it to a site login by accident) is
   // a conscious, test-breaking decision.
-  it("every personal-staff role gets the My Tasks Daily table; org/site logins don't", () => {
-    const withDailyTable = (Object.keys(ROLE_VIEWS) as ViewRole[])
-      .filter((v) => shows(v, "taskManager", "myTasksDaily"))
-      .sort();
-    // CEO joined 2026-08-01: their Task Manager "My Tasks" is the same
-    // weekday-sidebar Daily table now (the combined list is Home-only).
-    expect(withDailyTable).toEqual(
-      ["BRANCH_MANAGER", "BRANCH_MEMBER", "CEO", "COACH", "DEPT_MEMBER", "HOD", "OPS"].sort(),
+  it("every personal-staff role gets SOME Daily-showing surface on Task Manager (2026-08-12: myTasksDaily itself is retired everywhere, replaced by myOverview/departmentOverview/branchOverview/entityDropdowns)", () => {
+    const hasDailySurface = (v: ViewRole) =>
+      shows(v, "taskManager", "myOverview") ||
+      shows(v, "taskManager", "departmentOverview") ||
+      shows(v, "taskManager", "branchOverview") ||
+      shows(v, "taskManager", "entityDropdowns");
+    const withDailySurface = (Object.keys(ROLE_VIEWS) as ViewRole[]).filter(hasDailySurface).sort();
+    expect(withDailySurface).toEqual(
+      [
+        "ADMIN",
+        "BRANCH_MANAGER",
+        "BRANCH_MEMBER",
+        "BRANCH_SITE",
+        "CEO",
+        "COACH",
+        "DEPT_MEMBER",
+        "DEPT_SITE",
+        "ELEVATED_DEPT_SITE",
+        "HOD",
+        "OPS",
+      ].sort(),
     );
   });
 });
@@ -261,5 +265,92 @@ describe("taskManagerNavAccess", () => {
       package: false,
       packageTable: false,
     });
+  });
+});
+
+describe("thisWeekDatesForRange", () => {
+  // Friday 2026-08-14 — a known, fixed reference date (a real Friday).
+  const FRIDAY = new Date(2026, 7, 14); // month is 0-indexed: 7 = August
+
+  it("mon-sun: returns all 7 days of the week containing the reference date", () => {
+    const result = thisWeekDatesForRange("mon-sun", FRIDAY);
+    expect(result).toEqual([
+      { weekday: "Monday", date: "2026-08-10" },
+      { weekday: "Tuesday", date: "2026-08-11" },
+      { weekday: "Wednesday", date: "2026-08-12" },
+      { weekday: "Thursday", date: "2026-08-13" },
+      { weekday: "Friday", date: "2026-08-14" },
+      { weekday: "Saturday", date: "2026-08-15" },
+      { weekday: "Sunday", date: "2026-08-16" },
+    ]);
+  });
+
+  it("tue-sat: returns Tuesday through Saturday of that same week", () => {
+    const result = thisWeekDatesForRange("tue-sat", FRIDAY);
+    expect(result).toEqual([
+      { weekday: "Tuesday", date: "2026-08-11" },
+      { weekday: "Wednesday", date: "2026-08-12" },
+      { weekday: "Thursday", date: "2026-08-13" },
+      { weekday: "Friday", date: "2026-08-14" },
+      { weekday: "Saturday", date: "2026-08-15" },
+    ]);
+  });
+
+  it("tue-sun: returns Tuesday through Sunday of that same week", () => {
+    const result = thisWeekDatesForRange("tue-sun", FRIDAY);
+    expect(result.map((d) => d.weekday)).toEqual([
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ]);
+    expect(result[0].date).toBe("2026-08-11");
+    expect(result[5].date).toBe("2026-08-16");
+  });
+
+  it("wed-sun: returns Wednesday through Sunday of that same week", () => {
+    const result = thisWeekDatesForRange("wed-sun", FRIDAY);
+    expect(result.map((d) => d.weekday)).toEqual(["Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
+    expect(result[0].date).toBe("2026-08-12");
+  });
+
+  it("works when the reference date is itself a Sunday (week wraps backward correctly)", () => {
+    const SUNDAY = new Date(2026, 7, 16); // 2026-08-16 is the Sunday of that same week
+    const result = thisWeekDatesForRange("mon-sun", SUNDAY);
+    expect(result[0].date).toBe("2026-08-10"); // still Monday of the SAME week, not the next one
+    expect(result[6].date).toBe("2026-08-16");
+  });
+
+  it("works when the reference date is itself a Monday", () => {
+    const MONDAY = new Date(2026, 7, 10);
+    const result = thisWeekDatesForRange("tue-sat", MONDAY);
+    expect(result[0].date).toBe("2026-08-11");
+    expect(result[4].date).toBe("2026-08-15");
+  });
+});
+
+describe("isPersonalAccountView", () => {
+  it("false for the three shared/site views", () => {
+    const siteViews: ViewRole[] = ["DEPT_SITE", "BRANCH_SITE", "ELEVATED_DEPT_SITE"];
+    for (const view of siteViews) {
+      expect(isPersonalAccountView(view)).toBe(false);
+    }
+  });
+  it("true for every individual-person view", () => {
+    const personalViews: ViewRole[] = [
+      "ADMIN",
+      "CEO",
+      "OPS",
+      "HOD",
+      "BRANCH_MANAGER",
+      "DEPT_MEMBER",
+      "BRANCH_MEMBER",
+      "COACH",
+    ];
+    for (const view of personalViews) {
+      expect(isPersonalAccountView(view)).toBe(true);
+    }
   });
 });

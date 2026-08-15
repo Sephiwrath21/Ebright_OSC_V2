@@ -182,21 +182,21 @@ export default function AddAccountModal({
         onClick={onClose}
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
       />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-200 bg-gradient-to-b from-white to-slate-50">
+        <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-800">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="rounded-full w-11 h-11 bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+            <div className="rounded-full w-11 h-11 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 flex items-center justify-center shrink-0">
               <UserPlus className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h3
                 id="add-account-title"
-                className="text-base font-semibold text-slate-900"
+                className="text-base font-semibold text-slate-900 dark:text-slate-100"
               >
                 Add User
               </h3>
-              <p className="text-[12px] text-slate-500">
+              <p className="text-[12px] text-slate-500 dark:text-slate-400">
                 Pick a role first — the rest adapts to it.
               </p>
             </div>
@@ -204,7 +204,7 @@ export default function AddAccountModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all duration-200"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
             aria-label="Close"
           >
             <X className="w-5 h-5" aria-hidden="true" />
@@ -220,7 +220,7 @@ export default function AddAccountModal({
               onChange={(e) =>
                 changeRole(e.target.value === "" ? "" : Number(e.target.value))
               }
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
             >
               <option value="">Select a role…</option>
               {roles.map((r) => (
@@ -249,9 +249,9 @@ export default function AddAccountModal({
                       type="email"
                       value={email}
                       disabled
-                      className="h-10 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm text-slate-700"
+                      className="h-10 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm text-slate-700 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-200"
                     />
-                    <span className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                    <span className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 text-xs font-semibold">
                       <BadgeCheck className="w-4 h-4" aria-hidden="true" />
                       Verified
                     </span>
@@ -264,13 +264,13 @@ export default function AddAccountModal({
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@ebright.my"
                       autoComplete="off"
-                      className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                      className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                     />
                     <button
                       type="button"
                       onClick={handleVerify}
                       disabled={!emailValid || verifying}
-                      className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
+                      className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
                     >
                       {verifying && (
                         <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -280,7 +280,7 @@ export default function AddAccountModal({
                   </div>
                 )}
                 {verifyError && (
-                  <p className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-rose-600">
+                  <p className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-rose-600 dark:text-rose-400">
                     <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
                     {verifyError}
                   </p>
@@ -290,8 +290,8 @@ export default function AddAccountModal({
               {verified && (
                 <>
                   {/* Auto-filled record — read-only */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-1.5">
-                    <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-500">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-4 py-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-500 dark:text-slate-400">
                       <BadgeCheck className="w-4 h-4 text-emerald-500" aria-hidden="true" />
                       Staff record
                     </div>
@@ -328,7 +328,7 @@ export default function AddAccountModal({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@ebright.my"
                   autoComplete="off"
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                 />
               </Field>
 
@@ -339,7 +339,7 @@ export default function AddAccountModal({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
                   autoComplete="off"
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                 />
               </Field>
 
@@ -348,7 +348,7 @@ export default function AddAccountModal({
                   <select
                     value={orgUnit}
                     onChange={(e) => setOrgUnit(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                   >
                     <option value="">Select a department…</option>
                     {departments.map((d) => (
@@ -363,7 +363,7 @@ export default function AddAccountModal({
                   <select
                     value={orgUnit}
                     onChange={(e) => setOrgUnit(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                   >
                     <option value="">Select a branch…</option>
                     {branches.map((b) => (
@@ -382,7 +382,7 @@ export default function AddAccountModal({
                   <select
                     value={region}
                     onChange={(e) => setRegion(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                   >
                     <option value="">Select a region…</option>
                     {regions.map((r) => (
@@ -401,7 +401,7 @@ export default function AddAccountModal({
                   <select
                     value={orgUnit}
                     onChange={(e) => setOrgUnit(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
                   >
                     <option value="">— None —</option>
                     <optgroup label="Branches">
@@ -434,7 +434,7 @@ export default function AddAccountModal({
           )}
 
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">
+            <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-200">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>{error}</span>
             </div>
@@ -442,11 +442,11 @@ export default function AddAccountModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/60 flex justify-end gap-2">
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center h-9 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-200"
+            className="inline-flex items-center h-9 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
           >
             Cancel
           </button>
@@ -454,7 +454,7 @@ export default function AddAccountModal({
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit || submitting}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200"
           >
             {submitting && (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -481,10 +481,10 @@ function Field({
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-indigo-500">{icon}</span>
-        <h4 className="text-sm font-semibold text-slate-800">{label}</h4>
+        <span className="text-indigo-500 dark:text-indigo-400">{icon}</span>
+        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</h4>
       </div>
-      {hint && <p className="text-[12px] text-slate-500 mb-2.5">{hint}</p>}
+      {hint && <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-2.5">{hint}</p>}
       {children}
     </div>
   );
@@ -493,8 +493,8 @@ function Field({
 function ReadRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-semibold text-slate-800 truncate">
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
         {value ?? "—"}
       </span>
     </div>
@@ -529,7 +529,7 @@ function PasswordFields({
           onChange={(e) => setPassword(e.target.value)}
           placeholder="New password (min. 8 characters)"
           autoComplete="new-password"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
         />
         <input
           type="password"
@@ -537,13 +537,13 @@ function PasswordFields({
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="Confirm password"
           autoComplete="new-password"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-indigo-900/40 transition-all duration-200"
         />
       </div>
       {password.length > 0 && (
         <p
           className={`mt-2 inline-flex items-center gap-1 text-[12px] font-medium ${
-            pwValid ? "text-emerald-600" : "text-rose-600"
+            pwValid ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
           }`}
         >
           {pwValid ? (
@@ -559,7 +559,7 @@ function PasswordFields({
       {confirm.length > 0 && (
         <p
           className={`mt-1 inline-flex items-center gap-1 text-[12px] font-medium ${
-            pwMatch ? "text-emerald-600" : "text-rose-600"
+            pwMatch ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
           }`}
         >
           {pwMatch ? (

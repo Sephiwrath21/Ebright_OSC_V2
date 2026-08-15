@@ -26,6 +26,7 @@ import {
   type BucketCounts,
   type EntityCounts,
   type Period,
+  type PeriodWindow,
   type TaskRow,
 } from "./_lib";
 
@@ -183,26 +184,42 @@ export interface EntityPayload {
   members: MemberRollup[];
 }
 
-/** Entity detail: per-bucket task lists + member rollups for one branch/department. */
-export async function getEntityPayload(
+/** Shared core: entity-scoped task list + roster-first member rollups, for
+ *  ANY window (a real Daily/Monthly date window, or `null` for all-time —
+ *  see getEntityHodAssignedPayload below). `assignerRole`, when given,
+ *  further restricts to blocks whose run was started by a user with that
+ *  exact role (2026-08-12, powers the "HOD Assigned Task" filter) — applied
+ *  AFTER entity-membership scoping, via the same getUsersByIds lookup
+ *  pattern getMePayload's delegated sets already use for assigner info. */
+async function buildEntityPayload(
   type: "branch" | "department",
   name: string,
-  period: Period,
-  date?: string,
-  monthDays?: { from: number; to: number },
+  window: PeriodWindow | null,
+  opts: { strictWindow?: boolean; assignerRole?: string } = {},
 ): Promise<EntityPayload> {
-  let window = resolveWindow(period, date);
-  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
-  // strictWindow: this payload feeds the date-filterable entity overviews —
-  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
-  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
-  const all = await fetchPeriodBlocks(window, { strictWindow: true });
+  let assigneeIdIn: string[] | undefined;
+  if (window === null) {
+    const rosterIds = await prisma.user.findMany({
+      where: {
+        ...(type === "branch"
+          ? { branch: name === UNASSIGNED ? null : name }
+          : { department: name === UNASSIGNED ? null : name }),
+        role: { notIn: ["DEPT_SITE", "BRANCH_SITE"] },
+      },
+      select: { id: true },
+    });
+    assigneeIdIn = rosterIds.map((u) => u.id);
+  }
+  const all = await fetchPeriodBlocks(window, { strictWindow: opts.strictWindow ?? false, assigneeIdIn });
   const users = await getAssigneeMap(all);
 
   // Scope to this entity via the assignee's branch/department (null → Unassigned).
-  const blocks = all.filter(
-    (b) => (users.get(b.assigneeId)?.[type] || UNASSIGNED) === name,
-  );
+  let blocks = all.filter((b) => (users.get(b.assigneeId)?.[type] || UNASSIGNED) === name);
+
+  if (opts.assignerRole) {
+    const starters = await getUsersByIds(blocks.map((b) => b.run.startedById));
+    blocks = blocks.filter((b) => starters.get(b.run.startedById)?.role === opts.assignerRole);
+  }
 
   const tasks: Record<Bucket, DrillTaskRow[]> = { completed: [], pending: [], na: [] };
   for (const b of blocks) {
@@ -264,6 +281,45 @@ export async function getEntityPayload(
     .map(({ _rank, ...member }) => member);
 
   return { totals: countBuckets(blocks), tasks, members };
+}
+
+/** Entity detail: per-bucket task lists + member rollups for one branch/
+ *  department, for a real Daily/Monthly date window. */
+export async function getEntityPayload(
+  type: "branch" | "department",
+  name: string,
+  period: Period,
+  date?: string,
+  monthDays?: { from: number; to: number },
+): Promise<EntityPayload> {
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
+  // strictWindow: this payload feeds the date-filterable entity overviews —
+  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
+  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
+  return buildEntityPayload(type, name, window, { strictWindow: true });
+}
+
+/** "HOD Assigned Task" filter mode (2026-08-12): every task in this entity
+ *  whose assigner is an HOD, ALL-TIME — same "all-time, no date filter"
+ *  convention as the existing "Task Assignment"/delegatedAll view
+ *  (getMePayload), not a real Daily/Monthly window. */
+export async function getEntityHodAssignedPayload(
+  type: "branch" | "department",
+  name: string,
+): Promise<EntityPayload> {
+  return buildEntityPayload(type, name, null, { assignerRole: "HOD" });
+}
+
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign):
+ *  every task in this entity whose assigner is the CEO, ALL-TIME — same
+ *  shape and convention as getEntityHodAssignedPayload above, just a
+ *  different assignerRole. */
+export async function getEntityCeoAssignedPayload(
+  type: "branch" | "department",
+  name: string,
+): Promise<EntityPayload> {
+  return buildEntityPayload(type, name, null, { assignerRole: "CEO" });
 }
 
 /**
