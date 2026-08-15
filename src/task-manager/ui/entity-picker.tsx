@@ -7,6 +7,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { chunkLabel, monthDayChunks } from "./types";
 
 export interface EntityPickerGroup {
   /** Omit for a flat, ungrouped option list. */
@@ -75,22 +76,6 @@ export function DailyDatePicker({
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** The month's range chunks — FOUR, per the 2026-07-30 confirmation
- *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
- *  (22-31 / 22-30 / 22-28 depending on the month's actual length). */
-function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  return [
-    { from: 1, to: 7 },
-    { from: 8, to: 14 },
-    { from: 15, to: 21 },
-    { from: 22, to: daysInMonth },
-  ];
-}
-
-const chunkLabel = (c: { from: number; to: number }) =>
-  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
 
 /** How far the Year dropdown spans around the REAL current year (2026-08-05
  *  redesign — was a single combined "Jul 2026 ▾" select spanning only the

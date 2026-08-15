@@ -784,6 +784,48 @@ export function flowBucketize<T extends FlowTaskRow>(
   return out;
 }
 
+/** Wraps the viewer's own totals/tasks into a synthetic one-member
+ *  FlowEntityDetail, for roles/sections with no owned department or
+ *  branch entity (OPS, CEO, every self-scoped Monthly section, and
+ *  Home's personal Daily/Monthly/third-card sections). `done`/`notDone`
+ *  on the synthetic member are unused placeholders — no current consumer
+ *  (groupTasksByPerson, entity-card-overview.tsx) reads a single-member
+ *  roster's per-member counts; `totals` above is what drives the card. */
+export function toSelfEntityDetail(
+  me: { userId: string; name: string },
+  personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+): FlowEntityDetail {
+  return {
+    name: me.name,
+    totals: personal.totals,
+    tasks: flowBucketize(personal.tasks),
+    members: [
+      { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
+    ],
+  };
+}
+
+/** The month's range chunks — FOUR, per the 2026-07-30 confirmation
+ *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
+ *  (22-31 / 22-30 / 22-28 depending on the month's actual length). Moved
+ *  here from entity-picker.tsx (2026-08-15) so it can be called as a plain
+ *  function from a Server Component — entity-picker.tsx has "use client",
+ *  which turns every one of its exports into a client-reference proxy when
+ *  imported server-side; calling such a proxy as ordinary logic (not
+ *  rendering it as JSX) throws at runtime. */
+export function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return [
+    { from: 1, to: 7 },
+    { from: 8, to: 14 },
+    { from: 15, to: 21 },
+    { from: 22, to: daysInMonth },
+  ];
+}
+
+export const chunkLabel = (c: { from: number; to: number }) =>
+  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
+
 /** Human label for an assigner stream ("CEO assigned tasks" per the mockups). */
 export function flowStreamLabel(key: FlowRole | "self"): string {
   if (key === "self") return "Started by me";

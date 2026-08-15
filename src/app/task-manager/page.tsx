@@ -90,10 +90,8 @@ import {
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
-  type FlowBucketTotals,
-  type FlowDrillTask,
-  type FlowEntityDetail,
   type FlowKanbanColumnColor,
+  toSelfEntityDetail,
 } from "@/task-manager/ui/types";
 import {
   NoAccountCard,
@@ -210,23 +208,6 @@ export default async function TaskManagerPage({
   // ALREADY fetched (daily.me/monthly.me's FlowPersonal), not a new query.
   // FlowDrillTask rows here always carry the viewer's own name in
   // assigneeName already (see types.ts's comment on FlowPersonal.tasks).
-  function toSelfEntityDetail(
-    me: { userId: string; name: string },
-    personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
-  ): FlowEntityDetail {
-    return {
-      name: me.name,
-      totals: personal.totals,
-      tasks: flowBucketize(personal.tasks),
-      members: [
-        // done/notDone are unused placeholders, not real data — no current
-        // consumer (groupTasksByPerson, entity-card-overview.tsx) reads a
-        // single-member roster's per-member counts; totals above is what
-        // drives the card.
-        { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
-      ],
-    };
-  }
 
   // Expected errors are RETURNED, never thrown: Next.js masks thrown
   // server-action error messages in production, so every action here catches
