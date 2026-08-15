@@ -361,7 +361,10 @@ export default function EmployeeRecordView({
             columns keep fitting side by side instead of the rail getting
             pushed below the content. */}
         <div className="flex items-start">
-          <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[27px] rounded-tr-[27px] p-4 sm:p-6">
+          <div
+            className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[12px] rounded-tr-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-4 sm:p-6"
+            style={{ border: "0.5px solid var(--border-neutral)" }}
+          >
             {(() => {
               const lookupKey = `${category.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];

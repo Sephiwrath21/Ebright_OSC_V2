@@ -641,7 +641,10 @@ export default function StageProfileView({
             lg:w-[...] overrides), so there is nothing left for it to ever
             need to catch. */}
         <div className="flex items-start overflow-x-auto lg:overflow-visible">
-          <div className="relative flex-1 min-w-0 bg-white rounded-[24px] lg:rounded-[35px] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10">
+          <div
+            className="relative flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10"
+            style={{ border: "0.5px solid var(--border-neutral)" }}
+          >
             {/* Left column: avatar/name/status/Branch-Dept/Position/Phone/Email + proceed button */}
             <aside
               aria-label="Employee profile summary"
@@ -1142,9 +1145,23 @@ function resolvePanel({
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
-  // same populated data instead of a placeholder "-".
+  // same populated data instead of a placeholder "-". Wrapped in its own
+  // PageEditProvider (2026-08-15, see conversation) so an invalid phone/
+  // email on a history tab shows the same centered PageEditMessageDialog as
+  // every other Personal Info view, instead of EditableSection's smaller
+  // standalone corner popover — same pattern as the 4 already-wrapped
+  // current-tab blocks above, canEdit threaded through unchanged so
+  // read/write permission is identical to before this wrapping.
   if (section.key === "personal-info" && employeeDetail) {
-    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />;
+    return (
+      <PageEditProvider>
+        <PageEditMessageDialog />
+        <div className="mb-4 flex justify-end">
+          <PageEditToggleButton />
+        </div>
+        <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />
+      </PageEditProvider>
+    );
   }
   // Real resume table — same as above, shared with Employee Record's HR Info
   // > Resume/CV tab.

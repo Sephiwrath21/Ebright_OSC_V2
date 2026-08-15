@@ -702,7 +702,7 @@ export default function EmployeeForm({
               <input name="accountName" type="text" placeholder="e.g. ERNIE SUHAILA BINTI RAMLAN" className={inputCls} defaultValue={employee?.accountName ?? ""} />
             </Field>
             <Field label="Account Number" span={2}>
-              <input name="bankAccount" type="text" inputMode="numeric" placeholder="e.g. 1642-3344-9902" className={inputCls} defaultValue={employee?.bankAccount ?? ""} />
+              <AccountNumberInput name="bankAccount" defaultValue={employee?.bankAccount ?? ""} />
             </Field>
           </Section>
           </div>
@@ -798,6 +798,29 @@ function formatNric(digits: string): string {
   if (d.length <= 6) return d;
   if (d.length <= 8) return `${d.slice(0, 6)}-${d.slice(6)}`;
   return `${d.slice(0, 6)}-${d.slice(6, 8)}-${d.slice(8)}`;
+}
+
+// AccountNumberInput — digits only, no formatting (unlike NricInput's
+// dash-grouping, a bank account number has no fixed shape to format
+// against). inputMode="numeric" alone (the previous plain <input>) only
+// hints a numeric mobile keyboard — this actually strips non-digit
+// characters as typed, matching the same digit-only restriction applied to
+// every other Account Number field (ActiveProfilePanels.tsx's
+// OnboardingPayrollPanel, EmployeeRecordView.tsx's PaymentInfoPanel).
+function AccountNumberInput({ name, defaultValue = "" }: { name: string; defaultValue?: string }) {
+  const [digits, setDigits] = useState(() => defaultValue.replace(/\D/g, ""));
+  return (
+    <input
+      name={name}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      value={digits}
+      onChange={(e) => setDigits(e.target.value.replace(/\D/g, ""))}
+      placeholder="e.g. 1642334499"
+      className={inputCls}
+    />
+  );
 }
 
 function NricInput({ name, defaultValue = "" }: { name: string; defaultValue?: string }) {

@@ -117,7 +117,10 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
             button are shrink-0 with deliberately narrow fixed widths/padding
             on mobile so the three together never need to wrap. sm+ reverts
             to the original sizing unchanged. */}
-        <div className="flex flex-nowrap items-center gap-2 sm:gap-4 bg-white dark:bg-slate-900 rounded-[20px] p-4 sm:p-5 mb-3">
+        <div
+          className="flex flex-nowrap items-center gap-2 sm:gap-4 bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-4 sm:p-5 mb-3"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
             <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
@@ -438,7 +441,10 @@ function ListViewTable({
           on mobile instead of the whole page overflowing. The whole table
           (including Name) scrolls together as one unit — deliberately no
           sticky column. */}
-      <div className="bg-white dark:bg-slate-900 rounded-[20px] overflow-x-auto">
+      <div
+        className="bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] overflow-x-auto"
+        style={{ border: "0.5px solid var(--border-neutral)" }}
+      >
         {/* Opaque #d1f0f9 (the same #a4e2f480-over-white blend every other
             header row uses) rather than the translucent color directly —
             translucent backgrounds on a wide grid inside overflow-x-auto are

@@ -88,7 +88,10 @@ export default function StageFlatListView({ stage, rows, branches, departments }
             widths/padding on mobile, and overflow-x-auto is the fallback if
             it still doesn't fit (e.g. Pre's extra "+ Add" button). sm+
             reverts to the original flex-wrap layout and desktop sizing. */}
-        <div className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-4 overflow-x-auto sm:overflow-visible bg-white rounded-2xl p-4 sm:p-5 mb-6 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
+        <div
+          className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-4 overflow-x-auto sm:overflow-visible bg-white rounded-[12px] p-4 sm:p-5 mb-6 dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)]"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <div className="relative flex-1 min-w-[90px] sm:min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
@@ -135,7 +138,10 @@ export default function StageFlatListView({ stage, rows, branches, departments }
             together as one block instead of squishing into illegible
             slivers. Deliberately no sticky column — the whole row scrolls as
             a unit, per explicit request. */}
-        <div className="bg-white rounded-[27px] overflow-x-auto dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
+        <div
+          className="bg-white rounded-[12px] overflow-x-auto dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)]"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <div className="min-w-[680px]">
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] text-sm font-medium text-slate-900 dark:bg-slate-800 dark:text-slate-100">
               <span>Name</span>
