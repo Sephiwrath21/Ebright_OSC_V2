@@ -30,7 +30,11 @@ export type ViewRole =
 
 export type SectionKey =
   // org-level overviews
-  | "orgGrids" // all-departments + branch-regions (+ ad hoc regions) grids
+  | "orgGrids" // 2026-08-15: renders nothing on Home (the all-departments +
+  // branch-regions donut grids it used to gate were removed entirely per
+  // request); the key is retained purely as an org-role marker so the Home
+  // section still exits early for ADMIN/OPS/elevated DEPT_SITE without
+  // falling through to the MEMBER-shaped rendering below it
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
   | "departmentOverview" // own-department detail (chips + donut + roster)
   | "branchOverview" // own-branch detail (same component as department)
@@ -60,7 +64,7 @@ export type SectionKey =
   | "ceoCombinedList"
   | "ceoTaskTable" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
   | "ceoKanban"
-  | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc
+  | "branchRegionOverview"; // no longer used in any home/taskManager array as of 2026-08-15 (Branch Status by Region grid removed from Home); retained pending a cleanup task
 
 /** Daily weekday sidebar range — per the 2026-07-29 final spec (+ CEO,
  *  2026-08-01): department-side Tue–Sat; Branch Manager + Branch Exec
@@ -95,13 +99,11 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // sidebar Daily table view every other role uses (myTasksDaily — the
   // old un-windowed combined list is gone); Home keeps the ONE combined
   // "My Tasks" card (ceoCombinedList) with its date filter.
-  // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
-  // Monthly/Ad hoc, the same RegionDonutGrids sections ADMIN/OPS see via
-  // orgGrids — appended below the draggable department dashboards. Home
-  // only; the CEO's Task Manager page keeps entityDropdowns for branch
-  // drill-down instead.
+  // 2026-08-15: the Branch Status by Region donut grid (branchRegionOverview,
+  // added 2026-08-01) was removed from Home entirely per request, alongside
+  // the equivalent ADMIN/OPS orgGrids donut grids.
   CEO: {
-    home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
+    home: ["ceoCombinedList", "ceoKanban"],
     // 2026-08-12 stacked-sections redesign: myOverview replaces
     // myTasksDaily (own Daily/Monthly, now actionable card-grid form) and
     // ceoTaskTable (own delegated-out list) — the CEO no longer has one

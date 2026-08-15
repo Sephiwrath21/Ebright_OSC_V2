@@ -37,8 +37,8 @@
 //   ADMIN/ELEVATED_DEPT_SITE: entityDropdowns only — the Department|Branch
 //                    dropdown overview IS the whole page. The org-wide
 //                    overview grids (all-departments + branch-by-region,
-//                    overview-grids.tsx) render on the OSC Home page instead
-//                    (home-overview.tsx).
+//                    overview-grids.tsx) used to render on the OSC Home page
+//                    (home-overview.tsx) — both removed entirely, 2026-08-15.
 // No role has a Daily/Monthly toggle anywhere on this page — every
 // TaskOverviewStack shows BOTH periods simultaneously, stacked top to
 // bottom. Every drillable donut card (Ad hoc, assigner streams) opens its

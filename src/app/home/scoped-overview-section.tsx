@@ -2,11 +2,14 @@
 // type gets it (2026-07-28 "no exceptions" requirement), scoped by the data
 // layer's role routing and always carrying the date filter(s):
 //
-//   ADMIN / CEO / OPS ........ org-wide grids (departments + branch regions
-//                              + ad hoc when present) — HomeTaskOverview
-//   elevated DEPT_SITE ....... ALL departments Daily/Monthly grids (org
-//   (Operations/Optimisation)  payload with branch halves stripped — elevated
-//                              visibility is departments-only)
+//   ADMIN / OPS / elevated DEPT_SITE ... nothing (2026-08-15: the org-wide
+//                              "All Departments" + "Branch Status by Region"
+//                              grids were removed from Home entirely per
+//                              request — still viewable in full on the
+//                              Department Overview / Task Manager pages)
+//   CEO ...................... draggable department dashboards only (Branch
+//                              Status by Region removed alongside the above,
+//                              2026-08-15 — same donut grid, same request)
 //   other DEPT_SITE .......... own department Daily + Monthly donuts
 //   HOD ...................... FOUR sections (2026-07-29): personal Daily +
 //                              Monthly, CEO Assigned Tasks (?cdate=), and
@@ -36,9 +39,7 @@ import {
   MonthDropdown,
   MonthRangeDropdown,
 } from "@/task-manager/ui/entity-picker";
-import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
-import { RegionDonutGrids } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import {
   flowBucketize,
@@ -130,43 +131,19 @@ export async function HomeScopedOverviewSection({
         />
       </div>
     );
-    // CEO's branchRegionOverview Ad hoc section (2026-08-01) — same single-
-    // day picker as HomeTaskOverview's org-wide version.
-    const adhocPicker = (
-      <DailyDatePicker
-        key="ceo-adhoc-picker"
-        value={adhocAnchor}
-        basePath="/home"
-        param="adate"
-        extraParams={carry("adate")}
-      />
-    );
-
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization) — this section renders purely from the
     // config via shows(view, "home", key).
     const view = resolveViewRole(daily.me.me);
 
-    // Org roles (ADMIN/CEO/OPS): the full org-wide overview. CEO has no
-    // adhocByRegion (data layer only builds it for ADMIN/OPS) — the ad hoc
-    // section and its picker simply don't render for them.
+    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 — nothing renders
+    // here anymore. Both grids this branch used to show ("All Departments"
+    // and "Branch Status by Region") were removed from Home per request;
+    // the same data is still viewable in full on the Department Overview /
+    // Task Manager pages.
     if (daily.org && shows(view, "home", "orgGrids")) {
-      return (
-        <HomeTaskOverview
-          dailyOrg={daily.org}
-          monthlyOrg={monthly.org}
-          adhocByRegion={daily.adhocByRegion}
-          departmentOverviewHref="/task-manager?view=department"
-          dailyDate={daily.date}
-          monthlyDate={monthly.date}
-          adhocDate={adhocAnchor}
-          dateFilterParams={raw}
-        />
-      );
+      return null;
     }
-
-    // (Elevated department sites take the full orgGrids path above since
-    // the 2026-07-29 final role spec — superadmin-equivalent visibility.)
 
     // "Assignee only" rule: the viewer's own userId + the complete/N-A/
     // reopen actions make their own tasks' status circles live in the drill
@@ -468,39 +445,6 @@ export async function HomeScopedOverviewSection({
       );
     }
 
-    // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
-    // Monthly (Manager)/Ad hoc (Manager), the SAME RegionDonutGrids sections
-    // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
-    // draggable department dashboards. daily.org/monthly.org/adhocByRegion
-    // are already fetched for the CEO (canViewOrg includes CEO) — this only
-    // decides whether they render here.
-    let branchRegionOverview: ReactNode = null;
-    if (shows(view, "home", "branchRegionOverview") && daily.org) {
-      branchRegionOverview = (
-        <>
-          <RegionDonutGrids
-            title="Branch Status by Region — Daily"
-            regions={daily.org.regions}
-            action={dailyPicker}
-          />
-          {monthly.org && (
-            <RegionDonutGrids
-              title="Branch Status by Region — Monthly (Manager)"
-              regions={monthly.org.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []}
-              action={monthlyPicker}
-            />
-          )}
-          {daily.adhocByRegion && (
-            <RegionDonutGrids
-              title="Ad hoc Tasks by Region (Manager)"
-              regions={daily.adhocByRegion.regions}
-              action={adhocPicker}
-            />
-          )}
-        </>
-      );
-    }
-
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
     // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
     // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
@@ -555,7 +499,6 @@ export async function HomeScopedOverviewSection({
           </>,
         )}
         {ceoDashboards}
-        {branchRegionOverview}
       </div>
     );
   } catch {
