@@ -59,8 +59,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-purple-950 dark:border-purple-800 dark:text-purple-400",
-      current: "bg-[#d9a2fb] border-[#621096] text-[#4b4949d6] dark:bg-purple-900 dark:border-purple-500 dark:text-purple-100",
+      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-transparent dark:border-purple-700 dark:text-purple-300",
+      current: "bg-[#d9a2fb] border-[#621096] text-[#4b4949d6] dark:bg-purple-600 dark:border-purple-600 dark:text-white",
     },
   },
   probation: {
@@ -72,8 +72,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-purple-950 dark:border-purple-800 dark:text-purple-400",
-      current: "bg-[#6fa3f0d0] border-[#1f5fce] text-[#4b4949d6] dark:bg-blue-900 dark:border-blue-500 dark:text-blue-100",
+      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-transparent dark:border-purple-700 dark:text-purple-300",
+      current: "bg-[#6fa3f0d0] border-[#1f5fce] text-[#4b4949d6] dark:bg-blue-600 dark:border-blue-600 dark:text-white",
     },
   },
   onboarding: {
@@ -89,8 +89,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6] dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400",
-      current: "bg-[#7ef293] border-[#0a6e03] text-[#4b4949d6] dark:bg-emerald-900 dark:border-emerald-500 dark:text-emerald-100",
+      base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6] dark:bg-transparent dark:border-emerald-700 dark:text-emerald-300",
+      current: "bg-[#7ef293] border-[#0a6e03] text-[#4b4949d6] dark:bg-emerald-600 dark:border-emerald-600 dark:text-white",
     },
   },
   active: {
@@ -112,8 +112,11 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 10,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6] dark:bg-lime-950 dark:border-lime-800 dark:text-lime-400",
-      current: "bg-[#c8e94a] border-[#7a9c1f] text-[#4b4949d6] dark:bg-lime-900 dark:border-lime-500 dark:text-lime-100",
+      base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6] dark:bg-transparent dark:border-lime-700 dark:text-lime-300",
+      // Solid lime-600 reads too bright for white text at good contrast
+      // (unlike the other 4 hues) — lime-700 keeps the same "solid fill"
+      // structure with legible white text instead.
+      current: "bg-[#c8e94a] border-[#7a9c1f] text-[#4b4949d6] dark:bg-lime-700 dark:border-lime-700 dark:text-white",
     },
   },
   exit: {
@@ -133,10 +136,10 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 10,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6] dark:bg-red-950 dark:border-red-800 dark:text-red-400",
-      current: "bg-[#ee5f5f] border-[#961010] text-white dark:bg-red-900 dark:border-red-500",
-      clearanceBase: "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6] dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400",
-      clearanceCurrent: "bg-[#e8a93c] border-[#8a5a06] text-white dark:bg-amber-900 dark:border-amber-500",
+      base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6] dark:bg-transparent dark:border-red-700 dark:text-red-300",
+      current: "bg-[#ee5f5f] border-[#961010] text-white dark:bg-red-600 dark:border-red-600",
+      clearanceBase: "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6] dark:bg-transparent dark:border-amber-700 dark:text-amber-300",
+      clearanceCurrent: "bg-[#e8a93c] border-[#8a5a06] text-white dark:bg-amber-600 dark:border-amber-600",
     },
   },
 };

@@ -530,32 +530,32 @@ export default function StageProfileView({
           } as React.CSSProperties
         }
       >
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href={`/employee-folder/${stage}`} className="hover:text-slate-900 transition-colors">
+          <Link href={`/employee-folder/${stage}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             {STAGE_LABELS[stage]}
           </Link>
           {locationName && locationGroup && locationCode && (
             <>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-              <Link href={`/employee-folder/${stage}/${locationGroup}/${locationCode}`} className="hover:text-slate-900 transition-colors">
+              <Link href={`/employee-folder/${stage}/${locationGroup}/${locationCode}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
                 {locationName}
               </Link>
             </>
           )}
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">{employeeName}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">{employeeName}</span>
         </nav>
 
-        <h1 className="text-2xl font-semibold text-[#4b4949d6] mb-4">{STAGE_LABELS[stage]}</h1>
+        <h1 className="text-2xl font-semibold text-[#4b4949d6] dark:text-slate-100 mb-4">{STAGE_LABELS[stage]}</h1>
 
         {/* Desktop/mouse-driven-browser-only ([@media(hover:none)]:hidden —
             see EmployeeRecordView.tsx's own comments for why hover:none
