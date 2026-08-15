@@ -1,15 +1,17 @@
 "use client";
 
 // Superadmin's org-wide Task Manager overview, rendered on the OSC HOME page
-// (moved off /task-manager): all-departments Daily + Monthly donut grids,
-// branch status by Region A/B/C Daily + Monthly, and ad hoc tasks by region.
-// Same components and drill-down modals as the Task Manager page used —
-// read-only rollups, so no server actions are needed here.
+// (moved off /task-manager): all-departments Daily + Monthly stats grids
+// (2026-08-15: text-only, ring chart removed — see overview-grids.tsx's
+// EntityStatsGrid), branch status by Region A/B/C Daily + Monthly (still
+// donut-based, unchanged), and ad hoc tasks by region. Same components and
+// drill-down modals as the Task Manager page used — read-only rollups, so
+// no server actions are needed here.
 
 import type { FlowDetailResponse } from "./types";
 import { PageSectionHeading } from "./bits";
 import { DailyDatePicker, MonthDropdown, MonthRangeDropdown } from "./entity-picker";
-import { EntityDonutGrid, RegionDonutGrids } from "./overview-grids";
+import { EntityStatsGrid, RegionDonutGrids } from "./overview-grids";
 
 export function HomeTaskOverview({
   dailyOrg,
@@ -92,14 +94,14 @@ export function HomeTaskOverview({
   return (
     <div className="flex flex-col gap-5">
       <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
-      <EntityDonutGrid
+      <EntityStatsGrid
         title="All Departments — Daily"
         entities={dailyOrg.departments}
         nameHref={deptHref}
         action={dailyPicker}
       />
       {monthlyOrg && (
-        <EntityDonutGrid
+        <EntityStatsGrid
           title="All Departments — Monthly"
           entities={monthlyOrg.departments}
           nameHref={deptHref}

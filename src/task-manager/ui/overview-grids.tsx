@@ -122,6 +122,104 @@ export function EntityDonutGrid({
   );
 }
 
+/** Text-only sibling of MiniDonutBlock (2026-08-15, Home page's "All
+ *  Departments" grids only — see EntityStatsGrid below) — same name/
+ *  completion-%/bucket-counts/drill-in behavior, minus the StatusDonut
+ *  ring. The combined completion % previously lived ONLY inside the
+ *  ring's center text, so it's shown here as its own line instead of
+ *  being dropped. Deliberately a SEPARATE component rather than a
+ *  hide-the-chart flag on MiniDonutBlock — RegionDonutGrids ("Branch
+ *  Status by Region") keeps using MiniDonutBlock/the ring unchanged, and
+ *  a boolean toggle buried in a shared component risked a future caller
+ *  forgetting which mode it's in. */
+function MiniStatsBlock({
+  entity,
+  nameHref,
+}: {
+  entity: FlowEntityRollup;
+  nameHref?: string;
+}) {
+  const [drill, setDrill] = React.useState<"completed" | "pending" | "na" | null>(null);
+  const drillable = Boolean(entity.tasks);
+
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
+      {nameHref ? (
+        <a
+          href={nameHref}
+          className="w-full truncate text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+        >
+          {entity.name}
+        </a>
+      ) : (
+        <p className="w-full truncate text-center text-sm font-semibold text-gray-900 dark:text-slate-100">
+          {entity.name}
+        </p>
+      )}
+      <span className="text-sm font-bold text-gray-900 dark:text-slate-100">{flowCompletionPct(entity)}%</span>
+      <div className="flex gap-3 text-xs text-gray-500 dark:text-slate-400">
+        {BUCKET_META.map((b) =>
+          drillable ? (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setDrill(b.key)}
+              className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-800"
+            >
+              <span className={`size-2 rounded-full ${b.dot}`} />
+              {entity[b.key]}
+            </button>
+          ) : (
+            <span key={b.key} className="flex items-center gap-1">
+              <span className={`size-2 rounded-full ${b.dot}`} />
+              {entity[b.key]}
+            </span>
+          ),
+        )}
+      </div>
+      {drill && (
+        <EntityDrillModal
+          name={entity.name}
+          tasks={entity.tasks ?? EMPTY_DRILL_TASKS}
+          bucketKey={drill}
+          onClose={() => setDrill(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Text-only sibling of EntityDonutGrid (2026-08-15) — same shape/props,
+ *  renders MiniStatsBlock instead of MiniDonutBlock. Used only by the
+ *  Home page's "All Departments — Daily/Monthly" sections (ring chart
+ *  removed per request); every other donut grid on Home (Branch Status
+ *  by Region) is untouched. */
+export function EntityStatsGrid({
+  title,
+  entities,
+  nameHref,
+  action,
+}: {
+  title: string;
+  entities: FlowEntityRollup[];
+  nameHref?: (name: string) => string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <SectionCard title={title} action={action}>
+      {entities.length === 0 ? (
+        <p className="py-6 text-center text-sm text-gray-400">No activity.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {entities.map((e) => (
+            <MiniStatsBlock key={e.name} entity={e} nameHref={nameHref?.(e.name)} />
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 /**
  * Superadmin's branch view: donut grids grouped under Region A / B / C. When
  * `roleVariants` is given, pills (All / Manager / Branch Exec / Coach) filter
