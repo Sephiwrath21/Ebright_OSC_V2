@@ -79,7 +79,7 @@ const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 /** The month's range chunks — FOUR, per the 2026-07-30 confirmation
  *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
  *  (22-31 / 22-30 / 22-28 depending on the month's actual length). */
-function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
+export function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
   const daysInMonth = new Date(year, month, 0).getDate();
   return [
     { from: 1, to: 7 },
@@ -89,7 +89,7 @@ function monthDayChunks(year: number, month: number): { from: number; to: number
   ];
 }
 
-const chunkLabel = (c: { from: number; to: number }) =>
+export const chunkLabel = (c: { from: number; to: number }) =>
   c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
 
 /** How far the Year dropdown spans around the REAL current year (2026-08-05
