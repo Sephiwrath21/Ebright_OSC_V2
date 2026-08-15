@@ -38,12 +38,13 @@ import {
   getCeoDashboardConfig,
   getDepartmentDetail,
   getFlowDetail,
+  getFlowOverview,
   listActiveTaskCategories,
   saveCeoDashboardConfig,
   FlowBridgeError,
 } from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
-import { resolveViewRole, shows } from "@/task-manager/role-views";
+import { resolveViewRole, shows, thisWeekDatesForRange, weekdayRangeOf } from "@/task-manager/role-views";
 import {
   DailyDatePicker,
   MonthDropdown,
@@ -53,11 +54,18 @@ import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { parseExpandParam } from "@/task-manager/ui/expand-param";
 import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
+import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
+import type { MyMonthConfig, MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
 import {
+  chunkLabel,
   flowBucketize,
   flowStreamLabel,
+  monthDayChunks,
+  toSelfEntityDetail,
   visibleAssignerStreams,
   FLOW_DEPARTMENTS,
+  type FlowCategoryOption,
+  type FlowEntityDetail,
 } from "@/task-manager/ui/types";
 import type { ActionResult } from "@/task-manager/ui/types";
 
@@ -71,6 +79,7 @@ export async function HomeScopedOverviewSection({
   ceoDate,
   expand,
   department,
+  padate,
   actions,
 }: {
   email: string;
@@ -94,6 +103,10 @@ export async function HomeScopedOverviewSection({
    *  FLOW_DEPARTMENTS and defaulted to the account's own department by the
    *  orgGrids branch below, same as /task-manager's Department view. */
   department?: string;
+  /** Branch Manager's Ad hoc day anchor (?padate=, 2026-08-15) — mirrors
+   *  ?hdate=/?cdate= exactly (YYYY-MM-DD, defaults to today, independent
+   *  of every other filter). Ad hoc had no date filter before this. */
+  padate?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -276,87 +289,125 @@ export async function HomeScopedOverviewSection({
       onRemoveProof: actions.removeProof,
     };
 
-    // Assigner-stream card ("HOD assigned tasks" for staff, "CEO assigned
-    // tasks" for HODs) — ALWAYS rendered for its role (zero-filled when the
-    // stream doesn't exist yet; streamsAll only carries streams that HAVE
-    // tasks). Day-windowed by its OWN date param (default today) on each
+    // Personal task-list data (2026-08-15 — My Week/My Month, ported from
+    // /task-manager's myOverview): the 5 roles with personalDaily
+    // (HOD/BRANCH_MANAGER/DEPT_MEMBER/BRANCH_MEMBER/COACH) all need this;
+    // every other role skips it entirely (one cheap boolean check). Daily
+    // and Monthly are self-only here (2026-08-15 confirmed decision) —
+    // unlike /task-manager's own DEPT_MEMBER Daily, which shows the whole
+    // department roster; Home stays "only my task" for every role.
+    const isPersonalRole = shows(view, "home", "personalDaily");
+    const hasPersonalMonthly = shows(view, "home", "personalMonthly");
+    let categories: FlowCategoryOption[] = [];
+    let personalDailyEntity: FlowEntityDetail | undefined;
+    let personalMonthlyEntity: FlowEntityDetail | undefined;
+    let personalMyWeek: MyWeekConfig | undefined;
+    let personalMyMonth: MyMonthConfig | undefined;
+    if (isPersonalRole) {
+      categories = await listActiveTaskCategories(email).catch(() => []);
+      personalDailyEntity = toSelfEntityDetail(daily.me.me, daily.me);
+
+      const [dY, dM, dD] = daily.date.split("-").map(Number);
+      const myWeekDates = thisWeekDatesForRange(weekdayRangeOf(view), new Date(dY, dM - 1, dD));
+      const myWeekResults = await Promise.all(
+        myWeekDates.map((d) => getFlowOverview(email, "daily", d.date, { strictWindow: true })),
+      );
+      const myWeekResultByDate = new Map(myWeekResults.map((r) => [r.date, r]));
+      personalMyWeek = {
+        days: myWeekDates.map((d) => ({
+          weekday: d.weekday,
+          date: d.date,
+          tasks: myWeekResultByDate.get(d.date)?.tasks ?? [],
+        })),
+        selectedDate: daily.date,
+        nav: { basePath: "/home", extraParams: dateExtraParams("date") },
+      };
+
+      if (hasPersonalMonthly) {
+        personalMonthlyEntity = toSelfEntityDetail(monthly.me.me, monthly.me);
+        const [mY, mM] = monthly.date.split("-").map(Number);
+        const monthChunks = monthDayChunks(mY, mM);
+        const myMonthResults = await Promise.all(
+          monthChunks.map((c) =>
+            getFlowOverview(email, "monthly", monthly.date, { monthDays: c, strictWindow: true }),
+          ),
+        );
+        personalMyMonth = {
+          chunks: monthChunks.map((c, i) => ({
+            label: chunkLabel(c),
+            range: `${c.from}-${c.to}`,
+            tasks: myMonthResults[i].tasks,
+          })),
+          selectedRange: monthlyRangeParam || `${monthChunks[0].from}-${monthChunks[0].to}`,
+          nav: { basePath: "/home", extraParams: dateExtraParams("mdate", "mrange") },
+        };
+      }
+    }
+
+    // Day-windowed third-card entity (HOD/CEO Assigned Task) — the SAME
+    // dueAt-window filter Home has always used for these (previously fed a
+    // StatusOverviewCard's bucket counts directly; now wraps the filtered
+    // list via toSelfEntityDetail for a real EntityCardOverview list
+    // instead). Day-windowed by its OWN date param (default today) on each
     // task's due date — cadence-agnostic, so daily- AND monthly-cadence
     // assignments due that day both count; tasks with no due date at all
     // match no specific day.
-    const streamCard = (
-      streamKey: "HOD" | "CEO",
-      rawAnchor: string | undefined,
-      param: string,
-      subtitle?: string,
-    ) => {
+    const personalStreamEntity = (streamKey: "HOD" | "CEO", rawAnchor: string | undefined, param: string) => {
       const anchor = rawAnchor ?? formatLocalDate(new Date());
       const win = resolveWindow("daily", anchor);
       const stream = daily.me.streamsAll.find((s) => s.key === streamKey);
-      const buckets = flowBucketize(
-        (stream?.tasks ?? []).filter((t) => {
-          if (!t.dueAt) return false;
-          const due = new Date(t.dueAt);
-          return due >= win.start && due < win.end;
+      const filtered = (stream?.tasks ?? []).filter((t) => {
+        if (!t.dueAt) return false;
+        const due = new Date(t.dueAt);
+        return due >= win.start && due < win.end;
+      });
+      const buckets = flowBucketize(filtered);
+      return {
+        entity: toSelfEntityDetail(daily.me.me, {
+          totals: { completed: buckets.completed.length, pending: buckets.pending.length, na: buckets.na.length },
+          tasks: filtered,
         }),
-      );
-      return (
-        <StatusOverviewCard
-          key={`stream-${streamKey}`}
-          title={flowStreamLabel(streamKey)}
-          subtitle={subtitle}
-          totals={{
-            completed: buckets.completed.length,
-            pending: buckets.pending.length,
-            na: buckets.na.length,
-          }}
-          tasks={buckets}
-          action={
-            <DailyDatePicker
-              key={`home-${param}-picker`}
-              value={anchor}
-              basePath="/home"
-              param={param}
-              extraParams={carry(param)}
-            />
-          }
-          actionPlacement="row"
-          hideChart
-          {...completeProps}
-        />
-      );
+        dateControl: (
+          <DailyDatePicker
+            key={`home-${param}-picker`}
+            value={anchor}
+            basePath="/home"
+            param={param}
+            extraParams={carry(param)}
+          />
+        ),
+      };
     };
 
-    // Personal Daily/Monthly cards (clickable, no subtitle) — shared by
-    // every view whose config lists them. Which cards render is decided
-    // ENTIRELY by role-views.ts (e.g. BRANCH_MEMBER = Daily only).
-    const personalPair = (
-      <>
-        {shows(view, "home", "personalDaily") && (
-          <StatusOverviewCard
-            key="personal-daily"
-            title="Daily"
-            totals={daily.me.totals}
-            tasks={flowBucketize(daily.me.tasks)}
-            action={dailyPicker}
-            actionPlacement="row"
-            hideChart
-            {...completeProps}
+    // Branch Manager's Ad hoc (2026-08-15) — the SAME treatment as
+    // personalStreamEntity above, applied to daily.me.adhocAll instead of
+    // a streamsAll entry, day-windowed by a NEW ?padate= param (Ad hoc
+    // never had a date filter before this).
+    const personalAdhocEntity = (rawAnchor: string | undefined) => {
+      const anchor = rawAnchor ?? formatLocalDate(new Date());
+      const win = resolveWindow("daily", anchor);
+      const filtered = (daily.me.adhocAll?.tasks ?? []).filter((t) => {
+        if (!t.dueAt) return false;
+        const due = new Date(t.dueAt);
+        return due >= win.start && due < win.end;
+      });
+      const buckets = flowBucketize(filtered);
+      return {
+        entity: toSelfEntityDetail(daily.me.me, {
+          totals: { completed: buckets.completed.length, pending: buckets.pending.length, na: buckets.na.length },
+          tasks: filtered,
+        }),
+        dateControl: (
+          <DailyDatePicker
+            key="home-padate-picker"
+            value={anchor}
+            basePath="/home"
+            param="padate"
+            extraParams={carry("padate")}
           />
-        )}
-        {shows(view, "home", "personalMonthly") && (
-          <StatusOverviewCard
-            key="personal-monthly"
-            title="Monthly"
-            totals={monthly.me.totals}
-            tasks={flowBucketize(monthly.me.tasks)}
-            action={monthlyPicker}
-            actionPlacement="row"
-            hideChart
-            {...completeProps}
-          />
-        )}
-      </>
-    );
+        ),
+      };
+    };
 
     const grid = (children: ReactNode) => (
       <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
@@ -392,14 +443,44 @@ export async function HomeScopedOverviewSection({
       // Overview pair. View-only DEPT_SITE logins (no personal sections in
       // their config) keep the department pair alone.
       if (shows(view, "home", "personalDaily")) {
+        const ceoAssigned = shows(view, "home", "ceoAssigned")
+          ? personalStreamEntity("CEO", ceoDate, "cdate")
+          : undefined;
         return (
           <div className="flex flex-col gap-5">
-            {grid(
-              <>
-                {personalPair}
-                {shows(view, "home", "ceoAssigned") && streamCard("CEO", ceoDate, "cdate")}
-              </>,
-            )}
+            <TaskOverviewStack
+              entityName=""
+              categories={categories}
+              myUserId={daily.me.me.userId}
+              daily={
+                personalDailyEntity && {
+                  entity: personalDailyEntity,
+                  dateControl: dailyPicker,
+                  showViewToggle: false,
+                  myWeek: personalMyWeek,
+                }
+              }
+              monthly={
+                personalMonthlyEntity && {
+                  entity: personalMonthlyEntity,
+                  dateControl: monthlyPicker,
+                  showViewToggle: false,
+                  myMonth: personalMyMonth,
+                }
+              }
+              ceoAssigned={
+                ceoAssigned && {
+                  entity: ceoAssigned.entity,
+                  dateControl: ceoAssigned.dateControl,
+                  showViewToggle: false,
+                }
+              }
+              onComplete={actions?.complete}
+              onSkip={actions?.skip}
+              onReopen={actions?.reopen}
+              onUploadProof={actions?.uploadProof}
+              onRemoveProof={actions?.removeProof}
+            />
             <PageSectionHeading>Department Overview</PageSectionHeading>
             {grid(deptPair)}
           </div>
