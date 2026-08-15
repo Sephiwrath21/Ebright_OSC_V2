@@ -89,7 +89,7 @@ export default async function HomePage({
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const expand = sp.expand;
   const department = sp.department;
-  const padate = sp.padate;
+  const padate = sp.padate && DATE_PARAM_RE.test(sp.padate) ? sp.padate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {

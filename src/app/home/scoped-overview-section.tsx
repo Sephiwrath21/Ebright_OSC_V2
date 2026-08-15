@@ -139,6 +139,7 @@ export async function HomeScopedOverviewSection({
       adate: adhocDate,
       hdate: hodDate,
       cdate: ceoDate,
+      padate,
     };
     const carry = (...except: string[]) =>
       Object.fromEntries(
@@ -527,8 +528,9 @@ export async function HomeScopedOverviewSection({
       );
 
       // Branch Manager layout: personal-first — top row = personal cards
-      // (per config) + Ad hoc (plain ALL-TIME set, deliberately no date
-      // filter: ad hoc tasks are one-off/irregular), then the own-branch
+      // (per config) + Ad hoc (day-windowed by ?padate=, defaults to today —
+      // same dueAt-window + toSelfEntityDetail approach as
+      // personalStreamEntity/personalAdhocEntity above), then the own-branch
       // status pair below its own heading. View-only BRANCH_SITE logins
       // (no personal sections in their config) keep the pair alone.
       if (shows(view, "home", "personalDaily")) {
