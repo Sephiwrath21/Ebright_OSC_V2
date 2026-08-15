@@ -46,12 +46,22 @@ export function getFlowOverview(
   email: string,
   period: FlowPeriod,
   date?: string,
-  opts?: { strictWindow?: boolean },
+  opts?: {
+    strictWindow?: boolean;
+    /** Clamp a MONTHLY window to these days of the anchor month (e.g.
+     *  {from:1,to:7}) — same option getFlowDetail already exposes,
+     *  threaded through here too for Home's "My Month" tab fetches
+     *  (2026-08-15). Ignored when period is "daily". */
+    monthDays?: { from: number; to: number };
+  },
 ): Promise<FlowOverviewResponse> {
   return native(async () => {
     const q = analyticsQuerySchema.parse({ period, ...(date ? { date } : {}) });
     const user = await requireUserByEmail(email);
-    const payload = await getMePayload(user, q.period, q.date, { strictWindow: opts?.strictWindow });
+    const payload = await getMePayload(user, q.period, q.date, {
+      strictWindow: opts?.strictWindow,
+      monthDays: opts?.monthDays,
+    });
     return { period: q.period, date: resolvedDate(q.date), ...payload } as FlowOverviewResponse;
   }, "getFlowOverview");
 }
