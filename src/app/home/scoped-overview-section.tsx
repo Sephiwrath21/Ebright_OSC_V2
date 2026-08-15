@@ -44,6 +44,7 @@ import {
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { parseExpandParam } from "@/task-manager/ui/expand-param";
+// HomeRegionOverview: consumed by Task 5's CEO branchRegionOverview wiring, not yet added.
 import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import {
   flowBucketize,
@@ -140,6 +141,7 @@ export async function HomeScopedOverviewSection({
         />
       </div>
     );
+    // consumed by Task 5's CEO branchRegionOverview wiring, not yet added
     const adhocPicker = (
       <DailyDatePicker
         key="home-adhoc-picker"
@@ -161,10 +163,22 @@ export async function HomeScopedOverviewSection({
     // docs/superpowers/specs/2026-08-15-home-org-wide-person-list-design.md).
     if (daily.org && shows(view, "home", "orgGrids")) {
       const { departments: expandedDepts, branches: expandedBranches } = parseExpandParam(expand);
-      const categories = await listActiveTaskCategories(email).catch(() => []);
+      // Dedupe + cap defensively — the real UI (EntityRollupCard's toggle)
+      // never produces more than a handful of entries, but ?expand= is a
+      // public URL param and each name triggers a real DB-backed detail
+      // fetch. 20 comfortably covers any real "expand everything reasonable"
+      // scenario (6 departments, ~20-30 branches org-wide) without allowing
+      // an unbounded fan-out from a hand-crafted URL.
+      const MAX_EXPANDED = 20;
+      const dedupedDepts = [...new Set(expandedDepts)].slice(0, MAX_EXPANDED);
+      const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
+      const categories =
+        dedupedDepts.length || dedupedBranches.length
+          ? await listActiveTaskCategories(email).catch(() => [])
+          : [];
       const [expandedDepartmentDetails, expandedBranchDetails] = await Promise.all([
         Promise.all(
-          expandedDepts.map(async (name) => {
+          dedupedDepts.map(async (name) => {
             const [d, m] = await Promise.all([
               getDepartmentDetail(email, name, "daily", dailyDate).catch(() => null),
               getDepartmentDetail(email, name, "monthly", monthlyDate).catch(() => null),
@@ -173,7 +187,7 @@ export async function HomeScopedOverviewSection({
           }),
         ),
         Promise.all(
-          expandedBranches.map(async (name) => {
+          dedupedBranches.map(async (name) => {
             const [d, m] = await Promise.all([
               getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
               getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
