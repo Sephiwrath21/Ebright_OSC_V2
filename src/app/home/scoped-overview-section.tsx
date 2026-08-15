@@ -26,9 +26,11 @@ import type { ReactNode } from "react";
 import { revalidatePath } from "next/cache";
 import { requireLiveSession } from "@/task-manager/action-session";
 import {
+  getBranchDetail,
   getCeoDashboardConfig,
   getDepartmentDetail,
   getFlowDetail,
+  listActiveTaskCategories,
   saveCeoDashboardConfig,
   FlowBridgeError,
 } from "@/task-manager/data";
@@ -41,6 +43,8 @@ import {
 } from "@/task-manager/ui/entity-picker";
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
+import { parseExpandParam } from "@/task-manager/ui/expand-param";
+import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import {
   flowBucketize,
   flowStreamLabel,
@@ -57,6 +61,7 @@ export async function HomeScopedOverviewSection({
   adhocDate,
   hodDate,
   ceoDate,
+  expand,
   actions,
 }: {
   email: string;
@@ -71,6 +76,10 @@ export async function HomeScopedOverviewSection({
   hodDate?: string;
   /** HOD view's "CEO Assigned Tasks" day anchor (?cdate=). */
   ceoDate?: string;
+  /** Raw ?expand= value (2026-08-15) — which org-wide department/branch
+   *  sections show their full per-person list instead of a rollup card.
+   *  See expand-param.ts. */
+  expand?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -131,18 +140,73 @@ export async function HomeScopedOverviewSection({
         />
       </div>
     );
+    const adhocPicker = (
+      <DailyDatePicker
+        key="home-adhoc-picker"
+        value={adhocAnchor}
+        basePath="/home"
+        param="adate"
+        extraParams={carry("adate")}
+      />
+    );
+
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization) — this section renders purely from the
     // config via shows(view, "home", key).
     const view = resolveViewRole(daily.me.me);
 
-    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 — nothing renders
-    // here anymore. Both grids this branch used to show ("All Departments"
-    // and "Branch Status by Region") were removed from Home per request;
-    // the same data is still viewable in full on the Department Overview /
-    // Task Manager pages.
+    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 rebuild — every
+    // department/branch is a collapsible rollup card; only names present in
+    // ?expand= get a real getDepartmentDetail/getBranchDetail fetch (see
+    // docs/superpowers/specs/2026-08-15-home-org-wide-person-list-design.md).
     if (daily.org && shows(view, "home", "orgGrids")) {
-      return null;
+      const { departments: expandedDepts, branches: expandedBranches } = parseExpandParam(expand);
+      const categories = await listActiveTaskCategories(email).catch(() => []);
+      const [expandedDepartmentDetails, expandedBranchDetails] = await Promise.all([
+        Promise.all(
+          expandedDepts.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getDepartmentDetail(email, name, "daily", dailyDate).catch(() => null),
+              getDepartmentDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.department, monthly: m?.department }] as const;
+          }),
+        ),
+        Promise.all(
+          expandedBranches.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
+              getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.branch, monthly: m?.branch }] as const;
+          }),
+        ),
+      ]).then(([d, b]) => [Object.fromEntries(d), Object.fromEntries(b)] as const);
+      return (
+        <HomeTaskOverview
+          dailyOrg={daily.org}
+          monthlyOrg={monthly.org}
+          adhocByRegion={daily.adhocByRegion}
+          dailyDate={daily.date}
+          monthlyDate={monthly.date}
+          adhocDate={adhocAnchor}
+          dateFilterParams={raw}
+          expandedDepartmentDetails={expandedDepartmentDetails}
+          expandedBranchDetails={expandedBranchDetails}
+          expandParam={expand}
+          categories={categories}
+          myUserId={daily.me.me.userId}
+          actions={
+            actions && {
+              complete: actions.complete,
+              skip: actions.skip,
+              reopen: actions.reopen,
+              uploadProof: actions.uploadProof,
+              removeProof: actions.removeProof,
+            }
+          }
+        />
+      );
     }
 
     // "Assignee only" rule: the viewer's own userId + the complete/N-A/
