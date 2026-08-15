@@ -2,14 +2,14 @@
 // type gets it (2026-07-28 "no exceptions" requirement), scoped by the data
 // layer's role routing and always carrying the date filter(s):
 //
-//   ADMIN / OPS / elevated DEPT_SITE ... nothing (2026-08-15: the org-wide
-//                              "All Departments" + "Branch Status by Region"
-//                              grids were removed from Home entirely per
-//                              request — still viewable in full on the
-//                              Department Overview / Task Manager pages)
-//   CEO ...................... draggable department dashboards only (Branch
-//                              Status by Region removed alongside the above,
-//                              2026-08-15 — same donut grid, same request)
+//   ADMIN / OPS / elevated DEPT_SITE ... org-wide collapsible sections (All
+//                              Departments + Branch Status by Region, rollup
+//                              card by default per department/branch,
+//                              expanding into a per-person list via ?expand=
+//                              — 2026-08-15 rebuild) — HomeTaskOverview
+//   CEO ...................... draggable department dashboards + Branch
+//                              Status by Region (same collapsible sections,
+//                              via HomeRegionOverview, 2026-08-15)
 //   other DEPT_SITE .......... own department Daily + Monthly donuts
 //   HOD ...................... FOUR sections (2026-07-29): personal Daily +
 //                              Monthly, CEO Assigned Tasks (?cdate=), and
@@ -44,7 +44,6 @@ import {
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { parseExpandParam } from "@/task-manager/ui/expand-param";
-// HomeRegionOverview: consumed by Task 5's CEO branchRegionOverview wiring, not yet added.
 import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import {
   flowBucketize,
@@ -141,7 +140,9 @@ export async function HomeScopedOverviewSection({
         />
       </div>
     );
-    // consumed by Task 5's CEO branchRegionOverview wiring, not yet added
+    // Consumed directly by the branchRegionOverview block below (passed to
+    // HomeRegionOverview); the orgGrids branch's HomeTaskOverview builds its
+    // own adhoc picker internally from adhocDate instead of using this one.
     const adhocPicker = (
       <DailyDatePicker
         key="home-adhoc-picker"
