@@ -55,7 +55,7 @@ import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { parseExpandParam } from "@/task-manager/ui/expand-param";
 import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
-import type { MyMonthConfig, MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
+import { EntityCardOverview, type MyMonthConfig, type MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
 import {
   chunkLabel,
   flowBucketize,
@@ -151,8 +151,9 @@ export async function HomeScopedOverviewSection({
     // branchRegionOverview blocks' own `carry()` calls further down) must
     // NOT carry a stale expand value, since EntityRollupCard computes its
     // own new one. These top-level pickers are shared by many OTHER
-    // sections (personalPair, streamCard, ceoDashboards, dept/branch pairs)
-    // that don't read ?expand= at all — harmless for them to carry it too.
+    // sections (the personal TaskOverviewStack/EntityCardOverview cards,
+    // ceoDashboards, dept/branch pairs) that don't read ?expand= at all —
+    // harmless for them to carry it too.
     const dateExtraParams = (...except: string[]) => ({
       ...carry(...except),
       ...(expand ? { expand } : {}),
@@ -531,27 +532,52 @@ export async function HomeScopedOverviewSection({
       // status pair below its own heading. View-only BRANCH_SITE logins
       // (no personal sections in their config) keep the pair alone.
       if (shows(view, "home", "personalDaily")) {
-        const adhocBuckets = flowBucketize(daily.me.adhocAll?.tasks ?? []);
+        const personalAdhoc = shows(view, "home", "personalAdhoc")
+          ? personalAdhocEntity(padate)
+          : undefined;
         return (
           <div className="flex flex-col gap-5">
-            {grid(
-              <>
-                {personalPair}
-                {shows(view, "home", "personalAdhoc") && (
-                  <StatusOverviewCard
-                    key="personal-adhoc"
-                    title="Ad hoc"
-                    totals={{
-                      completed: adhocBuckets.completed.length,
-                      pending: adhocBuckets.pending.length,
-                      na: adhocBuckets.na.length,
-                    }}
-                    tasks={adhocBuckets}
-                    hideChart
-                    {...completeProps}
-                  />
-                )}
-              </>,
+            <TaskOverviewStack
+              entityName=""
+              categories={categories}
+              myUserId={daily.me.me.userId}
+              daily={
+                personalDailyEntity && {
+                  entity: personalDailyEntity,
+                  dateControl: dailyPicker,
+                  showViewToggle: false,
+                  myWeek: personalMyWeek,
+                }
+              }
+              monthly={
+                personalMonthlyEntity && {
+                  entity: personalMonthlyEntity,
+                  dateControl: monthlyPicker,
+                  showViewToggle: false,
+                  myMonth: personalMyMonth,
+                }
+              }
+              onComplete={actions?.complete}
+              onSkip={actions?.skip}
+              onReopen={actions?.reopen}
+              onUploadProof={actions?.uploadProof}
+              onRemoveProof={actions?.removeProof}
+            />
+            {personalAdhoc && (
+              <EntityCardOverview
+                sectionLabel="Ad hoc"
+                entityName=""
+                entity={personalAdhoc.entity}
+                categories={categories}
+                myUserId={daily.me.me.userId}
+                dateControl={personalAdhoc.dateControl}
+                showViewToggle={false}
+                onComplete={actions?.complete}
+                onSkip={actions?.skip}
+                onReopen={actions?.reopen}
+                onUploadProof={actions?.uploadProof}
+                onRemoveProof={actions?.removeProof}
+              />
             )}
             <PageSectionHeading>Branch Overview</PageSectionHeading>
             {grid(branchPair)}
