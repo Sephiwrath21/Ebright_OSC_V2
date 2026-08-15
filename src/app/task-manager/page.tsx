@@ -90,9 +90,6 @@ import {
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
-  type FlowBucketTotals,
-  type FlowDrillTask,
-  type FlowEntityDetail,
   type FlowKanbanColumnColor,
   toSelfEntityDetail,
 } from "@/task-manager/ui/types";
