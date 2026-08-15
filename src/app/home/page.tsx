@@ -66,6 +66,10 @@ export default async function HomePage({
     adate?: string;
     hdate?: string;
     cdate?: string;
+    /** Which org-wide department/branch sections are expanded (2026-08-15) —
+     *  see expand-param.ts. Passed through verbatim; validated there, not
+     *  here (unlike the date params, it has no fixed format to check). */
+    expand?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -75,6 +79,7 @@ export default async function HomePage({
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
+  const expand = sp.expand;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -188,6 +193,7 @@ export default async function HomePage({
         adhocDate={adhocDate}
         hodDate={hodDate}
         ceoDate={ceoDate}
+        expand={expand}
         actions={{
           complete: completeTask,
           skip: skipTask,

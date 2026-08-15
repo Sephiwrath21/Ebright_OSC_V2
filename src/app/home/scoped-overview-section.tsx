@@ -2,11 +2,17 @@
 // type gets it (2026-07-28 "no exceptions" requirement), scoped by the data
 // layer's role routing and always carrying the date filter(s):
 //
-//   ADMIN / CEO / OPS ........ org-wide grids (departments + branch regions
-//                              + ad hoc when present) — HomeTaskOverview
-//   elevated DEPT_SITE ....... ALL departments Daily/Monthly grids (org
-//   (Operations/Optimisation)  payload with branch halves stripped — elevated
-//                              visibility is departments-only)
+//   ADMIN / OPS / elevated DEPT_SITE ... org-wide collapsible sections (All
+//                              Departments + Branch Status by Region, rollup
+//                              card by default per department/branch,
+//                              expanding into a per-person list via ?expand=
+//                              — 2026-08-15 rebuild) — HomeTaskOverview
+//   CEO ...................... draggable department dashboards; Branch
+//                              Status by Region (same collapsible sections,
+//                              via HomeRegionOverview — code path added
+//                              2026-08-15, pending a role-config update to
+//                              actually surface it) is wired but not yet
+//                              reachable
 //   other DEPT_SITE .......... own department Daily + Monthly donuts
 //   HOD ...................... FOUR sections (2026-07-29): personal Daily +
 //                              Monthly, CEO Assigned Tasks (?cdate=), and
@@ -23,9 +29,11 @@ import type { ReactNode } from "react";
 import { revalidatePath } from "next/cache";
 import { requireLiveSession } from "@/task-manager/action-session";
 import {
+  getBranchDetail,
   getCeoDashboardConfig,
   getDepartmentDetail,
   getFlowDetail,
+  listActiveTaskCategories,
   saveCeoDashboardConfig,
   FlowBridgeError,
 } from "@/task-manager/data";
@@ -36,10 +44,10 @@ import {
   MonthDropdown,
   MonthRangeDropdown,
 } from "@/task-manager/ui/entity-picker";
-import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
-import { RegionDonutGrids } from "@/task-manager/ui/overview-grids";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
+import { parseExpandParam } from "@/task-manager/ui/expand-param";
+import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import {
   flowBucketize,
   flowStreamLabel,
@@ -56,6 +64,7 @@ export async function HomeScopedOverviewSection({
   adhocDate,
   hodDate,
   ceoDate,
+  expand,
   actions,
 }: {
   email: string;
@@ -70,6 +79,10 @@ export async function HomeScopedOverviewSection({
   hodDate?: string;
   /** HOD view's "CEO Assigned Tasks" day anchor (?cdate=). */
   ceoDate?: string;
+  /** Raw ?expand= value (2026-08-15) — which org-wide department/branch
+   *  sections show their full per-person list instead of a rollup card.
+   *  See expand-param.ts. */
+  expand?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -107,12 +120,25 @@ export async function HomeScopedOverviewSection({
       Object.fromEntries(
         Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
       ) as Record<string, string>;
+    // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
+    // date doesn't collapse whatever's already expanded in the CEO's
+    // branchRegionOverview below) — but the expand-toggle-link extraParams
+    // passed INTO HomeTaskOverview/HomeRegionOverview (the orgGrids/
+    // branchRegionOverview blocks' own `carry()` calls further down) must
+    // NOT carry a stale expand value, since EntityRollupCard computes its
+    // own new one. These top-level pickers are shared by many OTHER
+    // sections (personalPair, streamCard, ceoDashboards, dept/branch pairs)
+    // that don't read ?expand= at all — harmless for them to carry it too.
+    const dateExtraParams = (...except: string[]) => ({
+      ...carry(...except),
+      ...(expand ? { expand } : {}),
+    });
     const dailyPicker = (
       <DailyDatePicker
         key="home-daily-picker"
         value={daily.date}
         basePath="/home"
-        extraParams={carry("date")}
+        extraParams={dateExtraParams("date")}
       />
     );
     // Monthly selector (2026-07-29 redesign): compact [Month ▾][Range ▾]
@@ -121,24 +147,25 @@ export async function HomeScopedOverviewSection({
     // (they own them; changing month resets to Full month).
     const monthlyPicker = (
       <div key="home-monthly-controls" className="flex items-center gap-1.5">
-        <MonthDropdown value={monthly.date} basePath="/home" extraParams={carry("mdate", "mrange")} />
+        <MonthDropdown value={monthly.date} basePath="/home" extraParams={dateExtraParams("mdate", "mrange")} />
         <MonthRangeDropdown
           value={monthly.date}
           range={monthlyRangeParam}
           basePath="/home"
-          extraParams={carry("mdate", "mrange")}
+          extraParams={dateExtraParams("mdate", "mrange")}
         />
       </div>
     );
-    // CEO's branchRegionOverview Ad hoc section (2026-08-01) — same single-
-    // day picker as HomeTaskOverview's org-wide version.
+    // Consumed directly by the branchRegionOverview block below (passed to
+    // HomeRegionOverview); the orgGrids branch's HomeTaskOverview builds its
+    // own adhoc picker internally from adhocDate instead of using this one.
     const adhocPicker = (
       <DailyDatePicker
-        key="ceo-adhoc-picker"
+        key="home-adhoc-picker"
         value={adhocAnchor}
         basePath="/home"
         param="adate"
-        extraParams={carry("adate")}
+        extraParams={dateExtraParams("adate")}
       />
     );
 
@@ -147,26 +174,71 @@ export async function HomeScopedOverviewSection({
     // config via shows(view, "home", key).
     const view = resolveViewRole(daily.me.me);
 
-    // Org roles (ADMIN/CEO/OPS): the full org-wide overview. CEO has no
-    // adhocByRegion (data layer only builds it for ADMIN/OPS) — the ad hoc
-    // section and its picker simply don't render for them.
+    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 rebuild — every
+    // department/branch is a collapsible rollup card; only names present in
+    // ?expand= get a real getDepartmentDetail/getBranchDetail fetch (see
+    // docs/superpowers/specs/2026-08-15-home-org-wide-person-list-design.md).
     if (daily.org && shows(view, "home", "orgGrids")) {
+      const { departments: expandedDepts, branches: expandedBranches } = parseExpandParam(expand);
+      // Dedupe + cap defensively — the real UI (EntityRollupCard's toggle)
+      // never produces more than a handful of entries, but ?expand= is a
+      // public URL param and each name triggers a real DB-backed detail
+      // fetch. 20 comfortably covers any real "expand everything reasonable"
+      // scenario (6 departments, ~20-30 branches org-wide) without allowing
+      // an unbounded fan-out from a hand-crafted URL.
+      const MAX_EXPANDED = 20;
+      const dedupedDepts = [...new Set(expandedDepts)].slice(0, MAX_EXPANDED);
+      const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
+      const categories =
+        dedupedDepts.length || dedupedBranches.length
+          ? await listActiveTaskCategories(email).catch(() => [])
+          : [];
+      const [expandedDepartmentDetails, expandedBranchDetails] = await Promise.all([
+        Promise.all(
+          dedupedDepts.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getDepartmentDetail(email, name, "daily", dailyDate).catch(() => null),
+              getDepartmentDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.department, monthly: m?.department }] as const;
+          }),
+        ),
+        Promise.all(
+          dedupedBranches.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
+              getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.branch, monthly: m?.branch }] as const;
+          }),
+        ),
+      ]).then(([d, b]) => [Object.fromEntries(d), Object.fromEntries(b)] as const);
       return (
         <HomeTaskOverview
           dailyOrg={daily.org}
           monthlyOrg={monthly.org}
           adhocByRegion={daily.adhocByRegion}
-          departmentOverviewHref="/task-manager?view=department"
           dailyDate={daily.date}
           monthlyDate={monthly.date}
           adhocDate={adhocAnchor}
           dateFilterParams={raw}
+          expandedDepartmentDetails={expandedDepartmentDetails}
+          expandedBranchDetails={expandedBranchDetails}
+          expandParam={expand}
+          categories={categories}
+          myUserId={daily.me.me.userId}
+          actions={
+            actions && {
+              complete: actions.complete,
+              skip: actions.skip,
+              reopen: actions.reopen,
+              uploadProof: actions.uploadProof,
+              removeProof: actions.removeProof,
+            }
+          }
         />
       );
     }
-
-    // (Elevated department sites take the full orgGrids path above since
-    // the 2026-07-29 final role spec — superadmin-equivalent visibility.)
 
     // "Assignee only" rule: the viewer's own userId + the complete/N-A/
     // reopen actions make their own tasks' status circles live in the drill
@@ -243,6 +315,7 @@ export async function HomeScopedOverviewSection({
             tasks={flowBucketize(daily.me.tasks)}
             action={dailyPicker}
             actionPlacement="row"
+            hideChart
             {...completeProps}
           />
         )}
@@ -254,6 +327,7 @@ export async function HomeScopedOverviewSection({
             tasks={flowBucketize(monthly.me.tasks)}
             action={monthlyPicker}
             actionPlacement="row"
+            hideChart
             {...completeProps}
           />
         )}
@@ -466,36 +540,55 @@ export async function HomeScopedOverviewSection({
       );
     }
 
-    // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
-    // Monthly (Manager)/Ad hoc (Manager), the SAME RegionDonutGrids sections
+    // branchRegionOverview (2026-08-01, rebuilt 2026-08-15): Branch Status
+    // by Region — Daily/Monthly/Ad hoc, the SAME collapsible sections
     // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
-    // draggable department dashboards. daily.org/monthly.org/adhocByRegion
-    // are already fetched for the CEO (canViewOrg includes CEO) — this only
-    // decides whether they render here.
+    // draggable department dashboards.
     let branchRegionOverview: ReactNode = null;
     if (shows(view, "home", "branchRegionOverview") && daily.org) {
+      const { branches: expandedBranches } = parseExpandParam(expand);
+      // Dedupe + cap defensively, same reasoning as the orgGrids branch
+      // above: ?expand= is a public URL param and each name triggers a
+      // real DB-backed detail fetch.
+      const MAX_EXPANDED = 20;
+      const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
+      const categories = dedupedBranches.length
+        ? await listActiveTaskCategories(email).catch(() => [])
+        : [];
+      const expandedBranchDetails = Object.fromEntries(
+        await Promise.all(
+          dedupedBranches.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
+              getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.branch, monthly: m?.branch }] as const;
+          }),
+        ),
+      );
       branchRegionOverview = (
-        <>
-          <RegionDonutGrids
-            title="Branch Status by Region — Daily"
-            regions={daily.org.regions}
-            action={dailyPicker}
-          />
-          {monthly.org && (
-            <RegionDonutGrids
-              title="Branch Status by Region — Monthly (Manager)"
-              regions={monthly.org.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []}
-              action={monthlyPicker}
-            />
-          )}
-          {daily.adhocByRegion && (
-            <RegionDonutGrids
-              title="Ad hoc Tasks by Region (Manager)"
-              regions={daily.adhocByRegion.regions}
-              action={adhocPicker}
-            />
-          )}
-        </>
+        <HomeRegionOverview
+          dailyOrg={daily.org}
+          monthlyOrg={monthly.org}
+          adhocByRegion={daily.adhocByRegion}
+          expandedBranchDetails={expandedBranchDetails}
+          expandParam={expand}
+          categories={categories}
+          myUserId={daily.me.me.userId}
+          dailyPicker={dailyPicker}
+          monthlyPicker={monthlyPicker}
+          adhocPicker={adhocPicker}
+          extraParams={carry()}
+          actions={
+            actions && {
+              complete: actions.complete,
+              skip: actions.skip,
+              reopen: actions.reopen,
+              uploadProof: actions.uploadProof,
+              removeProof: actions.removeProof,
+            }
+          }
+        />
       );
     }
 

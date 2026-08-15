@@ -1,135 +1,314 @@
-"use client";
+// Org-wide Task Manager overview, rendered on the OSC HOME page (2026-08-15
+// rebuild — see docs/superpowers/specs/2026-08-15-home-org-wide-person-
+// list-design.md). Every department/branch is a collapsible section: a
+// lightweight rollup card by default, expanding (via ?expand=) into the
+// same per-person EntityCardOverview list /task-manager's own dropdown
+// view uses. HomeDepartmentOverview and HomeRegionOverview are exported
+// separately because ADMIN/OPS/elevated DEPT_SITE (HomeTaskOverview) get
+// BOTH, while the CEO's own dashboard (scoped-overview-section.tsx) gets
+// ONLY HomeRegionOverview, appended below their draggable department
+// dashboards.
 
-// Superadmin's org-wide Task Manager overview, rendered on the OSC HOME page
-// (moved off /task-manager): all-departments Daily + Monthly donut grids,
-// branch status by Region A/B/C Daily + Monthly, and ad hoc tasks by region.
-// Same components and drill-down modals as the Task Manager page used —
-// read-only rollups, so no server actions are needed here.
-
-import type { FlowDetailResponse } from "./types";
+import type { ReactNode } from "react";
+import type {
+  ActionResult,
+  FlowCategoryOption,
+  FlowDetailResponse,
+  FlowEntityDetail,
+  ProofRemoveHandler,
+  ProofUploadHandler,
+} from "./types";
 import { PageSectionHeading } from "./bits";
 import { DailyDatePicker, MonthDropdown, MonthRangeDropdown } from "./entity-picker";
-import { EntityDonutGrid, RegionDonutGrids } from "./overview-grids";
+import { EntityCardOverview } from "./entity-card-overview";
+import { AdhocRollupGrid, EntityRollupGrid, RegionRollupGrid } from "./overview-grids";
 
-export function HomeTaskOverview({
+interface EntityActions {
+  complete?: (runBlockId: string) => Promise<ActionResult>;
+  skip?: (runBlockId: string) => Promise<ActionResult>;
+  reopen?: (runBlockId: string) => Promise<ActionResult>;
+  uploadProof?: ProofUploadHandler;
+  removeProof?: ProofRemoveHandler;
+}
+
+/** One entity's fetched Daily/Monthly detail — only built for entities the
+ *  caller has already expanded (parsed from ?expand= by the caller). */
+export interface ExpandedEntityDetail {
+  daily?: FlowEntityDetail;
+  monthly?: FlowEntityDetail;
+}
+
+function buildExpandedContent(
+  details: Record<string, ExpandedEntityDetail>,
+  period: "daily" | "monthly",
+  categories: FlowCategoryOption[],
+  myUserId: string,
+  dateControl: ReactNode,
+  actions?: EntityActions,
+): Record<string, ReactNode> {
+  const out: Record<string, ReactNode> = {};
+  for (const [name, detail] of Object.entries(details)) {
+    const entity = period === "daily" ? detail.daily : detail.monthly;
+    if (!entity) continue;
+    out[name] = (
+      <EntityCardOverview
+        sectionLabel={period === "daily" ? "Daily" : "Monthly"}
+        entityName=""
+        entity={entity}
+        categories={categories}
+        myUserId={myUserId}
+        dateControl={dateControl}
+        showViewToggle
+        defaultOnlyMe={false}
+        onComplete={actions?.complete}
+        onSkip={actions?.skip}
+        onReopen={actions?.reopen}
+        onUploadProof={actions?.uploadProof}
+        onRemoveProof={actions?.removeProof}
+      />
+    );
+  }
+  return out;
+}
+
+export function HomeDepartmentOverview({
+  dailyOrg,
+  monthlyOrg,
+  expandedDepartmentDetails,
+  expandParam,
+  categories,
+  myUserId,
+  dailyPicker,
+  monthlyPicker,
+  extraParams,
+  actions,
+}: {
+  dailyOrg: NonNullable<FlowDetailResponse["org"]>;
+  monthlyOrg?: FlowDetailResponse["org"];
+  expandedDepartmentDetails: Record<string, ExpandedEntityDetail>;
+  expandParam?: string;
+  categories: FlowCategoryOption[];
+  myUserId: string;
+  dailyPicker: ReactNode;
+  monthlyPicker: ReactNode;
+  extraParams: Record<string, string>;
+  actions?: EntityActions;
+}) {
+  const expandedNames = new Set(Object.keys(expandedDepartmentDetails));
+  return (
+    <>
+      <EntityRollupGrid
+        title="All Departments — Daily"
+        entities={dailyOrg.departments}
+        kind="dept"
+        expandedNames={expandedNames}
+        expandedContent={buildExpandedContent(
+          expandedDepartmentDetails,
+          "daily",
+          categories,
+          myUserId,
+          dailyPicker,
+          actions,
+        )}
+        expandParam={expandParam}
+        basePath="/home"
+        extraParams={extraParams}
+        action={dailyPicker}
+      />
+      {monthlyOrg && (
+        <EntityRollupGrid
+          title="All Departments — Monthly"
+          entities={monthlyOrg.departments}
+          kind="dept"
+          expandedNames={expandedNames}
+          expandedContent={buildExpandedContent(
+            expandedDepartmentDetails,
+            "monthly",
+            categories,
+            myUserId,
+            monthlyPicker,
+            actions,
+          )}
+          expandParam={expandParam}
+          basePath="/home"
+          extraParams={extraParams}
+          action={monthlyPicker}
+        />
+      )}
+    </>
+  );
+}
+
+export function HomeRegionOverview({
   dailyOrg,
   monthlyOrg,
   adhocByRegion,
-  departmentOverviewHref,
-  dailyDate,
-  monthlyDate,
-  adhocDate,
-  dateFilterParams,
+  expandedBranchDetails,
+  expandParam,
+  categories,
+  myUserId,
+  dailyPicker,
+  monthlyPicker,
+  adhocPicker,
+  extraParams,
+  actions,
 }: {
   dailyOrg: NonNullable<FlowDetailResponse["org"]>;
   monthlyOrg?: FlowDetailResponse["org"];
   adhocByRegion?: FlowDetailResponse["adhocByRegion"];
-  /** Base URL of the Department Overview page — each department's name links
-   *  out to `?department=<name>` on it (same separator handling as
-   *  task-manager-view's deptHref). */
-  departmentOverviewHref: string;
-  /** Resolved Daily anchor date (YYYY-MM-DD) — when given, mounts the date
-   *  filter on the Daily grid heading. Both org payloads (departments AND
-   *  branch regions) follow their section's anchor. */
-  dailyDate?: string;
-  /** Resolved Monthly anchor date — filter on the Monthly grid heading;
-   *  any picked date selects that date's whole month. */
-  monthlyDate?: string;
-  /** Resolved Ad hoc anchor date — filter on the Ad hoc regions heading.
-   *  One picker only (Ad hoc is its own cadence, no Daily/Monthly split);
-   *  the section shows that single day's ad hoc tasks. */
-  adhocDate?: string;
-  /** The raw ?date=/?mdate=/?mrange=/?adate= values currently in the URL —
-   *  each control carries the OTHERS along so the filters stay independent. */
-  dateFilterParams?: { date?: string; mdate?: string; mrange?: string; adate?: string };
+  expandedBranchDetails: Record<string, ExpandedEntityDetail>;
+  expandParam?: string;
+  categories: FlowCategoryOption[];
+  myUserId: string;
+  dailyPicker: ReactNode;
+  monthlyPicker: ReactNode;
+  adhocPicker?: ReactNode;
+  extraParams: Record<string, string>;
+  actions?: EntityActions;
 }) {
-  const sep = departmentOverviewHref.includes("?") ? "&" : "?";
-  const deptHref = (department: string) =>
-    `${departmentOverviewHref}${sep}department=${encodeURIComponent(department)}`;
-  const raw = dateFilterParams ?? {};
-  // Every picker carries the OTHER filters' raw params along unchanged, so
-  // changing one date never resets the others.
-  const carry = (...except: string[]) =>
-    Object.fromEntries(
-      Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
-    ) as Record<string, string>;
-
-  // One picker per period, mounted on BOTH that period's sections
-  // (departments + branch regions). They share a URL param, so the two
-  // Daily pickers (and the two Monthly ones) always show the same date and
-  // either can drive it.
-  const dailyPicker = dailyDate && (
-    <DailyDatePicker
-      key="org-daily-picker"
-      value={dailyDate}
-      basePath="/home"
-      extraParams={carry("date")}
-    />
-  );
-  // Monthly selector (2026-07-29 redesign): compact [Month ▾][Range ▾]
-  // pair replaces the calendar picker on every Monthly grid heading.
-  const monthlyPicker = monthlyDate && (
-    <div key="org-monthly-controls" className="flex items-center gap-1.5">
-      <MonthDropdown value={monthlyDate} basePath="/home" extraParams={carry("mdate", "mrange")} />
-      <MonthRangeDropdown
-        value={monthlyDate}
-        range={raw.mrange}
-        basePath="/home"
-        extraParams={carry("mdate", "mrange")}
-      />
-    </div>
-  );
-  const adhocPicker = adhocDate && (
-    <DailyDatePicker
-      key="org-adhoc-picker"
-      value={adhocDate}
-      basePath="/home"
-      param="adate"
-      extraParams={carry("adate")}
-    />
-  );
-
+  const expandedNames = new Set(Object.keys(expandedBranchDetails));
   return (
-    <div className="flex flex-col gap-5">
-      <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
-      <EntityDonutGrid
-        title="All Departments — Daily"
-        entities={dailyOrg.departments}
-        nameHref={deptHref}
-        action={dailyPicker}
-      />
-      {monthlyOrg && (
-        <EntityDonutGrid
-          title="All Departments — Monthly"
-          entities={monthlyOrg.departments}
-          nameHref={deptHref}
-          action={monthlyPicker}
-        />
-      )}
-      {/* Branch status grouped by region — Daily combines all three staff
-          roles (Manager/Branch Exec/Coach); Monthly is Manager only. Same
-          fixed rules as the grids had on /task-manager. */}
-      <RegionDonutGrids
+    <>
+      <RegionRollupGrid
         title="Branch Status by Region — Daily"
         regions={dailyOrg.regions}
+        expandedNames={expandedNames}
+        expandedContent={buildExpandedContent(
+          expandedBranchDetails,
+          "daily",
+          categories,
+          myUserId,
+          dailyPicker,
+          actions,
+        )}
+        expandParam={expandParam}
+        basePath="/home"
+        extraParams={extraParams}
         action={dailyPicker}
       />
       {monthlyOrg && (
-        <RegionDonutGrids
+        <RegionRollupGrid
           title="Branch Status by Region — Monthly (Manager)"
-          regions={
-            monthlyOrg.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []
-          }
+          regions={monthlyOrg.regionsByRole.find((v) => v.role === "Manager")?.regions ?? []}
+          expandedNames={expandedNames}
+          expandedContent={buildExpandedContent(
+            expandedBranchDetails,
+            "monthly",
+            categories,
+            myUserId,
+            monthlyPicker,
+            actions,
+          )}
+          expandParam={expandParam}
+          basePath="/home"
+          extraParams={extraParams}
           action={monthlyPicker}
         />
       )}
       {adhocByRegion && (
-        <RegionDonutGrids
+        <AdhocRollupGrid
           title="Ad hoc Tasks by Region (Manager)"
           regions={adhocByRegion.regions}
           action={adhocPicker}
         />
       )}
+    </>
+  );
+}
+
+export function HomeTaskOverview({
+  dailyOrg,
+  monthlyOrg,
+  adhocByRegion,
+  dailyDate,
+  monthlyDate,
+  adhocDate,
+  dateFilterParams,
+  expandedDepartmentDetails,
+  expandedBranchDetails,
+  expandParam,
+  categories,
+  myUserId,
+  actions,
+}: {
+  dailyOrg: NonNullable<FlowDetailResponse["org"]>;
+  monthlyOrg?: FlowDetailResponse["org"];
+  adhocByRegion?: FlowDetailResponse["adhocByRegion"];
+  dailyDate?: string;
+  monthlyDate?: string;
+  adhocDate?: string;
+  dateFilterParams?: { date?: string; mdate?: string; mrange?: string; adate?: string };
+  expandedDepartmentDetails: Record<string, ExpandedEntityDetail>;
+  expandedBranchDetails: Record<string, ExpandedEntityDetail>;
+  expandParam?: string;
+  categories: FlowCategoryOption[];
+  myUserId: string;
+  actions?: EntityActions;
+}) {
+  const raw = dateFilterParams ?? {};
+  const carry = (...except: string[]) =>
+    Object.fromEntries(
+      Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
+    ) as Record<string, string>;
+  // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
+  // date doesn't collapse whatever's already expanded) — but the expand-
+  // toggle links themselves (expandExtraParams below) must NOT carry a
+  // stale expand value, since EntityRollupCard computes its own new one.
+  const dateExtraParams = (...except: string[]) => ({
+    ...carry(...except),
+    ...(expandParam ? { expand: expandParam } : {}),
+  });
+
+  const dailyPicker = dailyDate && (
+    <DailyDatePicker key="org-daily-picker" value={dailyDate} basePath="/home" extraParams={dateExtraParams("date")} />
+  );
+  const monthlyPicker = monthlyDate && (
+    <div key="org-monthly-controls" className="flex items-center gap-1.5">
+      <MonthDropdown value={monthlyDate} basePath="/home" extraParams={dateExtraParams("mdate", "mrange")} />
+      <MonthRangeDropdown
+        value={monthlyDate}
+        range={raw.mrange}
+        basePath="/home"
+        extraParams={dateExtraParams("mdate", "mrange")}
+      />
+    </div>
+  );
+  const adhocPicker = adhocDate && (
+    <DailyDatePicker key="org-adhoc-picker" value={adhocDate} basePath="/home" param="adate" extraParams={dateExtraParams("adate")} />
+  );
+  // Expand-toggle links carry every current date filter unchanged — no
+  // exclusions, since "expand" isn't itself one of the date params in `raw`.
+  const expandExtraParams = carry();
+
+  return (
+    <div className="flex flex-col gap-5">
+      <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
+      <HomeDepartmentOverview
+        dailyOrg={dailyOrg}
+        monthlyOrg={monthlyOrg}
+        expandedDepartmentDetails={expandedDepartmentDetails}
+        expandParam={expandParam}
+        categories={categories}
+        myUserId={myUserId}
+        dailyPicker={dailyPicker}
+        monthlyPicker={monthlyPicker}
+        extraParams={expandExtraParams}
+        actions={actions}
+      />
+      <HomeRegionOverview
+        dailyOrg={dailyOrg}
+        monthlyOrg={monthlyOrg}
+        adhocByRegion={adhocByRegion}
+        expandedBranchDetails={expandedBranchDetails}
+        expandParam={expandParam}
+        categories={categories}
+        myUserId={myUserId}
+        dailyPicker={dailyPicker}
+        monthlyPicker={monthlyPicker}
+        adhocPicker={adhocPicker}
+        extraParams={expandExtraParams}
+        actions={actions}
+      />
     </div>
   );
 }

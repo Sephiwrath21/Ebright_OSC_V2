@@ -30,7 +30,9 @@ export type ViewRole =
 
 export type SectionKey =
   // org-level overviews
-  | "orgGrids" // all-departments + branch-regions (+ ad hoc regions) grids
+  | "orgGrids" // all-departments + branch-regions (+ ad hoc regions)
+  // collapsible sections (rollup card by default, expands into a
+  // per-person list — 2026-08-15 rebuild)
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
   | "departmentOverview" // own-department detail (chips + donut + roster)
   | "branchOverview" // own-branch detail (same component as department)
@@ -95,10 +97,10 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // sidebar Daily table view every other role uses (myTasksDaily — the
   // old un-windowed combined list is gone); Home keeps the ONE combined
   // "My Tasks" card (ceoCombinedList) with its date filter.
-  // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
-  // Monthly/Ad hoc, the same RegionDonutGrids sections ADMIN/OPS see via
-  // orgGrids — appended below the draggable department dashboards. Home
-  // only; the CEO's Task Manager page keeps entityDropdowns for branch
+  // branchRegionOverview (2026-08-01, rebuilt 2026-08-15): Branch Status by
+  // Region — Daily/Monthly/Ad hoc, the same collapsible sections ADMIN/OPS
+  // see via orgGrids — appended below the draggable department dashboards.
+  // Home only; the CEO's Task Manager page keeps entityDropdowns for branch
   // drill-down instead.
   CEO: {
     home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
