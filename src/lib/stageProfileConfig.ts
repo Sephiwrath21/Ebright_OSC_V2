@@ -59,8 +59,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6]",
-      current: "bg-[#d9a2fb] border-[#621096] text-[#4b4949d6]",
+      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-purple-950 dark:border-purple-800 dark:text-purple-400",
+      current: "bg-[#d9a2fb] border-[#621096] text-[#4b4949d6] dark:bg-purple-900 dark:border-purple-500 dark:text-purple-100",
     },
   },
   probation: {
@@ -72,8 +72,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6]",
-      current: "bg-[#6fa3f0d0] border-[#1f5fce] text-[#4b4949d6]",
+      base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-purple-950 dark:border-purple-800 dark:text-purple-400",
+      current: "bg-[#6fa3f0d0] border-[#1f5fce] text-[#4b4949d6] dark:bg-blue-900 dark:border-blue-500 dark:text-blue-100",
     },
   },
   onboarding: {
@@ -89,8 +89,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 12,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6]",
-      current: "bg-[#7ef293] border-[#0a6e03] text-[#4b4949d6]",
+      base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6] dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400",
+      current: "bg-[#7ef293] border-[#0a6e03] text-[#4b4949d6] dark:bg-emerald-900 dark:border-emerald-500 dark:text-emerald-100",
     },
   },
   active: {
@@ -112,8 +112,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 10,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6]",
-      current: "bg-[#c8e94a] border-[#7a9c1f] text-[#4b4949d6]",
+      base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6] dark:bg-lime-950 dark:border-lime-800 dark:text-lime-400",
+      current: "bg-[#c8e94a] border-[#7a9c1f] text-[#4b4949d6] dark:bg-lime-900 dark:border-lime-500 dark:text-lime-100",
     },
   },
   exit: {
@@ -133,10 +133,10 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       gapPx: 10,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
-      base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6]",
-      current: "bg-[#ee5f5f] border-[#961010] text-white",
-      clearanceBase: "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6]",
-      clearanceCurrent: "bg-[#e8a93c] border-[#8a5a06] text-white",
+      base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6] dark:bg-red-950 dark:border-red-800 dark:text-red-400",
+      current: "bg-[#ee5f5f] border-[#961010] text-white dark:bg-red-900 dark:border-red-500",
+      clearanceBase: "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6] dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400",
+      clearanceCurrent: "bg-[#e8a93c] border-[#8a5a06] text-white dark:bg-amber-900 dark:border-amber-500",
     },
   },
 };
@@ -208,10 +208,10 @@ export const STAGE_PROCEED_BUTTON: Partial<Record<EmployeeStage, { label: string
 // confirmed via each stage's own CSS `#tab-X:checked ~ .page label[for=...]`
 // rule using its own accent, not a fixed color.
 export const STAGE_HISTORY_TAB_STYLE: Partial<Record<EmployeeStage, { base: string; hoverBg: string }>> = {
-  pre: { base: "bg-[#d9a2fba8] border-[#b95af4]", hoverBg: "#d9a2fb" },
-  probation: { base: "bg-[#90aeeea8] border-[#5388f9]", hoverBg: "#90aeee" },
-  onboarding: { base: "bg-[#67eab37d] border-[#55c999]", hoverBg: "#67eab3" },
-  active: { base: "bg-[#d9fd63a8] border-[#b4da37]", hoverBg: "#d9fd63" },
+  pre: { base: "bg-[#d9a2fba8] border-[#b95af4] dark:bg-purple-950 dark:border-purple-800 dark:text-purple-400", hoverBg: "#d9a2fb" },
+  probation: { base: "bg-[#90aeeea8] border-[#5388f9] dark:bg-blue-950 dark:border-blue-800 dark:text-blue-400", hoverBg: "#90aeee" },
+  onboarding: { base: "bg-[#67eab37d] border-[#55c999] dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400", hoverBg: "#67eab3" },
+  active: { base: "bg-[#d9fd63a8] border-[#b4da37] dark:bg-lime-950 dark:border-lime-800 dark:text-lime-400", hoverBg: "#d9fd63" },
 };
 
 // Abbreviated labels for the history-tab strip only (top-tabs/bookmark-tabs/
