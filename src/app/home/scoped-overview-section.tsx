@@ -7,9 +7,12 @@
 //                              card by default per department/branch,
 //                              expanding into a per-person list via ?expand=
 //                              — 2026-08-15 rebuild) — HomeTaskOverview
-//   CEO ...................... draggable department dashboards + Branch
+//   CEO ...................... draggable department dashboards; Branch
 //                              Status by Region (same collapsible sections,
-//                              via HomeRegionOverview, 2026-08-15)
+//                              via HomeRegionOverview — code path added
+//                              2026-08-15, pending a role-config update to
+//                              actually surface it) is wired but not yet
+//                              reachable
 //   other DEPT_SITE .......... own department Daily + Monthly donuts
 //   HOD ...................... FOUR sections (2026-07-29): personal Daily +
 //                              Monthly, CEO Assigned Tasks (?cdate=), and
