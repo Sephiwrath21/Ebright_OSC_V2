@@ -120,12 +120,25 @@ export async function HomeScopedOverviewSection({
       Object.fromEntries(
         Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
       ) as Record<string, string>;
+    // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
+    // date doesn't collapse whatever's already expanded in the CEO's
+    // branchRegionOverview below) — but the expand-toggle-link extraParams
+    // passed INTO HomeTaskOverview/HomeRegionOverview (the orgGrids/
+    // branchRegionOverview blocks' own `carry()` calls further down) must
+    // NOT carry a stale expand value, since EntityRollupCard computes its
+    // own new one. These top-level pickers are shared by many OTHER
+    // sections (personalPair, streamCard, ceoDashboards, dept/branch pairs)
+    // that don't read ?expand= at all — harmless for them to carry it too.
+    const dateExtraParams = (...except: string[]) => ({
+      ...carry(...except),
+      ...(expand ? { expand } : {}),
+    });
     const dailyPicker = (
       <DailyDatePicker
         key="home-daily-picker"
         value={daily.date}
         basePath="/home"
-        extraParams={carry("date")}
+        extraParams={dateExtraParams("date")}
       />
     );
     // Monthly selector (2026-07-29 redesign): compact [Month ▾][Range ▾]
@@ -134,12 +147,12 @@ export async function HomeScopedOverviewSection({
     // (they own them; changing month resets to Full month).
     const monthlyPicker = (
       <div key="home-monthly-controls" className="flex items-center gap-1.5">
-        <MonthDropdown value={monthly.date} basePath="/home" extraParams={carry("mdate", "mrange")} />
+        <MonthDropdown value={monthly.date} basePath="/home" extraParams={dateExtraParams("mdate", "mrange")} />
         <MonthRangeDropdown
           value={monthly.date}
           range={monthlyRangeParam}
           basePath="/home"
-          extraParams={carry("mdate", "mrange")}
+          extraParams={dateExtraParams("mdate", "mrange")}
         />
       </div>
     );
@@ -152,7 +165,7 @@ export async function HomeScopedOverviewSection({
         value={adhocAnchor}
         basePath="/home"
         param="adate"
-        extraParams={carry("adate")}
+        extraParams={dateExtraParams("adate")}
       />
     );
 

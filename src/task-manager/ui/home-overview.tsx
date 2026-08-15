@@ -113,6 +113,7 @@ export function HomeDepartmentOverview({
         expandParam={expandParam}
         basePath="/home"
         extraParams={extraParams}
+        action={dailyPicker}
       />
       {monthlyOrg && (
         <EntityRollupGrid
@@ -131,6 +132,7 @@ export function HomeDepartmentOverview({
           expandParam={expandParam}
           basePath="/home"
           extraParams={extraParams}
+          action={monthlyPicker}
         />
       )}
     </>
@@ -182,6 +184,7 @@ export function HomeRegionOverview({
         expandParam={expandParam}
         basePath="/home"
         extraParams={extraParams}
+        action={dailyPicker}
       />
       {monthlyOrg && (
         <RegionRollupGrid
@@ -199,6 +202,7 @@ export function HomeRegionOverview({
           expandParam={expandParam}
           basePath="/home"
           extraParams={extraParams}
+          action={monthlyPicker}
         />
       )}
       {adhocByRegion && (
@@ -246,23 +250,31 @@ export function HomeTaskOverview({
     Object.fromEntries(
       Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
     ) as Record<string, string>;
+  // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
+  // date doesn't collapse whatever's already expanded) — but the expand-
+  // toggle links themselves (expandExtraParams below) must NOT carry a
+  // stale expand value, since EntityRollupCard computes its own new one.
+  const dateExtraParams = (...except: string[]) => ({
+    ...carry(...except),
+    ...(expandParam ? { expand: expandParam } : {}),
+  });
 
   const dailyPicker = dailyDate && (
-    <DailyDatePicker key="org-daily-picker" value={dailyDate} basePath="/home" extraParams={carry("date")} />
+    <DailyDatePicker key="org-daily-picker" value={dailyDate} basePath="/home" extraParams={dateExtraParams("date")} />
   );
   const monthlyPicker = monthlyDate && (
     <div key="org-monthly-controls" className="flex items-center gap-1.5">
-      <MonthDropdown value={monthlyDate} basePath="/home" extraParams={carry("mdate", "mrange")} />
+      <MonthDropdown value={monthlyDate} basePath="/home" extraParams={dateExtraParams("mdate", "mrange")} />
       <MonthRangeDropdown
         value={monthlyDate}
         range={raw.mrange}
         basePath="/home"
-        extraParams={carry("mdate", "mrange")}
+        extraParams={dateExtraParams("mdate", "mrange")}
       />
     </div>
   );
   const adhocPicker = adhocDate && (
-    <DailyDatePicker key="org-adhoc-picker" value={adhocDate} basePath="/home" param="adate" extraParams={carry("adate")} />
+    <DailyDatePicker key="org-adhoc-picker" value={adhocDate} basePath="/home" param="adate" extraParams={dateExtraParams("adate")} />
   );
   // Expand-toggle links carry every current date filter unchanged — no
   // exclusions, since "expand" isn't itself one of the date params in `raw`.
