@@ -243,6 +243,7 @@ export async function HomeScopedOverviewSection({
             tasks={flowBucketize(daily.me.tasks)}
             action={dailyPicker}
             actionPlacement="row"
+            hideChart
             {...completeProps}
           />
         )}
@@ -254,6 +255,7 @@ export async function HomeScopedOverviewSection({
             tasks={flowBucketize(monthly.me.tasks)}
             action={monthlyPicker}
             actionPlacement="row"
+            hideChart
             {...completeProps}
           />
         )}

@@ -2546,6 +2546,7 @@ export function StatusOverviewCard({
   onUploadProof,
   onRemoveProof,
   reassign,
+  hideChart,
 }: {
   title: string;
   /** Period line under the title; omit for un-periodized overview cards. */
@@ -2554,6 +2555,12 @@ export function StatusOverviewCard({
   tasks?: Record<BucketKey, FlowDrillTask[]>;
   /** Rendered top-right (e.g. the Daily/Monthly toggle). */
   action?: React.ReactNode;
+  /** Skip the StatusDonut ring, keep the BucketLegend text (count +
+   *  percentage per bucket) — same drill-in behavior either way, just no
+   *  chart (2026-08-15, Home page's personal Daily/Monthly cards only —
+   *  every other StatusOverviewCard usage, on Home and on Task Manager's
+   *  own /task-manager page, is unaffected since they don't pass this). */
+  hideChart?: boolean;
   /** "corner" (default) overlays the action absolutely in the top-right —
    *  fine for tiny controls (the CEO cards' drag/remove handle). Wide
    *  controls like the date filter would sit ON TOP of the centered title,
@@ -2596,8 +2603,8 @@ export function StatusOverviewCard({
       {subtitle && <p className="text-center text-sm text-gray-500">{subtitle}</p>}
 
       <div className="mt-5 flex flex-col items-center">
-        <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />
-        <div className="mt-5 w-44">
+        {!hideChart && <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />}
+        <div className={`w-44 ${hideChart ? "" : "mt-5"}`}>
           <BucketLegend totals={totals} onSelect={drill} />
         </div>
       </div>
