@@ -66,10 +66,14 @@ export default async function HomePage({
     adate?: string;
     hdate?: string;
     cdate?: string;
-    /** Which org-wide department/branch sections are expanded (2026-08-15) —
+    /** Which Branch Status by Region sections are expanded (2026-08-15) —
      *  see expand-param.ts. Passed through verbatim; validated there, not
      *  here (unlike the date params, it has no fixed format to check). */
     expand?: string;
+    /** Which department the org-wide "All Departments" dropdown shows
+     *  (2026-08-15 rebuild #2). Passed through verbatim; validated against
+     *  FLOW_DEPARTMENTS in scoped-overview-section.tsx, not here. */
+    department?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -80,6 +84,7 @@ export default async function HomePage({
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const expand = sp.expand;
+  const department = sp.department;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -194,6 +199,7 @@ export default async function HomePage({
         hodDate={hodDate}
         ceoDate={ceoDate}
         expand={expand}
+        department={department}
         actions={{
           complete: completeTask,
           skip: skipTask,

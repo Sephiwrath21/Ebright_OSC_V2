@@ -1,14 +1,18 @@
 "use client";
 
-// Org-wide overview grids for Home's Task Manager section (2026-08-15
-// rebuild — see docs/superpowers/specs/2026-08-15-home-org-wide-person-
-// list-design.md). Every department/branch starts as a lightweight rollup
+// Org-wide overview grids for Home's Task Manager section — Branch Status
+// by Region (RegionRollupGrid) and Ad hoc by Region (AdhocRollupGrid).
+// "All Departments" used this same collapsible-rollup-card pattern from
+// 2026-08-15 to 2026-08-15 (rebuild #2); it since moved to a single-
+// department-dropdown + TaskOverviewStack view (HomeDepartmentPicker, in
+// home-overview.tsx) matching /task-manager's own Department view, so this
+// file is branches-only now. Every branch starts as a lightweight rollup
 // card (name, %, dot+count row — cheap, fed by the existing org rollup
-// query); clicking it adds/removes the entity from the page's ?expand=
+// query); clicking it adds/removes the branch from the page's ?expand=
 // param, which the SERVER caller (scoped-overview-section.tsx) reads to
-// decide which entities to fetch full per-person detail for. Ad hoc stays
+// decide which branches to fetch full per-person detail for. Ad hoc stays
 // rollup-only (see AdhocRollupGrid) — no per-person data source exists
-// for it yet (spec's explicit scope decision).
+// for it yet.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -71,17 +75,18 @@ function RollupStats({ entity }: { entity: FlowEntityRollup }) {
  *  expand/collapse toggle (a chevron + click anywhere on the name), navigating
  *  with an updated ?expand= — same client-push navigation pattern as
  *  DailyDatePicker/EntityPicker. Bucket-count buttons still open the drill
- *  modal, unrelated to expand/collapse. */
+ *  modal, unrelated to expand/collapse. Branches only (2026-08-15 rebuild
+ *  #2) — "All Departments" moved to the single-department-dropdown pattern
+ *  (HomeDepartmentPicker), so this is only ever used for Branch Status by
+ *  Region now. */
 function EntityRollupCard({
   entity,
-  kind,
   expanded,
   expandParam,
   basePath,
   extraParams,
 }: {
   entity: FlowEntityRollup;
-  kind: "dept" | "branch";
   expanded: boolean;
   expandParam?: string;
   basePath: string;
@@ -90,7 +95,7 @@ function EntityRollupCard({
   const router = useRouter();
 
   const toggle = () => {
-    const nextExpand = toggleExpandEntry(expandParam, kind, entity.name);
+    const nextExpand = toggleExpandEntry(expandParam, "branch", entity.name);
     const qs = new URLSearchParams({ ...extraParams, ...(nextExpand ? { expand: nextExpand } : {}) });
     router.push(`${basePath}?${qs.toString()}`);
   };
@@ -116,11 +121,9 @@ function EntityRollupCard({
 /** Collapsed entities render in a shared grid (unchanged look from before);
  *  expanded entities render below as full-width blocks — the rollup card
  *  stays visible above each one's per-person list as the collapse
- *  affordance. Shared by EntityRollupGrid (flat) and RegionRollupGrid
- *  (called once per region). */
+ *  affordance. Called once per region by RegionRollupGrid. */
 function EntityRollupList({
   entities,
-  kind,
   expandedNames,
   expandedContent,
   expandParam,
@@ -128,7 +131,6 @@ function EntityRollupList({
   extraParams,
 }: {
   entities: FlowEntityRollup[];
-  kind: "dept" | "branch";
   expandedNames: Set<string>;
   expandedContent: Record<string, React.ReactNode>;
   expandParam?: string;
@@ -145,7 +147,6 @@ function EntityRollupList({
             <EntityRollupCard
               key={e.name}
               entity={e}
-              kind={kind}
               expanded={false}
               expandParam={expandParam}
               basePath={basePath}
@@ -158,7 +159,6 @@ function EntityRollupList({
         <div key={e.name} className="rounded-xl border border-gray-100 p-4 shadow-sm dark:border-slate-800">
           <EntityRollupCard
             entity={e}
-            kind={kind}
             expanded
             expandParam={expandParam}
             basePath={basePath}
@@ -168,50 +168,6 @@ function EntityRollupList({
         </div>
       ))}
     </div>
-  );
-}
-
-export function EntityRollupGrid({
-  title,
-  entities,
-  kind,
-  expandedNames,
-  expandedContent,
-  expandParam,
-  basePath,
-  extraParams,
-  action,
-}: {
-  title: string;
-  entities: FlowEntityRollup[];
-  kind: "dept" | "branch";
-  expandedNames: Set<string>;
-  /** Pre-rendered detail content for each EXPANDED entity, keyed by name —
-   *  built server-side by the caller (already has that entity's fetched
-   *  detail); a Client Component can't receive a render-prop function from
-   *  its Server Component parent, only serializable ReactNode. */
-  expandedContent: Record<string, React.ReactNode>;
-  expandParam?: string;
-  basePath: string;
-  extraParams: Record<string, string>;
-  action?: React.ReactNode;
-}) {
-  return (
-    <SectionCard title={title} action={action}>
-      {entities.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">No activity.</p>
-      ) : (
-        <EntityRollupList
-          entities={entities}
-          kind={kind}
-          expandedNames={expandedNames}
-          expandedContent={expandedContent}
-          expandParam={expandParam}
-          basePath={basePath}
-          extraParams={extraParams}
-        />
-      )}
-    </SectionCard>
   );
 }
 
@@ -244,7 +200,6 @@ export function RegionRollupGrid({
             <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-slate-300">{region.name}</p>
             <EntityRollupList
               entities={region.branches}
-              kind="branch"
               expandedNames={expandedNames}
               expandedContent={expandedContent}
               expandParam={expandParam}

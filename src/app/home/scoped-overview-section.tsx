@@ -2,11 +2,16 @@
 // type gets it (2026-07-28 "no exceptions" requirement), scoped by the data
 // layer's role routing and always carrying the date filter(s):
 //
-//   ADMIN / OPS / elevated DEPT_SITE ... org-wide collapsible sections (All
-//                              Departments + Branch Status by Region, rollup
-//                              card by default per department/branch,
-//                              expanding into a per-person list via ?expand=
-//                              — 2026-08-15 rebuild) — HomeTaskOverview
+//   ADMIN / OPS / elevated DEPT_SITE ... All Departments = a single-
+//                              department dropdown + TaskOverviewStack
+//                              (Daily/Monthly), the same pattern
+//                              /task-manager's own Department view uses,
+//                              defaulting to the account's own department
+//                              (2026-08-15 rebuild #2); Branch Status by
+//                              Region stays the collapsible rollup-card
+//                              treatment (rollup card by default per
+//                              branch, expanding into a per-person list via
+//                              ?expand=) — HomeTaskOverview
 //   CEO ...................... draggable department dashboards; Branch
 //                              Status by Region (same collapsible sections,
 //                              via HomeRegionOverview — code path added
@@ -65,6 +70,7 @@ export async function HomeScopedOverviewSection({
   hodDate,
   ceoDate,
   expand,
+  department,
   actions,
 }: {
   email: string;
@@ -79,10 +85,15 @@ export async function HomeScopedOverviewSection({
   hodDate?: string;
   /** HOD view's "CEO Assigned Tasks" day anchor (?cdate=). */
   ceoDate?: string;
-  /** Raw ?expand= value (2026-08-15) — which org-wide department/branch
+  /** Raw ?expand= value (2026-08-15) — which Branch Status by Region
    *  sections show their full per-person list instead of a rollup card.
    *  See expand-param.ts. */
   expand?: string;
+  /** Raw ?department= value (2026-08-15 rebuild #2) — which department the
+   *  org-wide "All Departments" dropdown currently shows. Validated against
+   *  FLOW_DEPARTMENTS and defaulted to the account's own department by the
+   *  orgGrids branch below, same as /task-manager's Department view. */
+  department?: string;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -174,35 +185,45 @@ export async function HomeScopedOverviewSection({
     // config via shows(view, "home", key).
     const view = resolveViewRole(daily.me.me);
 
-    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 rebuild — every
-    // department/branch is a collapsible rollup card; only names present in
-    // ?expand= get a real getDepartmentDetail/getBranchDetail fetch (see
-    // docs/superpowers/specs/2026-08-15-home-org-wide-person-list-design.md).
+    // Org roles (ADMIN/OPS/elevated DEPT_SITE): 2026-08-15 rebuild #2 — "All
+    // Departments" is a single-department dropdown + TaskOverviewStack, the
+    // same pattern /task-manager's own Department view uses (page.tsx's
+    // buildEntityOverview), defaulting to the account's own department.
+    // "Branch Status by Region" keeps the collapsible rollup-card treatment
+    // from the first 2026-08-15 rebuild — only branch names present in
+    // ?expand= get a real getBranchDetail fetch.
     if (daily.org && shows(view, "home", "orgGrids")) {
-      const { departments: expandedDepts, branches: expandedBranches } = parseExpandParam(expand);
+      const { branches: expandedBranches } = parseExpandParam(expand);
       // Dedupe + cap defensively — the real UI (EntityRollupCard's toggle)
       // never produces more than a handful of entries, but ?expand= is a
       // public URL param and each name triggers a real DB-backed detail
       // fetch. 20 comfortably covers any real "expand everything reasonable"
-      // scenario (6 departments, ~20-30 branches org-wide) without allowing
-      // an unbounded fan-out from a hand-crafted URL.
+      // scenario (~20-30 branches org-wide) without allowing an unbounded
+      // fan-out from a hand-crafted URL.
       const MAX_EXPANDED = 20;
-      const dedupedDepts = [...new Set(expandedDepts)].slice(0, MAX_EXPANDED);
       const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
-      const categories =
-        dedupedDepts.length || dedupedBranches.length
-          ? await listActiveTaskCategories(email).catch(() => [])
-          : [];
-      const [expandedDepartmentDetails, expandedBranchDetails] = await Promise.all([
-        Promise.all(
-          dedupedDepts.map(async (name) => {
-            const [d, m] = await Promise.all([
-              getDepartmentDetail(email, name, "daily", dailyDate).catch(() => null),
-              getDepartmentDetail(email, name, "monthly", monthlyDate).catch(() => null),
-            ]);
-            return [name, { daily: d?.department, monthly: m?.department }] as const;
-          }),
-        ),
+      // Categories are needed unconditionally now (the department picker
+      // always renders a Sort: Type-capable TaskOverviewStack), unlike the
+      // branch-only fetch below which stays conditional on something being
+      // expanded.
+      const categories = await listActiveTaskCategories(email).catch(() => []);
+      // Same own-department-first resolution as /task-manager's
+      // buildEntityOverview: the account's own department when it has one
+      // and it's a real department, else the first department as a last
+      // resort. `department` here is the raw ?department= prop; the
+      // resolved value is named separately to avoid shadowing it.
+      const ownDepartment = daily.me.me.department;
+      const departmentFallback =
+        ownDepartment && (FLOW_DEPARTMENTS as readonly string[]).includes(ownDepartment)
+          ? ownDepartment
+          : FLOW_DEPARTMENTS[0];
+      const selectedDepartment =
+        department && (FLOW_DEPARTMENTS as readonly string[]).includes(department)
+          ? department
+          : departmentFallback;
+      const [departmentDailyDetail, departmentMonthlyDetail, expandedBranchDetails] = await Promise.all([
+        getDepartmentDetail(email, selectedDepartment, "daily", dailyDate),
+        getDepartmentDetail(email, selectedDepartment, "monthly", monthlyDate),
         Promise.all(
           dedupedBranches.map(async (name) => {
             const [d, m] = await Promise.all([
@@ -211,8 +232,8 @@ export async function HomeScopedOverviewSection({
             ]);
             return [name, { daily: d?.branch, monthly: m?.branch }] as const;
           }),
-        ),
-      ]).then(([d, b]) => [Object.fromEntries(d), Object.fromEntries(b)] as const);
+        ).then((entries) => Object.fromEntries(entries)),
+      ]);
       return (
         <HomeTaskOverview
           dailyOrg={daily.org}
@@ -222,7 +243,9 @@ export async function HomeScopedOverviewSection({
           monthlyDate={monthly.date}
           adhocDate={adhocAnchor}
           dateFilterParams={raw}
-          expandedDepartmentDetails={expandedDepartmentDetails}
+          department={selectedDepartment}
+          departmentDailyDetail={departmentDailyDetail.department}
+          departmentMonthlyDetail={departmentMonthlyDetail.department}
           expandedBranchDetails={expandedBranchDetails}
           expandParam={expand}
           categories={categories}
@@ -297,6 +320,7 @@ export async function HomeScopedOverviewSection({
             />
           }
           actionPlacement="row"
+          hideChart
           {...completeProps}
         />
       );
@@ -442,6 +466,7 @@ export async function HomeScopedOverviewSection({
                       na: adhocBuckets.na.length,
                     }}
                     tasks={adhocBuckets}
+                    hideChart
                     {...completeProps}
                   />
                 )}
@@ -605,6 +630,7 @@ export async function HomeScopedOverviewSection({
           title={flowStreamLabel(s.key)}
           totals={s.totals}
           tasks={flowBucketize(s.tasks)}
+          hideChart
           {...completeProps}
         />
       ));
@@ -636,6 +662,7 @@ export async function HomeScopedOverviewSection({
                     tasks={buckets}
                     action={dailyPicker}
                     actionPlacement="row"
+                    hideChart
                     {...completeProps}
                   />
                 );
