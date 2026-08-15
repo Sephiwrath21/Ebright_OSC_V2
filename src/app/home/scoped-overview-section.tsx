@@ -699,10 +699,12 @@ export async function HomeScopedOverviewSection({
     }
 
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
-    // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
-    // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
-    // Admin/Ops streams stay hidden per the "no special Admin Assigned
-    // Task category" spec (visibleAssignerStreams).
+    // DEPT_MEMBER gets Daily + Monthly + HOD Assigned; BRANCH_MEMBER/COACH
+    // (Branch Exec / Coaches) get ONLY the Daily card. Admin/Ops streams
+    // stay hidden per the "no special Admin Assigned Task category" spec
+    // (visibleAssignerStreams) — assignerStreams is never actually in any
+    // role's Home config today, so otherStreamCards never renders; kept
+    // as-is, unrelated to this change.
     const otherStreamCards = visibleAssignerStreams(daily.me.streamsAll)
       .filter((s) => s.key !== "HOD")
       .map((s) => (
@@ -715,6 +717,9 @@ export async function HomeScopedOverviewSection({
           {...completeProps}
         />
       ));
+    const hodAssigned = shows(view, "home", "hodAssigned")
+      ? personalStreamEntity("HOD", hodDate, "hdate")
+      : undefined;
     return (
       <div className="flex flex-col gap-5">
         {grid(
@@ -748,10 +753,43 @@ export async function HomeScopedOverviewSection({
                   />
                 );
               })()}
-            {personalPair}
-            {shows(view, "home", "hodAssigned") && streamCard("HOD", hodDate, "hdate", "From HOD")}
             {shows(view, "home", "assignerStreams") && otherStreamCards}
           </>,
+        )}
+        {isPersonalRole && (
+          <TaskOverviewStack
+            entityName=""
+            categories={categories}
+            myUserId={daily.me.me.userId}
+            daily={
+              personalDailyEntity && {
+                entity: personalDailyEntity,
+                dateControl: dailyPicker,
+                showViewToggle: false,
+                myWeek: personalMyWeek,
+              }
+            }
+            monthly={
+              personalMonthlyEntity && {
+                entity: personalMonthlyEntity,
+                dateControl: monthlyPicker,
+                showViewToggle: false,
+                myMonth: personalMyMonth,
+              }
+            }
+            hodAssigned={
+              hodAssigned && {
+                entity: hodAssigned.entity,
+                dateControl: hodAssigned.dateControl,
+                showViewToggle: false,
+              }
+            }
+            onComplete={actions?.complete}
+            onSkip={actions?.skip}
+            onReopen={actions?.reopen}
+            onUploadProof={actions?.uploadProof}
+            onRemoveProof={actions?.removeProof}
+          />
         )}
         {ceoDashboards}
         {branchRegionOverview}
