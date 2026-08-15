@@ -523,6 +523,58 @@ export async function HomeScopedOverviewSection({
       );
     }
 
+    // branchRegionOverview (2026-08-01, rebuilt 2026-08-15): Branch Status
+    // by Region — Daily/Monthly/Ad hoc, the SAME collapsible sections
+    // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
+    // draggable department dashboards.
+    let branchRegionOverview: ReactNode = null;
+    if (shows(view, "home", "branchRegionOverview") && daily.org) {
+      const { branches: expandedBranches } = parseExpandParam(expand);
+      // Dedupe + cap defensively, same reasoning as the orgGrids branch
+      // above: ?expand= is a public URL param and each name triggers a
+      // real DB-backed detail fetch.
+      const MAX_EXPANDED = 20;
+      const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
+      const categories = dedupedBranches.length
+        ? await listActiveTaskCategories(email).catch(() => [])
+        : [];
+      const expandedBranchDetails = Object.fromEntries(
+        await Promise.all(
+          dedupedBranches.map(async (name) => {
+            const [d, m] = await Promise.all([
+              getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
+              getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
+            ]);
+            return [name, { daily: d?.branch, monthly: m?.branch }] as const;
+          }),
+        ),
+      );
+      branchRegionOverview = (
+        <HomeRegionOverview
+          dailyOrg={daily.org}
+          monthlyOrg={monthly.org}
+          adhocByRegion={daily.adhocByRegion}
+          expandedBranchDetails={expandedBranchDetails}
+          expandParam={expand}
+          categories={categories}
+          myUserId={daily.me.me.userId}
+          dailyPicker={dailyPicker}
+          monthlyPicker={monthlyPicker}
+          adhocPicker={adhocPicker}
+          extraParams={carry()}
+          actions={
+            actions && {
+              complete: actions.complete,
+              skip: actions.skip,
+              reopen: actions.reopen,
+              uploadProof: actions.uploadProof,
+              removeProof: actions.removeProof,
+            }
+          }
+        />
+      );
+    }
+
     // MEMBER — which cards render is decided ENTIRELY by role-views.ts:
     // DEPT_MEMBER gets Daily + Monthly + HOD Assigned + streams;
     // BRANCH_MEMBER (Branch Exec / Coaches) gets ONLY the Daily card.
@@ -577,6 +629,7 @@ export async function HomeScopedOverviewSection({
           </>,
         )}
         {ceoDashboards}
+        {branchRegionOverview}
       </div>
     );
   } catch {
