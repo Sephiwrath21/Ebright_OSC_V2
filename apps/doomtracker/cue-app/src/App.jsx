@@ -4688,13 +4688,14 @@ const FC_SNAP = 11;
 const FC_MIN = 44;   // smallest a shape can be resized to
 
 // --- Task assignment helpers (HOD assigns each step; assignee completes it) ---
-// Every shape except Start/End is a "task" that can be assigned and ticked off.
-// Every non-terminal node is a task the HOD can assign and someone ticks off — including
-// a decision (a Yes/No / Approved-Not approved fork). A decision that also has its
-// branches labelled Approved / Not approved additionally gets a "Send for approval"
-// email button in the editor (see isApprovalDecision), but it's still a task like any
-// other: assignee, due date, subtasks, proof, My Work and reminders all apply.
-function fcIsTask(n) { return n && n.type !== "start" && n.type !== "end"; }
+// Only Start is a marker (just the entry point into the flow, nothing to do).
+// Every other shape — including End — is a task the HOD can assign and someone
+// ticks off, and including a decision (a Yes/No / Approved-Not approved fork). A
+// decision that also has its branches labelled Approved / Not approved additionally
+// gets a "Send for approval" email button in the editor (see isApprovalDecision),
+// but it's still a task like any other: assignee, due date, subtasks, proof, My
+// Work and reminders all apply.
+function fcIsTask(n) { return n && n.type !== "start"; }
 
 function fcInitials(name) {
   if (!name || !name.trim()) return "?";
@@ -4715,6 +4716,19 @@ function fcFmtDate(d) {
   const dt = new Date(`${d}T00:00:00`);
   if (isNaN(dt)) return "";
   return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+// Short forms used in the Gantt axis, where space per tick is tight.
+function fcFmtDateShort(d) {
+  if (!d) return "";
+  const dt = new Date(`${d}T00:00:00`);
+  if (isNaN(dt)) return "";
+  return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+function fcFmtMonthYear(d) {
+  if (!d) return "";
+  const dt = new Date(`${d}T00:00:00`);
+  if (isNaN(dt)) return "";
+  return dt.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 
 // Status of a task's due date relative to today (used for the on-canvas badge).
@@ -4796,7 +4810,16 @@ function fcTodayLineLeft(range, pxPerDay) {
   const t = fcISO(new Date());
   return (t < range.min || t > range.max) ? null : fcDayOffset(t, range.min) * pxPerDay;
 }
-// Tick labels: day -> every day; week -> every Monday (+ the range start); month -> the 1st of each month (+ the range start).
+// Tick labels: day -> every day (just the day number, it sits in its own pxPerDay-wide
+// column); week -> every Monday (+ the range start), "D Mon"; month -> the 1st of each
+// month (+ the range start), short month name. Kept short on purpose — the coarser
+// month/year band above (fcHeaderSegments) carries the year, so ticks don't repeat it.
+// The range start is always forced in as a tick (so the chart's left edge is labelled),
+// which can land just a day or two before the next natural tick (e.g. range starts
+// Friday, first Monday tick is two days later) — too close together at week/month zoom
+// for two text labels to fit without overlapping. Drop whichever regular tick would
+// land within one label-width of the previous kept tick.
+const FC_MIN_TICK_GAP = { day: 0, week: 46, month: 30 };
 function fcAxisTicks(range, zoom, pxPerDay) {
   if (!range) return [];
   const start = fcParseISO(range.min), end = fcParseISO(range.max);
@@ -4810,11 +4833,41 @@ function fcAxisTicks(range, zoom, pxPerDay) {
     if (zoom === "day") show = true;
     else if (zoom === "week") show = first || dow === 1;
     else show = first || dom === 1;
-    if (show) ticks.push({ iso, left: fcDayOffset(iso, range.min) * pxPerDay, label: fcFmtDate(iso) });
+    if (show) {
+      const label = zoom === "day" ? String(dom) : zoom === "week" ? fcFmtDateShort(iso) : cur.toLocaleDateString("en-GB", { month: "short" });
+      const left = fcDayOffset(iso, range.min) * pxPerDay;
+      const prev = ticks[ticks.length - 1];
+      if (!prev || (left - prev.left) >= FC_MIN_TICK_GAP[zoom]) {
+        ticks.push({ iso, left, label, isWeekend: dow === 0 || dow === 6 });
+      }
+    }
     cur.setUTCDate(cur.getUTCDate() + 1);
     first = false;
   }
   return ticks;
+}
+// Coarser band above the ticks — groups by month (day/week zoom) or by year (month
+// zoom) so the fine-grained ticks below always sit under a labelled month/year, and
+// the label itself doesn't need to repeat on every tick.
+function fcHeaderSegments(range, zoom, pxPerDay) {
+  if (!range) return [];
+  const start = fcParseISO(range.min), end = fcParseISO(range.max);
+  const segs = [];
+  const cur = new Date(start);
+  let key = null, seg = null;
+  while (cur <= end) {
+    const iso = fcISO(cur);
+    const groupKey = zoom === "month" ? String(cur.getUTCFullYear()) : `${cur.getUTCFullYear()}-${cur.getUTCMonth()}`;
+    if (groupKey !== key) {
+      if (seg) segs.push(seg);
+      key = groupKey;
+      seg = { key, left: fcDayOffset(iso, range.min) * pxPerDay, width: 0, label: zoom === "month" ? String(cur.getUTCFullYear()) : fcFmtMonthYear(iso) };
+    }
+    seg.width += pxPerDay;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  if (seg) segs.push(seg);
+  return segs;
 }
 
 // Per-step locks the HOD can set on a task: "wait for the previous step" (sequential)
@@ -5152,29 +5205,36 @@ function fcEmailStatus(tier, node) {
 
 // Right-angle (orthogonal) connector between two shapes, draw.io style.
 // Returns the SVG path string plus the midpoint for the branch label.
-function fcEdgeGeometry(a, b) {
+// `bend` is a manual pixel offset (dragged in by the user, see startBend)
+// applied to the connector's middle segment, so a line can be pulled clear
+// of boxes it would otherwise run past. It's a delta from the automatic
+// midpoint rather than an absolute position, so it keeps working sensibly
+// if either shape is later moved.
+function fcEdgeGeometry(a, b, bend = 0) {
   const sa = fcNodeSize(a), sb = fcNodeSize(b);
   const ac = { x: a.x + sa.w / 2, y: a.y + sa.h / 2 };
   const bc = { x: b.x + sb.w / 2, y: b.y + sb.h / 2 };
   const dx = bc.x - ac.x, dy = bc.y - ac.y;
-  let pts, mid;
+  let pts, mid, axis;
   if (Math.abs(dx) >= Math.abs(dy)) {
     const sx = dx >= 0 ? a.x + sa.w : a.x;
     const ex = dx >= 0 ? b.x : b.x + sb.w;
     const start = { x: sx, y: ac.y }, end = { x: ex, y: bc.y };
-    const mx = (sx + ex) / 2;
+    const mx = (sx + ex) / 2 + bend;
     pts = [start, { x: mx, y: start.y }, { x: mx, y: end.y }, end];
     mid = { x: mx, y: (start.y + end.y) / 2 };
+    axis = "x";
   } else {
     const sy = dy >= 0 ? a.y + sa.h : a.y;
     const ey = dy >= 0 ? b.y : b.y + sb.h;
     const start = { x: ac.x, y: sy }, end = { x: bc.x, y: ey };
-    const my = (sy + ey) / 2;
+    const my = (sy + ey) / 2 + bend;
     pts = [start, { x: start.x, y: my }, { x: end.x, y: my }, end];
     mid = { x: (start.x + end.x) / 2, y: my };
+    axis = "y";
   }
   const d = pts.map((p, i) => (i === 0 ? "M" : "L") + " " + p.x + " " + p.y).join(" ");
-  return { d, mid };
+  return { d, mid, axis };
 }
 
 // --- Export ---------------------------------------------------------------
@@ -5232,7 +5292,7 @@ function fcToSvg(nodes, edges, { route, reach, traceColor, vars = {} } = {}) {
     const a = nodes.find((n) => n.id === e.from);
     const z = nodes.find((n) => n.id === e.to);
     if (!a || !z) return;
-    const { d, mid } = fcEdgeGeometry(a, z);
+    const { d, mid } = fcEdgeGeometry(a, z, e.bend || 0);
     const onRoute = !!route && route.edges.has(e.id);
     const canLead = !onRoute && !!reach && reach.edges.has(e.id);
     if (onRoute && traceColor) {
@@ -5521,7 +5581,7 @@ function FcPreview({ nodes, edges, name, endNodes, traceEnd, setTraceEnd, routes
                 const a = nodes.find((n) => n.id === e.from);
                 const b = nodes.find((n) => n.id === e.to);
                 if (!a || !b) return null;
-                const { d, mid } = fcEdgeGeometry(a, b);
+                const { d, mid } = fcEdgeGeometry(a, b, e.bend || 0);
                 const onRoute = !!route && route.edges.has(e.id);
                 const canLead = !onRoute && !!reach && reach.edges.has(e.id);
                 return (
@@ -5697,6 +5757,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
   const resize = useRef(null);     // active resize gesture
   const pan = useRef(null);        // active pan gesture
   const box = useRef(null);        // active rubber-band select gesture
+  const bendDrag = useRef(null);   // active line-bend gesture, see startBend
   const clipboard = useRef(null);  // copied shapes { nodes, edges }
   const firstRender = useRef(true);
   const editorRefs = useRef({});           // task/subtask cards, so the index can jump to them
@@ -6017,6 +6078,24 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
     resize.current = { id: n.id, corner, start: { x: n.x, y: n.y, w, h }, moved: false, snapshot: { nodes, edges } };
   };
 
+  // Drag the little handle on a connector's middle segment to pull the line
+  // clear of boxes it happens to cross — see the `bend` param on
+  // fcEdgeGeometry. `axis` says which pointer coordinate the drag reads: the
+  // segment being dragged is always perpendicular to the connector's overall
+  // direction, so a left-right connector bends via x and a top-bottom one via y.
+  const startBend = (e, edge, a, b, axis) => {
+    if (!canEdit) return;
+    e.stopPropagation(); e.preventDefault();
+    const p = toContent(e.clientX, e.clientY);
+    bendDrag.current = {
+      id: edge.id, axis,
+      start: axis === "x" ? p.x : p.y,
+      startBend: edge.bend || 0,
+      moved: false,
+      snapshot: { nodes, edges },
+    };
+  };
+
   const startPan = (e) => { pan.current = { sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty }; };
 
   const onCanvasMove = (e) => {
@@ -6044,6 +6123,14 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
       return;
     }
     if (link) { const p = toContent(e.clientX, e.clientY); setLink((l) => (l ? { ...l, x: p.x, y: p.y } : l)); return; }
+    if (bendDrag.current) {
+      const bd = bendDrag.current;
+      const p = toContent(e.clientX, e.clientY);
+      const delta = (bd.axis === "x" ? p.x : p.y) - bd.start;
+      bd.moved = true;
+      setEdges((es) => es.map((e2) => (e2.id === bd.id ? { ...e2, bend: bd.startBend + delta } : e2)));
+      return;
+    }
     if (!drag.current) return;
     const p = toContent(e.clientX, e.clientY);
     const dc = drag.current;
@@ -6091,6 +6178,10 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
     if (drag.current) {
       if (drag.current.moved) { const snap = drag.current.snapshot; setUndoStack((u) => [...u, snap]); setRedoStack([]); }
       drag.current = null;
+    }
+    if (bendDrag.current) {
+      if (bendDrag.current.moved) { const snap = bendDrag.current.snapshot; setUndoStack((u) => [...u, snap]); setRedoStack([]); }
+      bendDrag.current = null;
     }
     setGuides([]);
   };
@@ -6171,17 +6262,21 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
   // Commit a traced route as THE workflow flow. Writes the route's branch pick onto each
   // decision it crosses (so fcActiveSet gates everything to this flow) and remembers the
   // ending in chosenEnd. Decisions get marked done so sequential locks flow, same as the
-  // per-decision "Which branch?" picker. Off-branch decisions are left untouched.
+  // per-decision "Which branch?" picker. Off-branch decisions are left untouched. A decision
+  // that has its own subtasks (real checking work, e.g. "Call reference 1/2" under "Reference
+  // checked?") is skipped here even if it's on the route — same rule as the manual picker —
+  // so the flow can't answer it, and unlock the steps after it, before that work is done.
   const commitFlow = (endId, route) => {
     if (!endId || !route) return;
     const choices = fcRouteDecisionChoices(route, nodes, edges);
     record();
     const now = new Date().toISOString();
-    setNodes((ns) => ns.map((n) => (
-      choices[n.id] != null
-        ? { ...n, decisionChoice: choices[n.id], done: true, completedAt: n.completedAt || now }
-        : n
-    )));
+    setNodes((ns) => ns.map((n) => {
+      if (choices[n.id] == null) return n;
+      const subs = n.subtasks || [];
+      if (subs.length > 0 && subs.some((s) => !s.done)) return n;
+      return { ...n, decisionChoice: choices[n.id], done: true, completedAt: n.completedAt || now };
+    }));
     setChosenEnd(endId);
     setShowOffBranch(false);
     setConfirmFlow(null);
@@ -6780,7 +6875,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
               const a = nodes.find((n) => n.id === e.from);
               const b = nodes.find((n) => n.id === e.to);
               if (!a || !b) return null;
-              const { d, mid } = fcEdgeGeometry(a, b);
+              const { d, mid, axis } = fcEdgeGeometry(a, b, e.bend || 0);
               const isSel = selEdge === e.id;
               const isEditing = editing?.kind === "edge" && editing.id === e.id;
               const onRoute = !!route && route.edges.has(e.id);
@@ -6809,6 +6904,13 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                   <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: "stroke", cursor: "pointer" }}
                     onClick={() => { setSelEdge(e.id); setSelNode(null); }}
                     onDoubleClick={() => { if (!canEdit) return; record(); setSelEdge(e.id); setSelNode(null); setEditing({ kind: "edge", id: e.id }); }} />
+                  {isSel && canEdit && !isEditing && (
+                    // Drag this to bend the line's middle segment clear of other
+                    // shapes it happens to be crossing — see startBend.
+                    <circle cx={mid.x} cy={mid.y} r={6} fill="#fff" stroke={C.spotlight} strokeWidth={2}
+                      style={{ cursor: axis === "x" ? "ew-resize" : "ns-resize" }}
+                      onMouseDown={(ev) => startBend(ev, e, a, b, axis)} />
+                  )}
                   {e.label && !isEditing && (
                     <g style={{ pointerEvents: "none" }}>
                       <rect x={mid.x - e.label.length * 3.7 - 6} y={mid.y - 10} width={e.label.length * 7.4 + 12} height={19} rx={5} fill="#fff" stroke={C.line} />
@@ -6832,7 +6934,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
             if (!e) return null;
             const a = nodes.find((n) => n.id === e.from), b = nodes.find((n) => n.id === e.to);
             if (!a || !b) return null;
-            const { mid } = fcEdgeGeometry(a, b);
+            const { mid } = fcEdgeGeometry(a, b, e.bend || 0);
             return (
               <input autoFocus value={e.label} placeholder="Yes / No"
                 onMouseDown={(ev) => ev.stopPropagation()}
@@ -7213,6 +7315,7 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
         const chartWidth = fcChartWidth(range, pxPerDay);
         const todayLeft = fcTodayLineLeft(range, pxPerDay);
         const ticks = fcAxisTicks(range, ganttZoom, pxPerDay);
+        const headerSegments = fcHeaderSegments(range, ganttZoom, pxPerDay);
         const LABEL_W = 220;
         if (!tasks.length) return (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -7240,23 +7343,43 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
               </div>
             ) : (
               <div style={{ position: "relative", width: chartWidth + LABEL_W, minWidth: "100%", boxSizing: "border-box" }}>
-                <div style={{ position: "relative", height: 26, marginLeft: LABEL_W, borderBottom: `1px solid ${C.line}` }}>
-                  {ticks.map((t) => (
-                    <div key={t.iso} style={{ position: "absolute", left: t.left, fontSize: 11, color: C.slate, whiteSpace: "nowrap" }}>{t.label}</div>
-                  ))}
+                {/* Header: coarse month/year band on top, fine day/week/month ticks below */}
+                <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.card }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: LABEL_W, display: "flex", alignItems: "flex-end", boxSizing: "border-box", padding: "0 8px 5px", fontFamily: "'Work Sans', sans-serif", fontSize: 11, fontWeight: 600, color: C.slate, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${C.line}` }}>Task</div>
+                  <div style={{ position: "relative", height: 20, marginLeft: LABEL_W }}>
+                    {headerSegments.map((seg) => (
+                      <div key={seg.key} style={{ position: "absolute", left: seg.left, width: seg.width, top: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Work Sans', sans-serif", fontSize: 11, fontWeight: 600, color: C.slate, borderLeft: `1px solid ${C.line}`, boxSizing: "border-box", overflow: "hidden", whiteSpace: "nowrap" }}>{seg.label}</div>
+                    ))}
+                  </div>
+                  <div style={{ position: "relative", height: 24, marginLeft: LABEL_W, borderBottom: `1px solid ${C.line}` }}>
+                    {ticks.map((t) => (
+                      <div key={t.iso} style={{
+                        position: "absolute", left: t.left, width: ganttZoom === "day" ? pxPerDay : undefined,
+                        top: 4, textAlign: ganttZoom === "day" ? "center" : "left",
+                        fontFamily: "'Work Sans', sans-serif", fontSize: 11, color: (ganttZoom === "day" && t.isWeekend) ? C.slateLight : C.slate,
+                        whiteSpace: "nowrap", borderLeft: `1px solid ${C.line}`, boxSizing: "border-box", paddingLeft: ganttZoom === "day" ? 0 : 4,
+                      }}>{t.label}</div>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ position: "relative" }}>
+                  {/* Vertical gridlines, one per tick, running the full height of the rows below —
+                      drawn above the zebra stripe (z-index 1) so they stay visible over both colors */}
+                  {ticks.map((t) => (
+                    <div key={`grid-${t.iso}`} style={{ position: "absolute", left: LABEL_W + t.left, top: 0, bottom: 0, width: 1, background: C.line, zIndex: 1 }} />
+                  ))}
                   {todayLeft != null && (
-                    <div style={{ position: "absolute", left: LABEL_W + todayLeft, top: 0, bottom: 0, width: 1, background: C.spotlight, zIndex: 2 }} title="Today" />
+                    <div style={{ position: "absolute", left: LABEL_W + todayLeft, top: 0, bottom: 0, width: 1, background: C.spotlight, zIndex: 3 }} title="Today" />
                   )}
-                  {scheduled.map((n) => {
+                  {scheduled.map((n, i) => {
                     const { left, width } = fcBarMetrics(n.start_date, n.end_date, range.min, pxPerDay);
                     const color = FC_STATUS_COLOR[n.status || "not_started"].dot;
+                    const rowBg = i % 2 === 0 ? C.card : C.paper;
                     return (
-                      <div key={n.id} style={{ display: "flex", alignItems: "center", height: 34 }}>
+                      <div key={n.id} style={{ display: "flex", alignItems: "center", height: 34, background: rowBg, borderBottom: `1px solid ${C.line}` }}>
                         <div style={{ width: LABEL_W, flexShrink: 0, fontSize: 12.5, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 8, boxSizing: "border-box" }}>{n.label || FC_META[n.type].name}</div>
                         <div style={{ position: "relative", flex: 1, height: "100%" }}>
-                          <div title={`${n.label || FC_META[n.type].name} · ${n.start_date} → ${n.end_date}`} style={{ position: "absolute", left, width, top: 7, height: 20, borderRadius: 5, background: color }} />
+                          <div title={`${n.label || FC_META[n.type].name} · ${n.start_date} → ${n.end_date}`} style={{ position: "absolute", left, width, top: 7, height: 20, borderRadius: 5, background: color, zIndex: 2 }} />
                         </div>
                       </div>
                     );
@@ -7499,25 +7622,37 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                       {n.type === "decision" && (
                       <div style={{ borderTop: `1px dashed ${C.line}`, paddingTop: 12 }}>
                         <span style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6 }}>
-                          <GitMerge size={14} color={C.spotlightDeep} /> Which branch does this take?
+                          <GitMerge size={14} color={C.spotlightDeep} /> What happened here?
                         </span>
                         <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate, lineHeight: 1.5, margin: "8px 0 0" }}>
-                          You decide the outcome here. Pick a branch and only <b>that</b> branch's downstream steps activate for the assignees — the others are skipped. Name each arrow leaving this decision (double-click it) so it becomes a choice.
+                          Click the answer that actually happened. The steps that come after it will open up for your team to do. The steps after the other answer are skipped — nobody needs to do those.
                         </p>
                         {(() => {
                           const labels = fcBranchLabels(n.id, edges);
                           if (!labels.length) return (
-                            <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: "#B23A2E", margin: "8px 0 0" }}>No arrows are labelled yet — double-click each arrow leaving this decision to name the choice.</p>
+                            <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: "#B23A2E", margin: "8px 0 0" }}>This question doesn't have any answers set up yet. Go to the flowchart, double-click an arrow coming out of this box, and give it a name like “Yes” or “No”.</p>
                           );
                           const chosen = (n.decisionChoice || "").trim();
+                          // If this decision has its own subtasks (e.g. "Call reference 1", "Call
+                          // reference 2" under "Reference checked?"), that's the real work that has
+                          // to happen before anyone can know the answer — so the Yes/No buttons stay
+                          // locked until every one of them is ticked off. Otherwise the HOD could
+                          // answer (and open up the next steps) before the checking is actually done.
+                          const subsPending = subs.length > 0 && subsDone < subs.length;
                           return (
                             <>
+                              {subsPending && (
+                                <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.spotlightDeep, margin: "8px 0 0" }}>
+                                  Finish the {subsDone}/{subs.length} subtasks below first — you'll be able to answer once they're all ticked off.
+                                </p>
+                              )}
                               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 9 }}>
                                 {labels.map((l) => {
                                   const isChosen = chosen === l;
                                   return (
-                                    <button key={l} onClick={() => { record(); patchNode(n.id, { decisionChoice: l, done: true, completedAt: new Date().toISOString() }); }} title={isChosen ? "This is the chosen path" : `Send the flow down “${l}”`}
-                                      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: isChosen ? C.sageDeep : C.paper, color: isChosen ? "#fff" : C.ink, border: `1px solid ${isChosen ? C.sageDeep : C.line}`, borderRadius: 8, padding: "8px 13px", cursor: "pointer", fontFamily: "'Work Sans', sans-serif", fontSize: 13, fontWeight: 600 }}>
+                                    <button key={l} disabled={subsPending} onClick={() => { record(); patchNode(n.id, { decisionChoice: l, done: true, completedAt: new Date().toISOString() }); }}
+                                      title={subsPending ? "Finish the subtasks below first" : isChosen ? "This is the chosen path" : `Send the flow down “${l}”`}
+                                      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: isChosen ? C.sageDeep : C.paper, color: isChosen ? "#fff" : C.ink, border: `1px solid ${isChosen ? C.sageDeep : C.line}`, borderRadius: 8, padding: "8px 13px", cursor: subsPending ? "not-allowed" : "pointer", opacity: subsPending ? 0.5 : 1, fontFamily: "'Work Sans', sans-serif", fontSize: 13, fontWeight: 600 }}>
                                       {isChosen && <CheckCircle2 size={14} />} {l}
                                     </button>
                                   );
@@ -7525,11 +7660,11 @@ function FlowchartCanvas({ template, onBack, onRename, onSave, onDuplicate, dept
                               </div>
                               {chosen ? (
                                 <div style={{ marginTop: 9, fontFamily: "'Work Sans', sans-serif", fontSize: 12, color: C.slate, lineHeight: 1.5 }}>
-                                  This decision goes down <b style={{ color: C.sageDeep }}>{chosen}</b> — those steps are now live; the other branches are skipped.{" "}
-                                  <button onClick={() => { record(); patchNode(n.id, { decisionChoice: "", done: false }); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.spotlight, fontFamily: "'Work Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Change</button>
+                                  You picked <b style={{ color: C.sageDeep }}>{chosen}</b>. Its steps are now open for your team. The other answer's steps are hidden.{" "}
+                                  <button onClick={() => { record(); patchNode(n.id, { decisionChoice: "", done: false }); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.spotlight, fontFamily: "'Work Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Pick again</button>
                                 </div>
-                              ) : (
-                                <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight, margin: "8px 0 0" }}>Not chosen yet — steps after this decision stay locked until you pick a branch.</p>
+                              ) : !subsPending && (
+                                <p style={{ fontFamily: "'Work Sans', sans-serif", fontSize: 11.5, color: C.slateLight, margin: "8px 0 0" }}>Not answered yet. The steps after this stay hidden until you click Yes or No above.</p>
                               )}
                             </>
                           );
