@@ -56,6 +56,7 @@ import {
   RESIZABLE_TASK_NAME_DEFAULT,
   RESIZABLE_TASK_NAME_MAX,
   RESIZABLE_TASK_NAME_MIN,
+  RowActionsMenu,
   TaskRowLine,
   useResizableColumn,
   type ReassignControl,
@@ -164,6 +165,7 @@ export function EntityCardOverview({
   onUploadProof,
   onRemoveProof,
   reassign,
+  canReassignOthers,
   myWeek,
   myMonth,
 }: {
@@ -217,6 +219,15 @@ export function EntityCardOverview({
    *  viewer's own pending task, regardless of which card/row it appears
    *  in. Omit to disable the action everywhere in this section. */
   reassign?: ReassignControl;
+  /** Manager mode for Person-sort's View All grid (2026-08-15): when true,
+   *  the reassign trigger also appears on OTHER people's rows (not just the
+   *  viewer's own), passed to TaskRowLine as `reassignAnyOwner` — the
+   *  caller (page.tsx / scoped-overview-section.tsx) decides who qualifies
+   *  (ADMIN/ELEVATED_DEPT_SITE, per the 2026-08-15 product decision); the
+   *  server re-checks the actor's role on every reassign call regardless.
+   *  Has no effect on the own card (already reassignable via `reassign`
+   *  alone) or on the Type-sort grid (self-service only, unchanged). */
+  canReassignOthers?: boolean;
   /** Weekday-tab view for the viewer's OWN card (2026-08-15) — Daily
    *  section only (the caller only ever builds this for the "Daily"
    *  SectionData; Monthly/HOD/CEO Assigned have no per-weekday concept).
@@ -282,6 +293,32 @@ export function EntityCardOverview({
     }
   };
   const [typeReassignOpen, setTypeReassignOpen] = React.useState<string | null>(null);
+  const typeGridRef = React.useRef<HTMLDivElement>(null);
+  // Auto-close the Type-sort grid's open ReassignPicker on an outside
+  // click/tap or Escape (2026-08-15) — same fix as TaskRowLine's own
+  // reassignContainerRef effect below; previously the only way to close it
+  // was reopening that row's ⋮ menu and toggling "Assign to Others" again.
+  // Scoped to the WHOLE grid (typeGridRef, set on the Type-sort card
+  // container below) since typeReassignOpen is one shared id for every
+  // category card, not per-row state — clicking a DIFFERENT row's trigger
+  // still works normally (that click is "inside" the grid).
+  React.useEffect(() => {
+    if (!typeReassignOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (typeGridRef.current && !typeGridRef.current.contains(e.target as Node)) {
+        setTypeReassignOpen(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTypeReassignOpen(null);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [typeReassignOpen]);
   // Task-column resize (2026-08-15) — ONE width shared by every card this
   // section renders (Person-sort's own card AND every Type-sort category
   // card alike, whichever is currently visible — never both at once, so
@@ -302,7 +339,18 @@ export function EntityCardOverview({
   const taskColWidth = "var(--tm-overview-col-task)";
 
   const tasks = flattenTasks(entity);
-  const scopeId = showViewToggle && onlyMe ? myUserId : undefined;
+  // A synthetic self-entity (toSelfEntityDetail's one-member roster, used
+  // for every showViewToggle:false section — OPS/CEO's own Monthly on
+  // /task-manager, and Home's personal Daily/Monthly/third-card sections)
+  // has no View All/Only Me toggle because it's ALWAYS implicitly "only
+  // me" — there's no one else in it. Sort: Type's "hide empty categories"
+  // rule (2026-08-15) should apply here too, same as it does whenever a
+  // real multi-person entity's viewer picks Only Me — without this, an
+  // empty category card (e.g. "SMS" with zero tasks for this person)
+  // incorrectly stays visible, since scopeId was only ever driven by the
+  // (nonexistent, for this entity) toggle state.
+  const isSelfOnlyEntity = entity.members.length === 1 && entity.members[0].userId === myUserId;
+  const scopeId = (showViewToggle && onlyMe) || isSelfOnlyEntity ? myUserId : undefined;
 
   const personCards = sortMode === "person" ? groupTasksByPerson(entity.members, tasks, scopeId) : [];
   const categoryCards = sortMode === "type" ? groupTasksByCategory(categories, tasks, scopeId) : [];
@@ -332,10 +380,10 @@ export function EntityCardOverview({
     <div
       ref={resizeContainerRef}
       style={resizeStyle}
-      className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+      className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-        <h2 className="text-lg font-semibold text-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
           {/* Empty entityName (2026-08-15, myOverview's own sections) omits
               the "X — " prefix entirely — printing just "Daily"/"Monthly"
               alone, not "My Tasks — Daily", since the Person-sort card
@@ -351,7 +399,7 @@ export function EntityCardOverview({
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
             aria-label="Sort"
-            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="person">Sort: Person</option>
             <option value="type">Sort: Type</option>
@@ -361,7 +409,7 @@ export function EntityCardOverview({
               value={onlyMe ? "onlyMe" : "all"}
               onChange={(e) => setOnlyMe(e.target.value === "onlyMe")}
               aria-label="View"
-              className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+              className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="all">View All</option>
               <option value="onlyMe">Only Me</option>
@@ -373,7 +421,7 @@ export function EntityCardOverview({
       {sortMode === "person" ? (
         <div className={cardGridClass(personCards.length)}>
           {personCards.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">No one to show.</p>
+            <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">No one to show.</p>
           ) : (
             personCards.map((card) => {
               const isOwnCard = card.userId === myUserId;
@@ -393,8 +441,8 @@ export function EntityCardOverview({
               // type they have zero tasks in is just noise.
               const typeGroups = groupTasksByCategory(categories, card.tasks).filter((g) => g.tasks.length > 0);
               return (
-                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
-                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700">
+                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">
                     {/* Own card (2026-08-15): "My Tasks" only in Only Me
                         mode, where it's the sole card on screen — the
                         viewer's name/avatar is already shown top-right on
@@ -423,12 +471,12 @@ export function EntityCardOverview({
                               aria-selected={active}
                               onClick={() => selectMyWeekDate(d.date)}
                               className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
-                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
                               }`}
                             >
                               <span>{d.weekday}</span>
                               <span
-                                className={active ? "text-blue-100" : "text-gray-400"}
+                                className={active ? "text-blue-100" : "text-gray-400 dark:text-slate-500"}
                                 aria-label={`${pendingCount} pending`}
                               >
                                 {pendingCount}
@@ -453,6 +501,8 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
+                            defaultNameWidth={400}
+                            reassignAsMenu
                           />
                         )}
                       </div>
@@ -473,12 +523,12 @@ export function EntityCardOverview({
                               aria-selected={active}
                               onClick={() => selectMyMonthRange(c.range)}
                               className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
-                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
                               }`}
                             >
                               <span>{c.label}</span>
                               <span
-                                className={active ? "text-blue-100" : "text-gray-400"}
+                                className={active ? "text-blue-100" : "text-gray-400 dark:text-slate-500"}
                                 aria-label={`${pendingCount} pending`}
                               >
                                 {pendingCount}
@@ -503,6 +553,8 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
+                            defaultNameWidth={400}
+                            reassignAsMenu
                           />
                         )}
                       </div>
@@ -521,7 +573,7 @@ export function EntityCardOverview({
                     className="max-h-80 overflow-auto px-3 py-1"
                   >
                     {card.tasks.length === 0 ? (
-                      <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                      <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
                     ) : (
                       <>
                         {/* Column header (2026-08-15) — only on the card
@@ -537,7 +589,7 @@ export function EntityCardOverview({
                             above every type group below, not repeated per
                             group — it's labeling columns, not group data. */}
                         {isOwnCard && (
-                          <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                          <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:border-slate-800 dark:text-slate-500">
                             <span className="w-4 shrink-0" aria-hidden />
                             <span className="w-3 shrink-0" aria-hidden />
                             <span className="relative shrink-0 truncate" style={{ width: taskColWidth }}>
@@ -557,7 +609,7 @@ export function EntityCardOverview({
                         )}
                         {typeGroups.map((group) => (
                           <div key={group.id}>
-                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0">
+                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-slate-500">
                               {group.name}
                             </p>
                             {group.tasks.map((t: FlowTaskRow) => (
@@ -607,6 +659,8 @@ export function EntityCardOverview({
                                 // populate a redundant per-row value under it.
                                 blankDueDate={sectionLabel === "Daily"}
                                 reassign={reassign}
+                                reassignAnyOwner={canReassignOthers}
+                                reassignAsMenu
                               />
                             ))}
                           </div>
@@ -621,20 +675,20 @@ export function EntityCardOverview({
           )}
         </div>
       ) : (
-        <div className={cardGridClass(categoryCards.length)}>
+        <div ref={typeGridRef} className={cardGridClass(categoryCards.length)}>
           {categoryCards.map((card) => (
             <div
               key={card.id}
-              className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300" : "border-gray-200"}`}
+              className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300 dark:border-slate-600" : "border-gray-200 dark:border-slate-700"}`}
             >
-              <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
+              <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">{card.name}</div>
               <div className="max-h-80 overflow-auto px-3 py-2">
                 {card.tasks.length === 0 ? (
-                  <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                  <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
                 ) : (
                   <table className="w-max min-w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-gray-500">
+                      <tr className="text-left text-xs text-gray-500 dark:text-slate-400">
                         {/* No column resize here (2026-08-15) — long content
                             scrolls (the card body above is the scroll
                             container, both axes) instead of being resized
@@ -660,23 +714,19 @@ export function EntityCardOverview({
                           t.status !== "SKIPPED";
                         return (
                           <React.Fragment key={t.runBlockId}>
-                            <tr className="border-t border-dashed border-gray-100">
-                              <td className="whitespace-nowrap py-1.5 pr-4">{t.blockTitle}</td>
-                              <td className="py-1.5 text-gray-500">
+                            <tr className="border-t border-dashed border-gray-100 dark:border-slate-800">
+                              <td className="whitespace-nowrap py-1.5 pr-4 dark:text-slate-200">{t.blockTitle}</td>
+                              <td className="py-1.5 text-gray-500 dark:text-slate-400">
                                 <div className="flex items-center justify-between gap-2">
                                   {!onlyMe && <span className="whitespace-nowrap">{t.assigneeName}</span>}
                                   {canReassignRow && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
+                                    <RowActionsMenu
+                                      onAssignToOthers={() =>
                                         setTypeReassignOpen(
                                           typeReassignOpen === t.runBlockId ? null : t.runBlockId,
                                         )
                                       }
-                                      className="shrink-0 rounded-full border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:border-blue-300 hover:bg-blue-50"
-                                    >
-                                      Assign to Others
-                                    </button>
+                                    />
                                   )}
                                 </div>
                               </td>

@@ -30,7 +30,8 @@ export type ViewRole =
 
 export type SectionKey =
   // org-level overviews
-  | "orgGrids" // all-departments + branch-regions (+ ad hoc regions)
+  | "orgGrids" // all-departments (+ ad hoc regions) — pair with
+  // branchRegionOverview below for roles that also oversee branches
   // collapsible sections (rollup card by default, expands into a
   // per-person list — 2026-08-15 rebuild)
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
@@ -80,6 +81,12 @@ export interface RoleViewConfig {
 }
 
 export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
+  // No branchRegionOverview on Home (2026-08-15, revised): confirmed
+  // removed for ADMIN too, not just ELEVATED_DEPT_SITE — see the
+  // ELEVATED_DEPT_SITE comment below for the original reasoning; ADMIN and
+  // OPS were pulled into the same removal per an explicit follow-up
+  // decision. CEO's own separate branchRegionOverview (below, its own
+  // distinct draggable-dashboard layout) is untouched.
   ADMIN: {
     home: ["orgGrids"],
     taskManager: ["entityDropdowns"],
@@ -116,6 +123,8 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     weekdayRange: "mon-sun",
     addTaskHeader: true,
   },
+  // No branchRegionOverview on Home (2026-08-15, revised) — same removal
+  // as ADMIN above.
   OPS: {
     home: ["orgGrids"],
     // 2026-08-12: myOverview replaces personalDaily/personalMonthly/
@@ -145,8 +154,10 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     addTaskHeader: true,
   },
   // Superadmin-equivalent (2026-07-29 final spec): full org grids on Home
-  // (departments + branches + ad hoc regions) and the Department | Branch
-  // dropdown toggle on the Task Manager page.
+  // (departments + ad hoc regions) and the Department | Branch dropdown
+  // toggle on the Task Manager page. No branchRegionOverview on Home
+  // (2026-08-15) — originally removed for this role alone, then confirmed
+  // to also apply to ADMIN and OPS (see their comments above).
   ELEVATED_DEPT_SITE: {
     home: ["orgGrids"],
     taskManager: ["entityDropdowns"],

@@ -2,16 +2,16 @@
 // type gets it (2026-07-28 "no exceptions" requirement), scoped by the data
 // layer's role routing and always carrying the date filter(s):
 //
-//   ADMIN / OPS / elevated DEPT_SITE ... All Departments = a single-
-//                              department dropdown + TaskOverviewStack
-//                              (Daily/Monthly), the same pattern
-//                              /task-manager's own Department view uses,
-//                              defaulting to the account's own department
-//                              (2026-08-15 rebuild #2); Branch Status by
-//                              Region stays the collapsible rollup-card
-//                              treatment (rollup card by default per
-//                              branch, expanding into a per-person list via
-//                              ?expand=) — HomeTaskOverview
+//   ADMIN / OPS / elevated DEPT_SITE ... All Departments = a TaskOverviewStack
+//                              (Daily/Monthly) LOCKED to the account's own
+//                              department, no switcher — unlike
+//                              /task-manager's own Department view, which
+//                              keeps its dropdown (2026-08-15 rebuild #3);
+//                              no Branch Status by Region for any of these
+//                              three roles on Home (2026-08-15 — originally
+//                              elevated-DEPT_SITE-only, then confirmed to
+//                              also cover ADMIN/OPS) — all via
+//                              HomeTaskOverview
 //   CEO ...................... draggable department dashboards; Branch
 //                              Status by Region (same collapsible sections,
 //                              via HomeRegionOverview — code path added
@@ -78,7 +78,6 @@ export async function HomeScopedOverviewSection({
   hodDate,
   ceoDate,
   expand,
-  department,
   padate,
   actions,
 }: {
@@ -98,11 +97,6 @@ export async function HomeScopedOverviewSection({
    *  sections show their full per-person list instead of a rollup card.
    *  See expand-param.ts. */
   expand?: string;
-  /** Raw ?department= value (2026-08-15 rebuild #2) — which department the
-   *  org-wide "All Departments" dropdown currently shows. Validated against
-   *  FLOW_DEPARTMENTS and defaulted to the account's own department by the
-   *  orgGrids branch below, same as /task-manager's Department view. */
-  department?: string;
   /** Branch Manager's Ad hoc day anchor (?padate=, 2026-08-15) — mirrors
    *  ?hdate=/?cdate= exactly (YYYY-MM-DD, defaults to today, independent
    *  of every other filter). Ad hoc had no date filter before this. */
@@ -221,11 +215,14 @@ export async function HomeScopedOverviewSection({
     // Departments" is a single-department dropdown + TaskOverviewStack, the
     // same pattern /task-manager's own Department view uses (page.tsx's
     // buildEntityOverview), defaulting to the account's own department.
-    // "Branch Status by Region" keeps the collapsible rollup-card treatment
-    // from the first 2026-08-15 rebuild — only branch names present in
-    // ?expand= get a real getBranchDetail fetch.
+    // None of these three roles get "Branch Status by Region" on Home
+    // (2026-08-15 — see role-views.ts) — its ?expand= fetch is skipped
+    // entirely rather than fetched and hidden. showRegionOverview stays
+    // config-driven (shows(...)) rather than hardcoded false, so a future
+    // role added to orgGrids can opt back in without touching this file.
     if (daily.org && shows(view, "home", "orgGrids")) {
-      const { branches: expandedBranches } = parseExpandParam(expand);
+      const showRegionOverview = shows(view, "home", "branchRegionOverview");
+      const { branches: expandedBranches } = showRegionOverview ? parseExpandParam(expand) : { branches: [] };
       // Dedupe + cap defensively — the real UI (EntityRollupCard's toggle)
       // never produces more than a handful of entries, but ?expand= is a
       // public URL param and each name triggers a real DB-backed detail
@@ -239,20 +236,19 @@ export async function HomeScopedOverviewSection({
       // branch-only fetch below which stays conditional on something being
       // expanded.
       const categories = await listActiveTaskCategories(email).catch(() => []);
-      // Same own-department-first resolution as /task-manager's
-      // buildEntityOverview: the account's own department when it has one
-      // and it's a real department, else the first department as a last
-      // resort. `department` here is the raw ?department= prop; the
-      // resolved value is named separately to avoid shadowing it.
+      // Locked to the account's own department (2026-08-15) — no ?department=
+      // override; Home never lets an org-wide account switch which
+      // department it sees here, unlike /task-manager's own Department
+      // view. Same own-department-first resolution as before, just with
+      // the URL-override branch removed: the account's own department
+      // when it has one and it's a real department, else the first
+      // department as a last resort (accounts with no department at all,
+      // e.g. true superadmin logins).
       const ownDepartment = daily.me.me.department;
-      const departmentFallback =
+      const selectedDepartment =
         ownDepartment && (FLOW_DEPARTMENTS as readonly string[]).includes(ownDepartment)
           ? ownDepartment
           : FLOW_DEPARTMENTS[0];
-      const selectedDepartment =
-        department && (FLOW_DEPARTMENTS as readonly string[]).includes(department)
-          ? department
-          : departmentFallback;
       const [departmentDailyDetail, departmentMonthlyDetail, expandedBranchDetails] = await Promise.all([
         getDepartmentDetail(email, selectedDepartment, "daily", dailyDate),
         getDepartmentDetail(email, selectedDepartment, "monthly", monthlyDate),
@@ -282,6 +278,7 @@ export async function HomeScopedOverviewSection({
           expandParam={expand}
           categories={categories}
           myUserId={daily.me.me.userId}
+          showRegionOverview={showRegionOverview}
           actions={
             actions && {
               complete: actions.complete,

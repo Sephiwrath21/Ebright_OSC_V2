@@ -70,10 +70,6 @@ export default async function HomePage({
      *  see expand-param.ts. Passed through verbatim; validated there, not
      *  here (unlike the date params, it has no fixed format to check). */
     expand?: string;
-    /** Which department the org-wide "All Departments" dropdown shows
-     *  (2026-08-15 rebuild #2). Passed through verbatim; validated against
-     *  FLOW_DEPARTMENTS in scoped-overview-section.tsx, not here. */
-    department?: string;
     /** Branch Manager's personal Ad hoc day anchor (2026-08-15) — mirrors
      *  ?hdate=/?cdate= exactly. Passed through verbatim; defaulted to
      *  today in scoped-overview-section.tsx, not here. */
@@ -88,7 +84,6 @@ export default async function HomePage({
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
   const expand = sp.expand;
-  const department = sp.department;
   const padate = sp.padate && DATE_PARAM_RE.test(sp.padate) ? sp.padate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
@@ -204,7 +199,6 @@ export default async function HomePage({
         hodDate={hodDate}
         ceoDate={ceoDate}
         expand={expand}
-        department={department}
         padate={padate}
         actions={{
           complete: completeTask,

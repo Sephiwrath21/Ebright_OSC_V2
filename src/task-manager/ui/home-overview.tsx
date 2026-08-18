@@ -7,10 +7,12 @@
 // 2026-08-15 rebuild (HomeRegionOverview) — every branch a rollup card by
 // default, expanding via ?expand= into the same per-person list.
 // HomeDepartmentPicker and HomeRegionOverview are exported separately
-// because ADMIN/OPS/elevated DEPT_SITE (HomeTaskOverview) get BOTH, while
-// the CEO's own dashboard (scoped-overview-section.tsx) gets ONLY
-// HomeRegionOverview, appended below their draggable department
-// dashboards.
+// because HomeTaskOverview's showRegionOverview prop (ADMIN/OPS/elevated
+// DEPT_SITE, 2026-08-15 — currently false for all three, config-driven via
+// role-views.ts's branchRegionOverview key) decides whether it renders
+// HomeRegionOverview alongside its department picker, while the CEO's own
+// dashboard (scoped-overview-section.tsx) calls HomeRegionOverview directly,
+// appended below their draggable department dashboards.
 
 import type { ReactNode } from "react";
 import type {
@@ -21,9 +23,8 @@ import type {
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
-import { FLOW_DEPARTMENTS } from "./types";
 import { PageSectionHeading } from "./bits";
-import { DailyDatePicker, EntityPicker, MonthDropdown, MonthRangeDropdown } from "./entity-picker";
+import { DailyDatePicker, MonthDropdown, MonthRangeDropdown } from "./entity-picker";
 import { EntityCardOverview } from "./entity-card-overview";
 import { TaskOverviewStack } from "./task-overview-stack";
 import { AdhocRollupGrid, RegionRollupGrid } from "./overview-grids";
@@ -76,13 +77,19 @@ function buildExpandedContent(
   return out;
 }
 
-/** "All Departments" (2026-08-15 rebuild #2) — the SAME single-department-
- *  dropdown + TaskOverviewStack pattern /task-manager's own Department view
- *  uses (page.tsx's buildEntityOverview), reused as-is rather than
- *  reimplemented: an EntityPicker to switch departments (defaulting to the
- *  account's own, resolved by the caller) and a TaskOverviewStack showing
- *  Daily + Monthly for whichever one is selected. Deliberately no HOD/CEO
- *  Assigned Task sections — Home only ever showed Daily/Monthly here. */
+/** "All Departments" (2026-08-15 rebuild #2, locked 2026-08-15) — the SAME
+ *  TaskOverviewStack /task-manager's own Department view uses for a single
+ *  entity, but with NO department switcher: Home always shows the
+ *  account's own department (resolved by the caller, same fallback rule
+ *  as /task-manager's own view when there's no owned department), never a
+ *  dropdown to view another one. This is a genuinely different component
+ *  from /task-manager's Department view, not a shared one with a mode
+ *  flag — /task-manager's own page builds its own separate EntityPicker +
+ *  TaskOverviewStack inline (task-manager/page.tsx's buildEntityOverview);
+ *  this component has exactly one caller (HomeTaskOverview) and never
+ *  needs a "free" mode, so there's nothing to toggle. Deliberately no
+ *  HOD/CEO Assigned Task sections — Home only ever showed Daily/Monthly
+ *  here. */
 export function HomeDepartmentPicker({
   department,
   dailyDetail,
@@ -90,6 +97,7 @@ export function HomeDepartmentPicker({
   categories,
   myUserId,
   dailyDate,
+  monthlyDate,
   extraParams,
   actions,
 }: {
@@ -99,46 +107,53 @@ export function HomeDepartmentPicker({
   categories: FlowCategoryOption[];
   myUserId: string;
   dailyDate: string;
-  /** Current date/expand filters to carry along when switching departments
-   *  or changing the Daily date (NOT including "department" itself, which
-   *  each control adds on its own). */
+  /** The resolved Monthly anchor, YYYY-MM-DD (2026-08-15) — feeds the new
+   *  Year/Month filter below; this section previously had no way to view
+   *  any month but the current one. */
+  monthlyDate: string;
+  /** Current date/expand filters to carry along when changing the Daily
+   *  date (there's no department switcher here to carry them for). Reused
+   *  for the Monthly Year/Month dropdowns too — MonthDropdown always sets
+   *  its own ?mdate= explicitly, so a stale mdate/mrange riding along here
+   *  is harmless (overwritten). */
   extraParams: Record<string, string>;
   actions?: EntityActions;
 }) {
   return (
-    <>
-      <EntityPicker
-        label="Department"
-        value={department}
-        groups={[{ options: FLOW_DEPARTMENTS }]}
-        param="department"
-        basePath="/home"
-        extraParams={extraParams}
-      />
-      <TaskOverviewStack
-        entityName={department}
-        categories={categories}
-        myUserId={myUserId}
-        daily={{
-          entity: dailyDetail,
-          dateControl: (
-            <DailyDatePicker
-              key="home-dept-daily-picker"
-              value={dailyDate}
-              basePath="/home"
-              extraParams={{ ...extraParams, department }}
-            />
-          ),
-          showViewToggle: true,
-        }}
-        monthly={{ entity: monthlyDetail, showViewToggle: true }}
-        onComplete={actions?.complete}
-        onSkip={actions?.skip}
-        onReopen={actions?.reopen}
-        onUploadProof={actions?.uploadProof}
-        onRemoveProof={actions?.removeProof}
-      />
-    </>
+    <TaskOverviewStack
+      entityName={department}
+      categories={categories}
+      myUserId={myUserId}
+      daily={{
+        entity: dailyDetail,
+        dateControl: (
+          <DailyDatePicker
+            key="home-dept-daily-picker"
+            value={dailyDate}
+            basePath="/home"
+            extraParams={extraParams}
+          />
+        ),
+        showViewToggle: true,
+      }}
+      monthly={{
+        entity: monthlyDetail,
+        dateControl: (
+          <MonthDropdown
+            key="home-dept-monthly-picker"
+            value={monthlyDate}
+            basePath="/home"
+            extraParams={extraParams}
+          />
+        ),
+        showViewToggle: true,
+      }}
+      onComplete={actions?.complete}
+      onSkip={actions?.skip}
+      onReopen={actions?.reopen}
+      onUploadProof={actions?.uploadProof}
+      onRemoveProof={actions?.removeProof}
+    />
   );
 }
 
@@ -234,6 +249,7 @@ export function HomeTaskOverview({
   expandParam,
   categories,
   myUserId,
+  showRegionOverview,
   actions,
 }: {
   dailyOrg: NonNullable<FlowDetailResponse["org"]>;
@@ -252,6 +268,11 @@ export function HomeTaskOverview({
   expandParam?: string;
   categories: FlowCategoryOption[];
   myUserId: string;
+  /** Whether to render "Branch Status by Region" below the department
+   *  picker — role-driven (ROLE_VIEWS' branchRegionOverview key, 2026-08-15):
+   *  true for ADMIN/OPS, false for ELEVATED_DEPT_SITE (Operations/
+   *  Optimisation are department accounts, not branch overseers). */
+  showRegionOverview: boolean;
   actions?: EntityActions;
 }) {
   const raw = dateFilterParams ?? {};
@@ -294,7 +315,7 @@ export function HomeTaskOverview({
   return (
     <div className="flex flex-col gap-5">
       <PageSectionHeading>Task Manager — Overview</PageSectionHeading>
-      {dailyDate && (
+      {dailyDate && monthlyDate && (
         <HomeDepartmentPicker
           department={department}
           dailyDetail={departmentDailyDetail}
@@ -302,24 +323,27 @@ export function HomeTaskOverview({
           categories={categories}
           myUserId={myUserId}
           dailyDate={dailyDate}
+          monthlyDate={monthlyDate}
           extraParams={departmentExtraParams}
           actions={actions}
         />
       )}
-      <HomeRegionOverview
-        dailyOrg={dailyOrg}
-        monthlyOrg={monthlyOrg}
-        adhocByRegion={adhocByRegion}
-        expandedBranchDetails={expandedBranchDetails}
-        expandParam={expandParam}
-        categories={categories}
-        myUserId={myUserId}
-        dailyPicker={dailyPicker}
-        monthlyPicker={monthlyPicker}
-        adhocPicker={adhocPicker}
-        extraParams={expandExtraParams}
-        actions={actions}
-      />
+      {showRegionOverview && (
+        <HomeRegionOverview
+          dailyOrg={dailyOrg}
+          monthlyOrg={monthlyOrg}
+          adhocByRegion={adhocByRegion}
+          expandedBranchDetails={expandedBranchDetails}
+          expandParam={expandParam}
+          categories={categories}
+          myUserId={myUserId}
+          dailyPicker={dailyPicker}
+          monthlyPicker={monthlyPicker}
+          adhocPicker={adhocPicker}
+          extraParams={expandExtraParams}
+          actions={actions}
+        />
+      )}
     </div>
   );
 }

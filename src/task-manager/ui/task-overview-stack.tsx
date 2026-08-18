@@ -44,6 +44,7 @@ export function TaskOverviewStack({
   onUploadProof,
   onRemoveProof,
   reassign,
+  canReassignOthers,
 }: {
   entityName: string;
   categories: FlowCategoryOption[];
@@ -60,6 +61,10 @@ export function TaskOverviewStack({
   /** "Assign to Others" self-service handoff (2026-08-13) — passed through
    *  identically to every section's EntityCardOverview. */
   reassign?: ReassignControl;
+  /** Manager mode for Person-sort's View All grid (2026-08-15) — see
+   *  EntityCardOverview's own `canReassignOthers` doc comment; passed
+   *  through identically to every section. */
+  canReassignOthers?: boolean;
 }) {
   const sections: { key: string; label: string; data?: SectionData }[] = [
     { key: "daily", label: "Daily", data: daily },
@@ -91,6 +96,7 @@ export function TaskOverviewStack({
               onUploadProof={onUploadProof}
               onRemoveProof={onRemoveProof}
               reassign={reassign}
+              canReassignOthers={canReassignOthers}
             />
           ),
       )}

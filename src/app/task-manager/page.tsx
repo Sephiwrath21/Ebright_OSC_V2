@@ -740,6 +740,16 @@ export default async function TaskManagerPage({
     // appended BELOW the CEO's own sections (config: entityDropdowns).
     // Extracted into a builder so both render paths share one definition.
     const entityView: "department" | "branch" = sp.view === "branch" ? "branch" : "department";
+    // Manager mode for the View All card grid (2026-08-15): lets ADMIN and
+    // elevated DEPT_SITE (Operations/Optimisation) reassign OTHER people's
+    // tasks directly from a Person-sort card row, not just their own —
+    // confirmed narrower than the existing `canReassign` (which also
+    // includes OPS/HOD for the drill-down modal elsewhere) per the explicit
+    // 2026-08-15 product decision. The server re-checks the actor's role
+    // regardless (see reassignFlowTask); this only controls whether the
+    // trigger renders.
+    const canReassignOthersInGrid = viewRole === "ADMIN" || viewRole === "ELEVATED_DEPT_SITE";
+
     async function buildEntityOverview(): Promise<ReactNode> {
       const view = entityView;
       let overview: ReactNode;
@@ -759,7 +769,7 @@ export default async function TaskManagerPage({
             : fallback;
         const [dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail] = await Promise.all([
           getDepartmentDetail(email, department, "daily", dailyDate),
-          getDepartmentDetail(email, department, "monthly"),
+          getDepartmentDetail(email, department, "monthly", monthlyDate),
           getDepartmentHodAssigned(email, department).catch(() => null),
           getDepartmentCeoAssigned(email, department).catch(() => null),
         ]);
@@ -790,7 +800,18 @@ export default async function TaskManagerPage({
                 showViewToggle: true,
                 myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "department", department } }),
               }}
-              monthly={{ entity: monthlyDetail.department, showViewToggle: true }}
+              monthly={{
+                entity: monthlyDetail.department,
+                dateControl: (
+                  <MonthDropdown
+                    key="admin-dept-monthly-picker"
+                    value={monthlyDetail.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "department", department }}
+                  />
+                ),
+                showViewToggle: true,
+              }}
               hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.department, showViewToggle: true } : undefined}
               ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.department, showViewToggle: true } : undefined}
               onComplete={completeTask}
@@ -799,6 +820,7 @@ export default async function TaskManagerPage({
               onUploadProof={uploadProof}
               onRemoveProof={removeProof}
               reassign={cardReassign}
+              canReassignOthers={canReassignOthersInGrid}
             />
           </>
         );
@@ -807,7 +829,7 @@ export default async function TaskManagerPage({
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
         const [dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail] = await Promise.all([
           getBranchDetail(email, branch, "daily", dailyDate),
-          getBranchDetail(email, branch, "monthly"),
+          getBranchDetail(email, branch, "monthly", monthlyDate),
           getBranchHodAssigned(email, branch).catch(() => null),
           getBranchCeoAssigned(email, branch).catch(() => null),
         ]);
@@ -841,7 +863,18 @@ export default async function TaskManagerPage({
                 showViewToggle: true,
                 myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "branch", branch } }),
               }}
-              monthly={{ entity: monthlyDetail.branch, showViewToggle: true }}
+              monthly={{
+                entity: monthlyDetail.branch,
+                dateControl: (
+                  <MonthDropdown
+                    key="admin-branch-monthly-picker"
+                    value={monthlyDetail.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "branch", branch }}
+                  />
+                ),
+                showViewToggle: true,
+              }}
               hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.branch, showViewToggle: true } : undefined}
               ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.branch, showViewToggle: true } : undefined}
               onComplete={completeTask}
@@ -850,6 +883,7 @@ export default async function TaskManagerPage({
               onUploadProof={uploadProof}
               onRemoveProof={removeProof}
               reassign={cardReassign}
+              canReassignOthers={canReassignOthersInGrid}
             />
           </>
         );
