@@ -45,6 +45,7 @@
 // it, same "editing back to the original value is a no-op" principle the
 // single-select version had.
 import * as React from "react";
+import { FLOW_BRANCH_REGIONS } from "./types";
 import type { ActionResult } from "./types";
 import type {
   AssignSavedPackagesResult,
@@ -342,6 +343,31 @@ export function BranchPackageScheduleGrid({
     [data.cells],
   );
 
+  // Region grouping (2026-08-18) — `data.branches` comes straight from the
+  // DB (distinct role=BRANCH users, alphabetical), so it's mapped against
+  // the same static FLOW_BRANCH_REGIONS list the Branch dropdown/Branch
+  // Status by Region already use, rather than duplicating a region source
+  // of truth here. A branch not (yet) listed in FLOW_BRANCH_REGIONS falls
+  // into "Other" instead of silently vanishing — keeps every branch
+  // visible even if the static list drifts behind the real roster.
+  const groupedBranches = React.useMemo(() => {
+    const regionOf = new Map<string, string>();
+    for (const region of FLOW_BRANCH_REGIONS) {
+      for (const branch of region.branches) regionOf.set(branch, region.name);
+    }
+    const byRegion = new Map<string, string[]>();
+    for (const branch of data.branches) {
+      const region = regionOf.get(branch) ?? "Other";
+      const list = byRegion.get(region);
+      if (list) list.push(branch);
+      else byRegion.set(region, [branch]);
+    }
+    const orderedRegionNames = [...FLOW_BRANCH_REGIONS.map((r) => r.name), "Other"];
+    return orderedRegionNames
+      .map((name) => ({ name, branches: byRegion.get(name) ?? [] }))
+      .filter((group) => group.branches.length > 0);
+  }, [data.branches]);
+
   // (branch, weekday) -> locally-edited, not-yet-saved FULL desired set of
   // package ids for that cell. Absent from this map = "shows the server
   // value, unchanged." A successful save does NOT delete its key
@@ -616,59 +642,80 @@ export function BranchPackageScheduleGrid({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {data.branches.map((branch) => (
-              <tr key={branch}>
-                <td className="whitespace-nowrap px-2 py-1 align-top text-sm font-medium text-gray-700 dark:text-slate-300">
-                  {branch}
+          {groupedBranches.map((group) => (
+            // One <tbody> per region (2026-08-18) — a real border/rounded
+            // box around a whole region's rows, not just a text label. A
+            // table's row-group accepts its own border in the
+            // border-separate model (this table's own border-spacing-y
+            // already used above), so this needs no restructuring into
+            // multiple <table>s (which would risk each one auto-sizing its
+            // columns independently and losing alignment with the shared
+            // header row above).
+            <tbody
+              key={group.name}
+              className="rounded-xl border border-gray-200 dark:border-slate-700"
+            >
+              <tr>
+                <td
+                  colSpan={data.weekdays.length + 1}
+                  className="px-2 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-500"
+                >
+                  {group.name}
                 </td>
-                {data.weekdays.map((weekday) => {
-                  // One shade darker than the "populated cell" bg-blue-50
-                  // used inside MultiPackageCell/StaticCell — otherwise a
-                  // populated cell in the highlighted column would blend
-                  // into the column's own background with no visible
-                  // boundary (caught in review). Dark mode mirrors that
-                  // with a translucent wash (dark:bg-blue-900/30) so the
-                  // solid dark:bg-blue-900 fill inside a populated cell
-                  // still reads as visually distinct from the column tint.
-                  const columnHighlightClass =
-                    weekday === highlightedWeekday ? "bg-blue-100 dark:bg-blue-900/30" : "";
-                  const cell = cellAt.get(cellKey(branch, weekday));
-                  if (!cell) {
+              </tr>
+              {group.branches.map((branch) => (
+                <tr key={branch}>
+                  <td className="whitespace-nowrap px-2 py-1 align-top text-sm font-medium text-gray-700 dark:text-slate-300">
+                    {branch}
+                  </td>
+                  {data.weekdays.map((weekday) => {
+                    // One shade darker than the "populated cell" bg-blue-50
+                    // used inside MultiPackageCell/StaticCell — otherwise a
+                    // populated cell in the highlighted column would blend
+                    // into the column's own background with no visible
+                    // boundary (caught in review). Dark mode mirrors that
+                    // with a translucent wash (dark:bg-blue-900/30) so the
+                    // solid dark:bg-blue-900 fill inside a populated cell
+                    // still reads as visually distinct from the column tint.
+                    const columnHighlightClass =
+                      weekday === highlightedWeekday ? "bg-blue-100 dark:bg-blue-900/30" : "";
+                    const cell = cellAt.get(cellKey(branch, weekday));
+                    if (!cell) {
+                      return (
+                        <td
+                          key={weekday}
+                          className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}
+                        >
+                          <span className="text-xs text-gray-300 dark:text-slate-600">–</span>
+                        </td>
+                      );
+                    }
+                    const key = cellKey(branch, weekday);
+                    const isDirty = pending.has(key);
+                    const selectedIds = isDirty
+                      ? (pending.get(key) as Set<string>)
+                      : idSet(cell.packages);
                     return (
-                      <td
-                        key={weekday}
-                        className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}
-                      >
-                        <span className="text-xs text-gray-300 dark:text-slate-600">–</span>
+                      <td key={weekday} className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}>
+                        {canEdit ? (
+                          <MultiPackageCell
+                            packages={data.packages}
+                            selectedIds={selectedIds}
+                            dirty={isDirty}
+                            disabled={saveState === "saving"}
+                            error={errors.get(key) ?? null}
+                            onToggle={(packageId) => toggleCellPackage(branch, weekday, packageId)}
+                          />
+                        ) : (
+                          <StaticCell cell={cell} />
+                        )}
                       </td>
                     );
-                  }
-                  const key = cellKey(branch, weekday);
-                  const isDirty = pending.has(key);
-                  const selectedIds = isDirty
-                    ? (pending.get(key) as Set<string>)
-                    : idSet(cell.packages);
-                  return (
-                    <td key={weekday} className={`min-w-32 px-2 py-1 align-top ${columnHighlightClass}`}>
-                      {canEdit ? (
-                        <MultiPackageCell
-                          packages={data.packages}
-                          selectedIds={selectedIds}
-                          dirty={isDirty}
-                          disabled={saveState === "saving"}
-                          error={errors.get(key) ?? null}
-                          onToggle={(packageId) => toggleCellPackage(branch, weekday, packageId)}
-                        />
-                      ) : (
-                        <StaticCell cell={cell} />
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
     </div>

@@ -455,52 +455,50 @@ export async function HomeScopedOverviewSection({
           />
         </>
       );
-      // HOD layout: TOP ROW = personal cards (per config) + CEO Assigned;
-      // BELOW, clearly separated under its own heading, the Department
-      // Overview pair. View-only DEPT_SITE logins (no personal sections in
-      // their config) keep the department pair alone.
+      // HOD layout (2026-08-18): personal cards (per config) + CEO
+      // Assigned only — the "Department Overview" donut pair below it was
+      // dropped per explicit request. View-only DEPT_SITE logins (no
+      // personal sections in their config) still fall through to the
+      // department pair alone, below — `deptPair` stays defined for that
+      // case.
       if (shows(view, "home", "personalDaily")) {
         const ceoAssigned = shows(view, "home", "ceoAssigned")
           ? personalStreamEntity("CEO", ceoDate, "cdate")
           : undefined;
         return (
-          <div className="flex flex-col gap-5">
-            <TaskOverviewStack
-              entityName=""
-              categories={categories}
-              myUserId={daily.me.me.userId}
-              daily={
-                personalDailyEntity && {
-                  entity: personalDailyEntity,
-                  dateControl: dailyPicker,
-                  showViewToggle: false,
-                  myWeek: personalMyWeek,
-                }
+          <TaskOverviewStack
+            entityName=""
+            categories={categories}
+            myUserId={daily.me.me.userId}
+            daily={
+              personalDailyEntity && {
+                entity: personalDailyEntity,
+                dateControl: dailyPicker,
+                showViewToggle: false,
+                myWeek: personalMyWeek,
               }
-              monthly={
-                personalMonthlyEntity && {
-                  entity: personalMonthlyEntity,
-                  dateControl: personalMonthlyPicker,
-                  showViewToggle: false,
-                  myMonth: personalMyMonth,
-                }
+            }
+            monthly={
+              personalMonthlyEntity && {
+                entity: personalMonthlyEntity,
+                dateControl: personalMonthlyPicker,
+                showViewToggle: false,
+                myMonth: personalMyMonth,
               }
-              ceoAssigned={
-                ceoAssigned && {
-                  entity: ceoAssigned.entity,
-                  dateControl: ceoAssigned.dateControl,
-                  showViewToggle: false,
-                }
+            }
+            ceoAssigned={
+              ceoAssigned && {
+                entity: ceoAssigned.entity,
+                dateControl: ceoAssigned.dateControl,
+                showViewToggle: false,
               }
-              onComplete={actions?.complete}
-              onSkip={actions?.skip}
-              onReopen={actions?.reopen}
-              onUploadProof={actions?.uploadProof}
-              onRemoveProof={actions?.removeProof}
-            />
-            <PageSectionHeading>Department Overview</PageSectionHeading>
-            {grid(deptPair)}
-          </div>
+            }
+            onComplete={actions?.complete}
+            onSkip={actions?.skip}
+            onReopen={actions?.reopen}
+            onUploadProof={actions?.uploadProof}
+            onRemoveProof={actions?.removeProof}
+          />
         );
       }
       return grid(deptPair);
