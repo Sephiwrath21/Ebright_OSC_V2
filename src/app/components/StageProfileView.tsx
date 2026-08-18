@@ -509,7 +509,7 @@ export default function StageProfileView({
   const mobileRowTwoSections = displayStage === stage ? mobileRowTwoTopLevel : historicalSubTabSections;
 
   return (
-    <div className="min-h-full bg-[#f9fbff]">
+    <div className="min-h-full bg-[#f9fbff] dark:bg-slate-950">
       {/* --rail-width (fluid, below lg) and --rail-width-lg (the exact
           original per-stage pixel value, pinned at lg+ via the className's
           own lg:w-[var(--rail-width-lg)]) are both declared once here so the
@@ -530,32 +530,32 @@ export default function StageProfileView({
           } as React.CSSProperties
         }
       >
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <Link href="/home" className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 transition-colors">
+          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href={`/employee-folder/${stage}`} className="hover:text-slate-900 transition-colors">
+          <Link href={`/employee-folder/${stage}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
             {STAGE_LABELS[stage]}
           </Link>
           {locationName && locationGroup && locationCode && (
             <>
               <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-              <Link href={`/employee-folder/${stage}/${locationGroup}/${locationCode}`} className="hover:text-slate-900 transition-colors">
+              <Link href={`/employee-folder/${stage}/${locationGroup}/${locationCode}`} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
                 {locationName}
               </Link>
             </>
           )}
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 font-medium">{employeeName}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">{employeeName}</span>
         </nav>
 
-        <h1 className="text-2xl font-semibold text-[#4b4949d6] mb-4">{STAGE_LABELS[stage]}</h1>
+        <h1 className="text-2xl font-semibold text-[#4b4949d6] dark:text-slate-100 mb-4">{STAGE_LABELS[stage]}</h1>
 
         {/* Desktop/mouse-driven-browser-only ([@media(hover:none)]:hidden —
             see EmployeeRecordView.tsx's own comments for why hover:none
@@ -641,7 +641,10 @@ export default function StageProfileView({
             lg:w-[...] overrides), so there is nothing left for it to ever
             need to catch. */}
         <div className="flex items-start overflow-x-auto lg:overflow-visible">
-          <div className="relative flex-1 min-w-0 bg-white rounded-[24px] lg:rounded-[35px] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10">
+          <div
+            className="relative flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-3 sm:p-7 lg:p-10 flex gap-3 sm:gap-6 lg:gap-10"
+            style={{ border: "0.5px solid var(--border-neutral)" }}
+          >
             {/* Left column: avatar/name/status/Branch-Dept/Position/Phone/Email + proceed button */}
             <aside
               aria-label="Employee profile summary"
@@ -679,7 +682,7 @@ export default function StageProfileView({
                     {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
                   {proceedNotice && (
-                    <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+                    <div role="status" className="mt-2 rounded-lg border border-slate-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-600 shadow-sm">
                       {proceedNotice}
                     </div>
                   )}
@@ -1142,9 +1145,23 @@ function resolvePanel({
   // Real user_profile-backed fields — same source and same component
   // Employee Record's own Personal Info tab uses, so a full-timer's Pre-stage
   // "Personal Info" (and every later stage's "P. Info" history tab) shows the
-  // same populated data instead of a placeholder "-".
+  // same populated data instead of a placeholder "-". Wrapped in its own
+  // PageEditProvider (2026-08-15, see conversation) so an invalid phone/
+  // email on a history tab shows the same centered PageEditMessageDialog as
+  // every other Personal Info view, instead of EditableSection's smaller
+  // standalone corner popover — same pattern as the 4 already-wrapped
+  // current-tab blocks above, canEdit threaded through unchanged so
+  // read/write permission is identical to before this wrapping.
   if (section.key === "personal-info" && employeeDetail) {
-    return <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />;
+    return (
+      <PageEditProvider>
+        <PageEditMessageDialog />
+        <div className="mb-4 flex justify-end">
+          <PageEditToggleButton />
+        </div>
+        <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />
+      </PageEditProvider>
+    );
   }
   // Real resume table — same as above, shared with Employee Record's HR Info
   // > Resume/CV tab.

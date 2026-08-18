@@ -30,7 +30,10 @@ export default function StageLocationsView({ stage, groupBy, locations }: Props)
           <span className="text-slate-900 font-medium dark:text-slate-100">{stageLabel}</span>
         </nav>
 
-        <div className="bg-white rounded-[27px] p-6 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
+        <div
+          className="bg-white rounded-[12px] p-6 dark:bg-slate-900 dark:ring-1 dark:ring-white/10 shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)]"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <div className="flex gap-2 mb-6">
             <Link
               href={`/employee-folder/${stage}?by=branch`}

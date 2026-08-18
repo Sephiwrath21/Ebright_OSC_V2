@@ -620,7 +620,7 @@ export default function StaffDirectory({
 
         <div className="flex gap-5">
           <div
-            className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col"
+            className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] overflow-hidden flex flex-col"
             style={{ minHeight: 600 }}
           >
             <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">

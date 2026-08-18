@@ -149,7 +149,7 @@ function Subsection({ heading, children }: { heading: string; children: ReactNod
 }
 
 const valueClass = "text-sm text-[#4b4949] dark:text-slate-300 truncate";
-const emptyClass = "text-sm italic text-slate-400";
+const emptyClass = "text-sm italic text-slate-400 dark:text-slate-500";
 const labelClass = "text-xs font-medium text-slate-500 dark:text-slate-400";
 const inputClass =
   "text-sm text-[#4b4949] dark:text-slate-100 bg-transparent border-0 border-b border-slate-300 dark:border-slate-500 p-0 pb-0.5 focus:outline-none focus:border-blue-500";
@@ -352,6 +352,78 @@ function EditableSelectField({
         </select>
       ) : value ? (
         <span className={valueClass}>{displayLabel}</span>
+      ) : (
+        <span className={emptyClass}>-</span>
+      )}
+    </div>
+  );
+}
+
+const DURATION_UNIT_OPTIONS = [
+  { value: "d", label: "d" },
+  { value: "w", label: "w" },
+  { value: "m", label: "m" },
+  { value: "y", label: "y" },
+];
+
+// Splits a stored "6m"/"2w"/"1y" duration into its number + unit letter for
+// editing. Also salvages any pre-existing freeform value entered before this
+// field had a fixed shape (e.g. a stray "er") by keeping whatever leading
+// digits it finds and defaulting the unit to month — never throws, worst
+// case is an empty amount the user fills in themselves.
+function parseDuration(value: string): { amount: string; unit: string } {
+  const match = /^(\d+)\s*([dwmy])$/i.exec(value.trim());
+  if (match) return { amount: match[1], unit: match[2].toLowerCase() };
+  const digits = /^\d+/.exec(value.trim());
+  return { amount: digits ? digits[0] : "", unit: "m" };
+}
+
+// Shared Duration field — numeric-only amount + a d(ay)/w(eek)/m(onth)/
+// y(ear) unit select, composed into a single stored string ("6m") on every
+// change so the caller's value/onChange contract stays identical to
+// EditableField's (a drop-in swap at every Non-Compete/Performance Review
+// Duration call site). Digits-only on the amount, same live-filter pattern
+// as EmployeeRecordView.tsx's PaymentInfoPanel Account Number field.
+export function DurationField({
+  label,
+  value,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  const editing = useEditMode();
+  const { amount, unit } = parseDuration(value);
+
+  function commit(nextAmount: string, nextUnit: string) {
+    onChange(nextAmount ? `${nextAmount}${nextUnit}` : "");
+  }
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${full ? "sm:col-span-2" : ""}`}>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => commit(e.target.value.replace(/\D/g, ""), unit)}
+            className={`${inputClass} w-16`}
+          />
+          <select value={unit} onChange={(e) => commit(amount, e.target.value)} className={inputClass}>
+            {DURATION_UNIT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : value ? (
+        <span className={valueClass}>{value}</span>
       ) : (
         <span className={emptyClass}>-</span>
       )}
@@ -1291,6 +1363,16 @@ export function OnboardingPayrollPanel({
     else setPcbFileId(null);
   }
 
+  // Catches a pre-existing saved value that contains non-digit characters
+  // (entered before this restriction existed) and was never retyped this
+  // session — same pattern as EmployeeRecordView.tsx's PaymentInfoPanel.
+  function validate(): ValidationResult {
+    if (showBankDetails && bankAccount && !/^\d+$/.test(bankAccount)) {
+      return { valid: false, error: "Account Number must contain digits only." };
+    }
+    return { valid: true };
+  }
+
   return (
     <EditableSection
       onSave={async () => {
@@ -1309,6 +1391,7 @@ export function OnboardingPayrollPanel({
         if (!bankResult.ok) return bankResult;
         return { ok: true };
       }}
+      validate={validate}
       canEdit={canEdit}
       sectionLabel={heading}
     >
@@ -1334,7 +1417,11 @@ export function OnboardingPayrollPanel({
         <Subsection heading="Bank Details">
           <EditableField label="Bank Name" value={bankName} onChange={setBankName} />
           <EditableField label="Account Holder" value={accountName} onChange={setAccountName} />
-          <EditableField label="Account Number" value={bankAccount} onChange={setBankAccount} full />
+          {/* Digits only, filtered live as typed — same pattern
+              EmployeeRecordView.tsx's PaymentInfoPanel uses. validate()
+              above still catches a pre-existing non-digit value that was
+              never retyped. */}
+          <EditableField label="Account Number" value={bankAccount} onChange={(v) => setBankAccount(v.replace(/\D/g, ""))} full />
         </Subsection>
       )}
     </EditableSection>
@@ -2833,7 +2920,7 @@ export function NonCompetePanel({ userId, data, canEdit = true }: { userId: numb
       <FieldGrid>
         <EditableField label="Signed Date" value={signDate} onChange={setSignDate} type="date" />
         <EditableField label="Expiry Date" value={expiryDate} onChange={setExpiryDate} type="date" />
-        <EditableField label="Duration" value={duration} onChange={setDuration} full />
+        <DurationField label="Duration" value={duration} onChange={setDuration} full />
         <RealFileField label="Attachment" existingFileId={fileId} pendingFile={pendingFile} onPick={setPendingFile} onClear={clearFile} full />
       </FieldGrid>
     </EditableSection>
@@ -2912,7 +2999,7 @@ export function NdaNcPanel({
       <Subsection heading="Non-Compete (NC)">
         <EditableField label="Signed Date" value={ncSignDate} onChange={setNcSignDate} type="date" />
         <EditableField label="Expiry Date" value={ncExpiryDate} onChange={setNcExpiryDate} type="date" />
-        <EditableField label="Duration" value={ncDuration} onChange={setNcDuration} full />
+        <DurationField label="Duration" value={ncDuration} onChange={setNcDuration} full />
         <RealFileField label="Attachment" existingFileId={ncFileId} pendingFile={ncPending} onPick={setNcPending} onClear={clearNcFile} full />
       </Subsection>
     </EditableSection>

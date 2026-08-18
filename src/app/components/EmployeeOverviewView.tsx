@@ -163,7 +163,10 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               with no padding/background of its own to lose), so every child
               rejoins the single flex-wrap row that was already here —
               desktop is byte-for-byte unchanged. */}
-          <div className="flex flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 mb-6">
+          <div
+            className="flex flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-4 sm:p-5 mb-6"
+            style={{ border: "0.5px solid var(--border-neutral)" }}
+          >
             <div className="flex flex-nowrap items-center gap-2 sm:contents">
               <div className="relative flex-1 min-w-0 sm:flex-1 sm:min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
@@ -244,7 +247,10 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
               structure on mobile instead of squishing it — the whole table,
               including Name, swipes left/right together as one unit
               (deliberately no sticky column). */}
-          <div className="bg-white dark:bg-slate-900 rounded-[27px] overflow-x-auto">
+          <div
+            className="bg-white dark:bg-slate-900 rounded-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] overflow-x-auto"
+            style={{ border: "0.5px solid var(--border-neutral)" }}
+          >
             <div className="min-w-[680px]">
               <div className="grid grid-cols-[2fr_1fr_1fr_1fr_60px] gap-4 px-8 py-4 bg-[#a4e2f480] dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100">
                 <span>Name</span>

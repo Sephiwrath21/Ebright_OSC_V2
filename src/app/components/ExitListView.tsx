@@ -191,7 +191,10 @@ export default function ExitListView({
           )}
         </nav>
 
-        <div className="bg-white rounded-[20px] p-5 mb-3 dark:bg-slate-900">
+        <div
+          className="bg-white rounded-[12px] p-5 mb-3 dark:bg-slate-900 shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)]"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <h2 className="text-base font-medium text-black/77 mb-3 dark:text-slate-200">Search Filter</h2>
 
           {/* Main row — always visible: Name search, Position, and (only for
@@ -342,7 +345,10 @@ export default function ExitListView({
             scroll below each column's own minmax() floor keeps every column
             reachable by swipe on mobile. The whole table (including Name)
             scrolls together as one unit — deliberately no sticky column. */}
-        <div className="bg-white rounded-[20px] overflow-x-auto dark:bg-slate-900">
+        <div
+          className="bg-white rounded-[12px] overflow-x-auto dark:bg-slate-900 shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)]"
+          style={{ border: "0.5px solid var(--border-neutral)" }}
+        >
           <div className={`grid ${gridColsClass} gap-4 px-8 py-4 bg-[#a4e2f480] text-[15px] font-medium text-black dark:bg-slate-800 dark:text-slate-100`}>
             <span>Name</span>
             <SortableDateHeader state={dateSort} onToggle={() => setDateSort(nextDateSortState)} label="Last Date" />

@@ -12,6 +12,7 @@ import {
   EditableField,
   CurrencyField,
   EditableSelectField,
+  DurationField,
   SelectWithOtherField,
   EditableTextArea,
   RecordTable,
@@ -602,7 +603,7 @@ export function PerformanceReviewPanel({
     <EditableSection onSave={handleSave} canEdit={canEdit} sectionLabel="Performance Review">
       <PanelHeading>{editingId !== null ? "Edit Performance Review" : "Performance Review"}</PanelHeading>
       <FieldGrid>
-        <EditableField label="Review Period" value={period} onChange={setPeriod} />
+        <DurationField label="Review Period" value={period} onChange={setPeriod} />
         <EditableField label="Review Date" value={reviewDate} onChange={setReviewDate} type="date" />
         <EditableField label="Reviewer" value={reviewer} onChange={setReviewer} />
         <EditableSelectField label="Overall Rating" value={overallRating} onChange={setOverallRating} options={PERFORMANCE_RATING_OPTIONS} />
