@@ -8,9 +8,11 @@ import type {
   FlowOverviewResponse,
   FlowPeriod,
   FlowStaffMember,
+  NoClaimIncentivePayload,
 } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
+import { FINANCE_EMAIL } from "../role-views";
 import {
   analyticsQuerySchema,
   canViewEntity,
@@ -22,10 +24,12 @@ import {
 import {
   getAdhocPayload,
   getAdhocRegionsPayload,
+  getEntityAdhocAssignedPayload,
   getEntityCeoAssignedPayload,
   getEntityHodAssignedPayload,
   getEntityPayload,
   getMePayload,
+  getNoClaimIncentivePayload,
   getOrgPayload,
   resolvedDate,
 } from "../analytics/_payloads";
@@ -378,4 +382,41 @@ export function getBranchCeoAssigned(
     const payload = await getEntityCeoAssignedPayload("branch", q.branch);
     return { branch: { name: q.branch, ...payload } };
   }, "getBranchCeoAssigned");
+}
+
+/** "Ad hoc" section for Branch Overview (2026-08-18, Branch Manager's own
+ *  Task Manager page only) — all-time, no period/date param, same
+ *  auth/shape convention as getBranchHodAssigned/getBranchCeoAssigned
+ *  above. */
+export function getBranchAdhocAssigned(
+  email: string,
+  branch: string,
+): Promise<{ branch: { name: string } & EntityPayload }> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const q = z.object({ branch: z.string().min(1).max(200) }).parse({ branch });
+    const user = await requireUserByEmail(email);
+    if (!canViewEntity(user, "branch", q.branch)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const payload = await getEntityAdhocAssignedPayload(q.branch);
+    return { branch: { name: q.branch, ...payload } };
+  }, "getBranchAdhocAssigned");
+}
+
+/** "No Claim/Incentive" list (2026-08-18): a company-wide compliance check
+ *  before approving a claim/incentive payment — see NoClaimIncentivePayload's
+ *  own doc comment (ui/types.ts). Scoped to exactly two identities per the
+ *  confirmed design: the CEO role, and the single Finance department login
+ *  (FINANCE_EMAIL) — deliberately narrower than canViewOrg (which would also
+ *  admit ADMIN/OPS, not requested here). */
+export function getNoClaimIncentiveList(email: string, month?: string): Promise<NoClaimIncentivePayload> {
+  return native(async () => {
+    const user = await requireUserByEmail(email);
+    const canView = user.role === "CEO" || email.toLowerCase() === FINANCE_EMAIL;
+    if (!canView) {
+      throw new ApiHttpError(403, "Not authorized to view this list");
+    }
+    return getNoClaimIncentivePayload(month);
+  }, "getNoClaimIncentiveList");
 }

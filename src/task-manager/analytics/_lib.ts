@@ -508,6 +508,10 @@ export interface TaskRow {
    *  (getMePayload), which drive the "Assigned by" column (2026-07-30). */
   assignerId: string;
   assignerName?: string | null;
+  /** The assigner's role (2026-08-19) — mirrored on FlowTaskRow for the
+   *  client, drives isDueDayLockExemptRole. Resolved wherever assignerName
+   *  also is. */
+  assignerRole?: string | null;
   /** Assignee-uploaded completion evidence (2026-07-30, the "Proof"
    *  column; multi-photo 2026-08-08) — empty array until any are uploaded,
    *  oldest-first. Each image is served by

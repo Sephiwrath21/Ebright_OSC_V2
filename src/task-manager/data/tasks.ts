@@ -23,7 +23,7 @@ import type { FlowAssignInput } from "../ui/types";
 import { isPastDueDay, isFutureDueDay } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
-import { completeBlock, reopenBlock, skipBlock, submitItem } from "../engine/run";
+import { completeBlock, isDueDayLockExempt, reopenBlock, skipBlock, submitItem } from "../engine/run";
 import { protectRecurringSeries } from "../engine/recurrence";
 import { isElevatedDeptSite } from "../analytics/_lib";
 import { native, requireUserByEmail } from "./core";
@@ -123,6 +123,45 @@ export function reassignFlowTask(
     // new assignee — today reminders are dormant (REDIS_URL unset), so
     // there's nothing to move yet.
   }, "reassignFlowTask");
+}
+
+/** Editable Due Date (2026-08-19), scoped to "Tasks I Assigned"/"CEO
+ *  Assigned Task" — only the task's own STARTER (run.startedById) may move
+ *  its due date; not the assignee, not a general manager permission like
+ *  reassignFlowTask's. This matches the feature's whole premise: it's the
+ *  assigner's own view of work they delegated out, so only they get to
+ *  adjust when it's due. DONE/SKIPPED tasks are excluded (same status gate
+ *  reassignFlowTask already uses) — a finished task's due date is history,
+ *  not something to rewrite after the fact. */
+export function updateFlowTaskDueDate(
+  actorEmail: string,
+  runBlockId: string,
+  newDueAtIso: string,
+): Promise<void> {
+  return native(async () => {
+    const actor = await requireUserByEmail(actorEmail);
+    const block = await prisma.runBlock.findUnique({ where: { id: runBlockId }, include: { run: true } });
+    if (!block) throw new ApiHttpError(404, "Task not found");
+    if (block.run.startedById !== actor.id) {
+      throw new ApiHttpError(403, "Only the person who assigned this task can change its due date");
+    }
+    if (block.status === "DONE" || block.status === "SKIPPED") {
+      throw new ApiHttpError(400, "This task is already finished — its due date can no longer be changed");
+    }
+    const newDueAt = new Date(newDueAtIso);
+    if (Number.isNaN(newDueAt.getTime())) throw new ApiHttpError(400, "Invalid due date");
+
+    await prisma.runBlock.update({ where: { id: block.id }, data: { dueAt: newDueAt } });
+    await prisma.auditLog.create({
+      data: {
+        runId: block.runId,
+        runBlockId: block.id,
+        actorId: actor.id,
+        action: "BLOCK_DUE_DATE_CHANGED",
+        detail: { from: block.dueAt?.toISOString() ?? null, to: newDueAt.toISOString() },
+      },
+    });
+  }, "updateFlowTaskDueDate");
 }
 
 // Elevated department sites (Operation/Optimisation) are the DEPT_SITE
@@ -335,22 +374,32 @@ export function uploadFlowTaskProof(
 
     const runBlock = await prisma.runBlock.findUnique({
       where: { id },
-      select: { assigneeId: true, title: true, cadence: true, dueAt: true, status: true },
+      select: {
+        assigneeId: true,
+        title: true,
+        cadence: true,
+        dueAt: true,
+        status: true,
+        run: { select: { startedById: true } },
+      },
     });
     if (!runBlock) throw new ApiHttpError(404, "Task not found");
     if (runBlock.assigneeId !== user.id) {
       throw new ApiHttpError(403, "You can only upload proof for your own tasks");
     }
     // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
-    // future-day): same rule as completeBlock's — a Daily task's day has
-    // passed once its dueAt is strictly before today, so proof can no
-    // longer be attached OR replaced for it; symmetrically, proof can't
+    // future-day, exempted 2026-08-19 for HOD/CEO-assigned tasks — see
+    // isDueDayLockExempt): same rule as completeBlock's — a Daily task's
+    // day has passed once its dueAt is strictly before today, so proof can
+    // no longer be attached OR replaced for it; symmetrically, proof can't
     // be attached before the task's own due day arrives either.
-    if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
-      throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
-    }
-    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
-      throw new ApiHttpError(400, "This task isn't due yet and can't accept proof until its day arrives");
+    if (!(await isDueDayLockExempt(runBlock.run.startedById))) {
+      if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+        throw new ApiHttpError(400, "This task's day has passed and can no longer accept proof");
+      }
+      if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+        throw new ApiHttpError(400, "This task isn't due yet and can't accept proof until its day arrives");
+      }
     }
     // Completion lock (2026-08-09): once marked Complete, the attached
     // photos become the frozen record of what was submitted — no further
@@ -436,7 +485,15 @@ export function removeFlowTaskProof(
       where: { id },
       select: {
         driveFileId: true,
-        runBlock: { select: { assigneeId: true, cadence: true, dueAt: true, status: true } },
+        runBlock: {
+          select: {
+            assigneeId: true,
+            cadence: true,
+            dueAt: true,
+            status: true,
+            run: { select: { startedById: true } },
+          },
+        },
       },
     });
     if (!proof) throw new ApiHttpError(404, "Proof not found");
@@ -444,13 +501,16 @@ export function removeFlowTaskProof(
       throw new ApiHttpError(403, "You can only remove proof from your own tasks");
     }
     // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to
-    // future-day) — same rule as uploadFlowTaskProof's, applied
+    // future-day, exempted 2026-08-19 for HOD/CEO-assigned tasks — see
+    // isDueDayLockExempt) — same rule as uploadFlowTaskProof's, applied
     // symmetrically to removal.
-    if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
-      throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
-    }
-    if (proof.runBlock.cadence === "DAILY" && isFutureDueDay(proof.runBlock.dueAt)) {
-      throw new ApiHttpError(400, "This task isn't due yet and can't be changed until its day arrives");
+    if (!(await isDueDayLockExempt(proof.runBlock.run.startedById))) {
+      if (proof.runBlock.cadence === "DAILY" && isPastDueDay(proof.runBlock.dueAt)) {
+        throw new ApiHttpError(400, "This task's day has passed and can no longer be changed");
+      }
+      if (proof.runBlock.cadence === "DAILY" && isFutureDueDay(proof.runBlock.dueAt)) {
+        throw new ApiHttpError(400, "This task isn't due yet and can't be changed until its day arrives");
+      }
     }
     if (proof.runBlock.status === "DONE") {
       throw new ApiHttpError(400, "This task is already complete and can no longer be changed");

@@ -53,7 +53,22 @@ async function requireOwnedColumn(email: string, columnId: string) {
 
 // Mirrors HOD_KANBAN_COLORS in ui/types.ts — duplicated deliberately, same as
 // the donor route did, so the UI package stays import-free of the data layer.
-const KANBAN_COLUMN_COLORS = ["blue", "indigo", "violet", "pink", "orange", "teal", "rose"] as const;
+const KANBAN_COLUMN_COLORS = [
+  "red",
+  "orange",
+  "amber",
+  "lime",
+  "emerald",
+  "teal",
+  "cyan",
+  "blue",
+  "indigo",
+  "violet",
+  "purple",
+  "fuchsia",
+  "pink",
+  "rose",
+] as const;
 
 export function getHodKanban(
   email: string,

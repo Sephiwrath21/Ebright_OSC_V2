@@ -13,6 +13,7 @@
     "tm:migrate": "prisma migrate deploy --config prisma.task-manager.config.ts",
     "tm:seed": "tsx --env-file-if-exists=.env prisma/task-manager/seed.ts",
     "tm:bootstrap": "tsx --env-file-if-exists=.env prisma/task-manager/bootstrap.ts",
+    "tm:clear-stale": "tsx --env-file-if-exists=.env prisma/task-manager/clear-stale-assignments.ts",
     "backfill:attendance": "tsx scripts/backfill-attendance.ts",
     "crm:generate": "prisma generate --config prisma.crm.config.ts",
     "crm:validate": "prisma validate --config prisma.crm.config.ts"

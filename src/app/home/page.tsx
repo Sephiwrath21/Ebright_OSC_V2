@@ -20,6 +20,7 @@ import {
   FlowBridgeError,
 } from "@/task-manager/data";
 import type { ActionResult, ProofUploadResult, ProofRemoveResult } from "@/task-manager/ui/types";
+import { FINANCE_EMAIL } from "@/task-manager/role-views";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
@@ -32,8 +33,6 @@ import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 import { HomeScopedOverviewSection } from "./scoped-overview-section";
-
-const FINANCE_EMAIL = "finance@ebright.my";
 
 /** Strict YYYY-MM-DD or nothing — anything else falls back to today (the
  *  data layer's own default when the date is omitted). Same rule as

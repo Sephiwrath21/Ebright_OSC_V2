@@ -17,7 +17,7 @@ import type {
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
-import { flowBucketTotal, formatDueDate, isPastDueDay, isFutureDueDay } from "./types";
+import { flowBucketTotal, formatDueDate, isDueDayLockExemptRole, isPastDueDay, isFutureDueDay, type DueDateDisplay } from "./types";
 import {
   compressImageFile,
   drawTimestampWatermark,
@@ -94,20 +94,47 @@ export function SectionCard({
   title,
   action,
   children,
+  collapsible,
+  defaultCollapsed,
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  /** Adds a chevron next to the title that collapses/expands the whole
+   *  card body (2026-08-19) — e.g. "Tasks I Assigned". Defaults to false
+   *  (unchanged behavior) everywhere this isn't explicitly set. */
+  collapsible?: boolean;
+  /** Starting collapsed state when collapsible is true. Defaults to
+   *  expanded. */
+  defaultCollapsed?: boolean;
 }) {
+  const [collapsed, setCollapsed] = React.useState(Boolean(collapsible && defaultCollapsed));
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-          {title}
-        </h3>
+      <div className={`flex items-center justify-between gap-3 ${collapsed ? "" : "mb-4"}`}>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            <span
+              aria-hidden
+              className={`text-[10px] normal-case transition-transform ${collapsed ? "" : "rotate-90"}`}
+            >
+              ›
+            </span>
+            {title}
+          </button>
+        ) : (
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+            {title}
+          </h3>
+        )}
         {action}
       </div>
-      {children}
+      {!collapsed && children}
     </div>
   );
 }
@@ -280,8 +307,16 @@ function statusCircleClasses(status: FlowTaskRow["status"]): string {
  *  removeFlowTaskProof (this is the disabled-UI half, not the
  *  enforcement; a request that somehow reached the server anyway would
  *  still be rejected there). Applies to every role — there's no exception
- *  for elevated viewers completing on someone else's behalf. */
-function isLockedDueDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
+ *  for elevated viewers completing on someone else's behalf.
+ *
+ *  EXCEPT tasks assigned by an HOD or CEO (2026-08-19,
+ *  isDueDayLockExemptRole) — those are exempt from this lock entirely,
+ *  everywhere they appear (not just "HOD/CEO Assigned Task" — the same
+ *  task can also show up in the recipient's own Daily section, and it
+ *  must behave identically there too, since the server enforces this
+ *  per-task, not per-section). */
+function isLockedDueDay(task: Pick<FlowTaskRow, "cadence" | "dueAt" | "assignerRole">): boolean {
+  if (isDueDayLockExemptRole(task.assignerRole)) return false;
   return task.cadence === "DAILY" && (isPastDueDay(task.dueAt) || isFutureDueDay(task.dueAt));
 }
 
@@ -403,7 +438,22 @@ function StatusDropdown({
             const next = !o;
             if (next && triggerRef.current) {
               const rect = triggerRef.current.getBoundingClientRect();
-              setMenuPos({ top: rect.bottom + 4, left: rect.left });
+              // Flip upward when there isn't room below (2026-08-19) — this
+              // menu always renders the same fixed 3-item/2-heading layout
+              // (~168px tall), so unconditionally opening downward cut
+              // Completed/N-A off-screen whenever the trigger sat in the
+              // bottom third of the viewport: not covered by anything,
+              // just rendered past the bottom edge — reported as
+              // "Completed/N-A missing" and separately misread as the ⋮
+              // menu overlapping the status circle. Estimated, not
+              // measured, since the menu isn't in the DOM yet at click
+              // time and its content never varies per task.
+              const MENU_HEIGHT_ESTIMATE = 168;
+              const MENU_WIDTH = 160; // matches the menu's own w-40
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8);
+              setMenuPos({ top, left });
             }
             return next;
           });
@@ -1394,7 +1444,13 @@ export function RowActionsMenu({ onAssignToOthers }: { onAssignToOthers: () => v
             const next = !o;
             if (next && triggerRef.current) {
               const rect = triggerRef.current.getBoundingClientRect();
-              setMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+              // Flip upward when there isn't room below (2026-08-19) — same
+              // viewport-overflow fix as StatusDropdown's own menu, same
+              // fixed single-item content so the estimate is safe.
+              const MENU_HEIGHT_ESTIMATE = 56;
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              setMenuPos({ top, left: rect.right - 160 });
             }
             return next;
           });
@@ -1430,6 +1486,78 @@ export function RowActionsMenu({ onAssignToOthers }: { onAssignToOthers: () => v
   );
 }
 
+/** Click-to-edit Due Date cell (2026-08-19) — ONLY used by TaskRowLine when
+ *  its caller passes `onDueAtChange` (currently: "Tasks I Assigned"/"CEO
+ *  Assigned Task" only). Click reveals a native date input; picking a date
+ *  preserves the task's existing time-of-day (only the calendar date
+ *  changes, same "same time, different day" convention the recurrence
+ *  engine's nextWeeklyDueAt uses) and calls the handler. busy/errorText
+ *  mirrors StatusDropdown's own local-state pattern elsewhere in this file
+ *  (same InlineActionError component) for a consistent feel. */
+function EditableDueDate({
+  task,
+  dueDisplay,
+  onDueAtChange,
+}: {
+  task: FlowTaskRow;
+  dueDisplay: DueDateDisplay | null;
+  onDueAtChange: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
+  const dateValue = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : "";
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.value; // "YYYY-MM-DD"
+    if (!picked) return;
+    setBusy(true);
+    setErrorText(null);
+    const [y, m, d] = picked.split("-").map(Number);
+    const next = task.dueAt ? new Date(task.dueAt) : new Date();
+    next.setUTCFullYear(y, m - 1, d);
+    const result = await onDueAtChange(task.runBlockId, next.toISOString());
+    setBusy(false);
+    if (result.ok) setEditing(false);
+    else setErrorText(result.message);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="shrink-0 truncate text-left text-xs hover:underline decoration-dotted"
+        style={{ width: DUE_COL_WIDTH }}
+        title="Click to change the due date"
+      >
+        {dueDisplay ? (
+          <span className={dueDisplay.className}>{dueDisplay.text}</span>
+        ) : (
+          <span className="text-gray-300 dark:text-slate-600">—</span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <span className="relative shrink-0" style={{ width: DUE_COL_WIDTH }}>
+      <input
+        type="date"
+        autoFocus
+        disabled={busy}
+        defaultValue={dateValue}
+        onChange={handleChange}
+        onBlur={() => {
+          if (!busy) setEditing(false);
+        }}
+        className="w-full rounded border border-gray-200 bg-white px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      />
+      {errorText && <InlineActionError text={errorText} />}
+    </span>
+  );
+}
+
 export function TaskRowLine({
   task,
   myUserId,
@@ -1450,6 +1578,8 @@ export function TaskRowLine({
   blankDueDate,
   hideStatusChip,
   hideAssignee,
+  assigneeSource,
+  onDueAtChange,
   reassign,
   reassignAnyOwner,
   reassignAsMenu,
@@ -1521,6 +1651,22 @@ export function TaskRowLine({
    *  already the CARD's owner's own task, so an "assigned by" column is
    *  redundant with the card header. */
   hideAssignee?: boolean;
+  /** Which name the Assignee column shows (2026-08-19): "assigner" (default,
+   *  unchanged everywhere existing callers already work) is who assigned
+   *  the task TO the viewer — the personal "My Tasks" meaning. "assignee"
+   *  is who the task is assigned TO — for "Tasks I Assigned"/"CEO Assigned
+   *  Task", where the viewer IS the assigner on every row (so assignerName
+   *  is always undefined/redundant there) and the useful thing to show is
+   *  who they delegated it to, from task.assigneeName (see FlowDrillTask). */
+  assigneeSource?: "assigner" | "assignee";
+  /** Editable Due Date (2026-08-19), scoped ONLY to "Tasks I Assigned"/"CEO
+   *  Assigned Task" — NOT a general TaskRowLine capability, deliberately:
+   *  every other Daily/Monthly/roster list's due date is either fixed by
+   *  the recurrence engine or the reader isn't the task's assigner. When
+   *  provided (and hideCompleted mode), clicking the Due Date cell reveals
+   *  a native date input; on change, calls this with the new date at the
+   *  SAME time-of-day the task's dueAt already had (see EditableDueDate). */
+  onDueAtChange?: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
   /** "Assign to Others" self-service handoff (2026-08-13): when provided
    *  and this row is the viewer's own pending task, renders a trigger that
    *  opens the same inline ReassignPicker the manager-oversight
@@ -1695,7 +1841,19 @@ export function TaskRowLine({
           <div
             onPointerDown={onResizeStart}
             title="Drag to resize"
-            className="absolute -right-1.5 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center"
+            // -top-2.5/-bottom-2.5 (2026-08-19, was top-0 h-full): this div's
+            // own height used to be just the Task title's line height — the
+            // wrapper it's positioned against (the parent "relative min-w-0"
+            // div) is only as tall as its own content, not the row's full
+            // py-2.5-padded height, so the line stopped short of the row's
+            // actual boundaries and left a visible gap between one row's
+            // segment and the next. Stretching top/bottom by py-2.5's own
+            // 10px (removing the conflicting h-full below) extends this
+            // div's height to cover the row's FULL allocated space instead,
+            // so consecutive rows' segments now meet with no gap — reads as
+            // one continuous line down the table instead of disconnected
+            // dashes.
+            className="absolute -right-1.5 -top-2.5 -bottom-2.5 flex w-3 cursor-col-resize touch-none items-center justify-center"
           >
             <div className="h-full w-px bg-gray-200 hover:w-0.5 hover:bg-blue-400 dark:bg-slate-700" />
           </div>
@@ -1719,7 +1877,9 @@ export function TaskRowLine({
           }`}
           style={assignerWidth === undefined ? undefined : { width: assignerWidth }}
         >
-          {task.assignerName ?? <span className="text-gray-300 dark:text-slate-600">—</span>}
+          {(assigneeSource === "assignee" ? task.assigneeName : task.assignerName) ?? (
+            <span className="text-gray-300 dark:text-slate-600">—</span>
+          )}
         </span>
       )}
       {/* Due Date: in table mode a FIXED column (constant width/position,
@@ -1737,13 +1897,17 @@ export function TaskRowLine({
       {!hideDueDate &&
         !blankDueDate &&
         (hideCompleted ? (
-          <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
-            {dueDisplay ? (
-              <span className={dueDisplay.className}>{dueDisplay.text}</span>
-            ) : (
-              <span className="text-gray-300 dark:text-slate-600">—</span>
-            )}
-          </span>
+          onDueAtChange ? (
+            <EditableDueDate task={task} dueDisplay={dueDisplay} onDueAtChange={onDueAtChange} />
+          ) : (
+            <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+              {dueDisplay ? (
+                <span className={dueDisplay.className}>{dueDisplay.text}</span>
+              ) : (
+                <span className="text-gray-300 dark:text-slate-600">—</span>
+              )}
+            </span>
+          )
         ) : (
           dueDisplay && (
             <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
@@ -1907,6 +2071,28 @@ export function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React
   );
 }
 
+/** Invisible stand-in for StatusDropdown's own trigger button (2026-08-19),
+ *  reserving the header's status-column slot at the SAME width the real
+ *  button actually renders at. A plain `w-3` spacer (matching just the
+ *  circle's own size-3) used to sit here, but StatusDropdown's trigger is
+ *  wider than that — circle + gap-0.5 + the "▾" chevron (added 2026-08-18
+ *  for click affordance) + p-1 padding, net of its own -m-1 — so every
+ *  header spacer that never got updated to match under-reserved space,
+ *  shifting the Task column (and everything after it, including its own
+ *  resize divider) rightward relative to the header in every data row. This
+ *  mirrors the trigger's exact classes/content instead of a hardcoded guess
+ *  at its width, so the two can never drift apart again even if the real
+ *  button's padding/content changes later. `invisible` (not `hidden`) so it
+ *  still occupies its layout space. */
+export function StatusHeaderSpacer() {
+  return (
+    <span className="invisible -m-1 flex shrink-0 items-center gap-0.5 rounded-full p-1" aria-hidden>
+      <span className="block size-3 rounded-full border-2 border-red-400 bg-white" />
+      <span className="text-[8px] leading-none">▾</span>
+    </span>
+  );
+}
+
 /**
  * The "My Tasks — Daily/Monthly" and roster-drill-down task lists, wrapping
  * `TaskRowLine` with a shared, draggable "Task Name" column width — every
@@ -2043,12 +2229,18 @@ export function ResizableTaskList({
   onRemoveProof,
   emptyLabel,
   hideCompleted,
+  showCompletedToggle,
+  showCompleted,
+  onShowCompletedChange,
   assigneeColumnLabel,
   hideRowResizeDivider,
   hideAssignee,
+  assigneeSource,
+  onDueAtChange,
   blankDueDate,
   reassign,
   reassignAsMenu,
+  reassignAnyOwner,
   defaultNameWidth,
 }: {
   tasks: FlowTaskRow[];
@@ -2064,6 +2256,24 @@ export function ResizableTaskList({
   onRemoveProof?: ProofRemoveHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
+  /** Renders a single "Show Completed" checkbox (2026-08-19) that expands/
+   *  collapses the Completed AND N/A groups TOGETHER, on top of their
+   *  existing individual chevrons — only meaningful alongside hideCompleted.
+   *  Uncontrolled by default (toggles this list's own internal
+   *  collapsedGroups state); pass showCompleted/onShowCompletedChange below
+   *  to control it externally instead (e.g. one shared toggle driving
+   *  several lists at once, see EntityCardOverview's groupByStatus mode). */
+  showCompletedToggle?: boolean;
+  /** Controlled override (2026-08-19) for whether the Completed/N-A groups
+   *  are expanded — when provided, this list stops managing that part of
+   *  collapsedGroups itself and defers entirely to this prop (Pending stays
+   *  always expanded either way). Requires onShowCompletedChange to still
+   *  be interactive; omit both for the original uncontrolled behavior. */
+  showCompleted?: boolean;
+  /** Pairs with showCompleted above — called instead of the internal
+   *  toggle when the viewer clicks the master switch or a Completed/N-A
+   *  group's own chevron. */
+  onShowCompletedChange?: (value: boolean) => void;
   /** Header override for the Assignee column (2026-08-05) — e.g. "Assigned
    *  To" for a "tasks I assigned" list, where the column shows who the
    *  task went TO rather than who assigned it to the viewer (the usual
@@ -2084,6 +2294,13 @@ export function ResizableTaskList({
    *  task, so "who assigned this to me" is redundant. See TaskRowLine's own
    *  hideAssignee doc comment. */
   hideAssignee?: boolean;
+  /** Passed straight through to every row's TaskRowLine — see its own
+   *  `assigneeSource` doc comment. */
+  assigneeSource?: "assigner" | "assignee";
+  /** Passed straight through to every row's TaskRowLine — see its own
+   *  `onDueAtChange` doc comment (scoped to "Tasks I Assigned"/"CEO
+   *  Assigned Task" only). */
+  onDueAtChange?: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
   /** Keep the Due Date column but blank its per-row value (2026-08-15,
    *  same EntityCardOverview Daily-card motivation as TaskRowLine's own
    *  blankDueDate — the date is implied by the section itself). */
@@ -2097,6 +2314,11 @@ export function ResizableTaskList({
    *  button (2026-08-15) — see TaskRowLine's own `reassignAsMenu` doc
    *  comment; passed straight through to every row. */
   reassignAsMenu?: boolean;
+  /** Manager mode (2026-08-19) — see TaskRowLine's own `reassignAnyOwner`
+   *  doc comment; passed straight through to every row. Lets a viewer with
+   *  this permission reassign OTHER people's pending tasks too, not just
+   *  their own. */
+  reassignAnyOwner?: boolean;
   /** Starting Task-column width before any drag (2026-08-15) — defaults to
    *  RESIZABLE_TASK_NAME_DEFAULT (the original "My Tasks" page behavior,
    *  unchanged) when omitted. Callers with a wider available row (no
@@ -2123,6 +2345,46 @@ export function ResizableTaskList({
       else next.add(key);
       return next;
     });
+  // Show Completed (2026-08-19) — a single master switch layered on top of
+  // the per-group chevrons above. In CONTROLLED mode (showCompleted prop
+  // provided), the Completed/N-A groups defer entirely to it instead of
+  // collapsedGroups, so several lists (e.g. every person's card in an
+  // EntityCardOverview section) can share one external boolean. Pending
+  // never collapses either way.
+  const isControlledCompleted = showCompleted !== undefined;
+  const isGroupCollapsed = (key: BucketKey): boolean => {
+    if (key === "pending") return false;
+    if (isControlledCompleted) return !showCompleted;
+    return collapsedGroups.has(key);
+  };
+  const masterShowCompleted = isControlledCompleted
+    ? showCompleted!
+    : !(collapsedGroups.has("completed") && collapsedGroups.has("na"));
+  const toggleGroupOrMaster = (key: BucketKey) => {
+    if (key !== "pending" && isControlledCompleted) {
+      onShowCompletedChange?.(!showCompleted);
+      return;
+    }
+    toggleGroup(key);
+  };
+  const toggleMasterShowCompleted = () => {
+    if (isControlledCompleted) {
+      onShowCompletedChange?.(!showCompleted);
+      return;
+    }
+    const turningOn = !masterShowCompleted;
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (turningOn) {
+        next.delete("completed");
+        next.delete("na");
+      } else {
+        next.add("completed");
+        next.add("na");
+      }
+      return next;
+    });
+  };
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
@@ -2454,6 +2716,17 @@ export function ResizableTaskList({
   return (
     <div ref={containerRef} style={containerStyle}>
       {controlBar}
+      {hideCompleted && showCompletedToggle && (
+        <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={masterShowCompleted}
+            onChange={toggleMasterShowCompleted}
+            className="size-3.5 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+          />
+          Show Completed
+        </label>
+      )}
       {/* Phones/tablets (2026-07-31): the fixed columns total ~700px, so
           in table mode the header+rows pan HORIZONTALLY inside this
           container instead of cutting off or squeezing — the page itself
@@ -2490,7 +2763,7 @@ export function ResizableTaskList({
             <span className="w-4 shrink-0" aria-hidden />
           )}
           {hasTree && <span className="w-6 shrink-0" aria-hidden />}
-          <span className="w-3 shrink-0" aria-hidden />
+          <StatusHeaderSpacer />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
             <HeaderResizeHandle onPointerDown={onResizeStart} />
@@ -2535,9 +2808,12 @@ export function ResizableTaskList({
             assignerWidth: ASSIGNER_COL_WIDTH,
             hideCompleted,
             hideAssignee,
+            assigneeSource,
+            onDueAtChange,
             blankDueDate,
             reassign,
             reassignAsMenu,
+            reassignAnyOwner,
           };
           return (
             <React.Fragment key={t.runBlockId}>
@@ -2582,12 +2858,12 @@ export function ResizableTaskList({
         // ungrouped list.
         return hideCompleted ? (
           groupedTopLevel.map((group) => {
-            const isCollapsed = collapsedGroups.has(group.key);
+            const isCollapsed = isGroupCollapsed(group.key);
             return (
               <div key={group.key} className="border-b border-gray-100 last:border-b-0 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => toggleGroup(group.key)}
+                  onClick={() => toggleGroupOrMaster(group.key)}
                   aria-expanded={!isCollapsed}
                   className="flex w-full items-center gap-2 py-2 text-left text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
                 >

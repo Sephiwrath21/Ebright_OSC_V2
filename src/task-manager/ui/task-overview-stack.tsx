@@ -38,6 +38,7 @@ export function TaskOverviewStack({
   monthly,
   hodAssigned,
   ceoAssigned,
+  adhocAssigned,
   onComplete,
   onSkip,
   onReopen,
@@ -53,6 +54,11 @@ export function TaskOverviewStack({
   monthly?: SectionData;
   hodAssigned?: SectionData;
   ceoAssigned?: SectionData;
+  /** "Ad hoc" section (2026-08-18, Branch Manager's own Task Manager page
+   *  only) — same roster-first card grid as HOD/CEO Assigned, just backed
+   *  by getBranchAdhocAssigned instead. Callers that want Ad hoc instead of
+   *  HOD/CEO Assigned simply omit those two props and pass this one. */
+  adhocAssigned?: SectionData;
   onComplete?: (runBlockId: string) => Promise<import("./types").ActionResult>;
   onSkip?: (runBlockId: string) => Promise<import("./types").ActionResult>;
   onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
@@ -71,6 +77,7 @@ export function TaskOverviewStack({
     { key: "monthly", label: "Monthly", data: monthly },
     { key: "hodAssigned", label: "HOD Assigned Task", data: hodAssigned },
     { key: "ceoAssigned", label: "CEO Assigned Task", data: ceoAssigned },
+    { key: "adhocAssigned", label: "Ad hoc", data: adhocAssigned },
   ];
 
   return (
@@ -97,6 +104,11 @@ export function TaskOverviewStack({
               onRemoveProof={onRemoveProof}
               reassign={reassign}
               canReassignOthers={canReassignOthers}
+              // Standardized Pending-first/Show-Completed/collapsible
+              // pattern (2026-08-19) — HOD/CEO Assigned Task ONLY, never
+              // Daily/Monthly/Ad hoc — see EntityCardOverview's own
+              // groupByStatus doc comment.
+              groupByStatus={key === "hodAssigned" || key === "ceoAssigned"}
             />
           ),
       )}

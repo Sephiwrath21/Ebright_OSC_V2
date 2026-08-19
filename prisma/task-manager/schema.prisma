@@ -625,7 +625,7 @@ model AuditLog {
   runId      String?
   runBlockId String?
   actorId    String // user id, or "system" for engine/worker actions
-  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | BLOCK_AUTO_REFRESH (historical only) | REMINDER_SENT
+  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | BLOCK_DUE_DATE_CHANGED | BLOCK_AUTO_REFRESH (historical only) | REMINDER_SENT
   detail     Json?
   createdAt  DateTime @default(now())
 

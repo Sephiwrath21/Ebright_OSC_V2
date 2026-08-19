@@ -42,6 +42,7 @@ import type {
   FlowCategoryOption,
   FlowEntityDetail,
   FlowTaskRow,
+  MyManpowerActualSlot,
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
@@ -57,6 +58,7 @@ import {
   RESIZABLE_TASK_NAME_MAX,
   RESIZABLE_TASK_NAME_MIN,
   RowActionsMenu,
+  StatusHeaderSpacer,
   TaskRowLine,
   useResizableColumn,
   type ReassignControl,
@@ -80,12 +82,28 @@ function flattenTasks(entity: FlowEntityDetail) {
   return [...entity.tasks.completed, ...entity.tasks.pending, ...entity.tasks.na];
 }
 
+/** groupByStatus's Sort: Type ordering (2026-08-19) — Pending always
+ *  first, matching ResizableTaskList's own fixed Pending/Completed/N-A
+ *  group order used for Person-sort's cards in the same mode; Completed/
+ *  N-A are omitted entirely unless showCompleted, same "hidden by default"
+ *  behavior as that master toggle. */
+function statusGroupedTasks(tasks: FlowTaskRow[], showCompleted: boolean): FlowTaskRow[] {
+  const pending = tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
+  if (!showCompleted) return pending;
+  const completed = tasks.filter((t) => t.status === "DONE" || t.status === "SKIPPED");
+  return [...pending, ...completed];
+}
+
 /** One weekday's worth of the viewer's own tasks (2026-08-15, embedded
  *  weekday-tab view — see EntityCardOverview's `myWeek` prop doc comment). */
 export interface MyWeekDay {
   weekday: string;
   date: string;
   tasks: FlowTaskRow[];
+  /** Manpower Scheduling's ACTUAL slot(s) for this day (2026-08-18), Coach/
+   *  Branch Full Time Exec only — see MyManpowerActualSlot's own doc comment.
+   *  Undefined/empty for every other role and for days with no assignment. */
+  schedule?: MyManpowerActualSlot[];
 }
 
 /** EntityCardOverview's `myWeek` prop shape, exported so every caller
@@ -168,6 +186,7 @@ export function EntityCardOverview({
   canReassignOthers,
   myWeek,
   myMonth,
+  groupByStatus,
 }: {
   /** The section's own heading, e.g. "Daily" / "Monthly" / "HOD Assigned
    *  Task" / "CEO Assigned Task" — TaskOverviewStack renders it above this
@@ -261,8 +280,26 @@ export function EntityCardOverview({
    *  unchanged (2026-08-15 product decision: My Month is Home-only for
    *  now). */
   myMonth?: MyMonthConfig;
+  /** Standardized Pending-first/Show-Completed/collapsible pattern
+   *  (2026-08-19, HOD/CEO Assigned Task only — TaskOverviewStack passes
+   *  this true ONLY for those two keys, never Daily/Monthly/Ad hoc). Swaps
+   *  Sort: Person's per-card category/type sub-grouping for the SAME
+   *  status-bucket grouping (Pending always first; Completed/N-A collapsed
+   *  by default) "Tasks I Assigned" uses, via a genuinely shared
+   *  ResizableTaskList instance per card rather than a lookalike — Sort:
+   *  Type keeps its category grouping but sorts each category pending-
+   *  first and hides Completed/N-A the same way. One "Show Completed"
+   *  master toggle (in this card's own header) and one collapse chevron
+   *  (around the whole section) drive every card/category at once. */
+  groupByStatus?: boolean;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
+  // groupByStatus's shared controls (2026-08-19) — one "Show Completed"
+  // master toggle and one collapse chevron for the WHOLE section,
+  // regardless of Sort mode or how many person/category cards it has.
+  // Meaningless (and unused) when groupByStatus is false.
+  const [showCompleted, setShowCompleted] = React.useState(false);
+  const [sectionCollapsed, setSectionCollapsed] = React.useState(false);
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -383,18 +420,47 @@ export function EntityCardOverview({
       className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
-          {/* Empty entityName (2026-08-15, myOverview's own sections) omits
-              the "X — " prefix entirely — printing just "Daily"/"Monthly"
-              alone, not "My Tasks — Daily", since the Person-sort card
-              directly below already says "My Tasks" (isOwnCard check
-              above) — showing that label twice, stacked, was itself the
-              redundancy this was meant to fix. Department/Branch Overview
-              still pass a real name here and keep the full "X — Y" form. */}
-          {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
-        </h2>
+        {groupByStatus ? (
+          <button
+            type="button"
+            onClick={() => setSectionCollapsed((c) => !c)}
+            aria-expanded={!sectionCollapsed}
+            className="flex items-center gap-1.5 text-lg font-semibold text-gray-900 hover:text-gray-700 dark:text-slate-100 dark:hover:text-slate-300"
+          >
+            <span
+              aria-hidden
+              className={`text-sm normal-case transition-transform ${sectionCollapsed ? "" : "rotate-90"}`}
+            >
+              ›
+            </span>
+            {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
+          </button>
+        ) : (
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+            {/* Empty entityName (2026-08-15, myOverview's own sections) omits
+                the "X — " prefix entirely — printing just "Daily"/"Monthly"
+                alone, not "My Tasks — Daily", since the Person-sort card
+                directly below already says "My Tasks" (isOwnCard check
+                above) — showing that label twice, stacked, was itself the
+                redundancy this was meant to fix. Department/Branch Overview
+                still pass a real name here and keep the full "X — Y" form. */}
+            {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
+          </h2>
+        )}
+        {!sectionCollapsed && (
         <div className="flex flex-wrap items-center gap-2">
           {dateControl}
+          {groupByStatus && (
+            <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={showCompleted}
+                onChange={(e) => setShowCompleted(e.target.checked)}
+                className="size-3.5 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+              />
+              Show Completed
+            </label>
+          )}
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
@@ -416,9 +482,10 @@ export function EntityCardOverview({
             </select>
           )}
         </div>
+        )}
       </div>
 
-      {sortMode === "person" ? (
+      {!sectionCollapsed && (sortMode === "person" ? (
         <div className={cardGridClass(personCards.length)}>
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">No one to show.</p>
@@ -486,6 +553,18 @@ export function EntityCardOverview({
                         })}
                       </div>
                       <div className="min-w-0 flex-1">
+                        {selectedMyWeekDay && selectedMyWeekDay.schedule && selectedMyWeekDay.schedule.length > 0 && (
+                          <div className="mb-2 space-y-1">
+                            {selectedMyWeekDay.schedule.map((s, i) => (
+                              <div
+                                key={i}
+                                className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              >
+                                {s.start} – {s.end}: {s.label}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {selectedMyWeekDay && (
                           <ResizableTaskList
                             key={selectedMyWeekDay.date}
@@ -574,6 +653,33 @@ export function EntityCardOverview({
                   >
                     {card.tasks.length === 0 ? (
                       <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
+                    ) : groupByStatus ? (
+                      // HOD/CEO Assigned Task (2026-08-19): status-bucket
+                      // grouping instead of category/type sub-grouping — the
+                      // SAME ResizableTaskList "Tasks I Assigned" uses, not a
+                      // lookalike. showCompleted/onShowCompletedChange are
+                      // this section's own lifted state (set above), so every
+                      // card in the grid — own and everyone else's alike —
+                      // expands/collapses Completed together from the ONE
+                      // "Show Completed" checkbox in this card's header.
+                      <ResizableTaskList
+                        tasks={card.tasks}
+                        myUserId={myUserId}
+                        onComplete={onComplete}
+                        onSkip={onSkip}
+                        onReopen={onReopen}
+                        onUploadProof={onUploadProof}
+                        onRemoveProof={onRemoveProof}
+                        emptyLabel="No tasks this period."
+                        hideCompleted
+                        showCompleted={showCompleted}
+                        onShowCompletedChange={setShowCompleted}
+                        hideAssignee
+                        reassign={reassign}
+                        reassignAnyOwner={canReassignOthers}
+                        reassignAsMenu
+                        defaultNameWidth={280}
+                      />
                     ) : (
                       <>
                         {/* Column header (2026-08-15) — only on the card
@@ -591,7 +697,7 @@ export function EntityCardOverview({
                         {isOwnCard && (
                           <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:border-slate-800 dark:text-slate-500">
                             <span className="w-4 shrink-0" aria-hidden />
-                            <span className="w-3 shrink-0" aria-hidden />
+                            <StatusHeaderSpacer />
                             <span className="relative shrink-0 truncate" style={{ width: taskColWidth }}>
                               Task
                               <HeaderResizeHandle onPointerDown={onResizeStart} />
@@ -676,14 +782,19 @@ export function EntityCardOverview({
         </div>
       ) : (
         <div ref={typeGridRef} className={cardGridClass(categoryCards.length)}>
-          {categoryCards.map((card) => (
+          {categoryCards.map((card) => {
+            // groupByStatus (2026-08-19): pending-first, Completed/N-A
+            // hidden unless the section's own "Show Completed" master
+            // toggle is on — see statusGroupedTasks's own doc comment.
+            const displayTasks = groupByStatus ? statusGroupedTasks(card.tasks, showCompleted) : card.tasks;
+            return (
             <div
               key={card.id}
               className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300 dark:border-slate-600" : "border-gray-200 dark:border-slate-700"}`}
             >
               <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">{card.name}</div>
               <div className="max-h-80 overflow-auto px-3 py-2">
-                {card.tasks.length === 0 ? (
+                {displayTasks.length === 0 ? (
                   <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
                 ) : (
                   <table className="w-max min-w-full text-sm">
@@ -706,7 +817,7 @@ export function EntityCardOverview({
                       </tr>
                     </thead>
                     <tbody>
-                      {card.tasks.map((t) => {
+                      {displayTasks.map((t) => {
                         const canReassignRow =
                           Boolean(reassign) &&
                           t.assigneeId === myUserId &&
@@ -754,9 +865,10 @@ export function EntityCardOverview({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+      ))}
     </div>
   );
 }

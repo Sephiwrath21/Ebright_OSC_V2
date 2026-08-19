@@ -388,6 +388,21 @@ export function BranchPackageScheduleGrid({
   const [highlightDate, setHighlightDate] = React.useState<string>(todayDateString);
   const highlightedWeekday = weekdayForDate(highlightDate);
 
+  // Collapsible region groups (2026-08-19) — EXPANDED by default (empty
+  // set), same "opt-in to collapse" default as ResizableTaskList's own
+  // collapsible status groups (bits.tsx) rather than starting folded away.
+  // Purely a display toggle — collapsing a region hides its branch rows but
+  // never touches `pending`/`cellAt`, so an in-progress edit inside a
+  // collapsed region is not lost, just not visible until re-expanded.
+  const [collapsedRegions, setCollapsedRegions] = React.useState<Set<string>>(new Set());
+  const toggleRegion = (name: string) =>
+    setCollapsedRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+
   const dirty = pending.size > 0;
 
   // Prune pending entries once the (revalidated) server data actually
@@ -642,7 +657,9 @@ export function BranchPackageScheduleGrid({
               ))}
             </tr>
           </thead>
-          {groupedBranches.map((group) => (
+          {groupedBranches.map((group) => {
+            const isCollapsed = collapsedRegions.has(group.name);
+            return (
             // One <tbody> per region (2026-08-18) — a real border/rounded
             // box around a whole region's rows, not just a text label. A
             // table's row-group accepts its own border in the
@@ -656,14 +673,30 @@ export function BranchPackageScheduleGrid({
               className="rounded-xl border border-gray-200 dark:border-slate-700"
             >
               <tr>
-                <td
-                  colSpan={data.weekdays.length + 1}
-                  className="px-2 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-500"
-                >
-                  {group.name}
+                <td colSpan={data.weekdays.length + 1} className="p-0">
+                  {/* Collapsible region header (2026-08-19) — same chevron/
+                      aria-expanded pattern as ResizableTaskList's status
+                      groups (bits.tsx). */}
+                  <button
+                    type="button"
+                    onClick={() => toggleRegion(group.name)}
+                    aria-expanded={!isCollapsed}
+                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-widest text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
+                  >
+                    <span
+                      aria-hidden
+                      className={`text-[10px] normal-case transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                    >
+                      ›
+                    </span>
+                    <span>{group.name}</span>
+                    <span className="font-normal normal-case tracking-normal text-gray-300 dark:text-slate-600">
+                      ({group.branches.length})
+                    </span>
+                  </button>
                 </td>
               </tr>
-              {group.branches.map((branch) => (
+              {!isCollapsed && group.branches.map((branch) => (
                 <tr key={branch}>
                   <td className="whitespace-nowrap px-2 py-1 align-top text-sm font-medium text-gray-700 dark:text-slate-300">
                     {branch}
@@ -715,7 +748,8 @@ export function BranchPackageScheduleGrid({
                 </tr>
               ))}
             </tbody>
-          ))}
+            );
+          })}
         </table>
       </div>
     </div>

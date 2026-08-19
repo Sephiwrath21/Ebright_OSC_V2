@@ -12,17 +12,22 @@
 //                              elevated-DEPT_SITE-only, then confirmed to
 //                              also cover ADMIN/OPS) — all via
 //                              HomeTaskOverview
-//   CEO ...................... draggable department dashboards; Branch
-//                              Status by Region (same collapsible sections,
-//                              via HomeRegionOverview — code path added
-//                              2026-08-15, pending a role-config update to
-//                              actually surface it) is wired but not yet
-//                              reachable
-//   other DEPT_SITE .......... own department Daily + Monthly donuts
+//   CEO ...................... just the personal "My Tasks" card
+//                              (ceoCombinedList) — the draggable department
+//                              dashboards and Branch Status by Region were
+//                              dropped entirely (2026-08-19, explicit
+//                              request); the same drill-down is still
+//                              reachable via entityDropdowns on CEO's own
+//                              Task Manager page
+//   other DEPT_SITE .......... own department TaskOverviewStack (2026-08-18
+//                              donut sweep — no donut, same card-grid format
+//                              /task-manager's departmentOverview uses)
 //   HOD ...................... FOUR sections (2026-07-29): personal Daily +
 //                              Monthly, CEO Assigned Tasks (?cdate=), and
 //                              own department status pair
-//   BRANCH / BRANCH_SITE ..... own branch Daily + Monthly donuts
+//   BRANCH / BRANCH_SITE ..... own branch TaskOverviewStack + Ad hoc
+//                              (2026-08-18 donut sweep, same reasoning as
+//                              DEPT_SITE above)
 //   MEMBER (any staff) ....... personal Daily + Monthly + HOD Assigned
 //
 // Daily rides ?date=, Monthly ?mdate= (whole-month), Ad hoc ?adate= (org
@@ -31,17 +36,12 @@
 // no account, bridge failure) renders nothing — Home must never break
 // because of Task Manager state.
 import type { ReactNode } from "react";
-import { revalidatePath } from "next/cache";
-import { requireLiveSession } from "@/task-manager/action-session";
 import {
   getBranchDetail,
-  getCeoDashboardConfig,
   getDepartmentDetail,
   getFlowDetail,
   getFlowOverview,
   listActiveTaskCategories,
-  saveCeoDashboardConfig,
-  FlowBridgeError,
 } from "@/task-manager/data";
 import { formatLocalDate, resolveWindow } from "@/task-manager/analytics/_lib";
 import { resolveViewRole, shows, thisWeekDatesForRange, weekdayRangeOf } from "@/task-manager/role-views";
@@ -50,10 +50,9 @@ import {
   MonthDropdown,
   MonthRangeDropdown,
 } from "@/task-manager/ui/entity-picker";
-import { CeoDashboardSection } from "@/task-manager/ui/ceo-dashboard";
 import { StatusOverviewCard, PageSectionHeading } from "@/task-manager/ui/bits";
 import { parseExpandParam } from "@/task-manager/ui/expand-param";
-import { HomeRegionOverview, HomeTaskOverview } from "@/task-manager/ui/home-overview";
+import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
 import { EntityCardOverview, type MyMonthConfig, type MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
 import {
@@ -140,15 +139,14 @@ export async function HomeScopedOverviewSection({
         Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
       ) as Record<string, string>;
     // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
-    // date doesn't collapse whatever's already expanded in the CEO's
-    // branchRegionOverview below) — but the expand-toggle-link extraParams
-    // passed INTO HomeTaskOverview/HomeRegionOverview (the orgGrids/
-    // branchRegionOverview blocks' own `carry()` calls further down) must
-    // NOT carry a stale expand value, since EntityRollupCard computes its
-    // own new one. These top-level pickers are shared by many OTHER
-    // sections (the personal TaskOverviewStack/EntityCardOverview cards,
-    // ceoDashboards, dept/branch pairs) that don't read ?expand= at all —
-    // harmless for them to carry it too.
+    // date doesn't collapse whatever's already expanded in orgGrids'
+    // rollup cards below) — but the expand-toggle-link extraParams passed
+    // INTO HomeTaskOverview (the orgGrids branch's own `carry()` call
+    // further down) must NOT carry a stale expand value, since
+    // EntityRollupCard computes its own new one. These top-level pickers are
+    // shared by many OTHER sections (the personal TaskOverviewStack/
+    // EntityCardOverview cards, dept/branch pairs) that don't read ?expand=
+    // at all — harmless for them to carry it too.
     const dateExtraParams = (...except: string[]) => ({
       ...carry(...except),
       ...(expand ? { expand } : {}),
@@ -182,9 +180,8 @@ export async function HomeScopedOverviewSection({
     // one specific chunk, same "no combined view" rule myWeek follows for
     // weekdays), so offering it here would silently contradict what the
     // card body actually shows. Personal Monthly's dateControl is Year/
-    // Month only; every OTHER Monthly usage (department/branch pairs,
-    // ceoDashboards, HomeRegionOverview) keeps the full monthlyPicker,
-    // unchanged.
+    // Month only; every OTHER Monthly usage (department/branch pairs) keeps
+    // the full monthlyPicker, unchanged.
     const personalMonthlyPicker = (
       <MonthDropdown
         key="home-personal-monthly-picker"
@@ -193,19 +190,6 @@ export async function HomeScopedOverviewSection({
         extraParams={dateExtraParams("mdate", "mrange")}
       />
     );
-    // Consumed directly by the branchRegionOverview block below (passed to
-    // HomeRegionOverview); the orgGrids branch's HomeTaskOverview builds its
-    // own adhoc picker internally from adhocDate instead of using this one.
-    const adhocPicker = (
-      <DailyDatePicker
-        key="home-adhoc-picker"
-        value={adhocAnchor}
-        basePath="/home"
-        param="adate"
-        extraParams={dateExtraParams("adate")}
-      />
-    );
-
     // ALL role gates below read role-views.ts (the single source of truth,
     // 2026-07-29 centralization) — this section renders purely from the
     // config via shows(view, "home", key).
@@ -433,34 +417,13 @@ export async function HomeScopedOverviewSection({
     );
 
     if (daily.department && monthly.department) {
-      const deptPair = (
-        <>
-          <StatusOverviewCard
-            key="dept-daily"
-            title="Daily"
-            subtitle={daily.department.name}
-            totals={daily.department.totals}
-            tasks={daily.department.tasks}
-            action={dailyPicker}
-            actionPlacement="row"
-          />
-          <StatusOverviewCard
-            key="dept-monthly"
-            title="Monthly"
-            subtitle={monthly.department.name}
-            totals={monthly.department.totals}
-            tasks={monthly.department.tasks}
-            action={monthlyPicker}
-            actionPlacement="row"
-          />
-        </>
-      );
       // HOD layout (2026-08-18): personal cards (per config) + CEO
       // Assigned only — the "Department Overview" donut pair below it was
       // dropped per explicit request. View-only DEPT_SITE logins (no
-      // personal sections in their config) still fall through to the
-      // department pair alone, below — `deptPair` stays defined for that
-      // case.
+      // personal sections in their config, e.g. finance@ebright.my) fall
+      // through below instead, onto the SAME TaskOverviewStack roster
+      // card-grid /task-manager's own departmentOverview section uses
+      // (2026-08-18 sweep) — no separate donut layout for Home anymore.
       if (shows(view, "home", "personalDaily")) {
         const ceoAssigned = shows(view, "home", "ceoAssigned")
           ? personalStreamEntity("CEO", ceoDate, "cdate")
@@ -501,7 +464,20 @@ export async function HomeScopedOverviewSection({
           />
         );
       }
-      return grid(deptPair);
+      return (
+        <TaskOverviewStack
+          entityName={daily.department.name}
+          categories={categories}
+          myUserId={daily.me.me.userId}
+          daily={{ entity: daily.department, dateControl: dailyPicker, showViewToggle: true }}
+          monthly={{ entity: monthly.department, dateControl: monthlyPicker, showViewToggle: true }}
+          onComplete={actions?.complete}
+          onSkip={actions?.skip}
+          onReopen={actions?.reopen}
+          onUploadProof={actions?.uploadProof}
+          onRemoveProof={actions?.removeProof}
+        />
+      );
     }
 
     if (daily.branch && monthly.branch) {
@@ -540,12 +516,15 @@ export async function HomeScopedOverviewSection({
         />
       );
 
-      // Branch Manager layout: personal-first — top row = personal cards
-      // (per config) + Ad hoc (day-windowed by ?padate=, defaults to today —
-      // same dueAt-window + toSelfEntityDetail approach as
-      // personalStreamEntity/personalAdhocEntity above), then the own-branch
-      // status pair below its own heading. View-only BRANCH_SITE logins
-      // (no personal sections in their config) keep the pair alone.
+      // Branch Manager layout (2026-08-18): personal cards (per config) +
+      // Ad hoc (day-windowed by ?padate=, defaults to today — same
+      // dueAt-window + toSelfEntityDetail approach as
+      // personalStreamEntity/personalAdhocEntity above) only — the "Branch
+      // Overview" donut pair below it was dropped per explicit request
+      // (same as HOD's "Department Overview" removal above). View-only
+      // BRANCH_SITE logins (no personal sections in their config) still
+      // fall through to the pair alone, below — `branchPair` stays defined
+      // for that case.
       if (shows(view, "home", "personalDaily")) {
         const personalAdhoc = shows(view, "home", "personalAdhoc")
           ? personalAdhocEntity(padate)
@@ -594,8 +573,6 @@ export async function HomeScopedOverviewSection({
                 onRemoveProof={actions?.removeProof}
               />
             )}
-            <PageSectionHeading>Branch Overview</PageSectionHeading>
-            {grid(branchPair)}
           </div>
         );
       }
@@ -604,138 +581,6 @@ export async function HomeScopedOverviewSection({
           {branchPair}
           {siteAdhocCard}
         </>,
-      );
-    }
-
-    // CEO (2026-08-01 redesign): below the personal pair, the DRAGGABLE
-    // pinned-department dashboards — the SAME CeoDashboardSection the Task
-    // Manager page uses (add / drag-reorder / ✕-remove, per-CEO persisted
-    // in CeoDashboardConfig; removing a card only hides it from this
-    // dashboard, never touches the department). Actions revalidate /home.
-    let ceoDashboards: ReactNode = null;
-    if (shows(view, "home", "ceoKanban")) {
-      const FALLBACK = "Something went wrong — please try again";
-      const makeCeoActions = (cadence: "daily" | "monthly") => {
-        async function add(department: string): Promise<ActionResult> {
-          "use server";
-          const stale = await requireLiveSession(email);
-          if (stale) return stale;
-          try {
-            const { departments } = await getCeoDashboardConfig(email, cadence);
-            if (!departments.includes(department)) {
-              await saveCeoDashboardConfig(email, cadence, [...departments, department]);
-            }
-            revalidatePath("/home");
-            return { ok: true };
-          } catch (err) {
-            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
-          }
-        }
-        async function remove(department: string): Promise<ActionResult> {
-          "use server";
-          const stale = await requireLiveSession(email);
-          if (stale) return stale;
-          try {
-            const { departments } = await getCeoDashboardConfig(email, cadence);
-            await saveCeoDashboardConfig(email, cadence, departments.filter((d) => d !== department));
-            revalidatePath("/home");
-            return { ok: true };
-          } catch (err) {
-            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
-          }
-        }
-        async function reorder(orderedNames: string[]): Promise<ActionResult> {
-          "use server";
-          const stale = await requireLiveSession(email);
-          if (stale) return stale;
-          try {
-            await saveCeoDashboardConfig(email, cadence, orderedNames);
-            revalidatePath("/home");
-            return { ok: true };
-          } catch (err) {
-            return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK };
-          }
-        }
-        return { add, remove, reorder };
-      };
-
-      const [dailyConfig, monthlyConfig] = await Promise.all([
-        getCeoDashboardConfig(email, "daily"),
-        getCeoDashboardConfig(email, "monthly"),
-      ]);
-      const [dailyDetails, monthlyDetails] = await Promise.all([
-        Promise.all(dailyConfig.departments.map((n) => getDepartmentDetail(email, n, "daily", dailyDate))),
-        Promise.all(monthlyConfig.departments.map((n) => getDepartmentDetail(email, n, "monthly", monthlyDate))),
-      ]);
-      ceoDashboards = (
-        <>
-          <PageSectionHeading action={dailyPicker}>Department Daily Overview</PageSectionHeading>
-          <CeoDashboardSection
-            periodLabel="Daily"
-            departments={dailyDetails.map((r) => r.department)}
-            availableToAdd={FLOW_DEPARTMENTS.filter((d) => !dailyConfig.departments.includes(d))}
-            actions={makeCeoActions("daily")}
-          />
-          <PageSectionHeading action={monthlyPicker}>Department Monthly Overview</PageSectionHeading>
-          <CeoDashboardSection
-            periodLabel="Monthly"
-            departments={monthlyDetails.map((r) => r.department)}
-            availableToAdd={FLOW_DEPARTMENTS.filter((d) => !monthlyConfig.departments.includes(d))}
-            actions={makeCeoActions("monthly")}
-          />
-        </>
-      );
-    }
-
-    // branchRegionOverview (2026-08-01, rebuilt 2026-08-15): Branch Status
-    // by Region — Daily/Monthly/Ad hoc, the SAME collapsible sections
-    // ADMIN/OPS/elevated sites see via orgGrids, appended below the CEO's
-    // draggable department dashboards.
-    let branchRegionOverview: ReactNode = null;
-    if (shows(view, "home", "branchRegionOverview") && daily.org) {
-      const { branches: expandedBranches } = parseExpandParam(expand);
-      // Dedupe + cap defensively, same reasoning as the orgGrids branch
-      // above: ?expand= is a public URL param and each name triggers a
-      // real DB-backed detail fetch.
-      const MAX_EXPANDED = 20;
-      const dedupedBranches = [...new Set(expandedBranches)].slice(0, MAX_EXPANDED);
-      const categories = dedupedBranches.length
-        ? await listActiveTaskCategories(email).catch(() => [])
-        : [];
-      const expandedBranchDetails = Object.fromEntries(
-        await Promise.all(
-          dedupedBranches.map(async (name) => {
-            const [d, m] = await Promise.all([
-              getBranchDetail(email, name, "daily", dailyDate).catch(() => null),
-              getBranchDetail(email, name, "monthly", monthlyDate).catch(() => null),
-            ]);
-            return [name, { daily: d?.branch, monthly: m?.branch }] as const;
-          }),
-        ),
-      );
-      branchRegionOverview = (
-        <HomeRegionOverview
-          dailyOrg={daily.org}
-          monthlyOrg={monthly.org}
-          adhocByRegion={daily.adhocByRegion}
-          expandedBranchDetails={expandedBranchDetails}
-          expandParam={expand}
-          categories={categories}
-          myUserId={daily.me.me.userId}
-          dailyPicker={dailyPicker}
-          monthlyPicker={monthlyPicker}
-          adhocPicker={adhocPicker}
-          extraParams={carry()}
-          actions={
-            actions && {
-              complete: actions.complete,
-              skip: actions.skip,
-              reopen: actions.reopen,
-              uploadProof: actions.uploadProof,
-              removeProof: actions.removeProof,
-            }
-          }
-        />
       );
     }
 
@@ -832,8 +677,6 @@ export async function HomeScopedOverviewSection({
             onRemoveProof={actions?.removeProof}
           />
         )}
-        {ceoDashboards}
-        {branchRegionOverview}
       </div>
     );
   } catch {
