@@ -289,8 +289,10 @@ export function EntityCardOverview({
    *  ResizableTaskList instance per card rather than a lookalike — Sort:
    *  Type keeps its category grouping but sorts each category pending-
    *  first and hides Completed/N-A the same way. One "Show Completed"
-   *  master toggle (in this card's own header) and one collapse chevron
-   *  (around the whole section) drive every card/category at once. */
+   *  master toggle (in this card's own header, after the Sort filter)
+   *  drives every card/category at once. No section-level collapse
+   *  (removed 2026-08-19, user feedback — HOD/CEO Assigned Task is always
+   *  expanded now, same as every other section). */
   groupByStatus?: boolean;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
@@ -299,7 +301,6 @@ export function EntityCardOverview({
   // regardless of Sort mode or how many person/category cards it has.
   // Meaningless (and unused) when groupByStatus is false.
   const [showCompleted, setShowCompleted] = React.useState(false);
-  const [sectionCollapsed, setSectionCollapsed] = React.useState(false);
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -420,22 +421,6 @@ export function EntityCardOverview({
       className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
-        {groupByStatus ? (
-          <button
-            type="button"
-            onClick={() => setSectionCollapsed((c) => !c)}
-            aria-expanded={!sectionCollapsed}
-            className="flex items-center gap-1.5 text-lg font-semibold text-gray-900 hover:text-gray-700 dark:text-slate-100 dark:hover:text-slate-300"
-          >
-            <span
-              aria-hidden
-              className={`text-sm normal-case transition-transform ${sectionCollapsed ? "" : "rotate-90"}`}
-            >
-              ›
-            </span>
-            {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
-          </button>
-        ) : (
           <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
             {/* Empty entityName (2026-08-15, myOverview's own sections) omits
                 the "X — " prefix entirely — printing just "Daily"/"Monthly"
@@ -443,13 +428,26 @@ export function EntityCardOverview({
                 directly below already says "My Tasks" (isOwnCard check
                 above) — showing that label twice, stacked, was itself the
                 redundancy this was meant to fix. Department/Branch Overview
-                still pass a real name here and keep the full "X — Y" form. */}
+                still pass a real name here and keep the full "X — Y" form.
+                HOD/CEO Assigned Task (groupByStatus) no longer collapses
+                the whole section (2026-08-19, user feedback) — always a
+                plain heading now, same as every other section. */}
             {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
           </h2>
-        )}
-        {!sectionCollapsed && (
         <div className="flex flex-wrap items-center gap-2">
           {dateControl}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            aria-label="Sort"
+            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          >
+            <option value="person">Sort: Person</option>
+            <option value="type">Sort: Type</option>
+          </select>
+          {/* Show Completed sits AFTER the Sort filter now (2026-08-19, user
+              feedback — previously between the date control and Sort,
+              reordered to read as part of/following the sort filter). */}
           {groupByStatus && (
             <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700 dark:text-slate-200">
               <input
@@ -461,15 +459,6 @@ export function EntityCardOverview({
               Show Completed
             </label>
           )}
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            aria-label="Sort"
-            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <option value="person">Sort: Person</option>
-            <option value="type">Sort: Type</option>
-          </select>
           {showViewToggle && (
             <select
               value={onlyMe ? "onlyMe" : "all"}
@@ -482,10 +471,9 @@ export function EntityCardOverview({
             </select>
           )}
         </div>
-        )}
       </div>
 
-      {!sectionCollapsed && (sortMode === "person" ? (
+      {(sortMode === "person" ? (
         <div className={cardGridClass(personCards.length)}>
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">No one to show.</p>
@@ -510,17 +498,17 @@ export function EntityCardOverview({
               return (
                 <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700">
                   <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">
-                    {/* Own card (2026-08-15): "My Tasks" only in Only Me
-                        mode, where it's the sole card on screen — the
-                        viewer's name/avatar is already shown top-right on
-                        every page, so repeating it here would be redundant.
-                        In View All, showing "My Tasks" instead of a real
-                        name breaks the scanning pattern every OTHER card
-                        follows (all named) and reads as confusing/
-                        unidentifiable in a full roster grid — so the own
-                        card shows its real name there too, same as
-                        everyone else's. */}
-                    {isOwnCard && onlyMe ? "My Tasks" : card.name}
+                    {/* Own card: always the real name (2026-08-19 — Only
+                        Me mode previously showed "My Tasks" instead, on the
+                        theory that the viewer's name/avatar already shows
+                        top-right so repeating it here felt redundant; user
+                        feedback was that the card still needs its own name,
+                        e.g. the Daily weekday-tab view where this card is
+                        the ONLY thing on screen with no other named card for
+                        context). Same real name in every mode now — Only
+                        Me, View All, Daily, Monthly — consistent with how
+                        every other person's card already worked. */}
+                    {card.name}
                   </div>
                   {showMyWeek && myWeek ? (
                     <div className="flex gap-3 p-3">
@@ -581,7 +569,6 @@ export function EntityCardOverview({
                             blankDueDate
                             reassign={reassign}
                             defaultNameWidth={400}
-                            reassignAsMenu
                           />
                         )}
                       </div>
@@ -633,7 +620,6 @@ export function EntityCardOverview({
                             blankDueDate
                             reassign={reassign}
                             defaultNameWidth={400}
-                            reassignAsMenu
                           />
                         )}
                       </div>
