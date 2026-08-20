@@ -76,11 +76,17 @@ jobs:
           GOOGLE_DRIVE_SA_EMAIL: ${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}
           GOOGLE_DRIVE_SA_PRIVATE_KEY: ${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
@@ -187,6 +193,57 @@ jobs:
               sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
               printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
             fi
+
+            # SMTP / outgoing mail (2026-08-20). Until now NOTHING in this
+            # workflow wrote SMTP_*, so the credentials existed only if
+            # someone had SSHed into the box and typed them by hand — a
+            # `git push` could never make mail start working, which is how
+            # staging ended up with password-reset, attendance, HR, FA and
+            # CRM mail all silently dead.
+            #
+            # Only SMTP_PASS is genuinely secret (a Gmail *app password* for
+            # SMTP_USER, not the account password). The other five are stable,
+            # non-secret, and already committed in .env.example, so they fall
+            # back to those values when the matching secret is undefined —
+            # that keeps this to a single secret to configure while still
+            # letting any of them be overridden later without touching CI.
+            #
+            # Same guarded pattern as the Drive/CRM blocks above, for the same
+            # reasons: values arrive as real env vars via `envs:` (never
+            # interpolated into this script's text, where a trailing newline
+            # would corrupt the line), and tr strips stray CR/LF from a
+            # pasted secret.
+            smtp_put() {
+              # $1 = var name, $2 = value. Empty value -> leave .env alone.
+              [ -n "$2" ] || return 0
+              sed -i "/^$1=/d" .env || true
+              printf '%s="%s"\n' "$1" "$2" >> .env
+            }
+            smtp_val() { printf '%s' "${1:-}" | tr -d '\r\n'; }
+
+            # SMTP_PASS has NO default — an undefined secret must leave any
+            # existing server value intact rather than blanking it (see the
+            # GOOGLE_DRIVE_FOLDER_ID incident noted above).
+            smtp_put SMTP_PASS "$(smtp_val "${SMTP_PASS:-}")"
+
+            SMTP_HOST_V="$(smtp_val "${SMTP_HOST:-}")";           [ -n "$SMTP_HOST_V" ]      || SMTP_HOST_V="smtp.gmail.com"
+            SMTP_PORT_V="$(smtp_val "${SMTP_PORT:-}")";           [ -n "$SMTP_PORT_V" ]      || SMTP_PORT_V="465"
+            SMTP_SECURE_V="$(smtp_val "${SMTP_SECURE:-}")";       [ -n "$SMTP_SECURE_V" ]    || SMTP_SECURE_V="true"
+            SMTP_USER_V="$(smtp_val "${SMTP_USER:-}")";           [ -n "$SMTP_USER_V" ]      || SMTP_USER_V="od@ebright.my"
+            SMTP_FROM_NAME_V="$(smtp_val "${SMTP_FROM_NAME:-}")"; [ -n "$SMTP_FROM_NAME_V" ] || SMTP_FROM_NAME_V="Ebright OD"
+
+            smtp_put SMTP_HOST      "$SMTP_HOST_V"
+            smtp_put SMTP_PORT      "$SMTP_PORT_V"
+            smtp_put SMTP_SECURE    "$SMTP_SECURE_V"
+            smtp_put SMTP_USER      "$SMTP_USER_V"
+            smtp_put SMTP_FROM_NAME "$SMTP_FROM_NAME_V"
+
+            # Report what the container will get, WITHOUT leaking the
+            # password — this failure was invisible for weeks precisely
+            # because nothing ever said anything.
+            echo "--- SMTP config in .env ---" >> ~/deploy.log 2>&1
+            sed -E 's/^SMTP_PASS=.*/SMTP_PASS="<set>"/' .env | grep -E '^SMTP_' >> ~/deploy.log 2>&1 || true
+            grep -q '^SMTP_PASS=' .env || echo "WARNING: SMTP_PASS is not set on this host - outgoing mail WILL fail. Add the SMTP_PASS repo secret (Gmail app password)." >> ~/deploy.log 2>&1
 
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on
