@@ -1606,6 +1606,22 @@ export interface RecordField {
 // not its `label`).
 export type RecordEditValues = Record<string, string>;
 
+// Shared field list for the Leave detail modal (Employee Record's Leave tab
+// and the Stage profile's MC/Leave tab both use this) — view-only, opened
+// via RecordAddModal with startReadOnly + canEdit={false}, per explicit
+// decision (see conversation): Leave has no Edit/Save concept at all, this
+// modal only ever displays a clicked row's fields.
+export const LEAVE_DETAIL_FIELDS: RecordField[] = [
+  { key: "type", label: "Leave Type", type: "text" },
+  { key: "dates", label: "Date", type: "text" },
+  { key: "days", label: "Duration", type: "text" },
+  { key: "reason", label: "Reason", type: "text", full: true },
+  // Attachment marked full (2026-08-20, see conversation) so Status lands
+  // on its own row below it instead of sitting side-by-side in the grid.
+  { key: "attachment", label: "Attachment", type: "file", full: true },
+  { key: "status", label: "Status", type: "text" },
+];
+
 const recordModalInputClass =
   "h-11 rounded-[10px] bg-[#f0f0f0a6] dark:bg-slate-950 border-0 px-3.5 text-sm text-[#4b4949] dark:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
 
@@ -1763,7 +1779,7 @@ function YearMonthPicker({ value, onChange }: { value: string; onChange: (value:
   );
 }
 
-function RecordAddModal({
+export function RecordAddModal({
   title,
   fields,
   saving,
@@ -1772,6 +1788,7 @@ function RecordAddModal({
   initialFileIds,
   startReadOnly = false,
   canEdit = true,
+  showFooter = true,
   onClose,
   onSave,
 }: {
@@ -1779,6 +1796,12 @@ function RecordAddModal({
   fields: RecordField[];
   saving: boolean;
   error: string | null;
+  /** false hides the bottom Close/Cancel + Edit/Save footer entirely (e.g.
+   *  Leave's detail view, see conversation) — the header's own "×" is the
+   *  only close affordance. Only meaningful alongside startReadOnly +
+   *  canEdit={false}, where there'd be nothing left in the footer anyway;
+   *  defaults true so every other RecordAddModal caller is unaffected. */
+  showFooter?: boolean;
   /** When editing an existing record, its current raw field values — takes
    *  priority over each field's own `defaultValue` (which only makes sense
    *  for a brand-new add). Omit for the "add new" case. */
@@ -1920,6 +1943,7 @@ function RecordAddModal({
           </div>
           {error && <p className="mt-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
+        {showFooter && (
         <div className="flex shrink-0 justify-end gap-3 px-5 sm:px-7 py-4 mt-2 border-t border-black/5 dark:border-white/10">
           <button
             type="button"
@@ -1950,6 +1974,7 @@ function RecordAddModal({
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

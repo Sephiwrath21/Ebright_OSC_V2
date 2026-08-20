@@ -257,16 +257,15 @@ export interface EmployeeOverviewRow {
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
-// already passed (calendar-date comparison, not timestamp); a set end_date
-// that's today/in the future is NOT exit regardless of status. status is
-// only consulted as a fallback when end_date is null at all, and only
-// "inactive" qualifies (not "archive" — not named in the spec, so an
-// archive-status employee with no end_date falls through to active/
-// onboarding/probation like anyone else). "probation" is derived from the
-// probation flag — there's no separate DB stage for it.
+// already passed OR is today (inclusive — see conversation), calendar-date
+// comparison, not timestamp; a set end_date still in the future is NOT exit
+// regardless of status. status alone is never enough — an "inactive" row
+// with no end_date at all is NOT exit (see conversation: status-only exit
+// wrongly caught people who were merely marked inactive without a real exit
+// date). "probation" is derived from the probation flag — there's no
+// separate DB stage for it.
 function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
-  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status);
-  if (status === "inactive") return "exit";
+  if (endIso) return endIso <= todayIso ? "exit" : nonExitStage(status);
   return nonExitStage(status);
 }
 
@@ -290,12 +289,15 @@ function stageFromEmployment(status: string | null, endIso: string | null, today
 // returns — it treats "onboarding"/"active" as equally eligible for a
 // Probation override, so removing these two guesses doesn't lose real
 // Probation membership for anyone board_stage genuinely matches.
-// Exit falls back to updated_at, everything else falls back to created_at —
-// EXCEPT Pre, where a missing start_date must stay null (not silently
-// backfilled) so the UI can show/sort "no date yet" rows distinctly, e.g.
-// career_applications-synced Pre employees before HR fills in a start_date.
+// Exit's date is always the real end_date — stageFromEmployment now only
+// ever assigns "exit" when end_date is set, so there's no gap left to fall
+// back to updated_at for (see conversation). Everything else falls back to
+// created_at — EXCEPT Pre, where a missing start_date must stay null (not
+// silently backfilled) so the UI can show/sort "no date yet" rows
+// distinctly, e.g. career_applications-synced Pre employees before HR fills
+// in a start_date.
 function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end_date: Date | null } | undefined, u: { created_at: Date; updated_at: Date }): Date | null {
-  if (stage === "exit") return emp?.end_date ?? u.updated_at;
+  if (stage === "exit") return emp?.end_date ?? null;
   if (stage === "pre") return emp?.start_date ?? null;
   return emp?.start_date ?? u.created_at;
 }
@@ -304,6 +306,54 @@ function nonExitStage(status: string | null): EmployeeStage {
   if (status === "onboarding") return "onboarding";
   if (status === "pre") return "onboarding";
   return "active";
+}
+
+// Intern-only Onboarding -> Active display override (see conversation).
+// Interns' working days are fixed Tue-Sat (Sun/Mon never count). Walking
+// forward from start_date, the first 3 Tue-Sat dates hit are Day 1-3 — a
+// start_date landing on Sun/Mon isn't Day 1 itself, the walk just starts at
+// the next Tue-Sat date instead. Day 4 is the very next CALENDAR day after
+// Day 3 — no further weekday skipping, even if Day 4 itself lands on a
+// Sun/Mon (confirmed explicitly — the working-day rule only counts the
+// initial 3 onboarding days, not when the transition lands). Returns the
+// ISO date "Active" starts on.
+const INTERN_ONBOARDING_EXCLUDED_DAYS = new Set([0, 1]); // Sun, Mon (UTC day-of-week)
+export function internActiveFromDate(startDate: Date): string {
+  const cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
+  let workingDaysSeen = 0;
+  while (workingDaysSeen < 3) {
+    if (!INTERN_ONBOARDING_EXCLUDED_DAYS.has(cursor.getUTCDay())) {
+      workingDaysSeen++;
+      if (workingDaysSeen === 3) break;
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  cursor.setUTCDate(cursor.getUTCDate() + 1); // Day 4 — plain next calendar day, unconditional.
+  return cursor.toISOString().slice(0, 10);
+}
+
+// Layers the Intern override on top of an already-computed base stage — same
+// pattern as the Probation dual-listing override in [stage]/page.tsx: never
+// touches employment.status (that's still advanceOnboardingToActive's job, a
+// separate coarser cron sweep this doesn't depend on or conflict with).
+// start_date is the sole authority for an Intern's Onboarding/Active display
+// once it's arrived — the stored status/stage is NOT consulted for that part
+// (see conversation: gating this on status === "onboarding" was wrong, since
+// a real Intern can be stored as "active", "pre", or anything else and
+// should still show Onboarding while within their first 3 working days).
+// Full precedence, checked in order: Exit (end_date-based) > Pre (start_date
+// still in the future — this rule doesn't apply yet, leave stage as-is) >
+// Onboarding (Day 1-3) > Active (Day 4 onward).
+function applyInternOnboardingOverride(
+  stage: EmployeeStage,
+  posGroup: PositionGroup | null | undefined,
+  startDate: Date | null | undefined,
+  todayIso: string,
+): EmployeeStage {
+  if (stage === "exit" || posGroup !== "Intern" || !startDate) return stage;
+  const startIso = startDate.toISOString().slice(0, 10);
+  if (todayIso < startIso) return stage; // Pre carve-out — start_date hasn't arrived, leave whatever stage already is
+  return todayIso >= internActiveFromDate(startDate) ? "active" : "onboarding";
 }
 
 // `skipScopeFilter` exists only for callers that deliberately need every
@@ -435,6 +485,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       departments,
       ambiguous,
     );
+    const effectiveStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
     rows.push({
       id: u.user_id,
       employeeId: emp?.employee_id ?? null,
@@ -446,7 +497,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       departmentName: emp?.department?.department_name ?? null,
       employmentType: emp?.employment_type ?? null,
       date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
-      stage,
+      stage: effectiveStage,
       resolvedPositionType,
     });
   }
@@ -555,6 +606,7 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     departments,
     ambiguous,
   );
+  const effectiveStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
   let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
@@ -566,7 +618,7 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     departmentName: emp?.department?.department_name ?? null,
     employmentType: emp?.employment_type ?? null,
     date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
-    stage,
+    stage: effectiveStage,
     resolvedPositionType,
   };
 
@@ -2008,7 +2060,19 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
     // it), so filtering on the literal enum value alone would show an empty
     // tab for every employee despite real open tasks existing.
     taskManagerPrisma.runBlock.findMany({
-      where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] } },
+      where: {
+        assigneeId: tmUser.id,
+        status: { notIn: ["DONE", "SKIPPED"] },
+        // Cancelled/archived runs must NOT appear as pending — a run's own
+        // status is separate from its blocks' status, so a cancelled run's
+        // blocks stay "ACTIVE" forever unless excluded here too. Same gate
+        // every other Task Manager list/count query uses (data/templates.ts,
+        // recurrence.ts, analytics/_lib.ts) — this function was the one
+        // place missing it (2026-08-19, see the "YQ TEST" investigation:
+        // deleting a task cancels its FlowRun, it doesn't row-delete the
+        // RunBlock, so without this filter a "deleted" task kept showing).
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
+      },
       orderBy: { dueAt: "asc" },
       select: { id: true, title: true, dueAt: true, cadence: true, run: { select: { startedById: true } } },
     }),
@@ -2018,7 +2082,12 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
     // past its due date belongs here too; a row can appear in both lists at
     // once).
     taskManagerPrisma.runBlock.findMany({
-      where: { assigneeId: tmUser.id, status: { notIn: ["DONE", "SKIPPED"] }, dueAt: { lt: startOfToday } },
+      where: {
+        assigneeId: tmUser.id,
+        status: { notIn: ["DONE", "SKIPPED"] },
+        dueAt: { lt: startOfToday },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
+      },
       orderBy: { dueAt: "asc" },
       select: { id: true, title: true, dueAt: true, cadence: true, run: { select: { startedById: true } } },
     }),
@@ -2076,6 +2145,9 @@ export async function getOverdueTaskCounts(userIds: number[]): Promise<Record<nu
       assigneeId: { in: [...tmIdToUserId.keys()] },
       status: { notIn: ["DONE", "SKIPPED"] },
       dueAt: { lt: startOfTodayUtc() },
+      // Same cancelled/archived-run exclusion as listEmployeeTasks() —
+      // see that function's comment for why it's needed.
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
     _count: { _all: true },
   });

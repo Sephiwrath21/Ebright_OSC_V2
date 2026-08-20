@@ -30,6 +30,8 @@ import {
   ShowcausePanel,
   PipPanel,
   RealAttachmentLink,
+  RecordAddModal,
+  LEAVE_DETAIL_FIELDS,
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection } from "@/app/components/EditMode";
 import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog, type ValidationResult } from "@/app/components/PageEditMode";
@@ -546,9 +548,14 @@ export default function EmployeeRecordView({
                 return (
                   <PageEditProvider>
                     <PageEditMessageDialog />
-                    <div className="mb-4 flex justify-end">
-                      <PageEditToggleButton />
-                    </div>
+                    {/* Leave has no Edit/Save concept at all (see conversation)
+                        -- hide the shared toggle while that sub-tab is showing,
+                        even though the other tabs in this batch still use it. */}
+                    {clientSection !== "leave" && (
+                      <div className="mb-4 flex justify-end">
+                        <PageEditToggleButton />
+                      </div>
+                    )}
                     <div className={clientSection === "leave" ? "" : "hidden"}>
                       <LeavePanel rows={leaveHistory} />
                     </div>
@@ -738,6 +745,12 @@ function PaymentInfoPanel({
 }
 
 function LeavePanel({ rows }: { rows: LeaveHistoryRow[] }) {
+  // View-only tab (see conversation) -- no Edit button, no add/delete; a
+  // clicked row just opens LEAVE_DETAIL_FIELDS in RecordAddModal's
+  // startReadOnly + canEdit={false} mode for a clean read-only detail view.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const selected = selectedIndex !== null ? rows[selectedIndex] : null;
+
   return (
     <div>
       <PanelHeading>Leave</PanelHeading>
@@ -746,6 +759,7 @@ function LeavePanel({ rows }: { rows: LeaveHistoryRow[] }) {
           { key: "type", label: "Leave Type" },
           { key: "dates", label: "Date" },
           { key: "days", label: "Duration" },
+          { key: "reason", label: "Reason" },
           { key: "status", label: "Status" },
           { key: "attachment", label: "Attachment" },
         ]}
@@ -753,10 +767,33 @@ function LeavePanel({ rows }: { rows: LeaveHistoryRow[] }) {
           type: r.leaveTypeName,
           dates: r.startDate === r.endDate ? r.startDate : `${r.startDate} – ${r.endDate}`,
           days: `${r.totalDays} Day${r.totalDays === "1" ? "" : "s"}`,
+          reason: r.reason ?? "—",
           status: <span className="capitalize">{r.status}</span>,
           attachment: <RealAttachmentLink fileId={r.attachment} />,
         }))}
+        onRowClick={(index) => setSelectedIndex(index)}
       />
+      {selected && (
+        <RecordAddModal
+          title="Leave Record"
+          fields={LEAVE_DETAIL_FIELDS}
+          saving={false}
+          error={null}
+          initialValues={{
+            type: selected.leaveTypeName,
+            dates: selected.startDate === selected.endDate ? selected.startDate : `${selected.startDate} – ${selected.endDate}`,
+            days: `${selected.totalDays} Day${selected.totalDays === "1" ? "" : "s"}`,
+            reason: selected.reason ?? "",
+            status: selected.status.charAt(0).toUpperCase() + selected.status.slice(1),
+          }}
+          initialFileIds={{ attachment: selected.attachment }}
+          startReadOnly
+          canEdit={false}
+          showFooter={false}
+          onClose={() => setSelectedIndex(null)}
+          onSave={() => {}}
+        />
+      )}
     </div>
   );
 }

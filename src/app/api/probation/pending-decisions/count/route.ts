@@ -9,11 +9,15 @@ export const dynamic = "force-dynamic";
 // Feeds the NotificationBell's Probation card — same
 // computeProbationReminderCandidates rule the red dot on the Probation
 // summary card uses (see employee-folder/page.tsx). Returns each
-// candidate's id/fullName (not just a count) so the bell can render one
-// line per person ("[Name]还有三天就结束probation") — per explicit
-// decision (see conversation), the bell used to only ever show an
-// aggregate count with no names. HR/Superadmin only, same restriction as
-// the decideProbationOutcome action this reminder points HR toward.
+// candidate's id/fullName/endDate (not just a count) so the bell can render
+// one line per person, e.g. "[Name]'s probation ends in 3 days" — per
+// explicit decision (see conversation), the bell used to only ever show an
+// aggregate count with no names. endDate is included (2026-08-19) so the
+// client can compute the real day count via probationReminderText.ts
+// instead of a hardcoded "3 days" (the eligibility window has no lower
+// bound — an already-overdue candidate needs "ended N days ago" wording,
+// not "ends in 3 days"). HR/Superadmin only, same restriction as the
+// decideProbationOutcome action this reminder points HR toward.
 export async function GET() {
   const session = await auth();
   const role = (session?.user as { role?: string } | undefined)?.role?.toLowerCase();
@@ -29,5 +33,7 @@ export async function GET() {
     (r) => r.stage === "probation" || matchIsProbationPipeline(careerApplications.get(normalizeName(r.fullName))),
   );
   const candidates = await computeProbationReminderCandidates(probationBadgedRows, careerApplications);
-  return NextResponse.json({ candidates: candidates.map((c) => ({ id: c.id, fullName: c.fullName })) });
+  return NextResponse.json({
+    candidates: candidates.map((c) => ({ id: c.id, fullName: c.fullName, endDate: c.endDate })),
+  });
 }

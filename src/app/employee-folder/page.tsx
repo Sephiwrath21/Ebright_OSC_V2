@@ -191,7 +191,7 @@ export default async function EmployeeFolderPage() {
         counts={counts}
         userName={userName}
         overdueTaskCounts={overdueTaskCounts}
-        probationReminderNames={probationReminders.map((r) => r.fullName)}
+        probationReminderNames={probationReminders.map((r) => ({ name: r.fullName, endDate: r.endDate }))}
       />
     </AppShell>
   );

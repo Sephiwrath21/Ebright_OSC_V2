@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bell, Hourglass, UserPlus, X } from "lucide-react";
+import { formatProbationReminder } from "@/lib/probationReminderText";
 
 const APPROVAL_ROLES = new Set(["superadmin"]);
 const INDUCTION_ROLES = new Set(["superadmin", "admin", "hr", "od"]);
@@ -24,7 +25,7 @@ export default function NotificationBell({ role }: { role?: string }) {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
-  const [probationCandidates, setProbationCandidates] = useState<{ id: number; fullName: string }[]>([]);
+  const [probationCandidates, setProbationCandidates] = useState<{ id: number; fullName: string; endDate: string }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function NotificationBell({ role }: { role?: string }) {
       try {
         const res = await fetch("/api/probation/pending-decisions/count", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { candidates?: { id: number; fullName: string }[] };
+        const data = (await res.json()) as { candidates?: { id: number; fullName: string; endDate: string }[] };
         if (!cancelled && Array.isArray(data.candidates)) setProbationCandidates(data.candidates);
       } catch {
         // network flake — no-op
@@ -269,7 +270,7 @@ export default function NotificationBell({ role }: { role?: string }) {
                           are flagged at once. */}
                       {probationCandidates.map((c) => (
                         <p key={c.id} className="mt-0.5 text-sm text-slate-500 dark:text-slate-400 leading-snug">
-                          {c.fullName}还有三天就结束probation
+                          {formatProbationReminder(c.fullName, c.endDate)}
                         </p>
                       ))}
                       <div className="mt-3">
