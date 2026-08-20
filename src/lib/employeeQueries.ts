@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // here to avoid colliding with this file's own `prisma` (the main hrfs db).
 import { prisma as taskManagerPrisma } from "@/task-manager/prisma";
 import { titleCaseName } from "@/lib/text";
-import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
+import { EMPLOYEE_STAGES, STAGE_LABELS, isEmployeeStage, stageFromEmployment, nonExitStage, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { getCurrentEmployeeScope, filterRowsByScope, isRowInScope } from "@/lib/employeeScope";
 // Type-only — erased at compile time, so this doesn't create the runtime
 // circular dependency a value import would (branchStaffProfile.ts statically
@@ -256,19 +256,6 @@ export interface EmployeeOverviewRow {
   readyForRealAccount?: boolean;
 }
 
-// Exit priority: end_date wins whenever it's set — "exit" only if it's
-// already passed OR is today (inclusive — see conversation), calendar-date
-// comparison, not timestamp; a set end_date still in the future is NOT exit
-// regardless of status. status alone is never enough — an "inactive" row
-// with no end_date at all is NOT exit (see conversation: status-only exit
-// wrongly caught people who were merely marked inactive without a real exit
-// date). "probation" is derived from the probation flag — there's no
-// separate DB stage for it.
-function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
-  if (endIso) return endIso <= todayIso ? "exit" : nonExitStage(status);
-  return nonExitStage(status);
-}
-
 // status === "pre" means start_date has arrived but the Pre -> Onboarding/
 // Active transition (proceedFromPreStage, or the automatic sweep in
 // stageTransitionAutomation.ts) hasn't actually run yet — same lag a click-
@@ -300,12 +287,6 @@ function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end
   if (stage === "exit") return emp?.end_date ?? null;
   if (stage === "pre") return emp?.start_date ?? null;
   return emp?.start_date ?? u.created_at;
-}
-
-function nonExitStage(status: string | null): EmployeeStage {
-  if (status === "onboarding") return "onboarding";
-  if (status === "pre") return "onboarding";
-  return "active";
 }
 
 // Intern-only Onboarding -> Active display override (see conversation).

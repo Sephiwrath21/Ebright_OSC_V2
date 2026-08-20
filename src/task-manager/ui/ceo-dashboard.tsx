@@ -1,12 +1,13 @@
 "use client";
 
 // OSC integration package — the CEO's customizable department dashboard:
-// pick departments from a dropdown to pin their status donut to the CEO's
+// pick departments from a dropdown to pin their status tile to the CEO's
 // own overview, drag-and-drop to reorder, remove when no longer wanted.
 // Personal to that CEO (persisted server-side), doesn't affect Superadmin's
-// or anyone else's view. Reuses StatusOverviewCard as-is for the donut —
-// this is just a customizable arrangement of the same department data
-// already used elsewhere (Department Overview, HOD's own card).
+// or anyone else's view. Reuses StatusOverviewCard (hideChart — 2026-08-18
+// donut sweep, no ring in these small draggable tiles) — this is just a
+// customizable arrangement of the same department data already used
+// elsewhere (Department Overview, HOD's own card).
 //
 // Drag-and-drop uses @dnd-kit (core/sortable/utilities) — already a
 // dependency of the host app (the sidebar's flow/workspace reordering and
@@ -102,6 +103,11 @@ function SortableDepartmentCard({
         subtitle={periodLabel}
         totals={dept.totals}
         tasks={dept.tasks}
+        // No ring (2026-08-18 donut sweep) — these are small, reorderable
+        // draggable tiles; a full Person-sort card grid doesn't fit here the
+        // way it does as a page section, so this keeps the compact
+        // title+legend+drill-modal card, just without the chart.
+        hideChart
         action={
           <CardControls
             onRemove={onRemove}

@@ -73,11 +73,14 @@ jobs:
         env:
           CRM_DATABASE_URL: ${{ secrets.CRM_DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          GOOGLE_DRIVE_SA_EMAIL: ${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}
+          GOOGLE_DRIVE_SA_PRIVATE_KEY: ${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
@@ -129,13 +132,35 @@ jobs:
             # GOOGLE_DRIVE_SA_PRIVATE_KEY's secret value must be stored with
             # literal \n (backslash-n) in place of real newlines, exactly as
             # it appears in a single-line PEM — src/lib/drive.ts unescapes it.
+            # 2026-08-15: these three were written UNGUARDED and interpolated
+            # straight into this script's text. A secret that is undefined
+            # interpolates to an empty string, so the sed+printf pair deleted a
+            # good value and wrote KEY="" in its place. That is exactly what
+            # happened: the folder-ID secret was named GOOGLE_DRIVE_PROOF while
+            # this workflow read GOOGLE_DRIVE_FOLDER_ID, so every deploy blanked
+            # it on both hosts and getFolderId() in src/lib/drive.ts threw
+            # "GOOGLE_DRIVE_FOLDER_ID is not configured" on every upload —
+            # Leave, Claim, Induction and Offboarding attachments all failed.
+            # Now guarded and forwarded via `envs:` like the CRM block below:
+            # an undefined secret leaves the server's existing value untouched
+            # instead of destroying it, and the raw bytes never enter the
+            # script text, so a trailing newline can't corrupt the value.
             touch .env
-            sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
-            sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
-            sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
-            printf '%s\n' 'GOOGLE_DRIVE_SA_EMAIL="${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}"' >> .env
-            printf '%s\n' 'GOOGLE_DRIVE_SA_PRIVATE_KEY="${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}"' >> .env
-            printf '%s\n' 'GOOGLE_DRIVE_FOLDER_ID="${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}"' >> .env
+            GD_EMAIL="$(printf '%s' "${GOOGLE_DRIVE_SA_EMAIL:-}" | tr -d '\r\n')"
+            if [ -n "$GD_EMAIL" ]; then
+              sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
+              printf 'GOOGLE_DRIVE_SA_EMAIL="%s"\n' "$GD_EMAIL" >> .env
+            fi
+            GD_KEY="$(printf '%s' "${GOOGLE_DRIVE_SA_PRIVATE_KEY:-}" | tr -d '\r\n')"
+            if [ -n "$GD_KEY" ]; then
+              sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
+              printf 'GOOGLE_DRIVE_SA_PRIVATE_KEY="%s"\n' "$GD_KEY" >> .env
+            fi
+            GD_FOLDER="$(printf '%s' "${GOOGLE_DRIVE_FOLDER_ID:-}" | tr -d '\r\n')"
+            if [ -n "$GD_FOLDER" ]; then
+              sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
+              printf 'GOOGLE_DRIVE_FOLDER_ID="%s"\n' "$GD_FOLDER" >> .env
+            fi
 
             # CRM runtime env (CRM port, 2026-08-07). Same pattern as the Drive
             # keys above, but guarded: only rewrite when the GitHub secret is

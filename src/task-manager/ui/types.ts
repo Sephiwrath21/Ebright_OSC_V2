@@ -46,6 +46,48 @@ export interface FlowBucketTotals {
   na: number;
 }
 
+/** One person on the "No Claim/Incentive" list (2026-08-18, month filter
+ *  added same day) — Finance (finance@ebright.my) and CEO only, a company-
+ *  wide compliance check before approving a claim/incentive payment: anyone
+ *  with at least one open (Pending/Active/Overdue/Escalated — i.e. not
+ *  DONE/SKIPPED) Task Manager task due in the selected month, any cadence.
+ *  See getNoClaimIncentivePayload (task-manager/analytics/_payloads.ts) for
+ *  how openCount and the month scope are computed. */
+export interface NoClaimPerson {
+  userId: string;
+  name: string;
+  openCount: number;
+}
+
+/** One Department or Branch's worth of NoClaimPerson entries, pre-sorted by
+ *  name — the "No Claim/Incentive" list's grouping unit. */
+export interface NoClaimGroup {
+  name: string;
+  people: NoClaimPerson[];
+}
+
+/** NoClaimIncentiveMenu's data shape — every department-side person under
+ *  `departments`, every branch-side person under `branches` (the app's
+ *  existing department/branch split — see resolveViewRole's own comment on
+ *  why a person is never both). Both arrays pre-sorted by group name. */
+export interface NoClaimIncentivePayload {
+  departments: NoClaimGroup[];
+  branches: NoClaimGroup[];
+}
+
+/** One scheduled slot from Manpower Scheduling's ACTUAL roster (2026-08-18)
+ *  — the root HRFS database's manpower_schedule table ("System A"), a
+ *  completely separate system from the fromSchedule/ManpowerSchedule fields
+ *  below (Task Manager's own "System B"). Read-only display data for the My
+ *  Week weekday sidebar, Coach/Branch Full Time Exec only — see
+ *  getMyManpowerSchedule (task-manager/data/manpower-actual.ts) for the
+ *  cross-database chain that produces it. */
+export interface MyManpowerActualSlot {
+  label: string; // e.g. "Coach 1" (branch_position.position_label)
+  start: string; // e.g. "6:00 PM"
+  end: string; // e.g. "7:15 PM"
+}
+
 export interface FlowTaskRow {
   runBlockId: string;
   runId: string;
@@ -72,6 +114,19 @@ export interface FlowTaskRow {
    *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
    *  undefined elsewhere (column shows a dash). */
   assignerName?: string | null;
+  /** Who the task is assigned TO — optional here on the base type (widened
+   *  2026-08-19 so TaskRowLine's `assigneeSource="assignee"` mode can read
+   *  it) because most FlowTaskRow-typed lists never populate it; always
+   *  populated where it matters (FlowDrillTask below re-declares it
+   *  required — the entity drill-down's "by who" — and getMePayload's
+   *  delegatedAll rows, "Tasks I Assigned"/"CEO Assigned Task", set it to
+   *  the recipient's name for the exact same reason). */
+  assigneeName?: string | null;
+  /** The assigner's role (2026-08-19) — drives isDueDayLockExemptRole (HOD/
+   *  CEO-assigned tasks skip the Daily due-day lock everywhere they appear).
+   *  Resolved wherever assignerName also is; undefined elsewhere means "not
+   *  exempt" (isLockedDueDay's usual cadence/date check still applies). */
+  assignerRole?: string | null;
   /** Assignee-uploaded completion evidence (2026-07-30, multi-photo
    *  2026-08-08) — drives the "Proof" column's gallery. Empty array is the
    *  "no proof" case now (no undefined/null/[] three-way ambiguity); each
@@ -622,12 +677,19 @@ export interface FlowManpowerScheduleResponse {
 /** Preset title-color palette for a board column — a curated key, never a
  *  raw hex/CSS value, so the picker UI and validation both stay closed-set. */
 export const HOD_KANBAN_COLORS = [
+  "red",
+  "orange",
+  "amber",
+  "lime",
+  "emerald",
+  "teal",
+  "cyan",
   "blue",
   "indigo",
   "violet",
+  "purple",
+  "fuchsia",
   "pink",
-  "orange",
-  "teal",
   "rose",
 ] as const;
 
@@ -784,6 +846,48 @@ export function flowBucketize<T extends FlowTaskRow>(
   return out;
 }
 
+/** Wraps the viewer's own totals/tasks into a synthetic one-member
+ *  FlowEntityDetail, for roles/sections with no owned department or
+ *  branch entity (OPS, CEO, every self-scoped Monthly section, and
+ *  Home's personal Daily/Monthly/third-card sections). `done`/`notDone`
+ *  on the synthetic member are unused placeholders — no current consumer
+ *  (groupTasksByPerson, entity-card-overview.tsx) reads a single-member
+ *  roster's per-member counts; `totals` above is what drives the card. */
+export function toSelfEntityDetail(
+  me: { userId: string; name: string },
+  personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+): FlowEntityDetail {
+  return {
+    name: me.name,
+    totals: personal.totals,
+    tasks: flowBucketize(personal.tasks),
+    members: [
+      { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
+    ],
+  };
+}
+
+/** The month's range chunks — FOUR, per the 2026-07-30 confirmation
+ *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
+ *  (22-31 / 22-30 / 22-28 depending on the month's actual length). Moved
+ *  here from entity-picker.tsx (2026-08-15) so it can be called as a plain
+ *  function from a Server Component — entity-picker.tsx has "use client",
+ *  which turns every one of its exports into a client-reference proxy when
+ *  imported server-side; calling such a proxy as ordinary logic (not
+ *  rendering it as JSX) throws at runtime. */
+export function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return [
+    { from: 1, to: 7 },
+    { from: 8, to: 14 },
+    { from: 15, to: 21 },
+    { from: 22, to: daysInMonth },
+  ];
+}
+
+export const chunkLabel = (c: { from: number; to: number }) =>
+  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
+
 /** Human label for an assigner stream ("CEO assigned tasks" per the mockups). */
 export function flowStreamLabel(key: FlowRole | "self"): string {
   if (key === "self") return "Started by me";
@@ -898,4 +1002,17 @@ export function isFutureDueDay(due: string | Date | null): boolean {
   const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
   const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   return diffDays > 0;
+}
+
+/** Due-day-lock exemption by assigner role (2026-08-19): a task an HOD or
+ *  CEO deliberately assigned is a directive, not a routine recurring daily
+ *  item — it should stay completable any day, never locked to exactly its
+ *  due date, in EVERY section it appears in (not just "HOD/CEO Assigned
+ *  Task" — the server can't tell which section a request came from, so the
+ *  exemption has to be a real property of the task itself: who assigned it,
+ *  not which page is showing it). Same dual-layer sharing as isPastDueDay/
+ *  isFutureDueDay above — engine/run.ts, data/tasks.ts, and bits.tsx all
+ *  call this exact function so the definition of "exempt" can't drift. */
+export function isDueDayLockExemptRole(role: string | null | undefined): boolean {
+  return role === "HOD" || role === "CEO";
 }

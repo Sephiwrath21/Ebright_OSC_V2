@@ -14,6 +14,24 @@ export function isEmployeeStage(value: string): value is EmployeeStage {
   return (EMPLOYEE_STAGES as string[]).includes(value);
 }
 
+// Exit priority: end_date wins whenever it's set — "exit" only if it's
+// already passed OR is today (inclusive), calendar-date comparison, not
+// timestamp; a set end_date still in the future is NOT exit regardless of
+// status. status alone is never enough — an "inactive" row with no end_date
+// at all is NOT exit (status-only exit wrongly caught people who were merely
+// marked inactive without a real exit date). "probation" is derived from the
+// probation flag — there's no separate DB stage for it.
+export function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
+  if (endIso) return endIso <= todayIso ? "exit" : nonExitStage(status);
+  return nonExitStage(status);
+}
+
+export function nonExitStage(status: string | null): EmployeeStage {
+  if (status === "onboarding") return "onboarding";
+  if (status === "pre") return "onboarding";
+  return "active";
+}
+
 // Exact pill colors lifted from the Emp_Folder reference's style.css (card-pill--*/status-*).
 // The light fills are translucent pastels that read as bright patches on a dark
 // card, and their text is near-black, so each carries a dark companion. Five

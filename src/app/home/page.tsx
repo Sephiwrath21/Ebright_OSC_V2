@@ -20,6 +20,7 @@ import {
   FlowBridgeError,
 } from "@/task-manager/data";
 import type { ActionResult, ProofUploadResult, ProofRemoveResult } from "@/task-manager/ui/types";
+import { FINANCE_EMAIL } from "@/task-manager/role-views";
 import DashboardHome from "@/app/components/DashboardHome";
 import EmployeeSelfServiceDashboard from "@/app/components/EmployeeSelfServiceDashboard";
 import FinanceDashboard from "@/app/components/FinanceDashboard";
@@ -32,8 +33,6 @@ import HrPersonalizedDashboard from "@/app/components/HrPersonalizedDashboard";
 import AppShell from "@/app/components/AppShell";
 import HodPendingAlert from "@/app/components/HodPendingAlert";
 import { HomeScopedOverviewSection } from "./scoped-overview-section";
-
-const FINANCE_EMAIL = "finance@ebright.my";
 
 /** Strict YYYY-MM-DD or nothing — anything else falls back to today (the
  *  data layer's own default when the date is omitted). Same rule as
@@ -66,6 +65,14 @@ export default async function HomePage({
     adate?: string;
     hdate?: string;
     cdate?: string;
+    /** Which Branch Status by Region sections are expanded (2026-08-15) —
+     *  see expand-param.ts. Passed through verbatim; validated there, not
+     *  here (unlike the date params, it has no fixed format to check). */
+    expand?: string;
+    /** Branch Manager's personal Ad hoc day anchor (2026-08-15) — mirrors
+     *  ?hdate=/?cdate= exactly. Passed through verbatim; defaulted to
+     *  today in scoped-overview-section.tsx, not here. */
+    padate?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -75,6 +82,8 @@ export default async function HomePage({
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
+  const expand = sp.expand;
+  const padate = sp.padate && DATE_PARAM_RE.test(sp.padate) ? sp.padate : undefined;
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   const su = session.user as {
@@ -188,6 +197,8 @@ export default async function HomePage({
         adhocDate={adhocDate}
         hodDate={hodDate}
         ceoDate={ceoDate}
+        expand={expand}
+        padate={padate}
         actions={{
           complete: completeTask,
           skip: skipTask,

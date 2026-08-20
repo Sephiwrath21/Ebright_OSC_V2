@@ -42,6 +42,7 @@ import type {
   FlowCategoryOption,
   FlowEntityDetail,
   FlowTaskRow,
+  MyManpowerActualSlot,
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
@@ -56,6 +57,8 @@ import {
   RESIZABLE_TASK_NAME_DEFAULT,
   RESIZABLE_TASK_NAME_MAX,
   RESIZABLE_TASK_NAME_MIN,
+  RowActionsMenu,
+  StatusHeaderSpacer,
   TaskRowLine,
   useResizableColumn,
   type ReassignControl,
@@ -79,12 +82,28 @@ function flattenTasks(entity: FlowEntityDetail) {
   return [...entity.tasks.completed, ...entity.tasks.pending, ...entity.tasks.na];
 }
 
+/** groupByStatus's Sort: Type ordering (2026-08-19) — Pending always
+ *  first, matching ResizableTaskList's own fixed Pending/Completed/N-A
+ *  group order used for Person-sort's cards in the same mode; Completed/
+ *  N-A are omitted entirely unless showCompleted, same "hidden by default"
+ *  behavior as that master toggle. */
+function statusGroupedTasks(tasks: FlowTaskRow[], showCompleted: boolean): FlowTaskRow[] {
+  const pending = tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
+  if (!showCompleted) return pending;
+  const completed = tasks.filter((t) => t.status === "DONE" || t.status === "SKIPPED");
+  return [...pending, ...completed];
+}
+
 /** One weekday's worth of the viewer's own tasks (2026-08-15, embedded
  *  weekday-tab view — see EntityCardOverview's `myWeek` prop doc comment). */
 export interface MyWeekDay {
   weekday: string;
   date: string;
   tasks: FlowTaskRow[];
+  /** Manpower Scheduling's ACTUAL slot(s) for this day (2026-08-18), Coach/
+   *  Branch Full Time Exec only — see MyManpowerActualSlot's own doc comment.
+   *  Undefined/empty for every other role and for days with no assignment. */
+  schedule?: MyManpowerActualSlot[];
 }
 
 /** EntityCardOverview's `myWeek` prop shape, exported so every caller
@@ -95,6 +114,34 @@ export interface MyWeekDay {
 export interface MyWeekConfig {
   days: MyWeekDay[];
   selectedDate: string;
+  nav: { basePath: string; extraParams?: Record<string, string> };
+}
+
+/** One day-range chunk's worth of the viewer's own tasks (2026-08-15,
+ *  Home's "My Month" tab view — the Monthly sibling of MyWeekDay/myWeek
+ *  above). */
+export interface MyMonthChunk {
+  label: string; // "1–7" / "22–31" etc — types.ts's chunkLabel
+  range: string; // "1-7" — the ?mrange= value this chunk represents
+  tasks: FlowTaskRow[];
+}
+
+/** EntityCardOverview's `myMonth` prop shape — same idea as MyWeekConfig,
+ *  generalized from weekdays to the 4 day-range chunks MonthRangeDropdown
+ *  already offers (Full month itself has no tab — same "no combined tab"
+ *  precedent myWeek already sets for the whole week). Exported for the
+ *  same reason MyWeekConfig is: one shared shape for every caller. */
+export interface MyMonthConfig {
+  chunks: MyMonthChunk[];
+  selectedRange: string; // current ?mrange= value, e.g. "1-7"
+  /** The resolved Monthly anchor month (YYYY-MM-DD, same shape MonthDropdown's
+   *  own `value` prop takes) — carried explicitly by selectMyMonthRange below
+   *  since `nav.extraParams` deliberately EXCLUDES both mdate/mrange (the
+   *  same "caller re-adds whichever one it owns" convention MonthDropdown's
+   *  and MonthRangeDropdown's own navigate functions already follow), so a
+   *  tab click must re-add mdate itself or the month silently resets to
+   *  current-month on navigation. */
+  anchorMonth: string;
   nav: { basePath: string; extraParams?: Record<string, string> };
 }
 
@@ -136,7 +183,10 @@ export function EntityCardOverview({
   onUploadProof,
   onRemoveProof,
   reassign,
+  canReassignOthers,
   myWeek,
+  myMonth,
+  groupByStatus,
 }: {
   /** The section's own heading, e.g. "Daily" / "Monthly" / "HOD Assigned
    *  Task" / "CEO Assigned Task" — TaskOverviewStack renders it above this
@@ -188,6 +238,15 @@ export function EntityCardOverview({
    *  viewer's own pending task, regardless of which card/row it appears
    *  in. Omit to disable the action everywhere in this section. */
   reassign?: ReassignControl;
+  /** Manager mode for Person-sort's View All grid (2026-08-15): when true,
+   *  the reassign trigger also appears on OTHER people's rows (not just the
+   *  viewer's own), passed to TaskRowLine as `reassignAnyOwner` — the
+   *  caller (page.tsx / scoped-overview-section.tsx) decides who qualifies
+   *  (ADMIN/ELEVATED_DEPT_SITE, per the 2026-08-15 product decision); the
+   *  server re-checks the actor's role on every reassign call regardless.
+   *  Has no effect on the own card (already reassignable via `reassign`
+   *  alone) or on the Type-sort grid (self-service only, unchanged). */
+  canReassignOthers?: boolean;
   /** Weekday-tab view for the viewer's OWN card (2026-08-15) — Daily
    *  section only (the caller only ever builds this for the "Daily"
    *  SectionData; Monthly/HOD/CEO Assigned have no per-weekday concept).
@@ -212,8 +271,36 @@ export function EntityCardOverview({
    *  than owning separate client state, keeping the picker's displayed
    *  value and the highlighted tab from ever drifting apart. */
   myWeek?: MyWeekConfig;
+  /** Month-range-chunk tab view for the viewer's OWN card (2026-08-15) —
+   *  Monthly section only, Home's "My Month" (the Monthly sibling of
+   *  `myWeek` above — same "own card, alone on screen" gate, same
+   *  two-way sync with the section's own dateControl, just tabbed by day-
+   *  range chunk instead of weekday). `/task-manager` never sets this —
+   *  its own Monthly section keeps the dropdown-based range picker,
+   *  unchanged (2026-08-15 product decision: My Month is Home-only for
+   *  now). */
+  myMonth?: MyMonthConfig;
+  /** Standardized Pending-first/Show-Completed/collapsible pattern
+   *  (2026-08-19, HOD/CEO Assigned Task only — TaskOverviewStack passes
+   *  this true ONLY for those two keys, never Daily/Monthly/Ad hoc). Swaps
+   *  Sort: Person's per-card category/type sub-grouping for the SAME
+   *  status-bucket grouping (Pending always first; Completed/N-A collapsed
+   *  by default) "Tasks I Assigned" uses, via a genuinely shared
+   *  ResizableTaskList instance per card rather than a lookalike — Sort:
+   *  Type keeps its category grouping but sorts each category pending-
+   *  first and hides Completed/N-A the same way. One "Show Completed"
+   *  master toggle (in this card's own header, after the Sort filter)
+   *  drives every card/category at once. No section-level collapse
+   *  (removed 2026-08-19, user feedback — HOD/CEO Assigned Task is always
+   *  expanded now, same as every other section). */
+  groupByStatus?: boolean;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
+  // groupByStatus's shared controls (2026-08-19) — one "Show Completed"
+  // master toggle and one collapse chevron for the WHOLE section,
+  // regardless of Sort mode or how many person/category cards it has.
+  // Meaningless (and unused) when groupByStatus is false.
+  const [showCompleted, setShowCompleted] = React.useState(false);
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -244,6 +331,32 @@ export function EntityCardOverview({
     }
   };
   const [typeReassignOpen, setTypeReassignOpen] = React.useState<string | null>(null);
+  const typeGridRef = React.useRef<HTMLDivElement>(null);
+  // Auto-close the Type-sort grid's open ReassignPicker on an outside
+  // click/tap or Escape (2026-08-15) — same fix as TaskRowLine's own
+  // reassignContainerRef effect below; previously the only way to close it
+  // was reopening that row's ⋮ menu and toggling "Assign to Others" again.
+  // Scoped to the WHOLE grid (typeGridRef, set on the Type-sort card
+  // container below) since typeReassignOpen is one shared id for every
+  // category card, not per-row state — clicking a DIFFERENT row's trigger
+  // still works normally (that click is "inside" the grid).
+  React.useEffect(() => {
+    if (!typeReassignOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (typeGridRef.current && !typeGridRef.current.contains(e.target as Node)) {
+        setTypeReassignOpen(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTypeReassignOpen(null);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [typeReassignOpen]);
   // Task-column resize (2026-08-15) — ONE width shared by every card this
   // section renders (Person-sort's own card AND every Type-sort category
   // card alike, whichever is currently visible — never both at once, so
@@ -264,7 +377,18 @@ export function EntityCardOverview({
   const taskColWidth = "var(--tm-overview-col-task)";
 
   const tasks = flattenTasks(entity);
-  const scopeId = showViewToggle && onlyMe ? myUserId : undefined;
+  // A synthetic self-entity (toSelfEntityDetail's one-member roster, used
+  // for every showViewToggle:false section — OPS/CEO's own Monthly on
+  // /task-manager, and Home's personal Daily/Monthly/third-card sections)
+  // has no View All/Only Me toggle because it's ALWAYS implicitly "only
+  // me" — there's no one else in it. Sort: Type's "hide empty categories"
+  // rule (2026-08-15) should apply here too, same as it does whenever a
+  // real multi-person entity's viewer picks Only Me — without this, an
+  // empty category card (e.g. "SMS" with zero tasks for this person)
+  // incorrectly stays visible, since scopeId was only ever driven by the
+  // (nonexistent, for this entity) toggle state.
+  const isSelfOnlyEntity = entity.members.length === 1 && entity.members[0].userId === myUserId;
+  const scopeId = (showViewToggle && onlyMe) || isSelfOnlyEntity ? myUserId : undefined;
 
   const personCards = sortMode === "person" ? groupTasksByPerson(entity.members, tasks, scopeId) : [];
   const categoryCards = sortMode === "type" ? groupTasksByCategory(categories, tasks, scopeId) : [];
@@ -282,41 +406,65 @@ export function EntityCardOverview({
     const qs = new URLSearchParams({ ...myWeek.nav.extraParams, date });
     router.push(`${myWeek.nav.basePath}?${qs.toString()}`);
   };
+  const selectedMyMonthChunk =
+    myMonth?.chunks.find((c) => c.range === myMonth.selectedRange) ?? myMonth?.chunks[0];
+  const selectMyMonthRange = (range: string) => {
+    if (!myMonth) return;
+    const qs = new URLSearchParams({ ...myMonth.nav.extraParams, mdate: myMonth.anchorMonth, mrange: range });
+    router.push(`${myMonth.nav.basePath}?${qs.toString()}`);
+  };
 
   return (
     <div
       ref={resizeContainerRef}
       style={resizeStyle}
-      className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+      className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-        <h2 className="text-lg font-semibold text-gray-900">
-          {/* Empty entityName (2026-08-15, myOverview's own sections) omits
-              the "X — " prefix entirely — printing just "Daily"/"Monthly"
-              alone, not "My Tasks — Daily", since the Person-sort card
-              directly below already says "My Tasks" (isOwnCard check
-              above) — showing that label twice, stacked, was itself the
-              redundancy this was meant to fix. Department/Branch Overview
-              still pass a real name here and keep the full "X — Y" form. */}
-          {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
-        </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+            {/* Empty entityName (2026-08-15, myOverview's own sections) omits
+                the "X — " prefix entirely — printing just "Daily"/"Monthly"
+                alone, not "My Tasks — Daily", since the Person-sort card
+                directly below already says "My Tasks" (isOwnCard check
+                above) — showing that label twice, stacked, was itself the
+                redundancy this was meant to fix. Department/Branch Overview
+                still pass a real name here and keep the full "X — Y" form.
+                HOD/CEO Assigned Task (groupByStatus) no longer collapses
+                the whole section (2026-08-19, user feedback) — always a
+                plain heading now, same as every other section. */}
+            {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
+          </h2>
         <div className="flex flex-wrap items-center gap-2">
           {dateControl}
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
             aria-label="Sort"
-            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="person">Sort: Person</option>
             <option value="type">Sort: Type</option>
           </select>
+          {/* Show Completed sits AFTER the Sort filter now (2026-08-19, user
+              feedback — previously between the date control and Sort,
+              reordered to read as part of/following the sort filter). */}
+          {groupByStatus && (
+            <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={showCompleted}
+                onChange={(e) => setShowCompleted(e.target.checked)}
+                className="size-3.5 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+              />
+              Show Completed
+            </label>
+          )}
           {showViewToggle && (
             <select
               value={onlyMe ? "onlyMe" : "all"}
               onChange={(e) => setOnlyMe(e.target.value === "onlyMe")}
               aria-label="View"
-              className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+              className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="all">View All</option>
               <option value="onlyMe">Only Me</option>
@@ -325,10 +473,10 @@ export function EntityCardOverview({
         </div>
       </div>
 
-      {sortMode === "person" ? (
+      {(sortMode === "person" ? (
         <div className={cardGridClass(personCards.length)}>
           {personCards.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">No one to show.</p>
+            <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">No one to show.</p>
           ) : (
             personCards.map((card) => {
               const isOwnCard = card.userId === myUserId;
@@ -336,6 +484,7 @@ export function EntityCardOverview({
               // doc comment for why this is scoped to "own card, alone on
               // screen" rather than every own-card appearance.
               const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1;
+              const showMyMonth = isOwnCard && Boolean(myMonth) && personCards.length === 1;
               // Type sub-grouping within each card (2026-08-15) — reuses
               // Sort: Type's own grouping function (entity-card-grouping.ts)
               // on this ONE person's already-scoped task list, so "Sort:
@@ -347,19 +496,19 @@ export function EntityCardOverview({
               // type they have zero tasks in is just noise.
               const typeGroups = groupTasksByCategory(categories, card.tasks).filter((g) => g.tasks.length > 0);
               return (
-                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200">
-                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
-                    {/* Own card (2026-08-15): "My Tasks" only in Only Me
-                        mode, where it's the sole card on screen — the
-                        viewer's name/avatar is already shown top-right on
-                        every page, so repeating it here would be redundant.
-                        In View All, showing "My Tasks" instead of a real
-                        name breaks the scanning pattern every OTHER card
-                        follows (all named) and reads as confusing/
-                        unidentifiable in a full roster grid — so the own
-                        card shows its real name there too, same as
-                        everyone else's. */}
-                    {isOwnCard && onlyMe ? "My Tasks" : card.name}
+                <div key={card.userId} className="overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700">
+                  <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">
+                    {/* Own card: always the real name (2026-08-19 — Only
+                        Me mode previously showed "My Tasks" instead, on the
+                        theory that the viewer's name/avatar already shows
+                        top-right so repeating it here felt redundant; user
+                        feedback was that the card still needs its own name,
+                        e.g. the Daily weekday-tab view where this card is
+                        the ONLY thing on screen with no other named card for
+                        context). Same real name in every mode now — Only
+                        Me, View All, Daily, Monthly — consistent with how
+                        every other person's card already worked. */}
+                    {card.name}
                   </div>
                   {showMyWeek && myWeek ? (
                     <div className="flex gap-3 p-3">
@@ -377,12 +526,12 @@ export function EntityCardOverview({
                               aria-selected={active}
                               onClick={() => selectMyWeekDate(d.date)}
                               className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
-                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
                               }`}
                             >
                               <span>{d.weekday}</span>
                               <span
-                                className={active ? "text-blue-100" : "text-gray-400"}
+                                className={active ? "text-blue-100" : "text-gray-400 dark:text-slate-500"}
                                 aria-label={`${pendingCount} pending`}
                               >
                                 {pendingCount}
@@ -392,6 +541,18 @@ export function EntityCardOverview({
                         })}
                       </div>
                       <div className="min-w-0 flex-1">
+                        {selectedMyWeekDay && selectedMyWeekDay.schedule && selectedMyWeekDay.schedule.length > 0 && (
+                          <div className="mb-2 space-y-1">
+                            {selectedMyWeekDay.schedule.map((s, i) => (
+                              <div
+                                key={i}
+                                className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              >
+                                {s.start} – {s.end}: {s.label}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {selectedMyWeekDay && (
                           <ResizableTaskList
                             key={selectedMyWeekDay.date}
@@ -407,6 +568,58 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
+                            defaultNameWidth={400}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : showMyMonth && myMonth ? (
+                    <div className="flex gap-3 p-3">
+                      <div role="tablist" className="w-32 shrink-0 space-y-0.5">
+                        {myMonth.chunks.map((c) => {
+                          const pendingCount = c.tasks.filter(
+                            (t) => t.status !== "DONE" && t.status !== "SKIPPED",
+                          ).length;
+                          const active = c.range === myMonth.selectedRange;
+                          return (
+                            <button
+                              key={c.range}
+                              type="button"
+                              role="tab"
+                              aria-selected={active}
+                              onClick={() => selectMyMonthRange(c.range)}
+                              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
+                                active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              <span>{c.label}</span>
+                              <span
+                                className={active ? "text-blue-100" : "text-gray-400 dark:text-slate-500"}
+                                aria-label={`${pendingCount} pending`}
+                              >
+                                {pendingCount}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {selectedMyMonthChunk && (
+                          <ResizableTaskList
+                            key={selectedMyMonthChunk.range}
+                            tasks={selectedMyMonthChunk.tasks}
+                            myUserId={myUserId}
+                            onComplete={onComplete}
+                            onSkip={onSkip}
+                            onReopen={onReopen}
+                            onUploadProof={onUploadProof}
+                            onRemoveProof={onRemoveProof}
+                            emptyLabel={`No tasks for ${selectedMyMonthChunk.label}.`}
+                            hideCompleted
+                            hideAssignee
+                            blankDueDate
+                            reassign={reassign}
+                            defaultNameWidth={400}
                           />
                         )}
                       </div>
@@ -425,7 +638,34 @@ export function EntityCardOverview({
                     className="max-h-80 overflow-auto px-3 py-1"
                   >
                     {card.tasks.length === 0 ? (
-                      <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                      <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
+                    ) : groupByStatus ? (
+                      // HOD/CEO Assigned Task (2026-08-19): status-bucket
+                      // grouping instead of category/type sub-grouping — the
+                      // SAME ResizableTaskList "Tasks I Assigned" uses, not a
+                      // lookalike. showCompleted/onShowCompletedChange are
+                      // this section's own lifted state (set above), so every
+                      // card in the grid — own and everyone else's alike —
+                      // expands/collapses Completed together from the ONE
+                      // "Show Completed" checkbox in this card's header.
+                      <ResizableTaskList
+                        tasks={card.tasks}
+                        myUserId={myUserId}
+                        onComplete={onComplete}
+                        onSkip={onSkip}
+                        onReopen={onReopen}
+                        onUploadProof={onUploadProof}
+                        onRemoveProof={onRemoveProof}
+                        emptyLabel="No tasks this period."
+                        hideCompleted
+                        showCompleted={showCompleted}
+                        onShowCompletedChange={setShowCompleted}
+                        hideAssignee
+                        reassign={reassign}
+                        reassignAnyOwner={canReassignOthers}
+                        reassignAsMenu
+                        defaultNameWidth={280}
+                      />
                     ) : (
                       <>
                         {/* Column header (2026-08-15) — only on the card
@@ -441,9 +681,9 @@ export function EntityCardOverview({
                             above every type group below, not repeated per
                             group — it's labeling columns, not group data. */}
                         {isOwnCard && (
-                          <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                          <div className="flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:border-slate-800 dark:text-slate-500">
                             <span className="w-4 shrink-0" aria-hidden />
-                            <span className="w-3 shrink-0" aria-hidden />
+                            <StatusHeaderSpacer />
                             <span className="relative shrink-0 truncate" style={{ width: taskColWidth }}>
                               Task
                               <HeaderResizeHandle onPointerDown={onResizeStart} />
@@ -461,7 +701,7 @@ export function EntityCardOverview({
                         )}
                         {typeGroups.map((group) => (
                           <div key={group.id}>
-                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0">
+                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-slate-500">
                               {group.name}
                             </p>
                             {group.tasks.map((t: FlowTaskRow) => (
@@ -511,6 +751,8 @@ export function EntityCardOverview({
                                 // populate a redundant per-row value under it.
                                 blankDueDate={sectionLabel === "Daily"}
                                 reassign={reassign}
+                                reassignAnyOwner={canReassignOthers}
+                                reassignAsMenu
                               />
                             ))}
                           </div>
@@ -525,20 +767,25 @@ export function EntityCardOverview({
           )}
         </div>
       ) : (
-        <div className={cardGridClass(categoryCards.length)}>
-          {categoryCards.map((card) => (
+        <div ref={typeGridRef} className={cardGridClass(categoryCards.length)}>
+          {categoryCards.map((card) => {
+            // groupByStatus (2026-08-19): pending-first, Completed/N-A
+            // hidden unless the section's own "Show Completed" master
+            // toggle is on — see statusGroupedTasks's own doc comment.
+            const displayTasks = groupByStatus ? statusGroupedTasks(card.tasks, showCompleted) : card.tasks;
+            return (
             <div
               key={card.id}
-              className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300" : "border-gray-200"}`}
+              className={`overflow-hidden rounded-xl border ${card.id === UNCATEGORIZED_CARD_ID ? "border-dashed border-gray-300 dark:border-slate-600" : "border-gray-200 dark:border-slate-700"}`}
             >
-              <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">{card.name}</div>
+              <div className="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 dark:bg-slate-800 dark:text-slate-200">{card.name}</div>
               <div className="max-h-80 overflow-auto px-3 py-2">
-                {card.tasks.length === 0 ? (
-                  <p className="py-2 text-xs italic text-gray-400">No tasks this period.</p>
+                {displayTasks.length === 0 ? (
+                  <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
                 ) : (
                   <table className="w-max min-w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-gray-500">
+                      <tr className="text-left text-xs text-gray-500 dark:text-slate-400">
                         {/* No column resize here (2026-08-15) — long content
                             scrolls (the card body above is the scroll
                             container, both axes) instead of being resized
@@ -556,7 +803,7 @@ export function EntityCardOverview({
                       </tr>
                     </thead>
                     <tbody>
-                      {card.tasks.map((t) => {
+                      {displayTasks.map((t) => {
                         const canReassignRow =
                           Boolean(reassign) &&
                           t.assigneeId === myUserId &&
@@ -564,23 +811,19 @@ export function EntityCardOverview({
                           t.status !== "SKIPPED";
                         return (
                           <React.Fragment key={t.runBlockId}>
-                            <tr className="border-t border-dashed border-gray-100">
-                              <td className="whitespace-nowrap py-1.5 pr-4">{t.blockTitle}</td>
-                              <td className="py-1.5 text-gray-500">
+                            <tr className="border-t border-dashed border-gray-100 dark:border-slate-800">
+                              <td className="whitespace-nowrap py-1.5 pr-4 dark:text-slate-200">{t.blockTitle}</td>
+                              <td className="py-1.5 text-gray-500 dark:text-slate-400">
                                 <div className="flex items-center justify-between gap-2">
                                   {!onlyMe && <span className="whitespace-nowrap">{t.assigneeName}</span>}
                                   {canReassignRow && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
+                                    <RowActionsMenu
+                                      onAssignToOthers={() =>
                                         setTypeReassignOpen(
                                           typeReassignOpen === t.runBlockId ? null : t.runBlockId,
                                         )
                                       }
-                                      className="shrink-0 rounded-full border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:border-blue-300 hover:bg-blue-50"
-                                    >
-                                      Assign to Others
-                                    </button>
+                                    />
                                   )}
                                 </div>
                               </td>
@@ -608,9 +851,10 @@ export function EntityCardOverview({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+      ))}
     </div>
   );
 }

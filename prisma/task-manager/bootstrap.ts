@@ -19,6 +19,14 @@ import { Pool } from "pg";
 import { Prisma } from "../../src/generated/task-manager-client";
 import { prisma } from "../../src/task-manager/prisma";
 import { FLOW_DEPARTMENTS } from "../../src/task-manager/ui/types";
+// Same "is this employment row currently active" rule Employee Folder uses
+// (src/lib/employeeQueries.ts) — end_date wins over a stale status, exactly
+// as documented on stageFromEmployment itself. Pulled from employeeStages.ts
+// specifically because that file is pure (no imports, no Prisma client
+// construction) — importing employeeQueries.ts directly here would eagerly
+// construct its two PrismaClient singletons as an unwanted side effect of
+// this being a plain tsx script, not a Next.js-bundled module.
+import { stageFromEmployment } from "../../src/lib/employeeStages";
 import {
   diffUserFields,
   EXTRA_USERS,
@@ -106,9 +114,11 @@ function resolvePortalUrl(): string {
  *  displays. 2026-07-25 root-cause finding: ebright_hrfs.User has NO
  *  department column at all, so mapping alone imported every generic staff
  *  member department-less; the real assignments live HERE (hrfs database:
- *  users -> employment -> department). Only ACTIVE employments count, and
- *  only department names that are real FLOW_DEPARTMENTS values — the portal
- *  also carries non-Task-Manager units ("IOP", "CEO"), which are skipped. */
+ *  users -> employment -> department). "Currently active" is decided by
+ *  stageFromEmployment — the exact same rule Employee Folder uses (end_date
+ *  wins over a stale status column) — not a bootstrap-specific status check.
+ *  Only department names that are real FLOW_DEPARTMENTS values count — the
+ *  portal also carries non-Task-Manager units ("IOP", "CEO"), skipped. */
 async function fetchPortalDepartments(): Promise<Map<string, string>> {
   const pool = new Pool({
     connectionString: resolvePortalUrl(),
@@ -116,15 +126,18 @@ async function fetchPortalDepartments(): Promise<Map<string, string>> {
     connectionTimeoutMillis: 10_000,
   });
   try {
-    const result = await pool.query<{ email: string; department_name: string }>(
-      `select lower(u.email) as email, d.department_name
+    const result = await pool.query<{ email: string; department_name: string; status: string; end_date: Date | null }>(
+      `select lower(u.email) as email, d.department_name, e.status, e.end_date
        from users u
        join employment e on e.user_id = u.user_id
        join department d on d.department_id = e.department_id
        where e.status = 'active' and u.deleted_at is null`,
     );
+    const todayIso = new Date().toISOString().slice(0, 10);
     const byEmail = new Map<string, string>();
     for (const r of result.rows) {
+      const endIso = r.end_date ? r.end_date.toISOString().slice(0, 10) : null;
+      if (stageFromEmployment(r.status, endIso, todayIso) !== "active") continue;
       // Portal still says "Operation" — normalize to the renamed value.
       const dept = normalizeSourceDepartment(r.department_name);
       if (dept && (FLOW_DEPARTMENTS as readonly string[]).includes(dept)) {
@@ -155,11 +168,14 @@ function enrichDepartments(toImport: MappedUser[], byEmail: Map<string, string>)
   return filled;
 }
 
-/** Read-only: ACTIVE portal employees (active login + their ACTIVE
- *  employment's position/department/branch). Employees with NO active
- *  employment row still return (position null) so they surface as loud
- *  unknown-position skips instead of silently vanishing. Second bootstrap
- *  source — see mapPortalEmployee's header in hrfs-map.ts. */
+/** Read-only: ACTIVE portal employees (active login + their currently-active
+ *  employment's position/department/branch). "Currently active" is decided
+ *  by stageFromEmployment — the exact same rule Employee Folder uses
+ *  (end_date wins over a stale status column), not a bootstrap-specific
+ *  check. Employees with NO currently-active employment row still return
+ *  (position null) so they surface as loud unknown-position skips instead
+ *  of silently vanishing. Second bootstrap source — see mapPortalEmployee's
+ *  header in hrfs-map.ts. */
 async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
   const pool = new Pool({
     connectionString: resolvePortalUrl(),
@@ -167,9 +183,10 @@ async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
     connectionTimeoutMillis: 10_000,
   });
   try {
-    const result = await pool.query<PortalEmployeeRow>(
+    const result = await pool.query<PortalEmployeeRow & { emp_status: string | null; end_date: Date | null }>(
       `select lower(u.email) as email, up.full_name as name, e.position,
-              d.department_name as department, b.branch_name as branch
+              d.department_name as department, b.branch_name as branch,
+              e.status as emp_status, e.end_date
        from users u
        join user_profile up on up.user_id = u.user_id
        left join employment e on e.user_id = u.user_id and e.status = 'active'
@@ -178,7 +195,18 @@ async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
        where u.deleted_at is null and u.status = 'active'
        order by u.email`,
     );
-    return result.rows;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    return result.rows.map((r) => {
+      const endIso = r.end_date ? r.end_date.toISOString().slice(0, 10) : null;
+      const isActive = r.emp_status != null && stageFromEmployment(r.emp_status, endIso, todayIso) === "active";
+      return {
+        email: r.email,
+        name: r.name,
+        position: isActive ? r.position : null,
+        department: isActive ? r.department : null,
+        branch: isActive ? r.branch : null,
+      };
+    });
   } finally {
     await pool.end();
   }

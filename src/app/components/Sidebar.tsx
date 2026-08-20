@@ -39,6 +39,8 @@ export interface NavItem {
   external?: boolean;
   /** Match the active route exactly instead of by prefix (for "Overview" links whose siblings share the prefix). */
   exact?: boolean;
+  /** Optional hover tooltip (native `title` attribute) shown on the expanded/flyout row. */
+  tooltip?: string;
   /** Access-management feature key that gates this item (and its subtree).
    *  Hidden unless the signed-in user can `view` it. Unset = always shown. */
   feature?: string;
@@ -169,7 +171,7 @@ export const primaryNav: NavItem[] = [
     href: "/task-manager",
     Icon: ListChecks,
     children: [
-      { name: "Overview", href: "/task-manager", exact: true },
+      { name: "Overview", href: "/task-manager", exact: true, tooltip: "A PLACE TO LET YOU BE A BUSYBODY" },
       { name: "Template", href: "/task-manager/template", taskManagerKey: "template" },
       { name: "Package", href: "/task-manager/package", taskManagerKey: "package" },
       { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
@@ -374,7 +376,7 @@ function NavNode({
   isFlyoutOpen?: boolean;
   onToggleFlyout?: (open: boolean) => void;
 }) {
-  const { name, href, Icon, iconSrc, external, children } = item;
+  const { name, href, Icon, iconSrc, external, children, tooltip } = item;
   const hasChildren = !!children?.length;
   const isActive = isItemActive(item, pathname);
   const hasActiveDescendant = hasChildren && containsActive(children, pathname);
@@ -681,6 +683,7 @@ function NavNode({
           href={href}
           target="_blank"
           rel="noopener noreferrer"
+          title={tooltip}
           className={rowClass}
           style={indent}
           onClick={onNavigate}
@@ -691,6 +694,7 @@ function NavNode({
         <Link
           href={href ?? "#"}
           aria-current={isActive ? "page" : undefined}
+          title={tooltip}
           className={rowClass}
           style={indent}
           onClick={onNavigate}

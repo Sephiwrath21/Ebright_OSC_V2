@@ -9,7 +9,7 @@
 // roles get which sections).
 import * as React from "react";
 import type { FlowCategoryOption, FlowEntityDetail } from "./types";
-import { EntityCardOverview, type MyWeekConfig } from "./entity-card-overview";
+import { EntityCardOverview, type MyMonthConfig, type MyWeekConfig } from "./entity-card-overview";
 import type { ReassignControl } from "./bits";
 
 interface SectionData {
@@ -24,6 +24,10 @@ interface SectionData {
    *  the "daily" SectionData; Monthly/HOD/CEO Assigned have no per-weekday
    *  concept, so callers never build this for those. */
   myWeek?: MyWeekConfig;
+  /** Month-range-chunk tab view for the own card (2026-08-15, Home only) —
+   *  see EntityCardOverview's own `myMonth` prop doc comment. Only ever
+   *  set on the "monthly" SectionData. */
+  myMonth?: MyMonthConfig;
 }
 
 export function TaskOverviewStack({
@@ -34,12 +38,14 @@ export function TaskOverviewStack({
   monthly,
   hodAssigned,
   ceoAssigned,
+  adhocAssigned,
   onComplete,
   onSkip,
   onReopen,
   onUploadProof,
   onRemoveProof,
   reassign,
+  canReassignOthers,
 }: {
   entityName: string;
   categories: FlowCategoryOption[];
@@ -48,6 +54,11 @@ export function TaskOverviewStack({
   monthly?: SectionData;
   hodAssigned?: SectionData;
   ceoAssigned?: SectionData;
+  /** "Ad hoc" section (2026-08-18, Branch Manager's own Task Manager page
+   *  only) — same roster-first card grid as HOD/CEO Assigned, just backed
+   *  by getBranchAdhocAssigned instead. Callers that want Ad hoc instead of
+   *  HOD/CEO Assigned simply omit those two props and pass this one. */
+  adhocAssigned?: SectionData;
   onComplete?: (runBlockId: string) => Promise<import("./types").ActionResult>;
   onSkip?: (runBlockId: string) => Promise<import("./types").ActionResult>;
   onReopen?: (runBlockId: string) => Promise<import("./types").ActionResult>;
@@ -56,12 +67,17 @@ export function TaskOverviewStack({
   /** "Assign to Others" self-service handoff (2026-08-13) — passed through
    *  identically to every section's EntityCardOverview. */
   reassign?: ReassignControl;
+  /** Manager mode for Person-sort's View All grid (2026-08-15) — see
+   *  EntityCardOverview's own `canReassignOthers` doc comment; passed
+   *  through identically to every section. */
+  canReassignOthers?: boolean;
 }) {
   const sections: { key: string; label: string; data?: SectionData }[] = [
     { key: "daily", label: "Daily", data: daily },
     { key: "monthly", label: "Monthly", data: monthly },
     { key: "hodAssigned", label: "HOD Assigned Task", data: hodAssigned },
     { key: "ceoAssigned", label: "CEO Assigned Task", data: ceoAssigned },
+    { key: "adhocAssigned", label: "Ad hoc", data: adhocAssigned },
   ];
 
   return (
@@ -80,12 +96,19 @@ export function TaskOverviewStack({
               showViewToggle={data.showViewToggle}
               defaultOnlyMe={data.defaultOnlyMe}
               myWeek={data.myWeek}
+              myMonth={data.myMonth}
               onComplete={onComplete}
               onSkip={onSkip}
               onReopen={onReopen}
               onUploadProof={onUploadProof}
               onRemoveProof={onRemoveProof}
               reassign={reassign}
+              canReassignOthers={canReassignOthers}
+              // Standardized Pending-first/Show-Completed/collapsible
+              // pattern (2026-08-19) — HOD/CEO Assigned Task ONLY, never
+              // Daily/Monthly/Ad hoc — see EntityCardOverview's own
+              // groupByStatus doc comment.
+              groupByStatus={key === "hodAssigned" || key === "ceoAssigned"}
             />
           ),
       )}

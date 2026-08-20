@@ -90,17 +90,31 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     ]);
   });
 
+  it("HOD's Task Manager: My Board, Tasks I Assigned, Department Overview, in order (2026-08-19: assignedByMeList revived)", () => {
+    expect(ROLE_VIEWS.HOD.taskManager).toEqual([
+      "myBoard",
+      "assignedByMeList",
+      "departmentOverview",
+    ]);
+  });
+
+  it("CEO's Home is just My Tasks (2026-08-19: ceoKanban/branchRegionOverview dropped entirely)", () => {
+    expect(ROLE_VIEWS.CEO.home).toEqual(["ceoCombinedList"]);
+    expect(shows("CEO", "home", "ceoKanban")).toBe(false);
+    expect(shows("CEO", "home", "branchRegionOverview")).toBe(false);
+  });
+
   it("DEPT_MEMBER gets the HOD Assigned card on Home only (2026-08-12: Task Manager's myOverview replaced it with whole-department Daily visibility instead)", () => {
     expect(shows("DEPT_MEMBER", "home", "hodAssigned")).toBe(true);
     expect(shows("DEPT_MEMBER", "taskManager", "hodAssigned")).toBe(false);
     expect(shows("DEPT_MEMBER", "taskManager", "myOverview")).toBe(true);
   });
 
-  it("Branch Manager: Daily/Monthly/Ad hoc personal + Branch Overview + Manpower link", () => {
+  it("Branch Manager: Daily/Monthly/Ad hoc personal + Branch Overview, no Manpower link on Task Manager (2026-08-18, dropped)", () => {
     expect(shows("BRANCH_MANAGER", "home", "personalAdhoc")).toBe(true);
     expect(shows("BRANCH_MANAGER", "taskManager", "myTasksAdhoc")).toBe(true);
     expect(shows("BRANCH_MANAGER", "home", "branchOverview")).toBe(true);
-    expect(shows("BRANCH_MANAGER", "taskManager", "manpowerLink")).toBe(true);
+    expect(shows("BRANCH_MANAGER", "taskManager", "manpowerLink")).toBe(false);
   });
 
   it("view-only site logins have no personal sections and no + Task", () => {
@@ -118,8 +132,13 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
 });
 
 describe("cross-page consistency invariants", () => {
-  it("Ad hoc stays identical on both pages (2026-08-12: NOT part of the stacked-sections redesign, unlike the other personal keys below)", () => {
+  it("Ad hoc stays identical on both pages (2026-08-12: NOT part of the stacked-sections redesign, unlike the other personal keys below) — EXCEPT BRANCH_MANAGER (2026-08-18), whose Task Manager personalAdhoc donut was dropped as redundant with myTasksAdhoc right below it; Home's own personalAdhoc card is untouched", () => {
     for (const v of Object.keys(ROLE_VIEWS) as ViewRole[]) {
+      if (v === "BRANCH_MANAGER") {
+        expect(shows(v, "home", "personalAdhoc")).toBe(true);
+        expect(shows(v, "taskManager", "personalAdhoc")).toBe(false);
+        continue;
+      }
       expect(
         shows(v, "home", "personalAdhoc"),
         `${v}/personalAdhoc: Home=${shows(v, "home", "personalAdhoc")} TM=${shows(v, "taskManager", "personalAdhoc")}`,

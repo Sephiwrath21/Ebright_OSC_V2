@@ -17,7 +17,30 @@ import type {
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
-import { flowBucketTotal, formatDueDate, isPastDueDay, isFutureDueDay } from "./types";
+import { flowBucketTotal, formatDueDate, isDueDayLockExemptRole, isPastDueDay, isFutureDueDay, type DueDateDisplay } from "./types";
+
+/** Collapse/expand chevron (2026-08-20) — replaces the old "›" unicode
+ *  glyph, which rendered as a checkmark-like shape at larger sizes in some
+ *  fonts (reported at text-sm). Plain inline SVG, no icon library, per this
+ *  file's own "no new dependencies" header comment. `expanded` controls the
+ *  90° rotation the two callers (SectionCard, ResizableTaskList's group
+ *  headers) previously did with a text-based transform. */
+function ChevronIcon({ expanded, className = "size-3" }: { expanded: boolean; className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""} ${className}`}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
 import {
   compressImageFile,
   drawTimestampWatermark,
@@ -34,7 +57,7 @@ import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
  *  by the caller so it never disturbs row/flex layout. */
 function InlineActionError({ text }: { text: string }) {
   return (
-    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md">
+    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-900 dark:bg-slate-800">
       {text}
     </p>
   );
@@ -79,8 +102,8 @@ export function PageSectionHeading({
 }) {
   return (
     <h2
-      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-lg font-semibold text-gray-900 ${
-        hideBorder ? "" : "border-b border-gray-200"
+      className={`mt-2 flex items-center justify-between gap-3 pb-2 text-lg font-semibold text-gray-900 dark:text-slate-100 ${
+        hideBorder ? "" : "border-b border-gray-200 dark:border-slate-700"
       }`}
     >
       <span>{children}</span>
@@ -94,20 +117,42 @@ export function SectionCard({
   title,
   action,
   children,
+  collapsible,
+  defaultCollapsed,
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  /** Adds a chevron next to the title that collapses/expands the whole
+   *  card body (2026-08-19) — e.g. "Tasks I Assigned". Defaults to false
+   *  (unchanged behavior) everywhere this isn't explicitly set. */
+  collapsible?: boolean;
+  /** Starting collapsed state when collapsible is true. Defaults to
+   *  expanded. */
+  defaultCollapsed?: boolean;
 }) {
+  const [collapsed, setCollapsed] = React.useState(Boolean(collapsible && defaultCollapsed));
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-          {title}
-        </h3>
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className={`flex items-center justify-between gap-3 ${collapsed ? "" : "mb-4"}`}>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            <ChevronIcon expanded={!collapsed} className="size-2.5" />
+            {title}
+          </button>
+        ) : (
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+            {title}
+          </h3>
+        )}
         {action}
       </div>
-      {children}
+      {!collapsed && children}
     </div>
   );
 }
@@ -148,7 +193,7 @@ export function StatusDonut({
           r={r}
           fill="none"
           strokeWidth={strokeWidth}
-          className="stroke-gray-100"
+          className="stroke-gray-100 dark:stroke-slate-700"
         />
         {segments.map((s) =>
           s.dash > 0 ? (
@@ -195,9 +240,9 @@ export function BucketLegend({
         const row = (
           <>
             <span className={`size-2.5 shrink-0 rounded-full ${b.dot}`} />
-            <span className="text-gray-600">{b.label}</span>
-            <span className="ml-auto font-semibold text-gray-900">{totals[b.key]}</span>
-            <span className="w-9 text-right text-xs text-gray-400">
+            <span className="text-gray-600 dark:text-slate-300">{b.label}</span>
+            <span className="ml-auto font-semibold text-gray-900 dark:text-slate-100">{totals[b.key]}</span>
+            <span className="w-9 text-right text-xs text-gray-400 dark:text-slate-500">
               {total > 0 ? Math.round((totals[b.key] / total) * 100) : 0}%
             </span>
           </>
@@ -207,7 +252,7 @@ export function BucketLegend({
             key={b.key}
             type="button"
             onClick={() => onSelect(b.key)}
-            className="flex items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm hover:bg-gray-50"
+            className="flex items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-800"
           >
             {row}
           </button>
@@ -233,7 +278,7 @@ export function CompletionMeter({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 ${className}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700 ${className}`}>
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
         style={{ width: `${pct}%` }}
@@ -243,12 +288,12 @@ export function CompletionMeter({
 }
 
 const STATUS_CHIP: Record<FlowTaskRow["status"], { label: string; className: string }> = {
-  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700" },
-  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600" },
-  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700" },
-  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800" },
-  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800" },
-  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500" },
+  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300" },
+  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
+  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
+  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" },
+  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-slate-700 dark:text-slate-400" },
 };
 
 export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
@@ -280,8 +325,16 @@ function statusCircleClasses(status: FlowTaskRow["status"]): string {
  *  removeFlowTaskProof (this is the disabled-UI half, not the
  *  enforcement; a request that somehow reached the server anyway would
  *  still be rejected there). Applies to every role — there's no exception
- *  for elevated viewers completing on someone else's behalf. */
-function isLockedDueDay(task: Pick<FlowTaskRow, "cadence" | "dueAt">): boolean {
+ *  for elevated viewers completing on someone else's behalf.
+ *
+ *  EXCEPT tasks assigned by an HOD or CEO (2026-08-19,
+ *  isDueDayLockExemptRole) — those are exempt from this lock entirely,
+ *  everywhere they appear (not just "HOD/CEO Assigned Task" — the same
+ *  task can also show up in the recipient's own Daily section, and it
+ *  must behave identically there too, since the server enforces this
+ *  per-task, not per-section). */
+function isLockedDueDay(task: Pick<FlowTaskRow, "cadence" | "dueAt" | "assignerRole">): boolean {
+  if (isDueDayLockExemptRole(task.assignerRole)) return false;
   return task.cadence === "DAILY" && (isPastDueDay(task.dueAt) || isFutureDueDay(task.dueAt));
 }
 
@@ -403,14 +456,41 @@ function StatusDropdown({
             const next = !o;
             if (next && triggerRef.current) {
               const rect = triggerRef.current.getBoundingClientRect();
-              setMenuPos({ top: rect.bottom + 4, left: rect.left });
+              // Flip upward when there isn't room below (2026-08-19) — this
+              // menu always renders the same fixed 3-item/2-heading layout
+              // (~168px tall), so unconditionally opening downward cut
+              // Completed/N-A off-screen whenever the trigger sat in the
+              // bottom third of the viewport: not covered by anything,
+              // just rendered past the bottom edge — reported as
+              // "Completed/N-A missing" and separately misread as the ⋮
+              // menu overlapping the status circle. Estimated, not
+              // measured, since the menu isn't in the DOM yet at click
+              // time and its content never varies per task.
+              const MENU_HEIGHT_ESTIMATE = 168;
+              const MENU_WIDTH = 160; // matches the menu's own w-40
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8);
+              setMenuPos({ top, left });
             }
             return next;
           });
         }}
-        className="flex size-3 shrink-0 items-center justify-center disabled:opacity-50"
+        // Visible click affordance (2026-08-18) — previously just the bare
+        // status dot with no hover feedback, which read as decoration
+        // rather than a control (the "Pending" reopen option was already
+        // here, just not discoverable). The hover ring/background and small
+        // ▾ now signal "click to change status" the same way any other
+        // dropdown trigger in this file does (e.g. RowActionsMenu's ⋮).
+        className="group -m-1 flex shrink-0 items-center gap-0.5 rounded-full p-1 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent dark:hover:bg-slate-700"
       >
         {circle}
+        <span
+          aria-hidden
+          className="text-[8px] leading-none text-gray-400 group-hover:text-gray-600 dark:text-slate-500 dark:group-hover:text-slate-300"
+        >
+          ▾
+        </span>
       </button>
       {errorText && <InlineActionError text={errorText} />}
       {open &&
@@ -420,21 +500,21 @@ function StatusDropdown({
             ref={menuRef}
             role="menu"
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
           >
-          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Statuses</p>
+          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">Statuses</p>
           <button
             type="button"
             role="menuitem"
             disabled={!canReopen}
             onClick={() => run(onReopen)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
           >
             <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
             Pending
           </button>
-          <div className="my-1 border-t border-gray-100" />
-          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Closed</p>
+          <div className="my-1 border-t border-gray-100 dark:border-slate-700" />
+          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">Closed</p>
           <button
             type="button"
             role="menuitem"
@@ -445,7 +525,7 @@ function StatusDropdown({
                 : undefined
             }
             onClick={() => run(onComplete)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
           >
             <span className="flex size-2.5 shrink-0 items-center justify-center text-[10px] font-bold text-emerald-500">
               ✓
@@ -457,7 +537,7 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canMarkNA}
             onClick={() => run(onSkip)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
           >
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
@@ -556,7 +636,7 @@ function GuidelineIndicator({
         onClick={() => setOpen(true)}
         title="View guideline"
         aria-label={`View guideline for ${title}`}
-        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60"
       >
         Guideline
       </button>
@@ -569,19 +649,19 @@ function GuidelineIndicator({
           onClick={() => setOpen(false)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-gray-900">Guideline</h4>
-                <p className="truncate text-xs text-gray-500">{title}</p>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Guideline</h4>
+                <p className="truncate text-xs text-gray-500 dark:text-slate-400">{title}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
               >
                 ✕
               </button>
@@ -591,7 +671,7 @@ function GuidelineIndicator({
                 href={guideline.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mb-3 block truncate rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-blue-600 hover:border-blue-300 hover:underline"
+                className="mb-3 block truncate rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-blue-600 hover:border-blue-300 hover:underline dark:border-slate-700 dark:bg-slate-700 dark:hover:border-blue-500"
               >
                 🔗 {guideline.url}
               </a>
@@ -602,7 +682,7 @@ function GuidelineIndicator({
                 <img
                   src={imageSrc}
                   alt={`Guideline for ${title}`}
-                  className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+                  className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain dark:border-slate-700"
                 />
               </a>
             )}
@@ -990,7 +1070,7 @@ function ProofCell({
           onClick={() => setPanelOpen(true)}
           title={`View proof (${proofIds.length}/${MAX_PROOFS_PER_TASK})`}
           aria-label={`View proof for ${task.blockTitle} (${proofIds.length} photo${proofIds.length === 1 ? "" : "s"})`}
-          className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-50 px-1.5 text-xs font-bold text-emerald-500 hover:bg-emerald-100"
+          className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-50 px-1.5 text-xs font-bold text-emerald-500 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
         >
           {proofIds.length > 1 ? `✓ ${proofIds.length}` : "✓"}
         </button>
@@ -1004,12 +1084,12 @@ function ProofCell({
           }}
           title="Attach Proof Of Completion — drop, paste, upload, or take a photo"
           aria-label={`Attach proof of completion for ${task.blockTitle}`}
-          className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+          className="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-gray-300 text-sm leading-none text-gray-400 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-500 dark:hover:border-blue-500 dark:hover:text-blue-400"
         >
           {uploading ? "…" : "＋"}
         </button>
       ) : (
-        <span className="text-xs text-gray-300">—</span>
+        <span className="text-xs text-gray-300 dark:text-slate-600">—</span>
       )}
       {/* Both panels render through a PORTAL to <body> (2026-07-30 fix):
           completed rows carry opacity-60, and CSS opacity on an ancestor
@@ -1022,19 +1102,19 @@ function ProofCell({
           onClick={() => setPanelOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900">Proof Of Completion</h4>
-                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Proof Of Completion</h4>
+                <p className="truncate text-xs text-gray-500 dark:text-slate-400">{task.blockTitle}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPanelOpen(false)}
                 aria-label="Close"
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
               >
                 ✕
               </button>
@@ -1052,7 +1132,7 @@ function ProofCell({
                       onClick={() => setEnlargedId(id)}
                       title="View photo"
                       aria-label={`View proof photo for ${task.blockTitle}`}
-                      className="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                      className="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-700"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1068,7 +1148,7 @@ function ProofCell({
                         onClick={() => void handleRemove(id)}
                         title="Remove photo"
                         aria-label="Remove this photo"
-                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400"
                       >
                         {removingId === id ? "…" : "×"}
                       </button>
@@ -1086,11 +1166,11 @@ function ProofCell({
                 by clicking Upload again. */}
             {pending.length > 0 && (
               <div className="mb-3">
-                <p className="mb-1 text-xs font-medium text-gray-500">Ready to upload</p>
+                <p className="mb-1 text-xs font-medium text-gray-500 dark:text-slate-400">Ready to upload</p>
                 <div className="flex flex-wrap gap-2">
                   {pending.map((p) => (
                     <div key={p.localId} className="group relative">
-                      <div className="block size-16 overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50">
+                      <div className="block size-16 overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/30">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={p.image.previewUrl}
@@ -1109,7 +1189,7 @@ function ProofCell({
                         onClick={() => removePending(p.localId)}
                         title="Discard"
                         aria-label="Discard this photo before uploading"
-                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-bold leading-none text-gray-400 opacity-0 hover:border-red-300 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400"
                       >
                         ×
                       </button>
@@ -1138,7 +1218,7 @@ function ProofCell({
                       : `Upload ${pending.length} photo${pending.length === 1 ? "" : "s"}`}
                   </button>
                 ) : isCompleted && isOwned ? (
-                  <p className="mt-2 text-center text-[11px] text-gray-400">
+                  <p className="mt-2 text-center text-[11px] text-gray-400 dark:text-slate-500">
                     🔒 Task is complete — these can no longer be uploaded.
                   </p>
                 ) : null}
@@ -1169,14 +1249,14 @@ function ProofCell({
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400"
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500"
                   >
                     Cancel
                   </button>
                 </div>
               </>
             ) : canUpload && atCap ? (
-              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
+              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500 dark:border-slate-700 dark:bg-slate-700 dark:text-slate-400">
                 {MAX_PROOFS_PER_TASK}/{MAX_PROOFS_PER_TASK} photos attached or staged — remove one to
                 add another.
               </p>
@@ -1190,7 +1270,7 @@ function ProofCell({
                 type="button"
                 disabled={uploading}
                 onClick={() => inputRef.current?.click()}
-                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
               >
                 ➕ Add Photo
               </button>
@@ -1213,21 +1293,21 @@ function ProofCell({
                     if (file) void addFile(file);
                   }}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
-                    dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
+                    dragOver ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/30" : "border-gray-300 bg-gray-50 dark:border-slate-600 dark:bg-slate-700"
                   }`}
                 >
                   <span className="text-xl" aria-hidden>
                     🖼️
                   </span>
-                  <p className="text-sm font-medium text-gray-600">Drop an Image Here</p>
-                  <p className="text-xs text-gray-400">or Paste It (Ctrl+V)</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Drop an Image Here</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">or Paste It (Ctrl+V)</p>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
                     disabled={uploading}
                     onClick={() => inputRef.current?.click()}
-                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
                   >
                     📁 Upload File
                   </button>
@@ -1235,21 +1315,21 @@ function ProofCell({
                     type="button"
                     disabled={uploading}
                     onClick={() => void openCamera()}
-                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+                    className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
                   >
                     📷 Take Photo
                   </button>
                 </div>
               </>
             ) : isCompleted && isOwned ? (
-              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500">
+              <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium text-gray-500 dark:border-slate-700 dark:bg-slate-700 dark:text-slate-400">
                 🔒 Task is complete — photos are locked.
               </p>
             ) : null}
             {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
             <ErrorLine error={error} />
             {canUpload && !atCap && !cameraOpen && (
-              <p className="mt-2 text-[11px] text-gray-400">
+              <p className="mt-2 text-[11px] text-gray-400 dark:text-slate-500">
                 PNG / JPEG / WebP · photos are auto-compressed (max 1280px) ·{" "}
                 {proofIds.length}/{MAX_PROOFS_PER_TASK} attached
                 {pending.length > 0 ? `, ${pending.length} staged` : ""}
@@ -1271,19 +1351,19 @@ function ProofCell({
           onClick={() => setEnlargedId(null)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900">Proof</h4>
-                <p className="truncate text-xs text-gray-500">{task.blockTitle}</p>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Proof</h4>
+                <p className="truncate text-xs text-gray-500 dark:text-slate-400">{task.blockTitle}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setEnlargedId(null)}
                 aria-label="Close"
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
               >
                 ✕
               </button>
@@ -1298,7 +1378,7 @@ function ProofCell({
               <img
                 src={`/api/task-manager/proof-image/${enlargedId}`}
                 alt={`Proof for ${task.blockTitle}`}
-                className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain"
+                className="max-h-[60vh] w-full rounded-xl border border-gray-200 object-contain dark:border-slate-700"
               />
             </a>
             {canRemove && (
@@ -1308,7 +1388,7 @@ function ProofCell({
                 onClick={() => {
                   if (enlargedId) void handleRemove(enlargedId);
                 }}
-                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                className="mt-3 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-400"
               >
                 {removingId === enlargedId ? "Removing…" : "Remove photo"}
               </button>
@@ -1318,6 +1398,180 @@ function ProofCell({
         </div>,
         document.body,
       )}
+    </span>
+  );
+}
+
+/** Row-level "⋮" actions menu (2026-08-15) — a small popover trigger
+ *  currently holding exactly one action ("Assign to Others"), replacing
+ *  what used to be a persistent inline button in space-constrained rows
+ *  (EntityCardOverview's card grid, which can require horizontal scroll to
+ *  reach a right-aligned button). Only rendered where a caller opts in via
+ *  TaskRowLine's `reassignAsMenu` prop — elsewhere (e.g. "My Tasks"
+ *  personal lists) the trigger stays a plain button, unchanged. Same
+ *  portal/outside-click/Escape pattern as StatusDropdown above, for the
+ *  same reason: rows can sit inside a scrolling ancestor (card bodies use
+ *  max-h-80 overflow-auto), which would clip a plain absolutely-positioned
+ *  popover instead of floating it over the row. Exported so
+ *  entity-card-overview.tsx's Type-sort table (which renders its own rows,
+ *  not through TaskRowLine) can reuse the identical trigger/menu. */
+export function RowActionsMenu({ onAssignToOthers }: { onAssignToOthers: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !(menuRef.current && menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        title="More actions"
+        aria-label="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => {
+            const next = !o;
+            if (next && triggerRef.current) {
+              const rect = triggerRef.current.getBoundingClientRect();
+              // Flip upward when there isn't room below (2026-08-19) — same
+              // viewport-overflow fix as StatusDropdown's own menu, same
+              // fixed single-item content so the estimate is safe.
+              const MENU_HEIGHT_ESTIMATE = 56;
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              setMenuPos({ top, left: rect.right - 160 });
+            }
+            return next;
+          });
+        }}
+        className="flex size-6 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+      >
+        ⋮
+      </button>
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onAssignToOthers();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              Assign to Others
+            </button>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+/** Click-to-edit Due Date cell (2026-08-19) — ONLY used by TaskRowLine when
+ *  its caller passes `onDueAtChange` (currently: "Tasks I Assigned"/"CEO
+ *  Assigned Task" only). Click reveals a native date input; picking a date
+ *  preserves the task's existing time-of-day (only the calendar date
+ *  changes, same "same time, different day" convention the recurrence
+ *  engine's nextWeeklyDueAt uses) and calls the handler. busy/errorText
+ *  mirrors StatusDropdown's own local-state pattern elsewhere in this file
+ *  (same InlineActionError component) for a consistent feel. */
+function EditableDueDate({
+  task,
+  dueDisplay,
+  onDueAtChange,
+}: {
+  task: FlowTaskRow;
+  dueDisplay: DueDateDisplay | null;
+  onDueAtChange: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [errorText, setErrorText] = React.useState<string | null>(null);
+  const dateValue = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : "";
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.value; // "YYYY-MM-DD"
+    if (!picked) return;
+    setBusy(true);
+    setErrorText(null);
+    const [y, m, d] = picked.split("-").map(Number);
+    const next = task.dueAt ? new Date(task.dueAt) : new Date();
+    next.setUTCFullYear(y, m - 1, d);
+    const result = await onDueAtChange(task.runBlockId, next.toISOString());
+    setBusy(false);
+    if (result.ok) setEditing(false);
+    else setErrorText(result.message);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="shrink-0 truncate text-left text-xs hover:underline decoration-dotted"
+        style={{ width: DUE_COL_WIDTH }}
+        title="Click to change the due date"
+      >
+        {dueDisplay ? (
+          <span className={dueDisplay.className}>{dueDisplay.text}</span>
+        ) : (
+          <span className="text-gray-300 dark:text-slate-600">—</span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <span className="relative shrink-0" style={{ width: DUE_COL_WIDTH }}>
+      <input
+        type="date"
+        autoFocus
+        disabled={busy}
+        defaultValue={dateValue}
+        onChange={handleChange}
+        onBlur={() => {
+          if (!busy) setEditing(false);
+        }}
+        className="w-full rounded border border-gray-200 bg-white px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      />
+      {errorText && <InlineActionError text={errorText} />}
     </span>
   );
 }
@@ -1342,7 +1596,11 @@ export function TaskRowLine({
   blankDueDate,
   hideStatusChip,
   hideAssignee,
+  assigneeSource,
+  onDueAtChange,
   reassign,
+  reassignAnyOwner,
+  reassignAsMenu,
 }: {
   task: FlowTaskRow;
   /** The VIEWER's own user id — see StatusOverviewCard. */
@@ -1411,6 +1669,22 @@ export function TaskRowLine({
    *  already the CARD's owner's own task, so an "assigned by" column is
    *  redundant with the card header. */
   hideAssignee?: boolean;
+  /** Which name the Assignee column shows (2026-08-19): "assigner" (default,
+   *  unchanged everywhere existing callers already work) is who assigned
+   *  the task TO the viewer — the personal "My Tasks" meaning. "assignee"
+   *  is who the task is assigned TO — for "Tasks I Assigned"/"CEO Assigned
+   *  Task", where the viewer IS the assigner on every row (so assignerName
+   *  is always undefined/redundant there) and the useful thing to show is
+   *  who they delegated it to, from task.assigneeName (see FlowDrillTask). */
+  assigneeSource?: "assigner" | "assignee";
+  /** Editable Due Date (2026-08-19), scoped ONLY to "Tasks I Assigned"/"CEO
+   *  Assigned Task" — NOT a general TaskRowLine capability, deliberately:
+   *  every other Daily/Monthly/roster list's due date is either fixed by
+   *  the recurrence engine or the reader isn't the task's assigner. When
+   *  provided (and hideCompleted mode), clicking the Due Date cell reveals
+   *  a native date input; on change, calls this with the new date at the
+   *  SAME time-of-day the task's dueAt already had (see EditableDueDate). */
+  onDueAtChange?: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
   /** "Assign to Others" self-service handoff (2026-08-13): when provided
    *  and this row is the viewer's own pending task, renders a trigger that
    *  opens the same inline ReassignPicker the manager-oversight
@@ -1418,13 +1692,57 @@ export function TaskRowLine({
    *  authorization (self-service is scoped server-side to same department/
    *  branch) — this prop only controls whether the trigger renders. */
   reassign?: ReassignControl;
+  /** Manager mode (2026-08-15): let the reassign trigger appear on ANY
+   *  pending row, not just the viewer's own — for View All card grids where
+   *  an authorized manager (ADMIN/ELEVATED_DEPT_SITE — the caller decides
+   *  who qualifies) can hand off someone else's task. reassignFlowTask
+   *  (data/tasks.ts) already supports this server-side for ADMIN/OPS/HOD/
+   *  elevated dept-site regardless of what the UI shows — this prop only
+   *  controls whether the trigger RENDERS for a non-owned row; the server
+   *  re-checks the actor's role on every call either way. */
+  reassignAnyOwner?: boolean;
+  /** Render the reassign trigger as a "⋮" icon + popover menu (RowActionsMenu
+   *  above) instead of the default persistent "Assign to Others" button
+   *  (2026-08-15) — opt-in per caller, e.g. EntityCardOverview's card rows
+   *  (space-constrained, needs horizontal scroll to reach a right-aligned
+   *  button); "My Tasks" personal lists leave this unset and keep the plain
+   *  button. Ignored when `reassign` isn't provided or the row isn't
+   *  reassignable (same `canReassign` gate either way). */
+  reassignAsMenu?: boolean;
 }) {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueDisplay = formatDueDate(due);
   const isOwned = Boolean(myUserId) && task.assigneeId === myUserId;
   const canComplete = Boolean(onComplete) && task.quickCompletable && isOwned && !isLockedDueDay(task);
-  const canReassign = Boolean(reassign) && isOwned && task.status !== "DONE" && task.status !== "SKIPPED";
+  const canReassign =
+    Boolean(reassign) && (isOwned || reassignAnyOwner) && task.status !== "DONE" && task.status !== "SKIPPED";
   const [reassignOpen, setReassignOpen] = React.useState(false);
+  const reassignContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-close the ReassignPicker on an outside click/tap or Escape
+  // (2026-08-15) — previously the only way to close it was to reopen the
+  // "Assign to Others" trigger and toggle it off again, same friction the
+  // ⋮ menu itself doesn't have (RowActionsMenu already closes on outside
+  // click). Scoped to THIS row's own wrapper (reassignContainerRef, set on
+  // the outer <div> below, which contains both the trigger and the picker)
+  // so clicking a DIFFERENT row's trigger doesn't get swallowed as "outside".
+  React.useEffect(() => {
+    if (!reassignOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (reassignContainerRef.current && !reassignContainerRef.current.contains(e.target as Node)) {
+        setReassignOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReassignOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [reassignOpen]);
 
   // Subtask rows indent by one slot (20px spacer + the 12px flex gap) and
   // shave that off the Task column so Proof/Assignee/Due Date columns stay
@@ -1441,7 +1759,7 @@ export function TaskRowLine({
         : nameWidth;
 
   return (
-    <div>
+    <div ref={reassignContainerRef}>
     <div
       className={`group flex items-center gap-3 py-2.5 [&:has(button[aria-expanded="true"])]:relative [&:has(button[aria-expanded="true"])]:z-30 ${
         hideCompleted && (task.status === "DONE" || task.status === "SKIPPED") ? "opacity-60" : ""
@@ -1458,7 +1776,7 @@ export function TaskRowLine({
           checked={selected ?? false}
           onChange={() => onToggleSelect(task.runBlockId)}
           aria-label={`Select ${task.blockTitle}`}
-          className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 transition-opacity ${
+          className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 transition-opacity dark:border-slate-600 ${
             selected
               ? "opacity-100"
               : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
@@ -1484,7 +1802,7 @@ export function TaskRowLine({
             onClick={tree.onToggle}
             title={tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
             aria-label={`${tree.expanded ? "Collapse" : "Expand"} subtasks of ${task.blockTitle}`}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-base leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-base leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
           >
             {tree.expanded ? "▾" : "▸"}
           </button>
@@ -1496,7 +1814,7 @@ export function TaskRowLine({
           at a glance even in a long expanded group. */}
       {isChild && (
         <span className="flex w-5 shrink-0 justify-center self-stretch" aria-hidden>
-          <span className="w-px bg-gray-200" />
+          <span className="w-px bg-gray-200 dark:bg-slate-700" />
         </span>
       )}
       {hideCompleted ? (
@@ -1517,18 +1835,18 @@ export function TaskRowLine({
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
             className={`min-w-0 text-sm font-semibold ${
-              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+              task.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
             }`}
           >
             {task.blockTitle}
           </p>
           {tree?.kind === "parent" && (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 dark:bg-slate-700 dark:text-slate-400">
               {tree.count}
             </span>
           )}
           {task.fromSchedule && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
@@ -1541,9 +1859,21 @@ export function TaskRowLine({
           <div
             onPointerDown={onResizeStart}
             title="Drag to resize"
-            className="absolute -right-1.5 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center"
+            // -top-2.5/-bottom-2.5 (2026-08-19, was top-0 h-full): this div's
+            // own height used to be just the Task title's line height — the
+            // wrapper it's positioned against (the parent "relative min-w-0"
+            // div) is only as tall as its own content, not the row's full
+            // py-2.5-padded height, so the line stopped short of the row's
+            // actual boundaries and left a visible gap between one row's
+            // segment and the next. Stretching top/bottom by py-2.5's own
+            // 10px (removing the conflicting h-full below) extends this
+            // div's height to cover the row's FULL allocated space instead,
+            // so consecutive rows' segments now meet with no gap — reads as
+            // one continuous line down the table instead of disconnected
+            // dashes.
+            className="absolute -right-1.5 -top-2.5 -bottom-2.5 flex w-3 cursor-col-resize touch-none items-center justify-center"
           >
-            <div className="h-full w-px bg-gray-200 hover:w-0.5 hover:bg-blue-400" />
+            <div className="h-full w-px bg-gray-200 hover:w-0.5 hover:bg-blue-400 dark:bg-slate-700" />
           </div>
         )}
       </div>
@@ -1560,12 +1890,14 @@ export function TaskRowLine({
           the context, so no per-row prefix. */}
       {hideCompleted && !hideAssignee && (
         <span
-          className={`truncate text-xs text-gray-500 ${
+          className={`truncate text-xs text-gray-500 dark:text-slate-400 ${
             assignerWidth === undefined ? "min-w-0 flex-1" : "shrink-0"
           }`}
           style={assignerWidth === undefined ? undefined : { width: assignerWidth }}
         >
-          {task.assignerName ?? <span className="text-gray-300">—</span>}
+          {(assigneeSource === "assignee" ? task.assigneeName : task.assignerName) ?? (
+            <span className="text-gray-300 dark:text-slate-600">—</span>
+          )}
         </span>
       )}
       {/* Due Date: in table mode a FIXED column (constant width/position,
@@ -1583,13 +1915,17 @@ export function TaskRowLine({
       {!hideDueDate &&
         !blankDueDate &&
         (hideCompleted ? (
-          <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
-            {dueDisplay ? (
-              <span className={dueDisplay.className}>{dueDisplay.text}</span>
-            ) : (
-              <span className="text-gray-300">—</span>
-            )}
-          </span>
+          onDueAtChange ? (
+            <EditableDueDate task={task} dueDisplay={dueDisplay} onDueAtChange={onDueAtChange} />
+          ) : (
+            <span className="shrink-0 truncate text-xs" style={{ width: DUE_COL_WIDTH }}>
+              {dueDisplay ? (
+                <span className={dueDisplay.className}>{dueDisplay.text}</span>
+              ) : (
+                <span className="text-gray-300 dark:text-slate-600">—</span>
+              )}
+            </span>
+          )
         ) : (
           dueDisplay && (
             <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
@@ -1599,18 +1935,22 @@ export function TaskRowLine({
         <span className="shrink-0" style={{ width: DUE_COL_WIDTH }} aria-hidden />
       )}
       {!hideCompleted && !hideStatusChip && <StatusChip status={task.status} />}
-      {canReassign && (
-        <button
-          type="button"
-          onClick={() => setReassignOpen((o) => !o)}
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-            reassignOpen
-              ? "border-blue-400 bg-blue-50 text-blue-700"
-              : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
-          }`}
-        >
-          Assign to Others
-        </button>
+      {canReassign && reassignAsMenu ? (
+        <RowActionsMenu onAssignToOthers={() => setReassignOpen((o) => !o)} />
+      ) : (
+        canReassign && (
+          <button
+            type="button"
+            onClick={() => setReassignOpen((o) => !o)}
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+              reassignOpen
+                ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
+                : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
+            }`}
+          >
+            Assign to Others
+          </button>
+        )
       )}
     </div>
     {canReassign && reassign && reassignOpen && (
@@ -1744,7 +2084,29 @@ export function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React
       title="Drag to resize"
       className="absolute -right-1.5 top-1/2 flex h-4 w-3 -translate-y-1/2 cursor-col-resize touch-none items-center justify-center"
     >
-      <span className="h-4 w-px bg-gray-300 hover:w-0.5 hover:bg-blue-400" />
+      <span className="h-4 w-px bg-gray-300 hover:w-0.5 hover:bg-blue-400 dark:bg-slate-600" />
+    </span>
+  );
+}
+
+/** Invisible stand-in for StatusDropdown's own trigger button (2026-08-19),
+ *  reserving the header's status-column slot at the SAME width the real
+ *  button actually renders at. A plain `w-3` spacer (matching just the
+ *  circle's own size-3) used to sit here, but StatusDropdown's trigger is
+ *  wider than that — circle + gap-0.5 + the "▾" chevron (added 2026-08-18
+ *  for click affordance) + p-1 padding, net of its own -m-1 — so every
+ *  header spacer that never got updated to match under-reserved space,
+ *  shifting the Task column (and everything after it, including its own
+ *  resize divider) rightward relative to the header in every data row. This
+ *  mirrors the trigger's exact classes/content instead of a hardcoded guess
+ *  at its width, so the two can never drift apart again even if the real
+ *  button's padding/content changes later. `invisible` (not `hidden`) so it
+ *  still occupies its layout space. */
+export function StatusHeaderSpacer() {
+  return (
+    <span className="invisible -m-1 flex shrink-0 items-center gap-0.5 rounded-full p-1" aria-hidden>
+      <span className="block size-3 rounded-full border-2 border-red-400 bg-white" />
+      <span className="text-[8px] leading-none">▾</span>
     </span>
   );
 }
@@ -1758,50 +2120,17 @@ export function HeaderResizeHandle({ onPointerDown }: { onPointerDown: (e: React
  *
  * `hideCompleted` — "My Tasks" personal-list mode ONLY (the roster
  * drill-down omits this prop and keeps its existing behavior: every status
- * visible, its own color per status, a text badge). When set: `TaskRowLine`
- * switches every row to the status-dropdown circle and drops the status text
- * badge. All three status buckets default to VISIBLE — independent "Show
- * Completed"/"Show Pending"/"Show N/A" toggles (local state, reset on
- * reload, all default ON) let the viewer decompose down to any combination,
- * matching the status donut's own three buckets (2026-08-11: Pending/N-A
- * toggles added alongside the original Show Completed one).
+ * visible, its own color per status, a text badge, one flat ungrouped
+ * list). When set: `TaskRowLine` switches every row to the status-dropdown
+ * circle and drops the status text badge, and rows render as three
+ * collapsible status GROUPS (Pending / Completed / N/A, in that order,
+ * matching the ClickUp reference — 2026-08-18, replacing the earlier Show
+ * Completed/Pending/N-A toggle switches, which hid a bucket entirely
+ * instead of letting it collapse/expand). Pending starts expanded;
+ * Completed/N-A start collapsed. A parent task's subtasks always stay
+ * nested under it within its own group, regardless of the subtasks' own
+ * status.
  */
-/** Pill-track toggle switch (gray/off, blue/on, sliding knob) — used by
- *  ResizableTaskList's "Show Completed"/"Show Pending"/"Show N/A" controls;
- *  generic enough to reuse anywhere else a plain on/off needs this exact
- *  visual style. */
-function ToggleSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-      {label}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={onChange}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-blue-600" : "bg-gray-300"
-        }`}
-      >
-        <span
-          className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
-            checked ? "translate-x-[18px]" : "translate-x-0.5"
-          }`}
-        />
-      </button>
-    </label>
-  );
-}
-
 /** Bulk-select's action trigger (appears once 1+ rows are checked in
  *  EntityDrillModal's own bucket) — same hand-rolled popover pattern as
  *  StatusDropdown (outside-click/Escape to close). Takes whichever actions
@@ -1888,7 +2217,7 @@ function BulkActionsButton({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md"
+          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
         >
           {actions.map((a) => (
             <button
@@ -1896,7 +2225,7 @@ function BulkActionsButton({
               type="button"
               role="menuitem"
               onClick={() => run(a.onRun)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
             >
               {a.icon}
               {a.label}
@@ -1918,11 +2247,19 @@ export function ResizableTaskList({
   onRemoveProof,
   emptyLabel,
   hideCompleted,
+  showCompletedToggle,
+  showCompleted,
+  onShowCompletedChange,
   assigneeColumnLabel,
   hideRowResizeDivider,
   hideAssignee,
+  assigneeSource,
+  onDueAtChange,
   blankDueDate,
   reassign,
+  reassignAsMenu,
+  reassignAnyOwner,
+  defaultNameWidth,
 }: {
   tasks: FlowTaskRow[];
   myUserId?: string;
@@ -1937,6 +2274,24 @@ export function ResizableTaskList({
   onRemoveProof?: ProofRemoveHandler;
   emptyLabel: string;
   hideCompleted?: boolean;
+  /** Renders a single "Show Completed" checkbox (2026-08-19) that expands/
+   *  collapses the Completed AND N/A groups TOGETHER, on top of their
+   *  existing individual chevrons — only meaningful alongside hideCompleted.
+   *  Uncontrolled by default (toggles this list's own internal
+   *  collapsedGroups state); pass showCompleted/onShowCompletedChange below
+   *  to control it externally instead (e.g. one shared toggle driving
+   *  several lists at once, see EntityCardOverview's groupByStatus mode). */
+  showCompletedToggle?: boolean;
+  /** Controlled override (2026-08-19) for whether the Completed/N-A groups
+   *  are expanded — when provided, this list stops managing that part of
+   *  collapsedGroups itself and defers entirely to this prop (Pending stays
+   *  always expanded either way). Requires onShowCompletedChange to still
+   *  be interactive; omit both for the original uncontrolled behavior. */
+  showCompleted?: boolean;
+  /** Pairs with showCompleted above — called instead of the internal
+   *  toggle when the viewer clicks the master switch or a Completed/N-A
+   *  group's own chevron. */
+  onShowCompletedChange?: (value: boolean) => void;
   /** Header override for the Assignee column (2026-08-05) — e.g. "Assigned
    *  To" for a "tasks I assigned" list, where the column shows who the
    *  task went TO rather than who assigned it to the viewer (the usual
@@ -1957,6 +2312,13 @@ export function ResizableTaskList({
    *  task, so "who assigned this to me" is redundant. See TaskRowLine's own
    *  hideAssignee doc comment. */
   hideAssignee?: boolean;
+  /** Passed straight through to every row's TaskRowLine — see its own
+   *  `assigneeSource` doc comment. */
+  assigneeSource?: "assigner" | "assignee";
+  /** Passed straight through to every row's TaskRowLine — see its own
+   *  `onDueAtChange` doc comment (scoped to "Tasks I Assigned"/"CEO
+   *  Assigned Task" only). */
+  onDueAtChange?: (runBlockId: string, newDueAtIso: string) => Promise<ActionResult>;
   /** Keep the Due Date column but blank its per-row value (2026-08-15,
    *  same EntityCardOverview Daily-card motivation as TaskRowLine's own
    *  blankDueDate — the date is implied by the section itself). */
@@ -1966,15 +2328,88 @@ export function ResizableTaskList({
    *  header column for it (replacing Assignee's slot when hideAssignee is
    *  also set, otherwise appended) only when provided. */
   reassign?: ReassignControl;
+  /** Render the reassign trigger as a "⋮" menu instead of a persistent
+   *  button (2026-08-15) — see TaskRowLine's own `reassignAsMenu` doc
+   *  comment; passed straight through to every row. */
+  reassignAsMenu?: boolean;
+  /** Manager mode (2026-08-19) — see TaskRowLine's own `reassignAnyOwner`
+   *  doc comment; passed straight through to every row. Lets a viewer with
+   *  this permission reassign OTHER people's pending tasks too, not just
+   *  their own. */
+  reassignAnyOwner?: boolean;
+  /** Starting Task-column width before any drag (2026-08-15) — defaults to
+   *  RESIZABLE_TASK_NAME_DEFAULT (the original "My Tasks" page behavior,
+   *  unchanged) when omitted. Callers with a wider available row (no
+   *  Assignee/Due columns eating space, e.g. EntityCardOverview's own-card
+   *  myWeek/myMonth tab body) can start the divider further right instead
+   *  of always opening at the same narrow default. Still fully draggable
+   *  afterward within RESIZABLE_TASK_NAME_MIN/MAX either way. */
+  defaultNameWidth?: number;
 }) {
-  // All three default to ON — nothing is hidden until the viewer toggles one
-  // off. Mirrors the status donut's own three buckets (Completed/Pending/
-  // N-A) so "My Tasks" can be decluttered down to any combination of them,
-  // not just Completed (2026-08-11: Pending/N-A toggles added alongside the
-  // original Show Completed one).
-  const [showCompleted, setShowCompleted] = React.useState(true);
-  const [showPending, setShowPending] = React.useState(true);
-  const [showNA, setShowNA] = React.useState(true);
+  // Collapsible status groups (2026-08-18, replacing the old Show Pending/
+  // Completed/N-A toggle switches — those hid a bucket entirely with no way
+  // to glance at its count; ClickUp's own task list uses collapsible
+  // sections instead, which is what this now matches). Pending starts
+  // expanded (the actionable bucket); Completed/N-A start collapsed (out of
+  // the way until opened) — every row still exists in the DOM tree, just
+  // hidden, so nothing is actually filtered out anymore. Pending IS
+  // collapsible via its own chevron (2026-08-20 fix — it previously always
+  // rendered expanded regardless of clicks, see isGroupCollapsed below).
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<BucketKey>>(
+    () => new Set<BucketKey>(["completed", "na"]),
+  );
+  const toggleGroup = (key: BucketKey) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  // Show Completed (2026-08-19) — a single master switch layered on top of
+  // the per-group chevrons above. In CONTROLLED mode (showCompleted prop
+  // provided), the Completed/N-A groups defer entirely to it instead of
+  // collapsedGroups, so several lists (e.g. every person's card in an
+  // EntityCardOverview section) can share one external boolean. Pending is
+  // deliberately NEVER driven by this controlled prop — collapsing Pending
+  // is a per-card layout preference, not part of "show completed work",
+  // so it always reads its own independent collapsedGroups entry instead
+  // (2026-08-20 fix — a hardcoded `return false` here previously made every
+  // card's Pending chevron register the click but never actually collapse,
+  // across every person card in the View All grid, not just one).
+  const isControlledCompleted = showCompleted !== undefined;
+  const isGroupCollapsed = (key: BucketKey): boolean => {
+    if (key === "pending") return collapsedGroups.has("pending");
+    if (isControlledCompleted) return !showCompleted;
+    return collapsedGroups.has(key);
+  };
+  const masterShowCompleted = isControlledCompleted
+    ? showCompleted!
+    : !(collapsedGroups.has("completed") && collapsedGroups.has("na"));
+  const toggleGroupOrMaster = (key: BucketKey) => {
+    if (key !== "pending" && isControlledCompleted) {
+      onShowCompletedChange?.(!showCompleted);
+      return;
+    }
+    toggleGroup(key);
+  };
+  const toggleMasterShowCompleted = () => {
+    if (isControlledCompleted) {
+      onShowCompletedChange?.(!showCompleted);
+      return;
+    }
+    const turningOn = !masterShowCompleted;
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (turningOn) {
+        next.delete("completed");
+        next.delete("na");
+      } else {
+        next.add("completed");
+        next.add("na");
+      }
+      return next;
+    });
+  };
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   /** Parents the viewer has collapsed — everything ELSE is expanded (the
    *  2026-07-30 confirmed default). */
@@ -2004,7 +2439,7 @@ export function ResizableTaskList({
   // doc comment for the extraction rationale.
   const { containerRef, containerStyle, onResizeStart } = useResizableColumn({
     cssVar: "--tm-col-name",
-    defaultWidth: RESIZABLE_TASK_NAME_DEFAULT,
+    defaultWidth: defaultNameWidth ?? RESIZABLE_TASK_NAME_DEFAULT,
     min: RESIZABLE_TASK_NAME_MIN,
     max: RESIZABLE_TASK_NAME_MAX,
   });
@@ -2018,24 +2453,23 @@ export function ResizableTaskList({
   const pendingCount = hideCompleted
     ? tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED").length
     : 0;
-  const visibleTasks = hideCompleted
-    ? tasks.filter((t) => {
-        if (t.status === "DONE") return showCompleted;
-        if (t.status === "SKIPPED") return showNA;
-        return showPending;
-      })
-    : tasks;
+  const bucketOf = (t: FlowTaskRow): BucketKey =>
+    t.status === "DONE" ? "completed" : t.status === "SKIPPED" ? "na" : "pending";
 
   // Main Task ↔ Subtask tree (2026-07-30, table mode only): group rows
   // under their parent, chevron-expandable (EXPANDED by default —
-  // collapsedIds tracks the exceptions). A subtask whose parent isn't in
-  // this list (different period window, or parent hidden by Show
-  // Completed) renders as a top-level row instead of vanishing.
-  const visibleIds = new Set(visibleTasks.map((t) => t.runBlockId));
+  // collapsedIds tracks the exceptions). Every task is always in this tree
+  // now (2026-08-18: the old Show Pending/Completed/N-A toggles used to
+  // filter `tasks` down to `visibleTasks` first, which could drop a subtask
+  // out of its parent's tree independently of the parent — collapsible
+  // groups replace that with per-STATUS-GROUP collapse of TOP-LEVEL tasks
+  // only, so a task's children always stay nested under it regardless of
+  // their own status).
+  const allIds = new Set(tasks.map((t) => t.runBlockId));
   const childrenOf = new Map<string, FlowTaskRow[]>();
   if (hideCompleted) {
-    for (const t of visibleTasks) {
-      if (t.parentId && visibleIds.has(t.parentId)) {
+    for (const t of tasks) {
+      if (t.parentId && allIds.has(t.parentId)) {
         const kids = childrenOf.get(t.parentId);
         if (kids) kids.push(t);
         else childrenOf.set(t.parentId, [t]);
@@ -2052,10 +2486,25 @@ export function ResizableTaskList({
       });
     }
   }
-  const topLevelTasks = hideCompleted
-    ? visibleTasks.filter((t) => !t.parentId || !visibleIds.has(t.parentId))
-    : visibleTasks;
+  const topLevelTasks = hideCompleted ? tasks.filter((t) => !t.parentId || !allIds.has(t.parentId)) : tasks;
   const hasTree = childrenOf.size > 0;
+  // Collapsible groups (2026-08-18) — top-level tasks only, grouped by
+  // their OWN status; a parent's children stay nested under it regardless
+  // of the group. Order is fixed: Pending, Completed, N/A (per product
+  // decision — pending first, everything else is out of the way by
+  // default). Only meaningful in hideCompleted ("My Tasks") mode — the
+  // roster drill-down (hideCompleted false) keeps its original flat,
+  // ungrouped rendering below, unchanged.
+  const GROUP_ORDER: BucketKey[] = ["pending", "completed", "na"];
+  const GROUP_LABEL: Record<BucketKey, string> = { pending: "Pending", completed: "Completed", na: "N/A" };
+  const groupedTopLevel = hideCompleted
+    ? GROUP_ORDER.map((key) => ({
+        key,
+        label: GROUP_LABEL[key],
+        dot: BUCKET_META.find((b) => b.key === key)!.dot,
+        rows: topLevelTasks.filter((t) => bucketOf(t) === key),
+      })).filter((g) => g.rows.length > 0)
+    : [];
   const toggleExpand = (id: string) =>
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -2160,7 +2609,7 @@ export function ResizableTaskList({
   // EntityDrillModal's checkboxes; there's no checkbox to check for anyone
   // else's task, so this is defense-in-depth, not a real gate in practice
   // (this whole list is always "my own tasks" by construction).
-  const ownedVisibleTasks = visibleTasks.filter((t) => myUserId && t.assigneeId === myUserId);
+  const ownedVisibleTasks = tasks.filter((t) => myUserId && t.assigneeId === myUserId);
   const allOwnedSelected =
     ownedVisibleTasks.length > 0 && ownedVisibleTasks.every((t) => selectedIds.has(t.runBlockId));
   const toggleSelect = (id: string) => {
@@ -2196,7 +2645,7 @@ export function ResizableTaskList({
     eligible: (t: FlowTaskRow) => boolean,
   ): Promise<ActionResult> => {
     if (!action) return { ok: true };
-    const targets = visibleTasks.filter((t) => selectedIds.has(t.runBlockId) && eligible(t));
+    const targets = tasks.filter((t) => selectedIds.has(t.runBlockId) && eligible(t));
     const results = await Promise.allSettled(targets.map((t) => action(t.runBlockId)));
     const failedIds = targets
       .filter((_, i) => {
@@ -2212,10 +2661,6 @@ export function ResizableTaskList({
     };
   };
 
-  // Deliberately just these two — no bulk reopen here, matching the per-row
-  // dropdown's own scope for a flat mixed-status list (unlike
-  // EntityDrillModal, which is bucket-scoped and offers reopen when the
-  // whole bucket being viewed is Completed/N-A).
   const bulkActions: { key: string; label: string; icon: React.ReactNode; onRun: () => Promise<ActionResult> }[] = [];
   if (onComplete) {
     bulkActions.push({
@@ -2242,57 +2687,53 @@ export function ResizableTaskList({
         runBulk(onSkip, (t) => t.status !== "SKIPPED" && t.assigneeId === myUserId && !isLockedDueDay(t)),
     });
   }
+  // Bulk reopen (2026-08-18) — previously deliberately omitted here ("no
+  // bulk reopen ... matching the per-row dropdown's own scope for a flat
+  // mixed-status list"), but the collapsible status groups above now make
+  // this list bucket-scoped too (same rationale EntityDrillModal already
+  // uses for its own bulk reopen, offered when the whole bucket being
+  // viewed is Completed/N-A) — selecting rows inside the Completed/N-A
+  // group and wanting to bulk-reopen them is a real, now-common flow.
+  // Eligibility mirrors the per-row StatusDropdown's own canReopen (DONE or
+  // SKIPPED, owned, not due-day-locked); a selection mixing Pending rows in
+  // just silently skips those, same as the other two actions above.
+  if (onReopen) {
+    bulkActions.push({
+      key: "reopen",
+      label: "Mark Pending",
+      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
+      onRun: () =>
+        runBulk(
+          onReopen,
+          (t) => (t.status === "DONE" || t.status === "SKIPPED") && t.assigneeId === myUserId && !isLockedDueDay(t),
+        ),
+    });
+  }
   // Past-day lock (2026-08-05): the WHOLE bulk-actions control goes inert
   // when every currently-selected task is locked — mirrors StatusDropdown's
   // own trigger-level lock rather than relying on per-action eligibility
   // alone. A mixed selection (some locked, some not) leaves the button
   // enabled; the eligible() filters above silently skip the locked ones
   // when it runs, same as any other ineligible row already does.
-  const selectedBulkTasks = visibleTasks.filter((t) => selectedIds.has(t.runBlockId));
+  const selectedBulkTasks = tasks.filter((t) => selectedIds.has(t.runBlockId));
   const allSelectedLocked = selectedBulkTasks.length > 0 && selectedBulkTasks.every(isLockedDueDay);
 
   // Select-all moved INTO the column header row (2026-07-31) — this slim
   // bar now only appears when it has something to show: the bulk-actions
-  // trigger (rows selected) and/or at least one of the three Show
-  // Completed/Pending/N-A toggles (each only rendered when its own bucket
-  // is non-empty, same as Show Completed always was).
-  const controlBar = hideCompleted &&
-    ((selectedIds.size > 0 && bulkActions.length > 0) ||
-      completedCount > 0 ||
-      pendingCount > 0 ||
-      naCount > 0) && (
-      <div className="flex items-center justify-between gap-3 pb-2">
-        <div className="flex items-center gap-3">
-          {selectedIds.size > 0 && bulkActions.length > 0 && (
-            <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {pendingCount > 0 && (
-            <ToggleSwitch checked={showPending} onChange={() => setShowPending((s) => !s)} label="Show Pending" />
-          )}
-          {naCount > 0 && (
-            <ToggleSwitch checked={showNA} onChange={() => setShowNA((s) => !s)} label="Show N/A" />
-          )}
-          {completedCount > 0 && (
-            <ToggleSwitch checked={showCompleted} onChange={() => setShowCompleted((s) => !s)} label="Show Completed" />
-          )}
-        </div>
-      </div>
-    );
+  // trigger, once 1+ rows are selected (2026-08-18: the old Show Pending/
+  // Completed/N-A toggles that used to also live here are gone — each
+  // status is now its own collapsible group below instead).
+  const controlBar = hideCompleted && selectedIds.size > 0 && bulkActions.length > 0 && (
+    <div className="flex items-center justify-between gap-3 pb-2">
+      <BulkActionsButton count={selectedIds.size} actions={bulkActions} disabled={allSelectedLocked} />
+    </div>
+  );
 
-  if (visibleTasks.length === 0) {
-    // Distinguishes "genuinely nothing assigned" (emptyLabel) from "there
-    // ARE tasks, they're just all hidden by the current Show
-    // Completed/Pending/N-A toggles" — the latter can now happen from any
-    // one of the three, not just Show Completed.
-    const allFilteredOut = tasks.length > 0;
+  if (tasks.length === 0) {
     return (
       <div>
         {controlBar}
-        <p className="py-6 text-center text-sm text-gray-400">
-          {allFilteredOut ? "No tasks match the current filters." : emptyLabel}
-        </p>
+        <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">{emptyLabel}</p>
       </div>
     );
   }
@@ -2300,6 +2741,17 @@ export function ResizableTaskList({
   return (
     <div ref={containerRef} style={containerStyle}>
       {controlBar}
+      {hideCompleted && showCompletedToggle && (
+        <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={masterShowCompleted}
+            onChange={toggleMasterShowCompleted}
+            className="size-3.5 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+          />
+          Show Completed
+        </label>
+      )}
       {/* Phones/tablets (2026-07-31): the fixed columns total ~700px, so
           in table mode the header+rows pan HORIZONTALLY inside this
           container instead of cutting off or squeezing — the page itself
@@ -2314,7 +2766,7 @@ export function ResizableTaskList({
           by are fixed-width, and Due date is pinned to the right edge
           (ml-auto) taking whatever remains. */}
       {hideCompleted && (
-        <div className="group flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+        <div className="group flex items-center gap-3 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:border-slate-800 dark:text-slate-500">
           {/* Select-all lives IN the header row (2026-07-31), occupying
               the checkbox column's slot so it aligns exactly above the
               row checkboxes. Bare (no text), hover-to-reveal like them —
@@ -2326,7 +2778,7 @@ export function ResizableTaskList({
               onChange={guardedToggleSelectAll}
               aria-label="Select all tasks"
               title="Select all"
-              className={`size-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 transition-opacity ${
+              className={`size-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 transition-opacity dark:border-slate-600 ${
                 allOwnedSelected
                   ? "opacity-100"
                   : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
@@ -2336,7 +2788,7 @@ export function ResizableTaskList({
             <span className="w-4 shrink-0" aria-hidden />
           )}
           {hasTree && <span className="w-6 shrink-0" aria-hidden />}
-          <span className="w-3 shrink-0" aria-hidden />
+          <StatusHeaderSpacer />
           <span className="relative shrink-0 truncate" style={{ width: "var(--tm-col-name)" }}>
             Task
             <HeaderResizeHandle onPointerDown={onResizeStart} />
@@ -2365,8 +2817,8 @@ export function ResizableTaskList({
           )}
         </div>
       )}
-      <div className="divide-y divide-gray-100">
-        {topLevelTasks.map((t) => {
+      {(() => {
+        const renderTopLevelRow = (t: FlowTaskRow) => {
           const kids = childrenOf.get(t.runBlockId) ?? [];
           const expanded = !collapsedIds.has(t.runBlockId);
           const shared = {
@@ -2381,8 +2833,12 @@ export function ResizableTaskList({
             assignerWidth: ASSIGNER_COL_WIDTH,
             hideCompleted,
             hideAssignee,
+            assigneeSource,
+            onDueAtChange,
             blankDueDate,
             reassign,
+            reassignAsMenu,
+            reassignAnyOwner,
           };
           return (
             <React.Fragment key={t.runBlockId}>
@@ -2420,8 +2876,41 @@ export function ResizableTaskList({
                 ))}
             </React.Fragment>
           );
-        })}
-      </div>
+        };
+
+        // Collapsible status groups (2026-08-18) — "My Tasks" mode only; the
+        // roster drill-down (hideCompleted false) keeps its original flat,
+        // ungrouped list.
+        return hideCompleted ? (
+          groupedTopLevel.map((group) => {
+            const isCollapsed = isGroupCollapsed(group.key);
+            return (
+              <div key={group.key} className="border-b border-gray-100 last:border-b-0 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => toggleGroupOrMaster(group.key)}
+                  aria-expanded={!isCollapsed}
+                  className="flex w-full items-center gap-2 py-2 text-left text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  <ChevronIcon expanded={!isCollapsed} className="size-3.5" />
+                  <span className={`size-2 shrink-0 rounded-full ${group.dot}`} />
+                  <span>{group.label}</span>
+                  <span className="text-gray-400 dark:text-slate-500">({group.rows.length})</span>
+                </button>
+                {!isCollapsed && (
+                  <div className="divide-y divide-gray-100 pb-1.5 dark:divide-slate-800">
+                    {group.rows.map(renderTopLevelRow)}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-slate-800">
+            {topLevelTasks.map(renderTopLevelRow)}
+          </div>
+        );
+      })()}
         </div>
       </div>
       {/* Unresolved-subtasks confirmation modal (2026-07-30) — portal to
@@ -2433,11 +2922,11 @@ export function ResizableTaskList({
             onClick={closeConfirm}
           >
             <div
-              className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+              className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-start justify-between gap-3">
-                <h4 className="text-base font-semibold text-gray-900">
+                <h4 className="text-base font-semibold text-gray-900 dark:text-slate-100">
                   {confirmTarget.parents.length === 1
                     ? `This task has ${confirmTarget.unresolved.length} unresolved item${confirmTarget.unresolved.length === 1 ? "" : "s"}`
                     : `These ${confirmTarget.parents.length} tasks have ${confirmTarget.unresolved.length} unresolved items`}
@@ -2446,7 +2935,7 @@ export function ResizableTaskList({
                   type="button"
                   onClick={closeConfirm}
                   aria-label="Close"
-                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
                 >
                   ✕
                 </button>
@@ -2454,23 +2943,18 @@ export function ResizableTaskList({
               <button
                 type="button"
                 onClick={() => setConfirmSubsOpen((o) => !o)}
-                className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 <span>
                   {confirmTarget.unresolved.length} Subtask
                   {confirmTarget.unresolved.length === 1 ? "" : "s"}
                 </span>
-                <span
-                  className={`text-gray-400 transition-transform ${confirmSubsOpen ? "rotate-90" : ""}`}
-                  aria-hidden
-                >
-                  ›
-                </span>
+                <ChevronIcon expanded={confirmSubsOpen} className="size-3.5 text-gray-400 dark:text-slate-500" />
               </button>
               {confirmSubsOpen && (
-                <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
+                <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-700">
                   {confirmTarget.unresolved.map((k) => (
-                    <li key={k.runBlockId} className="flex items-center gap-2 px-2 py-1 text-sm text-gray-700">
+                    <li key={k.runBlockId} className="flex items-center gap-2 px-2 py-1 text-sm text-gray-700 dark:text-slate-300">
                       <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
                       <span className="min-w-0 flex-1 truncate">{k.blockTitle}</span>
                     </li>
@@ -2479,12 +2963,12 @@ export function ResizableTaskList({
               )}
               {confirmError && <p className="mt-3 text-xs text-red-600">{confirmError}</p>}
               {warnSettingsOpen && (
-                <label className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <label className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-slate-700 dark:bg-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
                     checked={warnEnabled}
                     onChange={(e) => setWarning(e.target.checked)}
-                    className="size-4 rounded border-gray-300 accent-blue-600"
+                    className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
                   />
                   Warn me when completing a task with unresolved subtasks
                 </label>
@@ -2493,7 +2977,7 @@ export function ResizableTaskList({
                 <button
                   type="button"
                   onClick={() => setWarnSettingsOpen((o) => !o)}
-                  className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-600"
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
                 >
                   <span aria-hidden>⚙️</span> Warning Settings
                 </button>
@@ -2502,7 +2986,7 @@ export function ResizableTaskList({
                     type="button"
                     disabled={confirmBusy}
                     onClick={() => void continueWithoutResolving()}
-                    className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                    className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500"
                   >
                     Continue without resolving
                   </button>
@@ -2546,6 +3030,7 @@ export function StatusOverviewCard({
   onUploadProof,
   onRemoveProof,
   reassign,
+  hideChart,
 }: {
   title: string;
   /** Period line under the title; omit for un-periodized overview cards. */
@@ -2554,6 +3039,12 @@ export function StatusOverviewCard({
   tasks?: Record<BucketKey, FlowDrillTask[]>;
   /** Rendered top-right (e.g. the Daily/Monthly toggle). */
   action?: React.ReactNode;
+  /** Skip the StatusDonut ring, keep the BucketLegend text (count +
+   *  percentage per bucket) — same drill-in behavior either way, just no
+   *  chart (2026-08-15, Home page's personal Daily/Monthly cards only —
+   *  every other StatusOverviewCard usage, on Home and on Task Manager's
+   *  own /task-manager page, is unaffected since they don't pass this). */
+  hideChart?: boolean;
   /** "corner" (default) overlays the action absolutely in the top-right —
    *  fine for tiny controls (the CEO cards' drag/remove handle). Wide
    *  controls like the date filter would sit ON TOP of the centered title,
@@ -2585,19 +3076,19 @@ export function StatusOverviewCard({
   const drill = tasks ? setSelected : undefined;
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-white px-6 py-8 shadow-sm">
+    <div className="relative rounded-2xl border border-gray-200 bg-white px-6 py-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {action && actionPlacement === "corner" && (
         <div className="absolute right-4 top-4">{action}</div>
       )}
       {action && actionPlacement === "row" && (
         <div className="mb-3 flex flex-wrap justify-end">{action}</div>
       )}
-      <p className="text-center text-lg font-semibold text-gray-900">{title}</p>
-      {subtitle && <p className="text-center text-sm text-gray-500">{subtitle}</p>}
+      <p className="text-center text-lg font-semibold text-gray-900 dark:text-slate-100">{title}</p>
+      {subtitle && <p className="text-center text-sm text-gray-500 dark:text-slate-400">{subtitle}</p>}
 
       <div className="mt-5 flex flex-col items-center">
-        <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />
-        <div className="mt-5 w-44">
+        {!hideChart && <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />}
+        <div className={`w-44 ${hideChart ? "" : "mt-5"}`}>
           <BucketLegend totals={totals} onSelect={drill} />
         </div>
       </div>
@@ -2659,7 +3150,7 @@ export function ReassignPicker({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-800">
       <input
         value={search}
         onChange={(e) => {
@@ -2682,7 +3173,7 @@ export function ReassignPicker({
           if (!r.ok) setError(r.message);
         }}
       />
-      {busy && <p className="mt-1 text-xs text-gray-400">Assigning…</p>}
+      {busy && <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">Assigning…</p>}
     </div>
   );
 }
@@ -2837,32 +3328,32 @@ export function EntityDrillModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3">
+        <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3 dark:border-slate-800">
           <span className={`size-2.5 shrink-0 rounded-full ${meta.dot}`} />
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-slate-100">
             {name} — {meta.label}
           </p>
-          <span className="text-xs text-gray-400">{rows.length}</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500">{rows.length}</span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
           >
             ✕
           </button>
         </div>
         {ownedRows.length > 0 && (
           <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+            <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
               />
               Select all
             </label>
@@ -2872,18 +3363,18 @@ export function EntityDrillModal({
           </div>
         )}
         {rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">
+          <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">
             No {meta.label.toLowerCase()} tasks this period.
           </p>
         ) : (
           <>
             {/* Slim column header (2026-07-30) — the modal is too narrow
                 for the full three-column header, so just Task | Due date. */}
-            <div className="flex items-center justify-between gap-2.5 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            <div className="flex items-center justify-between gap-2.5 border-b border-gray-100 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:border-slate-800 dark:text-slate-500">
               <span>Task</span>
               <span>Due date</span>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-slate-800">
             {rows.map((t) => {
               const due = t.dueAt ? new Date(t.dueAt) : null;
               const dueDisplay = formatDueDate(due);
@@ -2901,27 +3392,27 @@ export function EntityDrillModal({
                         checked={selectedIds.has(t.runBlockId)}
                         onChange={() => toggleSelect(t.runBlockId)}
                         aria-label={`Select ${t.blockTitle}`}
-                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600"
+                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
                       />
                     )}
                     <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
                     <div className="min-w-0 flex-1">
                       <p
                         className={`truncate text-sm font-semibold ${
-                          t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"
+                          t.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
                         }`}
                       >
                         {t.blockTitle}
                       </p>
                       {!isOwned && (
-                        <p className="truncate text-xs text-gray-500">by {t.assigneeName}</p>
+                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
                       )}
                       {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
                           show who assigned them (assigner cards / personal
                           donut drills); rows about other people keep the
                           assignee line above instead. */}
                       {isOwned && t.assignerName && (
-                        <p className="truncate text-xs text-gray-500">
+                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">
                           Assigned by {t.assignerName}
                         </p>
                       )}
@@ -2949,8 +3440,8 @@ export function EntityDrillModal({
                         }
                         className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                           reassignRow === t.runBlockId
-                            ? "border-blue-400 bg-blue-50 text-blue-700"
-                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                            ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
+                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
                         }`}
                       >
                         Assign to Others

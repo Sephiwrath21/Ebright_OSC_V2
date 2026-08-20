@@ -8,6 +8,7 @@ export * from "./data/tasks";
 export * from "./data/templates";
 export * from "./data/template-groups";
 export * from "./data/manpower";
+export * from "./data/manpower-actual";
 export * from "./data/kanban";
 export * from "./data/branch-package-schedule";
 export * from "./data/task-categories";

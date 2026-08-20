@@ -15,7 +15,7 @@ import * as React from "react";
 import type { CreateCategoryResult, FlowCategoryOption } from "./types";
 
 const selectClass =
-  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none";
+  "w-full appearance-none rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200";
 
 export function CategoryPicker({
   value,
@@ -69,7 +69,7 @@ export function CategoryPicker({
   return (
     <div className="max-w-xl">
       {addingCategory ? (
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600 dark:text-slate-300">
           New type name
           <div className="mt-1 flex items-center gap-2">
             <input
@@ -78,7 +78,7 @@ export function CategoryPicker({
               placeholder="e.g. Flowghan"
               maxLength={100}
               disabled={categoryBusy}
-              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
             <button
               type="button"
@@ -96,7 +96,7 @@ export function CategoryPicker({
                 setCategoryError(null);
               }}
               disabled={categoryBusy}
-              className="text-xs font-medium text-gray-400 hover:text-gray-600 disabled:opacity-50"
+              className="text-xs font-medium text-gray-400 hover:text-gray-600 disabled:opacity-50 dark:text-slate-500 dark:hover:text-slate-300"
             >
               Cancel
             </button>
@@ -104,7 +104,7 @@ export function CategoryPicker({
           {categoryError && <p className="mt-1.5 text-xs text-red-600">{categoryError}</p>}
         </div>
       ) : (
-        <label className="text-sm text-gray-600">
+        <label className="text-sm text-gray-600 dark:text-slate-300">
           Category
           <select
             value={value}

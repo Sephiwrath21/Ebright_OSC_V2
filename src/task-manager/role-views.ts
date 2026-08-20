@@ -30,7 +30,10 @@ export type ViewRole =
 
 export type SectionKey =
   // org-level overviews
-  | "orgGrids" // all-departments + branch-regions (+ ad hoc regions) grids
+  | "orgGrids" // all-departments (+ ad hoc regions) — pair with
+  // branchRegionOverview below for roles that also oversee branches
+  // collapsible sections (rollup card by default, expands into a
+  // per-person list — 2026-08-15 rebuild)
   | "entityDropdowns" // /task-manager dropdown-driven entity overview
   | "departmentOverview" // own-department detail (chips + donut + roster)
   | "branchOverview" // own-branch detail (same component as department)
@@ -50,17 +53,25 @@ export type SectionKey =
   | "myTasksMonthly" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
   | "myTasksAdhoc" // Branch Manager's always-rendered ad hoc list
   | "myBoard" // HOD's personal Kanban
-  | "assignedByMeList" // 2026-08-05: HOD's "Task Assignment" inline list
-  // (Task/Proof of Completion/Assignee/Due Date, the shared My Tasks table
-  // reused read-only) — distinct from "delegated" above, which drives an
-  // unused donut card; CEO's equivalent is the separate ceoTaskTable below.
-  // no longer used in any home/taskManager array as of 2026-08-12; retained
-  // pending a cleanup task
+  | "assignedByMeList" // HOD's own delegated-out list ("Tasks I Assigned"): every task the HOD
+  // personally started, ALL-TIME, read-only Task/Assignee/Status table
+  // (getMePayload's delegatedAll) — distinct from "delegated" above, which
+  // drives an unused donut card. CEO's equivalent is ceoTaskTable below.
+  // Retired from Task Manager 2026-08-12, REVIVED 2026-08-19 (explicit
+  // request).
   // CEO-specific sections
   | "ceoCombinedList"
-  | "ceoTaskTable" // no longer used in any home/taskManager array as of 2026-08-12; retained pending a cleanup task
-  | "ceoKanban"
-  | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc
+  | "ceoTaskTable" // CEO's own delegated-out list ("CEO Assigned Task"): every task CEO
+  // personally started, ALL-TIME, read-only Task/Assignee(HOD)/Status table
+  // (getMePayload's delegatedAll — already computed for CEO, just unused
+  // until this key was revived 2026-08-19). Same "PIC" table shape
+  // assignedByMeList used for HOD.
+  | "ceoKanban" // no longer used in any home/taskManager array as of 2026-08-19; retained pending a cleanup task
+  | "branchRegionOverview"; // Home-only: Branch Status by Region — Daily/Monthly/Ad hoc. Not currently
+  // true for any role (2026-08-19: dropped from CEO, its last user) — the
+  // orgGrids branch's own shows() check on this key (scoped-overview-
+  // section.tsx) stays wired so a future role can opt back in without
+  // touching that file, per its own comment there.
 
 /** Daily weekday sidebar range — per the 2026-07-29 final spec (+ CEO,
  *  2026-08-01): department-side Tue–Sat; Branch Manager + Branch Exec
@@ -78,6 +89,12 @@ export interface RoleViewConfig {
 }
 
 export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
+  // No branchRegionOverview on Home (2026-08-15, revised): confirmed
+  // removed for ADMIN too, not just ELEVATED_DEPT_SITE — see the
+  // ELEVATED_DEPT_SITE comment below for the original reasoning; ADMIN and
+  // OPS were pulled into the same removal per an explicit follow-up
+  // decision. CEO's own separate branchRegionOverview (below, its own
+  // distinct draggable-dashboard layout) is untouched.
   ADMIN: {
     home: ["orgGrids"],
     taskManager: ["entityDropdowns"],
@@ -95,25 +112,29 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // sidebar Daily table view every other role uses (myTasksDaily — the
   // old un-windowed combined list is gone); Home keeps the ONE combined
   // "My Tasks" card (ceoCombinedList) with its date filter.
-  // branchRegionOverview (2026-08-01): Branch Status by Region — Daily/
-  // Monthly/Ad hoc, the same RegionDonutGrids sections ADMIN/OPS see via
-  // orgGrids — appended below the draggable department dashboards. Home
-  // only; the CEO's Task Manager page keeps entityDropdowns for branch
-  // drill-down instead.
+  // ceoKanban/branchRegionOverview dropped from Home entirely (2026-08-19,
+  // explicit request) — the same department/branch drill-down these gave is
+  // already reachable via entityDropdowns on CEO's own Task Manager page, so
+  // Home keeps ONLY ceoCombinedList now (own tasks). See scoped-overview-
+  // section.tsx — the render code backing both keys was removed too, not
+  // just this config entry.
   CEO: {
-    home: ["ceoCombinedList", "ceoKanban", "branchRegionOverview"],
+    home: ["ceoCombinedList"],
     // 2026-08-12 stacked-sections redesign: myOverview replaces
-    // myTasksDaily (own Daily/Monthly, now actionable card-grid form) and
-    // ceoTaskTable (own delegated-out list) — the CEO no longer has one
-    // combined cross-department "tasks I assigned" table; the same
-    // information is reachable per-department via entityDropdowns's new
-    // CEO Assigned Task section instead (confirmed accepted trade-off, see
-    // design doc addendum). Monthly is new for the CEO here (never had it
-    // before this redesign).
-    taskManager: ["myOverview", "entityDropdowns"],
+    // myTasksDaily (own Daily/Monthly, now actionable card-grid form).
+    // Monthly was new for the CEO here (never had it before this redesign)
+    // — DROPPED again 2026-08-19 (explicit request: CEO only needs the
+    // weekday view, no Monthly split) — see task-manager-view.tsx's
+    // myOverview render, which omits monthly for CEO specifically.
+    // ceoTaskTable REVIVED 2026-08-19 (explicit request) — CEO's own
+    // delegated-out list, positioned right after myOverview, before
+    // entityDropdowns.
+    taskManager: ["myOverview", "ceoTaskTable", "entityDropdowns"],
     weekdayRange: "mon-sun",
     addTaskHeader: true,
   },
+  // No branchRegionOverview on Home (2026-08-15, revised) — same removal
+  // as ADMIN above.
   OPS: {
     home: ["orgGrids"],
     // 2026-08-12: myOverview replaces personalDaily/personalMonthly/
@@ -129,22 +150,28 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   HOD: {
     home: ["personalDaily", "personalMonthly", "ceoAssigned", "departmentOverview"],
     // 2026-08-12 stacked-sections redesign: personalDaily/personalMonthly/
-    // ceoAssigned/myTasksDaily/myTasksMonthly/assignedByMeList are all
-    // retired from Task Manager (Home keeps them, unchanged) — every one
-    // of them is subsumed into departmentOverview's restructured 4-section
-    // stack: the HOD's own card already appears (actionable) inside the
-    // whole-department Daily/Monthly grid, and the new entity-wide HOD/CEO
-    // Assigned Task sections cover what ceoAssigned (personal, day-
-    // windowed) and assignedByMeList (delegated-out list) used to show,
-    // now visible department-wide instead of just to the HOD. myBoard
-    // (Kanban) is unrelated and unaffected.
-    taskManager: ["myBoard", "departmentOverview"],
+    // ceoAssigned/myTasksDaily/myTasksMonthly are all retired from Task
+    // Manager (Home keeps them, unchanged) — every one of them is subsumed
+    // into departmentOverview's restructured 4-section stack: the HOD's own
+    // card already appears (actionable) inside the whole-department Daily/
+    // Monthly grid, and the entity-wide HOD/CEO Assigned Task sections cover
+    // what ceoAssigned (personal, day-windowed) used to show, now visible
+    // department-wide instead of just to the HOD. myBoard (Kanban) is
+    // unrelated and unaffected.
+    // assignedByMeList REVIVED 2026-08-19 (explicit request) — HOD's own
+    // delegated-out list ("Tasks I Assigned"), positioned right after
+    // myBoard, before departmentOverview — the same "PIC" table shape as
+    // CEO's ceoTaskTable, sourced from getMePayload's delegatedAll (already
+    // computed for HOD, just unused until now).
+    taskManager: ["myBoard", "assignedByMeList", "departmentOverview"],
     weekdayRange: "tue-sat",
     addTaskHeader: true,
   },
   // Superadmin-equivalent (2026-07-29 final spec): full org grids on Home
-  // (departments + branches + ad hoc regions) and the Department | Branch
-  // dropdown toggle on the Task Manager page.
+  // (departments + ad hoc regions) and the Department | Branch dropdown
+  // toggle on the Task Manager page. No branchRegionOverview on Home
+  // (2026-08-15) — originally removed for this role alone, then confirmed
+  // to also apply to ADMIN and OPS (see their comments above).
   ELEVATED_DEPT_SITE: {
     home: ["orgGrids"],
     taskManager: ["entityDropdowns"],
@@ -161,11 +188,23 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     home: ["personalDaily", "personalMonthly", "personalAdhoc", "branchOverview"],
     // 2026-08-12: personalDaily/personalMonthly/myTasksDaily/myTasksMonthly
     // are retired — subsumed into branchOverview's restructured 4-section
-    // stack, same reasoning as HOD's departmentOverview above. Ad hoc
-    // (personalAdhoc/myTasksAdhoc/adhocOversight) and manpowerLink are
-    // UNTOUCHED — a fundamentally different, non-recurring cadence that's
-    // explicitly outside this redesign's scope.
-    taskManager: ["personalAdhoc", "myTasksAdhoc", "branchOverview", "adhocOversight", "manpowerLink"],
+    // stack, same reasoning as HOD's departmentOverview above. personalAdhoc
+    // dropped from Task Manager specifically (2026-08-18) — the personal
+    // "Ad hoc" donut was redundant with "My Tasks — Ad hoc" (myTasksAdhoc)
+    // right below it; Home's own personal Ad hoc card is untouched
+    // (separate `home` array above). branchOverview's own HOD/CEO Assigned
+    // sections are ALSO replaced with an "Ad hoc" card grid for this role
+    // specifically — see task-manager-view.tsx's branchOverview render (a
+    // role check there, not a SectionKey, since Branch Site shares this
+    // same key and keeps HOD/CEO Assigned unchanged). adhocOversight
+    // dropped too (2026-08-18, same visit) — the branch-wide "Ad hoc Tasks"
+    // donut at the bottom of the page became redundant once branchOverview's
+    // own new Ad hoc card grid covers the same data with a real per-person
+    // breakdown; Branch Site (separate entry below) keeps adhocOversight
+    // since it never gets that replacement. manpowerLink dropped too
+    // (2026-08-18, same visit, explicit request) — the "Manpower Schedule"
+    // Details card at the very bottom of the page.
+    taskManager: ["myTasksAdhoc", "branchOverview"],
     weekdayRange: "tue-sun",
     addTaskHeader: false,
   },
@@ -235,6 +274,13 @@ export function isElevatedDeptSite(user: {
     (ELEVATED_DEPT_SITE_DEPARTMENTS as readonly string[]).includes(user.department)
   );
 }
+
+/** The one Finance department login (a DEPT_SITE account) — gates
+ *  FinanceDashboard.tsx on Home and, as of 2026-08-18, the "No Claim/
+ *  Incentive" list on the Task Manager page. Lives here (not just locally in
+ *  home/page.tsx, its original home) so both call sites share one constant
+ *  instead of two copies that can drift. */
+export const FINANCE_EMAIL = "finance@ebright.my";
 
 /** Task Manager sidebar visibility for Template/Package/Package Table
  *  (2026-08-07 permission matrix, revised 2026-08-11) — View tier only,
