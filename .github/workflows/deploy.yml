@@ -282,6 +282,20 @@ jobs:
             sed -E 's/^SMTP_PASS=.*/SMTP_PASS="<set>"/' .env | grep -E '^SMTP_' >> ~/deploy.log 2>&1 || true
             grep -q '^SMTP_PASS=' .env || echo "WARNING: SMTP_PASS is not set on this host - outgoing mail WILL fail. Add the SMTP_PASS repo secret (Gmail app password)." >> ~/deploy.log 2>&1
 
+            # Pre-flight: refuse to go further if compose cannot read its own
+            # config. 2026-08-20: a malformed .env made `docker compose up`
+            # fail — but only AFTER `docker rm -f ebright-osc-v2` below had
+            # already destroyed the running container, so staging served
+            # nginx 502s from that moment until the next successful deploy.
+            # The container is expendable only once we know the config that
+            # replaces it actually parses. Checking here also fails in
+            # seconds rather than after the ~11-minute image build.
+            echo "--- Validating compose config ---" >> ~/deploy.log 2>&1
+            if ! docker compose config >/dev/null 2>>~/deploy.log; then
+              echo "FATAL: docker compose cannot read its config (malformed .env?). Aborting BEFORE touching the running container, so the current one keeps serving." >> ~/deploy.log 2>&1
+              exit 1
+            fi
+
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on
             # the small deploy host runs out of memory / time and fails the
