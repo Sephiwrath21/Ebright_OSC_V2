@@ -18,6 +18,29 @@ import type {
   ProofUploadHandler,
 } from "./types";
 import { flowBucketTotal, formatDueDate, isDueDayLockExemptRole, isPastDueDay, isFutureDueDay, type DueDateDisplay } from "./types";
+
+/** Collapse/expand chevron (2026-08-20) — replaces the old "›" unicode
+ *  glyph, which rendered as a checkmark-like shape at larger sizes in some
+ *  fonts (reported at text-sm). Plain inline SVG, no icon library, per this
+ *  file's own "no new dependencies" header comment. `expanded` controls the
+ *  90° rotation the two callers (SectionCard, ResizableTaskList's group
+ *  headers) previously did with a text-based transform. */
+function ChevronIcon({ expanded, className = "size-3" }: { expanded: boolean; className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""} ${className}`}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
 import {
   compressImageFile,
   drawTimestampWatermark,
@@ -119,12 +142,7 @@ export function SectionCard({
             aria-expanded={!collapsed}
             className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
           >
-            <span
-              aria-hidden
-              className={`text-[10px] normal-case transition-transform ${collapsed ? "" : "rotate-90"}`}
-            >
-              ›
-            </span>
+            <ChevronIcon expanded={!collapsed} className="size-2.5" />
             {title}
           </button>
         ) : (
@@ -2334,7 +2352,9 @@ export function ResizableTaskList({
   // sections instead, which is what this now matches). Pending starts
   // expanded (the actionable bucket); Completed/N-A start collapsed (out of
   // the way until opened) — every row still exists in the DOM tree, just
-  // hidden, so nothing is actually filtered out anymore.
+  // hidden, so nothing is actually filtered out anymore. Pending IS
+  // collapsible via its own chevron (2026-08-20 fix — it previously always
+  // rendered expanded regardless of clicks, see isGroupCollapsed below).
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<BucketKey>>(
     () => new Set<BucketKey>(["completed", "na"]),
   );
@@ -2349,11 +2369,16 @@ export function ResizableTaskList({
   // the per-group chevrons above. In CONTROLLED mode (showCompleted prop
   // provided), the Completed/N-A groups defer entirely to it instead of
   // collapsedGroups, so several lists (e.g. every person's card in an
-  // EntityCardOverview section) can share one external boolean. Pending
-  // never collapses either way.
+  // EntityCardOverview section) can share one external boolean. Pending is
+  // deliberately NEVER driven by this controlled prop — collapsing Pending
+  // is a per-card layout preference, not part of "show completed work",
+  // so it always reads its own independent collapsedGroups entry instead
+  // (2026-08-20 fix — a hardcoded `return false` here previously made every
+  // card's Pending chevron register the click but never actually collapse,
+  // across every person card in the View All grid, not just one).
   const isControlledCompleted = showCompleted !== undefined;
   const isGroupCollapsed = (key: BucketKey): boolean => {
-    if (key === "pending") return false;
+    if (key === "pending") return collapsedGroups.has("pending");
     if (isControlledCompleted) return !showCompleted;
     return collapsedGroups.has(key);
   };
@@ -2867,12 +2892,7 @@ export function ResizableTaskList({
                   aria-expanded={!isCollapsed}
                   className="flex w-full items-center gap-2 py-2 text-left text-xs font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
                 >
-                  <span
-                    aria-hidden
-                    className={`text-[10px] normal-case transition-transform ${isCollapsed ? "" : "rotate-90"}`}
-                  >
-                    ›
-                  </span>
+                  <ChevronIcon expanded={!isCollapsed} className="size-3.5" />
                   <span className={`size-2 shrink-0 rounded-full ${group.dot}`} />
                   <span>{group.label}</span>
                   <span className="text-gray-400 dark:text-slate-500">({group.rows.length})</span>
@@ -2929,12 +2949,7 @@ export function ResizableTaskList({
                   {confirmTarget.unresolved.length} Subtask
                   {confirmTarget.unresolved.length === 1 ? "" : "s"}
                 </span>
-                <span
-                  className={`text-gray-400 transition-transform dark:text-slate-500 ${confirmSubsOpen ? "rotate-90" : ""}`}
-                  aria-hidden
-                >
-                  ›
-                </span>
+                <ChevronIcon expanded={confirmSubsOpen} className="size-3.5 text-gray-400 dark:text-slate-500" />
               </button>
               {confirmSubsOpen && (
                 <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-700">
