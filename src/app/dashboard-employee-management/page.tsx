@@ -46,8 +46,7 @@ export default async function EmployeeManagementPage() {
     branchCount,
     departmentCount,
     onboardingActive,
-    onboardingCompleted,
-  };
+    onboardingCompleted,};
 
   const userEmail = session.user?.email ?? "";
   const userRole = (session.user as { role?: string } | undefined)?.role ?? "";
