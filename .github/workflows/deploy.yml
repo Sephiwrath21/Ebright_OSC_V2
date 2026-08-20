@@ -229,19 +229,31 @@ jobs:
             # NAME=... assignment is debris that WILL break the deploy. Drop
             # those, and refuse to act if the result would be empty (that
             # would mean the pattern is wrong, not that .env is all garbage).
-            if [ -s .env ]; then
+            # Runs both BEFORE the writes below (clear inherited debris) and
+            # again AFTER them, immediately before the compose gate. The first
+            # attempt at this only sanitized beforehand, and the deploy still
+            # died on the same line — proof the debris is produced by the
+            # writes themselves, not inherited. Sanitizing last is what
+            # actually guarantees compose sees a parseable file.
+            env_sanitize() {
+              [ -s .env ] || return 0
               grep -E '^[[:space:]]*($|#)|^[A-Za-z_][A-Za-z0-9_]*=' .env > .env.sanitized || true
               if [ -s .env.sanitized ]; then
                 env_dropped="$(( $(wc -l < .env) - $(wc -l < .env.sanitized) ))"
                 if [ "$env_dropped" -gt 0 ]; then
-                  echo "NOTE: dropped $env_dropped malformed line(s) from .env (split value debris)" >> ~/deploy.log 2>&1
+                  echo "NOTE: dropped $env_dropped malformed line(s) from .env ($1)" >> ~/deploy.log 2>&1
+                  # Show WHAT was dropped, with anything quote-like masked, so
+                  # the next failure of this kind is diagnosable from the log
+                  # instead of by guesswork.
+                  grep -vxF -f .env.sanitized .env 2>/dev/null | sed -E 's/[^ =]{4,}/<redacted>/g' >> ~/deploy.log 2>&1 || true
                 fi
                 mv .env.sanitized .env
               else
                 rm -f .env.sanitized
                 echo "WARNING: .env sanitize produced an empty file — left .env untouched" >> ~/deploy.log 2>&1
               fi
-            fi
+            }
+            env_sanitize "before writes"
 
             smtp_put() {
               # $1 = var name, $2 = value. Empty value -> leave .env alone.
@@ -249,13 +261,25 @@ jobs:
               sed -i "/^$1=/d" .env || true
               printf '%s="%s"\n' "$1" "$2" >> .env
             }
-            # Strip CR/LF, then one layer of surrounding double quotes. The
-            # quote strip matters because the natural way to populate these
-            # secrets is copying the line out of a working .env, which carries
-            # the quotes along — without this, printf wraps them again and
-            # writes NAME=""value"", which compose reads as an empty value.
+            # Reduce the value to printable characters, then remove double
+            # quotes outright.
+            #
+            # `tr -d '\r\n'` alone was NOT enough: a value still reached .env
+            # carrying an embedded newline and an unbalanced quote, splitting
+            # the assignment across two lines —
+            #   SMTP_PASS="
+            #   <rest of value>""
+            # — and compose choked on the orphan. Whatever produces that (the
+            # secret's stored bytes, or `envs:` forwarding) does not matter if
+            # the value physically cannot contain a line break or a quote by
+            # the time printf sees it.
+            #
+            # This cannot lose real data: none of these six values may legally
+            # contain a quote or a control character. A Gmail app password is
+            # sixteen letters in four groups, a host is a domain, a port is
+            # digits. Anything else in there is corruption.
             smtp_val() {
-              printf '%s' "${1:-}" | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/'
+              printf '%s' "${1:-}" | tr -cd '[:print:]' | tr -d '"'
             }
 
             # SMTP_PASS has NO default — an undefined secret must leave any
@@ -290,6 +314,10 @@ jobs:
             # The container is expendable only once we know the config that
             # replaces it actually parses. Checking here also fails in
             # seconds rather than after the ~11-minute image build.
+            # Last line of defence: clear anything the writes above produced
+            # before compose reads the file. See env_sanitize's note.
+            env_sanitize "after writes"
+
             echo "--- Validating compose config ---" >> ~/deploy.log 2>&1
             if ! docker compose config >/dev/null 2>>~/deploy.log; then
               echo "FATAL: docker compose cannot read its config (malformed .env?). Aborting BEFORE touching the running container, so the current one keeps serving." >> ~/deploy.log 2>&1
