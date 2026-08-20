@@ -213,13 +213,50 @@ jobs:
             # interpolated into this script's text, where a trailing newline
             # would corrupt the line), and tr strips stray CR/LF from a
             # pasted secret.
+            # Heal debris before writing anything. A value that got split
+            # across lines leaves an orphan continuation line behind, and the
+            # per-key `sed /^NAME=/d` below cannot remove it because the
+            # orphan does not start with "NAME=". docker compose then dies on
+            # the whole file:
+            #   failed to read .env: line 46: unexpected character '"' in
+            #   variable name "<...>"
+            # 2026-08-20: exactly that took down a staging deploy. The narrow
+            # `sed '/^"$/d'` heal in the CRM block above only catches a bare
+            # lone-quote line, not a line carrying the rest of a value.
+            #
+            # compose's env_file parser has NO multi-line value syntax, so any
+            # line that is not blank, not a comment, and not a well-formed
+            # NAME=... assignment is debris that WILL break the deploy. Drop
+            # those, and refuse to act if the result would be empty (that
+            # would mean the pattern is wrong, not that .env is all garbage).
+            if [ -s .env ]; then
+              grep -E '^[[:space:]]*($|#)|^[A-Za-z_][A-Za-z0-9_]*=' .env > .env.sanitized || true
+              if [ -s .env.sanitized ]; then
+                env_dropped="$(( $(wc -l < .env) - $(wc -l < .env.sanitized) ))"
+                if [ "$env_dropped" -gt 0 ]; then
+                  echo "NOTE: dropped $env_dropped malformed line(s) from .env (split value debris)" >> ~/deploy.log 2>&1
+                fi
+                mv .env.sanitized .env
+              else
+                rm -f .env.sanitized
+                echo "WARNING: .env sanitize produced an empty file — left .env untouched" >> ~/deploy.log 2>&1
+              fi
+            fi
+
             smtp_put() {
               # $1 = var name, $2 = value. Empty value -> leave .env alone.
               [ -n "$2" ] || return 0
               sed -i "/^$1=/d" .env || true
               printf '%s="%s"\n' "$1" "$2" >> .env
             }
-            smtp_val() { printf '%s' "${1:-}" | tr -d '\r\n'; }
+            # Strip CR/LF, then one layer of surrounding double quotes. The
+            # quote strip matters because the natural way to populate these
+            # secrets is copying the line out of a working .env, which carries
+            # the quotes along — without this, printf wraps them again and
+            # writes NAME=""value"", which compose reads as an empty value.
+            smtp_val() {
+              printf '%s' "${1:-}" | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/'
+            }
 
             # SMTP_PASS has NO default — an undefined secret must leave any
             # existing server value intact rather than blanking it (see the
