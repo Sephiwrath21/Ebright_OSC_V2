@@ -20,12 +20,11 @@ export default function ProfileOrgUnit({
   const [state, formAction, pending] = useActionState<UpdateOrgUnitResult | null, FormData>(updateOrgUnit, null);
 
   // HQ is a branch row in the database (every Department sits under it), but
-  // it isn't a centre like Ampang or Klang, so offering it among the branches
-  // here misrepresents it. Pulled out of Branches and listed at the top of
-  // Departments instead — the stored value stays `branch:<id>`, so existing
-  // HQ employment rows keep matching and listBranches() itself is untouched
-  // (Transfer's dropdown and the Add-employee form still need HQ in).
-  const hq = branches.find((b) => b.code === "HQ");
+  // it isn't a centre like Ampang or Klang and it isn't a department either,
+  // so it is offered in neither group: HQ staff pick the department they
+  // actually work in — Academy, Finance, HR — which is what the Departments
+  // group is labelled to say. listBranches() itself is untouched, since
+  // Transfer's dropdown and the Add-employee form still need HQ in.
   const realBranches = branches.filter((b) => b.code !== "HQ");
 
   return (
@@ -82,10 +81,7 @@ export default function ProfileOrgUnit({
                       <option key={`b-${b.id}`} value={`branch:${b.id}`}>{b.code} — {b.name}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="Departments">
-                    {hq && (
-                      <option key={`b-${hq.id}`} value={`branch:${hq.id}`}>{hq.code} — {hq.name}</option>
-                    )}
+                  <optgroup label="Departments (only applicable to HQ staff)">
                     {departments.map((d) => (
                       <option key={`d-${d.id}`} value={`dept:${d.id}`}>{d.code} — {d.name}</option>
                     ))}
