@@ -118,6 +118,63 @@ if (process.env.NODE_ENV === "production") {
   );
 }
 
+export interface MailerProbe {
+  ok: boolean;
+  /** Values the transport actually resolved — the derived ones matter most. */
+  resolved: { host?: string; port: number; secure: boolean; user?: string };
+  cooldownActive: boolean;
+  cooldownRemaining?: string;
+  error?: { name?: string; message: string; code?: string; responseCode?: number };
+}
+
+/**
+ * Authenticate against the SMTP server without sending anything, and report
+ * what the transport actually resolved.
+ *
+ * Exists because the deploy hosts are only reachable with a key held in CI,
+ * so `docker compose logs` — where [mailer] writes the real reason a send
+ * failed — is not something we can read when mail breaks. This lets the same
+ * question be answered from the browser, the way /api/debug/dashboard-health
+ * already does for the onboarding queries.
+ *
+ * Deliberately does NOT arm the cooldown on failure: an operator asking a
+ * diagnostic question must not take outgoing mail down for ten minutes. It
+ * does report whether a cooldown is already active, since that alone
+ * explains sends failing while the credentials are perfectly fine.
+ */
+export async function verifyMailer(): Promise<MailerProbe> {
+  const resolved = {
+    host: process.env.SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    user: process.env.SMTP_USER,
+  };
+  const now = Date.now();
+  const cooldownActive = now < cooldownUntil;
+  const base = {
+    resolved,
+    cooldownActive,
+    ...(cooldownActive ? { cooldownRemaining: fmtRemaining(cooldownUntil - now) } : {}),
+  };
+
+  try {
+    await transporter.verify();
+    return { ok: true, ...base };
+  } catch (err) {
+    const e = err as { name?: string; message?: string; code?: string; responseCode?: number };
+    return {
+      ok: false,
+      ...base,
+      error: {
+        name: e?.name,
+        message: e?.message ?? String(err),
+        code: e?.code,
+        responseCode: e?.responseCode,
+      },
+    };
+  }
+}
+
 /**
  * Generic SMTP send — used by the CRM email layer (lib/crm/email.ts) so all
  * CRM mail (ticket digest, ticket-event notifications, automation Send-Email)
