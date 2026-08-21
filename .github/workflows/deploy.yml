@@ -289,7 +289,16 @@ jobs:
 
             SMTP_HOST_V="$(smtp_val "${SMTP_HOST:-}")";           [ -n "$SMTP_HOST_V" ]      || SMTP_HOST_V="smtp.gmail.com"
             SMTP_PORT_V="$(smtp_val "${SMTP_PORT:-}")";           [ -n "$SMTP_PORT_V" ]      || SMTP_PORT_V="465"
-            SMTP_SECURE_V="$(smtp_val "${SMTP_SECURE:-}")";       [ -n "$SMTP_SECURE_V" ]    || SMTP_SECURE_V="true"
+            # Derive from the port rather than hardcoding "true". 465 speaks
+            # TLS from the first byte; 587 upgrades via STARTTLS. Forcing
+            # secure=true on 587 hangs the connection until mailer.ts's 5s
+            # timeout and reports nothing useful — and because this value is
+            # written on every deploy, a hardcoded "true" would also pin a
+            # wrong value in place permanently. Same rule as src/lib/mailer.ts.
+            SMTP_SECURE_V="$(smtp_val "${SMTP_SECURE:-}")"
+            if [ -z "$SMTP_SECURE_V" ]; then
+              if [ "$SMTP_PORT_V" = "465" ]; then SMTP_SECURE_V="true"; else SMTP_SECURE_V="false"; fi
+            fi
             SMTP_USER_V="$(smtp_val "${SMTP_USER:-}")";           [ -n "$SMTP_USER_V" ]      || SMTP_USER_V="od@ebright.my"
             SMTP_FROM_NAME_V="$(smtp_val "${SMTP_FROM_NAME:-}")"; [ -n "$SMTP_FROM_NAME_V" ] || SMTP_FROM_NAME_V="Ebright OD"
 
