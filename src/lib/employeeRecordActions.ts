@@ -2693,15 +2693,13 @@ export async function proceedFromOnboarding(userId: number): Promise<ActionResul
 }
 
 // ─── Active stage's "Exit" button — real employment update, no prerequisite
-// gate (same as Onboarding->Active). Sets status="inactive" with end_date
-// left null rather than setting end_date to today: the Exit-priority rule
-// (see stageFromEmployment) only treats a set end_date as Exit once it's
-// strictly BEFORE today, so an end_date of today would actually suppress the
-// inactive shortcut and leave them classified as Active until tomorrow —
-// null end_date + status="inactive" is the one combination that moves them
-// to Exit immediately, matching "processing their exit right now" rather
-// than waiting on a date boundary. Their Exit list "Last Date" naturally
-// shows today via updated_at, since this write happens today. ───
+// gate (same as Onboarding->Active). Sets status="inactive" with end_date =
+// today: stageFromEmployment now requires a real end_date (status alone is
+// never enough — see conversation) and treats end_date <= today as Exit
+// (inclusive), so today's date is the one value that moves them to Exit
+// immediately, matching "processing their exit right now" rather than
+// waiting on a date boundary. Their Exit list "Last Date" then shows the
+// real end_date, not a proxy like updated_at. ───
 
 export async function proceedFromActive(userId: number): Promise<ActionResult> {
   const authError = await requireSession();
@@ -2715,9 +2713,10 @@ export async function proceedFromActive(userId: number): Promise<ActionResult> {
     });
     if (!employment) return { ok: false, error: "No employment record found for this employee." };
 
+    const todayIso = new Date().toISOString().slice(0, 10);
     await prisma.employment.update({
       where: { employment_id: employment.employment_id },
-      data: { status: "inactive", end_date: null, probation: false },
+      data: { status: "inactive", end_date: new Date(`${todayIso}T00:00:00Z`), probation: false },
     });
 
     return { ok: true };

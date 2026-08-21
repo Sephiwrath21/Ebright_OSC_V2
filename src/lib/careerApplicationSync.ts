@@ -8,6 +8,7 @@ import {
   listEmployeeOverviewRows,
   listBranches,
   listDepartments,
+  internActiveFromDate,
   type EmployeeOverviewRow,
   type EmployeeDetailFull,
   type BranchOpt,
@@ -612,7 +613,25 @@ export async function computeRealAccountLifecycleOverrides<
     const startIso = emp.start_date.toISOString().slice(0, 10);
     if (startIso > todayIso) continue;
 
-    if (resolvePositionGroup(row) !== "Full Time") {
+    const posGroup = resolvePositionGroup(row);
+    if (posGroup === "Intern") {
+      // Tue-Sat scheduled-working-day rule (see conversation) — start_date
+      // is the sole authority once it's arrived; emp.status is NOT
+      // consulted (that was this exact bug: a real Intern stored as
+      // status="active" — e.g. Nur Aerisya Binti Abdillah — got marked
+      // Active immediately below without ever checking her day-count).
+      // Same canonical function employeeQueries.ts's own Intern override
+      // uses — this was a second, independent (and until now, buggy)
+      // reimplementation of that same rule; kept in sync by sharing the one
+      // function instead of two copies drifting apart again.
+      result.set(row.id, { stage: todayIso >= internActiveFromDate(emp.start_date) ? "active" : "onboarding" });
+      continue;
+    }
+    if (posGroup !== "Full Time") {
+      // Part Time — still the pre-existing calendar-day rule, unchanged.
+      // Out of scope for the Tue-Sat working-day rework (see conversation —
+      // Part Time's own schedule-sourcing question hasn't been answered
+      // yet), so deliberately left as-is here.
       if (emp.status === "active") {
         result.set(row.id, { stage: "active" });
         continue;
