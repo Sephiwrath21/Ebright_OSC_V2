@@ -102,12 +102,15 @@ export function TaskOverviewStack({
               onReopen={onReopen}
               onUploadProof={onUploadProof}
               onRemoveProof={onRemoveProof}
-              reassign={reassign}
+              // No "Assign to Others" on HOD/CEO Assigned Task (2026-08-21,
+              // user feedback) — withheld here rather than in
+              // EntityCardOverview so Daily/Monthly/Ad hoc keep it
+              // unaffected.
+              reassign={key === "hodAssigned" || key === "ceoAssigned" ? undefined : reassign}
               canReassignOthers={canReassignOthers}
-              // Standardized Pending-first/Show-Completed/collapsible
-              // pattern (2026-08-19) — HOD/CEO Assigned Task ONLY, never
-              // Daily/Monthly/Ad hoc — see EntityCardOverview's own
-              // groupByStatus doc comment.
+              // Standardized Pending-first/collapsible pattern (2026-08-19)
+              // — HOD/CEO Assigned Task ONLY, never Daily/Monthly/Ad hoc —
+              // see EntityCardOverview's own groupByStatus doc comment.
               groupByStatus={key === "hodAssigned" || key === "ceoAssigned"}
             />
           ),

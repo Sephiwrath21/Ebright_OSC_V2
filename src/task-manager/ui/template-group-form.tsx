@@ -15,8 +15,26 @@ import type {
 } from "./types";
 import { SubtaskListEditor } from "./subtask-list-editor";
 import { CategoryPicker } from "./category-picker";
+import { compressImageFile } from "./image-compress";
 
 const TASK_MAX = 20;
+
+/** Per-task Guideline display state (2026-08-20) — parallel array to
+ *  `tasks`/`taskKeys`, same index. Kept separate from FlowTemplateGroupTaskInput
+ *  itself because the UI needs the richer display shape (previewUrl, the
+ *  original filename for the "remove" label) that never gets submitted —
+ *  same split assign-task-form.tsx's own single `guidelineImage` state
+ *  already uses, just indexed per task here instead of one global value. */
+interface TaskGuideline {
+  url: string;
+  image: {
+    mime: "image/png" | "image/jpeg" | "image/webp";
+    dataBase64: string;
+    previewUrl: string;
+    name: string;
+  } | null;
+}
+const EMPTY_GUIDELINE: TaskGuideline = { url: "", image: null };
 
 export function TemplateGroupFormModal({
   control,
@@ -47,6 +65,8 @@ export function TemplateGroupFormModal({
   const [categoryId, setCategoryId] = React.useState("");
   const [tasks, setTasks] = React.useState<FlowTemplateGroupTaskInput[]>([{ title: "", subtasks: [] }]);
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
+  const [guidelines, setGuidelines] = React.useState<TaskGuideline[]>([{ ...EMPTY_GUIDELINE }]);
+  const imageInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const [loading, setLoading] = React.useState(isEdit);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -69,6 +89,19 @@ export function TemplateGroupFormModal({
       setCategoryId(result.group.categoryId ?? "");
       setTasks(result.group.tasks.map((t) => ({ id: t.id, title: t.title, subtasks: t.subtasks })));
       setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
+      setGuidelines(
+        result.group.tasks.map((t) => ({
+          url: t.guidelineUrl ?? "",
+          image: t.guidelineImage
+            ? {
+                mime: t.guidelineImage.mime,
+                dataBase64: t.guidelineImage.dataBase64,
+                previewUrl: `data:${t.guidelineImage.mime};base64,${t.guidelineImage.dataBase64}`,
+                name: `${t.title} (saved image)`,
+              }
+            : null,
+        })),
+      );
     });
     return () => {
       cancelled = true;
@@ -80,16 +113,55 @@ export function TemplateGroupFormModal({
     if (tasks.length >= TASK_MAX) return;
     setTasks((prev) => [...prev, { title: "", subtasks: [] }]);
     setTaskKeys((prev) => [...prev, crypto.randomUUID()]);
+    setGuidelines((prev) => [...prev, { ...EMPTY_GUIDELINE }]);
   };
   const removeTask = (index: number) => {
     setTasks((prev) => prev.filter((_, i) => i !== index));
     setTaskKeys((prev) => prev.filter((_, i) => i !== index));
+    setGuidelines((prev) => prev.filter((_, i) => i !== index));
+    imageInputRefs.current.splice(index, 1);
   };
   const updateTitle = (index: number, title: string) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, title } : t)));
   };
   const updateSubtasks = (index: number, subtasks: string[]) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, subtasks } : t)));
+  };
+  const updateGuidelineUrl = (index: number, url: string) => {
+    setGuidelines((prev) => prev.map((g, i) => (i === index ? { ...g, url } : g)));
+  };
+  const clearGuidelineImage = (index: number) => {
+    setGuidelines((prev) => prev.map((g, i) => (i === index ? { ...g, image: null } : g)));
+    const input = imageInputRefs.current[index];
+    if (input) input.value = "";
+  };
+  // Same compressed-client-side pipeline assign-task-form.tsx's single
+  // guideline image uses (ui/image-compress.ts) — ≤1280px JPEG, ≤2MB.
+  const onGuidelineImagePick = (index: number, file: File | undefined) => {
+    if (!file) return;
+    void compressImageFile(file).then((result) => {
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        clearGuidelineImage(index);
+        return;
+      }
+      setGuidelines((prev) =>
+        prev.map((g, i) =>
+          i === index
+            ? {
+                ...g,
+                image: {
+                  mime: result.image.mime,
+                  dataBase64: result.image.dataBase64,
+                  previewUrl: result.image.previewUrl,
+                  name: file.name,
+                },
+              }
+            : g,
+        ),
+      );
+      setMessage(null);
+    });
   };
 
   const save = () => {
@@ -109,7 +181,28 @@ export function TemplateGroupFormModal({
       setMessage({ ok: false, text: `Task ${blankIndex + 1} needs a title (or remove it with the ✕ button).` });
       return;
     }
-    const cleanTasks = trimmedTasks;
+    // Guideline link format (2026-08-20) — same rule assign-task-form.tsx
+    // enforces for its own single guideline, checked per task here.
+    const trimmedGuidelines = guidelines.map((g) => ({ ...g, url: g.url.trim() }));
+    const badUrlIndex = trimmedGuidelines.findIndex(
+      (g) => g.url.length > 0 && !/^https?:\/\//i.test(g.url),
+    );
+    if (badUrlIndex !== -1) {
+      setMessage({ ok: false, text: `Task ${badUrlIndex + 1}'s guideline link must start with http:// or https://.` });
+      return;
+    }
+    // Always sent (never a partial patch) — editTaskTemplateCore/
+    // createTemplateGroup both unconditionally overwrite these two columns
+    // from whatever's submitted, same as the single-task Edit hub; the
+    // guidelines state is already prefilled from the loaded group on edit,
+    // so "untouched" naturally resubmits the existing value either way.
+    const cleanTasks = trimmedTasks.map((t, i) => ({
+      ...t,
+      guidelineUrl: trimmedGuidelines[i].url || undefined,
+      guidelineImage: trimmedGuidelines[i].image
+        ? { mime: trimmedGuidelines[i].image.mime, dataBase64: trimmedGuidelines[i].image.dataBase64 }
+        : undefined,
+    }));
     startTransition(async () => {
       if (isEdit) {
         const impact = await control.impact(groupId as string);
@@ -200,6 +293,52 @@ export function TemplateGroupFormModal({
                 </div>
                 <div className="ml-4 mt-2 border-l-2 border-gray-200 pl-3 dark:border-slate-700">
                   <SubtaskListEditor subtasks={task.subtasks} onChange={(next) => updateSubtasks(index, next)} />
+                </div>
+
+                {/* Guideline (2026-08-20): SOP link and/or reference image,
+                    per task — same optional, never-blocks-save fields as
+                    the single "+ Task" assign form's own Guidelines block. */}
+                <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Guidelines</p>
+                  <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
+                    Link
+                    <input
+                      type="url"
+                      value={guidelines[index]?.url ?? ""}
+                      onChange={(e) => updateGuidelineUrl(index, e.target.value)}
+                      placeholder="https://… (SOP document, Google Doc, …)"
+                      className="mt-1 w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="mt-2 block text-sm text-gray-600 dark:text-slate-300">
+                    Image <span className="text-xs text-gray-400">(PNG / JPG / WebP, ≤ 2 MB)</span>
+                    <input
+                      ref={(el) => {
+                        imageInputRefs.current[index] = el;
+                      }}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => onGuidelineImagePick(index, e.target.files?.[0])}
+                      className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 file:shadow-sm hover:file:bg-gray-100 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
+                    />
+                  </label>
+                  {guidelines[index]?.image && (
+                    <div className="mt-2 flex items-start gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={guidelines[index].image!.previewUrl}
+                        alt="Guideline preview"
+                        className="max-h-28 rounded-lg border border-gray-200 object-contain dark:border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => clearGuidelineImage(index)}
+                        className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        ✕ remove {guidelines[index].image!.name}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

@@ -514,6 +514,12 @@ export interface FlowTemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
+  /** Per-task Guideline (2026-08-20) — SOP link and/or reference image,
+   *  same shape/meaning as the single-task template's own guideline
+   *  (FlowTemplateDetail above); each member task in a group gets its own,
+   *  independent of the other tasks in the same group. */
+  guidelineUrl: string | null;
+  guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
 }
 
 export interface FlowTemplateGroupDetail {
@@ -533,6 +539,12 @@ export interface FlowTemplateGroupTaskInput {
   id?: string;
   title: string;
   subtasks: string[];
+  /** Per-task Guideline (2026-08-20) — see FlowTemplateGroupTask's own doc
+   *  comment. `guidelineImage: null` explicitly clears a previously-saved
+   *  image on edit (undefined = leave whatever's already there — same
+   *  optional-vs-null convention FlowTemplateEditInput already uses). */
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
 }
 
 export type TemplateGroupLoadResult =
@@ -596,7 +608,7 @@ export interface FlowTemplateGroupControl {
   create: (input: {
     name: string;
     categoryId?: string;
-    tasks: { title: string; subtasks: string[] }[];
+    tasks: Omit<FlowTemplateGroupTaskInput, "id">[];
   }) => Promise<TemplateGroupSaveResult>;
   edit: (
     groupId: string,

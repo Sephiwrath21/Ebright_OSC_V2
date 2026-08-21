@@ -1,9 +1,13 @@
 // Idempotent production provisioning for Task Manager, driven by the SHARED
-// ebright_hrfs database rather than a hand-maintained roster.csv (see the
-// header comment in ./hrfs-map.ts for why). Upserts:
-//   1) staff Users, built from HRFS's ACTIVE `User` rows through hrfs-map.ts's
-//      mapHrfsUser(), plus hrfs-map.ts's EXTRA_USERS (site logins etc. that
-//      don't exist in HRFS at all).
+// `hrfs` portal database (users -> user_profile / employment -> department /
+// branch) rather than a hand-maintained roster.csv (see the header comment
+// in ./hrfs-map.ts for why). 2026-08-20: the ebright_hrfs-backed primary
+// source was removed on user instruction — ebright_hrfs is a separate,
+// sometimes-stale login/role system (confirmed corrupted/placeholder data on
+// live rows) and `hrfs` is the real HR system of record. Upserts:
+//   1) staff Users, built from the portal's active employees through
+//      hrfs-map.ts's mapPortalEmployee(), plus hrfs-map.ts's EXTRA_USERS
+//      (site logins etc. that don't exist in the portal at all).
 //   2) the ws-operations workspace.
 //   3) the 5 quick-assign utility flows (Flow + single Block + one required
 //      CHECKBOX item each) — assignFlowTask and the manpower slot-sync look
@@ -18,7 +22,6 @@
 import { Pool } from "pg";
 import { Prisma } from "../../src/generated/task-manager-client";
 import { prisma } from "../../src/task-manager/prisma";
-import { FLOW_DEPARTMENTS } from "../../src/task-manager/ui/types";
 // Same "is this employment row currently active" rule Employee Folder uses
 // (src/lib/employeeQueries.ts) — end_date wins over a stale status, exactly
 // as documented on stageFromEmployment itself. Pulled from employeeStages.ts
@@ -30,10 +33,7 @@ import { stageFromEmployment } from "../../src/lib/employeeStages";
 import {
   diffUserFields,
   EXTRA_USERS,
-  mapHrfsUser,
   mapPortalEmployee,
-  normalizeSourceDepartment,
-  type HrfsUserRow,
   type MappedUser,
   type PortalEmployeeRow,
 } from "./hrfs-map";
@@ -46,56 +46,10 @@ const UTILITY_FLOWS = [
   { flowId: "flow-ops-assign",   name: "Ops Assigned Task",   icon: "🗂️", description: "Tasks assigned from OPS's own '+ Assigned task' form.",          order: 6, blockId: "block-ops-assign",   nodeId: "node-ops-assign",   blockTitle: "Ops assigned task",   itemId: "item-ops-assign-done" },
 ] as const;
 
-/** HRFS_DATABASE_URL wins if set (lets ops point at a differently-hosted
- *  HRFS instance without touching TASK_MANAGER_DATABASE_URL). Otherwise fall
- *  back to TASK_MANAGER_DATABASE_URL with the DB name (pathname) swapped
- *  from whatever it is (e.g. ebright_task_manager / ebright_yqtm) to
- *  ebright_hrfs — same Postgres server, same credentials, by convention
- *  (verified: both TM and HRFS live on the one server). */
-function resolveHrfsUrl(): string {
-  if (process.env.HRFS_DATABASE_URL) return process.env.HRFS_DATABASE_URL;
-  const base = process.env.TASK_MANAGER_DATABASE_URL;
-  if (!base) {
-    throw new Error(
-      "bootstrap: neither HRFS_DATABASE_URL nor TASK_MANAGER_DATABASE_URL is set — cannot locate the HRFS database.",
-    );
-  }
-  const url = new URL(base);
-  url.pathname = "/ebright_hrfs";
-  return url.toString();
-}
-
-/** Read-only: fetches every ACTIVE row from ebright_hrfs.User via a plain pg
- *  Pool (deliberately NOT the Prisma client — there's no Prisma schema for
- *  HRFS in this repo, and generating one for a database we only ever
- *  SELECT from would be overkill). Closes its own pool before returning. */
-async function fetchHrfsRows(): Promise<HrfsUserRow[]> {
-  const pool = new Pool({
-    connectionString: resolveHrfsUrl(),
-    max: 3,
-    connectionTimeoutMillis: 10_000,
-  });
-  try {
-    const result = await pool.query<{ id: number; email: string; name: string | null; role: string; branchName: string | null; status: string }>(
-      `select id, email, name, role, "branchName", status from "User" where status = 'ACTIVE'`,
-    );
-    return result.rows.map((r) => ({
-      id: r.id,
-      email: r.email,
-      name: r.name,
-      role: r.role,
-      branchName: r.branchName,
-      status: r.status,
-    }));
-  } finally {
-    await pool.end();
-  }
-}
-
 /** OSC_PORTAL_DATABASE_URL wins if set; otherwise fall back to
  *  TASK_MANAGER_DATABASE_URL with the DB name (pathname) swapped to `hrfs` —
  *  the OSC portal's own database, same Postgres server, same credentials, by
- *  convention (same pattern as resolveHrfsUrl above). */
+ *  convention. */
 function resolvePortalUrl(): string {
   if (process.env.OSC_PORTAL_DATABASE_URL) return process.env.OSC_PORTAL_DATABASE_URL;
   const base = process.env.TASK_MANAGER_DATABASE_URL;
@@ -109,73 +63,15 @@ function resolvePortalUrl(): string {
   return url.toString();
 }
 
-/** Read-only: department per (lowercased) login email from the OSC portal's
- *  employment records — the same data the portal's HR staff directory
- *  displays. 2026-07-25 root-cause finding: ebright_hrfs.User has NO
- *  department column at all, so mapping alone imported every generic staff
- *  member department-less; the real assignments live HERE (hrfs database:
- *  users -> employment -> department). "Currently active" is decided by
- *  stageFromEmployment — the exact same rule Employee Folder uses (end_date
- *  wins over a stale status column) — not a bootstrap-specific status check.
- *  Only department names that are real FLOW_DEPARTMENTS values count — the
- *  portal also carries non-Task-Manager units ("IOP", "CEO"), skipped. */
-async function fetchPortalDepartments(): Promise<Map<string, string>> {
-  const pool = new Pool({
-    connectionString: resolvePortalUrl(),
-    max: 3,
-    connectionTimeoutMillis: 10_000,
-  });
-  try {
-    const result = await pool.query<{ email: string; department_name: string; status: string; end_date: Date | null }>(
-      `select lower(u.email) as email, d.department_name, e.status, e.end_date
-       from users u
-       join employment e on e.user_id = u.user_id
-       join department d on d.department_id = e.department_id
-       where e.status = 'active' and u.deleted_at is null`,
-    );
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const byEmail = new Map<string, string>();
-    for (const r of result.rows) {
-      const endIso = r.end_date ? r.end_date.toISOString().slice(0, 10) : null;
-      if (stageFromEmployment(r.status, endIso, todayIso) !== "active") continue;
-      // Portal still says "Operation" — normalize to the renamed value.
-      const dept = normalizeSourceDepartment(r.department_name);
-      if (dept && (FLOW_DEPARTMENTS as readonly string[]).includes(dept)) {
-        byEmail.set(r.email, dept);
-      }
-    }
-    return byEmail;
-  } finally {
-    await pool.end();
-  }
-}
-
-/** Fill department for department-side staff the mapping left department-
- *  less. Never touches branch staff (branch/department mutual exclusivity)
- *  and never overwrites an already-set department — ROLE_MAP's fixed values
- *  (ACADEMY/HR) and OVERRIDES both win simply by already being set. Returns
- *  how many users were filled. */
-function enrichDepartments(toImport: MappedUser[], byEmail: Map<string, string>): number {
-  let filled = 0;
-  for (const user of toImport) {
-    if (user.department !== null || user.branch !== null) continue;
-    if (user.role !== "MEMBER" && user.role !== "HOD") continue;
-    const dept = byEmail.get(user.email.toLowerCase());
-    if (!dept) continue;
-    user.department = dept;
-    filled++;
-  }
-  return filled;
-}
-
 /** Read-only: ACTIVE portal employees (active login + their currently-active
  *  employment's position/department/branch). "Currently active" is decided
  *  by stageFromEmployment — the exact same rule Employee Folder uses
  *  (end_date wins over a stale status column), not a bootstrap-specific
  *  check. Employees with NO currently-active employment row still return
  *  (position null) so they surface as loud unknown-position skips instead
- *  of silently vanishing. Second bootstrap source — see mapPortalEmployee's
- *  header in hrfs-map.ts. */
+ *  of silently vanishing. THE sole bootstrap source (2026-08-20: the
+ *  ebright_hrfs-backed primary source was removed — see mapPortalEmployee's
+ *  header in hrfs-map.ts and the file header below for why). */
 async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
   const pool = new Pool({
     connectionString: resolvePortalUrl(),
@@ -217,36 +113,44 @@ async function fetchPortalEmployees(): Promise<PortalEmployeeRow[]> {
  *  which needs to look each skipped email up in the Task Manager db. */
 interface SkippedRow {
   email: string;
-  reason: string; // already "<email>: <message>" — see mapHrfsUser/below.
+  reason: string; // already "<email>: <message>" — see mapPortalEmployee/below.
 }
 
 interface MapAllResult {
-  hrfsRowCount: number;
+  portalRowCount: number;
   toImport: MappedUser[];
   skipped: SkippedRow[];
   warnings: string[]; // one entry per warning, "<email>: <warning>"
 }
 
-/** Maps every HRFS row through mapHrfsUser, appends EXTRA_USERS verbatim,
- *  and buckets the results — pure aggregation, no I/O. Guards against HRFS
- *  returning the same (lowercased) email twice: the FIRST occurrence is
- *  mapped normally; every later one is skipped outright as a duplicate,
- *  regardless of what its own row would otherwise have mapped to. */
-function mapAll(rows: HrfsUserRow[]): MapAllResult {
+/** Appends EXTRA_USERS verbatim, then maps every portal row through
+ *  mapPortalEmployee, and buckets the results — pure aggregation, no I/O.
+ *  EXTRA_USERS wins on email collision (checked first, matching the old
+ *  primary-source-wins precedent from when ebright_hrfs was the primary
+ *  source); any later duplicate — an EXTRA_USERS email re-appearing in the
+ *  portal, or the portal returning the same (lowercased) email twice — is
+ *  skipped outright, regardless of what its own row would otherwise have
+ *  mapped to. */
+function mapAll(rows: PortalEmployeeRow[]): MapAllResult {
   const toImport: MappedUser[] = [];
   const skipped: SkippedRow[] = [];
   const warnings: string[] = [];
   const seenEmails = new Set<string>();
 
+  for (const extra of EXTRA_USERS) {
+    toImport.push(extra);
+    seenEmails.add(extra.email.toLowerCase());
+  }
+
   for (const row of rows) {
     const email = (row.email ?? "").trim().toLowerCase();
     if (seenEmails.has(email)) {
-      skipped.push({ email, reason: `${email}: duplicate HRFS email` });
+      skipped.push({ email, reason: `${email}: duplicate email (EXTRA_USERS or repeated portal row)` });
       continue;
     }
     seenEmails.add(email);
 
-    const result = mapHrfsUser(row);
+    const result = mapPortalEmployee(row);
     if (result.ok) {
       toImport.push(result.user);
       warnings.push(...result.warnings);
@@ -254,9 +158,8 @@ function mapAll(rows: HrfsUserRow[]): MapAllResult {
       skipped.push({ email, reason: result.reason });
     }
   }
-  for (const extra of EXTRA_USERS) toImport.push(extra);
 
-  return { hrfsRowCount: rows.length, toImport, skipped, warnings };
+  return { portalRowCount: rows.length, toImport, skipped, warnings };
 }
 
 /** Pulls every distinct raw branchName quoted inside "unresolved branch
@@ -276,15 +179,15 @@ function extractUnresolvedBranchCodes(messages: string[]): string[] {
 function printSummary(result: MapAllResult, opts: { dryRun: boolean }): void {
   const deptWarnings = result.warnings.filter((w) => w.includes("no department override"));
   const branchWarnings = result.warnings.filter((w) => w.includes("unresolved branch code"));
-  const duplicateSkips = result.skipped.filter((s) => s.reason.includes("duplicate HRFS email"));
+  const duplicateSkips = result.skipped.filter((s) => s.reason.includes("duplicate email"));
   const unresolvedCodes = extractUnresolvedBranchCodes([...result.skipped.map((s) => s.reason), ...branchWarnings]);
 
   console.log(`\n[bootstrap] ${opts.dryRun ? "DRY RUN — " : ""}mapping summary`);
-  console.log(`[bootstrap]   HRFS ACTIVE rows fetched:   ${result.hrfsRowCount}`);
+  console.log(`[bootstrap]   portal ACTIVE rows fetched: ${result.portalRowCount}`);
   console.log(`[bootstrap]   EXTRA_USERS appended:       ${EXTRA_USERS.length}`);
   console.log(`[bootstrap]   mapped for import:          ${result.toImport.length}`);
   console.log(
-    `[bootstrap]   skipped:                    ${result.skipped.length} (of which ${duplicateSkips.length} duplicate HRFS emails)`,
+    `[bootstrap]   skipped:                    ${result.skipped.length} (of which ${duplicateSkips.length} duplicate emails)`,
   );
   console.log(`[bootstrap]   "no department" warnings:   ${deptWarnings.length}`);
   console.log(`[bootstrap]   unresolved-branch warnings: ${branchWarnings.length}`);
@@ -310,8 +213,8 @@ function printSummary(result: MapAllResult, opts: { dryRun: boolean }): void {
     for (const w of branchWarnings) console.log(`  - ${w}`);
   }
 
-  if (result.hrfsRowCount === 0) {
-    console.warn("\n[bootstrap] HRFS returned 0 ACTIVE rows — check the connection/credentials before trusting this run.");
+  if (result.portalRowCount === 0) {
+    console.warn("\n[bootstrap] portal database returned 0 ACTIVE rows — check the connection/credentials before trusting this run.");
   }
   if (opts.dryRun) {
     console.log("\n[bootstrap] DRY RUN — no connection to the Task Manager database was made; nothing was written.");
@@ -443,67 +346,14 @@ async function provisionUtilityFlows(): Promise<void> {
 async function main() {
   const dryRun = process.argv.includes("--dry-run") || process.env.BOOTSTRAP_DRY_RUN === "1";
 
-  const rows = await fetchHrfsRows();
+  // 2026-08-20: the ebright_hrfs-backed primary source is gone — ebright_hrfs
+  // carries stale/corrupted data (confirmed placeholder names like "Region
+  // A"/"Region B"/"Region C" on live rows). The `hrfs` portal database
+  // (users -> user_profile / employment -> department / branch) is now the
+  // ONLY source of real staff; department/branch/position all come from the
+  // same query, so no separate enrichment pass is needed.
+  const rows = await fetchPortalEmployees();
   const result = mapAll(rows);
-
-  // SECOND SOURCE (2026-07-25): active portal employees ebright_hrfs doesn't
-  // cover — 63 of the Employee Management page's active staff had no
-  // ebright_hrfs row at all. Primary-source emails always win; duplicates
-  // within the portal result (multiple active employments) collapse to the
-  // first row.
-  try {
-    const portalEmployees = await fetchPortalEmployees();
-    const covered = new Set(result.toImport.map((u) => u.email.toLowerCase()));
-    let added = 0;
-    const portalSkipped: SkippedRow[] = [];
-    const portalWarnings: string[] = [];
-    for (const row of portalEmployees) {
-      const email = (row.email ?? "").trim().toLowerCase();
-      if (!email || covered.has(email)) continue;
-      covered.add(email);
-      const mapped = mapPortalEmployee(row);
-      if (mapped.ok) {
-        result.toImport.push(mapped.user);
-        added++;
-        portalWarnings.push(...mapped.warnings);
-      } else {
-        portalSkipped.push({ email, reason: mapped.reason });
-      }
-    }
-    console.log(
-      `[bootstrap] portal second source: ${portalEmployees.length} active employees checked, ${added} added from the portal, ${portalSkipped.length} skipped`,
-    );
-    for (const s of portalSkipped) console.log(`  - ${s.reason}`);
-    for (const w of portalWarnings) console.log(`  - WARN ${w}`);
-  } catch (err) {
-    console.warn(
-      `[bootstrap] WARNING: portal database unreachable — portal-only employees NOT imported (${err instanceof Error ? err.message : err})`,
-    );
-  }
-
-  // Department enrichment from the portal DB (read-only — runs in dry-run
-  // too). Non-fatal: if the portal database is unreachable, the import still
-  // proceeds exactly as before, just without filled departments.
-  let filled = 0;
-  try {
-    const portalDepartments = await fetchPortalDepartments();
-    filled = enrichDepartments(result.toImport, portalDepartments);
-    // Drop the "no department" warnings that enrichment just resolved, so
-    // the printed report reflects what will actually be imported.
-    if (filled > 0) {
-      const deptByEmail = new Map(result.toImport.map((u) => [u.email.toLowerCase(), u.department]));
-      result.warnings = result.warnings.filter((w) => {
-        if (!w.includes("no department override")) return true;
-        const email = w.split(":")[0]?.trim().toLowerCase();
-        return !(email && deptByEmail.get(email));
-      });
-    }
-  } catch (err) {
-    console.warn(
-      `[bootstrap] WARNING: portal database unreachable — departments NOT enriched (${err instanceof Error ? err.message : err})`,
-    );
-  }
-  console.log(`[bootstrap] departments filled from portal HR records: ${filled}`);
 
   printSummary(result, { dryRun });
 

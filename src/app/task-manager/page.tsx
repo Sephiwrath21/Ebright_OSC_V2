@@ -186,21 +186,17 @@ export default async function TaskManagerPage({
   // selector redesign) — undefined = Full month.
   const monthlyRange = parseMonthRange(sp.mrange);
   const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
-  // "HOD Assigned Task" date filter (2026-08-15, individual staff only —
-  // see myOverviewData.hodAssigned below) — independent of ?date=: you can
-  // look at a different day's HOD-assigned tasks without changing what the
-  // Daily section above it shows, same as Monthly's ?mdate= is independent
-  // of Daily's ?date=.
-  const hodAssignedDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
   // so changing one date never resets the others. (Ad hoc is deliberately
   // NOT date-filtered — 2026-07-29 simplification: one-off tasks, plain
-  // all-time list.)
+  // all-time list. "HOD Assigned Task" for individual staff was ALSO
+  // date-filtered via its own ?hdate= until 2026-08-20 — removed then, to
+  // match the department-wide "HOD Assigned Task" view's all-time
+  // behavior; see myOverviewData.hodAssigned below.)
   const rawParams = {
     date: dailyDate,
     mdate: monthlyDate,
     mrange: monthlyRangeParam,
-    hdate: hodAssignedDate,
   };
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
@@ -208,7 +204,6 @@ export default async function TaskManagerPage({
     ) as Record<string, string>;
   const monthlyCarry = carryTM("date");
   const dailyCarry = carryTM("mdate", "mrange");
-  const hodAssignedCarry = carryTM("hdate");
 
   // Self-scoped sections (2026-08-12 stacked-sections redesign): a role
   // with no owned entity (OPS, CEO, and Monthly for every MEMBER-role
@@ -718,17 +713,20 @@ export default async function TaskManagerPage({
     // wiring (personalDailyControl/departmentDailyControl, both built from
     // monthlyCarry below) — so they share this one nav config too.
     const personalMyWeek = buildMyWeek({ basePath: "/task-manager", extraParams: monthlyCarry });
-    // "My Month" tab sidebar (2026-08-18) — Branch Manager's own card in
-    // "Klang — Monthly" only, matching Home's own myMonth exactly (same
-    // monthDayChunks/chunkLabel day-range-chunk shape, same "own card,
-    // alone on screen" gate in EntityCardOverview). Was Home-only by an
-    // earlier explicit product decision; this reverses that for Branch
-    // Overview's Monthly section specifically — Department Overview and
-    // the org-wide entityDropdowns Monthly sections are unaffected, still
-    // the plain Full-month/range-dropdown view. Gated on viewRole so the 4
-    // concurrent chunk fetches only run for the one role that uses them.
+    // "My Month" tab sidebar (2026-08-18, widened 2026-08-21) — matching
+    // Home's own myMonth exactly (same monthDayChunks/chunkLabel day-range-
+    // chunk shape, same "own card, alone on screen" gate in
+    // EntityCardOverview). Covers every role whose personal Monthly section
+    // actually renders one: Branch Manager's own "Klang — Monthly" card,
+    // AND myOverview's Monthly section (OPS/DEPT_MEMBER — the only two
+    // viewRoles that reach the `monthly: myOverviewData.monthly` branch
+    // below; BRANCH_MEMBER/COACH/CEO have no Monthly section at all).
+    // Department Overview and the org-wide entityDropdowns Monthly sections
+    // are unaffected, still the plain Full-month/range-dropdown view. Gated
+    // on viewRole so the 4 concurrent chunk fetches only run for roles that
+    // actually use them.
     let personalMyMonth: MyMonthConfig | undefined;
-    if (viewRole === "BRANCH_MANAGER") {
+    if (viewRole === "BRANCH_MANAGER" || viewRole === "OPS" || viewRole === "DEPT_MEMBER") {
       const [monthlyDateY, monthlyDateM] = monthly.date.split("-").map(Number);
       const monthChunks = monthDayChunks(monthlyDateY, monthlyDateM);
       // "Full month" is one of the tabs too (2026-08-18), not just the
@@ -869,7 +867,7 @@ export default async function TaskManagerPage({
             : fallback;
         const [dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail] = await Promise.all([
           getDepartmentDetail(email, department, "daily", dailyDate),
-          getDepartmentDetail(email, department, "monthly", monthlyDate),
+          getDepartmentDetail(email, department, "monthly", monthlyDate, monthlyRange ?? undefined),
           getDepartmentHodAssigned(email, department).catch(() => null),
           getDepartmentCeoAssigned(email, department).catch(() => null),
         ]);
@@ -903,12 +901,26 @@ export default async function TaskManagerPage({
               monthly={{
                 entity: monthlyDetail.department,
                 dateControl: (
-                  <MonthDropdown
-                    key="admin-dept-monthly-picker"
-                    value={monthlyDetail.date}
-                    basePath="/task-manager"
-                    extraParams={{ view: "department", department }}
-                  />
+                  <div key="admin-dept-monthly-controls" className="flex items-center gap-1.5">
+                    <MonthDropdown
+                      key="admin-dept-monthly-picker"
+                      value={monthlyDetail.date}
+                      basePath="/task-manager"
+                      extraParams={{ view: "department", department }}
+                    />
+                    {/* Full month/1-7/8-14/15-21/22-{end} range dropdown
+                        (2026-08-21) — this admin/OPS/elevated-dept-site
+                        drill-down had no range filtering at all before;
+                        getDepartmentDetail now threads monthDays into
+                        getEntityPayload the same way getFlowDetail already
+                        does for HOD/DEPT_SITE's own Department Overview. */}
+                    <MonthRangeDropdown
+                      value={monthlyDetail.date}
+                      range={monthlyRangeParam}
+                      basePath="/task-manager"
+                      extraParams={{ view: "department", department }}
+                    />
+                  </div>
                 ),
                 showViewToggle: true,
               }}
@@ -932,7 +944,7 @@ export default async function TaskManagerPage({
         // branch's comment above for the full reasoning.
         const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
           getBranchDetail(email, branch, "daily", dailyDate),
-          getBranchDetail(email, branch, "monthly", monthlyDate),
+          getBranchDetail(email, branch, "monthly", monthlyDate, monthlyRange ?? undefined),
           getBranchHodAssigned(email, branch).catch(() => null),
         ]);
         overview = (
@@ -968,12 +980,23 @@ export default async function TaskManagerPage({
               monthly={{
                 entity: monthlyDetail.branch,
                 dateControl: (
-                  <MonthDropdown
-                    key="admin-branch-monthly-picker"
-                    value={monthlyDetail.date}
-                    basePath="/task-manager"
-                    extraParams={{ view: "branch", branch }}
-                  />
+                  <div key="admin-branch-monthly-controls" className="flex items-center gap-1.5">
+                    <MonthDropdown
+                      key="admin-branch-monthly-picker"
+                      value={monthlyDetail.date}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch }}
+                    />
+                    {/* Full month/1-7/8-14/15-21/22-{end} range dropdown
+                        (2026-08-21) — see the department block's identical
+                        comment just above. */}
+                    <MonthRangeDropdown
+                      value={monthlyDetail.date}
+                      range={monthlyRangeParam}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch }}
+                    />
+                  </div>
                 ),
                 showViewToggle: true,
               }}
@@ -1140,34 +1163,19 @@ export default async function TaskManagerPage({
         />
       </div>
     );
-    // "HOD Assigned Task" for individual staff (2026-08-15) — its own
-    // independent date filter (?hdate=, defaults to today), fetched
-    // separately from Daily/Monthly since it needs to window to a
-    // DIFFERENT date than either of them. getFlowOverview + strictWindow:
-    // true (not getFlowDetail) for the same reason the weekday-tab fetch
-    // uses it — personal-only, correctly windowed, without the wasted
-    // org/department/branch payloads getFlowDetail's role branches would
-    // otherwise pull for nothing. DEPT_MEMBER only (2026-08-18 fix) —
-    // matches Home's own role-views.ts scoping (DEPT_MEMBER.home includes
-    // "hodAssigned"; BRANCH_MEMBER/COACH's home arrays don't). Branch-side
-    // staff (Branch Exec/Coach) report to a Branch Manager, not a
-    // department HOD, so this section doesn't apply to them — previously
-    // included BRANCH_MEMBER/COACH here too, which incorrectly showed an
-    // (always-empty, for that role) "HOD Assigned Task" card on their Task
-    // Manager page, diverging from Home's already-correct behavior.
+    // "HOD Assigned Task" for individual staff — DEPT_MEMBER only
+    // (2026-08-18 fix, matches Home's own role-views.ts scoping:
+    // DEPT_MEMBER.home includes "hodAssigned"; BRANCH_MEMBER/COACH's home
+    // arrays don't — branch-side staff report to a Branch Manager, not a
+    // department HOD, so this section doesn't apply to them). ALL-TIME
+    // (2026-08-20 — was its own independent ?hdate=-windowed fetch via
+    // getFlowOverview; removed in favor of daily.me.streamsAll, the SAME
+    // all-time source the department-wide "HOD Assigned Task" view already
+    // uses, so a person's own card and their card within the department
+    // roster grid now always show identical numbers. No extra fetch
+    // needed — daily.me.streamsAll is already part of the Daily section's
+    // own payload, fetched above regardless of this section.
     const isIndividualStaff = viewRole === "DEPT_MEMBER";
-    const hodAssignedResult = isIndividualStaff
-      ? await getFlowOverview(email, "daily", hodAssignedDate, { strictWindow: true })
-      : null;
-    const personalHodAssignedControl = hodAssignedResult && (
-      <DailyDatePicker
-        key="personal-hod-assigned-picker"
-        value={hodAssignedResult.date}
-        basePath="/task-manager"
-        param="hdate"
-        extraParams={hodAssignedCarry}
-      />
-    );
     // Branch Manager's personal Ad hoc card + list (2026-07-29
     // simplification: NO date filter — ad hoc tasks are one-off/irregular,
     // so both the card and the always-rendered list show the plain ALL-TIME
@@ -1229,33 +1237,37 @@ export default async function TaskManagerPage({
       // DEPT_MEMBER (whose Daily section is whole-department) keeps
       // Monthly self-scoped, per the confirmed correction. Omitted
       // entirely for BRANCH_MEMBER/COACH (Daily-only) — see below.
-      monthly: { entity: toSelfEntityDetail(monthly.me.me, monthly.me), dateControl: personalMonthlyControl, showViewToggle: false },
+      monthly: {
+        entity: toSelfEntityDetail(monthly.me.me, monthly.me),
+        dateControl: personalMonthlyControl,
+        showViewToggle: false,
+        // Side-tab strip (2026-08-21) — see personalMyMonth's own doc
+        // comment above. undefined for every role except OPS/DEPT_MEMBER,
+        // harmless no-op for the rest (EntityCardOverview only renders the
+        // tab strip when myMonth is set).
+        myMonth: personalMyMonth,
+      },
       // "HOD Assigned Task" for individual staff (2026-08-15, after
       // Monthly — TaskOverviewStack's own stacking order already puts it
-      // there) — DEPT_MEMBER/BRANCH_MEMBER/COACH only (Intern/Full Time
-      // Exec/HQ Exec/Branch Exec/Coach), not OPS/CEO (managers, no "my
-      // own HOD" to be assigned by). Windowed to its own independent
-      // ?hdate= (hodAssignedResult, fetched above) rather than
-      // daily.me.streamsAll's all-time data — the SAME per-person
-      // assigner-role grouping Home's own "HOD assigned" card reads
-      // (scoped-overview-section.tsx), just date-windowed here instead of
-      // all-time. No owned entity to scope a department/branch-wide
-      // hodAssigned fetch to, unlike HOD's/BRANCH's own Department/Branch
-      // Overview sections below (which stay all-time, unchanged). Always
-      // present (never omitted) even with zero tasks, same as Daily/
-      // Monthly — an individual simply having no HOD-assigned task on a
-      // given day is a normal empty state, not a fetch failure like the
-      // entity-wide sections' undefined-on-403 case.
-      hodAssigned: hodAssignedResult
+      // there) — DEPT_MEMBER only (see isIndividualStaff above). ALL-TIME
+      // (2026-08-20 fix) — reads daily.me.streamsAll's "HOD" entry
+      // directly, the SAME per-person assigner-role grouping Home's own
+      // "HOD assigned" card reads (scoped-overview-section.tsx) and the
+      // SAME all-time source the department-wide "HOD Assigned Task" view
+      // uses, so this card's numbers always match that view's. No owned
+      // entity to scope a department/branch-wide hodAssigned fetch to,
+      // unlike HOD's/BRANCH's own Department/Branch Overview sections
+      // below (which were already all-time, unchanged). Always present
+      // (never omitted) even with zero tasks, same as Daily/Monthly.
+      hodAssigned: isIndividualStaff
         ? {
             entity: toSelfEntityDetail(
               daily.me.me,
-              hodAssignedResult.streams.find((s) => s.key === "HOD") ?? {
+              daily.me.streamsAll.find((s) => s.key === "HOD") ?? {
                 totals: { completed: 0, pending: 0, na: 0 },
                 tasks: [],
               },
             ),
-            dateControl: personalHodAssignedControl,
             showViewToggle: false,
           }
         : undefined,

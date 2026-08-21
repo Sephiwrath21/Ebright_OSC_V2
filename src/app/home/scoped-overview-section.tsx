@@ -175,13 +175,12 @@ export async function HomeScopedOverviewSection({
       </div>
     );
     // Personal Monthly sections use My Month's tab strip for range
-    // selection instead of a dropdown — MonthRangeDropdown's "Full month"
-    // option has no equivalent in the tabbed view (My Month always shows
-    // one specific chunk, same "no combined view" rule myWeek follows for
-    // weekdays), so offering it here would silently contradict what the
-    // card body actually shows. Personal Monthly's dateControl is Year/
-    // Month only; every OTHER Monthly usage (department/branch pairs) keeps
-    // the full monthlyPicker, unchanged.
+    // selection instead of a dropdown. "Full month" is now one of that
+    // strip's own tabs too (2026-08-21, reversing the earlier "no
+    // equivalent" split — see personalMyMonth below), so there's no
+    // contradiction with keeping this dateControl Year/Month-only; every
+    // OTHER Monthly usage (department/branch pairs) keeps the full
+    // monthlyPicker, unchanged.
     const personalMonthlyPicker = (
       <MonthDropdown
         key="home-personal-monthly-picker"
@@ -327,18 +326,31 @@ export async function HomeScopedOverviewSection({
         personalMonthlyEntity = toSelfEntityDetail(monthly.me.me, monthly.me);
         const [mY, mM] = monthly.date.split("-").map(Number);
         const monthChunks = monthDayChunks(mY, mM);
-        const myMonthResults = await Promise.all(
-          monthChunks.map((c) =>
-            getFlowOverview(email, "monthly", monthly.date, { monthDays: c, strictWindow: true }),
+        // "Full month" is one of the tabs too (2026-08-21, matching
+        // /task-manager's own myMonth — see bootstrap of that same pattern
+        // in src/app/task-manager/page.tsx's personalMyMonth): an unclamped
+        // fetch (no monthDays) alongside the 4 day-range chunks.
+        const [myMonthResults, fullMonthResult] = await Promise.all([
+          Promise.all(
+            monthChunks.map((c) =>
+              getFlowOverview(email, "monthly", monthly.date, { monthDays: c, strictWindow: true }),
+            ),
           ),
-        );
+          getFlowOverview(email, "monthly", monthly.date, { strictWindow: true }),
+        ]);
         personalMyMonth = {
-          chunks: monthChunks.map((c, i) => ({
-            label: chunkLabel(c),
-            range: `${c.from}-${c.to}`,
-            tasks: myMonthResults[i].tasks,
-          })),
-          selectedRange: monthlyRangeParam || `${monthChunks[0].from}-${monthChunks[0].to}`,
+          chunks: [
+            { label: "Full month", range: "", tasks: fullMonthResult.tasks },
+            ...monthChunks.map((c, i) => ({
+              label: chunkLabel(c),
+              range: `${c.from}-${c.to}`,
+              tasks: myMonthResults[i].tasks,
+            })),
+          ],
+          // Unset ?mrange= already means Full month everywhere else (see
+          // MonthRangeDropdown's own range??"" convention) — matches that
+          // instead of defaulting to the first day-range chunk.
+          selectedRange: monthlyRangeParam ?? "",
           anchorMonth: monthly.date,
           nav: { basePath: "/home", extraParams: dateExtraParams("mdate", "mrange") },
         };

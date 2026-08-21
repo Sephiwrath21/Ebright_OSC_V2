@@ -198,7 +198,15 @@ export function TaskManagerView({
       showViewToggle: boolean;
       myWeek?: MyWeekConfig;
     };
-    monthly?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
+    monthly?: {
+      entity: FlowEntityDetail;
+      dateControl?: React.ReactNode;
+      showViewToggle: boolean;
+      /** Month-range-chunk tab view for the own card (2026-08-21) — same
+       *  shape/behavior as Branch Overview's own myMonth (below), now also
+       *  wired for myOverview's Monthly section (OPS/DEPT_MEMBER). */
+      myMonth?: MyMonthConfig;
+    };
     hodAssigned?: { entity: FlowEntityDetail; dateControl?: React.ReactNode; showViewToggle: boolean };
     ceoAssigned?: { entity: FlowEntityDetail; showViewToggle: boolean };
   };
@@ -440,7 +448,21 @@ export function TaskManagerView({
               defaultOnlyMe,
               myWeek,
             }}
-            monthly={{ entity: monthly.department, showViewToggle: true, defaultOnlyMe }}
+            // Month + range dropdown (2026-08-21, matching Branch
+            // Overview's own Monthly exactly — same personalMonthlyControl/
+            // myMonth props) — previously had NO date-range filtering at
+            // all here, always showing the whole month. dateControl drives
+            // ?mrange= for the WHOLE roster; myMonth is the bonus per-card
+            // tab strip, only ever visible when the viewer narrows to
+            // "Only Me" (their own single card) — see EntityCardOverview's
+            // showMyMonth gate (isOwnCard && personCards.length === 1).
+            monthly={{
+              entity: monthly.department,
+              dateControl: personalMonthlyControl,
+              showViewToggle: true,
+              defaultOnlyMe,
+              myMonth,
+            }}
             hodAssigned={
               hodAssignedDepartment
                 ? { entity: hodAssignedDepartment.department, showViewToggle: true, defaultOnlyMe }

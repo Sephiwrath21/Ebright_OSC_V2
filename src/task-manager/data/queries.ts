@@ -242,12 +242,18 @@ const departmentQuerySchema = analyticsQuerySchema.extend({
 
 /** Full detail for ONE department by name (org roles any; HOD/DEPT_SITE own
  *  only; MEMBER additionally sees own department's Daily only (see
- *  ownDailyView below)). */
+ *  ownDailyView below)). monthDays (2026-08-21): the Monthly 7-day range
+ *  dropdown's clamp, same optional param getFlowDetail already threads into
+ *  getEntityPayload for HOD/DEPT_SITE/BRANCH's own Department/Branch
+ *  Overview — this function is the SEPARATE path the admin/OPS/elevated-
+ *  dept-site "entityDropdowns" drill-down uses instead (page.tsx), which had
+ *  no range support at all until now; ignored for period "daily". */
 export function getDepartmentDetail(
   email: string,
   department: string,
   period: FlowPeriod,
   date?: string,
+  monthDays?: { from: number; to: number },
 ): Promise<FlowDepartmentDetailResponse> {
   return native(async () => {
     await advanceRecurringBlocks();
@@ -266,7 +272,13 @@ export function getDepartmentDetail(
     if (!canViewEntity(user, "department", q.department) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own department");
     }
-    const payload = await getEntityPayload("department", q.department, q.period, q.date);
+    const payload = await getEntityPayload(
+      "department",
+      q.department,
+      q.period,
+      q.date,
+      q.period === "monthly" ? monthDays : undefined,
+    );
     return {
       period: q.period,
       date: resolvedDate(q.date),
@@ -320,12 +332,14 @@ const branchQuerySchema = analyticsQuerySchema.extend({
 /** Full detail for ONE branch by name (org roles any; BRANCH/BRANCH_SITE own
  *  only — elevated department sites deliberately have NO branch access;
  *  MEMBER additionally sees own branch's Daily only (see ownDailyView
- *  below)). */
+ *  below)). monthDays (2026-08-21) — same as getDepartmentDetail's own
+ *  param, see its doc comment. */
 export function getBranchDetail(
   email: string,
   branch: string,
   period: FlowPeriod,
   date?: string,
+  monthDays?: { from: number; to: number },
 ): Promise<FlowBranchDetailResponse> {
   return native(async () => {
     await advanceRecurringBlocks();
@@ -339,7 +353,13 @@ export function getBranchDetail(
     if (!canViewEntity(user, "branch", q.branch) && !ownDailyView) {
       throw new ApiHttpError(403, "You can only view your own branch");
     }
-    const payload = await getEntityPayload("branch", q.branch, q.period, q.date);
+    const payload = await getEntityPayload(
+      "branch",
+      q.branch,
+      q.period,
+      q.date,
+      q.period === "monthly" ? monthDays : undefined,
+    );
     return {
       period: q.period,
       date: resolvedDate(q.date),

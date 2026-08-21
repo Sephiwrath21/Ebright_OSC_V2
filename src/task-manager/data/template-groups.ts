@@ -62,7 +62,7 @@ import {
   PENDING_STATUSES,
   removeTemplateAssigneeCore,
 } from "./templates-internal";
-import { assignFlowTaskCore } from "./tasks-internal";
+import { assignFlowTaskCore, GUIDELINE_IMAGE_MIMES } from "./tasks-internal";
 import { formatLocalDate } from "../analytics/_lib";
 import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
 
@@ -105,6 +105,18 @@ const groupTaskSchema = z.object({
   id: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(200),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  // Per-task Guideline (2026-08-20) — same shape/limits as the single-task
+  // template's own editTemplateSchema (templates-internal.ts), duplicated
+  // rather than imported since that schema is scoped to a single templateId
+  // and isn't exported standalone; kept in sync by hand if either changes.
+  guidelineUrl: z.string().trim().url().max(2000).optional(),
+  guidelineImage: z
+    .object({
+      mime: z.enum(GUIDELINE_IMAGE_MIMES),
+      dataBase64: z.string().min(1).max(2 * 1024 * 1024 * 1.37),
+    })
+    .nullable()
+    .optional(),
 });
 
 /** Validates a submitted categoryId against a real, non-archived
@@ -175,6 +187,8 @@ export interface TemplateGroupTask {
   id: string;
   title: string;
   subtasks: string[];
+  guidelineUrl: string | null;
+  guidelineImage: { mime: string; dataBase64: string } | null;
 }
 
 export interface TemplateGroupDetail {
@@ -240,6 +254,11 @@ export function getTemplateGroup(
         id: t.id,
         title: t.title,
         subtasks: Array.isArray(t.subtasks) ? (t.subtasks as string[]) : [],
+        guidelineUrl: t.guidelineUrl,
+        guidelineImage:
+          t.guidelineMime && t.guidelineImage
+            ? { mime: t.guidelineMime, dataBase64: Buffer.from(t.guidelineImage).toString("base64") }
+            : null,
       })),
     };
   }, "getTemplateGroup");
@@ -269,6 +288,11 @@ export function createTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: g.id,
             groupPosition: index,
+            guidelineUrl: t.guidelineUrl ?? null,
+            guidelineMime: t.guidelineImage?.mime ?? null,
+            guidelineImage: t.guidelineImage
+              ? Buffer.from(t.guidelineImage.dataBase64, "base64")
+              : null,
           },
         });
       }
@@ -485,7 +509,12 @@ export function editTemplateGroup(
     let newTaskSkipped = 0;
     for (const [index, t] of body.tasks.entries()) {
       if (t.id && existingIds.has(t.id)) {
-        const result = await editTaskTemplateCore(user, t.id, { title: t.title, subtasks: t.subtasks });
+        const result = await editTaskTemplateCore(user, t.id, {
+          title: t.title,
+          subtasks: t.subtasks,
+          guidelineUrl: t.guidelineUrl,
+          guidelineImage: t.guidelineImage,
+        });
         updatedTasks += result.updatedTasks;
         employees += result.employees;
         await prisma.taskTemplate.update({ where: { id: t.id }, data: { groupPosition: index } });
@@ -498,6 +527,11 @@ export function editTemplateGroup(
             subtasks: t.subtasks as unknown as Prisma.InputJsonValue,
             templateGroupId: id,
             groupPosition: index,
+            guidelineUrl: t.guidelineUrl ?? null,
+            guidelineMime: t.guidelineImage?.mime ?? null,
+            guidelineImage: t.guidelineImage
+              ? Buffer.from(t.guidelineImage.dataBase64, "base64")
+              : null,
           },
         });
         createdTasks += 1;

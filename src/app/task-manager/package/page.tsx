@@ -123,7 +123,7 @@ export default async function TaskManagerPackagePage() {
     if (stale) return stale;
     try {
       const group = await getTemplateGroup(email, groupId, SCOPE);
-      return { ok: true, group };
+      return { ok: true, group: group as import("@/task-manager/ui/types").FlowTemplateGroupDetail };
     } catch (err) {
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }

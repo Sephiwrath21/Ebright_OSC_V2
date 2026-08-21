@@ -82,14 +82,14 @@ function flattenTasks(entity: FlowEntityDetail) {
   return [...entity.tasks.completed, ...entity.tasks.pending, ...entity.tasks.na];
 }
 
-/** groupByStatus's Sort: Type ordering (2026-08-19) — Pending always
- *  first, matching ResizableTaskList's own fixed Pending/Completed/N-A
- *  group order used for Person-sort's cards in the same mode; Completed/
- *  N-A are omitted entirely unless showCompleted, same "hidden by default"
- *  behavior as that master toggle. */
-function statusGroupedTasks(tasks: FlowTaskRow[], showCompleted: boolean): FlowTaskRow[] {
+/** groupByStatus's Sort: Type ordering (2026-08-19, master toggle removed
+ *  2026-08-21) — Pending always first, matching ResizableTaskList's own
+ *  fixed Pending/Completed/N-A group order used for Person-sort's cards in
+ *  the same mode. Sort: Type has no per-group chevrons (it's a flat table,
+ *  not ResizableTaskList), so with the master toggle gone there's no way to
+ *  reveal a hidden status here — always shows everything now. */
+function statusGroupedTasks(tasks: FlowTaskRow[]): FlowTaskRow[] {
   const pending = tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
-  if (!showCompleted) return pending;
   const completed = tasks.filter((t) => t.status === "DONE" || t.status === "SKIPPED");
   return [...pending, ...completed];
 }
@@ -280,27 +280,22 @@ export function EntityCardOverview({
    *  unchanged (2026-08-15 product decision: My Month is Home-only for
    *  now). */
   myMonth?: MyMonthConfig;
-  /** Standardized Pending-first/Show-Completed/collapsible pattern
-   *  (2026-08-19, HOD/CEO Assigned Task only — TaskOverviewStack passes
-   *  this true ONLY for those two keys, never Daily/Monthly/Ad hoc). Swaps
-   *  Sort: Person's per-card category/type sub-grouping for the SAME
-   *  status-bucket grouping (Pending always first; Completed/N-A collapsed
-   *  by default) "Tasks I Assigned" uses, via a genuinely shared
-   *  ResizableTaskList instance per card rather than a lookalike — Sort:
-   *  Type keeps its category grouping but sorts each category pending-
-   *  first and hides Completed/N-A the same way. One "Show Completed"
-   *  master toggle (in this card's own header, after the Sort filter)
-   *  drives every card/category at once. No section-level collapse
-   *  (removed 2026-08-19, user feedback — HOD/CEO Assigned Task is always
-   *  expanded now, same as every other section). */
+  /** Standardized Pending-first/collapsible pattern (2026-08-19, HOD/CEO
+   *  Assigned Task only — TaskOverviewStack passes this true ONLY for those
+   *  two keys, never Daily/Monthly/Ad hoc). Swaps Sort: Person's per-card
+   *  category/type sub-grouping for the SAME status-bucket grouping
+   *  (Pending/Completed/N-A, each independently collapsible via its own
+   *  chevron) "Tasks I Assigned" uses, via a genuinely shared
+   *  ResizableTaskList instance per card rather than a lookalike. No master
+   *  "Show Completed" toggle (removed 2026-08-21, user feedback) — each
+   *  group's chevron controls only itself, uncontrolled/per-card, same as
+   *  "Tasks I Assigned". Sort: Type keeps its category grouping and always
+   *  shows every status (no hide-by-default there, same reasoning). No
+   *  "Assign to Others" on these two sections either (TaskOverviewStack
+   *  withholds `reassign` for hodAssigned/ceoAssigned specifically). */
   groupByStatus?: boolean;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
-  // groupByStatus's shared controls (2026-08-19) — one "Show Completed"
-  // master toggle and one collapse chevron for the WHOLE section,
-  // regardless of Sort mode or how many person/category cards it has.
-  // Meaningless (and unused) when groupByStatus is false.
-  const [showCompleted, setShowCompleted] = React.useState(false);
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -445,20 +440,6 @@ export function EntityCardOverview({
             <option value="person">Sort: Person</option>
             <option value="type">Sort: Type</option>
           </select>
-          {/* Show Completed sits AFTER the Sort filter now (2026-08-19, user
-              feedback — previously between the date control and Sort,
-              reordered to read as part of/following the sort filter). */}
-          {groupByStatus && (
-            <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700 dark:text-slate-200">
-              <input
-                type="checkbox"
-                checked={showCompleted}
-                onChange={(e) => setShowCompleted(e.target.checked)}
-                className="size-3.5 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
-              />
-              Show Completed
-            </label>
-          )}
           {showViewToggle && (
             <select
               value={onlyMe ? "onlyMe" : "all"}
@@ -640,14 +621,17 @@ export function EntityCardOverview({
                     {card.tasks.length === 0 ? (
                       <p className="py-2 text-xs italic text-gray-400 dark:text-slate-500">No tasks this period.</p>
                     ) : groupByStatus ? (
-                      // HOD/CEO Assigned Task (2026-08-19): status-bucket
-                      // grouping instead of category/type sub-grouping — the
-                      // SAME ResizableTaskList "Tasks I Assigned" uses, not a
-                      // lookalike. showCompleted/onShowCompletedChange are
-                      // this section's own lifted state (set above), so every
-                      // card in the grid — own and everyone else's alike —
-                      // expands/collapses Completed together from the ONE
-                      // "Show Completed" checkbox in this card's header.
+                      // HOD/CEO Assigned Task (2026-08-19, master toggle
+                      // removed 2026-08-21): status-bucket grouping instead
+                      // of category/type sub-grouping — the SAME
+                      // ResizableTaskList "Tasks I Assigned" uses, not a
+                      // lookalike. Uncontrolled (no showCompleted/
+                      // onShowCompletedChange passed) — each group
+                      // (Pending/Completed/N-A) collapses independently via
+                      // its own chevron, per card, same as "Tasks I
+                      // Assigned". No reassign — TaskOverviewStack withholds
+                      // it for hodAssigned/ceoAssigned, so "Assign to
+                      // Others" doesn't appear on these two sections.
                       <ResizableTaskList
                         tasks={card.tasks}
                         myUserId={myUserId}
@@ -658,12 +642,7 @@ export function EntityCardOverview({
                         onRemoveProof={onRemoveProof}
                         emptyLabel="No tasks this period."
                         hideCompleted
-                        showCompleted={showCompleted}
-                        onShowCompletedChange={setShowCompleted}
                         hideAssignee
-                        reassign={reassign}
-                        reassignAnyOwner={canReassignOthers}
-                        reassignAsMenu
                         defaultNameWidth={280}
                       />
                     ) : (
@@ -772,7 +751,7 @@ export function EntityCardOverview({
             // groupByStatus (2026-08-19): pending-first, Completed/N-A
             // hidden unless the section's own "Show Completed" master
             // toggle is on — see statusGroupedTasks's own doc comment.
-            const displayTasks = groupByStatus ? statusGroupedTasks(card.tasks, showCompleted) : card.tasks;
+            const displayTasks = groupByStatus ? statusGroupedTasks(card.tasks) : card.tasks;
             return (
             <div
               key={card.id}
