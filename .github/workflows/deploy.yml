@@ -278,8 +278,24 @@ jobs:
             # contain a quote or a control character. A Gmail app password is
             # sixteen letters in four groups, a host is a domain, a port is
             # digits. Anything else in there is corruption.
+            # The trailing sed strips a leading NAME= prefix. 2026-08-20: every
+            # SMTP secret was stored as the whole .env line rather than just
+            # the value, so the app resolved a mail server literally named
+            # "SMTP_HOST=smtp.gmail.com" and died with EBADNAME; SMTP_PORT was
+            # non-numeric, which in turn made the secure/port derivation below
+            # pick the wrong answer. Pasting the line you copied is the obvious
+            # mistake to make, and this is the third secret-format incident
+            # this workflow has absorbed, after the GOOGLE_DRIVE_PROOF name
+            # mismatch and the trailing-newline corruption.
+            #
+            # Safe for all six: none of these values may legitimately begin
+            # with an identifier followed by "=" — a host is a domain, a port
+            # is digits, a user is an address, a password is letters.
             smtp_val() {
-              printf '%s' "${1:-}" | tr -cd '[:print:]' | tr -d '"'
+              printf '%s' "${1:-}" \
+                | tr -cd '[:print:]' \
+                | tr -d '"' \
+                | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=//'
             }
 
             # SMTP_PASS has NO default — an undefined secret must leave any
