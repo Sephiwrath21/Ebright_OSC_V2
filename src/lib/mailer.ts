@@ -157,6 +157,27 @@ export async function verifyMailer(): Promise<MailerProbe> {
     ...(cooldownActive ? { cooldownRemaining: fmtRemaining(cooldownUntil - now) } : {}),
   };
 
+  // Do not probe while the cooldown is armed. transporter.verify() performs a
+  // real login, so a diagnostic that probes unconditionally becomes part of
+  // the problem it is reporting: against Gmail's "454 Too many login
+  // attempts" the counter only winds down while nothing is attempting, and
+  // every reload of /api/debug/mail-health restarts it. The cooldown already
+  // records that a recent attempt failed and why, which is the answer the
+  // caller needs — so report that instead of buying it again.
+  if (cooldownActive) {
+    return {
+      ok: false,
+      ...base,
+      error: {
+        name: "CooldownActive",
+        message:
+          `Not probed — a recent attempt failed and the ${COOLDOWN_MS / 60000}-minute cooldown is armed. ` +
+          `Probing now would be another login attempt, which is what keeps a Gmail 454 lockout alive. ` +
+          `Wait for the cooldown to clear before checking again.`,
+      },
+    };
+  }
+
   try {
     await transporter.verify();
     return { ok: true, ...base };
