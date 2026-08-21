@@ -82,13 +82,11 @@ jobs:
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
-          CRM_RESEND_API_KEY: ${{ secrets.CRM_RESEND_API_KEY }}
-          CRM_FROM_EMAIL: ${{ secrets.CRM_FROM_EMAIL }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME,CRM_RESEND_API_KEY,CRM_FROM_EMAIL
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
@@ -341,31 +339,6 @@ jobs:
             # The container is expendable only once we know the config that
             # replaces it actually parses. Checking here also fails in
             # seconds rather than after the ~11-minute image build.
-            # Resend — the fallback transport password reset already tries
-            # when SMTP fails or is unconfigured (see the Resend block in
-            # src/app/forgot-password/password-reset-actions.ts). It has never
-            # had a key on either host, which is why resendConfigured reports
-            # false and a single misconfigured SMTP transport turned into a
-            # hard "contact support" failure instead of a degraded one. With a
-            # key present, password reset survives Gmail being locked out.
-            #
-            # No defaults, and guarded like everything else: an undefined
-            # secret must leave whatever the host already has alone. An
-            # invalid from-address fails silently at the provider, so guessing
-            # one would be worse than leaving it unset — the code already
-            # falls back to noreply@ebright.my on its own.
-            #
-            # CRM_FROM_EMAIL must be on a domain verified in Resend, or sends
-            # are rejected.
-            smtp_put CRM_RESEND_API_KEY "$(smtp_val "${CRM_RESEND_API_KEY:-}")"
-            smtp_put CRM_FROM_EMAIL     "$(smtp_val "${CRM_FROM_EMAIL:-}")"
-
-            if grep -q '^CRM_RESEND_API_KEY=' .env; then
-              echo "Resend fallback: configured" >> ~/deploy.log 2>&1
-            else
-              echo "NOTE: CRM_RESEND_API_KEY is not set — password reset has no fallback if SMTP fails." >> ~/deploy.log 2>&1
-            fi
-
             # Last line of defence: clear anything the writes above produced
             # before compose reads the file. See env_sanitize's note.
             env_sanitize "after writes"
