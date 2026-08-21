@@ -49,8 +49,21 @@ const transporter = nodemailer.createTransport({
 // what keeps the lockout going. Caller treats a cooldown skip as a failure
 // (clockInEmailSent stays false), so the email naturally retries after cooldown.
 const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+// A 454 ("Too many login attempts") needs a far longer back-off than a
+// one-off failure, because Google's counter only decays while nothing is
+// attempting. At 10 minutes we retried roughly six times an hour, which was
+// enough to keep the lockout alive indefinitely — the circuit breaker was
+// feeding the condition it exists to escape. Back off for an hour so the
+// account actually gets the silence it needs to recover.
+const RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 let cooldownUntil = 0;
 let cooldownLogged = false;
+
+/** How long to stay quiet after `err`. 454 gets the long back-off. */
+function cooldownForError(err: unknown): number {
+  const e = err as { responseCode?: number };
+  return e?.responseCode === 454 ? RATE_LIMIT_COOLDOWN_MS : COOLDOWN_MS;
+}
 
 function isRateLimitOrAuthError(err: unknown): boolean {
   const e = err as { code?: string; responseCode?: number; message?: string };
@@ -96,9 +109,10 @@ async function safeSend(msg: SendMailOptions): Promise<SentMessageInfo> {
     return info;
   } catch (err) {
     if (isRateLimitOrAuthError(err)) {
-      cooldownUntil = Date.now() + COOLDOWN_MS;
+      const wait = cooldownForError(err);
+      cooldownUntil = Date.now() + wait;
       cooldownLogged = false;
-      console.error(`[mailer] ✗ Gmail rejected send — entering ${COOLDOWN_MS / 60000}min cooldown`);
+      console.error(`[mailer] ✗ Gmail rejected send — entering ${wait / 60000}min cooldown`);
     }
     throw err;
   }
@@ -111,8 +125,9 @@ if (process.env.NODE_ENV === "production") {
     (err: Error) => {
       console.error(`[mailer] ✗ SMTP auth failed: ${err.message}`);
       if (isRateLimitOrAuthError(err)) {
-        cooldownUntil = Date.now() + COOLDOWN_MS;
-        console.error(`[mailer] ❄ Entering ${COOLDOWN_MS / 60000}min cooldown — no sends will be attempted`);
+        const wait = cooldownForError(err);
+        cooldownUntil = Date.now() + wait;
+        console.error(`[mailer] ❄ Entering ${wait / 60000}min cooldown — no sends will be attempted`);
       }
     },
   );
@@ -156,6 +171,27 @@ export async function verifyMailer(): Promise<MailerProbe> {
     cooldownActive,
     ...(cooldownActive ? { cooldownRemaining: fmtRemaining(cooldownUntil - now) } : {}),
   };
+
+  // Do not probe while the cooldown is armed. transporter.verify() performs a
+  // real login, so a diagnostic that probes unconditionally becomes part of
+  // the problem it is reporting: against Gmail's "454 Too many login
+  // attempts" the counter only winds down while nothing is attempting, and
+  // every reload of /api/debug/mail-health restarts it. The cooldown already
+  // records that a recent attempt failed and why, which is the answer the
+  // caller needs — so report that instead of buying it again.
+  if (cooldownActive) {
+    return {
+      ok: false,
+      ...base,
+      error: {
+        name: "CooldownActive",
+        message:
+          `Not probed — a recent attempt failed and the cooldown is armed. ` +
+          `Probing now would be another login attempt, which is what keeps a Gmail 454 lockout alive. ` +
+          `Wait for the cooldown to clear before checking again.`,
+      },
+    };
+  }
 
   try {
     await transporter.verify();
