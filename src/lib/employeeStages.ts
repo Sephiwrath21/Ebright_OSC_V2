@@ -15,16 +15,14 @@ export function isEmployeeStage(value: string): value is EmployeeStage {
 }
 
 // Exit priority: end_date wins whenever it's set — "exit" only if it's
-// already passed (calendar-date comparison, not timestamp); a set end_date
-// that's today/in the future is NOT exit regardless of status. status is
-// only consulted as a fallback when end_date is null at all, and only
-// "inactive" qualifies (not "archive" — not named in the spec, so an
-// archive-status employee with no end_date falls through to active/
-// onboarding/probation like anyone else). "probation" is derived from the
+// already passed OR is today (inclusive), calendar-date comparison, not
+// timestamp; a set end_date still in the future is NOT exit regardless of
+// status. status alone is never enough — an "inactive" row with no end_date
+// at all is NOT exit (status-only exit wrongly caught people who were merely
+// marked inactive without a real exit date). "probation" is derived from the
 // probation flag — there's no separate DB stage for it.
 export function stageFromEmployment(status: string | null, endIso: string | null, todayIso: string): EmployeeStage {
-  if (endIso) return endIso < todayIso ? "exit" : nonExitStage(status);
-  if (status === "inactive") return "exit";
+  if (endIso) return endIso <= todayIso ? "exit" : nonExitStage(status);
   return nonExitStage(status);
 }
 

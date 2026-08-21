@@ -2,6 +2,7 @@
 
 import { startTransition, useState, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { ListChecks } from "lucide-react";
 import {
   PanelHeading,
   SubsectionHeading,
@@ -684,7 +685,7 @@ export function PerformanceReviewPanel({
 // Overdue rows (isOverdue — due date passed, not completed) render in red so
 // they stand out from tasks still within their due date; every row on the
 // Overdue tab is overdue by definition, so it renders entirely red there too.
-function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
+function TaskTable({ tasks, showRowNumbers = false }: { tasks: EmployeeTaskRow[]; showRowNumbers?: boolean }) {
   return (
     <RecordTable
       columns={[
@@ -692,8 +693,16 @@ function TaskTable({ tasks }: { tasks: EmployeeTaskRow[] }) {
         { key: "date", label: "Date" },
         { key: "source", label: "Source" },
       ]}
-      rows={tasks.map((t) => ({
-        name: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.name}</span>,
+      rows={tasks.map((t, i) => ({
+        // Position in the currently filtered/displayed list, 1-based — no
+        // separate counter state needed since RecordTable has no
+        // pagination of its own (see conversation), so this array index
+        // already resets to 0 on every re-filter for free.
+        name: (
+          <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>
+            {showRowNumbers ? `${i + 1}. ${t.name}` : t.name}
+          </span>
+        ),
         date: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
         source: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.source}</span>,
       }))}
@@ -765,14 +774,32 @@ function TaskDateFilters({
 // pattern EmployeeOverviewView's own year filter already uses — so a new
 // year automatically gets an option the moment a task with that due date
 // exists, no code change required.
-function TaskPanel({ heading, tasks }: { heading: string; tasks: EmployeeTaskRow[] }) {
+function TaskPanel({
+  heading,
+  tasks,
+  showRowNumbers = false,
+}: {
+  heading: string;
+  tasks: EmployeeTaskRow[];
+  showRowNumbers?: boolean;
+}) {
   const years = useMemo(() => {
     const set = new Set(tasks.map((t) => t.dueDate?.slice(0, 4)).filter(Boolean) as string[]);
     return Array.from(set).sort((a, b) => b.localeCompare(a)); // most recent first
   }, [tasks]);
 
-  const [month, setMonth] = useState("all");
-  const [year, setYear] = useState("all");
+  // Default to the current month/year rather than "all" — per explicit
+  // decision, users land on what's actually due now instead of the full
+  // history. Lazy initializers so `new Date()` only runs once, on mount.
+  // year falls back to "all" if the current year isn't among this
+  // employee's own task due dates (see `years` above, data-derived, not a
+  // fixed range) — a controlled <select> whose value matches no <option>
+  // would otherwise render with nothing visibly selected.
+  const [month, setMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [year, setYear] = useState(() => {
+    const currentYear = String(new Date().getFullYear());
+    return years.includes(currentYear) ? currentYear : "all";
+  });
 
   const filtered = tasks.filter((t) => {
     if (!t.dueDate) return false;
@@ -783,21 +810,44 @@ function TaskPanel({ heading, tasks }: { heading: string; tasks: EmployeeTaskRow
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <PanelHeading>{heading}</PanelHeading>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          {/* Not the shared PanelHeading component here — its own mb-6 is
+              sized for a title with no second line underneath; this needs
+              a tight gap to the count row instead, so the heading markup
+              is replicated locally with a smaller margin. */}
+          <h2 className="text-2xl font-semibold text-[#4b4949d6] dark:text-slate-200 pr-24 sm:pr-0">{heading}</h2>
+          {/* filtered.length, not tasks.length — matches the currently
+              selected month/year exactly, same count RecordTable ends up
+              rendering rows for (no pagination in this table, see
+              conversation, so this is already the true total, not a
+              per-page count). --text-secondary is an existing themed
+              token (globals.css), same one BranchDashboard.tsx/
+              ClaimFormView.tsx already use for muted text via inline
+              style. */}
+          <span
+            className="mt-1 mb-6"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)" }}
+          >
+            <ListChecks size={15} aria-hidden="true" />
+            Total {filtered.length} {filtered.length === 1 ? "task" : "tasks"}
+          </span>
+        </div>
         <TaskDateFilters month={month} year={year} years={years} onMonthChange={setMonth} onYearChange={setYear} />
       </div>
-      <TaskTable tasks={filtered} />
+      <TaskTable tasks={filtered} showRowNumbers={showRowNumbers} />
     </div>
   );
 }
 
+// Row numbering (1., 2., ...) on both Pending and Overdue, per explicit
+// decision (see conversation) — same showRowNumbers prop, same TaskPanel.
 export function TaskPendingPanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
-  return <TaskPanel heading="Pending" tasks={tasks} />;
+  return <TaskPanel heading="Pending" tasks={tasks} showRowNumbers />;
 }
 
 export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
-  return <TaskPanel heading="Overdue" tasks={tasks} />;
+  return <TaskPanel heading="Overdue" tasks={tasks} showRowNumbers />;
 }
 
 // ─── Lookup: "category/section" -> panel component ───

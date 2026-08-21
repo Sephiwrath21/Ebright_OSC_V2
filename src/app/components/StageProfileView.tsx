@@ -76,6 +76,8 @@ import {
   AssetRecoveryPanel,
   SystemRevocationPanel,
   FinancialSettlementPanel,
+  RecordAddModal,
+  LEAVE_DETAIL_FIELDS,
 } from "@/app/components/ActiveProfilePanels";
 import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog } from "@/app/components/PageEditMode";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
@@ -317,7 +319,7 @@ export default function StageProfileView({
               <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
             </button>
             {isOpen && (
-              <div className="flex flex-col ml-4" style={{ gap: config.navRail.gapPx }}>
+              <div className="flex flex-col" style={{ gap: config.navRail.gapPx }}>
                 {groupSections.map((s) => {
                   const isCurrent = !history && s.key === currentKey;
                   const className = `w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${config.navRail.paddingClass} ${config.navRail.fontSizeClass} ${
@@ -886,9 +888,14 @@ export default function StageProfileView({
                 // through to resolvePanel below, unaffected.
                 <PageEditProvider>
                   <PageEditMessageDialog />
-                  <div className="mb-4 flex justify-end">
-                    <PageEditToggleButton />
-                  </div>
+                  {/* MC/Leave has no Edit/Save concept at all (see conversation)
+                      -- hide the shared toggle while that sub-tab is showing,
+                      even though the other tabs in this batch still use it. */}
+                  {currentKey !== "mc-leave" && (
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                  )}
                   <div className={currentKey === "salary-revision" ? "" : "hidden"}>
                     <SalaryRevisionPanel userId={employeeId} data={salaryRevisions} canEdit={canEdit} />
                   </div>
@@ -1488,6 +1495,12 @@ function LeaveDateCell({ startDate, endDate }: { startDate: string; endDate: str
 }
 
 function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
+  // View-only tab (see conversation) -- no Edit button, no add/delete; a
+  // clicked row just opens LEAVE_DETAIL_FIELDS in RecordAddModal's
+  // startReadOnly + canEdit={false} mode for a clean read-only detail view.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const selected = selectedIndex !== null ? rows[selectedIndex] : null;
+
   return (
     <div>
       <PanelHeading>MC/ Leave</PanelHeading>
@@ -1508,8 +1521,29 @@ function LeaveHistoryPanel({ rows }: { rows: LeaveHistoryRow[] }) {
           reason: r.reason ?? "—",
           attachment: <RealAttachmentLink fileId={r.attachment} />,
         }))}
-        addLabel="+ Add leave record"
+        onRowClick={(index) => setSelectedIndex(index)}
       />
+      {selected && (
+        <RecordAddModal
+          title="Leave Record"
+          fields={LEAVE_DETAIL_FIELDS}
+          saving={false}
+          error={null}
+          initialValues={{
+            type: selected.leaveTypeName,
+            dates: selected.startDate === selected.endDate ? selected.startDate : `${selected.startDate} – ${selected.endDate}`,
+            days: `${selected.totalDays} Day${selected.totalDays === "1" ? "" : "s"}`,
+            reason: selected.reason ?? "",
+            status: selected.status.charAt(0).toUpperCase() + selected.status.slice(1),
+          }}
+          initialFileIds={{ attachment: selected.attachment }}
+          startReadOnly
+          canEdit={false}
+          showFooter={false}
+          onClose={() => setSelectedIndex(null)}
+          onSave={() => {}}
+        />
+      )}
     </div>
   );
 }

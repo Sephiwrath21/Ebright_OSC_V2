@@ -11,6 +11,7 @@ import RowActionMenu from "@/app/components/RowActionMenu";
 import Pagination from "@/app/components/Pagination";
 import { SortableDateHeader, nextDateSortState, applyDateSort, type DateSortState } from "@/app/components/SortableHeader";
 import OverdueDot from "@/app/components/OverdueDot";
+import { formatProbationReminder } from "@/lib/probationReminderText";
 
 interface Props {
   rows: EmployeeOverviewRow[];
@@ -24,8 +25,10 @@ interface Props {
    *  red dot + tooltip on the Probation summary card, same signal as the
    *  NotificationBell's own Probation card. One name per line in the
    *  tooltip when 2+ people are flagged at once, per explicit decision (see
-   *  conversation) — not merged into one sentence. */
-  probationReminderNames?: string[];
+   *  conversation) — not merged into one sentence. endDate (2026-08-19) lets
+   *  the tooltip compute the real day count via probationReminderText.ts
+   *  instead of a hardcoded "3 days" — see that file's own comment. */
+  probationReminderNames?: { name: string; endDate: string }[];
 }
 
 export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, probationReminderNames }: Props) {
@@ -140,7 +143,7 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                   {stage === "probation" && probationReminderNames && probationReminderNames.length > 0 && (
                     <OverdueDot
                       count={probationReminderNames.length}
-                      label={probationReminderNames.map((name) => `${name}还有三天就结束probation`).join("\n")}
+                      label={probationReminderNames.map((r) => formatProbationReminder(r.name, r.endDate)).join("\n")}
                     />
                   )}
                 </span>
