@@ -39,6 +39,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type {
   ActionResult,
+  FlowBucketTotals,
   FlowCategoryOption,
   FlowEntityDetail,
   FlowTaskRow,
@@ -46,8 +47,20 @@ import type {
   ProofRemoveHandler,
   ProofUploadHandler,
 } from "./types";
-import { groupTasksByCategory, groupTasksByPerson, UNCATEGORIZED_CARD_ID } from "./entity-card-grouping";
+import { flowBucketTotal } from "./types";
+import { useCardMode } from "./card-mode-context";
 import {
+  groupTasksByCategory,
+  groupTasksByPerson,
+  UNCATEGORIZED_CARD_ID,
+  type PersonCard,
+} from "./entity-card-grouping";
+import {
+  BUCKET_META,
+  BUCKET_SOLID,
+  BUCKET_TEXT,
+  BUCKET_TINT,
+  ChevronIcon,
   DUE_COL_WIDTH,
   HeaderResizeHandle,
   PROOF_COL_WIDTH,
@@ -58,9 +71,13 @@ import {
   RESIZABLE_TASK_NAME_MAX,
   RESIZABLE_TASK_NAME_MIN,
   RowActionsMenu,
+  StatusDonut,
   StatusHeaderSpacer,
   TaskRowLine,
+  TOTAL_TEXT,
+  TOTAL_TINT,
   useResizableColumn,
+  type BucketKey,
   type ReassignControl,
 } from "./bits";
 
@@ -92,6 +109,101 @@ function statusGroupedTasks(tasks: FlowTaskRow[]): FlowTaskRow[] {
   const pending = tasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
   const completed = tasks.filter((t) => t.status === "DONE" || t.status === "SKIPPED");
   return [...pending, ...completed];
+}
+
+/** List/Donut toggle's "Donut" card (2026-08-22, user request) — a
+ *  per-person completion summary in the same visual LANGUAGE as the
+ *  ClickUp Task page's member card (DepartmentMembers.tsx: donut ring +
+ *  Done/Pending/N-A/Total stat chips + Completed/Pending/Not Applicable
+ *  accordions), rebuilt with Task Manager's own StatusDonut/BUCKET_META
+ *  components and Tailwind/dark-mode conventions rather than a visual
+ *  copy — that page runs on a different data source (ClickUp's own
+ *  integration, @/lib/clickup) and a different inline-style/CSS-token
+ *  styling system entirely, so nothing from it could be reused directly.
+ *  See the "List/Donut" toggle button just above in the header for where
+ *  this is switched on, and the groupByStatus doc comment for why it
+ *  never applies to HOD/CEO Assigned Task. */
+function PersonDonutCard({ card }: { card: PersonCard }) {
+  const [open, setOpen] = React.useState<BucketKey | null>(null);
+
+  const { totals, byBucket } = React.useMemo(() => {
+    const buckets: Record<BucketKey, FlowTaskRow[]> = { completed: [], pending: [], na: [] };
+    for (const t of card.tasks) {
+      if (t.status === "DONE") buckets.completed.push(t);
+      else if (t.status === "SKIPPED") buckets.na.push(t);
+      else buckets.pending.push(t);
+    }
+    const bucketTotals: FlowBucketTotals = {
+      completed: buckets.completed.length,
+      pending: buckets.pending.length,
+      na: buckets.na.length,
+    };
+    return { totals: bucketTotals, byBucket: buckets };
+  }, [card.tasks]);
+
+  const total = flowBucketTotal(totals);
+  const percent = total > 0 ? Math.round((totals.completed / total) * 100) : 0;
+
+  return (
+    <div className="flex flex-col items-center gap-3 p-4">
+      <StatusDonut totals={totals} size={104}>
+        <span className="text-lg font-bold text-gray-900 dark:text-slate-100">{percent}%</span>
+      </StatusDonut>
+
+      <div className="grid w-full grid-cols-4 gap-1.5">
+        {BUCKET_META.map((b) => (
+          <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
+            <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
+            <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">{b.label}</div>
+          </div>
+        ))}
+        <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
+          <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
+          <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">Total</div>
+        </div>
+      </div>
+
+      <div className="flex w-full flex-col gap-1.5">
+        {BUCKET_META.map((b) => {
+          const tasks = byBucket[b.key];
+          const isOpen = open === b.key;
+          return (
+            <div key={b.key} className={`overflow-hidden rounded-lg ${BUCKET_TINT[b.key]}`}>
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : b.key)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
+                  <ChevronIcon expanded={isOpen} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
+                  {b.label}
+                </span>
+                <span
+                  className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${BUCKET_SOLID[b.key]}`}
+                >
+                  {tasks.length}
+                </span>
+              </button>
+              {isOpen && (
+                <ul className="space-y-1 px-3 pb-2 pl-9 text-xs text-gray-600 dark:text-slate-300">
+                  {tasks.length === 0 ? (
+                    <li className="italic text-gray-400 dark:text-slate-500">Nothing here.</li>
+                  ) : (
+                    tasks.map((t) => (
+                      <li key={t.runBlockId} className="truncate">
+                        · {t.blockTitle}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /** One weekday's worth of the viewer's own tasks (2026-08-15, embedded
@@ -296,6 +408,18 @@ export function EntityCardOverview({
   groupByStatus?: boolean;
 }) {
   const [sortMode, setSortMode] = React.useState<SortMode>("person");
+  // List/Donut view toggle (2026-08-22) — Sort: Person cards only; the
+  // button itself is hidden for groupByStatus sections (HOD/CEO Assigned
+  // Task), so this simply never flips to "donut" there. Shared across every
+  // section on the page (2026-08-22, page-level toggle) when a
+  // CardModeProvider wraps this component (see card-mode-context.tsx) —
+  // falls back to independent local state, with its own toggle button
+  // rendered below, when unwrapped (every call site besides /task-manager's
+  // Department/Branch/All Departments dropdown flow).
+  const sharedCardMode = useCardMode();
+  const [localCardMode, setLocalCardMode] = React.useState<"list" | "donut">("list");
+  const cardMode = sharedCardMode ? sharedCardMode.mode : localCardMode;
+  const setCardMode = sharedCardMode ? sharedCardMode.setMode : setLocalCardMode;
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -440,6 +564,46 @@ export function EntityCardOverview({
             <option value="person">Sort: Person</option>
             <option value="type">Sort: Type</option>
           </select>
+          {/* List/Donut toggle (2026-08-22) — Sort: Person only, and not on
+              HOD/CEO Assigned Task (groupByStatus) sections, where a
+              donut summary doesn't fit the "assigned by" semantics. Hidden
+              here entirely when a page-level CardModeProvider is present
+              (sharedCardMode) — CardModeToggle, rendered once near the
+              Department/Branch dropdown, is the only control in that case. */}
+          {sortMode === "person" && !groupByStatus && !sharedCardMode && (
+            <div
+              role="radiogroup"
+              aria-label="Card style"
+              className="flex items-center gap-0.5 rounded-full border border-gray-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={cardMode === "list"}
+                onClick={() => setCardMode("list")}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  cardMode === "list"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                }`}
+              >
+                List
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={cardMode === "donut"}
+                onClick={() => setCardMode("donut")}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  cardMode === "donut"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                }`}
+              >
+                Donut
+              </button>
+            </div>
+          )}
           {showViewToggle && (
             <select
               value={onlyMe ? "onlyMe" : "all"}
@@ -463,9 +627,16 @@ export function EntityCardOverview({
               const isOwnCard = card.userId === myUserId;
               // Weekday-tab view (2026-08-15) — see the `myWeek` prop's own
               // doc comment for why this is scoped to "own card, alone on
-              // screen" rather than every own-card appearance.
-              const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1;
-              const showMyMonth = isOwnCard && Boolean(myMonth) && personCards.length === 1;
+              // screen" rather than every own-card appearance. Also gated on
+              // cardMode !== "donut" (2026-08-22, user report) — without
+              // this, picking "Donut" for the lone own card (Only Me) had no
+              // visible effect at all: the weekday/month-tab list took
+              // priority unconditionally, so the toggle never actually
+              // reached PersonDonutCard for this specific case even though
+              // it worked correctly everywhere else (View All, or any other
+              // person's card).
+              const showMyWeek = isOwnCard && Boolean(myWeek) && personCards.length === 1 && cardMode !== "donut";
+              const showMyMonth = isOwnCard && Boolean(myMonth) && personCards.length === 1 && cardMode !== "donut";
               // Type sub-grouping within each card (2026-08-15) — reuses
               // Sort: Type's own grouping function (entity-card-grouping.ts)
               // on this ONE person's already-scoped task list, so "Sort:
@@ -555,8 +726,14 @@ export function EntityCardOverview({
                       </div>
                     </div>
                   ) : showMyMonth && myMonth ? (
-                    <div className="flex gap-3 p-3">
-                      <div role="tablist" className="w-32 shrink-0 space-y-0.5">
+                    // Sized (2026-08-22, user feedback) — this branch had no
+                    // height of its own, unlike its siblings (max-h-80
+                    // below), so a short tab list next to a one-line empty
+                    // state left the card looking sparse. min-h gives it
+                    // real presence; the task list area also scrolls past
+                    // that height instead of growing unbounded.
+                    <div className="flex min-h-[22rem] gap-3 p-4">
+                      <div role="tablist" className="w-36 shrink-0 space-y-1">
                         {myMonth.chunks.map((c) => {
                           const pendingCount = c.tasks.filter(
                             (t) => t.status !== "DONE" && t.status !== "SKIPPED",
@@ -569,7 +746,7 @@ export function EntityCardOverview({
                               role="tab"
                               aria-selected={active}
                               onClick={() => selectMyMonthRange(c.range)}
-                              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-medium ${
+                              className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-medium ${
                                 active ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
                               }`}
                             >
@@ -584,7 +761,7 @@ export function EntityCardOverview({
                           );
                         })}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-h-0 min-w-0 max-h-[26rem] flex-1 overflow-auto">
                         {selectedMyMonthChunk && (
                           <ResizableTaskList
                             key={selectedMyMonthChunk.range}
@@ -605,6 +782,17 @@ export function EntityCardOverview({
                         )}
                       </div>
                     </div>
+                  ) : cardMode === "donut" ? (
+                    // List/Donut toggle (2026-08-22, user request) — an
+                    // alternate rendering of the SAME card.tasks, styled
+                    // like the ClickUp Task page's per-member donut card
+                    // (DepartmentMembers.tsx) but using Task Manager's own
+                    // Tailwind/dark-mode design language and StatusDonut
+                    // component instead of a visual copy. Never reached for
+                    // groupByStatus sections (HOD/CEO Assigned Task) — the
+                    // toggle button itself is hidden there, so cardMode
+                    // stays "list" by default; see the header control below.
+                    <PersonDonutCard card={card} />
                   ) : (
                   <div
                     // Scrollable body (2026-08-15) — a capped height with

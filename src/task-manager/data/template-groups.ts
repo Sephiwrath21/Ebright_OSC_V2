@@ -180,6 +180,11 @@ export interface TemplateGroupSummary {
   taskCount: number;
   /** First 3 member task titles, group order — dashboard card preview. */
   previewTitles: string[];
+  /** EVERY member task title (2026-08-22) — search-only, never rendered
+   *  directly (previewTitles above still drives the card's visible
+   *  preview). Feeds the dashboard's search bar, which must be able to
+   *  match a task beyond the first 3 shown on the card. */
+  allTaskTitles: string[];
   updatedAt: string; // ISO
 }
 
@@ -227,6 +232,7 @@ export function listTemplateGroups(
       name: g.name,
       taskCount: g.templates.length,
       previewTitles: g.templates.slice(0, 3).map((t) => t.title),
+      allTaskTitles: g.templates.map((t) => t.title),
       updatedAt: g.updatedAt.toISOString(),
     }));
   }, "listTemplateGroups");
@@ -754,17 +760,20 @@ export function getGroupAssignees(
   }, "getGroupAssignees");
 }
 
-/** "Remove" for one assignee (View Assignees modal): cancels that
- *  person's pending instances across every member task in this group —
- *  completed/N-A history kept, same split cancelPendingTemplateRuns
- *  already uses. Other assignees and the group/template itself are
- *  untouched. */
+/** "Remove" for one assignee (View Assignees modal, 2026-08-22 rule —
+ *  corrected same day): cancels ONLY today's instance of each member task
+ *  — see removeTemplateAssigneeCore's doc comment in templates-internal.ts
+ *  for the full rule. Records a TaskTemplateExcludedAssignee row per
+ *  member task, so this person stops receiving new recurring instances of
+ *  EVERY task in the group going forward, while every instance dated
+ *  before today (pending, overdue, or completed) stays exactly as it is.
+ *  Other assignees and the group/template itself are untouched. */
 export function removeGroupAssignee(
   email: string,
   groupId: string,
   scope: TemplateGroupScope,
   userId: string,
-): Promise<{ removedTasks: number; keptRecords: number }> {
+): Promise<{ excluded: true; cancelledToday: number; pendingKept: number }> {
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
@@ -775,13 +784,13 @@ export function removeGroupAssignee(
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
-    let removedTasks = 0;
-    let keptRecords = 0;
+    let cancelledToday = 0;
+    let pendingKept = 0;
     for (const t of group.templates) {
       const result = await removeTemplateAssigneeCore(user, t.id, targetUserId);
-      removedTasks += result.removedTasks;
-      keptRecords += result.keptRecords;
+      cancelledToday += result.cancelledToday;
+      pendingKept += result.pendingKept;
     }
-    return { removedTasks, keptRecords };
+    return { excluded: true, cancelledToday, pendingKept };
   }, "removeGroupAssignee");
 }

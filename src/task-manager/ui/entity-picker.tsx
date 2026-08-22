@@ -312,7 +312,7 @@ export function EntityPicker({
       <select
         value={value}
         onChange={(e) => navigate(e.target.value)}
-        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
+        className="rounded-xl border-2 border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
       >
         {groups.map((g, i) =>
           g.label ? (

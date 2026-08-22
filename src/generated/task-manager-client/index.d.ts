@@ -136,6 +136,21 @@ export type BranchPackageSchedule = $Result.DefaultSelection<Prisma.$BranchPacka
  */
 export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
 /**
+ * Model TaskTemplateExcludedAssignee
+ * "Remove Assignee" persistence (2026-08-22): the View Assignees modal's
+ * Remove button no longer cancels any FlowRun/RunBlock at all — see
+ * removeTemplateAssigneeCore's doc comment in data/templates-internal.ts
+ * for the full rule. A row here means (templateId, userId) should stop
+ * receiving NEW recurring instances of this template from here on, while
+ * every already-created instance (pending, overdue, completed, including
+ * today's) is left completely untouched. advanceRecurringBlocks
+ * (engine/recurrence.ts) consults this before generating a successor;
+ * getTemplateAssigneesCore filters excluded people out of the "currently
+ * assigned" list even while their last pending instance is still
+ * naturally running its course. Cascade-deleted with the template.
+ */
+export type TaskTemplateExcludedAssignee = $Result.DefaultSelection<Prisma.$TaskTemplateExcludedAssigneePayload>
+/**
  * Model Proof
  * Assignee-uploaded completion evidence for a RunBlock (a screenshot —
  * image only, capped at 2 MB by the upload action). Optional: uploading
@@ -636,6 +651,16 @@ export class PrismaClient<
     * ```
     */
   get taskTemplate(): Prisma.TaskTemplateDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.taskTemplateExcludedAssignee`: Exposes CRUD operations for the **TaskTemplateExcludedAssignee** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more TaskTemplateExcludedAssignees
+    * const taskTemplateExcludedAssignees = await prisma.taskTemplateExcludedAssignee.findMany()
+    * ```
+    */
+  get taskTemplateExcludedAssignee(): Prisma.TaskTemplateExcludedAssigneeDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.proof`: Exposes CRUD operations for the **Proof** model.
@@ -1189,6 +1214,7 @@ export namespace Prisma {
     TaskTemplateGroup: 'TaskTemplateGroup',
     BranchPackageSchedule: 'BranchPackageSchedule',
     TaskTemplate: 'TaskTemplate',
+    TaskTemplateExcludedAssignee: 'TaskTemplateExcludedAssignee',
     Proof: 'Proof',
     RunItem: 'RunItem',
     NotificationLog: 'NotificationLog',
@@ -1213,7 +1239,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskCategory" | "taskTemplateGroup" | "branchPackageSchedule" | "taskTemplate" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
+      modelProps: "user" | "hodKanbanCard" | "hodKanbanColumn" | "workspace" | "flow" | "flowTrigger" | "block" | "blockItem" | "decisionNode" | "flowRun" | "runBlock" | "guideline" | "taskCategory" | "taskTemplateGroup" | "branchPackageSchedule" | "taskTemplate" | "taskTemplateExcludedAssignee" | "proof" | "runItem" | "notificationLog" | "auditLog" | "flowDoc" | "savedView" | "manpowerSchedule" | "scheduleSlot" | "ceoDashboardConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2401,6 +2427,80 @@ export namespace Prisma {
           }
         }
       }
+      TaskTemplateExcludedAssignee: {
+        payload: Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>
+        fields: Prisma.TaskTemplateExcludedAssigneeFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.TaskTemplateExcludedAssigneeFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.TaskTemplateExcludedAssigneeFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          findFirst: {
+            args: Prisma.TaskTemplateExcludedAssigneeFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.TaskTemplateExcludedAssigneeFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          findMany: {
+            args: Prisma.TaskTemplateExcludedAssigneeFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>[]
+          }
+          create: {
+            args: Prisma.TaskTemplateExcludedAssigneeCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          createMany: {
+            args: Prisma.TaskTemplateExcludedAssigneeCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.TaskTemplateExcludedAssigneeCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>[]
+          }
+          delete: {
+            args: Prisma.TaskTemplateExcludedAssigneeDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          update: {
+            args: Prisma.TaskTemplateExcludedAssigneeUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          deleteMany: {
+            args: Prisma.TaskTemplateExcludedAssigneeDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.TaskTemplateExcludedAssigneeUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.TaskTemplateExcludedAssigneeUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>[]
+          }
+          upsert: {
+            args: Prisma.TaskTemplateExcludedAssigneeUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TaskTemplateExcludedAssigneePayload>
+          }
+          aggregate: {
+            args: Prisma.TaskTemplateExcludedAssigneeAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateTaskTemplateExcludedAssignee>
+          }
+          groupBy: {
+            args: Prisma.TaskTemplateExcludedAssigneeGroupByArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateExcludedAssigneeGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.TaskTemplateExcludedAssigneeCountArgs<ExtArgs>
+            result: $Utils.Optional<TaskTemplateExcludedAssigneeCountAggregateOutputType> | number
+          }
+        }
+      }
       Proof: {
         payload: Prisma.$ProofPayload<ExtArgs>
         fields: Prisma.ProofFieldRefs
@@ -3206,6 +3306,7 @@ export namespace Prisma {
     taskTemplateGroup?: TaskTemplateGroupOmit
     branchPackageSchedule?: BranchPackageScheduleOmit
     taskTemplate?: TaskTemplateOmit
+    taskTemplateExcludedAssignee?: TaskTemplateExcludedAssigneeOmit
     proof?: ProofOmit
     runItem?: RunItemOmit
     notificationLog?: NotificationLogOmit
@@ -3647,6 +3748,37 @@ export namespace Prisma {
    */
   export type TaskTemplateGroupCountOutputTypeCountBranchSchedulesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: BranchPackageScheduleWhereInput
+  }
+
+
+  /**
+   * Count Type TaskTemplateCountOutputType
+   */
+
+  export type TaskTemplateCountOutputType = {
+    excludedAssignees: number
+  }
+
+  export type TaskTemplateCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    excludedAssignees?: boolean | TaskTemplateCountOutputTypeCountExcludedAssigneesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * TaskTemplateCountOutputType without action
+   */
+  export type TaskTemplateCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateCountOutputType
+     */
+    select?: TaskTemplateCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * TaskTemplateCountOutputType without action
+   */
+  export type TaskTemplateCountOutputTypeCountExcludedAssigneesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateExcludedAssigneeWhereInput
   }
 
 
@@ -21586,6 +21718,8 @@ export namespace Prisma {
     updatedAt?: boolean
     group?: boolean | TaskTemplate$groupArgs<ExtArgs>
     category?: boolean | TaskTemplate$categoryArgs<ExtArgs>
+    excludedAssignees?: boolean | TaskTemplate$excludedAssigneesArgs<ExtArgs>
+    _count?: boolean | TaskTemplateCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplate"]>
 
   export type TaskTemplateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -21650,6 +21784,8 @@ export namespace Prisma {
   export type TaskTemplateInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     group?: boolean | TaskTemplate$groupArgs<ExtArgs>
     category?: boolean | TaskTemplate$categoryArgs<ExtArgs>
+    excludedAssignees?: boolean | TaskTemplate$excludedAssigneesArgs<ExtArgs>
+    _count?: boolean | TaskTemplateCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type TaskTemplateIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     group?: boolean | TaskTemplate$groupArgs<ExtArgs>
@@ -21665,6 +21801,7 @@ export namespace Prisma {
     objects: {
       group: Prisma.$TaskTemplateGroupPayload<ExtArgs> | null
       category: Prisma.$TaskCategoryPayload<ExtArgs> | null
+      excludedAssignees: Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -22078,6 +22215,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     group<T extends TaskTemplate$groupArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplate$groupArgs<ExtArgs>>): Prisma__TaskTemplateGroupClient<$Result.GetResult<Prisma.$TaskTemplateGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     category<T extends TaskTemplate$categoryArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplate$categoryArgs<ExtArgs>>): Prisma__TaskCategoryClient<$Result.GetResult<Prisma.$TaskCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    excludedAssignees<T extends TaskTemplate$excludedAssigneesArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplate$excludedAssigneesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -22561,6 +22699,30 @@ export namespace Prisma {
   }
 
   /**
+   * TaskTemplate.excludedAssignees
+   */
+  export type TaskTemplate$excludedAssigneesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithRelationInput | TaskTemplateExcludedAssigneeOrderByWithRelationInput[]
+    cursor?: TaskTemplateExcludedAssigneeWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: TaskTemplateExcludedAssigneeScalarFieldEnum | TaskTemplateExcludedAssigneeScalarFieldEnum[]
+  }
+
+  /**
    * TaskTemplate without action
    */
   export type TaskTemplateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -22576,6 +22738,1056 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: TaskTemplateInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model TaskTemplateExcludedAssignee
+   */
+
+  export type AggregateTaskTemplateExcludedAssignee = {
+    _count: TaskTemplateExcludedAssigneeCountAggregateOutputType | null
+    _min: TaskTemplateExcludedAssigneeMinAggregateOutputType | null
+    _max: TaskTemplateExcludedAssigneeMaxAggregateOutputType | null
+  }
+
+  export type TaskTemplateExcludedAssigneeMinAggregateOutputType = {
+    id: string | null
+    templateId: string | null
+    userId: string | null
+    createdAt: Date | null
+  }
+
+  export type TaskTemplateExcludedAssigneeMaxAggregateOutputType = {
+    id: string | null
+    templateId: string | null
+    userId: string | null
+    createdAt: Date | null
+  }
+
+  export type TaskTemplateExcludedAssigneeCountAggregateOutputType = {
+    id: number
+    templateId: number
+    userId: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type TaskTemplateExcludedAssigneeMinAggregateInputType = {
+    id?: true
+    templateId?: true
+    userId?: true
+    createdAt?: true
+  }
+
+  export type TaskTemplateExcludedAssigneeMaxAggregateInputType = {
+    id?: true
+    templateId?: true
+    userId?: true
+    createdAt?: true
+  }
+
+  export type TaskTemplateExcludedAssigneeCountAggregateInputType = {
+    id?: true
+    templateId?: true
+    userId?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type TaskTemplateExcludedAssigneeAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplateExcludedAssignee to aggregate.
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateExcludedAssignees to fetch.
+     */
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithRelationInput | TaskTemplateExcludedAssigneeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: TaskTemplateExcludedAssigneeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateExcludedAssignees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateExcludedAssignees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned TaskTemplateExcludedAssignees
+    **/
+    _count?: true | TaskTemplateExcludedAssigneeCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: TaskTemplateExcludedAssigneeMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: TaskTemplateExcludedAssigneeMaxAggregateInputType
+  }
+
+  export type GetTaskTemplateExcludedAssigneeAggregateType<T extends TaskTemplateExcludedAssigneeAggregateArgs> = {
+        [P in keyof T & keyof AggregateTaskTemplateExcludedAssignee]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateTaskTemplateExcludedAssignee[P]>
+      : GetScalarType<T[P], AggregateTaskTemplateExcludedAssignee[P]>
+  }
+
+
+
+
+  export type TaskTemplateExcludedAssigneeGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithAggregationInput | TaskTemplateExcludedAssigneeOrderByWithAggregationInput[]
+    by: TaskTemplateExcludedAssigneeScalarFieldEnum[] | TaskTemplateExcludedAssigneeScalarFieldEnum
+    having?: TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: TaskTemplateExcludedAssigneeCountAggregateInputType | true
+    _min?: TaskTemplateExcludedAssigneeMinAggregateInputType
+    _max?: TaskTemplateExcludedAssigneeMaxAggregateInputType
+  }
+
+  export type TaskTemplateExcludedAssigneeGroupByOutputType = {
+    id: string
+    templateId: string
+    userId: string
+    createdAt: Date
+    _count: TaskTemplateExcludedAssigneeCountAggregateOutputType | null
+    _min: TaskTemplateExcludedAssigneeMinAggregateOutputType | null
+    _max: TaskTemplateExcludedAssigneeMaxAggregateOutputType | null
+  }
+
+  type GetTaskTemplateExcludedAssigneeGroupByPayload<T extends TaskTemplateExcludedAssigneeGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<TaskTemplateExcludedAssigneeGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof TaskTemplateExcludedAssigneeGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], TaskTemplateExcludedAssigneeGroupByOutputType[P]>
+            : GetScalarType<T[P], TaskTemplateExcludedAssigneeGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type TaskTemplateExcludedAssigneeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    templateId?: boolean
+    userId?: boolean
+    createdAt?: boolean
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+
+  export type TaskTemplateExcludedAssigneeSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    templateId?: boolean
+    userId?: boolean
+    createdAt?: boolean
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+
+  export type TaskTemplateExcludedAssigneeSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    templateId?: boolean
+    userId?: boolean
+    createdAt?: boolean
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+
+  export type TaskTemplateExcludedAssigneeSelectScalar = {
+    id?: boolean
+    templateId?: boolean
+    userId?: boolean
+    createdAt?: boolean
+  }
+
+  export type TaskTemplateExcludedAssigneeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "templateId" | "userId" | "createdAt", ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+  export type TaskTemplateExcludedAssigneeInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }
+  export type TaskTemplateExcludedAssigneeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }
+  export type TaskTemplateExcludedAssigneeIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
+  }
+
+  export type $TaskTemplateExcludedAssigneePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "TaskTemplateExcludedAssignee"
+    objects: {
+      template: Prisma.$TaskTemplatePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      templateId: string
+      userId: string
+      createdAt: Date
+    }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+    composites: {}
+  }
+
+  type TaskTemplateExcludedAssigneeGetPayload<S extends boolean | null | undefined | TaskTemplateExcludedAssigneeDefaultArgs> = $Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload, S>
+
+  type TaskTemplateExcludedAssigneeCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<TaskTemplateExcludedAssigneeFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: TaskTemplateExcludedAssigneeCountAggregateInputType | true
+    }
+
+  export interface TaskTemplateExcludedAssigneeDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['TaskTemplateExcludedAssignee'], meta: { name: 'TaskTemplateExcludedAssignee' } }
+    /**
+     * Find zero or one TaskTemplateExcludedAssignee that matches the filter.
+     * @param {TaskTemplateExcludedAssigneeFindUniqueArgs} args - Arguments to find a TaskTemplateExcludedAssignee
+     * @example
+     * // Get one TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends TaskTemplateExcludedAssigneeFindUniqueArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeFindUniqueArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one TaskTemplateExcludedAssignee that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {TaskTemplateExcludedAssigneeFindUniqueOrThrowArgs} args - Arguments to find a TaskTemplateExcludedAssignee
+     * @example
+     * // Get one TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends TaskTemplateExcludedAssigneeFindUniqueOrThrowArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeFindUniqueOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplateExcludedAssignee that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeFindFirstArgs} args - Arguments to find a TaskTemplateExcludedAssignee
+     * @example
+     * // Get one TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends TaskTemplateExcludedAssigneeFindFirstArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeFindFirstArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first TaskTemplateExcludedAssignee that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeFindFirstOrThrowArgs} args - Arguments to find a TaskTemplateExcludedAssignee
+     * @example
+     * // Get one TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends TaskTemplateExcludedAssigneeFindFirstOrThrowArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeFindFirstOrThrowArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more TaskTemplateExcludedAssignees that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignees = await prisma.taskTemplateExcludedAssignee.findMany()
+     * 
+     * // Get first 10 TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignees = await prisma.taskTemplateExcludedAssignee.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const taskTemplateExcludedAssigneeWithIdOnly = await prisma.taskTemplateExcludedAssignee.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends TaskTemplateExcludedAssigneeFindManyArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a TaskTemplateExcludedAssignee.
+     * @param {TaskTemplateExcludedAssigneeCreateArgs} args - Arguments to create a TaskTemplateExcludedAssignee.
+     * @example
+     * // Create one TaskTemplateExcludedAssignee
+     * const TaskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.create({
+     *   data: {
+     *     // ... data to create a TaskTemplateExcludedAssignee
+     *   }
+     * })
+     * 
+     */
+    create<T extends TaskTemplateExcludedAssigneeCreateArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeCreateArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many TaskTemplateExcludedAssignees.
+     * @param {TaskTemplateExcludedAssigneeCreateManyArgs} args - Arguments to create many TaskTemplateExcludedAssignees.
+     * @example
+     * // Create many TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends TaskTemplateExcludedAssigneeCreateManyArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many TaskTemplateExcludedAssignees and returns the data saved in the database.
+     * @param {TaskTemplateExcludedAssigneeCreateManyAndReturnArgs} args - Arguments to create many TaskTemplateExcludedAssignees.
+     * @example
+     * // Create many TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many TaskTemplateExcludedAssignees and only return the `id`
+     * const taskTemplateExcludedAssigneeWithIdOnly = await prisma.taskTemplateExcludedAssignee.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends TaskTemplateExcludedAssigneeCreateManyAndReturnArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a TaskTemplateExcludedAssignee.
+     * @param {TaskTemplateExcludedAssigneeDeleteArgs} args - Arguments to delete one TaskTemplateExcludedAssignee.
+     * @example
+     * // Delete one TaskTemplateExcludedAssignee
+     * const TaskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.delete({
+     *   where: {
+     *     // ... filter to delete one TaskTemplateExcludedAssignee
+     *   }
+     * })
+     * 
+     */
+    delete<T extends TaskTemplateExcludedAssigneeDeleteArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeDeleteArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one TaskTemplateExcludedAssignee.
+     * @param {TaskTemplateExcludedAssigneeUpdateArgs} args - Arguments to update one TaskTemplateExcludedAssignee.
+     * @example
+     * // Update one TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends TaskTemplateExcludedAssigneeUpdateArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeUpdateArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more TaskTemplateExcludedAssignees.
+     * @param {TaskTemplateExcludedAssigneeDeleteManyArgs} args - Arguments to filter TaskTemplateExcludedAssignees to delete.
+     * @example
+     * // Delete a few TaskTemplateExcludedAssignees
+     * const { count } = await prisma.taskTemplateExcludedAssignee.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends TaskTemplateExcludedAssigneeDeleteManyArgs>(args?: SelectSubset<T, TaskTemplateExcludedAssigneeDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplateExcludedAssignees.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends TaskTemplateExcludedAssigneeUpdateManyArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TaskTemplateExcludedAssignees and returns the data updated in the database.
+     * @param {TaskTemplateExcludedAssigneeUpdateManyAndReturnArgs} args - Arguments to update many TaskTemplateExcludedAssignees.
+     * @example
+     * // Update many TaskTemplateExcludedAssignees
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more TaskTemplateExcludedAssignees and only return the `id`
+     * const taskTemplateExcludedAssigneeWithIdOnly = await prisma.taskTemplateExcludedAssignee.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends TaskTemplateExcludedAssigneeUpdateManyAndReturnArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one TaskTemplateExcludedAssignee.
+     * @param {TaskTemplateExcludedAssigneeUpsertArgs} args - Arguments to update or create a TaskTemplateExcludedAssignee.
+     * @example
+     * // Update or create a TaskTemplateExcludedAssignee
+     * const taskTemplateExcludedAssignee = await prisma.taskTemplateExcludedAssignee.upsert({
+     *   create: {
+     *     // ... data to create a TaskTemplateExcludedAssignee
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the TaskTemplateExcludedAssignee we want to update
+     *   }
+     * })
+     */
+    upsert<T extends TaskTemplateExcludedAssigneeUpsertArgs>(args: SelectSubset<T, TaskTemplateExcludedAssigneeUpsertArgs<ExtArgs>>): Prisma__TaskTemplateExcludedAssigneeClient<$Result.GetResult<Prisma.$TaskTemplateExcludedAssigneePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of TaskTemplateExcludedAssignees.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeCountArgs} args - Arguments to filter TaskTemplateExcludedAssignees to count.
+     * @example
+     * // Count the number of TaskTemplateExcludedAssignees
+     * const count = await prisma.taskTemplateExcludedAssignee.count({
+     *   where: {
+     *     // ... the filter for the TaskTemplateExcludedAssignees we want to count
+     *   }
+     * })
+    **/
+    count<T extends TaskTemplateExcludedAssigneeCountArgs>(
+      args?: Subset<T, TaskTemplateExcludedAssigneeCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], TaskTemplateExcludedAssigneeCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a TaskTemplateExcludedAssignee.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends TaskTemplateExcludedAssigneeAggregateArgs>(args: Subset<T, TaskTemplateExcludedAssigneeAggregateArgs>): Prisma.PrismaPromise<GetTaskTemplateExcludedAssigneeAggregateType<T>>
+
+    /**
+     * Group by TaskTemplateExcludedAssignee.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TaskTemplateExcludedAssigneeGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends TaskTemplateExcludedAssigneeGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: TaskTemplateExcludedAssigneeGroupByArgs['orderBy'] }
+        : { orderBy?: TaskTemplateExcludedAssigneeGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, TaskTemplateExcludedAssigneeGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetTaskTemplateExcludedAssigneeGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the TaskTemplateExcludedAssignee model
+   */
+  readonly fields: TaskTemplateExcludedAssigneeFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for TaskTemplateExcludedAssignee.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__TaskTemplateExcludedAssigneeClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    template<T extends TaskTemplateDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TaskTemplateDefaultArgs<ExtArgs>>): Prisma__TaskTemplateClient<$Result.GetResult<Prisma.$TaskTemplatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the TaskTemplateExcludedAssignee model
+   */
+  interface TaskTemplateExcludedAssigneeFieldRefs {
+    readonly id: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
+    readonly templateId: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
+    readonly userId: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
+    readonly createdAt: FieldRef<"TaskTemplateExcludedAssignee", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * TaskTemplateExcludedAssignee findUnique
+   */
+  export type TaskTemplateExcludedAssigneeFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateExcludedAssignee to fetch.
+     */
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee findUniqueOrThrow
+   */
+  export type TaskTemplateExcludedAssigneeFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateExcludedAssignee to fetch.
+     */
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee findFirst
+   */
+  export type TaskTemplateExcludedAssigneeFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateExcludedAssignee to fetch.
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateExcludedAssignees to fetch.
+     */
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithRelationInput | TaskTemplateExcludedAssigneeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplateExcludedAssignees.
+     */
+    cursor?: TaskTemplateExcludedAssigneeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateExcludedAssignees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateExcludedAssignees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateExcludedAssignees.
+     */
+    distinct?: TaskTemplateExcludedAssigneeScalarFieldEnum | TaskTemplateExcludedAssigneeScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee findFirstOrThrow
+   */
+  export type TaskTemplateExcludedAssigneeFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateExcludedAssignee to fetch.
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateExcludedAssignees to fetch.
+     */
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithRelationInput | TaskTemplateExcludedAssigneeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TaskTemplateExcludedAssignees.
+     */
+    cursor?: TaskTemplateExcludedAssigneeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateExcludedAssignees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateExcludedAssignees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateExcludedAssignees.
+     */
+    distinct?: TaskTemplateExcludedAssigneeScalarFieldEnum | TaskTemplateExcludedAssigneeScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee findMany
+   */
+  export type TaskTemplateExcludedAssigneeFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter, which TaskTemplateExcludedAssignees to fetch.
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TaskTemplateExcludedAssignees to fetch.
+     */
+    orderBy?: TaskTemplateExcludedAssigneeOrderByWithRelationInput | TaskTemplateExcludedAssigneeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing TaskTemplateExcludedAssignees.
+     */
+    cursor?: TaskTemplateExcludedAssigneeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TaskTemplateExcludedAssignees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TaskTemplateExcludedAssignees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TaskTemplateExcludedAssignees.
+     */
+    distinct?: TaskTemplateExcludedAssigneeScalarFieldEnum | TaskTemplateExcludedAssigneeScalarFieldEnum[]
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee create
+   */
+  export type TaskTemplateExcludedAssigneeCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * The data needed to create a TaskTemplateExcludedAssignee.
+     */
+    data: XOR<TaskTemplateExcludedAssigneeCreateInput, TaskTemplateExcludedAssigneeUncheckedCreateInput>
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee createMany
+   */
+  export type TaskTemplateExcludedAssigneeCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many TaskTemplateExcludedAssignees.
+     */
+    data: TaskTemplateExcludedAssigneeCreateManyInput | TaskTemplateExcludedAssigneeCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee createManyAndReturn
+   */
+  export type TaskTemplateExcludedAssigneeCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * The data used to create many TaskTemplateExcludedAssignees.
+     */
+    data: TaskTemplateExcludedAssigneeCreateManyInput | TaskTemplateExcludedAssigneeCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee update
+   */
+  export type TaskTemplateExcludedAssigneeUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * The data needed to update a TaskTemplateExcludedAssignee.
+     */
+    data: XOR<TaskTemplateExcludedAssigneeUpdateInput, TaskTemplateExcludedAssigneeUncheckedUpdateInput>
+    /**
+     * Choose, which TaskTemplateExcludedAssignee to update.
+     */
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee updateMany
+   */
+  export type TaskTemplateExcludedAssigneeUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update TaskTemplateExcludedAssignees.
+     */
+    data: XOR<TaskTemplateExcludedAssigneeUpdateManyMutationInput, TaskTemplateExcludedAssigneeUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplateExcludedAssignees to update
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * Limit how many TaskTemplateExcludedAssignees to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee updateManyAndReturn
+   */
+  export type TaskTemplateExcludedAssigneeUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * The data used to update TaskTemplateExcludedAssignees.
+     */
+    data: XOR<TaskTemplateExcludedAssigneeUpdateManyMutationInput, TaskTemplateExcludedAssigneeUncheckedUpdateManyInput>
+    /**
+     * Filter which TaskTemplateExcludedAssignees to update
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * Limit how many TaskTemplateExcludedAssignees to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee upsert
+   */
+  export type TaskTemplateExcludedAssigneeUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * The filter to search for the TaskTemplateExcludedAssignee to update in case it exists.
+     */
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+    /**
+     * In case the TaskTemplateExcludedAssignee found by the `where` argument doesn't exist, create a new TaskTemplateExcludedAssignee with this data.
+     */
+    create: XOR<TaskTemplateExcludedAssigneeCreateInput, TaskTemplateExcludedAssigneeUncheckedCreateInput>
+    /**
+     * In case the TaskTemplateExcludedAssignee was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<TaskTemplateExcludedAssigneeUpdateInput, TaskTemplateExcludedAssigneeUncheckedUpdateInput>
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee delete
+   */
+  export type TaskTemplateExcludedAssigneeDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
+    /**
+     * Filter which TaskTemplateExcludedAssignee to delete.
+     */
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee deleteMany
+   */
+  export type TaskTemplateExcludedAssigneeDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TaskTemplateExcludedAssignees to delete
+     */
+    where?: TaskTemplateExcludedAssigneeWhereInput
+    /**
+     * Limit how many TaskTemplateExcludedAssignees to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * TaskTemplateExcludedAssignee without action
+   */
+  export type TaskTemplateExcludedAssigneeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TaskTemplateExcludedAssignee
+     */
+    select?: TaskTemplateExcludedAssigneeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the TaskTemplateExcludedAssignee
+     */
+    omit?: TaskTemplateExcludedAssigneeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TaskTemplateExcludedAssigneeInclude<ExtArgs> | null
   }
 
 
@@ -32392,6 +33604,16 @@ export namespace Prisma {
   export type TaskTemplateScalarFieldEnum = (typeof TaskTemplateScalarFieldEnum)[keyof typeof TaskTemplateScalarFieldEnum]
 
 
+  export const TaskTemplateExcludedAssigneeScalarFieldEnum: {
+    id: 'id',
+    templateId: 'templateId',
+    userId: 'userId',
+    createdAt: 'createdAt'
+  };
+
+  export type TaskTemplateExcludedAssigneeScalarFieldEnum = (typeof TaskTemplateExcludedAssigneeScalarFieldEnum)[keyof typeof TaskTemplateExcludedAssigneeScalarFieldEnum]
+
+
   export const ProofScalarFieldEnum: {
     id: 'id',
     runBlockId: 'runBlockId',
@@ -34000,6 +35222,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     group?: XOR<TaskTemplateGroupNullableScalarRelationFilter, TaskTemplateGroupWhereInput> | null
     category?: XOR<TaskCategoryNullableScalarRelationFilter, TaskCategoryWhereInput> | null
+    excludedAssignees?: TaskTemplateExcludedAssigneeListRelationFilter
   }
 
   export type TaskTemplateOrderByWithRelationInput = {
@@ -34020,6 +35243,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     group?: TaskTemplateGroupOrderByWithRelationInput
     category?: TaskCategoryOrderByWithRelationInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeOrderByRelationAggregateInput
   }
 
   export type TaskTemplateWhereUniqueInput = Prisma.AtLeast<{
@@ -34043,6 +35267,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"TaskTemplate"> | Date | string
     group?: XOR<TaskTemplateGroupNullableScalarRelationFilter, TaskTemplateGroupWhereInput> | null
     category?: XOR<TaskCategoryNullableScalarRelationFilter, TaskCategoryWhereInput> | null
+    excludedAssignees?: TaskTemplateExcludedAssigneeListRelationFilter
   }, "id">
 
   export type TaskTemplateOrderByWithAggregationInput = {
@@ -34087,6 +35312,57 @@ export namespace Prisma {
     categoryId?: StringNullableWithAggregatesFilter<"TaskTemplate"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TaskTemplate"> | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeWhereInput = {
+    AND?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
+    OR?: TaskTemplateExcludedAssigneeWhereInput[]
+    NOT?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
+    id?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
+    template?: XOR<TaskTemplateScalarRelationFilter, TaskTemplateWhereInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeOrderByWithRelationInput = {
+    id?: SortOrder
+    templateId?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+    template?: TaskTemplateOrderByWithRelationInput
+  }
+
+  export type TaskTemplateExcludedAssigneeWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    templateId_userId?: TaskTemplateExcludedAssigneeTemplateIdUserIdCompoundUniqueInput
+    AND?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
+    OR?: TaskTemplateExcludedAssigneeWhereInput[]
+    NOT?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
+    templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
+    template?: XOR<TaskTemplateScalarRelationFilter, TaskTemplateWhereInput>
+  }, "id" | "templateId_userId">
+
+  export type TaskTemplateExcludedAssigneeOrderByWithAggregationInput = {
+    id?: SortOrder
+    templateId?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+    _count?: TaskTemplateExcludedAssigneeCountOrderByAggregateInput
+    _max?: TaskTemplateExcludedAssigneeMaxOrderByAggregateInput
+    _min?: TaskTemplateExcludedAssigneeMinOrderByAggregateInput
+  }
+
+  export type TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput = {
+    AND?: TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput | TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput[]
+    OR?: TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput[]
+    NOT?: TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput | TaskTemplateExcludedAssigneeScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
+    templateId?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
+    userId?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | Date | string
   }
 
   export type ProofWhereInput = {
@@ -35968,6 +37244,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     group?: TaskTemplateGroupCreateNestedOneWithoutTemplatesInput
     category?: TaskCategoryCreateNestedOneWithoutTemplatesInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateUncheckedCreateInput = {
@@ -35986,6 +37263,7 @@ export namespace Prisma {
     categoryId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateUpdateInput = {
@@ -36004,6 +37282,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     group?: TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput
     category?: TaskCategoryUpdateOneWithoutTemplatesNestedInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateInput = {
@@ -36022,6 +37301,7 @@ export namespace Prisma {
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateCreateManyInput = {
@@ -36074,6 +37354,54 @@ export namespace Prisma {
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeCreateInput = {
+    id?: string
+    userId: string
+    createdAt?: Date | string
+    template: TaskTemplateCreateNestedOneWithoutExcludedAssigneesInput
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedCreateInput = {
+    id?: string
+    templateId: string
+    userId: string
+    createdAt?: Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    template?: TaskTemplateUpdateOneRequiredWithoutExcludedAssigneesNestedInput
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    templateId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeCreateManyInput = {
+    id?: string
+    templateId: string
+    userId: string
+    createdAt?: Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    templateId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProofCreateInput = {
@@ -37931,6 +39259,16 @@ export namespace Prisma {
     isNot?: TaskTemplateGroupWhereInput | null
   }
 
+  export type TaskTemplateExcludedAssigneeListRelationFilter = {
+    every?: TaskTemplateExcludedAssigneeWhereInput
+    some?: TaskTemplateExcludedAssigneeWhereInput
+    none?: TaskTemplateExcludedAssigneeWhereInput
+  }
+
+  export type TaskTemplateExcludedAssigneeOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type TaskTemplateCountOrderByAggregateInput = {
     id?: SortOrder
     createdById?: SortOrder
@@ -37989,6 +39327,37 @@ export namespace Prisma {
 
   export type TaskTemplateSumOrderByAggregateInput = {
     groupPosition?: SortOrder
+  }
+
+  export type TaskTemplateScalarRelationFilter = {
+    is?: TaskTemplateWhereInput
+    isNot?: TaskTemplateWhereInput
+  }
+
+  export type TaskTemplateExcludedAssigneeTemplateIdUserIdCompoundUniqueInput = {
+    templateId: string
+    userId: string
+  }
+
+  export type TaskTemplateExcludedAssigneeCountOrderByAggregateInput = {
+    id?: SortOrder
+    templateId?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type TaskTemplateExcludedAssigneeMaxOrderByAggregateInput = {
+    id?: SortOrder
+    templateId?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type TaskTemplateExcludedAssigneeMinOrderByAggregateInput = {
+    id?: SortOrder
+    templateId?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
   }
 
   export type RunBlockScalarRelationFilter = {
@@ -39506,6 +40875,20 @@ export namespace Prisma {
     connect?: TaskCategoryWhereUniqueInput
   }
 
+  export type TaskTemplateExcludedAssigneeCreateNestedManyWithoutTemplateInput = {
+    create?: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput> | TaskTemplateExcludedAssigneeCreateWithoutTemplateInput[] | TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput[]
+    connectOrCreate?: TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput | TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput[]
+    createMany?: TaskTemplateExcludedAssigneeCreateManyTemplateInputEnvelope
+    connect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedCreateNestedManyWithoutTemplateInput = {
+    create?: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput> | TaskTemplateExcludedAssigneeCreateWithoutTemplateInput[] | TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput[]
+    connectOrCreate?: TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput | TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput[]
+    createMany?: TaskTemplateExcludedAssigneeCreateManyTemplateInputEnvelope
+    connect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+  }
+
   export type TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput = {
     create?: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
     connectOrCreate?: TaskTemplateGroupCreateOrConnectWithoutTemplatesInput
@@ -39524,6 +40907,48 @@ export namespace Prisma {
     delete?: TaskCategoryWhereInput | boolean
     connect?: TaskCategoryWhereUniqueInput
     update?: XOR<XOR<TaskCategoryUpdateToOneWithWhereWithoutTemplatesInput, TaskCategoryUpdateWithoutTemplatesInput>, TaskCategoryUncheckedUpdateWithoutTemplatesInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateManyWithoutTemplateNestedInput = {
+    create?: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput> | TaskTemplateExcludedAssigneeCreateWithoutTemplateInput[] | TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput[]
+    connectOrCreate?: TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput | TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput[]
+    upsert?: TaskTemplateExcludedAssigneeUpsertWithWhereUniqueWithoutTemplateInput | TaskTemplateExcludedAssigneeUpsertWithWhereUniqueWithoutTemplateInput[]
+    createMany?: TaskTemplateExcludedAssigneeCreateManyTemplateInputEnvelope
+    set?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    disconnect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    delete?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    connect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    update?: TaskTemplateExcludedAssigneeUpdateWithWhereUniqueWithoutTemplateInput | TaskTemplateExcludedAssigneeUpdateWithWhereUniqueWithoutTemplateInput[]
+    updateMany?: TaskTemplateExcludedAssigneeUpdateManyWithWhereWithoutTemplateInput | TaskTemplateExcludedAssigneeUpdateManyWithWhereWithoutTemplateInput[]
+    deleteMany?: TaskTemplateExcludedAssigneeScalarWhereInput | TaskTemplateExcludedAssigneeScalarWhereInput[]
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateNestedInput = {
+    create?: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput> | TaskTemplateExcludedAssigneeCreateWithoutTemplateInput[] | TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput[]
+    connectOrCreate?: TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput | TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput[]
+    upsert?: TaskTemplateExcludedAssigneeUpsertWithWhereUniqueWithoutTemplateInput | TaskTemplateExcludedAssigneeUpsertWithWhereUniqueWithoutTemplateInput[]
+    createMany?: TaskTemplateExcludedAssigneeCreateManyTemplateInputEnvelope
+    set?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    disconnect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    delete?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    connect?: TaskTemplateExcludedAssigneeWhereUniqueInput | TaskTemplateExcludedAssigneeWhereUniqueInput[]
+    update?: TaskTemplateExcludedAssigneeUpdateWithWhereUniqueWithoutTemplateInput | TaskTemplateExcludedAssigneeUpdateWithWhereUniqueWithoutTemplateInput[]
+    updateMany?: TaskTemplateExcludedAssigneeUpdateManyWithWhereWithoutTemplateInput | TaskTemplateExcludedAssigneeUpdateManyWithWhereWithoutTemplateInput[]
+    deleteMany?: TaskTemplateExcludedAssigneeScalarWhereInput | TaskTemplateExcludedAssigneeScalarWhereInput[]
+  }
+
+  export type TaskTemplateCreateNestedOneWithoutExcludedAssigneesInput = {
+    create?: XOR<TaskTemplateCreateWithoutExcludedAssigneesInput, TaskTemplateUncheckedCreateWithoutExcludedAssigneesInput>
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutExcludedAssigneesInput
+    connect?: TaskTemplateWhereUniqueInput
+  }
+
+  export type TaskTemplateUpdateOneRequiredWithoutExcludedAssigneesNestedInput = {
+    create?: XOR<TaskTemplateCreateWithoutExcludedAssigneesInput, TaskTemplateUncheckedCreateWithoutExcludedAssigneesInput>
+    connectOrCreate?: TaskTemplateCreateOrConnectWithoutExcludedAssigneesInput
+    upsert?: TaskTemplateUpsertWithoutExcludedAssigneesInput
+    connect?: TaskTemplateWhereUniqueInput
+    update?: XOR<XOR<TaskTemplateUpdateToOneWithWhereWithoutExcludedAssigneesInput, TaskTemplateUpdateWithoutExcludedAssigneesInput>, TaskTemplateUncheckedUpdateWithoutExcludedAssigneesInput>
   }
 
   export type RunBlockCreateNestedOneWithoutProofsInput = {
@@ -42311,6 +43736,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     group?: TaskTemplateGroupCreateNestedOneWithoutTemplatesInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateUncheckedCreateWithoutCategoryInput = {
@@ -42328,6 +43754,7 @@ export namespace Prisma {
     groupPosition?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateCreateOrConnectWithoutCategoryInput = {
@@ -42501,6 +43928,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     category?: TaskCategoryCreateNestedOneWithoutTemplatesInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateUncheckedCreateWithoutGroupInput = {
@@ -42518,6 +43946,7 @@ export namespace Prisma {
     categoryId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedCreateNestedManyWithoutTemplateInput
   }
 
   export type TaskTemplateCreateOrConnectWithoutGroupInput = {
@@ -42763,6 +44192,28 @@ export namespace Prisma {
     create: XOR<TaskCategoryCreateWithoutTemplatesInput, TaskCategoryUncheckedCreateWithoutTemplatesInput>
   }
 
+  export type TaskTemplateExcludedAssigneeCreateWithoutTemplateInput = {
+    id?: string
+    userId: string
+    createdAt?: Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput = {
+    id?: string
+    userId: string
+    createdAt?: Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeCreateOrConnectWithoutTemplateInput = {
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+    create: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeCreateManyTemplateInputEnvelope = {
+    data: TaskTemplateExcludedAssigneeCreateManyTemplateInput | TaskTemplateExcludedAssigneeCreateManyTemplateInput[]
+    skipDuplicates?: boolean
+  }
+
   export type TaskTemplateGroupUpsertWithoutTemplatesInput = {
     update: XOR<TaskTemplateGroupUpdateWithoutTemplatesInput, TaskTemplateGroupUncheckedUpdateWithoutTemplatesInput>
     create: XOR<TaskTemplateGroupCreateWithoutTemplatesInput, TaskTemplateGroupUncheckedCreateWithoutTemplatesInput>
@@ -42831,6 +44282,120 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     runBlocks?: RunBlockUncheckedUpdateManyWithoutCategoryNestedInput
     templateGroups?: TaskTemplateGroupUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type TaskTemplateExcludedAssigneeUpsertWithWhereUniqueWithoutTemplateInput = {
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+    update: XOR<TaskTemplateExcludedAssigneeUpdateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedUpdateWithoutTemplateInput>
+    create: XOR<TaskTemplateExcludedAssigneeCreateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateWithWhereUniqueWithoutTemplateInput = {
+    where: TaskTemplateExcludedAssigneeWhereUniqueInput
+    data: XOR<TaskTemplateExcludedAssigneeUpdateWithoutTemplateInput, TaskTemplateExcludedAssigneeUncheckedUpdateWithoutTemplateInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateManyWithWhereWithoutTemplateInput = {
+    where: TaskTemplateExcludedAssigneeScalarWhereInput
+    data: XOR<TaskTemplateExcludedAssigneeUpdateManyMutationInput, TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateInput>
+  }
+
+  export type TaskTemplateExcludedAssigneeScalarWhereInput = {
+    AND?: TaskTemplateExcludedAssigneeScalarWhereInput | TaskTemplateExcludedAssigneeScalarWhereInput[]
+    OR?: TaskTemplateExcludedAssigneeScalarWhereInput[]
+    NOT?: TaskTemplateExcludedAssigneeScalarWhereInput | TaskTemplateExcludedAssigneeScalarWhereInput[]
+    id?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
+  }
+
+  export type TaskTemplateCreateWithoutExcludedAssigneesInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
+    groupPosition?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    group?: TaskTemplateGroupCreateNestedOneWithoutTemplatesInput
+    category?: TaskCategoryCreateNestedOneWithoutTemplatesInput
+  }
+
+  export type TaskTemplateUncheckedCreateWithoutExcludedAssigneesInput = {
+    id?: string
+    createdById: string
+    name: string
+    title: string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: $Enums.Cadence | null
+    guidelineUrl?: string | null
+    guidelineMime?: string | null
+    guidelineImage?: Bytes | null
+    archivedAt?: Date | string | null
+    templateGroupId?: string | null
+    groupPosition?: number | null
+    categoryId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type TaskTemplateCreateOrConnectWithoutExcludedAssigneesInput = {
+    where: TaskTemplateWhereUniqueInput
+    create: XOR<TaskTemplateCreateWithoutExcludedAssigneesInput, TaskTemplateUncheckedCreateWithoutExcludedAssigneesInput>
+  }
+
+  export type TaskTemplateUpsertWithoutExcludedAssigneesInput = {
+    update: XOR<TaskTemplateUpdateWithoutExcludedAssigneesInput, TaskTemplateUncheckedUpdateWithoutExcludedAssigneesInput>
+    create: XOR<TaskTemplateCreateWithoutExcludedAssigneesInput, TaskTemplateUncheckedCreateWithoutExcludedAssigneesInput>
+    where?: TaskTemplateWhereInput
+  }
+
+  export type TaskTemplateUpdateToOneWithWhereWithoutExcludedAssigneesInput = {
+    where?: TaskTemplateWhereInput
+    data: XOR<TaskTemplateUpdateWithoutExcludedAssigneesInput, TaskTemplateUncheckedUpdateWithoutExcludedAssigneesInput>
+  }
+
+  export type TaskTemplateUpdateWithoutExcludedAssigneesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    group?: TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput
+    category?: TaskCategoryUpdateOneWithoutTemplatesNestedInput
+  }
+
+  export type TaskTemplateUncheckedUpdateWithoutExcludedAssigneesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdById?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    subtasks?: JsonNullValueInput | InputJsonValue
+    cadence?: NullableEnumCadenceFieldUpdateOperationsInput | $Enums.Cadence | null
+    guidelineUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineMime?: NullableStringFieldUpdateOperationsInput | string | null
+    guidelineImage?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    templateGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type RunBlockCreateWithoutProofsInput = {
@@ -44156,6 +45721,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     group?: TaskTemplateGroupUpdateOneWithoutTemplatesNestedInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateWithoutCategoryInput = {
@@ -44173,6 +45739,7 @@ export namespace Prisma {
     groupPosition?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateManyWithoutCategoryInput = {
@@ -44268,6 +45835,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     category?: TaskCategoryUpdateOneWithoutTemplatesNestedInput
+    excludedAssignees?: TaskTemplateExcludedAssigneeUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateWithoutGroupInput = {
@@ -44285,6 +45853,7 @@ export namespace Prisma {
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    excludedAssignees?: TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateNestedInput
   }
 
   export type TaskTemplateUncheckedUpdateManyWithoutGroupInput = {
@@ -44332,6 +45901,30 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type TaskTemplateExcludedAssigneeCreateManyTemplateInput = {
+    id?: string
+    userId: string
+    createdAt?: Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUpdateWithoutTemplateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedUpdateWithoutTemplateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ScheduleSlotCreateManyScheduleInput = {

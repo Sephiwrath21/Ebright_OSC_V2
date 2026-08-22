@@ -84,6 +84,7 @@ import {
   SectionCard,
   type ReassignControl,
 } from "./bits";
+import { CardModeProvider, CardModeToggle } from "./card-mode-context";
 
 export function TaskManagerView({
   daily,
@@ -344,12 +345,31 @@ export function TaskManagerView({
   // renders inside branchOverview's own TaskOverviewStack via its
   // adhocAssigned slot (2026-08-18 donut sweep) — no standalone card here.
 
+  // Shared page-level List/Donut toggle (2026-08-22, personal/HOD/Branch
+  // pages — mirrors the admin Department/Branch/All Departments page's own
+  // CardModeProvider, page.tsx) — ONE control at the top of the page
+  // governs every EntityCardOverview section below (myOverview's Daily +
+  // Monthly, departmentOverview's, branchOverview's) instead of each
+  // section owning its own independent toggle. Only shown when at least
+  // one of those sections actually renders for this role — a role with
+  // none of them (pure Kanban/table sections) gets no inert toggle.
+  const showCardModeToggle =
+    shows(view, "taskManager", "myOverview") ||
+    shows(view, "taskManager", "departmentOverview") ||
+    shows(view, "taskManager", "branchOverview");
+
   return (
+    <CardModeProvider>
     <div className="flex flex-col gap-5">
-      {/* No toggle for any role — every donut/list/roster below shows Daily
-          AND Monthly simultaneously, side by side. Superadmin/CEO's grids
-          already worked this way; OPS/Branch/HOD/Member are now consistent
-          with them too. */}
+      {showCardModeToggle && (
+        <div className="flex justify-end">
+          <CardModeToggle />
+        </div>
+      )}
+      {/* No Daily/Monthly toggle for any role — every donut/list/roster
+          below shows Daily AND Monthly simultaneously, side by side.
+          Superadmin/CEO's grids already worked this way; OPS/Branch/HOD/
+          Member are now consistent with them too. */}
 
       {/* personalAdhoc's own donut card (Branch Manager's Task Manager page)
           is gone (2026-08-18 donut sweep) — no role's taskManager config
@@ -626,5 +646,6 @@ export function TaskManagerView({
           consistency requirement) — the old bottom "Details" block is gone. */}
 
     </div>
+    </CardModeProvider>
   );
 }

@@ -88,18 +88,26 @@ export async function getTemplateDeletionImpactCore(
  *  (branch, weekday) must cancel only that weekday's recurring assignment
  *  and leave the same manager's OTHER-weekday assignment of the same
  *  package/template untouched. Both existing call sites omit it and keep
- *  their unfiltered (all-weekdays) behavior unchanged. */
+ *  their unfiltered (all-weekdays) behavior unchanged.
+ *
+ *  `dueDateRange` (2026-08-22, added for removeTemplateAssigneeCore's
+ *  "cancel today's instance only" rule): a plain DB `dueAt` range filter,
+ *  applied alongside the others. A null `dueAt` is naturally excluded by a
+ *  Postgres range comparison (unlike dueWeekday's post-fetch `getDay()`
+ *  check above, this needs no special null-handling). */
 export async function cancelPendingTemplateRuns(
   actorId: string,
   templateId: string,
   reason: string,
   assigneeId?: string,
   dueWeekday?: number,
+  dueDateRange?: { from: Date; to: Date },
 ) {
   const blocks = await prisma.runBlock.findMany({
     where: {
       templateId,
       ...(assigneeId ? { assigneeId } : {}),
+      ...(dueDateRange ? { dueAt: { gte: dueDateRange.from, lt: dueDateRange.to } } : {}),
       run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
     select: { runId: true, status: true, dueAt: true },
@@ -352,10 +360,14 @@ export interface TemplateAssignee {
   pendingTasks: number;
 }
 
-/** Who currently holds a PENDING instance of this template — Core version
- *  with NO templateGroupId filter (unlike ./templates's own
- *  getTemplateAssignees), so data/template-groups.ts can call this on
- *  group-member rows to aggregate a group's assignees. */
+/** Who currently holds a PENDING instance of this template AND hasn't been
+ *  excluded (removeTemplateAssigneeCore) — Core version with NO
+ *  templateGroupId filter (unlike ./templates's own getTemplateAssignees),
+ *  so data/template-groups.ts can call this on group-member rows to
+ *  aggregate a group's assignees. An excluded person's still-pending
+ *  instance is real and untouched (see removeTemplateAssigneeCore's doc
+ *  comment) but they no longer count as "currently assigned" here — the
+ *  whole point of exclusion is that they've been removed going forward. */
 export async function getTemplateAssigneesCore(
   user: { id: string },
   templateId: string,
@@ -367,17 +379,24 @@ export async function getTemplateAssigneesCore(
   });
   if (!template) throw new ApiHttpError(404, "Template not found");
 
-  const parents = await prisma.runBlock.findMany({
-    where: {
-      templateId: id,
-      parentId: null,
-      status: { in: [...PENDING_STATUSES] },
-      run: { status: { not: "CANCELLED" }, archivedAt: null },
-    },
-    select: { assigneeId: true },
-  });
+  const [parents, excluded] = await Promise.all([
+    prisma.runBlock.findMany({
+      where: {
+        templateId: id,
+        parentId: null,
+        status: { in: [...PENDING_STATUSES] },
+        run: { status: { not: "CANCELLED" }, archivedAt: null },
+      },
+      select: { assigneeId: true },
+    }),
+    prisma.taskTemplateExcludedAssignee.findMany({ where: { templateId: id }, select: { userId: true } }),
+  ]);
+  const excludedIds = new Set(excluded.map((e) => e.userId));
   const counts = new Map<string, number>();
-  for (const p of parents) counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
+  for (const p of parents) {
+    if (excludedIds.has(p.assigneeId)) continue;
+    counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
+  }
   const users = await getUsersByIds([...counts.keys()]);
   return [...counts.entries()]
     .map(([userId, pendingTasks]) => ({
@@ -388,16 +407,29 @@ export async function getTemplateAssigneesCore(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Cancel one assignee's pending instances of a template (their PENDING/
- *  ACTIVE/OVERDUE/ESCALATED runs only — completed/N-A history is kept,
- *  same split as cancelPendingTemplateRuns). No templateGroupId filter —
- *  same reasoning as getTemplateAssigneesCore, this is meant to be usable
- *  on group members via data/template-groups.ts. */
+/** "Remove Assignee" (View Assignees modal, 2026-08-22 rule — corrected
+ *  same day): cancels ONLY today's instance (per the module's todayStart()
+ *  day-boundary convention, same one engine/recurrence.ts uses — respects
+ *  TM_RESET_HOUR, not naive midnight) — this person is no longer expected
+ *  to complete a task that started today. Anything due BEFORE today is
+ *  left completely untouched regardless of status (pending, overdue,
+ *  completed). It also records a TaskTemplateExcludedAssignee row, which:
+ *   1) drops this person out of getTemplateAssigneesCore's "currently
+ *      assigned" list (above) even while a past-dated pending instance is
+ *      still naturally running its course, and
+ *   2) makes engine/recurrence.ts's advanceRecurringBlocks stop generating
+ *      NEW successors for this (template, assignee) pair from here on.
+ *  Idempotent (upsert on the unique (templateId, userId) pair; re-running
+ *  this on a later day cancels THAT day's instance, if any). No
+ *  templateGroupId filter — same reasoning as getTemplateAssigneesCore,
+ *  meant to be usable on group members via data/template-groups.ts.
+ *  pendingKept is purely informational: how many past-dated instances are
+ *  still open and will keep running exactly as before. */
 export async function removeTemplateAssigneeCore(
   user: { id: string },
   templateId: string,
   assigneeId: string,
-): Promise<{ removedTasks: number; keptRecords: number }> {
+): Promise<{ excluded: true; cancelledToday: number; pendingKept: number }> {
   const id = z.string().min(1).parse(templateId);
   const targetAssigneeId = z.string().min(1).parse(assigneeId);
   const template = await prisma.taskTemplate.findFirst({
@@ -405,5 +437,38 @@ export async function removeTemplateAssigneeCore(
     select: { id: true },
   });
   if (!template) throw new ApiHttpError(404, "Template not found");
-  return cancelPendingTemplateRuns(user.id, id, "template-assignee-removed", targetAssigneeId);
+
+  const totalPendingBefore = await prisma.runBlock.count({
+    where: {
+      templateId: id,
+      assigneeId: targetAssigneeId,
+      status: { in: [...PENDING_STATUSES] },
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+  });
+
+  const todayBoundary = todayStart();
+  const tomorrowBoundary = new Date(todayBoundary.getTime() + 24 * 60 * 60 * 1000);
+  const { removedTasks: cancelledToday } = await cancelPendingTemplateRuns(
+    user.id,
+    id,
+    "template-assignee-removed",
+    targetAssigneeId,
+    undefined,
+    { from: todayBoundary, to: tomorrowBoundary },
+  );
+
+  await prisma.taskTemplateExcludedAssignee.upsert({
+    where: { templateId_userId: { templateId: id, userId: targetAssigneeId } },
+    create: { templateId: id, userId: targetAssigneeId },
+    update: {},
+  });
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "TEMPLATE_ASSIGNEE_EXCLUDED",
+      detail: { templateId: id, assigneeId: targetAssigneeId, cancelledToday, pendingKept: totalPendingBefore - cancelledToday },
+    },
+  });
+  return { excluded: true, cancelledToday, pendingKept: totalPendingBefore - cancelledToday };
 }

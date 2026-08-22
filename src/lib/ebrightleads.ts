@@ -47,6 +47,17 @@ function makePool(): Pool {
   });
 }
 
+/** Whether the leads DB connection has been set up at all in this
+ *  environment — checked BEFORE calling queryEbrightLeads so an
+ *  unconfigured dev/local environment degrades to an empty result
+ *  (2026-08-22) instead of throwing + logging a noisy console.error on
+ *  every request. Once genuinely configured, a real query failure
+ *  (bad SQL, connection refused, etc.) still throws/logs normally —
+ *  this only short-circuits the "never set up" case. */
+export function isLeadsDbConfigured(): boolean {
+  return Boolean(process.env.LEADS_DB_URL || (process.env.EBRIGHTLEADS_HOST && process.env.EBRIGHTLEADS_DATABASE));
+}
+
 function getPool(): Pool {
   const signature = configSignature();
   const cached = globalForPool.__ebrightleads_pool;
@@ -94,6 +105,7 @@ export interface StaffMovementRow {
 export async function getStaffMovements(filters?: {
   type?: StaffMovementFilter;
 }): Promise<StaffMovementRow[]> {
+  if (!isLeadsDbConfigured()) return [];
   let sql =
     "SELECT id, name, position, department_branch, start_date, end_date FROM hr_staff_movements WHERE 1=1";
 
@@ -134,6 +146,7 @@ const EVENT_TONE: Record<EventStatus, string> = {
 
 /** All events from public.events, with status computed by date (DB CURRENT_DATE). */
 export async function getEvents(): Promise<DeptEvent[]> {
+  if (!isLeadsDbConfigured()) return [];
   const { rows } = await queryEbrightLeads<{
     id: string;
     event_name: string;

@@ -166,6 +166,27 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   // trigger makes the flip near-instant at that hour; the hourly sweep is
   // the backstop.
   const boundary = todayStart(now);
+
+  // Excluded template assignees (2026-08-22, "Remove Assignee" rule
+  // change — see data/templates-internal.ts's removeTemplateAssigneeCore
+  // doc comment): a (templateId, userId) pair recorded here must stop
+  // spawning NEW recurring successors from here on, while every already-
+  // created FlowRun/RunBlock (past and pending, including today's) is left
+  // completely untouched — so this is a post-fetch JS filter on
+  // (RunBlock.templateId, RunBlock.assigneeId) below, NOT a change to any
+  // FlowRun/RunBlock row, and NOT a DB-level `notIn` filter (Prisma's
+  // `notIn` on a nullable column risks excluding NULL rows too, which
+  // would wrongly stop non-template tasks from recurring). templateId
+  // itself is a plain string with no FK (see RunBlock's schema comment) —
+  // this mirrors that same loose-coupling, application-level-join pattern.
+  const excludedPairs = new Set(
+    (await prisma.taskTemplateExcludedAssignee.findMany({ select: { templateId: true, userId: true } })).map(
+      (e) => `${e.templateId}::${e.userId}`,
+    ),
+  );
+  const notExcluded = (b: { templateId: string | null; assigneeId: string }) =>
+    !b.templateId || !excludedPairs.has(`${b.templateId}::${b.assigneeId}`);
+
   // UNIVERSAL: every DAILY task with a due day recurs — no flag (the
   // repeatWeekly column is retired; see its schema comment). Manpower
   // Schedule slot tasks are excluded by scheduleSlotId (and are ADHOC
@@ -173,7 +194,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   // (parentId set) are excluded too: they never advance on their own —
   // the second pass below clones them under their parent's successor, so
   // the tree recurs as a unit.
-  const due = await prisma.runBlock.findMany({
+  const dueRaw = await prisma.runBlock.findMany({
     where: {
       cadence: "DAILY",
       scheduleSlotId: null,
@@ -187,6 +208,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
     },
     include: { run: true, runItems: true },
   });
+  const due = dueRaw.filter(notExcluded);
 
   let created = 0;
   for (const block of due) {
@@ -206,7 +228,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   // under that successor, so next week's parent arrives with next week's
   // subtasks. Idempotent the same way as the main loop: recurrenceOfId is
   // unique, and running this query re-checks `successor: null` each sweep.
-  const dueSubtasks = await prisma.runBlock.findMany({
+  const dueSubtasksRaw = await prisma.runBlock.findMany({
     where: {
       cadence: "DAILY",
       scheduleSlotId: null,
@@ -223,6 +245,7 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
       parent: { select: { successor: { select: { id: true } } } },
     },
   });
+  const dueSubtasks = dueSubtasksRaw.filter(notExcluded);
   for (const sub of dueSubtasks) {
     const newParentId = sub.parent?.successor?.id;
     if (!sub.dueAt || !newParentId) continue;

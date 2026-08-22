@@ -507,6 +507,10 @@ export interface FlowTemplateGroupSummary {
   name: string;
   taskCount: number;
   previewTitles: string[];
+  /** EVERY member task title — search-only, see data/template-groups.ts's
+   *  TemplateGroupSummary doc comment for why this is separate from
+   *  previewTitles. */
+  allTaskTitles: string[];
   updatedAt: string; // ISO
 }
 
@@ -596,8 +600,13 @@ export interface FlowTemplateGroupAssignee {
 export type TemplateGroupAssigneesResult =
   | { ok: true; assignees: FlowTemplateGroupAssignee[] }
   | { ok: false; message: string };
+/** Remove Assignee (2026-08-22 rule — corrected to same-day cutoff) —
+ *  cancels only today's instance (cancelledToday); anything dated before
+ *  today stays untouched (pendingKept, purely informational). See
+ *  data/templates-internal.ts's removeTemplateAssigneeCore doc comment
+ *  for the full rule. */
 export type TemplateGroupRemoveAssigneeResult =
-  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: true; excluded: true; cancelledToday: number; pendingKept: number }
   | { ok: false; message: string };
 
 /** Everything the /task-manager/template dashboard needs, bundled as one
@@ -899,6 +908,20 @@ export function monthDayChunks(year: number, month: number): { from: number; to:
 
 export const chunkLabel = (c: { from: number; to: number }) =>
   c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
+
+/** My Month's default tab (2026-08-22) when no ?mrange= is in the URL —
+ *  the week-range chunk that CONTAINS today's date, not "Full month".
+ *  Only applies when the anchor month being viewed is the real current
+ *  month; viewing a past/future month falls back to "Full month" ("")
+ *  since today isn't inside that month at all. `now` is a parameter (not
+ *  read internally) so a Server Component call site controls determinism
+ *  the same way todayStart()/advanceRecurringBlocks() do. */
+export function defaultMonthRange(anchorYear: number, anchorMonth: number, now: Date): string {
+  if (now.getFullYear() !== anchorYear || now.getMonth() + 1 !== anchorMonth) return "";
+  const today = now.getDate();
+  const chunk = monthDayChunks(anchorYear, anchorMonth).find((c) => today >= c.from && today <= c.to);
+  return chunk ? `${chunk.from}-${chunk.to}` : "";
+}
 
 /** Human label for an assigner stream ("CEO assigned tasks" per the mockups). */
 export function flowStreamLabel(key: FlowRole | "self"): string {

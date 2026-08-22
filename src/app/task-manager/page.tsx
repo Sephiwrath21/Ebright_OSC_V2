@@ -35,6 +35,7 @@ import {
   getFlowOverview,
   getFlowStaff,
   getHodKanban,
+  getOrgMonthlyDepartments,
   getMyManpowerSchedule,
   getNoClaimIncentiveList,
   moveKanbanCard,
@@ -80,6 +81,8 @@ import { TaskManagerView } from "@/task-manager/ui/task-manager-view";
 import { AddTaskButton } from "@/task-manager/ui/add-task-button";
 import { PageSectionHeading } from "@/task-manager/ui/bits";
 import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
+import { AllDepartmentsSection } from "@/task-manager/ui/department-donut-overview";
+import { CardModeProvider, CardModeToggle } from "@/task-manager/ui/card-mode-context";
 import type { MyMonthConfig, MyWeekDay } from "@/task-manager/ui/entity-card-overview";
 import type { MyManpowerActualSlot, NoClaimIncentivePayload } from "@/task-manager/ui/types";
 import { NoClaimIncentiveMenu } from "@/task-manager/ui/no-claim-incentive-menu";
@@ -91,6 +94,7 @@ import {
 } from "@/task-manager/ui/entity-picker";
 import {
   chunkLabel,
+  defaultMonthRange,
   FLOW_BRANCH_REGIONS,
   FLOW_DEPARTMENTS,
   flowBucketize,
@@ -113,11 +117,19 @@ const ALL_BRANCHES: string[] = FLOW_BRANCH_REGIONS.flatMap((r) => [...r.branches
 /** Fullest demo roster — the least-empty default for the Branch mode. */
 const DEFAULT_BRANCH = "Subang Taipan";
 
+/** "All Departments" (2026-08-22) — sentinel value for the admin/OPS
+ *  Department dropdown's EntityPicker, NOT a real FLOW_DEPARTMENTS entry.
+ *  Selecting it fans out a full TaskOverviewStack per department instead
+ *  of the usual single one — see buildEntityOverview's "view === department"
+ *  branch. Kept distinct from any real department name so it can never
+ *  collide with one. */
+const ALL_DEPARTMENTS_VALUE = "All Departments";
+
 /** Superadmin's top-level mode switch — Department or Branch, never both.
  *  Carries the selected Daily date across so switching modes keeps it. */
 function ModeTabs({ active, date }: { active: "department" | "branch"; date?: string }) {
-  const base = "rounded-lg px-4 py-1.5 text-sm font-medium";
-  const on = "bg-white text-gray-900 shadow-sm dark:bg-slate-700 dark:text-slate-100";
+  const base = "rounded-lg px-4 py-1.5 text-sm font-semibold border border-transparent";
+  const on = "bg-white text-gray-900 border-gray-300 shadow dark:bg-slate-700 dark:text-slate-100 dark:border-slate-500";
   const off = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300";
   const suffix = date ? `&date=${date}` : "";
   return (
@@ -750,10 +762,11 @@ export default async function TaskManagerPage({
             tasks: myMonthResults[i].tasks,
           })),
         ],
-        // Unset ?mrange= already means Full month everywhere else on this
-        // page (MonthRangeDropdown's own range??"" convention) — matches
-        // that instead of defaulting to the first day-range chunk.
-        selectedRange: monthlyRangeParam ?? "",
+        // Default tab (2026-08-22): the week-range chunk containing TODAY,
+        // not "Full month" — only when the anchor month being viewed is
+        // the real current month (defaultMonthRange falls back to "" —
+        // Full month — otherwise, e.g. viewing a past/future month).
+        selectedRange: monthlyRangeParam ?? defaultMonthRange(monthlyDateY, monthlyDateM, new Date()),
         anchorMonth: monthly.date,
         nav: { basePath: "/task-manager", extraParams: monthlyCarry },
       };
@@ -782,6 +795,7 @@ export default async function TaskManagerPage({
     const canManageCategories = canManageTaskTemplateGroups({
       role,
       department: daily.me.me.department ?? null,
+      email,
     });
 
     // "+ Task" lives in the PAGE HEADER (top-right) for every assign-capable
@@ -848,10 +862,164 @@ export default async function TaskManagerPage({
     // trigger renders.
     const canReassignOthersInGrid = viewRole === "ADMIN" || viewRole === "ELEVATED_DEPT_SITE";
 
+    // Builds one department's TaskOverviewStack — extracted (2026-08-22) so
+    // the single-department view and the new "All Departments" view (which
+    // renders this once per department, stacked under its own heading)
+    // share one definition instead of two copies that can drift.
+    function renderDepartmentStack(
+      department: string,
+      dailyDetail: Awaited<ReturnType<typeof getDepartmentDetail>>,
+      monthlyDetail: Awaited<ReturnType<typeof getDepartmentDetail>>,
+      hodAssignedDetail: Awaited<ReturnType<typeof getDepartmentHodAssigned>> | null,
+      ceoAssignedDetail: Awaited<ReturnType<typeof getDepartmentCeoAssigned>> | null,
+    ): ReactNode {
+      return (
+        <TaskOverviewStack
+          entityName={department}
+          categories={categoryList}
+          myUserId={daily.me.me.userId}
+          daily={{
+            entity: dailyDetail.department,
+            dateControl: (
+              <DailyDatePicker
+                key="admin-dept-daily-picker"
+                value={dailyDetail.date}
+                basePath="/task-manager"
+                extraParams={{ view: "department", department }}
+              />
+            ),
+            showViewToggle: true,
+            myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "department", department } }),
+          }}
+          monthly={{
+            entity: monthlyDetail.department,
+            dateControl: (
+              <div key="admin-dept-monthly-controls" className="flex items-center gap-1.5">
+                <MonthDropdown
+                  key="admin-dept-monthly-picker"
+                  value={monthlyDetail.date}
+                  basePath="/task-manager"
+                  extraParams={{ view: "department", department }}
+                />
+                {/* Full month/1-7/8-14/15-21/22-{end} range dropdown
+                    (2026-08-21) — this admin/OPS/elevated-dept-site
+                    drill-down had no range filtering at all before;
+                    getDepartmentDetail now threads monthDays into
+                    getEntityPayload the same way getFlowDetail already
+                    does for HOD/DEPT_SITE's own Department Overview. */}
+                <MonthRangeDropdown
+                  value={monthlyDetail.date}
+                  range={monthlyRangeParam}
+                  basePath="/task-manager"
+                  extraParams={{ view: "department", department }}
+                />
+              </div>
+            ),
+            showViewToggle: true,
+          }}
+          hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.department, showViewToggle: true } : undefined}
+          ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.department, showViewToggle: true } : undefined}
+          onComplete={completeTask}
+          onSkip={skipTask}
+          onReopen={reopenTask}
+          onUploadProof={uploadProof}
+          onRemoveProof={removeProof}
+          reassign={cardReassign}
+          canReassignOthers={canReassignOthersInGrid}
+        />
+      );
+    }
+
     async function buildEntityOverview(): Promise<ReactNode> {
       const view = entityView;
       let overview: ReactNode;
       if (view === "department") {
+        // "All Departments" (2026-08-22, rebuilt as a department-level donut
+        // grid per user request — the earlier per-person-stack-per-
+        // department version, and a separate donut-grid-replaces-it
+        // iteration, were both tried and reverted same day before landing
+        // here). One card per DEPARTMENT (aggregated across everyone in
+        // it), not one per person — picking a single real department below
+        // still gets the full per-person TaskOverviewStack, unchanged.
+        // Fed by daily.org.departments/monthly.org.departments — already
+        // computed by this page's own getFlowDetail() calls above (for
+        // every ADMIN/OPS/elevated-dept-site/CEO viewer who can reach this
+        // dropdown at all — see canViewOrg/isElevatedDeptSite in
+        // getFlowDetail, queries.ts), so this needs no fetch of its own.
+        // Sentinel dropdown value, not a real FLOW_DEPARTMENTS entry — see
+        // the EntityPicker options below.
+        if (sp.department === ALL_DEPARTMENTS_VALUE) {
+          // Default Monthly range to the week-chunk containing TODAY, not
+          // "Full month" (2026-08-22, user request — same default the
+          // personal Monthly section already uses, defaultMonthRange,
+          // types.ts) — only when the anchor month being viewed is the real
+          // current month; defaultMonthRange itself falls back to "" (Full
+          // month) otherwise.
+          const [allDeptsMonthlyY, allDeptsMonthlyM] = monthly.date.split("-").map(Number);
+          const allDeptsDefaultRange = defaultMonthRange(allDeptsMonthlyY, allDeptsMonthlyM, new Date());
+          const allDeptsMonthlyRange = monthlyRangeParam ?? allDeptsDefaultRange;
+          // The page's shared top-level `monthly` fetch above was clamped
+          // to ?mrange= when present, else left UNCLAMPED (Full month) — so
+          // when the dropdown's default just switched to today's chunk but
+          // the URL still has no ?mrange=, `monthly.org.departments` is
+          // stale (Full month totals, not this chunk's). Re-fetch ONLY in
+          // that one case; every other case (an explicit ?mrange=, or a
+          // past/future anchor month with no "today chunk" at all) reuses
+          // the shared fetch unchanged — no extra request.
+          const allDeptsMonthDepartments =
+            !monthlyRange && allDeptsDefaultRange
+              ? await getOrgMonthlyDepartments(email, monthlyDate, parseMonthRange(allDeptsDefaultRange)!)
+              : monthly.org?.departments ?? [];
+          overview = (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <EntityPicker
+                  label="Department"
+                  value={ALL_DEPARTMENTS_VALUE}
+                  groups={[{ options: [ALL_DEPARTMENTS_VALUE, ...FLOW_DEPARTMENTS] }]}
+                  param="department"
+                  basePath="/task-manager"
+                  extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
+                />
+                <CardModeToggle />
+              </div>
+              <AllDepartmentsSection
+                sectionLabel="Daily"
+                departments={daily.org?.departments ?? []}
+                dateControl={
+                  <DailyDatePicker
+                    key="all-departments-daily-picker"
+                    value={daily.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "department", department: ALL_DEPARTMENTS_VALUE }}
+                  />
+                }
+              />
+              <AllDepartmentsSection
+                sectionLabel="Monthly"
+                departments={allDeptsMonthDepartments}
+                dateControl={
+                  <div key="all-departments-monthly-controls" className="flex items-center gap-1.5">
+                    <MonthDropdown
+                      key="all-departments-monthly-picker"
+                      value={monthly.date}
+                      basePath="/task-manager"
+                      extraParams={{ view: "department", department: ALL_DEPARTMENTS_VALUE }}
+                    />
+                    <MonthRangeDropdown
+                      value={monthly.date}
+                      range={allDeptsMonthlyRange}
+                      basePath="/task-manager"
+                      extraParams={{ view: "department", department: ALL_DEPARTMENTS_VALUE }}
+                    />
+                  </div>
+                }
+              />
+            </>
+          );
+          return overview;
+        }
+
         // Default to the ACCOUNT'S OWN department when it has one — the
         // elevated sites always do, and od@ (Superadmin = the Optimisation
         // Department's login) carries Optimisation since the 2026-07-25
@@ -873,93 +1041,54 @@ export default async function TaskManagerPage({
         ]);
         overview = (
           <>
-            <EntityPicker
-              label="Department"
-              value={department}
-              groups={[{ options: FLOW_DEPARTMENTS }]}
-              param="department"
-              basePath="/task-manager"
-              extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
-            />
-            <TaskOverviewStack
-              entityName={department}
-              categories={categoryList}
-              myUserId={daily.me.me.userId}
-              daily={{
-                entity: dailyDetail.department,
-                dateControl: (
-                  <DailyDatePicker
-                    key="admin-dept-daily-picker"
-                    value={dailyDetail.date}
-                    basePath="/task-manager"
-                    extraParams={{ view: "department", department }}
-                  />
-                ),
-                showViewToggle: true,
-                myWeek: buildMyWeek({ basePath: "/task-manager", extraParams: { view: "department", department } }),
-              }}
-              monthly={{
-                entity: monthlyDetail.department,
-                dateControl: (
-                  <div key="admin-dept-monthly-controls" className="flex items-center gap-1.5">
-                    <MonthDropdown
-                      key="admin-dept-monthly-picker"
-                      value={monthlyDetail.date}
-                      basePath="/task-manager"
-                      extraParams={{ view: "department", department }}
-                    />
-                    {/* Full month/1-7/8-14/15-21/22-{end} range dropdown
-                        (2026-08-21) — this admin/OPS/elevated-dept-site
-                        drill-down had no range filtering at all before;
-                        getDepartmentDetail now threads monthDays into
-                        getEntityPayload the same way getFlowDetail already
-                        does for HOD/DEPT_SITE's own Department Overview. */}
-                    <MonthRangeDropdown
-                      value={monthlyDetail.date}
-                      range={monthlyRangeParam}
-                      basePath="/task-manager"
-                      extraParams={{ view: "department", department }}
-                    />
-                  </div>
-                ),
-                showViewToggle: true,
-              }}
-              hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.department, showViewToggle: true } : undefined}
-              ceoAssigned={ceoAssignedDetail ? { entity: ceoAssignedDetail.department, showViewToggle: true } : undefined}
-              onComplete={completeTask}
-              onSkip={skipTask}
-              onReopen={reopenTask}
-              onUploadProof={uploadProof}
-              onRemoveProof={removeProof}
-              reassign={cardReassign}
-              canReassignOthers={canReassignOthersInGrid}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <EntityPicker
+                label="Department"
+                value={department}
+                groups={[{ options: [ALL_DEPARTMENTS_VALUE, ...FLOW_DEPARTMENTS] }]}
+                param="department"
+                basePath="/task-manager"
+                extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
+              />
+              <CardModeToggle />
+            </div>
+            {renderDepartmentStack(department, dailyDetail, monthlyDetail, hodAssignedDetail, ceoAssignedDetail)}
           </>
         );
       } else {
         const branch =
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
-        // No ceoAssigned fetch here (2026-08-18) — branches have no HOD, so
-        // this would always be structurally empty; see the department
-        // branch's comment above for the full reasoning.
-        const [dailyDetail, monthlyDetail, hodAssignedDetail] = await Promise.all([
+        // No ceoAssigned/hodAssigned fetch here (2026-08-18, fixed
+        // 2026-08-22) — branches have no HOD, so both would always be
+        // structurally empty (getBranchHodAssigned WAS still being called
+        // until 2026-08-22, a leftover bug: it zero-filled the whole branch
+        // roster into a section that could never show real data, since no
+        // branch is ever assigned tasks by an HOD). "Ad hoc Task" replaces
+        // it instead — the section branches actually have, scoped to just
+        // the Branch Manager (getEntityAdhocAssignedPayload's
+        // restrictRosterToRole: "BRANCH", _payloads.ts) since ad hoc tasks
+        // are fundamentally their own work, not the whole roster's.
+        const [dailyDetail, monthlyDetail, adhocAssignedDetail] = await Promise.all([
           getBranchDetail(email, branch, "daily", dailyDate),
           getBranchDetail(email, branch, "monthly", monthlyDate, monthlyRange ?? undefined),
-          getBranchHodAssigned(email, branch).catch(() => null),
+          getBranchAdhocAssigned(email, branch).catch(() => null),
         ]);
         overview = (
           <>
-            <EntityPicker
-              label="Branch"
-              value={branch}
-              groups={FLOW_BRANCH_REGIONS.map((r) => ({
-                label: r.name,
-                options: r.branches,
-              }))}
-              param="branch"
-              basePath="/task-manager"
-              extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <EntityPicker
+                label="Branch"
+                value={branch}
+                groups={FLOW_BRANCH_REGIONS.map((r) => ({
+                  label: r.name,
+                  options: r.branches,
+                }))}
+                param="branch"
+                basePath="/task-manager"
+                extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
+              />
+              <CardModeToggle />
+            </div>
             <TaskOverviewStack
               entityName={branch}
               categories={categoryList}
@@ -1000,7 +1129,9 @@ export default async function TaskManagerPage({
                 ),
                 showViewToggle: true,
               }}
-              hodAssigned={hodAssignedDetail ? { entity: hodAssignedDetail.branch, showViewToggle: true } : undefined}
+              adhocAssigned={
+                adhocAssignedDetail ? { entity: adhocAssignedDetail.branch, showViewToggle: false } : undefined
+              }
               onComplete={completeTask}
               onSkip={skipTask}
               onReopen={reopenTask}
@@ -1023,7 +1154,10 @@ export default async function TaskManagerPage({
       body = (
         <div className="flex flex-col gap-6">
           <ModeTabs active={entityView} date={dailyDate} />
-          {await buildEntityOverview()}
+          {/* CardModeProvider (2026-08-22): one List/Donut toggle governs
+              every Daily/Monthly section AND the All Departments donut/list
+              section underneath — see card-mode-context.tsx. */}
+          <CardModeProvider>{await buildEntityOverview()}</CardModeProvider>
         </div>
       );
 
@@ -1345,7 +1479,7 @@ export default async function TaskManagerPage({
           {body}
           <PageSectionHeading>Department / Branch Overview</PageSectionHeading>
           <ModeTabs active={entityView} date={dailyDate} />
-          {await buildEntityOverview()}
+          <CardModeProvider>{await buildEntityOverview()}</CardModeProvider>
         </div>
       );
     }

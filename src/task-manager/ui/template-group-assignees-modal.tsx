@@ -2,9 +2,12 @@
 
 // "View Assignees" modal for Template Groups (2026-08-06): lists everyone
 // currently holding a pending task from this group, with a per-person
-// Remove action (cancels just their pending instances — completed history
-// kept, other assignees untouched — same convention the group's own
-// Delete action already uses).
+// Remove action. Remove (2026-08-22 rule — corrected to a same-day
+// cutoff) cancels ONLY today's instance of each task in the group;
+// anything dated before today (pending, overdue, or completed) stays
+// exactly as it is, and no NEW recurring instances get created for that
+// person going forward. See data/templates-internal.ts's
+// removeTemplateAssigneeCore doc comment.
 import * as React from "react";
 import type { FlowTemplateGroupAssignee, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
 
@@ -69,7 +72,7 @@ export function TemplateGroupAssigneesModal({
     setBusyUserId(userId);
     if (
       !window.confirm(
-        `Remove ${name}'s pending tasks from "${group.name}"? Their completed tasks stay untouched, and no one else assigned this ${labelLower} is affected.`,
+        `Remove ${name} from "${group.name}"? Today's task will be cancelled — they're no longer expected to complete it. Anything from before today (pending, overdue, or completed) stays untouched, and no new tasks will be created for them going forward. No one else assigned this ${labelLower} is affected.`,
       )
     ) {
       setBusyUserId(null);
@@ -80,7 +83,17 @@ export function TemplateGroupAssigneesModal({
         const result = await control.removeAssignee(group.id, userId);
         if (!mountedRef.current) return;
         if (result.ok) {
-          setMessage({ ok: true, text: `Removed ${name}'s pending tasks.` });
+          const parts: string[] = [];
+          if (result.cancelledToday > 0) {
+            parts.push(`today's task${result.cancelledToday === 1 ? "" : "s"} cancelled`);
+          }
+          if (result.pendingKept > 0) {
+            parts.push(`${result.pendingKept} earlier open task${result.pendingKept === 1 ? "" : "s"} kept untouched`);
+          }
+          setMessage({
+            ok: true,
+            text: `Removed ${name}${parts.length > 0 ? ` — ${parts.join(", ")}` : ""}.`,
+          });
           load();
         } else {
           setMessage({ ok: false, text: result.message });

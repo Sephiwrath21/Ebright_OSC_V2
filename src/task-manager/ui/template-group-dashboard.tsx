@@ -180,14 +180,37 @@ export function TemplateGroupDashboard({
   const assignedGroup = control.list.find((g) => g.id === assignGroupId) ?? null;
   const assigneesGroup = control.list.find((g) => g.id === assigneesGroupId) ?? null;
 
+  // Search (2026-08-22) — filters by name OR any member task title
+  // (allTaskTitles, not just the 3-item previewTitles the card displays),
+  // case-insensitive, entirely client-side since control.list is already
+  // fully loaded. No debounce needed: filtering a plain in-memory array on
+  // every keystroke is cheap at this list's scale.
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const filteredList = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return control.list;
+    return control.list.filter(
+      (g) => g.name.toLowerCase().includes(q) || g.allTaskTitles.some((t) => t.toLowerCase().includes(q)),
+    );
+  }, [control.list, searchQuery]);
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500 dark:text-slate-400">
-          {control.list.length} {labelLower}
-          {control.list.length === 1 ? "" : "s"}
+          {filteredList.length} {labelLower}
+          {filteredList.length === 1 ? "" : "s"}
+          {searchQuery.trim() && ` (of ${control.list.length})`}
         </p>
         <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={`Search ${labelLower}s or tasks…`}
+            aria-label={`Search ${labelLower}s`}
+            className="w-48 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
+          />
           <div
             role="radiogroup"
             aria-label="View"
@@ -230,13 +253,15 @@ export function TemplateGroupDashboard({
         <p className={`mt-3 text-sm ${message.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{message.text}</p>
       )}
 
-      {control.list.length === 0 ? (
+      {filteredList.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-          No {labelLower}s yet — create one to bundle several tasks together for reuse.
+          {control.list.length === 0
+            ? `No ${labelLower}s yet — create one to bundle several tasks together for reuse.`
+            : `No ${labelLower}s match "${searchQuery.trim()}".`}
         </div>
       ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {control.list.map((g) => (
+          {filteredList.map((g) => (
             <div key={g.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <p className="font-semibold text-gray-900 dark:text-slate-100">{g.name}</p>
               <p className="mt-1 text-xs text-gray-400">
@@ -282,7 +307,7 @@ export function TemplateGroupDashboard({
               </tr>
             </thead>
             <tbody>
-              {control.list.map((g) => (
+              {filteredList.map((g) => (
                 <tr key={g.id} className="border-b border-gray-100 last:border-0 dark:border-slate-800">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{g.name}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{g.taskCount}</td>

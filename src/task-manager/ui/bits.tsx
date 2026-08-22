@@ -25,7 +25,7 @@ import { flowBucketTotal, formatDueDate, isDueDayLockExemptRole, isPastDueDay, i
  *  file's own "no new dependencies" header comment. `expanded` controls the
  *  90° rotation the two callers (SectionCard, ResizableTaskList's group
  *  headers) previously did with a text-based transform. */
-function ChevronIcon({ expanded, className = "size-3" }: { expanded: boolean; className?: string }) {
+export function ChevronIcon({ expanded, className = "size-3" }: { expanded: boolean; className?: string }) {
   return (
     <svg
       aria-hidden
@@ -64,12 +64,58 @@ function InlineActionError({ text }: { text: string }) {
 }
 
 export const BUCKET_META = [
-  { key: "completed", label: "Completed", dot: "bg-emerald-500", stroke: "stroke-emerald-500" },
-  { key: "pending", label: "Pending", dot: "bg-red-400", stroke: "stroke-red-400" },
-  { key: "na", label: "N/A", dot: "bg-amber-400", stroke: "stroke-amber-400" },
+  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-500", stroke: "stroke-emerald-500" },
+  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-400", stroke: "stroke-red-400" },
+  // Yellow, not amber (2026-08-22, user feedback — amber reads orange,
+  // especially at dark-mode depth) — the pie wedge/dot/legend all use this
+  // same fixed (non-theme-varying) solid fill, so N/A stays a solid yellow
+  // everywhere, matching BUCKET_TINT/BUCKET_TEXT's own yellow swap below.
+  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-400", stroke: "stroke-yellow-400" },
 ] as const;
 
 export type BucketKey = (typeof BUCKET_META)[number]["key"];
+
+/** Background tint per bucket for donut cards' stat chips/accordion rows
+ *  (PersonDonutCard, DepartmentDonutCard) — same 3-color convention as
+ *  BUCKET_META's dot/stroke/fill classes, just as a soft background instead
+ *  of a solid fill. Matches the saturation of the ClickUp Task page's own
+ *  member card (DepartmentMembers.tsx's StatChip/Accordion bg tokens).
+ *  Shared here (2026-08-22) so every donut-style card stays visually
+ *  identical instead of drifting via separate copies.
+ *  Dark mode is SOLID (bg-*-900, no opacity fraction — 2026-08-22, user
+ *  feedback: the original *-950/40 wash was too close to the page's own
+ *  dark background to tell the three buckets apart at a glance). Matches
+ *  DepartmentMembers.tsx's own dark tint tokens (--tint-green/--tint-red
+ *  resolve to emerald-900/red-900) exactly. */
+export const BUCKET_TINT: Record<BucketKey, string> = {
+  completed: "bg-emerald-100 dark:bg-emerald-900",
+  pending: "bg-red-100 dark:bg-red-900",
+  // Yellow, not amber, in BOTH modes (2026-08-22, user feedback) — amber
+  // reads orange, most noticeably at dark-mode depth, but kept consistent
+  // in light mode too since BUCKET_META's dot/fill and BUCKET_SOLID's badge
+  // are now yellow as well — a light amber box next to a yellow dot/badge
+  // would be a mismatched hue.
+  na: "bg-yellow-100 dark:bg-yellow-900",
+};
+/** Colored text/icon per bucket — a stat chip's number, an accordion row's
+ *  chevron — matching DepartmentMembers.tsx's colored `color` token (label
+ *  text stays neutral either way — only the value/icon carries the bucket
+ *  color). */
+export const BUCKET_TEXT: Record<BucketKey, string> = {
+  completed: "text-emerald-700 dark:text-emerald-300",
+  pending: "text-red-600 dark:text-red-300",
+  na: "text-yellow-700 dark:text-yellow-300",
+};
+export const BUCKET_SOLID: Record<BucketKey, string> = {
+  completed: "bg-emerald-500",
+  pending: "bg-red-400",
+  na: "bg-yellow-400",
+};
+/** Total's own tint/text — purple, matching DepartmentMembers.tsx's
+ *  `--cat-purple-fg`/`--cat-purple-bg` Total StatChip. Solid dark-mode
+ *  background (violet-900), same reasoning as BUCKET_TINT above. */
+export const TOTAL_TINT = "bg-violet-100 dark:bg-violet-900";
+export const TOTAL_TEXT = "text-violet-700 dark:text-violet-300";
 
 /** Small calendar glyph — pairs with a date wherever a task shows one. */
 export function CalendarIcon({ className = "size-3" }: { className?: string }) {
@@ -158,68 +204,156 @@ export function SectionCard({
 }
 
 /** 3-segment status donut (SVG stroke arcs), center = children (count or %). */
+/** Solid pie chart (2026-08-22, replaced the previous hollow-ring donut) —
+ *  a filled wedge per non-empty bucket, each with an outward leader line to
+ *  a "LABEL count" text, matching the reference ClickUp-style pie chart's
+ *  visual language (own Tailwind/dark-mode styling, not a literal copy —
+ *  same precedent PersonDonutCard/DepartmentDonutCard already set). Wedges
+ *  stay clickable (onSegmentClick) exactly like the ring's segments were.
+ *  `children`, if provided, now renders BELOW the chart instead of
+ *  overlaid in a center hole — a solid pie has no hole to overlay into —
+ *  every existing call site's `children` (a %/total caption) still works
+ *  unchanged, just repositioned by this component, not the caller. */
 export function StatusDonut({
   totals,
   size = 120,
-  strokeWidth = 14,
   onSegmentClick,
   children,
 }: {
   totals: FlowBucketTotals;
   size?: number;
-  strokeWidth?: number;
   /** Makes segments clickable (drill into a status bucket). */
   onSegmentClick?: (key: BucketKey) => void;
   children?: React.ReactNode;
 }) {
+  // No hover pop-out or tooltip (2026-08-22: tried both same day, reverted)
+  // — with only 2-3 wedges in a small 92-132px chart, an "exploded" wedge on
+  // hover read as the chart visually breaking apart rather than a
+  // highlight, and the tooltip chip duplicated the always-visible outer
+  // leader-line label and the stat boxes below it. Wedges are static;
+  // hovering only gets the browser's native <title> tooltip below, same as
+  // clicking still opens the drill-down.
   const total = flowBucketTotal(totals);
-  const r = (size - strokeWidth) / 2;
-  const c = 2 * Math.PI * r;
+  const r = size / 2;
 
-  let offset = 0;
+  let cumulative = 0;
   const segments = BUCKET_META.map((b) => {
     const frac = total > 0 ? totals[b.key] / total : 0;
-    const seg = { ...b, dash: frac * c, offset };
-    offset += frac * c;
-    return seg;
+    const startAngle = cumulative * 2 * Math.PI;
+    cumulative += frac;
+    // Nudge an effectively-100% segment's end angle so the arc's start and
+    // end points are never identical — a single 'A' command can't draw a
+    // full circle (zero-length arc), same footgun stroke-dasharray never
+    // had to worry about.
+    const endAngle = frac >= 0.999 ? startAngle + 2 * Math.PI - 0.0001 : cumulative * 2 * Math.PI;
+    return { ...b, count: totals[b.key], frac, startAngle, endAngle };
+  }).filter((s) => s.frac > 0);
+
+  // Leader-line labels need real room outside the pie itself, in EVERY
+  // direction (2026-08-22 fix) — a label pointing straight up/down needs
+  // just as much clearance as one pointing left/right; an earlier version
+  // only padded left/right, which silently clipped any label near 12/6
+  // o'clock off the canvas.
+  //
+  // labelPad is a FIXED function of `size` alone — NOT of this instance's
+  // actual data (2026-08-22, second fix same day: a data-dependent labelPad
+  // — sized from the longest rendered label's own text, e.g. "PENDING 120"
+  // needing more room than "PENDING 0" — made sibling cards in the same
+  // grid render at DIFFERENT pixel footprints depending on which one had
+  // the longer number, breaking the grid's visual alignment card-to-card).
+  // The fixed floor (95, trimmed down 2026-08-22 — 115 made the card
+  // noticeably taller than needed) covers a realistic worst case at this
+  // font (a 9-char label like "Pending" + a 3-digit count, ~9px bold
+  // uppercase, ~6.2px/char) so real data doesn't clip, while every card
+  // using the same `size` prop always gets the exact same canvas regardless
+  // of its own totals.
+  const labelPad = Math.max(95, Math.round(size * 0.5));
+  const cx = r + labelPad;
+  const cy = r + labelPad;
+  const svgW = size + labelPad * 2;
+  const svgH = size + labelPad * 2;
+
+  // Clockwise from 12 o'clock, same convention the old -90deg-rotated ring
+  // visually produced.
+  const point = (angle: number, radius: number) => ({
+    x: cx + radius * Math.sin(angle),
+    y: cy - radius * Math.cos(angle),
   });
 
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          strokeWidth={strokeWidth}
-          className="stroke-gray-100 dark:stroke-slate-700"
-        />
-        {segments.map((s) =>
-          s.dash > 0 ? (
+    <div className="inline-flex flex-col items-center">
+      <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+        {total === 0 ? (
+          // Explicit "No tasks" empty state (2026-08-22) — a plain solid
+          // outline here reads as ambiguous (blank ring vs. a genuine "0
+          // tasks" state look identical at a glance, per user report).
+          // Dashed stroke + a centered label makes the "nothing to show"
+          // state unmistakable instead of looking like a rendering failure.
+          <g>
             <circle
-              key={s.key}
-              cx={size / 2}
-              cy={size / 2}
+              cx={cx}
+              cy={cy}
               r={r}
               fill="none"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${s.dash} ${c - s.dash}`}
-              strokeDashoffset={-s.offset}
-              onClick={onSegmentClick ? () => onSegmentClick(s.key) : undefined}
-              className={`${s.stroke} ${
-                onSegmentClick ? "cursor-pointer transition-opacity hover:opacity-75" : ""
-              }`}
+              strokeWidth={2}
+              strokeDasharray="6 5"
+              className="stroke-gray-300 dark:stroke-slate-600"
+            />
+            <text
+              x={cx}
+              y={cy}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-gray-400 text-[10px] font-medium dark:fill-slate-500"
             >
-              <title>{`${s.label}: ${totals[s.key]}`}</title>
-            </circle>
-          ) : null,
+              No tasks
+            </text>
+          </g>
+        ) : (
+          segments.map((s) => {
+            const start = point(s.startAngle, r);
+            const end = point(s.endAngle, r);
+            const large = s.endAngle - s.startAngle > Math.PI ? 1 : 0;
+            const wedge = `M ${cx},${cy} L ${start.x},${start.y} A ${r},${r} 0 ${large},1 ${end.x},${end.y} Z`;
+            const mid = (s.startAngle + s.endAngle) / 2;
+            const leaderStart = point(mid, r);
+            const leaderEnd = point(mid, r + 18);
+            const isRight = Math.sin(mid) >= 0;
+            const labelX = leaderEnd.x + (isRight ? 4 : -4);
+            return (
+              <g key={s.key}>
+                <path
+                  d={wedge}
+                  onClick={onSegmentClick ? () => onSegmentClick(s.key) : undefined}
+                  className={`${s.fill} ${
+                    onSegmentClick ? "cursor-pointer" : ""
+                  }`}
+                >
+                  <title>{`${s.label}: ${s.count}`}</title>
+                </path>
+                <line
+                  x1={leaderStart.x}
+                  y1={leaderStart.y}
+                  x2={leaderEnd.x}
+                  y2={leaderEnd.y}
+                  strokeWidth={1}
+                  className="stroke-gray-300 dark:stroke-slate-600"
+                />
+                <text
+                  x={labelX}
+                  y={leaderEnd.y}
+                  textAnchor={isRight ? "start" : "end"}
+                  dominantBaseline="middle"
+                  className="fill-gray-500 text-[9px] font-semibold uppercase tracking-wide dark:fill-slate-400"
+                >
+                  {s.label} <tspan className="fill-gray-900 font-bold dark:fill-slate-100">{s.count}</tspan>
+                </text>
+              </g>
+            );
+          })
         )}
       </svg>
-      {/* pointer-events-none: this overlay must never swallow segment clicks */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        {children}
-      </div>
+      {children && <div className="-mt-2 flex flex-col items-center text-center">{children}</div>}
     </div>
   );
 }
@@ -2869,6 +3003,12 @@ export function ResizableTaskList({
                     key={k.runBlockId}
                     task={k}
                     {...shared}
+                    // Subtask rows share the SAME nameWidth as their parent
+                    // (both spread from `shared` above) — the drag handle
+                    // itself was parent-only until now (2026-08-22 fix),
+                    // even though grabbing it from either row resizes the
+                    // one shared column.
+                    onResizeStart={hideRowResizeDivider ? undefined : onResizeStart}
                     selected={selectedIds.has(k.runBlockId)}
                     onToggleSelect={hideCompleted ? toggleSelect : undefined}
                     tree={{ kind: "child" }}
@@ -3087,7 +3227,7 @@ export function StatusOverviewCard({
       {subtitle && <p className="text-center text-sm text-gray-500 dark:text-slate-400">{subtitle}</p>}
 
       <div className="mt-5 flex flex-col items-center">
-        {!hideChart && <StatusDonut totals={totals} size={132} strokeWidth={20} onSegmentClick={drill} />}
+        {!hideChart && <StatusDonut totals={totals} size={132} onSegmentClick={drill} />}
         <div className={`w-44 ${hideChart ? "" : "mt-5"}`}>
           <BucketLegend totals={totals} onSelect={drill} />
         </div>
@@ -3417,6 +3557,13 @@ export function EntityDrillModal({
                         </p>
                       )}
                     </div>
+                    {/* Assignee avatar (2026-08-22, ClickUp-style reference)
+                        — initials on a per-person color, same InitialAvatar
+                        every other assignee chip in the app already uses
+                        (no photo data exists to show a real picture). Shown
+                        on every row, own or not, matching the reference's
+                        per-row avatar regardless of ownership. */}
+                    <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
                     {/* Proof (2026-07-30): ＋ upload on the viewer's own
                         rows, 📎 view for anyone once uploaded. Only takes
                         space when actionable/present — the modal is too

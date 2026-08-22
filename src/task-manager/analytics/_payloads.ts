@@ -427,9 +427,20 @@ export async function getEntityCeoAssignedPayload(
  *  Branch-only — Department has no ad hoc concept in this app (ad hoc
  *  tasks are fundamentally Branch Manager/branch-context work). Branch
  *  Exec/Coach are excluded from the roster (2026-08-18) — Daily-only roles
- *  app-wide, they never have ad hoc obligations either. */
+ *  app-wide, they never have ad hoc obligations either.
+ *  restrictRosterToRole: "BRANCH" (2026-08-22) — ad hoc tasks are
+ *  fundamentally the Branch Manager's own work (see this function's own
+ *  "started by a Branch Manager" filter above); the roster used to
+ *  zero-fill around every non-site-login branch member instead of just
+ *  them, which was clutter every OTHER role can never have real data in —
+ *  same fix getEntityCeoAssignedPayload's own restrictRosterToRole already
+ *  applied for its single-recipient (HOD) case. */
 export async function getEntityAdhocAssignedPayload(branch: string): Promise<EntityPayload> {
-  return buildEntityPayload("branch", branch, null, { adhocOnly: true, excludeDailyOnlyBranchRoles: true });
+  return buildEntityPayload("branch", branch, null, {
+    adhocOnly: true,
+    excludeDailyOnlyBranchRoles: true,
+    restrictRosterToRole: "BRANCH",
+  });
 }
 
 /**

@@ -57,6 +57,7 @@ import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
 import { EntityCardOverview, type MyMonthConfig, type MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
 import {
   chunkLabel,
+  defaultMonthRange,
   flowBucketize,
   flowStreamLabel,
   monthDayChunks,
@@ -347,10 +348,10 @@ export async function HomeScopedOverviewSection({
               tasks: myMonthResults[i].tasks,
             })),
           ],
-          // Unset ?mrange= already means Full month everywhere else (see
-          // MonthRangeDropdown's own range??"" convention) — matches that
-          // instead of defaulting to the first day-range chunk.
-          selectedRange: monthlyRangeParam ?? "",
+          // Default tab (2026-08-22): the week-range chunk containing
+          // TODAY, not "Full month" — see defaultMonthRange's own doc
+          // comment (ui/types.ts) for the past/future-month fallback.
+          selectedRange: monthlyRangeParam ?? defaultMonthRange(mY, mM, new Date()),
           anchorMonth: monthly.date,
           nav: { basePath: "/home", extraParams: dateExtraParams("mdate", "mrange") },
         };

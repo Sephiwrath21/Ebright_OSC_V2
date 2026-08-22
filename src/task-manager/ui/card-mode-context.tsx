@@ -1,0 +1,84 @@
+"use client";
+
+// Shared List/Donut toggle (2026-08-22) — previously each EntityCardOverview
+// section (Daily, Monthly, ...) owned its own independent "cardMode" state,
+// so switching Daily to Donut left Monthly on List and vice versa. This
+// context lifts that single choice to a page-level provider (wrapped around
+// the WHOLE Department/Branch/All Departments overview on /task-manager) so
+// one toggle button governs every section underneath it at once.
+//
+// EntityCardOverview and AllDepartmentsSection both read this context: when
+// present, they use its shared mode/setMode and suppress their OWN toggle
+// button (CardModeToggle, rendered once near the Department/Branch dropdown,
+// is the only control). When absent (any OTHER page that renders these
+// components without wrapping them in a CardModeProvider — Home, Department
+// Overview on task-manager-view.tsx), each section keeps its own local
+// state and its own toggle button, exactly as before this change — an
+// unwrapped consumer is a deliberate, backward-compatible fallback, not an
+// error state.
+import * as React from "react";
+
+export type CardMode = "list" | "donut";
+
+interface CardModeState {
+  mode: CardMode;
+  setMode: (mode: CardMode) => void;
+}
+
+const CardModeContext = React.createContext<CardModeState | null>(null);
+
+export function CardModeProvider({ children }: { children: React.ReactNode }) {
+  const [mode, setMode] = React.useState<CardMode>("list");
+  const value = React.useMemo(() => ({ mode, setMode }), [mode]);
+  return <CardModeContext.Provider value={value}>{children}</CardModeContext.Provider>;
+}
+
+/** Null when no CardModeProvider is above in the tree — callers fall back
+ *  to their own local state in that case, see this file's own doc comment. */
+export function useCardMode(): CardModeState | null {
+  return React.useContext(CardModeContext);
+}
+
+/** The single page-level List/Donut button, rendered once near the
+ *  Department/Branch dropdown — same visual style as the per-section toggle
+ *  it replaces. Renders nothing outside a CardModeProvider (nothing to
+ *  control). */
+export function CardModeToggle() {
+  const ctx = useCardMode();
+  if (!ctx) return null;
+  const { mode, setMode } = ctx;
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Card style"
+      className="flex items-center gap-0.5 rounded-full border border-gray-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === "list"}
+        onClick={() => setMode("list")}
+        className={`rounded-full px-3 py-1 text-xs font-medium ${
+          mode === "list"
+            ? "bg-blue-600 text-white"
+            : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
+        }`}
+      >
+        List
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === "donut"}
+        onClick={() => setMode("donut")}
+        className={`rounded-full px-3 py-1 text-xs font-medium ${
+          mode === "donut"
+            ? "bg-blue-600 text-white"
+            : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
+        }`}
+      >
+        Donut
+      </button>
+    </div>
+  );
+}

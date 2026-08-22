@@ -313,6 +313,13 @@ exports.Prisma.TaskTemplateScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.TaskTemplateExcludedAssigneeScalarFieldEnum = {
+  id: 'id',
+  templateId: 'templateId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.ProofScalarFieldEnum = {
   id: 'id',
   runBlockId: 'runBlockId',
@@ -523,6 +530,7 @@ exports.Prisma.ModelName = {
   TaskTemplateGroup: 'TaskTemplateGroup',
   BranchPackageSchedule: 'BranchPackageSchedule',
   TaskTemplate: 'TaskTemplate',
+  TaskTemplateExcludedAssignee: 'TaskTemplateExcludedAssignee',
   Proof: 'Proof',
   RunItem: 'RunItem',
   NotificationLog: 'NotificationLog',

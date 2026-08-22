@@ -5,6 +5,7 @@ import type {
   FlowBranchDetailResponse,
   FlowDepartmentDetailResponse,
   FlowDetailResponse,
+  FlowEntityRollup,
   FlowOverviewResponse,
   FlowPeriod,
   FlowStaffMember,
@@ -196,6 +197,37 @@ export function getFlowDetail(
   }, "getFlowDetail");
 }
 
+/** Org-wide department rollups clamped to a specific Monthly day-range
+ *  (2026-08-22) — a lighter alternative to getFlowDetail for "All
+ *  Departments" Monthly's "default to today's day-range chunk, not Full
+ *  month" behavior (page.tsx): the page's own top-level
+ *  getFlowDetail("monthly", ...) call already covers the unclamped (Full
+ *  month) and the explicitly-?mrange=-clamped cases; this is only called
+ *  for the one remaining case — no ?mrange= in the URL, but the dropdown
+ *  should still default to showing today's chunk — where the shared
+ *  fetch's own data (Full month) wouldn't match what the dropdown
+ *  defaults to. Same auth/role gate as getFlowDetail's own org branch
+ *  (canViewOrg/isElevatedDeptSite), just returning ONLY the department
+ *  rollups instead of the whole payload (org/adhoc/adhocByRegion/me). */
+export function getOrgMonthlyDepartments(
+  email: string,
+  date: string | undefined,
+  monthDays: { from: number; to: number },
+): Promise<FlowEntityRollup[]> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const user = await requireUserByEmail(email);
+    if (!canViewOrg(user.role) && !isElevatedDeptSite(user)) {
+      throw new ApiHttpError(403, "You can only view your own department");
+    }
+    const org = await getOrgPayload("monthly", date, monthDays);
+    // Same internal-to-public-shape cast getFlowDetail's own org branch
+    // relies on (EntityCountsDetailed → FlowEntityRollup, structurally
+    // compatible but not nominally the same type).
+    return org.departments as unknown as FlowEntityRollup[];
+  }, "getOrgMonthlyDepartments");
+}
+
 // Deliberately no per-user auth (donor parity): call sites must sit behind
 // session auth. Returns the PII-free staff subset only.
 /** Assignable staff directory (recipient picker options). */
@@ -219,20 +251,22 @@ export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
   }, "getFlowStaff");
 }
 
-/** Just the caller's own Task Manager domain role (+ department) — a light
- *  alternative to getFlowDetail/getFlowOverview for callers that only need
- *  the role, e.g. deciding whether to hide the Cadence picker for a CEO
- *  (mirrors /task-manager/page.tsx's `role === "CEO"` check, without
- *  fetching that page's full daily payload). Deliberately NOT the OSC
- *  portal session's own role field — a different identity system.
- *  `department` (2026-08-07, RBAC plan) travels alongside `role` because
+/** Just the caller's own Task Manager domain role (+ department + email) —
+ *  a light alternative to getFlowDetail/getFlowOverview for callers that
+ *  only need the role, e.g. deciding whether to hide the Cadence picker
+ *  for a CEO (mirrors /task-manager/page.tsx's `role === "CEO"` check,
+ *  without fetching that page's full daily payload). Deliberately NOT the
+ *  OSC portal session's own role field — a different identity system.
+ *  `department` (2026-08-07, RBAC plan) and `email` (2026-08-22, for
+ *  EXTRA_TEMPLATE_GROUP_EDITOR_EMAILS) travel alongside `role` because
  *  `canManageTaskTemplateGroups`/`taskManagerNavAccess` (see role-views.ts)
- *  need both together — used by template/page.tsx, package/page.tsx, and
- *  package-table/page.tsx to compute their `canEdit`/view-access checks. */
-export function getMyRole(email: string): Promise<{ role: string; department: string | null }> {
+ *  need all three together — used by template/page.tsx, package/page.tsx,
+ *  and package-table/page.tsx to compute their `canEdit`/view-access
+ *  checks. */
+export function getMyRole(email: string): Promise<{ role: string; department: string | null; email: string }> {
   return native(async () => {
     const user = await requireUserByEmail(email);
-    return { role: user.role, department: user.department };
+    return { role: user.role, department: user.department, email: user.email };
   }, "getMyRole");
 }
 

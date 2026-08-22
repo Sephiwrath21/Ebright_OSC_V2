@@ -320,6 +320,7 @@ export const FINANCE_EMAIL = "finance@ebright.my";
 export function taskManagerNavAccess(user: {
   role: string;
   department: string | null;
+  email?: string;
 }): { template: boolean; package: boolean; packageTable: boolean } {
   const manage = canManageTaskTemplateGroups(user);
   const orgViewer = user.role === "CEO" || user.role === "HOD";
@@ -332,17 +333,41 @@ export function taskManagerNavAccess(user: {
   };
 }
 
+/** Extra per-user grants (2026-08-22) — narrow, explicit exceptions to the
+ *  role-based Template/Package/Package Table edit rule below, for a
+ *  specific person who needs edit access their role wouldn't otherwise
+ *  grant. Keyed by (lowercased) email — a stable identifier, not name
+ *  (this session hit repeated name-matching/casing issues) or role. Add
+ *  future exceptions here; no other code changes needed.
+ *
+ *  IMPORTANT: this is a GLOBAL grant, same as any elevated dept-site
+ *  account already gets — TaskTemplateGroup has no `department` column,
+ *  so Template/Package/Package Table access has never been per-department
+ *  scoped for anyone. A listed email gets full edit access to every
+ *  department's templates/packages, not just their own. */
+export const EXTRA_TEMPLATE_GROUP_EDITOR_EMAILS: readonly string[] = [
+  // Wan Nuraihan Hanisah Binti Wan Abdul Hadi — Optimisation dept exec
+  // (role MEMBER, so she doesn't otherwise qualify) — 2026-08-22 request.
+  "nuraihanhanisah2002@gmail.com",
+];
+
 /** Task Manager Template/Package/Package Table EDIT capability
  *  (create/edit/delete/assign) — identical for all three pages under the
  *  2026-08-07 matrix (unchanged by the 2026-08-11 revision): Super Admin
- *  (ADMIN) and the elevated Operations/Optimisation dept-site accounts
- *  only. Everyone else who can still VIEW (HOD, CEO, Branch Manager, per
+ *  (ADMIN), the elevated Operations/Optimisation dept-site accounts, and
+ *  anyone in EXTRA_TEMPLATE_GROUP_EDITOR_EMAILS above (2026-08-22).
+ *  Everyone else who can still VIEW (HOD, CEO, Branch Manager, per
  *  taskManagerNavAccess above) is read-only across all three pages. */
 export function canManageTaskTemplateGroups(user: {
   role: string;
   department: string | null;
+  email?: string;
 }): boolean {
-  return user.role === "ADMIN" || isElevatedDeptSite(user);
+  return (
+    user.role === "ADMIN" ||
+    isElevatedDeptSite(user) ||
+    (user.email != null && EXTRA_TEMPLATE_GROUP_EDITOR_EMAILS.includes(user.email.trim().toLowerCase()))
+  );
 }
 
 /** Raw role (+ department/branch/employmentType) → UI view identity. */
