@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ChevronRight, Home, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Home, Search } from "lucide-react";
 import { EMPLOYEE_STAGES, STAGE_LABELS, STAGE_PILL_CLASSES, type EmployeeStage } from "@/lib/employeeStages";
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 import { deleteEmployeeRecord } from "@/lib/employeeRecordActions";
@@ -47,19 +47,47 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
   const [searchDraft, setSearchDraft] = useState("");
   const [yearDraft, setYearDraft] = useState("");
   const [monthDraft, setMonthDraft] = useState("");
+  // Branch/Department drafts — advanced filters, mutually exclusive (2026-08-25,
+  // see conversation): a row's own branchName/departmentName are already
+  // mutually exclusive in the data (an employee belongs to one or the other,
+  // never both), so letting both filters be set at once could only ever
+  // produce zero results. Picking one clears and disables the other, both in
+  // the draft here and in resetFilters/applyFilters below.
+  const [branchFilterDraft, setBranchFilterDraft] = useState("");
+  const [departmentFilterDraft, setDepartmentFilterDraft] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<EmployeeStage | "">("");
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [dateSort, setDateSort] = useState<DateSortState>("default");
 
+  // Date column, year/month filters, and default sort all key off startDate
+  // specifically (2026-08-25, see conversation), not the shared `date` field
+  // — `date` is end_date for Exit rows (see dateSourceFor in
+  // employeeQueries.ts), but this table's Date column should always read as
+  // "when they started," Exit included.
   const years = useMemo(() => {
-    const set = new Set(rows.map((r) => r.date?.slice(0, 4)).filter(Boolean) as string[]);
+    const set = new Set(rows.map((r) => r.startDate?.slice(0, 4)).filter(Boolean) as string[]);
     return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [rows]);
+  // Derived from the already-loaded rows (same approach as `years` above)
+  // rather than a separate canonical-list prop — Employee Records spans every
+  // stage combined, so in practice every real branch/department already has
+  // at least one row here.
+  const branchOptions = useMemo(() => {
+    const set = new Set(rows.map((r) => r.branchName).filter(Boolean) as string[]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+  const departmentOptions = useMemo(() => {
+    const set = new Set(rows.map((r) => r.departmentName).filter(Boolean) as string[]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -72,12 +100,14 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
       // match on either, not just the row's own primary stage.
       if (statusFilter && r.stage !== statusFilter && !r.extraStages?.includes(statusFilter)) return false;
       if (q && !r.fullName.toLowerCase().includes(q)) return false;
-      if (year && r.date?.slice(0, 4) !== year) return false;
-      if (month && r.date?.slice(5, 7) !== month) return false;
+      if (year && r.startDate?.slice(0, 4) !== year) return false;
+      if (month && r.startDate?.slice(5, 7) !== month) return false;
+      if (branchFilter && r.branchName !== branchFilter) return false;
+      if (departmentFilter && r.departmentName !== departmentFilter) return false;
       return true;
     });
-    return applyDateSort(result, dateSort, (r) => r.date, Boolean(year) || Boolean(month));
-  }, [rows, statusFilter, search, year, month, dateSort]);
+    return applyDateSort(result, dateSort, (r) => r.startDate, Boolean(year) || Boolean(month));
+  }, [rows, statusFilter, search, year, month, branchFilter, departmentFilter, dateSort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -87,6 +117,8 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
     setSearch(searchDraft);
     setYear(yearDraft);
     setMonth(monthDraft);
+    setBranchFilter(branchFilterDraft);
+    setDepartmentFilter(departmentFilterDraft);
     setPage(1);
   }
 
@@ -95,10 +127,14 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
     setSearchDraft("");
     setYearDraft("");
     setMonthDraft("");
+    setBranchFilterDraft("");
+    setDepartmentFilterDraft("");
     setStatusFilter("");
     setSearch("");
     setYear("");
     setMonth("");
+    setBranchFilter("");
+    setDepartmentFilter("");
     setPage(1);
   }
 
@@ -228,21 +264,80 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                   </option>
                 ))}
               </select>
+            </div>
 
+            {/* Advanced filters — collapsible, same pattern as the Exit
+                list's own Branch/Department dropdowns, but mutually
+                exclusive here (2026-08-25, see conversation): picking one
+                clears and disables the other, since a row can only ever
+                have one or the other set. */}
+            {advancedOpen && (
+              <div className="w-full flex flex-wrap items-center gap-2 sm:gap-4">
+                <select
+                  value={branchFilterDraft}
+                  disabled={Boolean(departmentFilterDraft)}
+                  onChange={(e) => {
+                    setBranchFilterDraft(e.target.value);
+                    if (e.target.value) setDepartmentFilterDraft("");
+                  }}
+                  className="shrink-0 h-11 px-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 truncate min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">All branches</option>
+                  {branchOptions.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={departmentFilterDraft}
+                  disabled={Boolean(branchFilterDraft)}
+                  onChange={(e) => {
+                    setDepartmentFilterDraft(e.target.value);
+                    if (e.target.value) setBranchFilterDraft("");
+                  }}
+                  className="shrink-0 h-11 px-3 rounded-lg border-2 border-slate-200 dark:border-slate-500 dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 truncate min-w-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">All departments</option>
+                  {departmentOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Bottom row — advanced-filters toggle on the left, Search/Reset
+                on the right, same layout as the Exit list's own filter card
+                (2026-08-25, see conversation: this was previously inline
+                right after the main row's fields; moved down here to match). */}
+            <div className="w-full flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={applyFilters}
-                className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-semibold text-xs sm:text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                aria-expanded={advancedOpen}
+                className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-[#004386c9] hover:underline dark:text-blue-300"
               >
-                Search
+                {advancedOpen ? "hide advanced filters" : "advanced filters"}
+                <ChevronDown className={`w-4 h-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="shrink-0 h-11 px-3 sm:px-4 rounded-lg border-2 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                Reset
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={applyFilters}
+                  className="shrink-0 h-11 px-3 sm:px-6 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-semibold text-xs sm:text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                >
+                  Search
+                </button>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="shrink-0 h-11 px-3 sm:px-4 rounded-lg border-2 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 
@@ -278,7 +373,7 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                       {row.departmentName ?? row.branchName ?? "—"}
                     </span>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{row.date ?? "—"}</span>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{row.startDate ?? "—"}</span>
                     <span className="flex flex-wrap gap-1.5">
                       <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${STAGE_PILL_CLASSES[row.stage]}`}>
                         {STAGE_LABELS[row.stage]}

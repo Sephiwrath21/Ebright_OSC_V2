@@ -16,6 +16,16 @@ export interface ProfileSection {
 export const RAIL_PILL_PADDING_CLASS = "py-2 px-2 sm:py-[11px] sm:px-[16px]";
 export const RAIL_PILL_FONT_SIZE_CLASS = "text-xs sm:text-sm";
 
+// Unified rail width + gap (2026-08-25, see conversation) — every stage
+// previously had its own widthPx/gapPx (Pre/Probation 220/12, Onboarding
+// 200/12, Active 200/10, Exit 210/10), which made the rail visibly a
+// different size depending which stage you were on even though the pill
+// padding/font above were already shared. EmployeeRecordView.tsx's own
+// separate rail was already 210/10, so that's the value every stage now
+// matches too. Colors still vary per stage — only width/gap are unified.
+export const RAIL_WIDTH_PX = 210;
+export const RAIL_GAP_PX = 10;
+
 /** Exact colors/spacing for the vertical .tab-nav/.nav-pill rail, per stage — lifted from each stage's own CSS in Emp_Folder (every stage reuses the same rail *mechanics*, only color/spacing differs). */
 export interface NavRailStyle {
   widthPx: number;
@@ -55,8 +65,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       { key: "medical", label: "Medical Check" },
     ],
     navRail: {
-      widthPx: 220,
-      gapPx: 12,
+      widthPx: RAIL_WIDTH_PX,
+      gapPx: RAIL_GAP_PX,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-transparent dark:border-purple-700 dark:text-purple-300",
@@ -68,8 +78,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
     profileMode: "in-page-tabs",
     sections: [{ key: "probation", label: "Probation" }],
     navRail: {
-      widthPx: 220,
-      gapPx: 12,
+      widthPx: RAIL_WIDTH_PX,
+      gapPx: RAIL_GAP_PX,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9a2fba8] border-[#b95af4] text-[#4b4949d6] dark:bg-transparent dark:border-purple-700 dark:text-purple-300",
@@ -85,8 +95,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       { key: "emergency-contact", label: "Emergency Contact" },
     ],
     navRail: {
-      widthPx: 200,
-      gapPx: 12,
+      widthPx: RAIL_WIDTH_PX,
+      gapPx: RAIL_GAP_PX,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#b0ffbfa8] border-[#0a6e03] text-[#4b4949d6] dark:bg-transparent dark:border-emerald-700 dark:text-emerald-300",
@@ -108,8 +118,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       { key: "disciplinary", label: "Disciplinary" },
     ],
     navRail: {
-      widthPx: 200,
-      gapPx: 10,
+      widthPx: RAIL_WIDTH_PX,
+      gapPx: RAIL_GAP_PX,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#d9fd63a8] border-[#b4da37] text-[#4b4949d6] dark:bg-transparent dark:border-lime-700 dark:text-lime-300",
@@ -132,8 +142,8 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
       { key: "exit-interview-notes", label: "Exit Interview Notes" },
     ],
     navRail: {
-      widthPx: 210,
-      gapPx: 10,
+      widthPx: RAIL_WIDTH_PX,
+      gapPx: RAIL_GAP_PX,
       paddingClass: RAIL_PILL_PADDING_CLASS,
       fontSizeClass: RAIL_PILL_FONT_SIZE_CLASS,
       base: "bg-[#f48e8ea8] border-[#ee5f5f] text-[#4b4949d6] dark:bg-transparent dark:border-red-700 dark:text-red-300",

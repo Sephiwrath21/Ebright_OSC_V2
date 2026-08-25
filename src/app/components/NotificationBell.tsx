@@ -9,6 +9,46 @@ const APPROVAL_ROLES = new Set(["superadmin"]);
 const INDUCTION_ROLES = new Set(["superadmin", "admin", "hr", "od"]);
 const PROBATION_DECISION_ROLES = new Set(["hr", "superadmin"]);
 
+// Read-tracking for probation reminders — localStorage, per-browser (2026-08-25,
+// see conversation: explicit decision, DB table rejected in favor of this
+// simpler option, accepting that a cache clear or new device shows everything
+// as unread again). Deliberately separate from the Probation summary card's
+// own red dot (EmployeeOverviewView.tsx's probationReminderNames prop, a
+// server-rendered value from a completely different fetch) — nothing here
+// touches that, so the dot keeps reflecting every currently-pending candidate
+// regardless of what's been "read" in the bell.
+//
+// Keyed by candidateId + endDate, not just candidateId: if a probation gets
+// extended (a new end_date), the old marker no longer matches and the
+// reminder naturally becomes unread again — no manual cleanup needed. A
+// confirmed/resolved candidate just stops appearing in probationCandidates at
+// all (existing rule), leaving its marker an unused, harmless entry.
+const PROBATION_READ_STORAGE_KEY = "ebright-probation-reminder-read";
+
+function probationReadMarkerKey(candidateId: number, endDate: string): string {
+  return `${candidateId}:${endDate}`;
+}
+
+function loadProbationReadMarkers(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(PROBATION_READ_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? (parsed as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveProbationReadMarkers(markers: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PROBATION_READ_STORAGE_KEY, JSON.stringify([...markers]));
+  } catch {
+    // storage full/blocked — no-op; worst case the badge just keeps counting it
+  }
+}
+
 interface Counts {
   approvals: number;
   inductionRequests: number;
@@ -26,7 +66,20 @@ export default function NotificationBell({ role }: { role?: string }) {
   const [count, setCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
   const [probationCandidates, setProbationCandidates] = useState<{ id: number; fullName: string; endDate: string }[]>([]);
+  const [probationReadMarkers, setProbationReadMarkers] = useState<Set<string>>(() => loadProbationReadMarkers());
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Marks one candidate read in localStorage and in local state together —
+  // used both by "open the panel" (marks everything currently shown) and by
+  // clicking directly into a specific candidate's Review link.
+  const markProbationCandidateRead = (candidate: { id: number; endDate: string }) => {
+    setProbationReadMarkers((prev) => {
+      const next = new Set(prev);
+      next.add(probationReadMarkerKey(candidate.id, candidate.endDate));
+      saveProbationReadMarkers(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!shouldShow) return;
@@ -124,7 +177,34 @@ export default function NotificationBell({ role }: { role?: string }) {
     };
   }, [open]);
 
-  const totalCount = count + leaveCount + probationCandidates.length;
+  // Unread-only figure for the badge (see markProbationCandidateRead above) —
+  // separate from hasAnyContent below, which decides whether the panel shows
+  // its empty state. A read-but-still-pending candidate no longer counts
+  // toward the badge, but still renders in the panel when opened.
+  const unreadProbationCandidates = probationCandidates.filter(
+    (c) => !probationReadMarkers.has(probationReadMarkerKey(c.id, c.endDate)),
+  );
+  const totalCount = count + leaveCount + unreadProbationCandidates.length;
+  const hasAnyContent = count > 0 || leaveCount > 0 || probationCandidates.length > 0;
+
+  // Opening the panel marks every candidate CURRENTLY shown as read — per
+  // explicit decision (see conversation), same trigger as clicking directly
+  // into one candidate's own Review link below.
+  const handleToggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next && probationCandidates.length > 0) {
+        setProbationReadMarkers((prevMarkers) => {
+          const merged = new Set(prevMarkers);
+          for (const c of probationCandidates) merged.add(probationReadMarkerKey(c.id, c.endDate));
+          saveProbationReadMarkers(merged);
+          return merged;
+        });
+      }
+      return next;
+    });
+  };
+
   const leaveMessage =
     role === "hr"
       ? leaveCount === 1
@@ -138,7 +218,7 @@ export default function NotificationBell({ role }: { role?: string }) {
     <div className="relative" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleToggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={totalCount > 0 ? `Notifications: ${totalCount} pending` : "Notifications"}
@@ -194,7 +274,7 @@ export default function NotificationBell({ role }: { role?: string }) {
             </button>
           </div>
 
-          {totalCount === 0 ? (
+          {!hasAnyContent ? (
             <div className="px-5 py-10 text-center">
               <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                 <Bell className="w-5 h-5 text-slate-400" aria-hidden="true" />
@@ -256,27 +336,31 @@ export default function NotificationBell({ role }: { role?: string }) {
                 </div>
               )}
 
-              {probationCandidates.length > 0 && (
-                <div className="p-4">
+              {/* One row per candidate, per explicit decision (see
+                  conversation, 2026-08-25) — was one shared block with one
+                  shared "Review" button linking to the general Probation
+                  list; each candidate now gets their own row and their own
+                  Review link straight to their own profile, since "Review"
+                  for one specific person's reminder should never require
+                  finding them again in a list. */}
+              {probationCandidates.map((c) => (
+                <div key={c.id} className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900 flex items-center justify-center shrink-0 ring-1 ring-inset ring-red-200 dark:ring-red-700">
                       <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">Probation ending soon</p>
-                      {/* One line per candidate, per explicit decision (see
-                          conversation) — not a merged/pluralized sentence,
-                          so each name is individually legible when 2+ people
-                          are flagged at once. */}
-                      {probationCandidates.map((c) => (
-                        <p key={c.id} className="mt-0.5 text-sm text-slate-500 dark:text-slate-400 leading-snug">
-                          {formatProbationReminder(c.fullName, c.endDate)}
-                        </p>
-                      ))}
+                      <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400 leading-snug">
+                        {formatProbationReminder(c.fullName, c.endDate)}
+                      </p>
                       <div className="mt-3">
                         <Link
-                          href="/employee-folder/probation"
-                          onClick={() => setOpen(false)}
+                          href={`/employee-folder/probation/employee/${c.id}`}
+                          onClick={() => {
+                            markProbationCandidateRead(c);
+                            setOpen(false);
+                          }}
                           className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
                         >
                           Review
@@ -285,7 +369,7 @@ export default function NotificationBell({ role }: { role?: string }) {
                     </div>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
         </div>
