@@ -998,7 +998,7 @@ export default function StageProfileView({
               the mobile sub-tab row above replaces this there instead. */}
           <nav
             aria-label={`${STAGE_LABELS[stage]} sections`}
-            className="flex-none flex flex-col mt-4 sm:mt-6 w-[var(--rail-width)] lg:w-[var(--rail-width-lg)] [@media(hover:none)]:hidden"
+            className="flex-none flex flex-col min-w-0 mt-4 sm:mt-6 w-[var(--rail-width)] lg:w-[var(--rail-width-lg)] [@media(hover:none)]:hidden"
             style={{ gap: config.navRail.gapPx }}
           >
             {navSections}

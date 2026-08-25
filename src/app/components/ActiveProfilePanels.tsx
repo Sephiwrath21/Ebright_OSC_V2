@@ -687,7 +687,22 @@ function looksLikeDriveFileId(value: string): boolean {
 }
 
 export function RealAttachmentLink({ fileId }: { fileId: string | null }) {
-  if (!fileId || !looksLikeDriveFileId(fileId)) return <span className="text-slate-400">—</span>;
+  if (!fileId) return <span className="text-slate-400">—</span>;
+  // Legacy-migrated value that isn't a real Drive id (2026-08-25, see
+  // conversation) — shown as a visible, non-clickable label rather than a
+  // "View" link that would 404 through /api/attachment/[id], and rather
+  // than hiding the field entirely (an earlier version of this fix did
+  // that; superseded by this explicit decision).
+  if (!looksLikeDriveFileId(fileId)) {
+    return (
+      <span
+        className="inline-flex items-center text-sm text-slate-400 dark:text-slate-500 cursor-not-allowed select-none"
+        title="This attachment was migrated from legacy data without a working file reference."
+      >
+        Original file not available
+      </span>
+    );
+  }
   return (
     <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       View
@@ -1888,11 +1903,6 @@ export function RecordAddModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             {fields
               .filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true))
-              // A read-only file field whose value doesn't resolve to a real,
-              // reachable attachment (see looksLikeDriveFileId — legacy-synced
-              // leave attachments are a bare filename, not a Drive id) is
-              // hidden entirely rather than shown as a dead/broken link.
-              .filter((f) => !(readOnly && f.type === "file" && initialFileIds?.[f.key] && !looksLikeDriveFileId(initialFileIds[f.key]!)))
               .map((f) => (
                 <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
                 <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>

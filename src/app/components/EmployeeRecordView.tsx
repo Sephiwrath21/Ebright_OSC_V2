@@ -35,7 +35,7 @@ import {
 } from "@/app/components/ActiveProfilePanels";
 import { EditableSection } from "@/app/components/EditMode";
 import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog, type ValidationResult } from "@/app/components/PageEditMode";
-import { RAIL_PILL_PADDING_CLASS, RAIL_PILL_FONT_SIZE_CLASS } from "@/lib/stageProfileConfig";
+import { RAIL_PILL_PADDING_CLASS, RAIL_PILL_FONT_SIZE_CLASS, RAIL_GAP_PX } from "@/lib/stageProfileConfig";
 import {
   EMPLOYEE_RECORD_STATIC_PANELS,
   PayrollPanel,
@@ -81,8 +81,13 @@ import type {
 // Bank Info / Emergency Contact under "Personal Info"). Hidden entirely on
 // touch devices ([@media(hover:none)]:hidden below) — width is a literal
 // w-[210px] Tailwind class since it now only ever renders at its one fixed
-// desktop size.
-const RAIL_GAP_PX = 10;
+// desktop size. That literal must stay equal to RAIL_WIDTH_PX (imported
+// above) — every stage's own rail (StageProfileView.tsx) now reads
+// RAIL_WIDTH_PX/RAIL_GAP_PX directly from stageProfileConfig.ts so they can
+// never drift from this page's rail again (2026-08-25, see conversation);
+// this page's grid column can't reference the constant directly since
+// Tailwind arbitrary-value classes must be static strings, so keep both in
+// sync by hand if either ever changes.
 const RAIL_BASE = "bg-[#b0ffbfa8] dark:bg-slate-800 border-[#0a6e03] dark:border-emerald-700 text-[#4b4949d6] dark:text-slate-300";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
 
@@ -628,10 +633,16 @@ export default function EmployeeRecordView({
               exist in that position there at all, not just visually adapt.
               Width itself now comes from the grid column (see the row div
               above) rather than an explicit w-[210px] here, so the two stay
-              tied to the same single value instead of drifting apart. */}
+              tied to the same single value instead of drifting apart.
+              min-w-0 (2026-08-25, see conversation) — as a grid item, this
+              nav's default min-width:auto let a long wrapped label
+              ("Showcause / Warning Letter", "Performance Improvement Plan")
+              force the fixed-210px column wider than intended; min-w-0 caps
+              it back to the column's actual size so every pill wraps within
+              a consistent width instead of stretching the rail. */}
           <nav
             aria-label={`${category.label} sections`}
-            className="flex flex-col mt-4 sm:mt-6 [@media(hover:none)]:hidden"
+            className="flex flex-col min-w-0 mt-4 sm:mt-6 [@media(hover:none)]:hidden"
             style={{ gap: RAIL_GAP_PX }}
           >
             {category.sections.map((section) => {

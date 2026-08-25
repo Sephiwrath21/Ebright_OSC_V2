@@ -585,14 +585,31 @@ export async function computeRealAccountLifecycleOverrides<
   const probationMatchedIds = new Set(probationMatched.map((r) => r.id));
   const confirmedIds = await computeAutoConfirmedProbationIds(probationMatched, careerApplications, bsPositionGroups);
 
-  // board_stage-matched rows with NO probation row at all yet — see the
-  // function's own doc comment above.
+  // Split per explicit decision (see conversation, 2026-08-25): a
+  // board-stage-matched row (real career_applications entry, board_stage
+  // === "Probation" — see matchIsProbationPipeline above) has a genuinely
+  // trackable feedback2/status2 signal, so it should ONLY ever leave
+  // Probation via isEffectivelyConfirmed (local "Confirmed" or
+  // status2="Accept"+feedback2 set) — no date-based escape hatch. Without
+  // an explicit confirmation it stays in Probation+Onboarding indefinitely,
+  // even once its estimated end date passes. The no-match population (no
+  // board_stage footprint at all — addPreStageEmployee's manual "+ Add"
+  // shape) has nothing else to check against, so it keeps the original
+  // pastEndDateIds fallback exactly as before (see computeProbationEndDates'
+  // own comment on why this exists — Ng Ying Chen et al. would otherwise be
+  // stuck in Probation forever with no way out).
+  const hasBoardStageMatch = (r: T) => careerApplications.get(normalizeName(r.fullName))?.boardStage != null;
+  const noMatchStarted = probationMatched.filter((r) => !hasBoardStageMatch(r));
+
+  // No-match rows with NO probation row at all yet — see the function's
+  // own doc comment above. Board-stage-matched rows never reach the date
+  // fallback at all now, so they're excluded from this query entirely.
   const probationRows = await prisma.probation.findMany({
-    where: { user_id: { in: probationMatched.map((r) => r.id) } },
+    where: { user_id: { in: noMatchStarted.map((r) => r.id) } },
     select: { user_id: true },
   });
   const hasProbationRow = new Set(probationRows.map((p) => p.user_id));
-  const noProbationRowRows = probationMatched.filter((r) => !confirmedIds.has(r.id) && !hasProbationRow.has(r.id));
+  const noProbationRowRows = noMatchStarted.filter((r) => !confirmedIds.has(r.id) && !hasProbationRow.has(r.id));
   const probationEndDates = await computeProbationEndDates(noProbationRowRows);
   const pastEndDateIds = new Set(
     noProbationRowRows
@@ -612,7 +629,7 @@ export async function computeRealAccountLifecycleOverrides<
     // the start_date gate below, which only applies to the Part Time/
     // Intern day-count branch that genuinely needs a date to count from.
     if (probationMatchedIds.has(row.id)) {
-      const effectivelyDone = confirmedIds.has(row.id) || pastEndDateIds.has(row.id);
+      const effectivelyDone = confirmedIds.has(row.id) || (!hasBoardStageMatch(row) && pastEndDateIds.has(row.id));
       result.set(row.id, effectivelyDone ? { stage: "active" } : { stage: "probation", extraStages: ["onboarding"] });
       continue;
     }
@@ -1264,6 +1281,7 @@ async function computePreEligibleRows(
         departmentName,
         employmentType: null,
         date: startDate,
+        startDate,
         stage: "pre",
         isCandidate,
         resolvedPositionType,

@@ -237,6 +237,14 @@ export interface EmployeeOverviewRow {
   departmentName: string | null;
   employmentType: string | null;
   date: string | null;
+  /** Always the (BranchStaff-resolved effective) start_date, regardless of
+   *  stage — unlike `date` above, which is end_date for Exit rows (see
+   *  dateSourceFor's own comment). Added (2026-08-25, see conversation) so
+   *  the Employee Records table's Date column can show "when they started"
+   *  for every row, Exit included, without changing what `date` means for
+   *  every other existing consumer (dedicated Exit list's own "Last Date"
+   *  column, year/month filters elsewhere, etc.). */
+  startDate: string | null;
   stage: EmployeeStage;
   /** True only for onboarding_candidate rows (see listUpcomingOnboardingCandidates)
    *  — a future hire sourced from ebrightleads with no real portal account yet,
@@ -622,6 +630,7 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       departmentName: emp?.department?.department_name ?? null,
       employmentType: emp?.employment_type ?? null,
       date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
+      startDate: effectiveEmp?.start_date ? effectiveEmp.start_date.toISOString().slice(0, 10) : null,
       stage: effectiveStage,
       resolvedPositionType,
     });
@@ -750,6 +759,7 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     departmentName: emp?.department?.department_name ?? null,
     employmentType: emp?.employment_type ?? null,
     date: dateSource ? dateSource.toISOString().slice(0, 10) : null,
+    startDate: effectiveEmp?.start_date ? effectiveEmp.start_date.toISOString().slice(0, 10) : null,
     stage: effectiveStage,
     resolvedPositionType,
   };
@@ -852,6 +862,7 @@ export async function listUpcomingOnboardingCandidates(existingRows: EmployeeOve
         ...loc,
         employmentType: null,
         date: c.start_date.toISOString().slice(0, 10),
+        startDate: c.start_date.toISOString().slice(0, 10),
         stage: "pre",
         isCandidate: true,
       };
