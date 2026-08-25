@@ -359,7 +359,7 @@ export function TaskManagerView({
     shows(view, "taskManager", "branchOverview");
 
   return (
-    <CardModeProvider>
+    <CardModeProvider userId={me.me.userId}>
     <div className="flex flex-col gap-5">
       {showCardModeToggle && (
         <div className="flex justify-end">

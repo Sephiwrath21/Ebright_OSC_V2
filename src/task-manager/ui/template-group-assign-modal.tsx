@@ -22,7 +22,7 @@
 // Template keeps the full, unrestricted picker (label defaults to
 // "Template", so `assignableStaff`/`groupOptions` fall through unchanged).
 import * as React from "react";
-import { FLOW_DAYS, visibleCadenceOptions, type CadenceOption } from "./types";
+import { FLOW_DAYS, FLOW_MONTH_RANGES, visibleCadenceOptions, type CadenceOption } from "./types";
 import type { FlowStaffMember, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
 import { RecipientPicker } from "./recipient-picker";
 
@@ -59,6 +59,7 @@ export function TemplateGroupAssignModal({
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
   const [days, setDays] = React.useState<(typeof FLOW_DAYS)[number][]>([]);
+  const [monthRanges, setMonthRanges] = React.useState<(typeof FLOW_MONTH_RANGES)[number][]>([]);
   const [dueDate, setDueDate] = React.useState("");
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -83,6 +84,17 @@ export function TemplateGroupAssignModal({
     setDays((prev) => (prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]));
   };
 
+  // "Range" (week-of-month) — Monthly's own equivalent of "Day" above
+  // (2026-08-25, user request).
+  const showMonthRange = cadence === "monthly";
+  React.useEffect(() => {
+    if (!showMonthRange) setMonthRanges([]);
+  }, [showMonthRange]);
+
+  const toggleMonthRange = (value: (typeof FLOW_MONTH_RANGES)[number]) => {
+    setMonthRanges((prev) => (prev.includes(value) ? prev.filter((r) => r !== value) : [...prev, value]));
+  };
+
   const submit = () => {
     if (pending) return;
     if (userIds.length === 0) {
@@ -97,6 +109,7 @@ export function TemplateGroupAssignModal({
       const result = await control.apply(group.id, {
         userIds,
         days,
+        monthRanges,
         dueDate: dueDate || undefined,
         cadence,
       });
@@ -179,6 +192,24 @@ export function TemplateGroupAssignModal({
                     className={dayChipClass(days.includes(d))}
                   >
                     {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {showMonthRange && (
+            <div className="max-w-md">
+              <p className="text-sm text-gray-600 dark:text-slate-300">Range</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {FLOW_MONTH_RANGES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => toggleMonthRange(r)}
+                    aria-pressed={monthRanges.includes(r)}
+                    className={dayChipClass(monthRanges.includes(r))}
+                  >
+                    {r}
                   </button>
                 ))}
               </div>

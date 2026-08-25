@@ -14,6 +14,7 @@
 import * as React from "react";
 import {
   FLOW_DAYS,
+  FLOW_MONTH_RANGES,
   visibleCadenceOptions,
   type AssignActionResult,
   type CadenceOption,
@@ -103,6 +104,7 @@ export function AssignTaskForm({
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [cadence, setCadence] = React.useState<CadenceOption | null>(hideCadence ? "daily" : null);
   const [days, setDays] = React.useState<NonNullable<FlowAssignInput["days"]>>([]);
+  const [monthRanges, setMonthRanges] = React.useState<NonNullable<FlowAssignInput["monthRanges"]>>([]);
   const [dueDate, setDueDate] = React.useState("");
   // Guideline (optional, 2026-07-30): SOP link and/or reference image —
   // both may stay empty; submission never depends on them.
@@ -228,6 +230,18 @@ export function AssignTaskForm({
     setDays((prev) => (prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]));
   };
 
+  // "Range" (week-of-month) — Monthly's own equivalent of "Day" above
+  // (2026-08-25, user request), same reasoning: only makes sense alongside
+  // Monthly cadence.
+  const showMonthRange = cadence === "monthly";
+  React.useEffect(() => {
+    if (!showMonthRange) setMonthRanges([]);
+  }, [showMonthRange]);
+
+  const toggleMonthRange = (value: (typeof FLOW_MONTH_RANGES)[number]) => {
+    setMonthRanges((prev) => (prev.includes(value) ? prev.filter((r) => r !== value) : [...prev, value]));
+  };
+
   const submit = () => {
     if (!title.trim()) {
       setMessage({ ok: false, text: "Give the task a title first." });
@@ -252,6 +266,7 @@ export function AssignTaskForm({
         userIds,
         cadence,
         days,
+        monthRanges,
         dueDate: dueDate || undefined,
         guidelineUrl: trimmedGuidelineUrl || undefined,
         guidelineImage: guidelineImage
@@ -270,6 +285,7 @@ export function AssignTaskForm({
         setUserIds([]);
         setCadence(hideCadence ? "daily" : null);
         setDays([]);
+        setMonthRanges([]);
         setDueDate("");
         setGuidelineUrl("");
         clearGuidelineImage();
@@ -423,6 +439,47 @@ export function AssignTaskForm({
                   {days.map((d) => (
                     <button key={d} type="button" onClick={() => toggleDay(d)} className={dayChipClass(true)}>
                       {d} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {showMonthRange && (
+          <div className="max-w-md">
+            <p className="text-sm text-gray-600 dark:text-slate-300">Range</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {FLOW_MONTH_RANGES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => toggleMonthRange(r)}
+                  aria-pressed={monthRanges.includes(r)}
+                  className={dayChipClass(monthRanges.includes(r))}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            {monthRanges.length > 0 && (
+              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                    Selected ({monthRanges.length})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setMonthRanges([])}
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {monthRanges.map((r) => (
+                    <button key={r} type="button" onClick={() => toggleMonthRange(r)} className={dayChipClass(true)}>
+                      {r} ×
                     </button>
                   ))}
                 </div>

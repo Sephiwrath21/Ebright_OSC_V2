@@ -264,12 +264,16 @@ export function MonthRangeDropdown({
 }) {
   const router = useRouter();
   const [y, m] = value.split("-").map(Number);
+  // mrange is ALWAYS written explicitly, including "" for Full month
+  // (2026-08-25 fix) — omitting the key entirely made "Full month" and
+  // "?mrange= was never set" the same URL, so the page's own "default to
+  // today's day-range chunk when unset" fallback (defaultMonthRange) kept
+  // silently overriding an explicit Full month pick on the current month.
+  // An explicit `mrange=` (present, empty) is how the caller now tells
+  // "explicitly Full month" apart from "unset" — same convention
+  // entity-card-overview.tsx's selectMyMonthRange already used correctly.
   const navigate = (v: string) => {
-    const qs = new URLSearchParams({
-      ...extraParams,
-      mdate: value,
-      ...(v ? { mrange: v } : {}),
-    });
+    const qs = new URLSearchParams({ ...extraParams, mdate: value, mrange: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
 
@@ -290,6 +294,7 @@ export function EntityPicker({
   param,
   basePath,
   extraParams = {},
+  boldValues,
 }: {
   label: string;
   value: string;
@@ -299,12 +304,20 @@ export function EntityPicker({
   basePath: string;
   /** Params to carry along unchanged (e.g. { view: "branch" }). */
   extraParams?: Record<string, string>;
+  /** Options to render bold (2026-08-25, user request) — the "All X"
+   *  aggregate sentinels (All Departments/All Regions/All Region A…),
+   *  which otherwise sit visually identical to the real entity names
+   *  they're mixed in among. Plain <option> font-weight — supported
+   *  cross-browser (unlike most other <option> styling). */
+  boldValues?: readonly string[];
 }) {
   const router = useRouter();
   const navigate = (v: string) => {
     const qs = new URLSearchParams({ ...extraParams, [param]: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
+  const optionStyle = (o: string): React.CSSProperties | undefined =>
+    boldValues?.includes(o) ? { fontWeight: 700 } : undefined;
 
   return (
     <label className="flex w-fit items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -318,7 +331,7 @@ export function EntityPicker({
           g.label ? (
             <optgroup key={g.label} label={g.label}>
               {g.options.map((o) => (
-                <option key={o} value={o}>
+                <option key={o} value={o} style={optionStyle(o)}>
                   {o}
                 </option>
               ))}
@@ -326,7 +339,7 @@ export function EntityPicker({
           ) : (
             <React.Fragment key={i}>
               {g.options.map((o) => (
-                <option key={o} value={o}>
+                <option key={o} value={o} style={optionStyle(o)}>
                   {o}
                 </option>
               ))}

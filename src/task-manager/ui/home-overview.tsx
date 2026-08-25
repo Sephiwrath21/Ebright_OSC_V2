@@ -276,9 +276,15 @@ export function HomeTaskOverview({
   actions?: EntityActions;
 }) {
   const raw = dateFilterParams ?? {};
+  // v !== undefined (not the old truthy `v &&`, 2026-08-25 fix) — an
+  // explicit Full month's mrange="" must still be carried along, or
+  // toggling the department picker/expand state while Full month is
+  // selected would silently drop back to "unset" and re-default (see
+  // scoped-overview-section.tsx's monthlyRangeParam derivation, the source
+  // of this same raw.mrange value, for the full explanation).
   const carry = (...except: string[]) =>
     Object.fromEntries(
-      Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
+      Object.entries(raw).filter(([k, v]) => v !== undefined && !except.includes(k)),
     ) as Record<string, string>;
   // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
   // date doesn't collapse whatever's already expanded) — but the expand-

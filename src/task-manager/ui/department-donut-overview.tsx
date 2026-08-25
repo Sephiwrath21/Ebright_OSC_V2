@@ -1,17 +1,23 @@
 "use client";
 
-// "All Departments" overview section (2026-08-22) — used ONLY when the
-// admin/OPS/elevated-dept-site Department dropdown's "All Departments"
-// sentinel is selected (page.tsx's ALL_DEPARTMENTS_VALUE branch). Renders
-// ONE department per card (aggregated across everyone in it), NOT a
-// per-person breakdown — picking a single real department still gets the
-// existing full TaskOverviewStack (Sort:Person/Type, per-person List/
-// Donut, View All/Only Me, HOD/CEO Assigned Task), unchanged.
+// "All Departments" / "All Regions" overview section (2026-08-22, extended
+// 2026-08-25) — used when the admin/OPS/elevated-dept-site Department
+// dropdown's "All Departments" sentinel, or the Branch dropdown's "All
+// Regions" sentinel, is selected (page.tsx's ALL_DEPARTMENTS_VALUE /
+// ALL_REGIONS_VALUE branches). Renders ONE department/region per card
+// (aggregated across everyone in it), NOT a per-person breakdown — picking
+// a single real department/branch still gets the existing full
+// TaskOverviewStack (Sort:Person/Type, per-person List/Donut, View
+// All/Only Me, HOD/CEO Assigned Task), unchanged.
 //
-// Fed entirely by FlowDetailResponse.org.departments (daily.org.departments
-// / monthly.org.departments, queries.ts) — already computed as part of the
-// SAME getFlowDetail() calls page.tsx makes for every other section on this
-// page, so this section needs no fetch of its own.
+// Departments are fed directly from FlowDetailResponse.org.departments
+// (daily.org.departments/monthly.org.departments, queries.ts) — already
+// computed as part of the SAME getFlowDetail() calls page.tsx makes for
+// every other section on this page. Regions have no equivalent
+// pre-aggregated org field; page.tsx sums org.branches per region (via
+// FLOW_BRANCH_REGIONS, ui/types.ts — the SAME mapping the Branch
+// dropdown's own optgroups already use) before handing the result to this
+// same component. Either way, no fetch happens IN this file.
 import * as React from "react";
 import type { FlowDrillTask, FlowEntityRollup } from "./types";
 import { flowBucketTotal, flowCompletionPct } from "./types";
@@ -35,11 +41,10 @@ const EMPTY_DRILL_TASKS: Record<BucketKey, FlowDrillTask[]> = { completed: [], p
  *  per-person PersonDonutCard (entity-card-overview.tsx: colored stat chips
  *  + colored bucket rows), just fed by a department's aggregated totals
  *  instead of one person's tasks, and rows open EntityDrillModal on click
- *  rather than expanding inline (2026-08-22, matching PersonDonutCard's
- *  colors exactly — user feedback) — a department aggregates many people,
- *  so the richer modal (avatars, per-row actions) suits it better than a
- *  bare inline task-title list; the row's chevron stays static (not an
- *  expand/collapse toggle) as a "view details" affordance instead. */
+ *  rather than expanding inline (2026-08-25, reconfirmed after a same-day
+ *  round trip through inline expansion and back — user request: a
+ *  department aggregates many people, so the richer modal (avatars,
+ *  per-row actions, due dates) suits it better than a bare inline list). */
 function DepartmentDonutCard({ entity }: { entity: FlowEntityRollup }) {
   const [drill, setDrill] = React.useState<BucketKey | null>(null);
   const total = flowBucketTotal(entity);
@@ -62,12 +67,19 @@ function DepartmentDonutCard({ entity }: { entity: FlowEntityRollup }) {
         {BUCKET_META.map((b) => (
           <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
             <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{entity[b.key]}</div>
-            <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">{b.label}</div>
+            {/* N/A's fill stays pale in both modes (BUCKET_TINT's own doc
+                comment) — its label needs dark, NEUTRAL (not yellow — same
+                brown-reading problem as a dark yellow fill, see
+                BUCKET_TEXT.na's doc comment) text in both modes too,
+                instead of the other buckets' light-in-dark-mode slate. */}
+            <div className={`text-[10px] font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}>
+              {b.label}
+            </div>
           </div>
         ))}
         <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
           <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
-          <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">Total</div>
+          <div className="text-[10px] font-medium text-gray-900 dark:text-white">Total</div>
         </div>
       </div>
 
@@ -82,12 +94,14 @@ function DepartmentDonutCard({ entity }: { entity: FlowEntityRollup }) {
               drillable ? "" : "cursor-default opacity-60"
             }`}
           >
-            <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
+            <span
+              className={`flex items-center gap-2 text-sm font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}
+            >
               <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
               {b.label}
             </span>
             <span
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${BUCKET_SOLID[b.key]}`}
+              className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
             >
               {entity[b.key]}
             </span>
@@ -161,12 +175,25 @@ function DepartmentTaskListCard({ entity }: { entity: FlowEntityRollup }) {
  *  Departments" view rendered. No Sort:Person/Type (nothing to sort — one
  *  card per department, not per person) and no View All/Only Me (no
  *  personal scope at department-aggregate granularity) — just the List/
- *  Donut toggle, mirroring EntityCardOverview's own toggle styling. */
+ *  Donut toggle, mirroring EntityCardOverview's own toggle styling.
+ *
+ *  Generalized (2026-08-25) to also power "All Regions" (Branch mode's own
+ *  sentinel dropdown value) via `groupLabel` — the component's own logic
+ *  (StatusDonut wiring, colored stat chips/rows, List-mode table, 3-column
+ *  grid, shared List/Donut toggle) is entirely generic over
+ *  `FlowEntityRollup[]`; only the heading text and the caller's own
+ *  aggregation step (department rollups arrive pre-aggregated via
+ *  org.departments, region rollups are summed from org.branches by
+ *  page.tsx) differ. Kept as ONE component rather than a duplicated
+ *  ~250-line region-donut-overview.tsx twin. */
 export function AllDepartmentsSection({
+  groupLabel = "All Departments",
   sectionLabel,
   departments,
   dateControl,
 }: {
+  /** "All Departments" (default, unchanged callers) or "All Regions". */
+  groupLabel?: string;
   sectionLabel: string;
   departments: FlowEntityRollup[];
   /** DailyDatePicker (Daily) / MonthDropdown+MonthRangeDropdown (Monthly)
@@ -193,7 +220,7 @@ export function AllDepartmentsSection({
     <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
-          All Departments — {sectionLabel}
+          {groupLabel} — {sectionLabel}
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           {dateControl}
@@ -227,7 +254,7 @@ export function AllDepartmentsSection({
                   : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
               }`}
             >
-              Donut
+              Pie
             </button>
           </div>
           )}

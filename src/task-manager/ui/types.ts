@@ -327,6 +327,16 @@ export const FLOW_BRANCH_REGIONS = [
 
 export const FLOW_STAFF_ROLES = ["Manager", "Branch Exec", "Coach"] as const;
 export const FLOW_DAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+/** Monthly's own equivalent of FLOW_DAYS (2026-08-25, user request) — the
+ *  SAME 4 day-range chunks the Monthly viewing surfaces already show
+ *  (monthDayChunks/MonthRangeDropdown), reused here for the "+ Task"/
+ *  Template assign forms' Monthly-cadence "Range" picker. "22-31" is a
+ *  fixed label — the server resolves the real end-of-month day
+ *  (nextMonthlyOccurrence, tasks-internal.ts) when computing the actual
+ *  due date, same as monthDayChunks' own daysInMonth clamp. No "Full
+ *  month" option here (unlike the viewing dropdown) — assignment needs a
+ *  real due date, and "Full month" has no single day to resolve to. */
+export const FLOW_MONTH_RANGES = ["1-7", "8-14", "15-21", "22-31"] as const;
 export const FLOW_DEPARTMENTS = [
   // Renamed from "Operation" 2026-07-25 (user spelling correction). The
   // SOURCE systems (portal hrfs department table, HRFS markers) still say
@@ -354,6 +364,14 @@ export interface FlowAssignInput {
    *  see assign/route.ts. They're independent, separately-completable
    *  instances that happen to share a title, not one recurring task. */
   days?: (typeof FLOW_DAYS)[number][];
+  /** Monthly's own equivalent of `days` above (2026-08-25) — multi-select,
+   *  each selected range becomes its OWN separate RunBlock per recipient,
+   *  due on that range's last day (nextMonthlyOccurrence, tasks-internal.ts)
+   *  — same independent-instances reasoning as `days`, just week-of-month
+   *  instead of day-of-week. Only meaningful alongside Monthly cadence
+   *  (mirrors `days` being Daily-only); ignored if `dueDate` is also set
+   *  (dueDate always wins, same precedence `days` already has). */
+  monthRanges?: (typeof FLOW_MONTH_RANGES)[number][];
   /** RETIRED (2026-07-25 final decision): every Daily task auto-recurs
    *  weekly, system-wide — nothing sends this anymore; the server accepts
    *  and ignores it for API stability. */
@@ -587,6 +605,9 @@ export type TemplateGroupDeleteResult =
 export interface FlowTemplateGroupApplyInput {
   userIds: string[];
   days?: (typeof FLOW_DAYS)[number][];
+  /** Monthly's own equivalent of `days` above (2026-08-25) — see
+   *  FlowAssignInput.monthRanges' own doc comment for the full explanation. */
+  monthRanges?: (typeof FLOW_MONTH_RANGES)[number][];
   dueDate?: string;
   cadence: CadenceOption;
 }

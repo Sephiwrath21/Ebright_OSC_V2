@@ -17,6 +17,8 @@ import {
   skipFlowTask,
   uploadFlowTaskProof,
   removeFlowTaskProof,
+  reassignFlowTask,
+  getFlowStaff,
   FlowBridgeError,
 } from "@/task-manager/data";
 import type { ActionResult, ProofUploadResult, ProofRemoveResult } from "@/task-manager/ui/types";
@@ -79,6 +81,12 @@ export default async function HomePage({
   const dailyDate = sp.date && DATE_PARAM_RE.test(sp.date) ? sp.date : undefined;
   const monthlyDate = sp.mdate && DATE_PARAM_RE.test(sp.mdate) ? sp.mdate : undefined;
   const monthlyRange = parseMonthRange(sp.mrange);
+  // Distinguishes "?mrange= was explicitly set to Full month" (empty but
+  // present) from "never touched" (2026-08-25 fix) — parseMonthRange alone
+  // collapses both to undefined, which made an explicit Full month pick
+  // indistinguishable from unset further down (see scoped-overview-
+  // section.tsx's own monthlyRangeParam derivation for where this matters).
+  const monthlyRangeExplicit = sp.mrange !== undefined;
   const adhocDate = sp.adate && DATE_PARAM_RE.test(sp.adate) ? sp.adate : undefined;
   const hodDate = sp.hdate && DATE_PARAM_RE.test(sp.hdate) ? sp.hdate : undefined;
   const ceoDate = sp.cdate && DATE_PARAM_RE.test(sp.cdate) ? sp.cdate : undefined;
@@ -183,6 +191,28 @@ export default async function HomePage({
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
   }
+  // "Assign to Others" (2026-08-25, feature parity request) — Home's own
+  // personal task cards never had this wired at all (no reassign prop
+  // existed on HomeScopedOverviewSection, so its TaskOverviewStack calls
+  // always rendered without the column). Same action + staff list
+  // /task-manager's own admin page uses (reassignTask -> reassignFlowTask,
+  // the shared data-layer function — one implementation, not duplicated;
+  // its own scope/permission check re-runs regardless of which page calls
+  // it), just revalidating "/home" instead of "/task-manager".
+  async function reassignTask(runBlockId: string, newAssigneeId: string): Promise<ActionResult> {
+    "use server";
+    const stale = await requireLiveSession(userEmail);
+    if (stale) return stale;
+    try {
+      await reassignFlowTask(userEmail, runBlockId, newAssigneeId);
+      revalidatePath("/home");
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+  const { staff } = await getFlowStaff();
+  const cardReassign = { staff, action: reassignTask };
 
   // One overview for every account type — the section itself resolves the
   // Task Manager role and scopes/routes accordingly (and renders nothing on
@@ -194,11 +224,13 @@ export default async function HomePage({
         dailyDate={dailyDate}
         monthlyDate={monthlyDate}
         monthlyRange={monthlyRange}
+        monthlyRangeExplicit={monthlyRangeExplicit}
         adhocDate={adhocDate}
         hodDate={hodDate}
         ceoDate={ceoDate}
         expand={expand}
         padate={padate}
+        reassign={cardReassign}
         actions={{
           complete: completeTask,
           skip: skipTask,

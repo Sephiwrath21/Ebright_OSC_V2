@@ -65,7 +65,7 @@ import {
 } from "./templates-internal";
 import { assignFlowTaskCore, GUIDELINE_IMAGE_MIMES } from "./tasks-internal";
 import { formatLocalDate } from "../analytics/_lib";
-import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
+import { FLOW_DAYS, FLOW_MONTH_RANGES, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
 
@@ -665,6 +665,7 @@ export function deleteTemplateGroup(
 const applyGroupSchema = z.object({
   userIds: z.array(z.string().min(1)).min(1),
   days: z.array(z.enum(FLOW_DAYS)).optional(),
+  monthRanges: z.array(z.enum(FLOW_MONTH_RANGES)).optional(),
   dueDate: z.string().optional(),
   cadence: z.enum(["daily", "monthly", "adhoc"]),
 });
@@ -741,6 +742,7 @@ export function applyTemplateGroup(
         subtasks: subtasks.length > 0 ? subtasks : undefined,
         userIds: body.userIds,
         days: body.days,
+        monthRanges: body.monthRanges,
         dueDate: body.dueDate,
         cadence: body.cadence,
         fromTemplateId: t.id,

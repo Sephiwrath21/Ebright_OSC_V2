@@ -36,6 +36,7 @@ import {
   getFlowStaff,
   getHodKanban,
   getOrgMonthlyDepartments,
+  getOrgMonthlyRegions,
   getMyManpowerSchedule,
   getNoClaimIncentiveList,
   moveKanbanCard,
@@ -102,6 +103,7 @@ import {
   type ActionResult,
   type AssignActionResult,
   type FlowAssignInput,
+  type FlowEntityRollup,
   type FlowKanbanColumnColor,
   toSelfEntityDetail,
 } from "@/task-manager/ui/types";
@@ -124,6 +126,69 @@ const DEFAULT_BRANCH = "Subang Taipan";
  *  branch. Kept distinct from any real department name so it can never
  *  collide with one. */
 const ALL_DEPARTMENTS_VALUE = "All Departments";
+
+/** "All Regions" (2026-08-25) — the Branch dropdown's own equivalent
+ *  sentinel, same convention as ALL_DEPARTMENTS_VALUE above (not a real
+ *  branch name, kept distinct so it can never collide with one). Selecting
+ *  it shows one aggregated donut/list card per region — see
+ *  buildEntityOverview's "view === branch" branch and sumRegionRollup
+ *  below. */
+const ALL_REGIONS_VALUE = "All Regions";
+
+/** Sums one org.regions entry's branches into a single region-level
+ *  FlowEntityRollup (2026-08-25 fix — this used to filter the FLAT
+ *  org.branches by name instead; confirmed live that org.branches is
+ *  task-derived only with no roster-first zero-fill, unlike
+ *  org.departments' withAllDepartments wrapper — a branch with zero tasks
+ *  that day was silently ABSENT rather than zero-filled, so on a day with
+ *  zero branch-assigned tasks anywhere, org.branches was entirely empty
+ *  and every region/branch card here showed 0/0/0/0 regardless of real
+ *  data. org.regions (queries.ts's getOrgMonthlyRegions doc comment has
+ *  the full story) is ALREADY correctly roster-first — every real branch
+ *  always present, zero-filled — so this now just sums it, no filtering
+ *  needed). region.branches carries bucket totals only (EntityCounts, not
+ *  EntityCountsDetailed) — no `tasks` drill-down list, so click-to-drill
+ *  is unavailable on cards built from this; an accepted trade-off for
+ *  correct zero-filled data over a currently-broken drill feature. */
+function sumRegionRollup(region: { name: string; branches: FlowEntityRollup[] }): FlowEntityRollup {
+  const totals = region.branches.reduce(
+    (acc, b) => ({
+      completed: acc.completed + b.completed,
+      pending: acc.pending + b.pending,
+      na: acc.na + b.na,
+    }),
+    { completed: 0, pending: 0, na: 0 },
+  );
+  return { name: region.name, ...totals };
+}
+
+/** "All Region A" / "All Region B" / "All Region C" (2026-08-25, user
+ *  request) — a THIRD granularity, distinct from both a single branch and
+ *  "All Regions": every branch WITHIN one region gets its own card (same
+ *  as "All Departments" shows one card per department), NOT summed into
+ *  one region total (that's what ALL_REGIONS_VALUE/sumRegionRollup above
+ *  are for) — this reads a region's own `branches` array directly (already
+ *  the correct, roster-first per-branch list from org.regions), no
+ *  summing at all. Generated from FLOW_BRANCH_REGIONS rather than three
+ *  hardcoded constants, so a future Region D needs no new sentinel here. */
+function allRegionValue(regionName: string): string {
+  return `All ${regionName}`;
+}
+
+/** Reverse lookup: the FLOW_BRANCH_REGIONS entry an "All Region X" sentinel
+ *  refers to, or undefined for anything else (a real branch name,
+ *  ALL_REGIONS_VALUE, or garbage). */
+function regionForAllRegionValue(value: string | undefined): (typeof FLOW_BRANCH_REGIONS)[number] | undefined {
+  if (!value) return undefined;
+  return FLOW_BRANCH_REGIONS.find((r) => allRegionValue(r.name) === value);
+}
+
+/** Every Branch dropdown's aggregate sentinels (2026-08-25, user request —
+ *  bold them so they read as a distinct "view", not just another branch
+ *  name buried alphabetically in their own region's optgroup). Shared by
+ *  all three Branch EntityPicker call sites (All Regions/All Region X/
+ *  single-branch) so the bold set can never drift between them. */
+const ALL_BRANCH_BOLD_VALUES = [ALL_REGIONS_VALUE, ...FLOW_BRANCH_REGIONS.map((r) => allRegionValue(r.name))];
 
 /** Superadmin's top-level mode switch — Department or Branch, never both.
  *  Carries the selected Daily date across so switching modes keeps it. */
@@ -197,7 +262,20 @@ export default async function TaskManagerPage({
   // Monthly 7-day chunk within the anchor month (2026-07-29 Monthly
   // selector redesign) — undefined = Full month.
   const monthlyRange = parseMonthRange(sp.mrange);
-  const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
+  // Three states, not two (2026-08-25 fix): undefined (?mrange= truly
+  // absent — every "default to today's day-range chunk when unset" below
+  // should kick in), "" (explicitly Full month — an EMPTY but PRESENT
+  // ?mrange=, written by MonthRangeDropdown/selectMyMonthRange; must NOT
+  // be defaulted away), or "d-d" (a real chunk). Collapsing "" and
+  // undefined together (the old `monthlyRange ? ... : undefined`) made an
+  // explicit Full month pick indistinguishable from "never chosen", so
+  // every `monthlyRangeParam ?? defaultMonthRange(...)` fallback below
+  // silently overrode it back to today's chunk on the current month.
+  const monthlyRangeParam = monthlyRange
+    ? `${monthlyRange.from}-${monthlyRange.to}`
+    : sp.mrange !== undefined
+      ? ""
+      : undefined;
   // Every control carries the OTHER filters' raw params along unchanged,
   // so changing one date never resets the others. (Ad hoc is deliberately
   // NOT date-filtered — 2026-07-29 simplification: one-off tasks, plain
@@ -210,9 +288,13 @@ export default async function TaskManagerPage({
     mdate: monthlyDate,
     mrange: monthlyRangeParam,
   };
+  // v !== undefined (not the old truthy `v &&`, 2026-08-25 fix) — an
+  // explicit Full month's mrange="" must still be carried along, or
+  // switching the anchor month (MonthDropdown) while Full month is
+  // selected would silently drop back to "unset" and re-default.
   const carryTM = (...except: string[]) =>
     Object.fromEntries(
-      Object.entries(rawParams).filter(([k, v]) => v && !except.includes(k)),
+      Object.entries(rawParams).filter(([k, v]) => v !== undefined && !except.includes(k)),
     ) as Record<string, string>;
   const monthlyCarry = carryTM("date");
   const dailyCarry = carryTM("mdate", "mrange");
@@ -967,7 +1049,7 @@ export default async function TaskManagerPage({
           // past/future anchor month with no "today chunk" at all) reuses
           // the shared fetch unchanged — no extra request.
           const allDeptsMonthDepartments =
-            !monthlyRange && allDeptsDefaultRange
+            monthlyRangeParam === undefined && allDeptsDefaultRange
               ? await getOrgMonthlyDepartments(email, monthlyDate, parseMonthRange(allDeptsDefaultRange)!)
               : monthly.org?.departments ?? [];
           overview = (
@@ -980,6 +1062,7 @@ export default async function TaskManagerPage({
                   param="department"
                   basePath="/task-manager"
                   extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
+                  boldValues={[ALL_DEPARTMENTS_VALUE]}
                 />
                 <CardModeToggle />
               </div>
@@ -1049,6 +1132,7 @@ export default async function TaskManagerPage({
                 param="department"
                 basePath="/task-manager"
                 extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
+                boldValues={[ALL_DEPARTMENTS_VALUE]}
               />
               <CardModeToggle />
             </div>
@@ -1056,6 +1140,163 @@ export default async function TaskManagerPage({
           </>
         );
       } else {
+        // "All Regions" (2026-08-25, user request) — mirrors the "All
+        // Departments" branch above: one donut/list card per region
+        // instead of the usual single-branch TaskOverviewStack.
+        // org.regions is already fetched by the SAME top-level
+        // getFlowDetail() calls as everything else on this page (already
+        // roster-first — see sumRegionRollup's own doc comment for why
+        // this reads org.regions and NOT org.branches) — no new fetch for
+        // Daily. Monthly reuses the SAME "default to today's chunk" fix
+        // All Departments has — getOrgMonthlyRegions only runs in the one
+        // case the shared top-level `monthly` fetch doesn't already cover
+        // (see that branch's own comment above for the full reasoning).
+        if (sp.branch === ALL_REGIONS_VALUE) {
+          const [allRegionsMonthlyY, allRegionsMonthlyM] = monthly.date.split("-").map(Number);
+          const allRegionsDefaultRange = defaultMonthRange(allRegionsMonthlyY, allRegionsMonthlyM, new Date());
+          const allRegionsMonthlyRange = monthlyRangeParam ?? allRegionsDefaultRange;
+          const allRegionsMonthlyRegions =
+            monthlyRangeParam === undefined && allRegionsDefaultRange
+              ? await getOrgMonthlyRegions(email, monthlyDate, parseMonthRange(allRegionsDefaultRange)!)
+              : monthly.org?.regions ?? [];
+          overview = (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <EntityPicker
+                  label="Branch"
+                  value={ALL_REGIONS_VALUE}
+                  groups={[
+                    { options: [ALL_REGIONS_VALUE] },
+                    ...FLOW_BRANCH_REGIONS.map((r) => ({
+                      label: r.name,
+                      options: [allRegionValue(r.name), ...r.branches],
+                    })),
+                  ]}
+                  param="branch"
+                  basePath="/task-manager"
+                  extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
+                  boldValues={ALL_BRANCH_BOLD_VALUES}
+                />
+                <CardModeToggle />
+              </div>
+              <AllDepartmentsSection
+                groupLabel="All Regions"
+                sectionLabel="Daily"
+                departments={(daily.org?.regions ?? []).map(sumRegionRollup)}
+                dateControl={
+                  <DailyDatePicker
+                    key="all-regions-daily-picker"
+                    value={daily.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "branch", branch: ALL_REGIONS_VALUE }}
+                  />
+                }
+              />
+              <AllDepartmentsSection
+                groupLabel="All Regions"
+                sectionLabel="Monthly"
+                departments={allRegionsMonthlyRegions.map(sumRegionRollup)}
+                dateControl={
+                  <div key="all-regions-monthly-controls" className="flex items-center gap-1.5">
+                    <MonthDropdown
+                      key="all-regions-monthly-picker"
+                      value={monthly.date}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch: ALL_REGIONS_VALUE }}
+                    />
+                    <MonthRangeDropdown
+                      value={monthly.date}
+                      range={allRegionsMonthlyRange}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch: ALL_REGIONS_VALUE }}
+                    />
+                  </div>
+                }
+              />
+            </>
+          );
+          return overview;
+        }
+
+        // "All Region A" / "All Region B" / "All Region C" (2026-08-25) —
+        // every branch WITHIN the selected region as its own card (see
+        // allRegionValue's own doc comment for how this differs from "All
+        // Regions" above). Same zero-new-fetch-for-Daily /
+        // getOrgMonthlyRegions-only-when-defaulting pattern as "All
+        // Regions" — just a filter down to this one region's branch names
+        // instead of sumRegionRollup's sum — this region's own `branches`
+        // array (from org.regions, already the correct roster-first
+        // per-branch list) is used AS-IS, no filtering needed.
+        const selectedAllRegion = regionForAllRegionValue(sp.branch);
+        if (selectedAllRegion) {
+          const branchesOf = (regions: { name: string; branches: FlowEntityRollup[] }[]) =>
+            regions.find((r) => r.name === selectedAllRegion.name)?.branches ?? [];
+          const [oneRegionMonthlyY, oneRegionMonthlyM] = monthly.date.split("-").map(Number);
+          const oneRegionDefaultRange = defaultMonthRange(oneRegionMonthlyY, oneRegionMonthlyM, new Date());
+          const oneRegionMonthlyRange = monthlyRangeParam ?? oneRegionDefaultRange;
+          const oneRegionMonthlyRegions =
+            monthlyRangeParam === undefined && oneRegionDefaultRange
+              ? await getOrgMonthlyRegions(email, monthlyDate, parseMonthRange(oneRegionDefaultRange)!)
+              : monthly.org?.regions ?? [];
+          overview = (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <EntityPicker
+                  label="Branch"
+                  value={allRegionValue(selectedAllRegion.name)}
+                  groups={[
+                    { options: [ALL_REGIONS_VALUE] },
+                    ...FLOW_BRANCH_REGIONS.map((r) => ({
+                      label: r.name,
+                      options: [allRegionValue(r.name), ...r.branches],
+                    })),
+                  ]}
+                  param="branch"
+                  basePath="/task-manager"
+                  extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
+                  boldValues={ALL_BRANCH_BOLD_VALUES}
+                />
+                <CardModeToggle />
+              </div>
+              <AllDepartmentsSection
+                groupLabel={selectedAllRegion.name}
+                sectionLabel="Daily"
+                departments={branchesOf(daily.org?.regions ?? [])}
+                dateControl={
+                  <DailyDatePicker
+                    key="all-region-daily-picker"
+                    value={daily.date}
+                    basePath="/task-manager"
+                    extraParams={{ view: "branch", branch: allRegionValue(selectedAllRegion.name) }}
+                  />
+                }
+              />
+              <AllDepartmentsSection
+                groupLabel={selectedAllRegion.name}
+                sectionLabel="Monthly"
+                departments={branchesOf(oneRegionMonthlyRegions)}
+                dateControl={
+                  <div key="all-region-monthly-controls" className="flex items-center gap-1.5">
+                    <MonthDropdown
+                      key="all-region-monthly-picker"
+                      value={monthly.date}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch: allRegionValue(selectedAllRegion.name) }}
+                    />
+                    <MonthRangeDropdown
+                      value={monthly.date}
+                      range={oneRegionMonthlyRange}
+                      basePath="/task-manager"
+                      extraParams={{ view: "branch", branch: allRegionValue(selectedAllRegion.name) }}
+                    />
+                  </div>
+                }
+              />
+            </>
+          );
+          return overview;
+        }
+
         const branch =
           sp.branch && ALL_BRANCHES.includes(sp.branch) ? sp.branch : DEFAULT_BRANCH;
         // No ceoAssigned/hodAssigned fetch here (2026-08-18, fixed
@@ -1079,13 +1320,17 @@ export default async function TaskManagerPage({
               <EntityPicker
                 label="Branch"
                 value={branch}
-                groups={FLOW_BRANCH_REGIONS.map((r) => ({
-                  label: r.name,
-                  options: r.branches,
-                }))}
+                groups={[
+                  { options: [ALL_REGIONS_VALUE] },
+                  ...FLOW_BRANCH_REGIONS.map((r) => ({
+                    label: r.name,
+                    options: [allRegionValue(r.name), ...r.branches],
+                  })),
+                ]}
                 param="branch"
                 basePath="/task-manager"
                 extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
+                boldValues={ALL_BRANCH_BOLD_VALUES}
               />
               <CardModeToggle />
             </div>
@@ -1156,8 +1401,9 @@ export default async function TaskManagerPage({
           <ModeTabs active={entityView} date={dailyDate} />
           {/* CardModeProvider (2026-08-22): one List/Donut toggle governs
               every Daily/Monthly section AND the All Departments donut/list
-              section underneath — see card-mode-context.tsx. */}
-          <CardModeProvider>{await buildEntityOverview()}</CardModeProvider>
+              section underneath — see card-mode-context.tsx. Persisted
+              per-user (userId) since 2026-08-22. */}
+          <CardModeProvider userId={daily.me.me.userId}>{await buildEntityOverview()}</CardModeProvider>
         </div>
       );
 
@@ -1479,7 +1725,7 @@ export default async function TaskManagerPage({
           {body}
           <PageSectionHeading>Department / Branch Overview</PageSectionHeading>
           <ModeTabs active={entityView} date={dailyDate} />
-          <CardModeProvider>{await buildEntityOverview()}</CardModeProvider>
+          <CardModeProvider userId={daily.me.me.userId}>{await buildEntityOverview()}</CardModeProvider>
         </div>
       );
     }

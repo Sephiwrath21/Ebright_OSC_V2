@@ -27,8 +27,48 @@ interface CardModeState {
 
 const CardModeContext = React.createContext<CardModeState | null>(null);
 
-export function CardModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = React.useState<CardMode>("list");
+/** Persistence (2026-08-22, user request) — ONE stored preference per user,
+ *  same localStorage-per-browser/device convention EntityCardOverview's own
+ *  "Only Me"/"View All" toggle already established (onlyMeStorageKey) —
+ *  keyed by userId (per-user, not shared/global), restored on the next
+ *  page load/navigation. Not synced across devices/browsers; that's the
+ *  established, already-accepted trade-off for this exact kind of
+ *  preference in this codebase. */
+function cardModeStorageKey(userId: string): string {
+  return `tm-cardmode-${userId}`;
+}
+
+function readStoredCardMode(userId: string): CardMode | null {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(cardModeStorageKey(userId));
+  return stored === "list" || stored === "donut" ? stored : null;
+}
+
+export function CardModeProvider({
+  userId,
+  children,
+}: {
+  /** The viewer's own user id — the stored preference's key. */
+  userId: string;
+  children: React.ReactNode;
+}) {
+  // Hydration-safe (same fix EntityCardOverview's own onlyMe state already
+  // applies): the FIRST render must match server output exactly — default
+  // to "list" on both server and client, then apply the stored choice a
+  // moment later in the effect below, which only ever runs client-side
+  // AFTER hydration has already reconciled.
+  const [mode, setModeState] = React.useState<CardMode>("list");
+  React.useEffect(() => {
+    const stored = readStoredCardMode(userId);
+    if (stored !== null) setModeState(stored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+  const setMode = (next: CardMode) => {
+    setModeState(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(cardModeStorageKey(userId), next);
+    }
+  };
   const value = React.useMemo(() => ({ mode, setMode }), [mode]);
   return <CardModeContext.Provider value={value}>{children}</CardModeContext.Provider>;
 }
@@ -77,7 +117,7 @@ export function CardModeToggle() {
             : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
         }`}
       >
-        Donut
+        Pie
       </button>
     </div>
   );

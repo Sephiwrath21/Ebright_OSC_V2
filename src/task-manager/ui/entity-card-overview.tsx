@@ -41,6 +41,7 @@ import type {
   ActionResult,
   FlowBucketTotals,
   FlowCategoryOption,
+  FlowDrillTask,
   FlowEntityDetail,
   FlowTaskRow,
   MyManpowerActualSlot,
@@ -62,6 +63,7 @@ import {
   BUCKET_TINT,
   ChevronIcon,
   DUE_COL_WIDTH,
+  EntityDrillModal,
   HeaderResizeHandle,
   PROOF_COL_WIDTH,
   REASSIGN_COL_WIDTH,
@@ -124,10 +126,15 @@ function statusGroupedTasks(tasks: FlowTaskRow[]): FlowTaskRow[] {
  *  this is switched on, and the groupByStatus doc comment for why it
  *  never applies to HOD/CEO Assigned Task. */
 function PersonDonutCard({ card }: { card: PersonCard }) {
-  const [open, setOpen] = React.useState<BucketKey | null>(null);
+  // Rows open EntityDrillModal on click, same as DepartmentDonutCard
+  // (department-donut-overview.tsx) rather than expanding inline
+  // (2026-08-25, reverted back from inline expansion — user request to
+  // match the department card's own same-day round trip back to the
+  // modal, for consistency across every donut card in the app).
+  const [drill, setDrill] = React.useState<BucketKey | null>(null);
 
   const { totals, byBucket } = React.useMemo(() => {
-    const buckets: Record<BucketKey, FlowTaskRow[]> = { completed: [], pending: [], na: [] };
+    const buckets: Record<BucketKey, FlowDrillTask[]> = { completed: [], pending: [], na: [] };
     for (const t of card.tasks) {
       if (t.status === "DONE") buckets.completed.push(t);
       else if (t.status === "SKIPPED") buckets.na.push(t);
@@ -146,12 +153,7 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
 
   return (
     <div className="flex flex-col items-center gap-3 p-4">
-      {/* Segment click opens the matching accordion below (2026-08-22, user
-          request — "click the donut, pop out the tasks") — same open/close
-          state the accordion's own header button already toggles, just a
-          second trigger onto it rather than a separate modal (the tasks are
-          already reachable right below, no need to duplicate that view). */}
-      <StatusDonut totals={totals} size={140} onSegmentClick={(key) => setOpen((cur) => (cur === key ? null : key))}>
+      <StatusDonut totals={totals} size={140} onSegmentClick={setDrill}>
         <span className="text-lg font-bold text-gray-900 dark:text-slate-100">{percent}%</span>
       </StatusDonut>
 
@@ -159,54 +161,48 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
         {BUCKET_META.map((b) => (
           <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
             <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
-            <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">{b.label}</div>
+            {/* N/A's fill stays pale in both modes (BUCKET_TINT's own doc
+                comment) — its label needs dark, NEUTRAL (not yellow — same
+                brown-reading problem as a dark yellow fill, see
+                BUCKET_TEXT.na's doc comment) text in both modes too,
+                instead of the other buckets' light-in-dark-mode slate. */}
+            <div className={`text-[10px] font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}>
+              {b.label}
+            </div>
           </div>
         ))}
         <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
           <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
-          <div className="text-[10px] font-medium text-gray-500 dark:text-slate-400">Total</div>
+          <div className="text-[10px] font-medium text-gray-900 dark:text-white">Total</div>
         </div>
       </div>
 
       <div className="flex w-full flex-col gap-1.5">
-        {BUCKET_META.map((b) => {
-          const tasks = byBucket[b.key];
-          const isOpen = open === b.key;
-          return (
-            <div key={b.key} className={`overflow-hidden rounded-lg ${BUCKET_TINT[b.key]}`}>
-              <button
-                type="button"
-                onClick={() => setOpen(isOpen ? null : b.key)}
-                aria-expanded={isOpen}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
-                  <ChevronIcon expanded={isOpen} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
-                  {b.label}
-                </span>
-                <span
-                  className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${BUCKET_SOLID[b.key]}`}
-                >
-                  {tasks.length}
-                </span>
-              </button>
-              {isOpen && (
-                <ul className="space-y-1 px-3 pb-2 pl-9 text-xs text-gray-600 dark:text-slate-300">
-                  {tasks.length === 0 ? (
-                    <li className="italic text-gray-400 dark:text-slate-500">Nothing here.</li>
-                  ) : (
-                    tasks.map((t) => (
-                      <li key={t.runBlockId} className="truncate">
-                        · {t.blockTitle}
-                      </li>
-                    ))
-                  )}
-                </ul>
-              )}
-            </div>
-          );
-        })}
+        {BUCKET_META.map((b) => (
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => setDrill(b.key)}
+            className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left ${BUCKET_TINT[b.key]}`}
+          >
+            <span
+              className={`flex items-center gap-2 text-sm font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}
+            >
+              <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
+              {b.label}
+            </span>
+            <span
+              className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
+            >
+              {byBucket[b.key].length}
+            </span>
+          </button>
+        ))}
       </div>
+
+      {drill && (
+        <EntityDrillModal name={card.name} tasks={byBucket} bucketKey={drill} onClose={() => setDrill(null)} />
+      )}
     </div>
   );
 }
@@ -425,6 +421,25 @@ export function EntityCardOverview({
   const [localCardMode, setLocalCardMode] = React.useState<"list" | "donut">("list");
   const cardMode = sharedCardMode ? sharedCardMode.mode : localCardMode;
   const setCardMode = sharedCardMode ? sharedCardMode.setMode : setLocalCardMode;
+  // Main task / subtask tree for Sort:Person's card body (2026-08-22, bug
+  // fix) — every task (parent AND child alike) used to render as a flat
+  // sibling TaskRowLine, with no indication a task like "Process Street"
+  // actually has real child RunBlocks underneath it (confirmed via the
+  // DB: parentId IS correctly set, this was purely a rendering gap, not a
+  // data gap). Reuses TaskRowLine's own `tree` prop — the exact same
+  // chevron/indent mechanism ResizableTaskList's "My Tasks" view already
+  // uses — via a local childrenOf/topLevel grouping built per type-group
+  // below, instead of duplicating a second tree-rendering implementation.
+  // Expanded by default, same convention as ResizableTaskList's own
+  // collapsedIds (tracks the exceptions, not the norm).
+  const [collapsedParentIds, setCollapsedParentIds] = React.useState<Set<string>>(new Set());
+  const toggleParentExpand = (id: string) =>
+    setCollapsedParentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   // Hydration-safe (2026-08-14 fix): the FIRST render must produce IDENTICAL
   // output on the server and the client, so this starts from the role-based
   // defaultOnlyMe on both — never localStorage — even though localStorage IS
@@ -605,7 +620,7 @@ export function EntityCardOverview({
                     : "text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
                 }`}
               >
-                Donut
+                Pie
               </button>
             </div>
           )}
@@ -871,64 +886,105 @@ export function EntityCardOverview({
                             </span>
                           </div>
                         )}
-                        {typeGroups.map((group) => (
-                          <div key={group.id}>
-                            <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-slate-500">
-                              {group.name}
-                            </p>
-                            {group.tasks.map((t: FlowTaskRow) => (
-                              <TaskRowLine
-                                key={t.runBlockId}
-                                task={t}
-                                myUserId={myUserId}
-                                onComplete={onComplete}
-                                onSkip={onSkip}
-                                onReopen={onReopen}
-                                onUploadProof={onUploadProof}
-                                onRemoveProof={onRemoveProof}
-                                hideCompleted={isOwnCard}
-                                hideStatusChip
-                                // Draggable Task column (2026-08-15) — OWN CARD
-                                // ONLY (2026-08-15 fix): the resize header above
-                                // only renders for isOwnCard, but this prop was
-                                // applied unconditionally, giving every OTHER
-                                // person's card the same fixed shrink-0 width
-                                // too. In a 3-per-row "View All" grid those
-                                // cards are much narrower than that fixed width,
-                                // so the row overflowed and the card's own
-                                // overflow-hidden (for its rounded corners)
-                                // clipped the title mid-word — a regression, not
-                                // the intended "wrap normally" behavior
-                                // established earlier. Other cards now go back
-                                // to undefined (TaskRowLine's flex-1 fallback),
-                                // matching their pre-resize-feature behavior.
-                                nameWidth={isOwnCard ? taskColWidth : undefined}
-                                onResizeStart={isOwnCard ? onResizeStart : undefined}
-                                // No Assignee column (2026-08-15) — every row
-                                // here is the CARD OWNER's own task, so an
-                                // "assigned by" column is redundant with the
-                                // card header; Due date is back (was suppressed
-                                // 2026-08-13) per the new 4-column header above.
-                                hideAssignee
-                                // Matches the header's PROOF_COL_WIDTH exactly
-                                // (2026-08-15 fix) — without this the row cell
-                                // defaulted to 40px while the header used 96px,
-                                // so the centered "+" button sat under the
-                                // header's left portion instead of its center.
-                                proofWidth={PROOF_COL_WIDTH}
-                                // Daily's date is implied by the section itself
-                                // (2026-08-15) — keep the column/header (layout
-                                // consistency with Monthly/HOD/CEO Assigned
-                                // Task, which DO show a real date), just don't
-                                // populate a redundant per-row value under it.
-                                blankDueDate={sectionLabel === "Daily"}
-                                reassign={reassign}
-                                reassignAnyOwner={canReassignOthers}
-                                reassignAsMenu
-                              />
-                            ))}
-                          </div>
-                        ))}
+                        {typeGroups.map((group) => {
+                          // Parent/subtask tree, scoped to this ONE type
+                          // group (a subtask always shares its parent's
+                          // categoryId, so both land in the same group —
+                          // see editTaskTemplateCore/assignFlowTaskCore).
+                          const groupIds = new Set(group.tasks.map((t) => t.runBlockId));
+                          const childrenOfGroup = new Map<string, FlowTaskRow[]>();
+                          for (const t of group.tasks) {
+                            if (t.parentId && groupIds.has(t.parentId)) {
+                              const kids = childrenOfGroup.get(t.parentId);
+                              if (kids) kids.push(t);
+                              else childrenOfGroup.set(t.parentId, [t]);
+                            }
+                          }
+                          for (const kids of childrenOfGroup.values()) {
+                            kids.sort((a, b) => (a.subtaskOrder ?? Number.MAX_SAFE_INTEGER) - (b.subtaskOrder ?? Number.MAX_SAFE_INTEGER));
+                          }
+                          const topLevel = group.tasks.filter((t) => !t.parentId || !groupIds.has(t.parentId));
+                          const sharedRowProps = {
+                            myUserId,
+                            onComplete,
+                            onSkip,
+                            onReopen,
+                            onUploadProof,
+                            onRemoveProof,
+                            hideCompleted: isOwnCard,
+                            hideStatusChip: true,
+                            // Draggable Task column (2026-08-15) — OWN CARD
+                            // ONLY (2026-08-15 fix): the resize header above
+                            // only renders for isOwnCard, but this prop was
+                            // applied unconditionally, giving every OTHER
+                            // person's card the same fixed shrink-0 width
+                            // too. In a 3-per-row "View All" grid those
+                            // cards are much narrower than that fixed width,
+                            // so the row overflowed and the card's own
+                            // overflow-hidden (for its rounded corners)
+                            // clipped the title mid-word — a regression, not
+                            // the intended "wrap normally" behavior
+                            // established earlier. Other cards now go back
+                            // to undefined (TaskRowLine's flex-1 fallback),
+                            // matching their pre-resize-feature behavior.
+                            // Subtask rows share the SAME nameWidth as their
+                            // parent (matches ResizableTaskList's own
+                            // precedent — the drag handle resizes one shared
+                            // column regardless of which row it's grabbed
+                            // from).
+                            nameWidth: isOwnCard ? taskColWidth : undefined,
+                            onResizeStart: isOwnCard ? onResizeStart : undefined,
+                            // No Assignee column (2026-08-15) — every row
+                            // here is the CARD OWNER's own task, so an
+                            // "assigned by" column is redundant with the
+                            // card header; Due date is back (was suppressed
+                            // 2026-08-13) per the new 4-column header above.
+                            hideAssignee: true,
+                            // Matches the header's PROOF_COL_WIDTH exactly
+                            // (2026-08-15 fix) — without this the row cell
+                            // defaulted to 40px while the header used 96px,
+                            // so the centered "+" button sat under the
+                            // header's left portion instead of its center.
+                            proofWidth: PROOF_COL_WIDTH,
+                            // Daily's date is implied by the section itself
+                            // (2026-08-15) — keep the column/header (layout
+                            // consistency with Monthly/HOD/CEO Assigned
+                            // Task, which DO show a real date), just don't
+                            // populate a redundant per-row value under it.
+                            blankDueDate: sectionLabel === "Daily",
+                            reassign,
+                            reassignAnyOwner: canReassignOthers,
+                            reassignAsMenu: true,
+                          };
+                          return (
+                            <div key={group.id}>
+                              <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-slate-500">
+                                {group.name}
+                              </p>
+                              {topLevel.map((t: FlowTaskRow) => {
+                                const kids = childrenOfGroup.get(t.runBlockId) ?? [];
+                                const expanded = !collapsedParentIds.has(t.runBlockId);
+                                return (
+                                  <React.Fragment key={t.runBlockId}>
+                                    <TaskRowLine
+                                      task={t}
+                                      {...sharedRowProps}
+                                      tree={
+                                        kids.length > 0
+                                          ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleParentExpand(t.runBlockId) }
+                                          : undefined
+                                      }
+                                    />
+                                    {expanded &&
+                                      kids.map((k) => (
+                                        <TaskRowLine key={k.runBlockId} task={k} {...sharedRowProps} tree={{ kind: "child" }} />
+                                      ))}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
                       </>
                     )}
                   </div>
