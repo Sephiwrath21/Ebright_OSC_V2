@@ -675,8 +675,19 @@ export function FileLink({ file }: { file: File }) {
 // get a 404 until that route's permission check is extended to allow HR/
 // staff read access. Flagging rather than changing that route unasked, since
 // it's a shared, security-relevant access-control file.
+// Legacy-synced leave_request.attachment rows (from the ebright_hrfs
+// LeaveTransaction migration) hold a bare filename ("1786779495141.jpg"),
+// not a real Drive file ID — the source system itself never captured more
+// than that (see conversation, 2026-08-22 attachment investigation). Same
+// heuristic as looksLikeDriveId() in src/lib/drive.ts (not imported directly
+// — that module is server-only and pulls in googleapis, which can't reach
+// this client component): a real Drive ID has no "/" or "." and is long.
+function looksLikeDriveFileId(value: string): boolean {
+  return !value.includes("/") && !value.includes(".") && value.length >= 20;
+}
+
 export function RealAttachmentLink({ fileId }: { fileId: string | null }) {
-  if (!fileId) return <span className="text-slate-400">—</span>;
+  if (!fileId || !looksLikeDriveFileId(fileId)) return <span className="text-slate-400">—</span>;
   return (
     <a href={`/api/attachment/${encodeURIComponent(fileId)}`} target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] dark:text-blue-400 hover:underline">
       View
@@ -1869,14 +1880,21 @@ export function RecordAddModal({
             ×
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 sm:px-7">
+        <div className={`flex-1 overflow-y-auto px-5 sm:px-7 ${showFooter ? "" : "pb-7"}`}>
           {/* Single column below the sm breakpoint (phones) so labels/inputs
               never get squeezed into an unreadably narrow half-width column;
               2 columns from sm (640px) up, where a ~560px modal still leaves
               each column comfortably wide (phone landscape and tablet). */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-            {fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true)).map((f) => (
-              <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
+            {fields
+              .filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true))
+              // A read-only file field whose value doesn't resolve to a real,
+              // reachable attachment (see looksLikeDriveFileId — legacy-synced
+              // leave attachments are a bare filename, not a Drive id) is
+              // hidden entirely rather than shown as a dead/broken link.
+              .filter((f) => !(readOnly && f.type === "file" && initialFileIds?.[f.key] && !looksLikeDriveFileId(initialFileIds[f.key]!)))
+              .map((f) => (
+                <div key={f.key} className={`flex flex-col gap-2 min-w-0 ${f.full ? "sm:col-span-2" : ""}`}>
                 <label className="text-sm font-medium text-[#4b4949] dark:text-slate-300">{f.label}</label>
                 {readOnly ? (
                   f.type === "file" ? (

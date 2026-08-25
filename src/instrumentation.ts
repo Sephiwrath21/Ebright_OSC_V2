@@ -168,6 +168,7 @@ export async function register(): Promise<void> {
   const { advancePreStageEmployees, advanceOnboardingToActive, advanceProbationToNext } = await import(
     "@/lib/stageTransitionAutomation"
   );
+  const { detectBranchStaffMissingEmployment } = await import("@/lib/branchStaffReconciliation");
   const stageTransitionSweep = async () => {
     try {
       if (CAREER_APPLICATION_SYNC_ENABLED) await careerApplicationSweep();
@@ -185,6 +186,24 @@ export async function register(): Promise<void> {
     } catch (err) {
       console.warn(
         `[stage-transition] sweep failed (will retry next interval): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    // Detection-only — see branchStaffReconciliation.ts's own doc comment
+    // for why this never creates anything itself. Logged separately from
+    // the try/catch above so a failure here never blocks the real
+    // stage-advance sweep it shares a timer with.
+    try {
+      const missing = await detectBranchStaffMissingEmployment();
+      if (missing.length > 0) {
+        console.warn(
+          `[branchstaff-reconciliation] ${missing.length} BranchStaff record(s) with no matching employment row (review before creating): ` +
+            missing.map((m) => `#${m.branchStaffId} "${m.name}"`).join(", "),
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[branchstaff-reconciliation] sweep failed (will retry next interval): ${err instanceof Error ? err.message : err}`,
       );
     }
   };

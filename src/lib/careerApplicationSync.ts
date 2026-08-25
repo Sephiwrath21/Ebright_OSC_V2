@@ -9,6 +9,7 @@ import {
   listBranches,
   listDepartments,
   internActiveFromDate,
+  partTimeActiveFromDate,
   type EmployeeOverviewRow,
   type EmployeeDetailFull,
   type BranchOpt,
@@ -154,6 +155,14 @@ export type SyncAction =
 export function normalizeName(name: string): string {
   return name
     .toUpperCase()
+    // Some ebright_hrfs.BranchStaff.name values contain literal embedded
+    // \r/\n (e.g. "CHE\r\nKU ELMI SHAZWAL..."). Without this, the
+    // [^A-Z0-9 ] strip below deletes them outright instead of treating them
+    // as a word boundary, gluing the two halves into "CHEKU ELMI..." and
+    // silently breaking the match against a normally-spaced name — found via
+    // the 2026-08-22 BranchStaff/employment reconciliation audit (7 of 363
+    // BranchStaff rows affected). Must run BEFORE the punctuation strip.
+    .replace(/[\r\n\t]+/g, " ")
     // Malaysian/Indian relational honorifics ("daughter of"/"son of") are
     // written inconsistently across systems — e.g. real user "Ramitha
     // Moghan" vs onboarding_candidate's "Ramitha A/P Moghan" for the exact
@@ -530,7 +539,7 @@ export async function computeRealAccountLifecycleOverrides<
   const employments = await prisma.employment.findMany({
     where: { user_id: { in: eligible.map((r) => r.id) } },
     orderBy: { start_date: "desc" },
-    select: { user_id: true, status: true, start_date: true },
+    select: { user_id: true, status: true, start_date: true, working_hours_json: true },
   });
   const empByUserId = new Map<number, (typeof employments)[number]>();
   for (const e of employments) if (!empByUserId.has(e.user_id)) empByUserId.set(e.user_id, e);
@@ -628,16 +637,22 @@ export async function computeRealAccountLifecycleOverrides<
       continue;
     }
     if (posGroup !== "Full Time") {
-      // Part Time — still the pre-existing calendar-day rule, unchanged.
-      // Out of scope for the Tue-Sat working-day rework (see conversation —
-      // Part Time's own schedule-sourcing question hasn't been answered
-      // yet), so deliberately left as-is here.
-      if (emp.status === "active") {
-        result.set(row.id, { stage: "active" });
+      // Part Time — working_hours_json-based 4-working-day rule (see
+      // conversation, 2026-08-22 spec), same shape as the Intern branch
+      // above. emp.status is deliberately NOT consulted directly — trusting
+      // a stored "active" was exactly the bug already fixed for Interns
+      // (see that branch's own comment), and was reproducing here too (a
+      // Part Time employee stored as "active" on their own start_date
+      // displayed Active immediately, skipping the working-day count
+      // entirely).
+      const activeFrom = partTimeActiveFromDate(emp.start_date, emp.working_hours_json);
+      if (activeFrom == null) {
+        console.warn(
+          `[part-time-onboarding] working_hours_json has no working days configured for user_id=${row.id} — skipping the Onboarding->Active override`,
+        );
         continue;
       }
-      const daysSinceStart = Math.floor((Date.parse(todayIso) - Date.parse(startIso)) / 86_400_000);
-      result.set(row.id, daysSinceStart >= 3 ? { stage: "active" } : { stage: "onboarding" });
+      result.set(row.id, { stage: todayIso >= activeFrom ? "active" : "onboarding" });
     }
     // else: Full Time, not board_stage-matched — no override, keeps
     // whatever raw/base stage this row already had.

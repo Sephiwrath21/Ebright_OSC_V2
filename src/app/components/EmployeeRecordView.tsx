@@ -353,18 +353,26 @@ export default function EmployeeRecordView({
           </nav>
         )}
 
-        {/* Card + vertical sub-nav rail as flex siblings, docked under the
+        {/* Card + vertical sub-nav rail as grid siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
-            breakpoint (never stacks). No gap between them (fixed
-            2026-08-13, see conversation) — the rail sits flush against the
-            card's right edge; same fix applied to StageProfileView.tsx's
-            own separate copy of this layout. The rail's own width fluidly
-            shrinks on narrow viewports (see its own style below) so both
-            columns keep fitting side by side instead of the rail getting
-            pushed below the content. */}
-        <div className="flex items-start">
+            breakpoint (never stacks). Card column is minmax(0, 1fr) — it
+            fills the rest of the row beside the fixed 210px rail, not a
+            separate/independent width (2026-08-22, see conversation — width
+            is settled, do not change it further). Grid (not flex) so
+            that's a hard cap regardless of content, unlike flex-basis,
+            which let a wide table push the card past its intended share.
+            No `items-start` (2026-08-22) — default grid stretch instead,
+            so on a short tab like Leave the card's white background grows
+            to match the taller rail's height rather than the rail's lower
+            pills hanging past the card's bottom edge into the page
+            background. No gap between them — the rail sits flush against
+            the card's right edge; same layout shape used in
+            StageProfileView.tsx's own separate copy. Single column on
+            touch devices, matching the rail's own [@media(hover:none)]:hidden
+            below (mobile has no rail to reserve space for). */}
+        <div className="grid grid-cols-[minmax(0,1fr)_210px] [@media(hover:none)]:grid-cols-1">
           <div
-            className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-b-[12px] rounded-tr-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-4 sm:p-6"
+            className="min-w-0 bg-white dark:bg-slate-900 rounded-b-[12px] rounded-tr-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.12),0_8px_20px_rgba(0,0,0,0.10)] p-4 sm:p-6"
             style={{ border: "0.5px solid var(--border-neutral)" }}
           >
             {(() => {
@@ -618,12 +626,12 @@ export default function EmployeeRecordView({
               landscape) the mobile sub-tab row above replaces this
               entirely, per explicit request — the vertical rail shouldn't
               exist in that position there at all, not just visually adapt.
-              w-[210px] is unconditional now (was lg:w-[210px] against a
-              fluid mobile width) since this element is either fully hidden
-              or rendered at its one fixed desktop size, nothing in between. */}
+              Width itself now comes from the grid column (see the row div
+              above) rather than an explicit w-[210px] here, so the two stay
+              tied to the same single value instead of drifting apart. */}
           <nav
             aria-label={`${category.label} sections`}
-            className="flex flex-none w-[210px] flex-col mt-4 sm:mt-6 [@media(hover:none)]:hidden"
+            className="flex flex-col mt-4 sm:mt-6 [@media(hover:none)]:hidden"
             style={{ gap: RAIL_GAP_PX }}
           >
             {category.sections.map((section) => {
