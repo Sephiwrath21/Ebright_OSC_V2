@@ -167,27 +167,61 @@ export async function listEmployees(filters: ListFilters = {}): Promise<Employee
     orderBy: { created_at: "desc" },
   });
 
-  return rows.map((u): EmployeeRow => {
+  // Part Time/Intern Onboarding->Active override — same mechanism as
+  // listEmployeeOverviewRows (see conversation, 2026-08-22): this function's
+  // own `status` field used to be the raw employment.status/users.status
+  // value verbatim, so a Part Time/Intern row whose stored status hadn't
+  // caught up to their real working-day-based stage showed wrong here too
+  // (this page's own Status pill/filter, and getEmployeeById's Status field
+  // below, were the last two real bypasses of this override found in the
+  // 2026-08-22 audit).
+  const { buildBranchStaffMatchIndex, resolveEffectivePositionGroup, logAmbiguousBranchStaffMatches } = await import(
+    "@/lib/branchStaffProfile"
+  );
+  const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+  const bsIndex = await buildBranchStaffMatchIndex();
+  const ambiguous: AmbiguousBranchStaffMatch[] = [];
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const result = rows.map((u): EmployeeRow => {
     const emp = u.employment[0];
+    const fullName = titleCaseName(u.user_profile?.full_name) || u.email;
+    const branchCode = emp?.branch?.branch_code ?? null;
+    const departmentCode = emp?.department?.department_code ?? null;
+    const resolvedPositionType = resolveEffectivePositionGroup(
+      emp?.position ?? null,
+      fullName,
+      branchCode,
+      departmentCode,
+      bsIndex,
+      branches,
+      departments,
+      ambiguous,
+    );
+    const rawStatus = emp?.status ?? u.status ?? null;
+    const internStatus = applyInternStatusOverride(rawStatus, resolvedPositionType, emp?.start_date, todayIso);
+    const status = applyPartTimeStatusOverride(internStatus, resolvedPositionType, emp?.start_date, emp?.working_hours_json, todayIso);
     return {
       id: u.user_id,
       email: u.email,
       employeeId: emp?.employee_id ?? null,
-      fullName: titleCaseName(u.user_profile?.full_name) || u.email,
+      fullName,
       nickName: u.user_profile?.nick_name ? titleCaseName(u.user_profile.nick_name) : null,
       dob: u.user_profile?.dob ? u.user_profile.dob.toISOString().slice(0, 10) : null,
       phone: u.user_profile?.phone ?? null,
       role: emp?.position ?? null,
-      branchCode: emp?.branch?.branch_code ?? null,
+      branchCode,
       branchName: emp?.branch?.branch_name ?? null,
-      departmentCode: emp?.department?.department_code ?? null,
+      departmentCode,
       departmentName: emp?.department?.department_name ?? null,
-      status: emp?.status ?? u.status ?? null,
+      status,
       startDate: emp?.start_date ? emp.start_date.toISOString().slice(0, 10) : null,
       endDate: emp?.end_date ? emp.end_date.toISOString().slice(0, 10) : null,
       pendingOnboarding: !u.user_profile,
     };
   });
+  logAmbiguousBranchStaffMatches(ambiguous);
+  return result;
 }
 
 export interface EmployeeOverviewRow {
@@ -290,26 +324,29 @@ function dateSourceFor(stage: EmployeeStage, emp: { start_date: Date | null; end
 }
 
 // Intern-only Onboarding -> Active display override (see conversation).
-// Interns' working days are fixed Tue-Sat (Sun/Mon never count). Walking
-// forward from start_date, the first 3 Tue-Sat dates hit are Day 1-3 — a
-// start_date landing on Sun/Mon isn't Day 1 itself, the walk just starts at
-// the next Tue-Sat date instead. Day 4 is the very next CALENDAR day after
-// Day 3 — no further weekday skipping, even if Day 4 itself lands on a
-// Sun/Mon (confirmed explicitly — the working-day rule only counts the
-// initial 3 onboarding days, not when the transition lands). Returns the
-// ISO date "Active" starts on.
+// Interns' working days are fixed Tue-Sat (Sun/Mon never count) — unlike
+// Part Time, this is NOT sourced from working_hours_json (explicit decision:
+// every Intern's working days are fixed Tue-Sat in practice, and Intern
+// working_hours_json is missing for roughly half of real rows — reading it
+// here would regress Interns who currently transition correctly under the
+// fixed-day rule into "no data, can't compute" limbo). Walking forward from
+// start_date, the first 4 Tue-Sat dates hit are Day 1-4 — a start_date
+// landing on Sun/Mon isn't Day 1 itself, the walk just starts at the next
+// Tue-Sat date instead. Day 4 (the 4th Tue-Sat date itself, same as Part
+// Time's rule — this used to be "the next calendar day after Day 3",
+// corrected 2026-08-22 to match) is when Active starts. Returns the ISO date
+// "Active" starts on.
 const INTERN_ONBOARDING_EXCLUDED_DAYS = new Set([0, 1]); // Sun, Mon (UTC day-of-week)
 export function internActiveFromDate(startDate: Date): string {
   const cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
   let workingDaysSeen = 0;
-  while (workingDaysSeen < 3) {
+  while (workingDaysSeen < 4) {
     if (!INTERN_ONBOARDING_EXCLUDED_DAYS.has(cursor.getUTCDay())) {
       workingDaysSeen++;
-      if (workingDaysSeen === 3) break;
+      if (workingDaysSeen === 4) break;
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
-  cursor.setUTCDate(cursor.getUTCDate() + 1); // Day 4 — plain next calendar day, unconditional.
   return cursor.toISOString().slice(0, 10);
 }
 
@@ -335,6 +372,106 @@ function applyInternOnboardingOverride(
   const startIso = startDate.toISOString().slice(0, 10);
   if (todayIso < startIso) return stage; // Pre carve-out — start_date hasn't arrived, leave whatever stage already is
   return todayIso >= internActiveFromDate(startDate) ? "active" : "onboarding";
+}
+
+// Part Time-only Onboarding -> Active display override (see conversation,
+// 2026-08-22 spec). Unlike Interns' fixed Tue-Sat schedule, Part Time's
+// working days come from each employee's own employment.working_hours_json
+// (keyed Mon..Sun, each value null or {start,end}) — the "own schedule-
+// sourcing question" a prior comment in careerApplicationSync.ts left open.
+// Walking forward from start_date (day 1, if a working day), the 4th
+// working day IS active_date itself — no extra "next calendar day" step
+// like Interns' Day 4 (confirmed explicitly: the 4th working day is when
+// status flips, not the day after it). Returns null if working_hours_json
+// has zero working days configured across all 7 keys — a data error, not a
+// date to loop toward forever; callers skip the override and flag this
+// rather than guess a fallback status.
+const WORKING_HOURS_WEEKDAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function isWorkingHoursEntry(value: unknown): value is { start: string; end: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).start === "string" &&
+    typeof (value as Record<string, unknown>).end === "string"
+  );
+}
+
+export function partTimeActiveFromDate(startDate: Date, workingHoursJson: unknown): string | null {
+  const hours = (workingHoursJson && typeof workingHoursJson === "object" ? workingHoursJson : {}) as Record<string, unknown>;
+  const workingDays = new Set(WORKING_HOURS_WEEKDAY_KEYS.filter((key) => isWorkingHoursEntry(hours[key])));
+  if (workingDays.size === 0) return null;
+
+  const cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
+  let workingDaysSeen = 0;
+  while (workingDaysSeen < 4) {
+    if (workingDays.has(WORKING_HOURS_WEEKDAY_KEYS[cursor.getUTCDay()])) {
+      workingDaysSeen++;
+      if (workingDaysSeen === 4) break;
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return cursor.toISOString().slice(0, 10);
+}
+
+function applyPartTimeOnboardingOverride(
+  stage: EmployeeStage,
+  posGroup: PositionGroup | null | undefined,
+  startDate: Date | null | undefined,
+  workingHoursJson: unknown,
+  todayIso: string,
+): EmployeeStage {
+  if (stage === "exit" || posGroup !== "Part Time" || !startDate) return stage;
+  const startIso = startDate.toISOString().slice(0, 10);
+  if (todayIso < startIso) return stage; // Pre carve-out — start_date hasn't arrived, leave whatever stage already is
+  const activeFrom = partTimeActiveFromDate(startDate, workingHoursJson);
+  if (activeFrom == null) {
+    console.warn(
+      `[part-time-onboarding] working_hours_json has no working days configured for a Part Time employee (start_date=${startIso}) — skipping the Onboarding->Active override`,
+    );
+    return stage;
+  }
+  return todayIso >= activeFrom ? "active" : "onboarding";
+}
+
+// Same two overrides, adapted for listEmployees()/getEmployeeById() — these
+// two return a raw employment.status STRING (StatusOption: "active" |
+// "onboarding" | "inactive" | "archive"), not the 5-value EmployeeStage the
+// two functions above operate on. "inactive"/"archive" have no EmployeeStage
+// equivalent (nonExitStage collapses them to "active" for stage purposes),
+// so unlike the stage-based versions above, these only ever override an
+// incoming "onboarding" or "active" — a manually-set "inactive"/"archive"
+// (or a not-yet-advanced "pre") is left alone rather than resurrected.
+function applyInternStatusOverride(
+  status: string | null,
+  posGroup: PositionGroup | null | undefined,
+  startDate: Date | null | undefined,
+  todayIso: string,
+): string | null {
+  if ((status !== "onboarding" && status !== "active") || posGroup !== "Intern" || !startDate) return status;
+  const startIso = startDate.toISOString().slice(0, 10);
+  if (todayIso < startIso) return status;
+  return todayIso >= internActiveFromDate(startDate) ? "active" : "onboarding";
+}
+
+function applyPartTimeStatusOverride(
+  status: string | null,
+  posGroup: PositionGroup | null | undefined,
+  startDate: Date | null | undefined,
+  workingHoursJson: unknown,
+  todayIso: string,
+): string | null {
+  if ((status !== "onboarding" && status !== "active") || posGroup !== "Part Time" || !startDate) return status;
+  const startIso = startDate.toISOString().slice(0, 10);
+  if (todayIso < startIso) return status;
+  const activeFrom = partTimeActiveFromDate(startDate, workingHoursJson);
+  if (activeFrom == null) {
+    console.warn(
+      `[part-time-onboarding] working_hours_json has no working days configured for a Part Time employee (start_date=${startIso}) — skipping the Onboarding->Active override`,
+    );
+    return status;
+  }
+  return todayIso >= activeFrom ? "active" : "onboarding";
 }
 
 // `skipScopeFilter` exists only for callers that deliberately need every
@@ -466,7 +603,14 @@ export async function listEmployeeOverviewRows(options: { skipScopeFilter?: bool
       departments,
       ambiguous,
     );
-    const effectiveStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
+    const internStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
+    const effectiveStage = applyPartTimeOnboardingOverride(
+      internStage,
+      resolvedPositionType,
+      effectiveEmp?.start_date,
+      emp?.working_hours_json,
+      todayIso,
+    );
     rows.push({
       id: u.user_id,
       employeeId: emp?.employee_id ?? null,
@@ -587,7 +731,14 @@ export async function getEmployeeOverviewRowById(id: number): Promise<EmployeeOv
     departments,
     ambiguous,
   );
-  const effectiveStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
+  const internStage = applyInternOnboardingOverride(stage, resolvedPositionType, effectiveEmp?.start_date, todayIso);
+  const effectiveStage = applyPartTimeOnboardingOverride(
+    internStage,
+    resolvedPositionType,
+    effectiveEmp?.start_date,
+    emp?.working_hours_json,
+    todayIso,
+  );
   let row: EmployeeOverviewRow = {
     id: u.user_id,
     employeeId: emp?.employee_id ?? null,
@@ -1729,9 +1880,8 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
   // why this errs toward not matching rather than guessing), falling back
   // to this app's own local data per-field whenever there's no confident
   // match or the matched BranchStaff row has that particular field blank.
-  const { buildBranchStaffMatchIndex, matchBranchStaffForRealAccount, branchStaffProfileFields } = await import(
-    "@/lib/branchStaffProfile"
-  );
+  const { buildBranchStaffMatchIndex, matchBranchStaffForRealAccount, branchStaffProfileFields, resolveEffectivePositionGroup, logAmbiguousBranchStaffMatches } =
+    await import("@/lib/branchStaffProfile");
   const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
   const bsIndex = await buildBranchStaffMatchIndex();
   const bsMatch = matchBranchStaffForRealAccount(
@@ -1744,6 +1894,26 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
   );
   const bs = bsMatch ? branchStaffProfileFields(bsMatch) : null;
 
+  // Part Time/Intern Onboarding->Active override — same mechanism as
+  // getEmployeeOverviewRowById (see conversation, 2026-08-22): this field
+  // used to be the raw employment.status/users.status value verbatim.
+  const ambiguous: AmbiguousBranchStaffMatch[] = [];
+  const resolvedPositionType = resolveEffectivePositionGroup(
+    emp?.position ?? null,
+    fullName,
+    emp?.branch?.branch_code ?? null,
+    emp?.department?.department_code ?? null,
+    bsIndex,
+    branches,
+    departments,
+    ambiguous,
+  );
+  logAmbiguousBranchStaffMatches(ambiguous);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const rawStatus = emp?.status ?? u.status ?? null;
+  const internStatus = applyInternStatusOverride(rawStatus, resolvedPositionType, emp?.start_date, todayIso);
+  const status = applyPartTimeStatusOverride(internStatus, resolvedPositionType, emp?.start_date, emp?.working_hours_json, todayIso);
+
   return {
     id: u.user_id,
     email: bs?.email ?? u.email,
@@ -1755,7 +1925,7 @@ export async function getEmployeeById(userId: number): Promise<EmployeeDetailFul
     branchName: emp?.branch?.branch_name ?? null,
     departmentCode: emp?.department?.department_code ?? null,
     departmentName: emp?.department?.department_name ?? null,
-    status: emp?.status ?? u.status ?? null,
+    status,
     startDate: bs?.startDate
       ? bs.startDate.toISOString().slice(0, 10)
       : emp?.start_date

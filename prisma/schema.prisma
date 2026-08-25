@@ -819,6 +819,9 @@ model user_profile {
   nationality                  String?                        @db.VarChar(100)
   nric                         String?                        @unique @db.VarChar(30)
   home_address                 String?
+  university                   String?                        @db.VarChar(255)
+  programme                    String?                        @db.VarChar(255)
+  qualification                String?                        @db.VarChar(255)
   manpower_schedule            manpower_schedule[]
   manpower_schedule_attendance manpower_schedule_attendance[]
   users                        users                          @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profile_user")

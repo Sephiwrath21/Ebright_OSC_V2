@@ -79,6 +79,16 @@ describe("normalizeName", () => {
     expect(normalizeName("Harshini A/P C.Rethnam")).toBe("HARSHINI CRETHNAM");
     expect(normalizeName("Aadesh Abhayaprada A/L Balamurugan")).toBe("AADESH ABHAYAPRADA BALAMURUGAN");
   });
+
+  it("treats embedded \\r/\\n/\\t as word separators instead of deleting them", () => {
+    // Real ebright_hrfs.BranchStaff.name data contains literal embedded
+    // newlines (found via the 2026-08-22 BranchStaff/employment
+    // reconciliation audit) — without this, "CHE\r\nKU ELMI..." normalized
+    // to "CHEKU ELMI..." (words glued together), silently failing to match
+    // the normally-spaced "Che Ku Elmi..." from a real employment record.
+    expect(normalizeName("Che\r\nKu Elmi Shazwal")).toBe(normalizeName("Che Ku Elmi Shazwal"));
+    expect(normalizeName("Ishini Rithu\nMadhika Gordon")).toBe("ISHINI RITHU MADHIKA GORDON");
+  });
 });
 
 describe("normalizeEmail", () => {
