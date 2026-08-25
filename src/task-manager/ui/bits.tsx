@@ -64,13 +64,17 @@ function InlineActionError({ text }: { text: string }) {
 }
 
 export const BUCKET_META = [
-  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-500", stroke: "stroke-emerald-500" },
-  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-400", stroke: "stroke-red-400" },
-  // Yellow, not amber (2026-08-22, user feedback — amber reads orange,
-  // especially at dark-mode depth) — the pie wedge/dot/legend all use this
-  // same fixed (non-theme-varying) solid fill, so N/A stays a solid yellow
-  // everywhere, matching BUCKET_TINT/BUCKET_TEXT's own yellow swap below.
-  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-400", stroke: "stroke-yellow-400" },
+  // `fill` (the pie wedge) is now theme-aware and matches BUCKET_TINT's own
+  // stat-chip/accordion-row colors exactly, shade for shade (2026-08-22,
+  // user request — the chart's wedges and the row list below it were two
+  // different, unrelated color choices before: fill was a single fixed
+  // shade regardless of theme, BUCKET_TINT was a light tint in light mode
+  // and a solid dark shade in dark mode). `dot` stays its own fixed
+  // (non-theme-varying) shade — used for small legend/rollup dots
+  // elsewhere that were never part of this donut-card color mismatch.
+  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-100 dark:fill-emerald-900", stroke: "stroke-emerald-500" },
+  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-100 dark:fill-red-900", stroke: "stroke-red-400" },
+  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-100 dark:fill-yellow-900", stroke: "stroke-yellow-400" },
 ] as const;
 
 export type BucketKey = (typeof BUCKET_META)[number]["key"];

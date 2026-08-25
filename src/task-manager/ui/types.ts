@@ -623,7 +623,14 @@ export interface FlowTemplateGroupControl {
     groupId: string,
     input: { name: string; categoryId?: string; tasks: FlowTemplateGroupTaskInput[] },
   ) => Promise<TemplateGroupEditResult>;
+  /** Pre-DELETE preview — every pending block regardless of due date (the
+   *  Remove-template confirm dialog). */
   impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
+  /** Pre-EDIT preview (2026-08-22) — narrower than `impact` above: parent
+   *  blocks only, excluding past-due instances, matching what Save is
+   *  actually about to update (see getTemplateEditImpactCore's own doc
+   *  comment for why this needs its own count instead of reusing `impact`). */
+  editImpact: (groupId: string) => Promise<TemplateGroupImpactResult>;
   remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
   apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
   assignees: (groupId: string) => Promise<TemplateGroupAssigneesResult>;

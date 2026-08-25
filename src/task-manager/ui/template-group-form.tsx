@@ -205,7 +205,13 @@ export function TemplateGroupFormModal({
     }));
     startTransition(async () => {
       if (isEdit) {
-        const impact = await control.impact(groupId as string);
+        // editImpact, not impact (2026-08-22) — a narrower count than the
+        // Remove-template dialog's: parent tasks only, excluding anything
+        // already past-due (editTemplateGroup's real update criteria), so
+        // this number matches what Save is actually about to change
+        // instead of overstating it. See getTemplateEditImpactCore's own
+        // doc comment.
+        const impact = await control.editImpact(groupId as string);
         if (!impact.ok) {
           setMessage({ ok: false, text: impact.message });
           return;

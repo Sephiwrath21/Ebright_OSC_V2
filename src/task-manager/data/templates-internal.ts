@@ -69,6 +69,47 @@ export async function getTemplateDeletionImpactCore(
   };
 }
 
+/** Pre-EDIT preview core (2026-08-22) — separate from
+ *  getTemplateDeletionImpactCore above because editTaskTemplateCore's real
+ *  eligibility is narrower than plain "pending": PARENT blocks only
+ *  (subtasks update as a side effect of their parent, not counted
+ *  separately) and excludes PAST-DUE instances (dueAt non-null and before
+ *  today — same protection editTaskTemplateCore itself applies, so this
+ *  preview's count matches what the save button is actually about to do).
+ *  Deletion's own cascade (cancelPendingTemplateRuns) has NO such
+ *  exclusions — it cancels every pending block regardless of due date —
+ *  so getTemplateDeletionImpactCore stays correct and unchanged for the
+ *  Remove-template confirm dialog; this is ONLY for the Edit confirm
+ *  dialog. */
+export async function getTemplateEditImpactCore(
+  user: { id: string },
+  templateId: string,
+): Promise<TemplateDeletionImpact> {
+  const id = z.string().min(1).parse(templateId);
+  const template = await prisma.taskTemplate.findFirst({
+    where: { id, createdById: user.id },
+    select: { id: true },
+  });
+  if (!template) throw new ApiHttpError(404, "Template not found");
+  const boundary = todayStart();
+
+  const blocks = await prisma.runBlock.findMany({
+    where: { templateId: id, run: { status: { not: "CANCELLED" }, archivedAt: null } },
+    select: { assigneeId: true, status: true, parentId: true, dueAt: true },
+  });
+  const willUpdate = blocks.filter(
+    (b) =>
+      b.parentId === null &&
+      (PENDING_STATUSES as readonly string[]).includes(b.status) &&
+      (!b.dueAt || b.dueAt >= boundary),
+  );
+  return {
+    pendingTasks: willUpdate.length,
+    pendingEmployees: new Set(willUpdate.map((b) => b.assigneeId)).size,
+    completedKept: blocks.length - willUpdate.length,
+  };
+}
+
 /** Shared cascade core: CANCEL the runs of every still-pending block of
  *  this template (parents AND subtasks — both are stamped). Cancelled runs
  *  are invisible to the whole data layer (fetchPeriodBlocks & the sidebar

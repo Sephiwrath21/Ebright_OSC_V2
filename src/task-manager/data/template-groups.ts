@@ -59,6 +59,7 @@ import {
   editTaskTemplateCore,
   getTemplateAssigneesCore,
   getTemplateDeletionImpactCore,
+  getTemplateEditImpactCore,
   PENDING_STATUSES,
   removeTemplateAssigneeCore,
 } from "./templates-internal";
@@ -598,6 +599,38 @@ export function getGroupDeletionImpact(
     }
     return { pendingTasks, pendingEmployees, completedKept };
   }, "getGroupDeletionImpact");
+}
+
+/** Aggregated pre-EDIT preview across every member task (2026-08-22) — same
+ *  shape/double-counting caveat as getGroupDeletionImpact above, but backed
+ *  by getTemplateEditImpactCore instead of getTemplateDeletionImpactCore,
+ *  so the Edit confirm dialog's count matches what editTemplateGroup is
+ *  actually about to update (parents only, excluding past-due instances)
+ *  rather than the Delete dialog's broader "every pending block" count. */
+export function getGroupEditImpact(
+  email: string,
+  groupId: string,
+  scope: TemplateGroupScope,
+): Promise<GroupDeletionImpact> {
+  return native(async () => {
+    const user = await requireGroupEditAccess(email, scope);
+    const id = z.string().min(1).parse(groupId);
+    const group = await prisma.taskTemplateGroup.findFirst({
+      where: { id, scope },
+      include: { templates: { select: { id: true } } },
+    });
+    if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
+    let pendingTasks = 0;
+    let pendingEmployees = 0;
+    let completedKept = 0;
+    for (const t of group.templates) {
+      const impact = await getTemplateEditImpactCore(user, t.id);
+      pendingTasks += impact.pendingTasks;
+      pendingEmployees += impact.pendingEmployees;
+      completedKept += impact.completedKept;
+    }
+    return { pendingTasks, pendingEmployees, completedKept };
+  }, "getGroupEditImpact");
 }
 
 /** Deletes every member task (cascade-safe — see deleteTaskTemplate) then

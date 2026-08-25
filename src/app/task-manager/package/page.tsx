@@ -36,6 +36,7 @@ import {
   editTemplateGroup,
   getGroupAssignees,
   getGroupDeletionImpact,
+  getGroupEditImpact,
   getFlowStaff,
   getMyRole,
   getTemplateGroup,
@@ -174,6 +175,18 @@ export default async function TaskManagerPackagePage() {
     }
   }
 
+  async function groupEditImpact(groupId: string): Promise<TemplateGroupImpactResult> {
+    "use server";
+    const stale = await requireLiveSession(email);
+    if (stale) return stale;
+    try {
+      const impact = await getGroupEditImpact(email, groupId, SCOPE);
+      return { ok: true, ...impact };
+    } catch (err) {
+      return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
+    }
+  }
+
   async function removeGroup(groupId: string): Promise<TemplateGroupDeleteResult> {
     "use server";
     const stale = await requireLiveSession(email);
@@ -270,6 +283,7 @@ export default async function TaskManagerPackagePage() {
               create: createGroup,
               edit: editGroup,
               impact: groupImpact,
+              editImpact: groupEditImpact,
               remove: removeGroup,
               apply: applyGroup,
               assignees: groupAssignees,

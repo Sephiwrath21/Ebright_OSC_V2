@@ -146,7 +146,12 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
 
   return (
     <div className="flex flex-col items-center gap-3 p-4">
-      <StatusDonut totals={totals} size={104}>
+      {/* Segment click opens the matching accordion below (2026-08-22, user
+          request — "click the donut, pop out the tasks") — same open/close
+          state the accordion's own header button already toggles, just a
+          second trigger onto it rather than a separate modal (the tasks are
+          already reachable right below, no need to duplicate that view). */}
+      <StatusDonut totals={totals} size={140} onSegmentClick={(key) => setOpen((cur) => (cur === key ? null : key))}>
         <span className="text-lg font-bold text-gray-900 dark:text-slate-100">{percent}%</span>
       </StatusDonut>
 

@@ -55,6 +55,7 @@ import { parseExpandParam } from "@/task-manager/ui/expand-param";
 import { HomeTaskOverview } from "@/task-manager/ui/home-overview";
 import { TaskOverviewStack } from "@/task-manager/ui/task-overview-stack";
 import { EntityCardOverview, type MyMonthConfig, type MyWeekConfig } from "@/task-manager/ui/entity-card-overview";
+import { CardModeProvider, CardModeToggle } from "@/task-manager/ui/card-mode-context";
 import {
   chunkLabel,
   defaultMonthRange,
@@ -119,6 +120,15 @@ export async function HomeScopedOverviewSection({
   };
 }) {
   try {
+    // Shared page-level List/Donut toggle (2026-08-22, user request — "top
+    // of daily task", mirroring /task-manager's own CardModeProvider) — this
+    // function has several structurally different return branches below
+    // (org roles / HOD / Branch / Member-CEO), each returning its own JSX
+    // early, so the whole branch-selection body is wrapped in this inner
+    // IIFE (every existing `return` inside it now returns to `content`
+    // instead of exiting the function) and the single toggle + provider
+    // wrap happens once, after whichever branch actually ran.
+    const content: ReactNode = await (async (): Promise<ReactNode> => {
     const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
     const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
     const [daily, monthly] = await Promise.all([
@@ -691,6 +701,19 @@ export async function HomeScopedOverviewSection({
           />
         )}
       </div>
+    );
+    })();
+
+    if (!content) return null;
+    return (
+      <CardModeProvider>
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-end">
+            <CardModeToggle />
+          </div>
+          {content}
+        </div>
+      </CardModeProvider>
     );
   } catch {
     return null;
