@@ -46,11 +46,17 @@ export function TaskOverviewStack({
   onRemoveProof,
   reassign,
   canReassignOthers,
+  dailyLabel,
 }: {
   entityName: string;
   categories: FlowCategoryOption[];
   myUserId: string;
   daily?: SectionData;
+  /** Override the Daily section's own heading, "Daily" by default
+   *  (2026-08-26, CEO's Home page — its single section reads "My Tasks"
+   *  instead, matching the old ceoCombinedList card's title it replaced;
+   *  every other caller omits this and keeps the plain "Daily" label). */
+  dailyLabel?: string;
   monthly?: SectionData;
   hodAssigned?: SectionData;
   ceoAssigned?: SectionData;
@@ -73,7 +79,7 @@ export function TaskOverviewStack({
   canReassignOthers?: boolean;
 }) {
   const sections: { key: string; label: string; data?: SectionData }[] = [
-    { key: "daily", label: "Daily", data: daily },
+    { key: "daily", label: dailyLabel ?? "Daily", data: daily },
     { key: "monthly", label: "Monthly", data: monthly },
     { key: "hodAssigned", label: "HOD Assigned Task", data: hodAssigned },
     { key: "ceoAssigned", label: "CEO Assigned Task", data: ceoAssigned },

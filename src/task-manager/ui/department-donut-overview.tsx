@@ -67,19 +67,15 @@ function DepartmentDonutCard({ entity }: { entity: FlowEntityRollup }) {
         {BUCKET_META.map((b) => (
           <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
             <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{entity[b.key]}</div>
-            {/* N/A's fill stays pale in both modes (BUCKET_TINT's own doc
-                comment) — its label needs dark, NEUTRAL (not yellow — same
-                brown-reading problem as a dark yellow fill, see
-                BUCKET_TEXT.na's doc comment) text in both modes too,
-                instead of the other buckets' light-in-dark-mode slate. */}
-            <div className={`text-[10px] font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}>
-              {b.label}
-            </div>
+            {/* BUCKET_TINT is the same pale shade in both modes for every
+                bucket now (2026-08-26) — the label text is just plain
+                black, unconditionally, no dark: override needed. */}
+            <div className="text-[10px] font-medium text-gray-900">{b.label}</div>
           </div>
         ))}
         <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
           <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
-          <div className="text-[10px] font-medium text-gray-900 dark:text-white">Total</div>
+          <div className="text-[10px] font-medium text-gray-900">Total</div>
         </div>
       </div>
 
@@ -94,9 +90,7 @@ function DepartmentDonutCard({ entity }: { entity: FlowEntityRollup }) {
               drillable ? "" : "cursor-default opacity-60"
             }`}
           >
-            <span
-              className={`flex items-center gap-2 text-sm font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}
-            >
+            <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
               <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
               {b.label}
             </span>

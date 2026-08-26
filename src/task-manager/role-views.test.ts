@@ -98,10 +98,11 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     ]);
   });
 
-  it("CEO's Home is just My Tasks (2026-08-19: ceoKanban/branchRegionOverview dropped entirely)", () => {
-    expect(ROLE_VIEWS.CEO.home).toEqual(["ceoCombinedList"]);
+  it("CEO's Home is just My Tasks (2026-08-19: ceoKanban/branchRegionOverview dropped entirely; 2026-08-26: ceoCombinedList swapped for personalDaily, matching every other role's weekday-table Home view)", () => {
+    expect(ROLE_VIEWS.CEO.home).toEqual(["personalDaily"]);
     expect(shows("CEO", "home", "ceoKanban")).toBe(false);
     expect(shows("CEO", "home", "branchRegionOverview")).toBe(false);
+    expect(shows("CEO", "home", "personalMonthly")).toBe(false);
   });
 
   it("DEPT_MEMBER gets the HOD Assigned card on Home only (2026-08-12: Task Manager's myOverview replaced it with whole-department Daily visibility instead)", () => {

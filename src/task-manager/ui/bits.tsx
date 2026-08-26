@@ -64,21 +64,24 @@ function InlineActionError({ text }: { text: string }) {
 }
 
 export const BUCKET_META = [
-  // `fill` (the pie wedge) is now theme-aware and matches BUCKET_TINT's own
-  // stat-chip/accordion-row colors exactly, shade for shade (2026-08-22,
-  // user request — the chart's wedges and the row list below it were two
-  // different, unrelated color choices before: fill was a single fixed
-  // shade regardless of theme, BUCKET_TINT was a light tint in light mode
-  // and a solid dark shade in dark mode). `dot` stays its own fixed
-  // (non-theme-varying) shade — used for small legend/rollup dots
+  // `fill` (the pie wedge) is now the SAME shade in both themes for
+  // Completed/Pending (2026-08-26, user feedback — a big solid dark:*-700
+  // wedge read as too vivid/harsh against the dark page background,
+  // compared to the soft pastel look in light mode; the user wanted the
+  // wedge itself to look identical either way). This deliberately diverges
+  // from BUCKET_TINT below (which still darkens the stat-chip/accordion-row
+  // backgrounds in dark mode) — the wedge is the single largest, most
+  // visually dominant element on the card, so its own theme-independence
+  // was asked for specifically, not the whole card's. `dot` stays its own
+  // fixed (non-theme-varying) shade — used for small legend/rollup dots
   // elsewhere that were never part of this donut-card color mismatch.
-  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-300 dark:fill-emerald-900", stroke: "stroke-emerald-500" },
-  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-300 dark:fill-red-900", stroke: "stroke-red-400" },
-  // fill stays PALE in dark mode too (2026-08-25, user feedback: the N/A
-  // wedge/chip read as orange/brown, not yellow) — see BUCKET_TINT's own
-  // doc comment for why yellow specifically can't just follow Completed/
-  // Pending's solid-900 pattern.
-  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-300 dark:fill-yellow-200", stroke: "stroke-yellow-400" },
+  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-300", stroke: "stroke-emerald-500" },
+  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-300", stroke: "stroke-red-400" },
+  // Already the same shade in both modes (2026-08-25, user feedback: the
+  // N/A wedge/chip read as orange/brown, not yellow, when darkened) — see
+  // BUCKET_TINT's own doc comment for why yellow specifically can't just
+  // follow Completed/Pending's dark treatment.
+  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-300", stroke: "stroke-yellow-400" },
 ] as const;
 
 export type BucketKey = (typeof BUCKET_META)[number]["key"];
@@ -88,46 +91,34 @@ export type BucketKey = (typeof BUCKET_META)[number]["key"];
  *  BUCKET_META's dot/stroke/fill classes, just as a soft background instead
  *  of a solid fill. Shared here (2026-08-22) so every donut-style card
  *  stays visually identical instead of drifting via separate copies.
- *  Light mode is *-300 (2026-08-25, user feedback: the original *-100 wash
- *  read as washed-out/too light, especially on the pie wedges) — bumped up
- *  from the ClickUp Task page's own *-100 member-card tokens
- *  (DepartmentMembers.tsx's StatChip/Accordion bg) this used to match
- *  exactly; that page is unaffected, only this donut-card copy changed.
- *  Dark mode is SOLID (bg-*-900, no opacity fraction — 2026-08-22, user
- *  feedback: the original *-950/40 wash was too close to the page's own
- *  dark background to tell the three buckets apart at a glance). Matches
- *  DepartmentMembers.tsx's own dark tint tokens (--tint-green/--tint-red
- *  resolve to emerald-900/red-900) exactly.
- *  N/A is the one exception (2026-08-25, user feedback: bg-yellow-900 read
- *  as orange/brown, not yellow) — dark yellow only reads as a distinct
- *  color at high lightness (unlike red/emerald, which stay recognizable
- *  when darkened), so N/A keeps a PALE fill in dark mode too, with dark
- *  text instead of light (BUCKET_TEXT.na below) for contrast. */
+ *  SAME shade in both themes now (2026-08-26, user feedback — after the
+ *  pie wedge itself went theme-independent, the chips/rows sitting right
+ *  below it still visibly darkened in dark mode, which read as
+ *  inconsistent once the wedge no longer did; this went through several
+ *  dark-mode-only iterations first — *-100 wash, then solid *-900, then
+ *  *-700 — before landing on "just match light mode," same resolution the
+ *  wedge itself reached one prompt earlier). N/A was already unified for
+ *  its own separate reason (2026-08-25: a darkened yellow reads as
+ *  orange/brown, not yellow, at any lightness low enough to look "dark
+ *  mode" — see BUCKET_TEXT.na below for the paired dark-text fix that
+ *  makes THIS true in light mode too, not just dark). */
 export const BUCKET_TINT: Record<BucketKey, string> = {
-  completed: "bg-emerald-300 dark:bg-emerald-900",
-  pending: "bg-red-300 dark:bg-red-900",
-  na: "bg-yellow-300 dark:bg-yellow-200",
+  completed: "bg-emerald-300",
+  pending: "bg-red-300",
+  na: "bg-yellow-300",
 };
 /** Colored text/icon per bucket — a stat chip's number, an accordion row's
  *  chevron — matching DepartmentMembers.tsx's colored `color` token (label
  *  text stays neutral either way — only the value/icon carries the bucket
- *  color). Plain black in light mode / white in dark mode for
- *  Completed/Pending (2026-08-25, user feedback, two rounds: first that the
- *  tinted emerald-300/red-300 numbers were hard to read against their own
- *  now-solid dark-900 chip backgrounds in dark mode, then that the tinted
- *  emerald-700/red-600 numbers should go plain black in light mode too, for
- *  the same high-contrast-over-color reason). N/A is still the one
- *  exception, needing dark, NEUTRAL (not yellow — see below) text in BOTH
- *  modes to pair with BUCKET_TINT.na's pale fill above (white text there
- *  would be unreadable). NEUTRAL gray, not a dark yellow shade (2026-08-25
- *  — user feedback: yellow-800/900 TEXT reads exactly as brown/muddy as
- *  yellow-900 BACKGROUNDS did, same colorimetric limit, just moved from the
- *  fill to the text) — plain gray-900 gives the same contrast against the
- *  pale yellow fill without carrying a hue at all; happens to be the exact
- *  same value Completed/Pending's own light-mode black now uses too. */
+ *  color). Plain black in BOTH modes now (2026-08-26) — since BUCKET_TINT
+ *  above is the same pale shade in both modes too, white text (the old
+ *  dark-mode treatment, from when the chip itself was dark) would now be
+ *  unreadable against it; black is simply BUCKET_TINT.na's own existing
+ *  treatment extended to every bucket, since every bucket's background is
+ *  now exactly as pale as N/A's always was. */
 export const BUCKET_TEXT: Record<BucketKey, string> = {
-  completed: "text-gray-900 dark:text-white",
-  pending: "text-gray-900 dark:text-white",
+  completed: "text-gray-900",
+  pending: "text-gray-900",
   na: "text-gray-900",
 };
 export const BUCKET_SOLID: Record<BucketKey, string> = {
@@ -135,13 +126,11 @@ export const BUCKET_SOLID: Record<BucketKey, string> = {
   pending: "bg-red-400",
   na: "bg-yellow-400",
 };
-/** Total's own tint/text — purple. Solid dark-mode background (violet-900),
- *  same reasoning as BUCKET_TINT above; light mode bumped to violet-300
- *  alongside it (2026-08-25, same "too light" feedback). Text is plain
- *  black in light mode / white in dark mode (2026-08-25), same readability
- *  fix as BUCKET_TEXT's completed/pending above. */
-export const TOTAL_TINT = "bg-violet-300 dark:bg-violet-900";
-export const TOTAL_TEXT = "text-gray-900 dark:text-white";
+/** Total's own tint/text — purple. Same shade in both themes (2026-08-26),
+ *  same reasoning as BUCKET_TINT above; text stays plain black in both
+ *  modes too, same reasoning as BUCKET_TEXT above. */
+export const TOTAL_TINT = "bg-violet-300";
+export const TOTAL_TEXT = "text-gray-900";
 
 /** Small calendar glyph — pairs with a date wherever a task shows one. */
 export function CalendarIcon({ className = "size-3" }: { className?: string }) {

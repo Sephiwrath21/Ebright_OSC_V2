@@ -1543,6 +1543,36 @@ export default async function TaskManagerPage({
         />
       </div>
     );
+    // Personal (self-only) Monthly card default (2026-08-26, user request):
+    // when ?mrange= is untouched, default to the week-range chunk containing
+    // TODAY (e.g. "22-31") instead of Full month — same "only-when-
+    // defaulting" pattern All Departments/All Regions already use (this
+    // page's own buildEntityOverview), just for myOverviewData.monthly
+    // specifically. Deliberately a SEPARATE control/data source from
+    // personalMonthlyControl/monthly.me above — that pair is also shared by
+    // HOD's departmentOverview.monthly and Branch Manager's
+    // branchOverview.monthly (task-manager-view.tsx), which weren't part of
+    // this request and stay on the existing "Full month by default" behavior
+    // unless asked for too.
+    const [personalMonthlyAnchorY, personalMonthlyAnchorM] = monthly.date.split("-").map(Number);
+    const personalMonthlyDefaultRange = defaultMonthRange(personalMonthlyAnchorY, personalMonthlyAnchorM, new Date());
+    const personalMonthlyRangeParam = monthlyRangeParam ?? personalMonthlyDefaultRange;
+    const personalMonthlyMe =
+      monthlyRangeParam === undefined && personalMonthlyDefaultRange
+        ? (await getFlowDetail(email, "monthly", monthlyDate, { monthDays: parseMonthRange(personalMonthlyDefaultRange)! }))
+            .me
+        : monthly.me;
+    const personalMonthlyControlSelf = (
+      <div key="personal-monthly-controls-self" className="flex items-center gap-1.5">
+        <MonthDropdown value={monthly.date} basePath="/task-manager" extraParams={dailyCarry} />
+        <MonthRangeDropdown
+          value={monthly.date}
+          range={personalMonthlyRangeParam}
+          basePath="/task-manager"
+          extraParams={dailyCarry}
+        />
+      </div>
+    );
     // "HOD Assigned Task" for individual staff — DEPT_MEMBER only
     // (2026-08-18 fix, matches Home's own role-views.ts scoping:
     // DEPT_MEMBER.home includes "hodAssigned"; BRANCH_MEMBER/COACH's home
@@ -1618,8 +1648,8 @@ export default async function TaskManagerPage({
       // Monthly self-scoped, per the confirmed correction. Omitted
       // entirely for BRANCH_MEMBER/COACH (Daily-only) — see below.
       monthly: {
-        entity: toSelfEntityDetail(monthly.me.me, monthly.me),
-        dateControl: personalMonthlyControl,
+        entity: toSelfEntityDetail(personalMonthlyMe.me, personalMonthlyMe),
+        dateControl: personalMonthlyControlSelf,
         showViewToggle: false,
         // Side-tab strip (2026-08-21) — see personalMyMonth's own doc
         // comment above. undefined for every role except OPS/DEPT_MEMBER,
