@@ -82,11 +82,13 @@ jobs:
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          CRM_RESEND_API_KEY: ${{ secrets.CRM_RESEND_API_KEY }}
+          CRM_FROM_EMAIL: ${{ secrets.CRM_FROM_EMAIL }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME,CRM_RESEND_API_KEY,CRM_FROM_EMAIL
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
@@ -192,6 +194,29 @@ jobs:
             if [ -n "$BA_SECRET" ]; then
               sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
               printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
+            fi
+
+            # Resend — the transport password reset falls back to when SMTP
+            # fails, and now the primary way it delivers: Gmail has od@ locked
+            # under a 454 "too many login attempts", while the ebright.my
+            # domain is verified in Resend. Without a key here the fallback is
+            # dead code, which is why an SMTP outage became a hard "contact
+            # support" failure instead of a degraded one.
+            #
+            # Written with the same shape as the two blocks above, on purpose.
+            # An earlier attempt used the SMTP section's helper functions
+            # instead and the deploy died on those lines with no output — the
+            # cause was never identified. These four lines copy a pattern that
+            # has run on this host for weeks rather than inventing a new one.
+            RS_KEY="$(printf '%s' "$CRM_RESEND_API_KEY" | tr -d '\r\n')"
+            if [ -n "$RS_KEY" ]; then
+              sed -i '/^CRM_RESEND_API_KEY=/d' .env || true
+              printf 'CRM_RESEND_API_KEY="%s"\n' "$RS_KEY" >> .env
+            fi
+            RS_FROM="$(printf '%s' "$CRM_FROM_EMAIL" | tr -d '\r\n')"
+            if [ -n "$RS_FROM" ]; then
+              sed -i '/^CRM_FROM_EMAIL=/d' .env || true
+              printf 'CRM_FROM_EMAIL="%s"\n' "$RS_FROM" >> .env
             fi
 
             # SMTP / outgoing mail (2026-08-20). Until now NOTHING in this
