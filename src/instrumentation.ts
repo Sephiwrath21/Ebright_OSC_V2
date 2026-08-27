@@ -16,6 +16,14 @@ const TRANSFER_REVERT_SWEEP_MS = 60 * 60 * 1000; // hourly — end_date is a cal
 
 const STAGE_TRANSITION_SWEEP_MS = 60 * 60 * 1000; // hourly — same reasoning as the transfer-revert sweep, day-level granularity only
 
+// The ebrightsms staff sync ticks hourly but runs at most once per
+// Asia/Kuala_Lumpur day, at SMS_STAFF_SYNC_HOUR_KL. Nightly rather than
+// hourly because HR identity changes slowly and each run provisions accounts
+// in another product; a bare 24h setInterval was rejected because it drifts to
+// whatever time the container last restarted.
+const SMS_STAFF_SYNC_TICK_MS = 60 * 60 * 1000;
+const SMS_STAFF_SYNC_HOUR_KL = 2;
+
 // Disabled per explicit decision — Onboarding -> Active and Probation ->
 // next-stage should only happen via the manual "Next" button for now, not
 // automatically after 3 qualifying days. Code is left in place (not
@@ -212,4 +220,71 @@ export async function register(): Promise<void> {
   setInterval(() => {
     void stageTransitionSweep();
   }, STAGE_TRANSITION_SWEEP_MS);
+
+  // ebrightsms staff sync — pushes staff identity into the student management
+  // system, which cannot pull (see smsStaffSync.ts). Unlike every sweep above
+  // it writes to a DIFFERENT product over HTTP, so it stays off entirely
+  // unless both env vars are present rather than failing every hour.
+  const klNow = () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      day: "2-digit",
+      hour: "2-digit",
+      hour12: false,
+      month: "2-digit",
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+    }).formatToParts(new Date());
+    const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    return { day: `${part("year")}-${part("month")}-${part("day")}`, hour: Number(part("hour")) };
+  };
+
+  // Seeded at boot to today when the app starts after the hour has already
+  // passed, so a restart or deploy never triggers an unattended full push at
+  // an arbitrary time of day. A day lost to downtime simply syncs the next
+  // night — the sweep is idempotent, so nothing accumulates or is missed.
+  const boot = klNow();
+  let smsStaffSyncLastDay: string | null = boot.hour >= SMS_STAFF_SYNC_HOUR_KL ? boot.day : null;
+
+  const smsStaffSyncSweep = async () => {
+    const { day, hour } = klNow();
+    if (day === smsStaffSyncLastDay || hour < SMS_STAFF_SYNC_HOUR_KL) return;
+    // Claim the slot before doing the work, not after: a failure should wait
+    // for tomorrow rather than re-push the whole workforce every hour.
+    smsStaffSyncLastDay = day;
+
+    try {
+      const { runSmsStaffSync } = await import("@/lib/smsStaffSync");
+      const { records, skipped, outcome } = await runSmsStaffSync({ apply: true });
+      console.log(
+        `[sms-staff-sync] ${records.length} sent — created ${outcome?.created ?? 0}, ` +
+          `updated ${outcome?.updated ?? 0}, failed ${outcome?.failures.length ?? 0}; ${skipped.length} skipped`,
+      );
+      for (const failure of outcome?.failures ?? []) {
+        console.warn(`[sms-staff-sync] rejected ${failure.externalId}: ${failure.error}`);
+      }
+      // Only the fixable skips are worth a line each — the rest (HQ, no
+      // branch, pre-hires) are the selection rules working as intended.
+      for (const person of skipped.filter((s) => s.reason.startsWith("job title") || s.reason.startsWith("email"))) {
+        console.warn(`[sms-staff-sync] needs fixing in HRMS: ${person.fullName} (${person.branch}) — ${person.reason}`);
+      }
+    } catch (err) {
+      console.warn(
+        `[sms-staff-sync] sweep failed (will retry tomorrow): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  };
+
+  if (!process.env.SMS_BASE_URL || !process.env.SMS_STAFF_SYNC_API_KEY) {
+    console.log(
+      "[sms-staff-sync] SMS_BASE_URL / SMS_STAFF_SYNC_API_KEY not set — nightly staff sync disabled",
+    );
+  } else {
+    console.log(
+      `[sms-staff-sync] nightly sweep armed for ` +
+        `${String(SMS_STAFF_SYNC_HOUR_KL).padStart(2, "0")}:00 Asia/Kuala_Lumpur`,
+    );
+    setInterval(() => {
+      void smsStaffSyncSweep();
+    }, SMS_STAFF_SYNC_TICK_MS);
+  }
 }
