@@ -54,10 +54,12 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     }
   });
 
-  it("the THREE weekday ranges: dept Tue–Sat, Manager/Exec Tue–Sun, Coach Wed–Sun", () => {
+  it("the FOUR weekday ranges: dept Tue–Sat, Branch Exec Tue–Sun, Branch Manager/Coach Wed–Sun", () => {
     expect(weekdayRangeOf("DEPT_MEMBER")).toBe("tue-sat");
     expect(weekdayRangeOf("HOD")).toBe("tue-sat");
-    expect(weekdayRangeOf("BRANCH_MANAGER")).toBe("tue-sun");
+    // Wed-Sun (2026-08-26, user request — dropped Tuesday for Branch
+    // Manager specifically; Branch Exec/BRANCH_MEMBER is unchanged).
+    expect(weekdayRangeOf("BRANCH_MANAGER")).toBe("wed-sun");
     expect(weekdayRangeOf("BRANCH_MEMBER")).toBe("tue-sun");
     expect(weekdayRangeOf("COACH")).toBe("wed-sun");
   });

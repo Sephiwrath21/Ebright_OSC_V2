@@ -12,9 +12,10 @@
 // HOD/DEPT_SITE's detail now inline there too. "+ Task" sits in the page
 // header for superadmin + elevated sites.
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { ModeTabs } from "./mode-tabs";
 import { auth } from "@/auth";
 import { requireLiveSession } from "@/task-manager/action-session";
 import AppShell from "@/app/components/AppShell";
@@ -190,31 +191,6 @@ function regionForAllRegionValue(value: string | undefined): (typeof FLOW_BRANCH
  *  single-branch) so the bold set can never drift between them. */
 const ALL_BRANCH_BOLD_VALUES = [ALL_REGIONS_VALUE, ...FLOW_BRANCH_REGIONS.map((r) => allRegionValue(r.name))];
 
-/** Superadmin's top-level mode switch — Department or Branch, never both.
- *  Carries the selected Daily date across so switching modes keeps it. */
-function ModeTabs({ active, date }: { active: "department" | "branch"; date?: string }) {
-  const base = "rounded-lg px-4 py-1.5 text-sm font-semibold border border-transparent";
-  const on = "bg-white text-gray-900 border-gray-300 shadow dark:bg-slate-700 dark:text-slate-100 dark:border-slate-500";
-  const off = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300";
-  const suffix = date ? `&date=${date}` : "";
-  return (
-    <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-800">
-      <Link
-        href={`/task-manager?view=department${suffix}`}
-        className={`${base} ${active === "department" ? on : off}`}
-      >
-        Department
-      </Link>
-      <Link
-        href={`/task-manager?view=branch${suffix}`}
-        className={`${base} ${active === "branch" ? on : off}`}
-      >
-        Branch
-      </Link>
-    </div>
-  );
-}
-
 /** Strict YYYY-MM-DD or nothing — anything else falls back to today (the
  *  data layer's own default when `date` is omitted). */
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -251,6 +227,14 @@ export default async function TaskManagerPage({
   const email = su.email;
 
   const sp = await searchParams;
+  // Superadmin/elevated-site/CEO's Department|Branch toggle (ModeTabs)
+  // remembers the last picked mode across visits (2026-08-26, user
+  // request) — a cookie, not localStorage, since ModeTabs' own Links are
+  // plain server-rendered navigation with no client JS otherwise; ?view=
+  // still wins whenever present (an explicit navigation/bookmark), the
+  // cookie only fills in when it's altogether absent. See ModeTabs' own
+  // onClick below for where this gets written.
+  const cookieEntityView = (await cookies()).get("tm_entity_view")?.value;
   const period = sp.period === "monthly" ? "monthly" : "daily";
   const href = (p: string) => `/task-manager?period=${p}`;
   // Date filters: ?date= drives every DAILY surface (entity Details AND the
@@ -933,7 +917,8 @@ export default async function TaskManagerPage({
     // superadmin/elevated sites' WHOLE page, and since 2026-08-01 also
     // appended BELOW the CEO's own sections (config: entityDropdowns).
     // Extracted into a builder so both render paths share one definition.
-    const entityView: "department" | "branch" = sp.view === "branch" ? "branch" : "department";
+    const entityView: "department" | "branch" =
+      sp.view === "branch" ? "branch" : sp.view === "department" ? "department" : cookieEntityView === "branch" ? "branch" : "department";
     // Manager mode for the View All card grid (2026-08-15): lets ADMIN and
     // elevated DEPT_SITE (Operations/Optimisation) reassign OTHER people's
     // tasks directly from a Person-sort card row, not just their own —
@@ -1063,6 +1048,8 @@ export default async function TaskManagerPage({
                   basePath="/task-manager"
                   extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
                   boldValues={[ALL_DEPARTMENTS_VALUE]}
+                  userId={daily.me.me.userId}
+                  hasExplicitValue={sp.department === ALL_DEPARTMENTS_VALUE}
                 />
                 <CardModeToggle />
               </div>
@@ -1133,6 +1120,8 @@ export default async function TaskManagerPage({
                 basePath="/task-manager"
                 extraParams={{ view: "department", ...(dailyDate ? { date: dailyDate } : {}) }}
                 boldValues={[ALL_DEPARTMENTS_VALUE]}
+                userId={daily.me.me.userId}
+                hasExplicitValue={sp.department === department}
               />
               <CardModeToggle />
             </div>
@@ -1176,6 +1165,8 @@ export default async function TaskManagerPage({
                   basePath="/task-manager"
                   extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
                   boldValues={ALL_BRANCH_BOLD_VALUES}
+                  userId={daily.me.me.userId}
+                  hasExplicitValue={sp.branch === ALL_REGIONS_VALUE}
                 />
                 <CardModeToggle />
               </div>
@@ -1255,6 +1246,8 @@ export default async function TaskManagerPage({
                   basePath="/task-manager"
                   extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
                   boldValues={ALL_BRANCH_BOLD_VALUES}
+                  userId={daily.me.me.userId}
+                  hasExplicitValue={sp.branch === allRegionValue(selectedAllRegion.name)}
                 />
                 <CardModeToggle />
               </div>
@@ -1331,6 +1324,8 @@ export default async function TaskManagerPage({
                 basePath="/task-manager"
                 extraParams={{ view: "branch", ...(dailyDate ? { date: dailyDate } : {}) }}
                 boldValues={ALL_BRANCH_BOLD_VALUES}
+                userId={daily.me.me.userId}
+                hasExplicitValue={sp.branch === branch}
               />
               <CardModeToggle />
             </div>

@@ -207,7 +207,10 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     // (2026-08-18, same visit, explicit request) — the "Manpower Schedule"
     // Details card at the very bottom of the page.
     taskManager: ["myTasksAdhoc", "branchOverview"],
-    weekdayRange: "tue-sun",
+    // Wed-Sun (2026-08-26, user request — dropped Tuesday) — same range
+    // Coaches already use; matches FLOW_DAYS/the Package Table's own
+    // Wed-Sun week, which never has a Monday/Tuesday column either.
+    weekdayRange: "wed-sun",
     addTaskHeader: false,
   },
   // Branch sites see Daily, Monthly AND the branch-wide ad hoc set

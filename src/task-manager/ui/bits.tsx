@@ -86,6 +86,14 @@ export const BUCKET_META = [
 
 export type BucketKey = (typeof BUCKET_META)[number]["key"];
 
+/** Row order for the donut cards' collapsible accordion (Department/Branch
+ *  and Person cards) — Pending first (2026-08-26, user request: the thing
+ *  needing attention should lead), Completed second, N/A last. Deliberately
+ *  separate from BUCKET_META's own array order, which stays
+ *  Completed/Pending/N/A and still drives the stat-chip row above the
+ *  accordion (untouched by this request) plus the pie wedges/legend. */
+export const ACCORDION_BUCKET_ORDER: BucketKey[] = ["pending", "completed", "na"];
+
 /** Background tint per bucket for donut cards' stat chips/accordion rows
  *  (PersonDonutCard, DepartmentDonutCard) — same 3-color convention as
  *  BUCKET_META's dot/stroke/fill classes, just as a soft background instead
@@ -2302,20 +2310,33 @@ function BulkActionsButton({
   const [busy, setBusy] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !(menuRef.current && menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -2351,37 +2372,62 @@ function BulkActionsButton({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Bulk actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
         disabled={busy || disabled}
         onClick={() => {
           setErrorText(null);
-          setOpen((o) => !o);
+          setOpen((o) => {
+            const next = !o;
+            if (next && triggerRef.current) {
+              // Portal to <body> with a computed fixed position (2026-08-26
+              // fix) — same rationale as RowActionsMenu's own menu just
+              // above: this button can sit inside a scrolling/clipped card
+              // body (ResizableTaskList's hideCompleted groups, the
+              // SectionCard wrapper around "CEO Assigned Task"/"Tasks I
+              // Assigned"), which clipped/mispositioned the old plain
+              // `absolute` dropdown instead of floating it over the row.
+              const rect = triggerRef.current.getBoundingClientRect();
+              const MENU_HEIGHT_ESTIMATE = actions.length * 32 + 12;
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              setMenuPos({ top, left: rect.right - 176 });
+            }
+            return next;
+          });
         }}
         className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
         {busy ? "Updating…" : `(${count}) ▾`}
       </button>
       {errorText && <InlineActionError text={errorText} />}
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
-        >
-          {actions.map((a) => (
-            <button
-              key={a.key}
-              type="button"
-              role="menuitem"
-              onClick={() => run(a.onRun)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              {a.icon}
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
+          >
+            {actions.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                role="menuitem"
+                onClick={() => run(a.onRun)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {a.icon}
+                {a.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

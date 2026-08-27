@@ -57,6 +57,7 @@ import {
   type PersonCard,
 } from "./entity-card-grouping";
 import {
+  ACCORDION_BUCKET_ORDER,
   BUCKET_META,
   BUCKET_SOLID,
   BUCKET_TEXT,
@@ -168,15 +169,18 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
       </StatusDonut>
 
       <div className="grid w-full grid-cols-4 gap-1.5">
-        {BUCKET_META.map((b) => (
-          <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
-            <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
-            {/* BUCKET_TINT is the same pale shade in both modes for every
-                bucket now (2026-08-26) — the label text is just plain
-                black, unconditionally, no dark: override needed. */}
-            <div className="text-[10px] font-medium text-gray-900">{b.label}</div>
-          </div>
-        ))}
+        {ACCORDION_BUCKET_ORDER.map((key) => {
+          const b = BUCKET_META.find((m) => m.key === key)!;
+          return (
+            <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
+              <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
+              {/* BUCKET_TINT is the same pale shade in both modes for every
+                  bucket now (2026-08-26) — the label text is just plain
+                  black, unconditionally, no dark: override needed. */}
+              <div className="text-[10px] font-medium text-gray-900">{b.label}</div>
+            </div>
+          );
+        })}
         <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
           <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
           <div className="text-[10px] font-medium text-gray-900">Total</div>
@@ -184,24 +188,27 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
       </div>
 
       <div className="flex w-full flex-col gap-1.5">
-        {BUCKET_META.map((b) => (
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => setDrill(b.key)}
-            className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left ${BUCKET_TINT[b.key]}`}
-          >
-            <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-              <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
-              {b.label}
-            </span>
-            <span
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
+        {ACCORDION_BUCKET_ORDER.map((key) => {
+          const b = BUCKET_META.find((m) => m.key === key)!;
+          return (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setDrill(b.key)}
+              className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left ${BUCKET_TINT[b.key]}`}
             >
-              {byBucket[b.key].length}
-            </span>
-          </button>
-        ))}
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
+                {b.label}
+              </span>
+              <span
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
+              >
+                {byBucket[b.key].length}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {drill && (
