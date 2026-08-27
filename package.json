@@ -16,7 +16,8 @@
     "tm:clear-stale": "tsx --env-file-if-exists=.env prisma/task-manager/clear-stale-assignments.ts",
     "backfill:attendance": "tsx scripts/backfill-attendance.ts",
     "crm:generate": "prisma generate --config prisma.crm.config.ts",
-    "crm:validate": "prisma validate --config prisma.crm.config.ts"
+    "crm:validate": "prisma validate --config prisma.crm.config.ts",
+    "sync:sms-staff": "tsx scripts/sync-staff-to-sms.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
