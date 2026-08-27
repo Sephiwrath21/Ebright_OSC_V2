@@ -5,7 +5,7 @@
 //   npm run sync:sms-staff -- --branch="Rimbayu"        # dry run, one branch
 //   npm run sync:sms-staff -- --branch="Rimbayu" --apply
 //   npm run sync:sms-staff -- --apply                   # every branch
-//   npm run sync:sms-staff -- --apply --include-leavers # also archive people who left
+//   npm run sync:sms-staff -- --apply --skip-leavers    # active/onboarding only
 //
 // A dry run touches nothing. --apply provisions accounts in ebrightsms AND
 // sends each new person an activation email, so run a single branch first.
@@ -45,12 +45,12 @@ function countBy<T>(items: T[], key: (item: T) => string): Record<string, number
 (async () => {
   const apply = flag("apply");
   const branchName = option("branch");
-  const includeLeavers = flag("include-leavers");
+  const includeLeavers = !flag("skip-leavers");
 
   console.log(
     `[sms-staff-sync] ${apply ? "APPLYING" : "dry run"}` +
       `${branchName ? ` · branch "${branchName}"` : " · all branches"}` +
-      `${includeLeavers ? " · including leavers" : ""}`,
+      `${includeLeavers ? " · including leavers" : " · skipping leavers"}`,
   );
 
   const { records, skipped, outcome } = await runSmsStaffSync({ apply, branchName, includeLeavers });

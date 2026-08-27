@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { z } from "zod";
 
 import { normalizeName } from "@/lib/normalizeName";
 import { prisma } from "@/lib/prisma";
@@ -87,11 +88,13 @@ export interface SkippedStaff {
 export interface CollectOptions {
   /** Restrict to one branch by name — for a cautious first live run. */
   branchName?: string;
-  /** Send people who have left, so ebrightsms archives them. Off until the
-   * initial import has landed: with it on, a first run would also create ~96
-   * accounts for people who already left, each getting an invite email. Turn
-   * it on straight after the first successful full import, otherwise
-   * departures never reach ebrightsms at all. */
+  /** Set false to stop sending people who have left. On by default since the
+   * initial import landed (2026-08-27): ebrightsms only ever learns of a
+   * departure from a record pushed to it, so leaving them out means nobody is
+   * ever archived there. It was off for that first run because leavers do not
+   * exist in ebrightsms yet, so including them creates an archived account
+   * rather than archiving an existing one — a one-off backfill of ex-staff
+   * that is only worth paying once. */
   includeLeavers?: boolean;
 }
 
@@ -109,6 +112,9 @@ const EXCLUDED_BRANCH_NAMES = new Set(["HQ"]);
 // itself on their start date (stageTransitionAutomation.ts), so the next run
 // picks them up with no human involved.
 const PRESENT_STATUSES = new Set(["active", "onboarding"]);
+
+// Mirrors StaffSyncSchema.email in ebrightsms's lib/staff-sync.ts.
+const EMAIL = z.string().trim().toLowerCase().email();
 
 // Test rows that live in the real staff tables. Pinned by user_id rather than
 // by name so a later rename cannot quietly let them through.
@@ -198,13 +204,20 @@ export async function collectStaffForSms(options: CollectOptions = {}): Promise<
 
     const status = employment.status ?? "";
     const present = PRESENT_STATUSES.has(status);
-    if (!present && !(options.includeLeavers && status === "inactive")) {
+    const includeLeavers = options.includeLeavers ?? true;
+    if (!present && !(includeLeavers && status === "inactive")) {
       note(`employment status "${status || "(none)"}"`);
       continue;
     }
 
     if (!fullName) { note("no full name recorded"); continue; }
     if (!person.email?.trim()) { note("no email address"); continue; }
+    // The bulk endpoint parses the WHOLE batch before writing any of it, so a
+    // single unparseable address rejects all 247 records rather than its own.
+    // HRMS holds addresses nobody validated on the way in (a trailing
+    // backslash, at time of writing), so screen them here against the same
+    // rule the receiving schema applies and report the row instead.
+    if (!EMAIL.safeParse(person.email).success) { note(`email "${person.email.trim()}" is not a valid address`); continue; }
 
     const title = branchStaffTitle(index, fullName, branchName) ?? employment.position;
     const positionType = POSITION_TYPE_OVERRIDES.get(normalizeName(fullName)) ?? positionTypeFromTitle(title);
