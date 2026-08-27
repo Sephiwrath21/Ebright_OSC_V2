@@ -755,7 +755,19 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
-                            defaultNameWidth={400}
+                            // Trimmed from 400 (2026-08-26, user report — some
+                            // viewers saw an unwanted horizontal scrollbar just
+                            // to complete a task). 400 was sized on the
+                            // (mistaken) assumption that blankDueDate frees up
+                            // its column's width — it doesn't, the DUE_COL_WIDTH
+                            // spacer stays reserved (empty) for row alignment,
+                            // so the real total (checkbox + status + 400 Task +
+                            // Proof 96 + blank Due 120 + Reassign 112 + gaps) ran
+                            // past the available width on anything narrower than
+                            // a wide desktop monitor, alongside this tab list's
+                            // own 128px sidebar. Still fully draggable up to
+                            // RESIZABLE_TASK_NAME_MAX afterward.
+                            defaultNameWidth={260}
                           />
                         )}
                       </div>
@@ -812,7 +824,19 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
-                            defaultNameWidth={400}
+                            // Trimmed from 400 (2026-08-26, user report — some
+                            // viewers saw an unwanted horizontal scrollbar just
+                            // to complete a task). 400 was sized on the
+                            // (mistaken) assumption that blankDueDate frees up
+                            // its column's width — it doesn't, the DUE_COL_WIDTH
+                            // spacer stays reserved (empty) for row alignment,
+                            // so the real total (checkbox + status + 400 Task +
+                            // Proof 96 + blank Due 120 + Reassign 112 + gaps) ran
+                            // past the available width on anything narrower than
+                            // a wide desktop monitor, alongside this tab list's
+                            // own 128px sidebar. Still fully draggable up to
+                            // RESIZABLE_TASK_NAME_MAX afterward.
+                            defaultNameWidth={260}
                           />
                         )}
                       </div>

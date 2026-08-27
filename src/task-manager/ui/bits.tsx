@@ -2534,10 +2534,15 @@ export function ResizableTaskList({
   reassignAnyOwner?: boolean;
   /** Starting Task-column width before any drag (2026-08-15) — defaults to
    *  RESIZABLE_TASK_NAME_DEFAULT (the original "My Tasks" page behavior,
-   *  unchanged) when omitted. Callers with a wider available row (no
-   *  Assignee/Due columns eating space, e.g. EntityCardOverview's own-card
-   *  myWeek/myMonth tab body) can start the divider further right instead
-   *  of always opening at the same narrow default. Still fully draggable
+   *  unchanged) when omitted. Callers with a wider available row (e.g. no
+   *  Assignee column, EntityCardOverview's own-card myWeek/myMonth tab
+   *  body) can start the divider further right instead of always opening
+   *  at the same narrow default — but keep in mind blankDueDate does NOT
+   *  free up its column's width, only its displayed value (the
+   *  DUE_COL_WIDTH spacer stays reserved either way, for row alignment);
+   *  a caller combining blankDueDate with a wide defaultNameWidth can still
+   *  overflow a narrower viewport (2026-08-26 fix: myWeek/myMonth's own
+   *  400 did exactly this, trimmed to 260). Still fully draggable
    *  afterward within RESIZABLE_TASK_NAME_MIN/MAX either way. */
   defaultNameWidth?: number;
 }) {
