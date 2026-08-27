@@ -39,6 +39,7 @@ const EMPTY_GUIDELINE: TaskGuideline = { url: "", image: null };
 export function TemplateGroupFormModal({
   control,
   groupId,
+  duplicateFromId,
   onClose,
   label = "Template",
   categories,
@@ -46,6 +47,14 @@ export function TemplateGroupFormModal({
 }: {
   control: FlowTemplateGroupControl;
   groupId?: string;
+  /** Duplicate mode (2026-08-26, user request — "different template but
+   *  similar task, just a few tasks different"): prefills a blank CREATE
+   *  form from an existing group's tasks/subtasks/guidelines/category, so
+   *  the viewer only has to tweak the differences instead of rebuilding
+   *  from scratch. Mutually exclusive with `groupId` — this is still
+   *  create mode (isEdit stays false, Save calls control.create and makes
+   *  a brand-new group; the source group is never touched). */
+  duplicateFromId?: string;
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
   label?: "Template" | "Package";
@@ -67,7 +76,7 @@ export function TemplateGroupFormModal({
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [guidelines, setGuidelines] = React.useState<TaskGuideline[]>([{ ...EMPTY_GUIDELINE }]);
   const imageInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-  const [loading, setLoading] = React.useState(isEdit);
+  const [loading, setLoading] = React.useState(isEdit || Boolean(duplicateFromId));
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   // Unsaved-changes guard (2026-08-26, user report — an accidental
@@ -115,6 +124,49 @@ export function TemplateGroupFormModal({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
+
+  // Duplicate mode's own load (2026-08-26) — same source data as the edit
+  // effect above, but into what stays a CREATE form: name gets a "Copy of"
+  // prefix (so it doesn't silently collide with the original), and every
+  // task's `id` is dropped so control.create makes brand-new TaskTemplate
+  // rows rather than referencing the source's. Marked dirty immediately
+  // after populating — unlike edit mode's baseline (already saved,
+  // nothing lost by closing untouched), this prefilled copy hasn't been
+  // created yet, so an accidental close SHOULD warn before discarding it.
+  React.useEffect(() => {
+    if (!duplicateFromId || groupId) return;
+    let cancelled = false;
+    void control.load(duplicateFromId).then((result) => {
+      if (cancelled) return;
+      setLoading(false);
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        return;
+      }
+      setName(`Copy of ${result.group.name}`);
+      setCategoryId(result.group.categoryId ?? "");
+      setTasks(result.group.tasks.map((t) => ({ title: t.title, subtasks: t.subtasks })));
+      setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
+      setGuidelines(
+        result.group.tasks.map((t) => ({
+          url: t.guidelineUrl ?? "",
+          image: t.guidelineImage
+            ? {
+                mime: t.guidelineImage.mime,
+                dataBase64: t.guidelineImage.dataBase64,
+                previewUrl: `data:${t.guidelineImage.mime};base64,${t.guidelineImage.dataBase64}`,
+                name: `${t.title} (saved image)`,
+              }
+            : null,
+        })),
+      );
+      setDirty(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duplicateFromId, groupId]);
 
   const addTask = () => {
     if (tasks.length >= TASK_MAX) return;
@@ -270,7 +322,9 @@ export function TemplateGroupFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3 dark:border-slate-800">
-          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{isEdit ? `Edit ${label}` : `New ${label}`}</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+            {isEdit ? `Edit ${label}` : duplicateFromId ? `Duplicate ${label}` : `New ${label}`}
+          </p>
           <button
             type="button"
             onClick={requestClose}

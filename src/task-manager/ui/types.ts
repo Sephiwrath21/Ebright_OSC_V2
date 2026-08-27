@@ -617,6 +617,11 @@ export interface FlowTemplateGroupAssignee {
   userId: string;
   name: string;
   pendingTasks: number;
+  /** Which FLOW_DAYS weekday(s) this person currently has a pending
+   *  instance due on (2026-08-26, "View Assignees" modal) — see
+   *  data/template-groups.ts's TemplateGroupAssignee for how this is
+   *  derived/merged. */
+  days: (typeof FLOW_DAYS)[number][];
 }
 export type TemplateGroupAssigneesResult =
   | { ok: true; assignees: FlowTemplateGroupAssignee[] }
