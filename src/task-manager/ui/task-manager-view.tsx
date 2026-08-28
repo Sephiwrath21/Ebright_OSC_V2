@@ -359,7 +359,7 @@ export function TaskManagerView({
     shows(view, "taskManager", "branchOverview");
 
   return (
-    <CardModeProvider>
+    <CardModeProvider userId={me.me.userId}>
     <div className="flex flex-col gap-5">
       {showCardModeToggle && (
         <div className="flex justify-end">
@@ -625,11 +625,15 @@ export function TaskManagerView({
           grouping — each group has its own chevron; no master "Show
           Completed" toggle here (removed 2026-08-19, same as "Tasks I
           Assigned" above) — see ResizableTaskList's own doc comments for
-          both. ---- */}
-      {shows(view, "taskManager", "ceoTaskTable") && ceoDelegatedAll && (
+          both. Card ALWAYS renders now (2026-08-26, user request) even with
+          zero delegated tasks — ceoDelegatedAll is null in that case, so
+          ResizableTaskList gets an empty array and shows its own
+          emptyLabel; previously the whole card (border included) was
+          omitted, which read as "does the CEO even have this section?" ---- */}
+      {shows(view, "taskManager", "ceoTaskTable") && (
         <SectionCard title="CEO Assigned Task" collapsible>
           <ResizableTaskList
-            tasks={ceoDelegatedAll.tasks}
+            tasks={ceoDelegatedAll?.tasks ?? []}
             myUserId={me.me.userId}
             emptyLabel="No tasks assigned to any HOD yet."
             hideCompleted

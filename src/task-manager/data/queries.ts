@@ -230,6 +230,39 @@ export function getOrgMonthlyDepartments(
   }, "getOrgMonthlyDepartments");
 }
 
+/** Org-wide REGION-grouped branch rollups clamped to a specific Monthly
+ *  day-range (2026-08-25) — the same purpose as getOrgMonthlyDepartments
+ *  above, but built on org.regions rather than org.branches. org.branches
+ *  is task-derived only (groupByDimension with no roster-first fill,
+ *  unlike org.departments' withAllDepartments wrapper) — a branch with
+ *  zero tasks that day is silently ABSENT from it rather than zero-filled,
+ *  confirmed live: with zero branch-assigned tasks today, org.branches
+ *  returned 0 entries entirely while org.regions (built via
+ *  groupBranchesByRegion, analytics/_lib.ts — a real roster query,
+ *  zero-filling every FLOW_BRANCH_REGIONS branch regardless of task data)
+ *  correctly listed all 27. "All Regions"/"All Region X" (page.tsx) both
+ *  need real branches even when empty, so this — not
+ *  org.branches-flavored getOrgMonthlyDepartments' sibling — is the right
+ *  source. Region branches carry bucket totals only, no `tasks` drill-down
+ *  list (EntityCounts, not EntityCountsDetailed) — click-to-drill is
+ *  unavailable on these cards, an accepted trade-off for correct
+ *  zero-filled data. */
+export function getOrgMonthlyRegions(
+  email: string,
+  date: string | undefined,
+  monthDays: { from: number; to: number },
+): Promise<{ name: string; branches: FlowEntityRollup[] }[]> {
+  return native(async () => {
+    await advanceRecurringBlocks();
+    const user = await requireUserByEmail(email);
+    if (!canViewOrg(user.role) && !isElevatedDeptSite(user)) {
+      throw new ApiHttpError(403, "You can only view your own branch");
+    }
+    const org = await getOrgPayload("monthly", date, monthDays);
+    return org.regions as unknown as { name: string; branches: FlowEntityRollup[] }[];
+  }, "getOrgMonthlyRegions");
+}
+
 // Deliberately no per-user auth (donor parity): call sites must sit behind
 // session auth. Returns the PII-free staff subset only.
 /** Assignable staff directory (recipient picker options). */

@@ -60,6 +60,41 @@ function nextOccurrence(day: (typeof DAYS)[number], from = new Date()): Date {
   return new Date(from.getFullYear(), from.getMonth(), from.getDate() + diff, DUE_HOUR);
 }
 
+// Monthly's own equivalent of DAYS/nextOccurrence above (2026-08-25, user
+// request) — mirrors ui/types.ts's FLOW_MONTH_RANGES/monthDayChunks (same
+// local-mirror precedent as DAYS itself, see this file's header).
+const MONTH_RANGES = ["1-7", "8-14", "15-21", "22-31"] as const;
+const MONTH_RANGE_FROM: Record<(typeof MONTH_RANGES)[number], number> = {
+  "1-7": 1,
+  "8-14": 8,
+  "15-21": 15,
+  "22-31": 22,
+};
+
+/** The last day of `range` within (year, month) — month is 1-indexed, same
+ *  convention as ui/types.ts's monthDayChunks. "22-31" clamps to the real
+ *  number of days in the month (e.g. 28/29 for February) rather than the
+ *  literal "31" in the label; the other three chunks are always a fixed
+ *  7 days. */
+function monthChunkEnd(year: number, month: number, rangeFrom: number): number {
+  if (rangeFrom === 22) return new Date(year, month, 0).getDate();
+  return rangeFrom + 6;
+}
+
+/** Monthly's own equivalent of nextOccurrence above — the next time
+ *  `range`'s LAST day arrives, from today: this month's if it hasn't
+ *  passed yet, otherwise next month's. */
+function nextMonthlyOccurrence(range: (typeof MONTH_RANGES)[number], from = new Date()): Date {
+  const rangeFrom = MONTH_RANGE_FROM[range];
+  const year = from.getFullYear();
+  const month0 = from.getMonth(); // 0-indexed, for the Date constructor
+  const candidate = new Date(year, month0, monthChunkEnd(year, month0 + 1, rangeFrom), DUE_HOUR);
+  if (candidate >= from) return candidate;
+  const nextMonth0 = month0 === 11 ? 0 : month0 + 1;
+  const nextYear = month0 === 11 ? year + 1 : year;
+  return new Date(nextYear, nextMonth0, monthChunkEnd(nextYear, nextMonth0 + 1, rangeFrom), DUE_HOUR);
+}
+
 /** Guideline image cap: 2 MB binary ≈ ~2.8M base64 chars. Shared with
  *  ./tasks's own proof-upload schema — exported so that file imports it
  *  back rather than duplicating the mime list. */
@@ -71,6 +106,7 @@ export const assignInputSchema = z.object({
   branches: z.array(z.string().min(1).max(100)).max(50).default([]),
   role: z.enum(["All", ...BRANCH_STAFF_ROLES]).default("All"),
   days: z.array(z.enum(DAYS)).max(DAYS.length).default([]),
+  monthRanges: z.array(z.enum(MONTH_RANGES)).max(MONTH_RANGES.length).default([]),
   userIds: z.array(z.string().min(1).max(100)).max(100).default([]),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   cadence: z.enum(CADENCE_OPTIONS),
@@ -194,6 +230,11 @@ export async function assignFlowTaskCore(
     occurrences = body.days.map((day) => ({
       dueAt: nextOccurrence(day),
       runName: `${body.title} (${day})`,
+    }));
+  } else if (body.monthRanges.length > 0) {
+    occurrences = body.monthRanges.map((range) => ({
+      dueAt: nextMonthlyOccurrence(range),
+      runName: `${body.title} (${range})`,
     }));
   } else {
     occurrences = [{ dueAt: null, runName: body.title }];

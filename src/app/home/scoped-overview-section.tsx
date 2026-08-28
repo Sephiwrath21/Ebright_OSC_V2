@@ -75,11 +75,13 @@ export async function HomeScopedOverviewSection({
   dailyDate,
   monthlyDate,
   monthlyRange,
+  monthlyRangeExplicit,
   adhocDate,
   hodDate,
   ceoDate,
   expand,
   padate,
+  reassign,
   actions,
 }: {
   email: string;
@@ -90,6 +92,11 @@ export async function HomeScopedOverviewSection({
   /** Monthly 7-day chunk within the anchor month (?mrange=, 2026-07-29).
    *  Undefined = Full month. */
   monthlyRange?: { from: number; to: number };
+  /** Whether ?mrange= was present at all (2026-08-25 fix), even as an
+   *  explicit empty value — distinguishes "explicitly Full month" from
+   *  "never touched" (monthlyRange alone collapses both to undefined).
+   *  See monthlyRangeParam's derivation below for why this matters. */
+  monthlyRangeExplicit?: boolean;
   adhocDate?: string;
   hodDate?: string;
   /** HOD view's "CEO Assigned Tasks" day anchor (?cdate=). */
@@ -102,6 +109,14 @@ export async function HomeScopedOverviewSection({
    *  ?hdate=/?cdate= exactly (YYYY-MM-DD, defaults to today, independent
    *  of every other filter). Ad hoc had no date filter before this. */
   padate?: string;
+  /** "Assign to Others" (2026-08-25, feature parity request) — same
+   *  {staff, action} shape /task-manager's own admin page already builds
+   *  (page.tsx's cardReassign), passed through unchanged into every
+   *  personal-task TaskOverviewStack/EntityCardOverview below.
+   *  TaskOverviewStack's own internal rule (never hodAssigned/ceoAssigned)
+   *  still applies here exactly as it does on /task-manager, without any
+   *  extra gating needed at this call site. */
+  reassign?: import("@/task-manager/ui/bits").ReassignControl;
   /** Personal-task server actions (complete / N-A / reopen) — wired ONLY
    *  into the PERSONAL cards' drill modals (with the viewer's own userId,
    *  so the status circle is clickable exactly on the viewer's own tasks —
@@ -128,13 +143,27 @@ export async function HomeScopedOverviewSection({
     // IIFE (every existing `return` inside it now returns to `content`
     // instead of exiting the function) and the single toggle + provider
     // wrap happens once, after whichever branch actually ran.
+    // Captured inside the IIFE below (once `daily` is fetched) so
+    // CardModeProvider's userId is reachable AFTER the IIFE resolves too —
+    // `daily` itself is scoped to the IIFE, this one variable is not.
+    let viewerUserId = "";
     const content: ReactNode = await (async (): Promise<ReactNode> => {
     const adhocAnchor = adhocDate ?? formatLocalDate(new Date());
-    const monthlyRangeParam = monthlyRange ? `${monthlyRange.from}-${monthlyRange.to}` : undefined;
+    // Three states, not two (2026-08-25 fix, see monthlyRangeExplicit's own
+    // doc comment above) — "" (explicit Full month) must survive as a
+    // distinct value from undefined (never touched), or personalMyMonth's
+    // own `monthlyRangeParam ?? defaultMonthRange(...)` fallback below
+    // silently overrides an explicit Full month pick back to today's chunk.
+    const monthlyRangeParam = monthlyRange
+      ? `${monthlyRange.from}-${monthlyRange.to}`
+      : monthlyRangeExplicit
+        ? ""
+        : undefined;
     const [daily, monthly] = await Promise.all([
       getFlowDetail(email, "daily", dailyDate, { adhocDate: adhocAnchor }),
       getFlowDetail(email, "monthly", monthlyDate, monthlyRange ? { monthDays: monthlyRange } : undefined),
     ]);
+    viewerUserId = daily.me.me.userId;
 
     const raw = {
       date: dailyDate,
@@ -145,9 +174,13 @@ export async function HomeScopedOverviewSection({
       cdate: ceoDate,
       padate,
     };
+    // v !== undefined (not the old truthy `v &&`, 2026-08-25 fix) — an
+    // explicit Full month's mrange="" must still be carried along, or
+    // switching the anchor month (MonthDropdown) while Full month is
+    // selected would silently drop back to "unset" and re-default.
     const carry = (...except: string[]) =>
       Object.fromEntries(
-        Object.entries(raw).filter(([k, v]) => v && !except.includes(k)),
+        Object.entries(raw).filter(([k, v]) => v !== undefined && !except.includes(k)),
       ) as Record<string, string>;
     // Date pickers must carry the CURRENT ?expand= unchanged (so changing the
     // date doesn't collapse whatever's already expanded in orgGrids'
@@ -484,6 +517,7 @@ export async function HomeScopedOverviewSection({
             onReopen={actions?.reopen}
             onUploadProof={actions?.uploadProof}
             onRemoveProof={actions?.removeProof}
+            reassign={reassign}
           />
         );
       }
@@ -499,6 +533,7 @@ export async function HomeScopedOverviewSection({
           onReopen={actions?.reopen}
           onUploadProof={actions?.uploadProof}
           onRemoveProof={actions?.removeProof}
+          reassign={reassign}
         />
       );
     }
@@ -579,6 +614,7 @@ export async function HomeScopedOverviewSection({
               onReopen={actions?.reopen}
               onUploadProof={actions?.uploadProof}
               onRemoveProof={actions?.removeProof}
+              reassign={reassign}
             />
             {personalAdhoc && (
               <EntityCardOverview
@@ -594,6 +630,7 @@ export async function HomeScopedOverviewSection({
                 onReopen={actions?.reopen}
                 onUploadProof={actions?.uploadProof}
                 onRemoveProof={actions?.removeProof}
+                reassign={reassign}
               />
             )}
           </div>
@@ -633,35 +670,6 @@ export async function HomeScopedOverviewSection({
       <div className="flex flex-col gap-5">
         {grid(
           <>
-            {/* CEO (2026-08-01): ONE combined "My Tasks" card — no
-                Daily/Monthly split — with the shared ?date= filter
-                windowing it by DUE date (undated tasks always show). */}
-            {shows(view, "home", "ceoCombinedList") &&
-              (() => {
-                const win = resolveWindow("daily", dailyDate ?? formatLocalDate(new Date()));
-                const windowed = daily.me.tasks.filter((t) => {
-                  if (!t.dueAt) return true;
-                  const due = new Date(t.dueAt);
-                  return due >= win.start && due < win.end;
-                });
-                const buckets = flowBucketize(windowed);
-                return (
-                  <StatusOverviewCard
-                    key="ceo-own-tasks"
-                    title="My Tasks"
-                    totals={{
-                      completed: buckets.completed.length,
-                      pending: buckets.pending.length,
-                      na: buckets.na.length,
-                    }}
-                    tasks={buckets}
-                    action={dailyPicker}
-                    actionPlacement="row"
-                    hideChart
-                    {...completeProps}
-                  />
-                );
-              })()}
             {shows(view, "home", "assignerStreams") && otherStreamCards}
           </>,
         )}
@@ -670,6 +678,10 @@ export async function HomeScopedOverviewSection({
             entityName=""
             categories={categories}
             myUserId={daily.me.me.userId}
+            // CEO's own section reads "My Tasks" (2026-08-26), matching
+            // the ceoCombinedList card's title it replaced — every other
+            // isPersonalRole role keeps the plain "Daily" label.
+            dailyLabel={view === "CEO" ? "My Tasks" : undefined}
             daily={
               personalDailyEntity && {
                 entity: personalDailyEntity,
@@ -698,6 +710,7 @@ export async function HomeScopedOverviewSection({
             onReopen={actions?.reopen}
             onUploadProof={actions?.uploadProof}
             onRemoveProof={actions?.removeProof}
+            reassign={reassign}
           />
         )}
       </div>
@@ -706,7 +719,7 @@ export async function HomeScopedOverviewSection({
 
     if (!content) return null;
     return (
-      <CardModeProvider>
+      <CardModeProvider userId={viewerUserId}>
         <div className="flex flex-col gap-3">
           <div className="flex justify-end">
             <CardModeToggle />

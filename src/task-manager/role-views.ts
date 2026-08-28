@@ -60,7 +60,7 @@ export type SectionKey =
   // Retired from Task Manager 2026-08-12, REVIVED 2026-08-19 (explicit
   // request).
   // CEO-specific sections
-  | "ceoCombinedList"
+  | "ceoCombinedList" // no longer used in any home/taskManager array as of 2026-08-26 (CEO's Home swapped to personalDaily); retained pending a cleanup task
   | "ceoTaskTable" // CEO's own delegated-out list ("CEO Assigned Task"): every task CEO
   // personally started, ALL-TIME, read-only Task/Assignee(HOD)/Status table
   // (getMePayload's delegatedAll — already computed for CEO, just unused
@@ -108,18 +108,20 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
   // dashboards live on HOME ONLY (relocated off /task-manager, same-day
   // follow-up); Task Manager = own tasks + the superadmin-style
   // Department|Branch dropdown overview (entityDropdowns) below them.
-  // CEO (2026-08-01, latest): Task Manager "My Tasks" = the SAME weekday-
-  // sidebar Daily table view every other role uses (myTasksDaily — the
-  // old un-windowed combined list is gone); Home keeps the ONE combined
-  // "My Tasks" card (ceoCombinedList) with its date filter.
   // ceoKanban/branchRegionOverview dropped from Home entirely (2026-08-19,
   // explicit request) — the same department/branch drill-down these gave is
-  // already reachable via entityDropdowns on CEO's own Task Manager page, so
-  // Home keeps ONLY ceoCombinedList now (own tasks). See scoped-overview-
-  // section.tsx — the render code backing both keys was removed too, not
-  // just this config entry.
+  // already reachable via entityDropdowns on CEO's own Task Manager page.
+  // Home's "My Tasks" swapped from ceoCombinedList to personalDaily
+  // (2026-08-26, user request) — CEO now gets the SAME weekday-sidebar
+  // Daily table view (Task/Proof/Due Date/Assign to Others columns) every
+  // other role's Home page already has, matching what CEO's own Task
+  // Manager page (myOverview, below) already showed all along — the old
+  // ceoCombinedList summary-card-plus-modal was Home-only and out of step
+  // with that. No personalMonthly (still no Monthly split for CEO
+  // anywhere, per the 2026-08-19 explicit request task-manager-view.tsx's
+  // myOverview render still honors).
   CEO: {
-    home: ["ceoCombinedList"],
+    home: ["personalDaily"],
     // 2026-08-12 stacked-sections redesign: myOverview replaces
     // myTasksDaily (own Daily/Monthly, now actionable card-grid form).
     // Monthly was new for the CEO here (never had it before this redesign)
@@ -205,7 +207,10 @@ export const ROLE_VIEWS: Record<ViewRole, RoleViewConfig> = {
     // (2026-08-18, same visit, explicit request) — the "Manpower Schedule"
     // Details card at the very bottom of the page.
     taskManager: ["myTasksAdhoc", "branchOverview"],
-    weekdayRange: "tue-sun",
+    // Wed-Sun (2026-08-26, user request — dropped Tuesday) — same range
+    // Coaches already use; matches FLOW_DAYS/the Package Table's own
+    // Wed-Sun week, which never has a Monday/Tuesday column either.
+    weekdayRange: "wed-sun",
     addTaskHeader: false,
   },
   // Branch sites see Daily, Monthly AND the branch-wide ad hoc set

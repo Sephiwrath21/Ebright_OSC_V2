@@ -25,6 +25,23 @@ import { ApiHttpError } from "../lib/api-server";
 import { todayStart } from "../lib/dates";
 import { getUsersByIds } from "../lib/users";
 import { prisma } from "../prisma";
+import { FLOW_DAYS } from "../ui/types";
+
+// JS Date.getDay() -> FLOW_DAYS weekday name — local mirror of
+// tasks-internal.ts's own DAY_INDEX (reversed), same precedent as
+// template-groups.ts's own JS_DAY_TO_FLOW_DAY (that file's own doc comment
+// explains why this stays a small local copy per file rather than one
+// shared export: DAY_INDEX itself isn't exported, only assignFlowTaskCore
+// is meant to be called from outside tasks-internal.ts). Monday (1)
+// deliberately absent — see template-groups.ts's copy for why.
+const JS_DAY_TO_FLOW_DAY: Partial<Record<number, (typeof FLOW_DAYS)[number]>> = {
+  0: "Sun",
+  2: "Tue",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+};
 
 /** "Still pending" for the deletion cascade = any non-terminal status —
  *  DONE and SKIPPED (N/A) both count as resolved history and are KEPT.
@@ -399,6 +416,15 @@ export interface TemplateAssignee {
   name: string;
   /** Pending MAIN tasks (subtasks not counted separately). */
   pendingTasks: number;
+  /** Which FLOW_DAYS weekday(s) this person currently has a pending
+   *  instance due on (2026-08-26, "View Assignees" modal — lets a viewer
+   *  see at a glance whether e.g. Tuesday is already covered for this
+   *  task). Derived from each pending block's own dueAt, not from any
+   *  cadence/schedule config — an undated pending block (dueAt null, e.g.
+   *  an ad hoc-tagged one) contributes no day. Sorted in FLOW_DAYS order,
+   *  deduped (a person can hold only one pending instance per weekday of a
+   *  single template at a time, but this stays a Set for safety). */
+  days: (typeof FLOW_DAYS)[number][];
 }
 
 /** Who currently holds a PENDING instance of this template AND hasn't been
@@ -428,15 +454,22 @@ export async function getTemplateAssigneesCore(
         status: { in: [...PENDING_STATUSES] },
         run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
-      select: { assigneeId: true },
+      select: { assigneeId: true, dueAt: true },
     }),
     prisma.taskTemplateExcludedAssignee.findMany({ where: { templateId: id }, select: { userId: true } }),
   ]);
   const excludedIds = new Set(excluded.map((e) => e.userId));
   const counts = new Map<string, number>();
+  const days = new Map<string, Set<(typeof FLOW_DAYS)[number]>>();
   for (const p of parents) {
     if (excludedIds.has(p.assigneeId)) continue;
     counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
+    const day = p.dueAt ? JS_DAY_TO_FLOW_DAY[p.dueAt.getDay()] : undefined;
+    if (day) {
+      const set = days.get(p.assigneeId) ?? new Set();
+      set.add(day);
+      days.set(p.assigneeId, set);
+    }
   }
   const users = await getUsersByIds([...counts.keys()]);
   return [...counts.entries()]
@@ -444,6 +477,7 @@ export async function getTemplateAssigneesCore(
       userId,
       name: users.get(userId)?.name ?? userId,
       pendingTasks,
+      days: FLOW_DAYS.filter((d) => days.get(userId)?.has(d)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

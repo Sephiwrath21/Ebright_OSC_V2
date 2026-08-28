@@ -65,7 +65,7 @@ import {
 } from "./templates-internal";
 import { assignFlowTaskCore, GUIDELINE_IMAGE_MIMES } from "./tasks-internal";
 import { formatLocalDate } from "../analytics/_lib";
-import { FLOW_DAYS, type FlowAssignInput } from "../ui/types";
+import { FLOW_DAYS, FLOW_MONTH_RANGES, type FlowAssignInput } from "../ui/types";
 
 const GROUP_TASK_MAX = 20;
 
@@ -665,6 +665,7 @@ export function deleteTemplateGroup(
 const applyGroupSchema = z.object({
   userIds: z.array(z.string().min(1)).min(1),
   days: z.array(z.enum(FLOW_DAYS)).optional(),
+  monthRanges: z.array(z.enum(FLOW_MONTH_RANGES)).optional(),
   dueDate: z.string().optional(),
   cadence: z.enum(["daily", "monthly", "adhoc"]),
 });
@@ -741,6 +742,7 @@ export function applyTemplateGroup(
         subtasks: subtasks.length > 0 ? subtasks : undefined,
         userIds: body.userIds,
         days: body.days,
+        monthRanges: body.monthRanges,
         dueDate: body.dueDate,
         cadence: body.cadence,
         fromTemplateId: t.id,
@@ -756,6 +758,12 @@ export interface TemplateGroupAssignee {
   userId: string;
   name: string;
   pendingTasks: number;
+  /** Union of every member task's own `days` for this person (2026-08-26)
+   *  — see getTemplateAssigneesCore's own doc comment for how a single
+   *  task's days are derived. Sorted in FLOW_DAYS order, deduped across
+   *  member tasks (a person covering Tue on one member task and Wed on
+   *  another shows both). */
+  days: (typeof FLOW_DAYS)[number][];
 }
 
 /** Everyone currently holding a pending instance of ANY task in this
@@ -776,19 +784,27 @@ export function getGroupAssignees(
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
-    const merged = new Map<string, { name: string; pendingTasks: number }>();
+    const merged = new Map<string, { name: string; pendingTasks: number; days: Set<(typeof FLOW_DAYS)[number]> }>();
     for (const t of group.templates) {
       const assignees = await getTemplateAssigneesCore(user, t.id);
       for (const a of assignees) {
         const existing = merged.get(a.userId);
+        const days = existing?.days ?? new Set();
+        for (const d of a.days) days.add(d);
         merged.set(a.userId, {
           name: a.name,
           pendingTasks: (existing?.pendingTasks ?? 0) + a.pendingTasks,
+          days,
         });
       }
     }
     return [...merged.entries()]
-      .map(([userId, v]) => ({ userId, name: v.name, pendingTasks: v.pendingTasks }))
+      .map(([userId, v]) => ({
+        userId,
+        name: v.name,
+        pendingTasks: v.pendingTasks,
+        days: FLOW_DAYS.filter((d) => v.days.has(d)),
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, "getGroupAssignees");
 }

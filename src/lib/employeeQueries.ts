@@ -2212,6 +2212,15 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
       where: {
         assigneeId: tmUser.id,
         status: { notIn: ["DONE", "SKIPPED"] },
+        // No due date, or a due date that hasn't passed yet (2026-08-25,
+        // user feedback) — a task WITH a due date moves to Overdue-only
+        // once it passes, instead of staying duplicated in both lists (see
+        // the overdue query's own doc comment below for why this couldn't
+        // just be "not overdue" via the `status` field alone). A task with
+        // NO due date stays here indefinitely — it can never satisfy the
+        // overdue query's `dueAt: { lt: startOfToday }` below, so it has no
+        // other list to move to.
+        OR: [{ dueAt: null }, { dueAt: { gte: startOfToday } }],
         // Cancelled/archived runs must NOT appear as pending — a run's own
         // status is separate from its blocks' status, so a cancelled run's
         // blocks stay "ACTIVE" forever unless excluded here too. Same gate
@@ -2228,8 +2237,9 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
     // Due date strictly before today and not completed — independent of the
     // current `status` label (Task Manager's own OVERDUE status is only set
     // when a periodic reminder sweep gets to it, so a still-"PENDING" row
-    // past its due date belongs here too; a row can appear in both lists at
-    // once).
+    // past its due date belongs here too). A row now appears in exactly ONE
+    // of the two lists (2026-08-25) — the pending query above excludes
+    // anything this query would also match.
     taskManagerPrisma.runBlock.findMany({
       where: {
         assigneeId: tmUser.id,
@@ -2243,8 +2253,10 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
   ]);
 
   // One batched role lookup for every distinct starter across both lists
-  // (they overlap heavily — overdue is a subset of pending) rather than a
-  // lookup per row, same batching rationale as getOverdueTaskCounts below.
+  // (still cheaper as one combined dedup-and-lookup than per-row, even now
+  // that the two lists are disjoint — see the pending query's own doc
+  // comment above) rather than a lookup per row, same batching rationale as
+  // getOverdueTaskCounts below.
   const starterIds = new Set<string>();
   for (const r of [...pendingRows, ...overdueRows]) starterIds.add(r.run.startedById);
   const starters = await taskManagerPrisma.user.findMany({

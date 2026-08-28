@@ -39,6 +39,7 @@ const EMPTY_GUIDELINE: TaskGuideline = { url: "", image: null };
 export function TemplateGroupFormModal({
   control,
   groupId,
+  duplicateFromId,
   onClose,
   label = "Template",
   categories,
@@ -46,6 +47,14 @@ export function TemplateGroupFormModal({
 }: {
   control: FlowTemplateGroupControl;
   groupId?: string;
+  /** Duplicate mode (2026-08-26, user request — "different template but
+   *  similar task, just a few tasks different"): prefills a blank CREATE
+   *  form from an existing group's tasks/subtasks/guidelines/category, so
+   *  the viewer only has to tweak the differences instead of rebuilding
+   *  from scratch. Mutually exclusive with `groupId` — this is still
+   *  create mode (isEdit stays false, Save calls control.create and makes
+   *  a brand-new group; the source group is never touched). */
+  duplicateFromId?: string;
   onClose: () => void;
   /** Display copy override (2026-08-06) — "Template" (default) or "Package". */
   label?: "Template" | "Package";
@@ -67,9 +76,16 @@ export function TemplateGroupFormModal({
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [guidelines, setGuidelines] = React.useState<TaskGuideline[]>([{ ...EMPTY_GUIDELINE }]);
   const imageInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-  const [loading, setLoading] = React.useState(isEdit);
+  const [loading, setLoading] = React.useState(isEdit || Boolean(duplicateFromId));
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+  // Unsaved-changes guard (2026-08-26, user report — an accidental
+  // backdrop click discarded a half-filled task with no warning at all).
+  // Set on every field edit below; NOT set by the load effect populating
+  // edit mode's baseline, and cleared once a save actually succeeds (see
+  // save() below) or the viewer explicitly discards (see requestClose).
+  const [dirty, setDirty] = React.useState(false);
+  const [confirmClose, setConfirmClose] = React.useState(false);
   // Inline "+ Add new type" (2026-08-12): categories start from the prop,
   // then grow locally as this session creates new ones — no page refresh
   // needed to pick a category you just added.
@@ -109,31 +125,80 @@ export function TemplateGroupFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
+  // Duplicate mode's own load (2026-08-26) — same source data as the edit
+  // effect above, but into what stays a CREATE form: name gets a "Copy of"
+  // prefix (so it doesn't silently collide with the original), and every
+  // task's `id` is dropped so control.create makes brand-new TaskTemplate
+  // rows rather than referencing the source's. Marked dirty immediately
+  // after populating — unlike edit mode's baseline (already saved,
+  // nothing lost by closing untouched), this prefilled copy hasn't been
+  // created yet, so an accidental close SHOULD warn before discarding it.
+  React.useEffect(() => {
+    if (!duplicateFromId || groupId) return;
+    let cancelled = false;
+    void control.load(duplicateFromId).then((result) => {
+      if (cancelled) return;
+      setLoading(false);
+      if (!result.ok) {
+        setMessage({ ok: false, text: result.message });
+        return;
+      }
+      setName(`Copy of ${result.group.name}`);
+      setCategoryId(result.group.categoryId ?? "");
+      setTasks(result.group.tasks.map((t) => ({ title: t.title, subtasks: t.subtasks })));
+      setTaskKeys(result.group.tasks.map(() => crypto.randomUUID()));
+      setGuidelines(
+        result.group.tasks.map((t) => ({
+          url: t.guidelineUrl ?? "",
+          image: t.guidelineImage
+            ? {
+                mime: t.guidelineImage.mime,
+                dataBase64: t.guidelineImage.dataBase64,
+                previewUrl: `data:${t.guidelineImage.mime};base64,${t.guidelineImage.dataBase64}`,
+                name: `${t.title} (saved image)`,
+              }
+            : null,
+        })),
+      );
+      setDirty(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duplicateFromId, groupId]);
+
   const addTask = () => {
     if (tasks.length >= TASK_MAX) return;
     setTasks((prev) => [...prev, { title: "", subtasks: [] }]);
     setTaskKeys((prev) => [...prev, crypto.randomUUID()]);
     setGuidelines((prev) => [...prev, { ...EMPTY_GUIDELINE }]);
+    setDirty(true);
   };
   const removeTask = (index: number) => {
     setTasks((prev) => prev.filter((_, i) => i !== index));
     setTaskKeys((prev) => prev.filter((_, i) => i !== index));
     setGuidelines((prev) => prev.filter((_, i) => i !== index));
     imageInputRefs.current.splice(index, 1);
+    setDirty(true);
   };
   const updateTitle = (index: number, title: string) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, title } : t)));
+    setDirty(true);
   };
   const updateSubtasks = (index: number, subtasks: string[]) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, subtasks } : t)));
+    setDirty(true);
   };
   const updateGuidelineUrl = (index: number, url: string) => {
     setGuidelines((prev) => prev.map((g, i) => (i === index ? { ...g, url } : g)));
+    setDirty(true);
   };
   const clearGuidelineImage = (index: number) => {
     setGuidelines((prev) => prev.map((g, i) => (i === index ? { ...g, image: null } : g)));
     const input = imageInputRefs.current[index];
     if (input) input.value = "";
+    setDirty(true);
   };
   // Same compressed-client-side pipeline assign-task-form.tsx's single
   // guideline image uses (ui/image-compress.ts) — ≤1280px JPEG, ≤2MB.
@@ -161,6 +226,7 @@ export function TemplateGroupFormModal({
         ),
       );
       setMessage(null);
+      setDirty(true);
     });
   };
 
@@ -225,6 +291,7 @@ export function TemplateGroupFormModal({
         ? await control.edit(groupId as string, { name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks })
         : await control.create({ name: trimmedName, categoryId: categoryId || undefined, tasks: cleanTasks });
       if (result.ok) {
+        setDirty(false);
         onClose();
       } else {
         setMessage({ ok: false, text: result.message });
@@ -232,17 +299,35 @@ export function TemplateGroupFormModal({
     });
   };
 
+  /** Backdrop click / ✕ button (2026-08-26) — go straight through when
+   *  nothing's been touched, otherwise ask first instead of silently
+   *  discarding a half-filled task. */
+  const requestClose = () => {
+    if (dirty) setConfirmClose(true);
+    else onClose();
+  };
+  const discardAndClose = () => {
+    setConfirmClose(false);
+    onClose();
+  };
+  const saveFromConfirm = () => {
+    setConfirmClose(false);
+    save();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={requestClose}>
       <div
         className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3 dark:border-slate-800">
-          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{isEdit ? `Edit ${label}` : `New ${label}`}</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+            {isEdit ? `Edit ${label}` : duplicateFromId ? `Duplicate ${label}` : `New ${label}`}
+          </p>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close"
             className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
@@ -258,7 +343,10 @@ export function TemplateGroupFormModal({
               {label} name
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setDirty(true);
+                }}
                 placeholder="e.g. Create Video"
                 maxLength={100}
                 className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
@@ -267,7 +355,10 @@ export function TemplateGroupFormModal({
 
             <CategoryPicker
               value={categoryId}
-              onChange={setCategoryId}
+              onChange={(id) => {
+                setCategoryId(id);
+                setDirty(true);
+              }}
               categories={localCategories}
               onCreateCategory={onCreateCategory}
               onCategoryCreated={(c) => setLocalCategories((prev) => [...prev, c])}
@@ -374,6 +465,53 @@ export function TemplateGroupFormModal({
           )}
         </div>
       </div>
+
+      {/* Unsaved-changes guard (2026-08-26) — a nested confirm dialog, same
+          dimmed-backdrop pattern as the outer modal itself. Its own onClick
+          stopPropagation keeps a click INSIDE it from bubbling up and
+          hitting the outer backdrop's requestClose again. */}
+      {confirmClose && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+          onClick={() => setConfirmClose(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+              Save changes to this {labelLower}?
+            </p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              You've entered something that hasn't been saved yet.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmClose(false)}
+                className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-400 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={discardAndClose}
+                className="rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:border-red-400 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={saveFromConfirm}
+                className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {pending ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

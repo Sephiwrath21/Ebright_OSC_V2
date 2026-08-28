@@ -138,6 +138,17 @@ export function TemplateGroupAssigneesModal({
                 >
                   <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-slate-300">
                     {a.name}
+                    {/* Which weekday(s) this person's pending instance(s)
+                        fall on (2026-08-26, user request) — e.g. "- Tue,
+                        Wed" so a viewer can tell at a glance whether a
+                        given day is already covered for this template/
+                        package. Omitted entirely when every one of their
+                        pending tasks is undated (days is empty). */}
+                    {a.days.length > 0 && (
+                      <span className="ml-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                        - {a.days.join(", ")}
+                      </span>
+                    )}
                     <span className="ml-1.5 text-xs text-gray-400">
                       {a.pendingTasks} pending task{a.pendingTasks === 1 ? "" : "s"}
                     </span>
