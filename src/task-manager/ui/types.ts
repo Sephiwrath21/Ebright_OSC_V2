@@ -626,13 +626,14 @@ export interface FlowTemplateGroupAssignee {
 export type TemplateGroupAssigneesResult =
   | { ok: true; assignees: FlowTemplateGroupAssignee[] }
   | { ok: false; message: string };
-/** Remove Assignee (2026-08-22 rule — corrected to same-day cutoff) —
- *  cancels only today's instance (cancelledToday); anything dated before
+/** Remove Assignee (2026-08-22 rule — corrected to same-day cutoff;
+ *  2026-08-27 fix — the cutoff now has no upper bound) — cancels every
+ *  instance due today or later (cancelledPending); anything dated before
  *  today stays untouched (pendingKept, purely informational). See
  *  data/templates-internal.ts's removeTemplateAssigneeCore doc comment
  *  for the full rule. */
 export type TemplateGroupRemoveAssigneeResult =
-  | { ok: true; excluded: true; cancelledToday: number; pendingKept: number }
+  | { ok: true; excluded: true; cancelledPending: number; pendingKept: number }
   | { ok: false; message: string };
 
 /** Everything the /task-manager/template dashboard needs, bundled as one

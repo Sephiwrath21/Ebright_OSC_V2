@@ -195,7 +195,6 @@ export function TemplateEditPanel({ templates }: { templates: FlowTemplateContro
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              maxLength={200}
               className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>

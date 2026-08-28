@@ -291,6 +291,30 @@ export async function assignFlowTaskCore(
   }
   const templateId = body.fromTemplateId ?? savedTemplateId ?? null;
 
+  // Un-exclude on re-assign (2026-08-28, user decision — see
+  // removeTemplateAssigneeCore's own doc comment for the bug this closes
+  // the loop on): a TaskTemplateExcludedAssignee row never cleared itself
+  // once written, so a manager who removed someone and later explicitly
+  // re-assigned them the SAME template's task was fighting a silent,
+  // permanent block — the fresh task would itself never auto-recur past
+  // its own due date, forcing them to keep manually re-assigning it every
+  // few days forever (this is exactly what was happening to Teh Yee
+  // Qian's "OD - INT YQ" task from 22/8 onward). An explicit "Assign"
+  // action is a deliberate decision to put this person back on this task,
+  // so it now clears any stale exclusion for (templateId, each target)
+  // BEFORE creating the new blocks — the person shows up in "View
+  // Assignees" again and future occurrences resume auto-recurring
+  // normally. Every assignment path funnels through here (the "+ Task"
+  // quick form, Template/Package Group Assign via applyTemplateGroup,
+  // Branch Package Schedule), so this one place covers all of them. A
+  // no-op when there's no template link (templateId null) or nobody was
+  // actually excluded — deleteMany on a non-matching filter is harmless.
+  if (templateId) {
+    await prisma.taskTemplateExcludedAssignee.deleteMany({
+      where: { templateId, userId: { in: targets.map((t) => t.id) } },
+    });
+  }
+
   // Pairs touch disjoint rows — no shared transaction ties them together
   // (each create was already its own implicit transaction in the donor's
   // loop form), so they run concurrently on purpose. Do not "fix" into a
