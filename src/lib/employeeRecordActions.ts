@@ -111,10 +111,11 @@ async function requireHrOrSuperadmin(): Promise<ActionResult | null> {
 
 // Matches pinfo_personalInfo.html's exact field set, plus Full Name/Email
 // (user_profile.full_name / users.email) — editable here too now, even
-// though they double as the login identifier, per explicit request. Signed
-// Offer Letter is a real Google Drive file now too (employment.
-// offer_letter_file_id, on the employee's current/most-recent employment
-// row) — same upload-on-save convention as Resume/CV.
+// though they double as the login identifier, per explicit request.
+// Signed Offer Letter used to save here too (bundled with these fields) —
+// split out into its own updateOfferLetter action below (2026-08-26, see
+// conversation) once Offer Letter became a standalone HR Info tab (Employee
+// Record AND the Pre stage-flow) rather than a field embedded in this panel.
 export interface PersonalInfoInput {
   fullName: string;
   email: string;
@@ -123,8 +124,6 @@ export interface PersonalInfoInput {
   gender: string;
   nric: string;
   homeAddress: string;
-  offerLetterFileId: string | null;
-  offerLetterFile: File | null;
 }
 
 export async function updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ActionResult> {
@@ -137,21 +136,6 @@ export async function updatePersonalInfo(userId: number, data: PersonalInfoInput
   if (!fullName) return { ok: false, error: "Full Name cannot be empty." };
   if (!email) return { ok: false, error: "Email cannot be empty." };
   try {
-    const currentEmployment = await prisma.employment.findFirst({
-      where: { user_id: userId },
-      orderBy: { start_date: "desc" },
-      select: { employment_id: true, offer_letter_file_id: true },
-    });
-
-    let offerLetterFileId = data.offerLetterFileId;
-    if (data.offerLetterFile) {
-      const uploaded = await uploadToDrive(data.offerLetterFile, { prefix: "offer-letter", folderEnvVar: "GOOGLE_DRIVE_OFFER_LETTER_ID" });
-      offerLetterFileId = uploaded.id;
-    }
-    if (currentEmployment?.offer_letter_file_id && currentEmployment.offer_letter_file_id !== offerLetterFileId) {
-      await deleteFromDrive(currentEmployment.offer_letter_file_id);
-    }
-
     await prisma.$transaction([
       prisma.user_profile.update({
         where: { user_id: userId },
@@ -165,14 +149,6 @@ export async function updatePersonalInfo(userId: number, data: PersonalInfoInput
         },
       }),
       prisma.users.update({ where: { user_id: userId }, data: { email } }),
-      ...(currentEmployment
-        ? [
-            prisma.employment.update({
-              where: { employment_id: currentEmployment.employment_id },
-              data: { offer_letter_file_id: offerLetterFileId },
-            }),
-          ]
-        : []),
     ]);
     return { ok: true };
   } catch (e) {
@@ -182,6 +158,50 @@ export async function updatePersonalInfo(userId: number, data: PersonalInfoInput
       return { ok: false, error: "This email is already in use by another account." };
     }
     return { ok: false, error: e instanceof Error ? e.message : "Failed to save Personal Info." };
+  }
+}
+
+// Signed Offer Letter — a real Google Drive file (employment.
+// offer_letter_file_id, on the employee's current/most-recent employment
+// row), same upload-on-save convention as Resume/CV (updateResume below).
+// Standalone HR Info tab now (2026-08-26, see conversation) — used
+// identically by Employee Record's HR Info and the Pre stage-flow's HR Info
+// (both current and, via resolvePanel, every later stage's Pre-history
+// view) — previously bundled into updatePersonalInfo/PersonalInfoPanel.
+export interface UpdateOfferLetterInput {
+  offerLetterFileId: string | null;
+  offerLetterFile: File | null;
+}
+
+export async function updateOfferLetter(userId: number, data: UpdateOfferLetterInput): Promise<ActionResult> {
+  const authError = await requireSession();
+  if (authError) return authError;
+  const scopeError = await requireEmployeeInScope(userId);
+  if (scopeError) return scopeError;
+  try {
+    const currentEmployment = await prisma.employment.findFirst({
+      where: { user_id: userId },
+      orderBy: { start_date: "desc" },
+      select: { employment_id: true, offer_letter_file_id: true },
+    });
+    if (!currentEmployment) return { ok: false, error: "No employment record found to attach the offer letter to." };
+
+    let offerLetterFileId = data.offerLetterFileId;
+    if (data.offerLetterFile) {
+      const uploaded = await uploadToDrive(data.offerLetterFile, { prefix: "offer-letter", folderEnvVar: "GOOGLE_DRIVE_OFFER_LETTER_ID" });
+      offerLetterFileId = uploaded.id;
+    }
+    if (currentEmployment.offer_letter_file_id && currentEmployment.offer_letter_file_id !== offerLetterFileId) {
+      await deleteFromDrive(currentEmployment.offer_letter_file_id);
+    }
+
+    await prisma.employment.update({
+      where: { employment_id: currentEmployment.employment_id },
+      data: { offer_letter_file_id: offerLetterFileId },
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to save Offer Letter." };
   }
 }
 
@@ -445,7 +465,6 @@ export async function updateMedicalCheck(userId: number, input: UpdateMedicalChe
 // below, not this broader-access form — keeping them here would have left
 // exactly the loophole that restriction was meant to close.
 export interface UpdateProbationInput {
-  confirmDate: string;
   extEndDate: string;
   confirmationLetterFileId: string | null;
   confirmationLetterFile: File | null;
@@ -493,7 +512,6 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     }
 
     const data = {
-      confirm_date: input.confirmDate ? new Date(`${input.confirmDate}T00:00:00Z`) : null,
       ext_end_date: input.extEndDate ? new Date(`${input.extEndDate}T00:00:00Z`) : null,
       confirmation_letter_file_id: confirmationLetterFileId,
       extension_letter_file_id: extensionLetterFileId,

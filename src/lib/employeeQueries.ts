@@ -519,26 +519,13 @@ function stageForRow(
   return stageFromEmployment(emp?.status ?? usersStatus, endIso, todayIso);
 }
 
-// Pre-existing test/seed accounts (test-ceo@ebright.my and siblings) — no
-// employment record, never real people, confirmed via investigation (see
-// conversation). Kept in the database untouched per explicit decision; just
-// excluded from every Employee Overview/Folder view so they stop showing up
-// under Active > Unassigned. Exact id list, not an email-pattern match — a
-// future test-*@ebright.my account should still show up unless added here.
-const HIDDEN_TEST_USER_IDS = new Set([305, 306, 308, 324]);
-
 export async function listEmployeeOverviewRows(options: { skipScopeFilter?: boolean } = {}): Promise<EmployeeOverviewRow[]> {
   // One combined population: every staff-role user (any status) plus every
   // still-pending user regardless of role — status alone no longer decides
   // Pre membership (see stageForRow), so both groups have to be considered
   // together rather than as two disjoint queries.
   const users = await prisma.users.findMany({
-    where: {
-      AND: [
-        { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
-        { user_id: { notIn: Array.from(HIDDEN_TEST_USER_IDS) } },
-      ],
-    },
+    where: { OR: [{ status: "pending" }, { role_id: { in: EMPLOYEE_LIFECYCLE_ROLE_IDS } }] },
     include: {
       user_profile: true,
       employment: { include: { branch: true, department: true }, orderBy: { start_date: "desc" }, take: 1 },
@@ -2320,4 +2307,78 @@ export async function getOverdueTaskCounts(userIds: number[]): Promise<Record<nu
     if (employeeId !== undefined) counts[employeeId] = g._count._all;
   }
   return counts;
+}
+
+// ─── Pending & Overdue Tasks Overview (company-wide list page, 2026-08-27,
+// see conversation) ───
+//
+// Deliberately NOT listEmployeeTasks' own pending/overdue split — that
+// function's own comment says outright "a row can appear in both lists at
+// once" (its `pending` is "everything not Done/Skipped," which already
+// includes overdue tasks; `overdue` is a separate, overlapping query). This
+// page's Pending column must exclude Overdue entirely, so both counts can
+// sit side by side without double-counting the same task. Batched exactly
+// like getOverdueTaskCounts above (one users lookup, one Task Manager user
+// lookup, both keyed on lowercased email) but returns full rows (name +
+// source, for the click-to-drill modal), not just a count, and in ONE
+// runBlock query covering every requested employee at once — the single
+// result set is split into disjoint pending/overdue buckets client-side by
+// the same isOverdue rule toEmployeeTaskRow already uses, rather than
+// running two overlapping queries per employee.
+export async function listPendingOverdueTaskDetails(userIds: number[]): Promise<Record<number, EmployeeTasksSummary>> {
+  if (userIds.length === 0) return {};
+
+  const users = await prisma.users.findMany({ where: { user_id: { in: userIds } }, select: { user_id: true, email: true } });
+  if (users.length === 0) return {};
+
+  const emailToUserId = new Map<string, number>();
+  for (const u of users) emailToUserId.set(u.email.trim().toLowerCase(), u.user_id);
+
+  const tmUsers = await taskManagerPrisma.user.findMany({
+    where: { email: { in: [...emailToUserId.keys()] } },
+    select: { id: true, email: true },
+  });
+  if (tmUsers.length === 0) return {};
+
+  const tmIdToUserId = new Map<string, number>();
+  for (const u of tmUsers) {
+    const employeeId = emailToUserId.get(u.email);
+    if (employeeId !== undefined) tmIdToUserId.set(u.id, employeeId);
+  }
+
+  const rows = await taskManagerPrisma.runBlock.findMany({
+    where: {
+      assigneeId: { in: [...tmIdToUserId.keys()] },
+      status: { notIn: ["DONE", "SKIPPED"] },
+      // Same cancelled/archived-run exclusion as listEmployeeTasks()/
+      // getOverdueTaskCounts() above.
+      run: { status: { not: "CANCELLED" }, archivedAt: null },
+    },
+    orderBy: { dueAt: "asc" },
+    select: { id: true, title: true, dueAt: true, cadence: true, assigneeId: true, run: { select: { startedById: true } } },
+  });
+
+  // One batched role lookup for every distinct starter across every
+  // employee's rows, same batching rationale as listEmployeeTasks/
+  // getOverdueTaskCounts above.
+  const starterIds = new Set<string>();
+  for (const r of rows) starterIds.add(r.run.startedById);
+  const starters = await taskManagerPrisma.user.findMany({
+    where: { id: { in: [...starterIds] } },
+    select: { id: true, role: true },
+  });
+  const starterRoles = new Map(starters.map((s) => [s.id, s.role as string]));
+
+  const startOfToday = startOfTodayUtc();
+  const result: Record<number, EmployeeTasksSummary> = {};
+  for (const employeeId of tmIdToUserId.values()) result[employeeId] = { pending: [], overdue: [] };
+
+  for (const row of rows) {
+    const employeeId = tmIdToUserId.get(row.assigneeId);
+    if (employeeId === undefined) continue;
+    const taskRow = toEmployeeTaskRow(row, startOfToday, row.assigneeId, starterRoles);
+    (taskRow.isOverdue ? result[employeeId].overdue : result[employeeId].pending).push(taskRow);
+  }
+
+  return result;
 }

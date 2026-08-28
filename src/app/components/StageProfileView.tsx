@@ -45,6 +45,7 @@ import type {
   ExitInterviewNoteInfo,
   ExitChecklistItem,
   FinancialSettlementInfo,
+  GuardianInfoEntry,
 } from "@/lib/employeeQueries";
 import type { ProbationDisplayInfo } from "@/lib/probationDecision";
 import {
@@ -53,6 +54,7 @@ import {
   SidebarField,
   EmergencyContactPanel,
   PersonalInfoPanel,
+  OfferLetterPanel,
   ResumePanel,
   InterviewAssessmentPanel,
   ReferenceCheckPanel,
@@ -79,6 +81,7 @@ import {
   RecordAddModal,
   LEAVE_DETAIL_FIELDS,
 } from "@/app/components/ActiveProfilePanels";
+import { GuardianInfoPanel } from "@/app/components/EmployeeRecordPanels";
 import { PageEditProvider, PageEditToggleButton, PageEditMessageDialog } from "@/app/components/PageEditMode";
 import { STAGE_CONTENT_PANELS } from "@/app/components/StageHistoryPanels";
 import {
@@ -102,6 +105,10 @@ interface Props {
   interviewAssessment?: InterviewAssessmentInfo | null;
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
+  /** Pre stage's own "Personal Info" group > Guardian Info sub-tab
+   *  (2026-08-26, see conversation) — same GuardianInfoEntry[] shape Employee
+   *  Record's Personal Info > Guardian Info already uses. */
+  guardianInfo?: GuardianInfoEntry[];
   probationInfo?: ProbationInfo | null;
   /** BranchStaff/career_applications-derived Start Date/End Date/Feedback/
    *  display status (see probationDecision.ts) — undefined only when this
@@ -178,6 +185,7 @@ export default function StageProfileView({
   interviewAssessment,
   referenceCheck,
   medicalCheck,
+  guardianInfo,
   probationInfo,
   probationDisplay,
   canDecideProbation,
@@ -698,7 +706,7 @@ export default function StageProfileView({
             <div className="flex-1 min-w-[130px]">
               {stage === "pre" && employeeDetail ? (
                 // Pre stage rollout batch 1 (2026-08-13, see conversation) —
-                // all 5 of Pre's own tabs render together, wrapped in one
+                // all of Pre's own tabs render together, wrapped in one
                 // PageEditProvider, each hidden via CSS instead of switched
                 // via resolvePanel() below, so an edit in progress on one
                 // survives clicking to another. No route/Link conversion
@@ -710,14 +718,25 @@ export default function StageProfileView({
                 // so displayStage/displaySection always equal stage/
                 // currentSection here — safe to key visibility off
                 // currentKey directly rather than displaySection.key.
+                // Restructured (2026-08-26, see conversation) to match
+                // Employee Record's real nested Personal Info/HR Info group
+                // shape — see stageProfileConfig.ts's own comment on Pre's
+                // sections. Guardian Info and the now-real Offer Letter
+                // panels added; Interview Assessment relabeled "Hiring Notes"
+                // (same component/data, no separate entry).
                 <PageEditProvider>
                   <PageEditMessageDialog />
                   <div className="mb-4 flex justify-end">
                     <PageEditToggleButton />
                   </div>
                   <div className={currentKey === "personal-info" ? "" : "hidden"}>
-                    <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />
+                    <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />
                   </div>
+                  {guardianInfo !== undefined && (
+                    <div className={currentKey === "guardian-info" ? "" : "hidden"}>
+                      <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />
+                    </div>
+                  )}
                   {resumeInfo && (
                     <div className={currentKey === "resume" ? "" : "hidden"}>
                       <ResumePanel
@@ -728,9 +747,12 @@ export default function StageProfileView({
                       />
                     </div>
                   )}
+                  <div className={currentKey === "offer-letter" ? "" : "hidden"}>
+                    <OfferLetterPanel employeeId={employeeId} offerLetterFileId={employeeDetail.offerLetterFileId} canEdit={canEdit} />
+                  </div>
                   {interviewAssessment !== undefined && (
                     <div className={currentKey === "interview" ? "" : "hidden"}>
-                      <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} canEdit={canEdit} />
+                      <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} heading="Hiring Notes" canEdit={canEdit} />
                     </div>
                   )}
                   {referenceCheck !== undefined && (
@@ -949,6 +971,7 @@ export default function StageProfileView({
                   interviewAssessment,
                   referenceCheck,
                   medicalCheck,
+                  guardianInfo,
                   probationInfo,
                   probationDisplay,
                   canDecideProbation,
@@ -1069,6 +1092,7 @@ function resolvePanel({
   interviewAssessment,
   referenceCheck,
   medicalCheck,
+  guardianInfo,
   probationInfo,
   probationDisplay,
   canDecideProbation,
@@ -1107,6 +1131,7 @@ function resolvePanel({
   interviewAssessment?: InterviewAssessmentInfo | null;
   referenceCheck?: ReferenceCheckInfo | null;
   medicalCheck?: MedicalCheckInfo | null;
+  guardianInfo?: GuardianInfoEntry[];
   probationInfo?: ProbationInfo | null;
   probationDisplay?: ProbationDisplayInfo;
   canDecideProbation?: boolean;
@@ -1166,9 +1191,15 @@ function resolvePanel({
         <div className="mb-4 flex justify-end">
           <PageEditToggleButton />
         </div>
-        <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} showOfferLetter canEdit={canEdit} />
+        <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />
       </PageEditProvider>
     );
+  }
+  // Real guardian_info table — Pre stage's own "Personal Info" group, same
+  // GuardianInfoPanel as Employee Record's Personal Info > Guardian Info
+  // (2026-08-26, see conversation).
+  if (section.key === "guardian-info" && guardianInfo !== undefined) {
+    return <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />;
   }
   // Real resume table — same as above, shared with Employee Record's HR Info
   // > Resume/CV tab.
@@ -1182,12 +1213,20 @@ function resolvePanel({
       />
     );
   }
-  // Real interview_assessment table — Pre stage's own Interview Assessment
-  // tab. interviewAssessment can validly be null (no row saved yet), so this
-  // must gate on !== undefined rather than truthiness — an empty real panel
-  // still beats falling through to a placeholder.
+  // Real employment.offer_letter_file_id — standalone HR Info tab now
+  // (2026-08-26, see conversation), same real OfferLetterPanel Employee
+  // Record's own HR Info tab uses (previously a mock there).
+  if (section.key === "offer-letter" && employeeDetail) {
+    return <OfferLetterPanel employeeId={employeeId} offerLetterFileId={employeeDetail.offerLetterFileId} canEdit={canEdit} />;
+  }
+  // Real interview_assessment table — Pre stage's own "Hiring Notes" tab
+  // (relabeled 2026-08-26, see conversation — same component/data as
+  // Employee Record's own HR Info > Hiring Notes). interviewAssessment can
+  // validly be null (no row saved yet), so this must gate on !== undefined
+  // rather than truthiness — an empty real panel still beats falling through
+  // to a placeholder.
   if (section.key === "interview" && interviewAssessment !== undefined) {
-    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} canEdit={canEdit} />;
+    return <InterviewAssessmentPanel userId={employeeId} data={interviewAssessment} heading="Hiring Notes" canEdit={canEdit} />;
   }
   // Real reference_check/medical_check/probation tables — same !== undefined
   // gating as interview_assessment above (a valid "no row saved yet" null
