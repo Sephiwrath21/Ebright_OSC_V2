@@ -104,7 +104,11 @@ const groupTaskSchema = z.object({
   /** Present = an existing member being kept (edit reconciliation); absent
    *  = a new task to create. */
   id: z.string().min(1).optional(),
-  title: z.string().trim().min(1).max(200),
+  // No max() on title (2026-08-28, user request) — was capped at 200
+  // characters; TaskTemplate.title/RunBlock.title are both plain Prisma
+  // String columns (Postgres TEXT, unbounded), so nothing downstream
+  // needed a migration to lift this. min(1) (non-blank) is unchanged.
+  title: z.string().trim().min(1),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
   // Per-task Guideline (2026-08-20) — same shape/limits as the single-task
   // template's own editTemplateSchema (templates-internal.ts), duplicated
@@ -810,11 +814,11 @@ export function getGroupAssignees(
 }
 
 /** "Remove" for one assignee (View Assignees modal, 2026-08-22 rule —
- *  corrected same day): cancels ONLY today's instance of each member task
- *  — see removeTemplateAssigneeCore's doc comment in templates-internal.ts
- *  for the full rule. Records a TaskTemplateExcludedAssignee row per
- *  member task, so this person stops receiving new recurring instances of
- *  EVERY task in the group going forward, while every instance dated
+ *  corrected same day; 2026-08-27 fix — see removeTemplateAssigneeCore's
+ *  own doc comment): cancels every instance of each member task due TODAY
+ *  OR LATER, not just today's. Records a TaskTemplateExcludedAssignee row
+ *  per member task, so this person stops receiving new recurring instances
+ *  of EVERY task in the group going forward, while every instance dated
  *  before today (pending, overdue, or completed) stays exactly as it is.
  *  Other assignees and the group/template itself are untouched. */
 export function removeGroupAssignee(
@@ -822,7 +826,7 @@ export function removeGroupAssignee(
   groupId: string,
   scope: TemplateGroupScope,
   userId: string,
-): Promise<{ excluded: true; cancelledToday: number; pendingKept: number }> {
+): Promise<{ excluded: true; cancelledPending: number; pendingKept: number }> {
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
@@ -833,13 +837,13 @@ export function removeGroupAssignee(
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
-    let cancelledToday = 0;
+    let cancelledPending = 0;
     let pendingKept = 0;
     for (const t of group.templates) {
       const result = await removeTemplateAssigneeCore(user, t.id, targetUserId);
-      cancelledToday += result.cancelledToday;
+      cancelledPending += result.cancelledPending;
       pendingKept += result.pendingKept;
     }
-    return { excluded: true, cancelledToday, pendingKept };
+    return { excluded: true, cancelledPending, pendingKept };
   }, "removeGroupAssignee");
 }

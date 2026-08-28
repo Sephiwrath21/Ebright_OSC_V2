@@ -3,11 +3,12 @@
 // "View Assignees" modal for Template Groups (2026-08-06): lists everyone
 // currently holding a pending task from this group, with a per-person
 // Remove action. Remove (2026-08-22 rule — corrected to a same-day
-// cutoff) cancels ONLY today's instance of each task in the group;
-// anything dated before today (pending, overdue, or completed) stays
-// exactly as it is, and no NEW recurring instances get created for that
-// person going forward. See data/templates-internal.ts's
-// removeTemplateAssigneeCore doc comment.
+// cutoff; 2026-08-27 fix — the cutoff has no upper bound) cancels every
+// instance of each task in the group due TODAY OR LATER; anything dated
+// before today (pending, overdue, or completed) stays exactly as it is,
+// and no NEW recurring instances get created for that person going
+// forward. See data/templates-internal.ts's removeTemplateAssigneeCore
+// doc comment.
 import * as React from "react";
 import type { FlowTemplateGroupAssignee, FlowTemplateGroupControl, FlowTemplateGroupSummary } from "./types";
 
@@ -72,7 +73,7 @@ export function TemplateGroupAssigneesModal({
     setBusyUserId(userId);
     if (
       !window.confirm(
-        `Remove ${name} from "${group.name}"? Today's task will be cancelled — they're no longer expected to complete it. Anything from before today (pending, overdue, or completed) stays untouched, and no new tasks will be created for them going forward. No one else assigned this ${labelLower} is affected.`,
+        `Remove ${name} from "${group.name}"? Today's and any later pending tasks will be cancelled — they're no longer expected to complete them. Anything from before today (pending, overdue, or completed) stays untouched, and no new tasks will be created for them going forward. No one else assigned this ${labelLower} is affected.`,
       )
     ) {
       setBusyUserId(null);
@@ -84,8 +85,8 @@ export function TemplateGroupAssigneesModal({
         if (!mountedRef.current) return;
         if (result.ok) {
           const parts: string[] = [];
-          if (result.cancelledToday > 0) {
-            parts.push(`today's task${result.cancelledToday === 1 ? "" : "s"} cancelled`);
+          if (result.cancelledPending > 0) {
+            parts.push(`${result.cancelledPending} pending task${result.cancelledPending === 1 ? "" : "s"} cancelled`);
           }
           if (result.pendingKept > 0) {
             parts.push(`${result.pendingKept} earlier open task${result.pendingKept === 1 ? "" : "s"} kept untouched`);

@@ -149,23 +149,27 @@ export async function getTemplateEditImpactCore(
  *  their unfiltered (all-weekdays) behavior unchanged.
  *
  *  `dueDateRange` (2026-08-22, added for removeTemplateAssigneeCore's
- *  "cancel today's instance only" rule): a plain DB `dueAt` range filter,
- *  applied alongside the others. A null `dueAt` is naturally excluded by a
- *  Postgres range comparison (unlike dueWeekday's post-fetch `getDay()`
- *  check above, this needs no special null-handling). */
+ *  same-day-onward rule; `to` made optional 2026-08-27 — see that
+ *  function's own doc comment for the bug this fixed): a plain DB `dueAt`
+ *  range filter, applied alongside the others. `to` omitted = no upper
+ *  bound (everything from `from` onward). A null `dueAt` is naturally
+ *  excluded by a Postgres range comparison (unlike dueWeekday's post-fetch
+ *  `getDay()` check above, this needs no special null-handling). */
 export async function cancelPendingTemplateRuns(
   actorId: string,
   templateId: string,
   reason: string,
   assigneeId?: string,
   dueWeekday?: number,
-  dueDateRange?: { from: Date; to: Date },
+  dueDateRange?: { from: Date; to?: Date },
 ) {
   const blocks = await prisma.runBlock.findMany({
     where: {
       templateId,
       ...(assigneeId ? { assigneeId } : {}),
-      ...(dueDateRange ? { dueAt: { gte: dueDateRange.from, lt: dueDateRange.to } } : {}),
+      ...(dueDateRange
+        ? { dueAt: { gte: dueDateRange.from, ...(dueDateRange.to ? { lt: dueDateRange.to } : {}) } }
+        : {}),
       run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
     select: { runId: true, status: true, dueAt: true },
@@ -224,7 +228,10 @@ export async function deleteTaskTemplateCore(user: { id: string }, templateId: s
 }
 
 const editTemplateSchema = z.object({
-  title: z.string().trim().min(1).max(200),
+  // No max() on title (2026-08-28, user request) — see the identical
+  // change to template-groups.ts's groupTaskSchema for why this is safe
+  // (both title columns are unbounded Postgres TEXT).
+  title: z.string().trim().min(1),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
   guidelineUrl: z.string().trim().url().max(2000).optional(),
   guidelineImage: z
@@ -483,19 +490,41 @@ export async function getTemplateAssigneesCore(
 }
 
 /** "Remove Assignee" (View Assignees modal, 2026-08-22 rule — corrected
- *  same day): cancels ONLY today's instance (per the module's todayStart()
- *  day-boundary convention, same one engine/recurrence.ts uses — respects
- *  TM_RESET_HOUR, not naive midnight) — this person is no longer expected
- *  to complete a task that started today. Anything due BEFORE today is
- *  left completely untouched regardless of status (pending, overdue,
- *  completed). It also records a TaskTemplateExcludedAssignee row, which:
+ *  same day; 2026-08-27 fix — see below): cancels every instance due TODAY
+ *  OR LATER (per the module's todayStart() day-boundary convention, same
+ *  one engine/recurrence.ts uses — respects TM_RESET_HOUR, not naive
+ *  midnight) — this person is no longer expected to complete any of them.
+ *  Anything due BEFORE today is left completely untouched regardless of
+ *  status (pending, overdue, completed). It also records a
+ *  TaskTemplateExcludedAssignee row, which:
  *   1) drops this person out of getTemplateAssigneesCore's "currently
  *      assigned" list (above) even while a past-dated pending instance is
  *      still naturally running its course, and
  *   2) makes engine/recurrence.ts's advanceRecurringBlocks stop generating
- *      NEW successors for this (template, assignee) pair from here on.
- *  Idempotent (upsert on the unique (templateId, userId) pair; re-running
- *  this on a later day cancels THAT day's instance, if any). No
+ *      NEW successors for this (template, assignee) pair from here on —
+ *      NOT permanently, though: assignFlowTaskCore (data/tasks-internal.ts,
+ *      the shared fan-out every assign path funnels through) clears this
+ *      exact row the moment someone explicitly re-assigns this template's
+ *      task to this person again (2026-08-28 fix) — an explicit re-assign
+ *      is a deliberate "put them back on this" decision, so it un-does the
+ *      exclusion rather than leaving the fresh task to silently never
+ *      auto-recur past its own due date.
+ *
+ *  2026-08-27 bug fix: this used to cancel ONLY today's instance (a
+ *  `dueAt` window of exactly [today, tomorrow)), on the assumption that at
+ *  most one pending instance could exist at a time. That's false for a
+ *  template assigned across several weekdays at once (e.g. "Tue-Sat" —
+ *  assignFlowTaskCore's `days` fan-out creates one block PER selected day
+ *  in a single call, all up front) — this week's later-weekday blocks
+ *  (e.g. Thu/Fri/Sat, already created days earlier alongside Tuesday's)
+ *  are due AFTER today but are NOT new recurrence successors the
+ *  exclusion row would have blocked; they already existed, so they kept
+ *  showing up on the removed person's list for days after removal. Now
+ *  cancelling everything from today onward (dueDateRange has no `to`
+ *  bound) closes that gap while the documented "before today" exception
+ *  (overdue work already in progress) is unchanged.
+ *
+ *  Idempotent (upsert on the unique (templateId, userId) pair). No
  *  templateGroupId filter — same reasoning as getTemplateAssigneesCore,
  *  meant to be usable on group members via data/template-groups.ts.
  *  pendingKept is purely informational: how many past-dated instances are
@@ -504,7 +533,7 @@ export async function removeTemplateAssigneeCore(
   user: { id: string },
   templateId: string,
   assigneeId: string,
-): Promise<{ excluded: true; cancelledToday: number; pendingKept: number }> {
+): Promise<{ excluded: true; cancelledPending: number; pendingKept: number }> {
   const id = z.string().min(1).parse(templateId);
   const targetAssigneeId = z.string().min(1).parse(assigneeId);
   const template = await prisma.taskTemplate.findFirst({
@@ -522,15 +551,17 @@ export async function removeTemplateAssigneeCore(
     },
   });
 
+  // Today OR LATER (no `to` bound) — 2026-08-27 fix, see this function's
+  // own doc comment for why an upper bound left later-this-week instances
+  // (already created ahead of time by a multi-day fan-out) uncancelled.
   const todayBoundary = todayStart();
-  const tomorrowBoundary = new Date(todayBoundary.getTime() + 24 * 60 * 60 * 1000);
-  const { removedTasks: cancelledToday } = await cancelPendingTemplateRuns(
+  const { removedTasks: cancelledPending } = await cancelPendingTemplateRuns(
     user.id,
     id,
     "template-assignee-removed",
     targetAssigneeId,
     undefined,
-    { from: todayBoundary, to: tomorrowBoundary },
+    { from: todayBoundary },
   );
 
   await prisma.taskTemplateExcludedAssignee.upsert({
@@ -542,8 +573,8 @@ export async function removeTemplateAssigneeCore(
     data: {
       actorId: user.id,
       action: "TEMPLATE_ASSIGNEE_EXCLUDED",
-      detail: { templateId: id, assigneeId: targetAssigneeId, cancelledToday, pendingKept: totalPendingBefore - cancelledToday },
+      detail: { templateId: id, assigneeId: targetAssigneeId, cancelledPending, pendingKept: totalPendingBefore - cancelledPending },
     },
   });
-  return { excluded: true, cancelledToday, pendingKept: totalPendingBefore - cancelledToday };
+  return { excluded: true, cancelledPending, pendingKept: totalPendingBefore - cancelledPending };
 }
