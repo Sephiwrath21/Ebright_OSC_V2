@@ -57,12 +57,22 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
   pre: {
     hasLocationLayer: false,
     profileMode: "in-page-tabs",
+    // Restructured (2026-08-26, see conversation) to match Employee Record's
+    // real nested Personal Info / HR Info group shape exactly — same
+    // navigation depth (group header expands to reveal its own sub-tabs),
+    // just a narrower set of panels than Employee Record shows, since Pre is
+    // an earlier stage. Guardian Info added as Personal Info's sub-tab;
+    // Offer Letter and Hiring Notes (the same InterviewAssessmentPanel,
+    // relabeled — no separate entry) added under HR Info. NDA/Non-Compete
+    // and Handbook are deliberately never part of Pre — later-stage panels.
     sections: [
-      { key: "personal-info", label: "Personal Info" },
-      { key: "resume", label: "Resume" },
-      { key: "interview", label: "Interview Assessment" },
-      { key: "reference", label: "Reference Check" },
-      { key: "medical", label: "Medical Check" },
+      { key: "personal-info", label: "Personal Info", group: "Personal Info" },
+      { key: "guardian-info", label: "Guardian Info", group: "Personal Info" },
+      { key: "resume", label: "Resume", group: "HR Info" },
+      { key: "offer-letter", label: "Offer Letter", group: "HR Info" },
+      { key: "interview", label: "Hiring Notes", group: "HR Info" },
+      { key: "reference", label: "Reference Check", group: "HR Info" },
+      { key: "medical", label: "Medical Check", group: "HR Info" },
     ],
     navRail: {
       widthPx: RAIL_WIDTH_PX,
@@ -154,18 +164,26 @@ export const STAGE_PROFILE_CONFIG: Record<EmployeeStage, StageProfileConfig> = {
   },
 };
 
-// Builds the profile URL for a given stage — "in-page-tabs" stages (Pre/
-// Probation) have no section segment, "separate-pages" stages (Onboarding/
-// Active/Exit) land on their first section. Used to send a real stage-move
+// Builds the profile URL for a given stage. Used to send a real stage-move
 // action (Proceed, or Probation's Confirm decision — see ProbationPanel in
 // ActiveProfilePanels.tsx) straight to the employee's new profile,
 // whichever URL shape that target stage actually uses. Lives here rather
 // than in StageProfileView.tsx (its original home) because ProbationPanel
 // needs it too, and StageProfileView.tsx itself imports FROM
 // ActiveProfilePanels.tsx — importing back the other way would be circular.
+//
+// Onboarding/Active/Exit (2026-08-27, see conversation — fixed alongside
+// Exit's own conversion) are special-cased to the bare URL even though
+// STAGE_PROFILE_CONFIG still labels their profileMode "separate-pages" —
+// that field now only describes whether [section]/page.tsx remains a valid
+// fallback route for old bookmarks, not which URL a fresh navigation should
+// use; all three now render from [id]/page.tsx directly on one URL, same as
+// Pre/Probation. Before this fix, transitioning into one of these three
+// stages briefly landed on the OLD StageProfileView UI (still functional,
+// just not the new unified one) until the person navigated away and back.
 export function profileUrlForStage(stage: EmployeeStage, employeeId: number): string {
   const config = STAGE_PROFILE_CONFIG[stage];
-  if (config.profileMode === "separate-pages") {
+  if (config.profileMode === "separate-pages" && stage !== "onboarding" && stage !== "active" && stage !== "exit") {
     return `/employee-folder/${stage}/employee/${employeeId}/${config.sections[0].key}`;
   }
   return `/employee-folder/${stage}/employee/${employeeId}`;

@@ -8,7 +8,6 @@ import {
   SubsectionHeading,
   Subsection,
   FieldGrid,
-  PlaceholderUploadField,
   SalaryRevisionFields,
   EditableField,
   CurrencyField,
@@ -330,22 +329,11 @@ export function GuardianInfoPanel({
 // (Handbook shares DocumentsPanel with the stage-flow's Onboarding
 // "Documents" tab, Hiring Notes shares InterviewAssessmentPanel with Pre
 // stage's own "Interview Assessment" tab — same interview_assessment record
-// either way, see that component's own comment), special-cased in
-// EmployeeRecordView's resolvePanel instead of living in the static-panel
-// lookup below since they need real userId/data props the others don't
-// take. Offer Letter alone still has no schema backing (would need its own
-// candidate-intake table). ───
-
-export function OfferLetterPanel({ canEdit = true }: { canEdit?: boolean }) {
-  return (
-    <EditableSection hasRealBacking={false} canEdit={canEdit}>
-      <PanelHeading>Offer Letter</PanelHeading>
-      <FieldGrid>
-        <PlaceholderUploadField label="Offer Letter" />
-      </FieldGrid>
-    </EditableSection>
-  );
-}
+// either way, see that component's own comment; Offer Letter is now real too
+// — moved to ActiveProfilePanels.tsx's OfferLetterPanel, 2026-08-26, see
+// conversation), special-cased in EmployeeRecordView's resolvePanel instead
+// of living in the static-panel lookup below since they need real
+// userId/data props the others don't take. ───
 
 // NDA/NC is real now — see ActiveProfilePanels.NdaNcPanel (combines nda +
 // non_compete in one Edit/Save cycle), special-cased in EmployeeRecordView's
@@ -852,10 +840,14 @@ export function TaskOverduePanel({ tasks }: { tasks: EmployeeTaskRow[] }) {
 
 // ─── Lookup: "category/section" -> panel component ───
 //
-// Task/Pending and Task/Overdue are NOT here — they need real userId/tasks
-// props the rest of this dictionary doesn't take, so they're special-cased
-// in EmployeeRecordView's resolvePanel instead (same convention as Training/
-// Promotion/Transfer/Cert.-Achievement/the 4 Disciplinary sub-tabs).
-export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, (props: { canEdit?: boolean }) => ReactNode> = {
-  "hr-info/offer-letter": OfferLetterPanel,
-};
+// Empty now (2026-08-26, see conversation) — its one entry, Offer Letter,
+// was already dead code before this: HR Info's "batch 2" rollout (see
+// EmployeeRecordView's resolvePanel) renders all of HR Info's sub-panels
+// together and returns early, so this lookup was never actually reached for
+// it. Kept as a real (if currently empty) lookup rather than removed
+// outright — Task/Pending and Task/Overdue are NOT here — they need real
+// userId/tasks props this dictionary's signature doesn't take, so they're
+// special-cased in EmployeeRecordView's resolvePanel instead (same
+// convention as Training/Promotion/Transfer/Cert.-Achievement/the 4
+// Disciplinary sub-tabs) — a future static-only panel can still land here.
+export const EMPLOYEE_RECORD_STATIC_PANELS: Record<string, (props: { canEdit?: boolean }) => ReactNode> = {};

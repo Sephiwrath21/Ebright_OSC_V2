@@ -53,6 +53,11 @@ export interface NavItem {
    *  items that don't need Task-Manager-specific gating (e.g. "Overview",
    *  which stays unconditionally visible). */
   taskManagerKey?: "template" | "package" | "packageTable";
+  /** Gates on NavAccess.pendingOverdueTasksAccess (2026-08-27) — CEO/
+   *  Finance/HR/Superadmin/HOD/BM only, resolved the same way the "Pending
+   *  & Overdue Tasks Overview" route itself enforces server-side (see
+   *  pendingOverdueTasksAccess.ts). Omit for every other item. */
+  requiresPendingOverdueTasksAccess?: boolean;
   children?: NavItem[];
 }
 
@@ -81,16 +86,61 @@ export const primaryNav: NavItem[] = [
       { name: "HR Dashboard", href: "/induction/hr-dashboard", feature: "hr_dashboard" },
       { name: "Manpower Cost Report", href: "/manpower-cost-report", feature: "manpower_cost" },
       { name: "Staff Directory", href: "/staff-directory", feature: "staff_directory" },
-      // No `feature` gate — Employee Folder's real access control is
-      // employeeScope.ts (department/branch/own-record scoping), not the
-      // access-management role_permission matrix; that matrix currently has
-      // no grant configured for any role but department/HR, which was
-      // hiding this link for every branch/department/staff account even
-      // though their own /employee-folder route works fine and is properly
-      // scoped. Per explicit decision (see conversation) — visibility
-      // should follow the same rule the route itself enforces, not a
-      // separate, out-of-sync permission table.
-      { name: "Employee Folder", href: "/employee-folder" },
+      // Converted from a flat leaf into an expandable parent (2026-08-27,
+      // see conversation) so "Pending & Overdue Tasks Overview" can live
+      // underneath it, same expand/collapse pattern "Attendance" above
+      // already uses (a depth-1 parent with no `href` of its own — verified
+      // in NavNode's render code that an item with `children` never renders
+      // as a Link regardless of any `href` it's given, HRMS's own dead
+      // `href="/dashboards/hrms"` being proof of that — the row becomes a
+      // pure toggle). The "Overview" child below is what makes
+      // "/employee-folder" itself still reachable in one click, exactly
+      // mirroring HRMS's/Attendance's own "Overview" child — `exact: true`
+      // included, copied directly from Attendance's own Overview (2026-08-27,
+      // see conversation — an earlier version of this left `exact` off to
+      // keep the parent auto-highlighted while browsing Employee Folder's
+      // many dynamic sub-routes, e.g. [stage]/employee/[id], but that made
+      // "Overview" ALSO match "/employee-folder/pending-overdue-tasks" via
+      // its own prefix check, so both children lit up at once — the same bug
+      // `exact: true` prevents for Attendance's own Overview vs. its
+      // siblings). Accepted consequence of matching Attendance's pattern
+      // exactly: unlike before this conversion, browsing a deep sub-route
+      // (e.g. /employee-folder/active) no longer highlights any child or
+      // auto-expands the parent, since neither child's href matches it —
+      // Attendance itself avoids this only because Leave/Report/Summary/
+      // Justifications each own a distinct non-exact prefix covering their
+      // own subtree, which Employee Folder has no equivalent of (its
+      // sub-routes are all depth within the "Overview" feature itself, not
+      // separate nav destinations to add a child for).
+      //
+      // No `feature` gate on "Overview" — Employee Folder's real access
+      // control is employeeScope.ts (department/branch/own-record scoping),
+      // not the access-management role_permission matrix; that matrix
+      // currently has no grant configured for any role but department/HR,
+      // which was hiding this link for every branch/department/staff
+      // account even though their own /employee-folder route works fine and
+      // is properly scoped. Per explicit decision (see conversation) —
+      // visibility should follow the same rule the route itself enforces,
+      // not a separate, out-of-sync permission table.
+      {
+        name: "Employee Folder",
+        children: [
+          { name: "Overview", href: "/employee-folder", exact: true },
+          // requiresPendingOverdueTasksAccess (2026-08-27, see conversation)
+          // — CEO/Finance/HR/Superadmin/HOD/BM (plus a real BM employee or
+          // the generic shared branch login) only; plain staff, and anyone
+          // whose employment.position is Intern/PT Coach/FT Coach/FT Exec/
+          // Protege Intern, never see this link at all, and the route
+          // itself independently re-checks the exact same access
+          // server-side regardless (see pendingOverdueTasksAccess.ts) —
+          // this hides the link, it isn't the real gate.
+          {
+            name: "Pending & Overdue Tasks Overview",
+            href: "/employee-folder/pending-overdue-tasks",
+            requiresPendingOverdueTasksAccess: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -221,6 +271,7 @@ function filterNav(
   for (const item of items) {
     if (item.privileged && !access.privileged) continue;
     if (item.feature && !access.features.includes(item.feature)) continue;
+    if (item.requiresPendingOverdueTasksAccess && !access.pendingOverdueTasksAccess) continue;
     if (item.taskManagerKey) {
       // null (still loading) leaves it shown, matching the existing
       // "null access leaves the menu untouched" behavior for navAccess.

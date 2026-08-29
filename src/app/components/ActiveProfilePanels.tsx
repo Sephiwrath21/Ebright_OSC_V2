@@ -8,6 +8,7 @@ import { POSITION_OPTIONS } from "@/lib/employeeStages";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   updatePersonalInfo,
+  updateOfferLetter,
   updateResume,
   updateInterviewAssessment,
   updateReferenceCheck,
@@ -1025,8 +1026,8 @@ function StaticField({ label, value, full = false }: { label: string; value: str
 }
 
 const PROBATION_STATUS_PILL_CLASSES: Record<string, string> = {
-  Confirm: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
-  Stop: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Confirmed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  Stopped: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
   Extended: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   "In Progress": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
@@ -1126,7 +1127,6 @@ export function ProbationPanel({
   canEdit?: boolean;
 }) {
   const router = useRouter();
-  const [confirmDate, setConfirmDate] = useState(data?.confirmDate ?? "");
   const [extEndDate, setExtEndDate] = useState(data?.extEndDate ?? "");
   const [confirmationLetterFileId, setConfirmationLetterFileId] = useState(data?.confirmationLetterFileId ?? null);
   const [confirmationLetterPending, setConfirmationLetterPending] = useState<File | null>(null);
@@ -1195,7 +1195,6 @@ export function ProbationPanel({
       <EditableSection
         onSave={async () => {
           const result = await updateProbationInfo(userId, {
-            confirmDate,
             extEndDate,
             confirmationLetterFileId,
             confirmationLetterFile: confirmationLetterPending,
@@ -1222,7 +1221,7 @@ export function ProbationPanel({
               {display.displayStatus}
             </span>
           </div>
-          <EditableField label="Confirmation Date" value={confirmDate} onChange={setConfirmDate} type="date" />
+          <StaticField label="Confirmation Date" value={display.confirmationDate} />
           {display.displayStatus === "Extended" && (
             <EditableField label="Extension End Date" value={extEndDate} onChange={setExtEndDate} type="date" />
           )}
@@ -4197,9 +4196,7 @@ const GENDER_OPTIONS = [
 
 // Matches pinfo_personalInfo.html's/pre_PersonalInfo.html's exact field set:
 // Full Name, Date of Birth, Gender, IC/Passport No., Email, Phone Number,
-// Home Address, +Signed Offer Letter (Pre-stage's own intake form only —
-// Employee Record's Personal Info tab doesn't show it, so it's opt-in via
-// showOfferLetter). Same user_profile-backed component, same updatePersonalInfo
+// Home Address. Same user_profile-backed component, same updatePersonalInfo
 // action, used both by Employee Record's Personal Info tab AND the stage-flow's
 // Pre "Personal Info" section (+ every later stage's "P. Info" history tab) —
 // one real data source for both places an employee's personal info shows up,
@@ -4208,18 +4205,17 @@ const GENDER_OPTIONS = [
 // here). Full Name/Email are editable despite doubling as the login
 // identifier (users.email) — editing an account's own email invalidates its
 // current session (next request's lookup-by-email no longer matches), same
-// as any email change would. Signed Offer Letter is a real Google Drive file
-// now (employment.offer_letter_file_id) — same upload-on-save RealFileField
-// convention as Resume/CV.
+// as any email change would. Signed Offer Letter used to be an opt-in field
+// here (showOfferLetter, Pre-stage only) — moved out into its own standalone
+// OfferLetterPanel/HR Info tab (2026-08-26, see conversation), used
+// identically by Employee Record and the Pre stage-flow now.
 export function PersonalInfoPanel({
   employee,
   employeeId,
-  showOfferLetter = false,
   canEdit = true,
 }: {
   employee: EmployeeDetailFull;
   employeeId: number;
-  showOfferLetter?: boolean;
   canEdit?: boolean;
 }) {
   const [fullName, setFullName] = useState(employee.fullName ?? "");
@@ -4229,13 +4225,6 @@ export function PersonalInfoPanel({
   const [gender, setGender] = useState(employee.gender ?? "");
   const [nric, setNric] = useState(employee.nric ?? "");
   const [homeAddress, setHomeAddress] = useState(employee.homeAddress ?? "");
-  const [offerLetterFileId, setOfferLetterFileId] = useState(employee.offerLetterFileId ?? null);
-  const [offerLetterPending, setOfferLetterPending] = useState<File | null>(null);
-
-  function clearOfferLetter() {
-    if (offerLetterPending) setOfferLetterPending(null);
-    else setOfferLetterFileId(null);
-  }
 
   // Same checks as handleSave's own inline guard below, extracted so a
   // PageEditProvider (see PageEditMode.tsx) can validate this section
@@ -4268,8 +4257,6 @@ export function PersonalInfoPanel({
       gender,
       nric,
       homeAddress,
-      offerLetterFileId,
-      offerLetterFile: offerLetterPending,
     });
   }
 
@@ -4284,16 +4271,52 @@ export function PersonalInfoPanel({
         <EmailField label="Email" value={email} onChange={setEmail} />
         <PhoneField label="Phone Number" value={phone} onChange={setPhone} />
         <EditableField label="Home Address" value={homeAddress} onChange={setHomeAddress} full />
-        {showOfferLetter && (
-          <RealFileField
-            label="Signed Offer Letter"
-            existingFileId={offerLetterFileId}
-            pendingFile={offerLetterPending}
-            onPick={setOfferLetterPending}
-            onClear={clearOfferLetter}
-            full
-          />
-        )}
+      </FieldGrid>
+    </EditableSection>
+  );
+}
+
+// Signed Offer Letter — extracted out of PersonalInfoPanel above (2026-08-26,
+// see conversation) into its own standalone, real HR Info tab, replacing the
+// old mock OfferLetterPanel (EmployeeRecordPanels.tsx) that had no data
+// backing at all. Same real Google Drive file (employment.
+// offer_letter_file_id) and RealFileField convention as Resume/CV — used
+// identically by Employee Record's HR Info tab AND the Pre stage-flow's HR
+// Info tab (current view and, via resolvePanel, every later stage's
+// Pre-history view).
+export function OfferLetterPanel({
+  employeeId,
+  offerLetterFileId: initialOfferLetterFileId,
+  canEdit = true,
+}: {
+  employeeId: number;
+  offerLetterFileId: string | null;
+  canEdit?: boolean;
+}) {
+  const [offerLetterFileId, setOfferLetterFileId] = useState(initialOfferLetterFileId);
+  const [offerLetterPending, setOfferLetterPending] = useState<File | null>(null);
+
+  function clearOfferLetter() {
+    if (offerLetterPending) setOfferLetterPending(null);
+    else setOfferLetterFileId(null);
+  }
+
+  return (
+    <EditableSection
+      onSave={() => updateOfferLetter(employeeId, { offerLetterFileId, offerLetterFile: offerLetterPending })}
+      canEdit={canEdit}
+      sectionLabel="Offer Letter"
+    >
+      <PanelHeading>Offer Letter</PanelHeading>
+      <FieldGrid>
+        <RealFileField
+          label="Signed Offer Letter"
+          existingFileId={offerLetterFileId}
+          pendingFile={offerLetterPending}
+          onPick={setOfferLetterPending}
+          onClear={clearOfferLetter}
+          full
+        />
       </FieldGrid>
     </EditableSection>
   );
