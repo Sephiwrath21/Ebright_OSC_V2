@@ -145,17 +145,24 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
   const [drill, setDrill] = React.useState<BucketKey | null>(null);
 
   const { totals, byBucket } = React.useMemo(() => {
+    // byBucket keeps EVERY task, including subtasks — the drill modal
+    // still lists/lets you complete them individually, same as ClickUp's
+    // own expandable checklist. totals is the donut/percentage's own
+    // count and does NOT count subtasks separately (2026-08-29, user
+    // report — a parent with 5 subtasks was inflating this card's total
+    // from 9 to 14, dragging 89% down to 57%): only top-level tasks
+    // (parentId null/undefined) are tallied, matching the same rule
+    // countBuckets/groupByDimension/buildEntityPayload already apply
+    // server-side for every OTHER donut in the app — this is the one card
+    // that computed its own totals client-side instead of receiving them
+    // pre-computed, so it needed the identical guard added by hand.
     const buckets: Record<BucketKey, FlowDrillTask[]> = { completed: [], pending: [], na: [] };
+    const bucketTotals: FlowBucketTotals = { completed: 0, pending: 0, na: 0 };
     for (const t of card.tasks) {
-      if (t.status === "DONE") buckets.completed.push(t);
-      else if (t.status === "SKIPPED") buckets.na.push(t);
-      else buckets.pending.push(t);
+      const key: BucketKey = t.status === "DONE" ? "completed" : t.status === "SKIPPED" ? "na" : "pending";
+      buckets[key].push(t);
+      if (t.parentId == null) bucketTotals[key] += 1;
     }
-    const bucketTotals: FlowBucketTotals = {
-      completed: buckets.completed.length,
-      pending: buckets.pending.length,
-      na: buckets.na.length,
-    };
     return { totals: bucketTotals, byBucket: buckets };
   }, [card.tasks]);
 
@@ -204,7 +211,16 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
               <span
                 className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
               >
-                {byBucket[b.key].length}
+                {/* totals[b.key], NOT byBucket[b.key].length (2026-08-29
+                    fix) — byBucket keeps subtasks for the drill modal's own
+                    list (clicking still opens it via setDrill below,
+                    unchanged), but the badge itself must match the top
+                    stat-chip row, which already excludes them. This was
+                    the second of two spots in this card with the same
+                    stale-count bug — the stat chips read `totals` and were
+                    already correct; this badge still read the raw
+                    (subtask-inclusive) array length. */}
+                {totals[b.key]}
               </span>
             </button>
           );

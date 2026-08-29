@@ -3443,6 +3443,43 @@ export function EntityDrillModal({
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [reassignRow, setReassignRow] = React.useState<string | null>(null);
 
+  // Main task <-> subtask tree (2026-08-29, user request — subtasks were
+  // rendered as their own flat, same-level rows here, unlike every OTHER
+  // task list in the app (ResizableTaskList's own tree), so a task with
+  // several subtasks looked like several unrelated tasks). `tasks[bucketKey]`
+  // is already filtered to ONE status bucket, and a subtask's status is
+  // independent of its parent's — so a subtask only nests here when its
+  // PARENT happens to land in this SAME bucket too (both share this
+  // bucket's status); otherwise there's no parent row in this list to nest
+  // under, and it stays a plain top-level row, same as before. EXPANDED by
+  // default (collapsedParentIds tracks the exceptions) — same convention
+  // ResizableTaskList's own parent/child tree already uses, so a task with
+  // subtasks doesn't visually shrink when this feature first landed.
+  const [collapsedParentIds, setCollapsedParentIds] = React.useState<Set<string>>(new Set());
+  const toggleParentExpand = (id: string) =>
+    setCollapsedParentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const { topLevelRows, childrenOf } = React.useMemo(() => {
+    const allIds = new Set(rows.map((r) => r.runBlockId));
+    const children = new Map<string, FlowDrillTask[]>();
+    for (const r of rows) {
+      if (r.parentId && allIds.has(r.parentId)) {
+        const kids = children.get(r.parentId);
+        if (kids) kids.push(r);
+        else children.set(r.parentId, [r]);
+      }
+    }
+    for (const kids of children.values()) {
+      kids.sort((a, b) => (a.subtaskOrder ?? Number.MAX_SAFE_INTEGER) - (b.subtaskOrder ?? Number.MAX_SAFE_INTEGER));
+    }
+    const top = rows.filter((r) => !r.parentId || !allIds.has(r.parentId));
+    return { topLevelRows: top, childrenOf: children };
+  }, [rows]);
+
   const ownedRows = rows.filter((t) => myUserId && t.assigneeId === myUserId);
   const allOwnedSelected = ownedRows.length > 0 && ownedRows.every((t) => selectedIds.has(t.runBlockId));
   const toggleSelect = (id: string) => {
@@ -3528,6 +3565,122 @@ export function EntityDrillModal({
   const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
   const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedDueDay);
 
+  /** One row — a main task (optionally with an expand/collapse chevron +
+   *  subtask count when `tree.kind === "parent"`) or an indented subtask
+   *  (`tree.kind === "child"`). Same row content/actions either way; only
+   *  the leading chevron-or-indent differs. */
+  const renderDrillRow = (
+    t: FlowDrillTask,
+    opts: { tree?: { kind: "parent"; count: number; expanded: boolean; onToggle: () => void } | { kind: "child" } },
+  ) => {
+    const due = t.dueAt ? new Date(t.dueAt) : null;
+    const dueDisplay = formatDueDate(due);
+    const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
+    const canReassign = bucketKey === "pending" && Boolean(reassign);
+    return (
+      <div
+        key={t.runBlockId}
+        className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
+      >
+        <div className="flex items-center gap-2.5">
+          {opts.tree?.kind === "parent" ? (
+            <button
+              type="button"
+              onClick={opts.tree.onToggle}
+              aria-expanded={opts.tree.expanded}
+              aria-label={opts.tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
+              className="flex shrink-0 items-center gap-0.5 text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
+            >
+              <ChevronIcon expanded={opts.tree.expanded} className="size-3.5" />
+              <span className="text-[10px] font-semibold">{opts.tree.count}</span>
+            </button>
+          ) : (
+            opts.tree?.kind === "child" && <span className="w-4 shrink-0" aria-hidden />
+          )}
+          {isOwned && (
+            <input
+              type="checkbox"
+              checked={selectedIds.has(t.runBlockId)}
+              onChange={() => toggleSelect(t.runBlockId)}
+              aria-label={`Select ${t.blockTitle}`}
+              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+            />
+          )}
+          <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate text-sm font-semibold ${
+                t.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
+              }`}
+            >
+              {t.blockTitle}
+            </p>
+            {!isOwned && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
+            )}
+            {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
+                show who assigned them (assigner cards / personal
+                donut drills); rows about other people keep the
+                assignee line above instead. */}
+            {isOwned && t.assignerName && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">
+                Assigned by {t.assignerName}
+              </p>
+            )}
+          </div>
+          {/* Assignee avatar (2026-08-22, ClickUp-style reference)
+              — initials on a per-person color, same InitialAvatar
+              every other assignee chip in the app already uses
+              (no photo data exists to show a real picture). Shown
+              on every row, own or not, matching the reference's
+              per-row avatar regardless of ownership. */}
+          <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
+          {/* Proof (2026-07-30): ＋ upload on the viewer's own
+              rows, 📎 view for anyone once uploaded. Only takes
+              space when actionable/present — the modal is too
+              narrow for a dash placeholder column. */}
+          {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
+            <ProofCell
+              task={t}
+              isOwned={isOwned}
+              onUploadProof={onUploadProof}
+              onRemoveProof={onRemoveProof}
+            />
+          )}
+          {dueDisplay && (
+            <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+          )}
+          {canReassign && (
+            <button
+              type="button"
+              onClick={() =>
+                setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
+              }
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                reassignRow === t.runBlockId
+                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
+                  : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
+              }`}
+            >
+              Assign to Others
+            </button>
+          )}
+        </div>
+        {canReassign && reassign && reassignRow === t.runBlockId && (
+          <ReassignPicker
+            staff={reassign.staff}
+            currentAssigneeId={t.assigneeId}
+            onPick={async (userId) => {
+              const r = await reassign.action(t.runBlockId, userId);
+              if (r.ok) setReassignRow(null);
+              return r;
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
@@ -3581,98 +3734,21 @@ export function EntityDrillModal({
               <span>Due date</span>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-slate-800">
-            {rows.map((t) => {
-              const due = t.dueAt ? new Date(t.dueAt) : null;
-              const dueDisplay = formatDueDate(due);
-              const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
-              const canReassign = bucketKey === "pending" && Boolean(reassign);
+            {topLevelRows.map((t) => {
+              const kids = childrenOf.get(t.runBlockId) ?? [];
+              const expanded = !collapsedParentIds.has(t.runBlockId);
               return (
-                <div
-                  key={t.runBlockId}
-                  className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
-                >
-                  <div className="flex items-center gap-2.5">
-                    {isOwned && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(t.runBlockId)}
-                        onChange={() => toggleSelect(t.runBlockId)}
-                        aria-label={`Select ${t.blockTitle}`}
-                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
-                      />
-                    )}
-                    <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-semibold ${
-                          t.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
-                        }`}
-                      >
-                        {t.blockTitle}
-                      </p>
-                      {!isOwned && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
-                      )}
-                      {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
-                          show who assigned them (assigner cards / personal
-                          donut drills); rows about other people keep the
-                          assignee line above instead. */}
-                      {isOwned && t.assignerName && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">
-                          Assigned by {t.assignerName}
-                        </p>
-                      )}
-                    </div>
-                    {/* Assignee avatar (2026-08-22, ClickUp-style reference)
-                        — initials on a per-person color, same InitialAvatar
-                        every other assignee chip in the app already uses
-                        (no photo data exists to show a real picture). Shown
-                        on every row, own or not, matching the reference's
-                        per-row avatar regardless of ownership. */}
-                    <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
-                    {/* Proof (2026-07-30): ＋ upload on the viewer's own
-                        rows, 📎 view for anyone once uploaded. Only takes
-                        space when actionable/present — the modal is too
-                        narrow for a dash placeholder column. */}
-                    {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
-                      <ProofCell
-                        task={t}
-                        isOwned={isOwned}
-                        onUploadProof={onUploadProof}
-                        onRemoveProof={onRemoveProof}
-                      />
-                    )}
-                    {dueDisplay && (
-                      <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
-                    )}
-                    {canReassign && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
-                        }
-                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                          reassignRow === t.runBlockId
-                            ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
-                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
-                        }`}
-                      >
-                        Assign to Others
-                      </button>
-                    )}
-                  </div>
-                  {canReassign && reassign && reassignRow === t.runBlockId && (
-                    <ReassignPicker
-                      staff={reassign.staff}
-                      currentAssigneeId={t.assigneeId}
-                      onPick={async (userId) => {
-                        const r = await reassign.action(t.runBlockId, userId);
-                        if (r.ok) setReassignRow(null);
-                        return r;
-                      }}
-                    />
-                  )}
-                </div>
+                <React.Fragment key={t.runBlockId}>
+                  {renderDrillRow(t, {
+                    tree:
+                      kids.length > 0
+                        ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleParentExpand(t.runBlockId) }
+                        : undefined,
+                  })}
+                  {kids.length > 0 &&
+                    expanded &&
+                    kids.map((k) => renderDrillRow(k, { tree: { kind: "child" } }))}
+                </React.Fragment>
               );
             })}
             </div>

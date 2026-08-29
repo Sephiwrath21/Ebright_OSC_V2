@@ -194,6 +194,29 @@ describe("countBuckets", () => {
       na: 1,
     });
   });
+
+  it("does not count subtasks separately from their parent (2026-08-29)", () => {
+    // One parent task (DONE) with 5 SKIPPED subtasks — ClickUp counts this
+    // as ONE unit total; countBuckets must match, not tally 6.
+    const blocks = [
+      { status: "DONE" as BlockStatus, parentId: null },
+      { status: "SKIPPED" as BlockStatus, parentId: "parent-1" },
+      { status: "SKIPPED" as BlockStatus, parentId: "parent-1" },
+      { status: "SKIPPED" as BlockStatus, parentId: "parent-1" },
+      { status: "SKIPPED" as BlockStatus, parentId: "parent-1" },
+      { status: "SKIPPED" as BlockStatus, parentId: "parent-1" },
+    ];
+    expect(countBuckets(blocks)).toEqual({ completed: 1, pending: 0, na: 0 });
+  });
+
+  it("treats a missing parentId the same as null (existing callers unaffected)", () => {
+    const statuses: BlockStatus[] = ["DONE", "SKIPPED"];
+    expect(countBuckets(statuses.map((status) => ({ status })))).toEqual({
+      completed: 1,
+      pending: 0,
+      na: 1,
+    });
+  });
 });
 
 // ---------- period rule (dueAt in window, else startedAt) ----------
@@ -275,6 +298,18 @@ describe("groupByDimension", () => {
       (id) => (id === "u-z" ? "Zenith Branch" : null),
     );
     expect(rows.map((r) => r.name)).toEqual(["Zenith Branch"]);
+  });
+
+  it("does not count subtasks separately from their parent (2026-08-29)", () => {
+    const rows = groupByDimension(
+      [
+        { assigneeId: "u-sofia", status: "DONE", parentId: null },
+        { assigneeId: "u-sofia", status: "SKIPPED", parentId: "parent-1" },
+        { assigneeId: "u-sofia", status: "SKIPPED", parentId: "parent-1" },
+      ],
+      dimensionOf,
+    );
+    expect(rows).toEqual([{ name: "Subang Taipan", completed: 1, pending: 0, na: 0 }]);
   });
 });
 

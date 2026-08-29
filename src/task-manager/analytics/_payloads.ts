@@ -336,6 +336,11 @@ async function buildEntityPayload(
   const byMember = new Map<string, { done: number; notDone: number }>();
   for (const u of roster) byMember.set(u.id, { done: 0, notDone: 0 });
   for (const b of blocks) {
+    // Subtasks don't count separately (2026-08-29) — see countBuckets' own
+    // doc comment in _lib.ts for why (this loop predates that shared
+    // helper and tallies done/notDone by hand, so it needs the same guard
+    // repeated here rather than inheriting it for free).
+    if (b.parentId != null) continue;
     const tally = byMember.get(b.assigneeId) ?? { done: 0, notDone: 0 };
     const bucket = bucketOf(b.status);
     if (bucket === "completed") tally.done += 1;
