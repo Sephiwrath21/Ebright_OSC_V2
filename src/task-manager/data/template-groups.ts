@@ -814,23 +814,28 @@ export function getGroupAssignees(
 }
 
 /** "Remove" for one assignee (View Assignees modal, 2026-08-22 rule —
- *  corrected same day; 2026-08-27 fix — see removeTemplateAssigneeCore's
- *  own doc comment): cancels every instance of each member task due TODAY
- *  OR LATER, not just today's. Records a TaskTemplateExcludedAssignee row
- *  per member task, so this person stops receiving new recurring instances
- *  of EVERY task in the group going forward, while every instance dated
- *  before today (pending, overdue, or completed) stays exactly as it is.
- *  Other assignees and the group/template itself are untouched. */
+ *  corrected same day; 2026-08-27 fix; made PER-WEEKDAY 2026-08-29 — see
+ *  removeTemplateAssigneeCore's own doc comment for all three): cancels
+ *  every instance of each member task, due on one of the given `weekdays`,
+ *  TODAY OR LATER — not just today's, and not the person's other weekdays
+ *  of the same group. Records one TaskTemplateExcludedAssignee row per
+ *  (member task, given weekday), so this person stops receiving new
+ *  recurring instances of EVERY task in the group ON THOSE DAYS going
+ *  forward, while every instance dated before today (pending, overdue, or
+ *  completed), on ANY weekday, stays exactly as it is. Other assignees and
+ *  the group/template itself are untouched. */
 export function removeGroupAssignee(
   email: string,
   groupId: string,
   scope: TemplateGroupScope,
   userId: string,
+  weekdays: (typeof FLOW_DAYS)[number][],
 ): Promise<{ excluded: true; cancelledPending: number; pendingKept: number }> {
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const targetUserId = z.string().min(1).parse(userId);
+    const targetWeekdays = z.array(z.enum(FLOW_DAYS)).min(1).parse(weekdays);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
@@ -840,7 +845,7 @@ export function removeGroupAssignee(
     let cancelledPending = 0;
     let pendingKept = 0;
     for (const t of group.templates) {
-      const result = await removeTemplateAssigneeCore(user, t.id, targetUserId);
+      const result = await removeTemplateAssigneeCore(user, t.id, targetUserId, targetWeekdays);
       cancelledPending += result.cancelledPending;
       pendingKept += result.pendingKept;
     }
