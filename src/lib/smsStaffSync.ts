@@ -149,6 +149,9 @@ export function positionTypeFromTitle(title: string | null): SmsStaffRecord["ext
   if (!value) return null;
   if (/\bINT\b|INTERN/.test(value)) return "intern";
   if (/COACH/.test(value)) return "coach";
+  // Executives run classes alongside their desk work, so they take the Coach
+  // role too. Kept below COACH so hybrid titles are unaffected either way.
+  if (/\bEXEC/.test(value)) return "coach";
   if (/^BM$|BRANCH MANAGER|MANAGER/.test(value)) return "manager";
   return null;
 }
