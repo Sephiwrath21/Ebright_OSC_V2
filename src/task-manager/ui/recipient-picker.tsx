@@ -105,6 +105,7 @@ function MemberDropdown({
   onToggleAll,
   emptyLabel,
   showRole = true,
+  selectAllLabel,
 }: {
   members: FlowStaffMember[];
   selected: Set<string>;
@@ -112,6 +113,8 @@ function MemberDropdown({
   onToggleAll: (ids: string[]) => void;
   emptyLabel: string;
   showRole?: boolean;
+  /** Overrides the default "Select all (N)" text (e.g. "All HODs (N)"). */
+  selectAllLabel?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -161,7 +164,7 @@ function MemberDropdown({
             onClick={() => onToggleAll(members.map((m) => m.id))}
             className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-slate-800"
           >
-            {allSelected ? "Deselect all" : `Select all (${members.length})`}
+            {allSelected ? "Deselect all" : (selectAllLabel ?? `Select all (${members.length})`)}
           </button>
           {members.map((m) => {
             const isSelected = selected.has(m.id);
@@ -245,6 +248,8 @@ export function RecipientPicker({
   selected,
   onChange,
   restrictToGroup,
+  quickSelfId,
+  groupOptions,
 }: {
   staff: FlowStaffMember[];
   selected: string[];
@@ -255,6 +260,20 @@ export function RecipientPicker({
    *  CEO's "+ Add Task" form (HODs only). Omit for the normal, fully
    *  flexible Person + any-Group picker. */
   restrictToGroup?: FlowGroup;
+  /** CEO quick-picks (2026-08-01): the caller's OWN user id — renders a
+   *  "Myself" toggle chip next to "All {group}s" in the restricted picker,
+   *  letting the CEO self-assign even though they aren't in the restricted
+   *  group's member list. Both chips merge into the same selection as
+   *  individually-picked people. */
+  quickSelfId?: string;
+  /** Package assign restriction (2026-08-06): narrows which options appear
+   *  in the "Group" dropdown, without restricting to a single forced group
+   *  like `restrictToGroup` (Person search + the normal Person/Group menu
+   *  both stay available). Callers should also pre-filter the `staff` array
+   *  itself to match — this only trims the dropdown's option list, it does
+   *  not filter `flowGroupMembers`'s results on its own. Omit for the full
+   *  FLOW_GROUPS list (unchanged default). */
+  groupOptions?: readonly FlowGroup[];
 }) {
   const [view, setView] = React.useState<PickerView>("menu");
   const [search, setSearch] = React.useState("");
@@ -325,6 +344,15 @@ export function RecipientPicker({
     return (
       <div className="flex flex-col gap-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          {quickSelfId && (
+            <button
+              type="button"
+              onClick={() => toggle(quickSelfId)}
+              className={`mb-2 ${chipClass(selectedSet.has(quickSelfId))}`}
+            >
+              {selectedSet.has(quickSelfId) ? "✓ Myself" : "+ Myself"}
+            </button>
+          )}
           {(needsSub || optionalDeptSub) && (
             <select
               value={groupSub}
@@ -349,6 +377,7 @@ export function RecipientPicker({
               onToggle={toggle}
               onToggleAll={toggleAll}
               emptyLabel={`No ${restrictToGroup.toLowerCase()} staff found.`}
+              selectAllLabel={`All ${restrictToGroup}s (${groupResults.length})`}
             />
           )}
         </div>
@@ -398,7 +427,7 @@ export function RecipientPicker({
             className={`mb-2 ${selectClass}`}
           >
             <option value="">Select a group…</option>
-            {FLOW_GROUPS.map((g) => (
+            {(groupOptions ?? FLOW_GROUPS).map((g) => (
               <option key={g}>{g}</option>
             ))}
           </select>

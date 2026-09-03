@@ -15,9 +15,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -58,19 +58,53 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
+        # CRM_DATABASE_URL / BETTER_AUTH_SECRET are forwarded as real remote
+        # env vars via `envs:` below, NOT interpolated into `script:` text.
+        # 2026-08-13: a trailing newline on the CRM_DATABASE_URL secret was
+        # getting spliced into the *middle* of a script line by GitHub's own
+        # ${{ }} substitution, before ssh-action ever ran — combined with
+        # script_stop's line-by-line dispatch, that left an unterminated
+        # quote which swallowed ssh-action's own next glue-check line
+        # (`DRONE_SSH_PREV_COMMAND_EXIT_CODE=...`) into the value, which then
+        # got written straight into .env. Passing the secret via `env:`/
+        # `envs:` keeps its raw bytes (newline included) out of the script
+        # text entirely, so this can't recur regardless of whether the
+        # secret itself carries a trailing newline.
+        env:
+          CRM_DATABASE_URL: ${{ secrets.CRM_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          GOOGLE_DRIVE_SA_EMAIL: ${{ secrets.GOOGLE_DRIVE_SA_EMAIL }}
+          GOOGLE_DRIVE_SA_PRIVATE_KEY: ${{ secrets.GOOGLE_DRIVE_SA_PRIVATE_KEY }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          CRM_RESEND_API_KEY: ${{ secrets.CRM_RESEND_API_KEY }}
+          CRM_FROM_EMAIL: ${{ secrets.CRM_FROM_EMAIL }}
         with:
           host: ${{ steps.target.outputs.host }}
           username: ${{ steps.target.outputs.user }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          envs: CRM_DATABASE_URL,BETTER_AUTH_SECRET,GOOGLE_DRIVE_SA_EMAIL,GOOGLE_DRIVE_SA_PRIVATE_KEY,GOOGLE_DRIVE_FOLDER_ID,SMTP_PASS,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_FROM_NAME,CRM_RESEND_API_KEY,CRM_FROM_EMAIL
           # The Docker build on the small deploy host takes ~11 min, which
           # exceeds appleboy/ssh-action's 10-minute default command_timeout —
           # causing the SSH session to be killed and the job to report a FALSE
           # failure even though the build finished and the container came up.
           # Give it generous headroom so a slow-but-successful deploy is green.
-          command_timeout: 20m
+          # 2026-08-11: raised 20m -> 40m — production's FIRST build of the
+          # CRM-era image (new deps + 3 prisma generates + bigger next build)
+          # has no layer cache and exceeded 20m ("Run Command Timeout").
+          command_timeout: 40m
           script_stop: true
           script: |
             set -euo pipefail
+            # Everything below redirects into ~/deploy.log on the server, so a
+            # failure looks like a bare "exit 1" in the Actions UI. Dump the
+            # log's tail on ANY exit so the real error is visible in CI.
+            trap 'echo "=== ~/deploy.log (last 120 lines) ==="; tail -120 ~/deploy.log 2>/dev/null || echo "(no deploy.log — failed before first redirect, e.g. cd)"' EXIT
             cd ~/Ebright_OSC_V2
 
             echo "=== Deploying ${{ steps.target.outputs.env_name }} on ${{ steps.target.outputs.host }} ===" > ~/deploy.log 2>&1
@@ -97,14 +131,248 @@ jobs:
             echo "--- Tip of source (templates.ts first 25 lines): ---" >> ~/deploy.log 2>&1
             head -25 src/app/induction/templates.ts >> ~/deploy.log 2>&1 || true
 
-            # Ensure remote .env has Google Drive configuration
+            # Ensure remote .env has Google Drive configuration. Values come
+            # from GitHub Actions secrets (Settings > Secrets and variables >
+            # Actions) — 2026-08-04: previously hardcoded here in plaintext,
+            # which committed a live service-account private key to git
+            # history. That key must be rotated in Google Cloud Console; this
+            # workflow no longer has access to whatever the old key was.
+            # GOOGLE_DRIVE_SA_PRIVATE_KEY's secret value must be stored with
+            # literal \n (backslash-n) in place of real newlines, exactly as
+            # it appears in a single-line PEM — src/lib/drive.ts unescapes it.
+            # 2026-08-15: these three were written UNGUARDED and interpolated
+            # straight into this script's text. A secret that is undefined
+            # interpolates to an empty string, so the sed+printf pair deleted a
+            # good value and wrote KEY="" in its place. That is exactly what
+            # happened: the folder-ID secret was named GOOGLE_DRIVE_PROOF while
+            # this workflow read GOOGLE_DRIVE_FOLDER_ID, so every deploy blanked
+            # it on both hosts and getFolderId() in src/lib/drive.ts threw
+            # "GOOGLE_DRIVE_FOLDER_ID is not configured" on every upload —
+            # Leave, Claim, Induction and Offboarding attachments all failed.
+            # Now guarded and forwarded via `envs:` like the CRM block below:
+            # an undefined secret leaves the server's existing value untouched
+            # instead of destroying it, and the raw bytes never enter the
+            # script text, so a trailing newline can't corrupt the value.
             touch .env
-            sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
-            sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
-            sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
-            printf '%s\n' 'GOOGLE_DRIVE_SA_EMAIL="ebright-uploads@ebright-portal-hrfs.iam.gserviceaccount.com"' >> .env
-            printf '%s\n' 'GOOGLE_DRIVE_SA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7aQINNpTbJAQU\n3AwveMbfanMFO0K5FAYqculC7N5aQEj7YZDd+Qr99orFS2hW1hnAkK9xGbvLgKqW\n3cXCLNdQn3VdpVkTU2yPdQbs4IEbXikIkS4Qc8S95ZxXVcBlqZVEXXgbzTqXMyaZ\n5Rg5y3pr5Ukh31yvOF/YDIVbx5yBo8gr5J0r0O+viDP1ToI27Dbfaw+SIj9tBsJI\nq2M92YbEoXBdJG9V+9YeptFUCvOAckdnjcScxzjUnMfpdCvBwiTzZ1GvaYLHwLnl\n3xjYQ/mUzD9GjU+3QdABqei6s9cpnzZwfm/okX8xkWW2p26WNwwpQ/Zk1SCnI0u8\nomtDogKRAgMBAAECggEAGr0gOE9lzKBmXq2IpYtHYJ/4+jGa0vo66PqNMmnGTb0n\nTIp+l1UNju+KnBymreENOo7KIUppI19ft3e72/j23X9qyOoq+9lmv08Upl5fvU5h\nb2H7XwiNdQSaGlHXSgn4jJEDboAJEIKRStrHapOQC23i0czjFfLmpdYfftlLiKld\nfCQrwLssxtbU5b7QImejUlD1pk/hhbz7OiPFQvgOZrx1nsEHx6z9WbwbHjWuTBiU\ncJ0sL5NH+aCq5dLr/gspLSuzTYZRALREttsR8+XaErRpGHD/X471vpd6zWnyqNGB\nA4o08KivKTzLeXEJ87HgNo0iAeOV1N8k+7O34hxBSwKBgQDj4gmbXyKMEphuLL5y\nyyVpwYB5cL95Lo1UyKxaihngz4m+uHbQV/fJX1ji32NSEz0smaSgS0EmAY24jH0Y\nrAmAjWymWg3hZhBnQ0k9I+IhnQnHuAvEfGaW/Zy24EENGRTTzQkPiXneVq6dSVid\nJo0Carh2AA8oXQypcY05bY2bJwKBgQDSiJaiAX7qQjrITNW2tam0p9qSNThzw49K\nSc0Vy8qr6vdnvl5YtOwbWPA/S39GX20GEt+UI1LqfDKRoQFDp52WI5Agrxm3cqfk\nfThTZy5VEi4Yo/ROArxN7m4oV6Dg54mHCWGtqfDhIKWSt9g++FPJF7hRbPv3pa7R\n2nv/XoPnhwKBgQC3A3zFrETZi8Ghkguts5qrcX0VisgrsYhN1BAfcpPP6b1tT0YU\nkuFsd0eyhMeGTe8uV4JQPb/nnw3LbgC1hMzo0iu0+dP19nssA2zZTm04o58MJ7JD\nrcjScIGgmT+FHmSMqTkioj0epCz+Ir6pDyHmFAFquydxOjGGD6zktygntwKBgAmv\nfPaRCQyv5VJnroFMVDVab4TAbAtvWL07LfMtv/Iuyhj8ugxsrlwHuG3BBGbxZuub\nnKuNAHiHJDBs7sj1AhvxIOVQCOfWn4C0fg3gNlJ1lqdNi6S3HYCcUncKqP0PydTr\nipHZupowzU01pf4noHsk2zbrw5++AI/o9EFoULsrAoGAVoHc4vj1j28BkJt3vhOI\nPcsCG8zWyITS8W/85XkgQ08m1UzL/etazArxKT5QLwsf7aKsoPL4ptLH3zDMADV1\nb+pCDcpDoE9mva8G3cGYhG0bePj+pXeazgydSY4FWKXmsJlm/UNyPyZNICL1pOQF\nH2H6RMESAQ3A67q8cSuWG1M=\n-----END PRIVATE KEY-----\n"' >> .env
-            printf '%s\n' 'GOOGLE_DRIVE_FOLDER_ID="1j-wW_6l-aC4Ijoj_7hjdbDNQU6qPTCzK"' >> .env
+            GD_EMAIL="$(printf '%s' "${GOOGLE_DRIVE_SA_EMAIL:-}" | tr -d '\r\n')"
+            if [ -n "$GD_EMAIL" ]; then
+              sed -i '/^GOOGLE_DRIVE_SA_EMAIL=/d' .env || true
+              printf 'GOOGLE_DRIVE_SA_EMAIL="%s"\n' "$GD_EMAIL" >> .env
+            fi
+            GD_KEY="$(printf '%s' "${GOOGLE_DRIVE_SA_PRIVATE_KEY:-}" | tr -d '\r\n')"
+            if [ -n "$GD_KEY" ]; then
+              sed -i '/^GOOGLE_DRIVE_SA_PRIVATE_KEY=/d' .env || true
+              printf 'GOOGLE_DRIVE_SA_PRIVATE_KEY="%s"\n' "$GD_KEY" >> .env
+            fi
+            GD_FOLDER="$(printf '%s' "${GOOGLE_DRIVE_FOLDER_ID:-}" | tr -d '\r\n')"
+            if [ -n "$GD_FOLDER" ]; then
+              sed -i '/^GOOGLE_DRIVE_FOLDER_ID=/d' .env || true
+              printf 'GOOGLE_DRIVE_FOLDER_ID="%s"\n' "$GD_FOLDER" >> .env
+            fi
+
+            # CRM runtime env (CRM port, 2026-08-07). Same pattern as the Drive
+            # keys above, but guarded: only rewrite when the GitHub secret is
+            # actually defined, so a manually-added value in the server's .env
+            # survives until the secrets are configured.
+            # The values are passed through tr -d '\r\n' because a secret
+            # pasted with a trailing newline writes a bare '"' line into .env,
+            # which breaks docker compose's env_file parser ("unexpected
+            # character '\"' in variable name"). Also heal any such orphan
+            # quote line an earlier deploy already left behind.
+            sed -i '/^"$/d' .env || true
+            # $CRM_DATABASE_URL / $BETTER_AUTH_SECRET are real shell env vars
+            # here, forwarded by ssh-action's `envs:` (see the step's `env:`
+            # block above) — not spliced into this script's text by GitHub
+            # Actions. tr -d '\r\n' is kept as defensive cleanup in case the
+            # secret's actual value legitimately ends in whitespace.
+            CRM_URL="$(printf '%s' "$CRM_DATABASE_URL" | tr -d '\r\n')"
+            if [ -n "$CRM_URL" ]; then
+              sed -i '/^CRM_DATABASE_URL=/d' .env || true
+              printf 'CRM_DATABASE_URL="%s"\n' "$CRM_URL" >> .env
+            fi
+            BA_SECRET="$(printf '%s' "$BETTER_AUTH_SECRET" | tr -d '\r\n')"
+            if [ -n "$BA_SECRET" ]; then
+              sed -i '/^BETTER_AUTH_SECRET=/d' .env || true
+              printf 'BETTER_AUTH_SECRET="%s"\n' "$BA_SECRET" >> .env
+            fi
+
+            # Resend — the transport password reset falls back to when SMTP
+            # fails, and now the primary way it delivers: Gmail has od@ locked
+            # under a 454 "too many login attempts", while the ebright.my
+            # domain is verified in Resend. Without a key here the fallback is
+            # dead code, which is why an SMTP outage became a hard "contact
+            # support" failure instead of a degraded one.
+            #
+            # Written with the same shape as the two blocks above, on purpose.
+            # An earlier attempt used the SMTP section's helper functions
+            # instead and the deploy died on those lines with no output — the
+            # cause was never identified. These four lines copy a pattern that
+            # has run on this host for weeks rather than inventing a new one.
+            RS_KEY="$(printf '%s' "$CRM_RESEND_API_KEY" | tr -d '\r\n')"
+            if [ -n "$RS_KEY" ]; then
+              sed -i '/^CRM_RESEND_API_KEY=/d' .env || true
+              printf 'CRM_RESEND_API_KEY="%s"\n' "$RS_KEY" >> .env
+            fi
+            RS_FROM="$(printf '%s' "$CRM_FROM_EMAIL" | tr -d '\r\n')"
+            if [ -n "$RS_FROM" ]; then
+              sed -i '/^CRM_FROM_EMAIL=/d' .env || true
+              printf 'CRM_FROM_EMAIL="%s"\n' "$RS_FROM" >> .env
+            fi
+
+            # SMTP / outgoing mail (2026-08-20). Until now NOTHING in this
+            # workflow wrote SMTP_*, so the credentials existed only if
+            # someone had SSHed into the box and typed them by hand — a
+            # `git push` could never make mail start working, which is how
+            # staging ended up with password-reset, attendance, HR, FA and
+            # CRM mail all silently dead.
+            #
+            # Only SMTP_PASS is genuinely secret (a Gmail *app password* for
+            # SMTP_USER, not the account password). The other five are stable,
+            # non-secret, and already committed in .env.example, so they fall
+            # back to those values when the matching secret is undefined —
+            # that keeps this to a single secret to configure while still
+            # letting any of them be overridden later without touching CI.
+            #
+            # Same guarded pattern as the Drive/CRM blocks above, for the same
+            # reasons: values arrive as real env vars via `envs:` (never
+            # interpolated into this script's text, where a trailing newline
+            # would corrupt the line), and tr strips stray CR/LF from a
+            # pasted secret.
+            # Heal debris before writing anything. A value that got split
+            # across lines leaves an orphan continuation line behind, and the
+            # per-key `sed /^NAME=/d` below cannot remove it because the
+            # orphan does not start with "NAME=". docker compose then dies on
+            # the whole file:
+            #   failed to read .env: line 46: unexpected character '"' in
+            #   variable name "<...>"
+            # 2026-08-20: exactly that took down a staging deploy. The narrow
+            # `sed '/^"$/d'` heal in the CRM block above only catches a bare
+            # lone-quote line, not a line carrying the rest of a value.
+            #
+            # compose's env_file parser has NO multi-line value syntax, so any
+            # line that is not blank, not a comment, and not a well-formed
+            # NAME=... assignment is debris that WILL break the deploy. Drop
+            # those, and refuse to act if the result would be empty (that
+            # would mean the pattern is wrong, not that .env is all garbage).
+            # Runs both BEFORE the writes below (clear inherited debris) and
+            # again AFTER them, immediately before the compose gate. The first
+            # attempt at this only sanitized beforehand, and the deploy still
+            # died on the same line — proof the debris is produced by the
+            # writes themselves, not inherited. Sanitizing last is what
+            # actually guarantees compose sees a parseable file.
+            env_sanitize() {
+              [ -s .env ] || return 0
+              grep -E '^[[:space:]]*($|#)|^[A-Za-z_][A-Za-z0-9_]*=' .env > .env.sanitized || true
+              if [ -s .env.sanitized ]; then
+                env_dropped="$(( $(wc -l < .env) - $(wc -l < .env.sanitized) ))"
+                if [ "$env_dropped" -gt 0 ]; then
+                  echo "NOTE: dropped $env_dropped malformed line(s) from .env ($1)" >> ~/deploy.log 2>&1
+                  # Show WHAT was dropped, with anything quote-like masked, so
+                  # the next failure of this kind is diagnosable from the log
+                  # instead of by guesswork.
+                  grep -vxF -f .env.sanitized .env 2>/dev/null | sed -E 's/[^ =]{4,}/<redacted>/g' >> ~/deploy.log 2>&1 || true
+                fi
+                mv .env.sanitized .env
+              else
+                rm -f .env.sanitized
+                echo "WARNING: .env sanitize produced an empty file — left .env untouched" >> ~/deploy.log 2>&1
+              fi
+            }
+            env_sanitize "before writes"
+
+            smtp_put() {
+              # $1 = var name, $2 = value. Empty value -> leave .env alone.
+              [ -n "$2" ] || return 0
+              sed -i "/^$1=/d" .env || true
+              printf '%s="%s"\n' "$1" "$2" >> .env
+            }
+            # Reduce the value to printable characters, then remove double
+            # quotes outright.
+            #
+            # `tr -d '\r\n'` alone was NOT enough: a value still reached .env
+            # carrying an embedded newline and an unbalanced quote, splitting
+            # the assignment across two lines —
+            #   SMTP_PASS="
+            #   <rest of value>""
+            # — and compose choked on the orphan. Whatever produces that (the
+            # secret's stored bytes, or `envs:` forwarding) does not matter if
+            # the value physically cannot contain a line break or a quote by
+            # the time printf sees it.
+            #
+            # This cannot lose real data: none of these six values may legally
+            # contain a quote or a control character. A Gmail app password is
+            # sixteen letters in four groups, a host is a domain, a port is
+            # digits. Anything else in there is corruption.
+            # The trailing sed strips a leading NAME= prefix. 2026-08-20: every
+            # SMTP secret was stored as the whole .env line rather than just
+            # the value, so the app resolved a mail server literally named
+            # "SMTP_HOST=smtp.gmail.com" and died with EBADNAME; SMTP_PORT was
+            # non-numeric, which in turn made the secure/port derivation below
+            # pick the wrong answer. Pasting the line you copied is the obvious
+            # mistake to make, and this is the third secret-format incident
+            # this workflow has absorbed, after the GOOGLE_DRIVE_PROOF name
+            # mismatch and the trailing-newline corruption.
+            #
+            # Safe for all six: none of these values may legitimately begin
+            # with an identifier followed by "=" — a host is a domain, a port
+            # is digits, a user is an address, a password is letters.
+            smtp_val() {
+              printf '%s' "${1:-}" \
+                | tr -cd '[:print:]' \
+                | tr -d '"' \
+                | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=//'
+            }
+
+            # SMTP_PASS has NO default — an undefined secret must leave any
+            # existing server value intact rather than blanking it (see the
+            # GOOGLE_DRIVE_FOLDER_ID incident noted above).
+            smtp_put SMTP_PASS "$(smtp_val "${SMTP_PASS:-}")"
+
+            SMTP_HOST_V="$(smtp_val "${SMTP_HOST:-}")";           [ -n "$SMTP_HOST_V" ]      || SMTP_HOST_V="smtp.gmail.com"
+            SMTP_PORT_V="$(smtp_val "${SMTP_PORT:-}")";           [ -n "$SMTP_PORT_V" ]      || SMTP_PORT_V="465"
+            # Derive from the port rather than hardcoding "true". 465 speaks
+            # TLS from the first byte; 587 upgrades via STARTTLS. Forcing
+            # secure=true on 587 hangs the connection until mailer.ts's 5s
+            # timeout and reports nothing useful — and because this value is
+            # written on every deploy, a hardcoded "true" would also pin a
+            # wrong value in place permanently. Same rule as src/lib/mailer.ts.
+            SMTP_SECURE_V="$(smtp_val "${SMTP_SECURE:-}")"
+            if [ -z "$SMTP_SECURE_V" ]; then
+              if [ "$SMTP_PORT_V" = "465" ]; then SMTP_SECURE_V="true"; else SMTP_SECURE_V="false"; fi
+            fi
+            SMTP_USER_V="$(smtp_val "${SMTP_USER:-}")";           [ -n "$SMTP_USER_V" ]      || SMTP_USER_V="od@ebright.my"
+            SMTP_FROM_NAME_V="$(smtp_val "${SMTP_FROM_NAME:-}")"; [ -n "$SMTP_FROM_NAME_V" ] || SMTP_FROM_NAME_V="Ebright OD"
+
+            smtp_put SMTP_HOST      "$SMTP_HOST_V"
+            smtp_put SMTP_PORT      "$SMTP_PORT_V"
+            smtp_put SMTP_SECURE    "$SMTP_SECURE_V"
+            smtp_put SMTP_USER      "$SMTP_USER_V"
+            smtp_put SMTP_FROM_NAME "$SMTP_FROM_NAME_V"
+
+            # Report what the container will get, WITHOUT leaking the
+            # password — this failure was invisible for weeks precisely
+            # because nothing ever said anything.
+            echo "--- SMTP config in .env ---" >> ~/deploy.log 2>&1
+            sed -E 's/^SMTP_PASS=.*/SMTP_PASS="<set>"/' .env | grep -E '^SMTP_' >> ~/deploy.log 2>&1 || true
+            grep -q '^SMTP_PASS=' .env || echo "WARNING: SMTP_PASS is not set on this host - outgoing mail WILL fail. Add the SMTP_PASS repo secret (Gmail app password)." >> ~/deploy.log 2>&1
+
+            # Pre-flight: refuse to go further if compose cannot read its own
+            # config. 2026-08-20: a malformed .env made `docker compose up`
+            # fail — but only AFTER `docker rm -f ebright-osc-v2` below had
+            # already destroyed the running container, so staging served
+            # nginx 502s from that moment until the next successful deploy.
+            # The container is expendable only once we know the config that
+            # replaces it actually parses. Checking here also fails in
+            # seconds rather than after the ~11-minute image build.
+            # Last line of defence: clear anything the writes above produced
+            # before compose reads the file. See env_sanitize's note.
+            env_sanitize "after writes"
+
+            echo "--- Validating compose config ---" >> ~/deploy.log 2>&1
+            if ! docker compose config >/dev/null 2>>~/deploy.log; then
+              echo "FATAL: docker compose cannot read its config (malformed .env?). Aborting BEFORE touching the running container, so the current one keeps serving." >> ~/deploy.log 2>&1
+              exit 1
+            fi
 
             # Build new image, force recreate so env_file changes apply.
             # NOTE: do NOT use --no-cache here — full uncached rebuild on

@@ -1,37 +1,50 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
+import { useTheme } from "next-themes";
 
 /**
- * Two-state light/dark switch.
+ * Two-state light/dark switch for the main app shell.
  *
- * Toggling flips the class on <html> for an instant repaint and writes the
- * cookie so the server renders the same theme on the next request. There is no
- * server action and no re-render — the class on <html> is the single source of
- * truth, and the icons and the screen-reader label are both chosen from it by
- * CSS rather than by React state.
+ * next-themes resolves the theme on the client, so `theme` is undefined on the
+ * server and during the first render. Rendering the icons before mount would
+ * therefore emit whichever icon the server guessed and then swap it, which is
+ * both a hydration mismatch and a visible flicker. We render a same-size
+ * placeholder until mounted so the top bar doesn't shift.
+ *
+ * The CRM subtree has its own toggle (ThemeToggleRow) against the same
+ * provider, so the two stay in sync — both read and write next-themes state.
  */
 export default function ThemeToggle() {
-  function toggle() {
-    const root = document.documentElement;
-    const next = root.classList.contains("dark") ? "light" : "dark";
-    root.classList.toggle("dark", next === "dark");
-    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; SameSite=Lax${
-      location.protocol === "https:" ? "; Secure" : ""
-    }`;
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = resolvedTheme === "dark";
+
+  if (!mounted) {
+    return <div className="w-9 h-9 shrink-0" aria-hidden="true" />;
   }
 
   return (
     <button
-      onClick={toggle}
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
       title="Toggle dark mode"
       className="shrink-0 p-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
     >
-      <span className="sr-only dark:hidden">Light mode active. Switch to dark mode.</span>
-      <span className="sr-only hidden dark:inline">Dark mode active. Switch to light mode.</span>
-      <Sun className="w-5 h-5 dark:hidden" aria-hidden="true" />
-      <Moon className="w-5 h-5 hidden dark:block" aria-hidden="true" />
+      <span className="sr-only">
+        {isDark
+          ? "Dark mode active. Switch to light mode."
+          : "Light mode active. Switch to dark mode."}
+      </span>
+      {isDark ? (
+        <Moon className="w-5 h-5" aria-hidden="true" />
+      ) : (
+        <Sun className="w-5 h-5" aria-hidden="true" />
+      )}
     </button>
   );
 }

@@ -63,16 +63,24 @@ CREATE TABLE IF NOT EXISTS attendance_all (
   clock_in_time   TIME,
   clock_out_time  TIME,
   status          VARCHAR(20)  NOT NULL DEFAULT 'no record',
+  scan_count      INTEGER      NOT NULL DEFAULT 0,
+  device_name     TEXT,
   synced_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
   CONSTRAINT uq_attendance_all_emp_date UNIQUE (employee_id, date)
 );
 CREATE INDEX IF NOT EXISTS idx_attendance_all_date   ON attendance_all (date);
 CREATE INDEX IF NOT EXISTS idx_attendance_all_branch ON attendance_all (branch_id);
+-- Columns added after the table first shipped — kept as separate ALTERs so
+-- existing installs pick them up (CREATE TABLE IF NOT EXISTS won't).
+ALTER TABLE attendance_all ADD COLUMN IF NOT EXISTS scan_count  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE attendance_all ADD COLUMN IF NOT EXISTS device_name TEXT;
 `;
 
 export interface SyncOptions {
   /** Only reprocess scans on/after this YYYY-MM-DD (inclusive). Omit = all time. */
   since?: string;
+  /** Only reprocess scans on/before this YYYY-MM-DD (inclusive). Omit = up to now. */
+  until?: string;
 }
 
 export interface SyncResult {
@@ -90,6 +98,8 @@ interface DayAgg {
   date: string; // YYYY-MM-DD
   clockIn: string; // HH:MM:SS
   clockOut: string; // HH:MM:SS
+  scanCount: number;
+  deviceName: string | null; // device of the earliest scan that day
 }
 
 /**
@@ -118,18 +128,24 @@ export async function syncAttendance(opts: SyncOptions = {}): Promise<SyncResult
   let where = `person_id IS NOT NULL AND person_id <> '' AND person_id <> '0'`;
   if (opts.since) {
     params.push(opts.since);
-    where += ` AND event_time >= $1::date`;
+    where += ` AND event_time >= $${params.length}::date`;
+  }
+  if (opts.until) {
+    params.push(opts.until);
+    where += ` AND event_time < ($${params.length}::date + interval '1 day')`;
   }
   const scanRes = await src.query<{
     person_id: string;
     device_id: string | null;
     d: string;
     t: string;
+    device_name: string | null;
   }>(
     `SELECT person_id,
             device_id,
             to_char(event_time, 'YYYY-MM-DD') AS d,
-            to_char(event_time, 'HH24:MI:SS') AS t
+            to_char(event_time, 'HH24:MI:SS') AS t,
+            device_name
        FROM public.hikvision_attendance_all
       WHERE ${where}
       ORDER BY event_time ASC`,
@@ -145,10 +161,20 @@ export async function syncAttendance(opts: SyncOptions = {}): Promise<SyncResult
     const key = `${employeeId}|${row.d}`;
     const existing = byDay.get(key);
     if (!existing) {
-      byDay.set(key, { employeeId, date: row.d, clockIn: row.t, clockOut: row.t });
+      // Scans are ordered by event_time ASC, so this first one is the earliest
+      // → its device is the "sample" device used for branch/visitor detection.
+      byDay.set(key, {
+        employeeId,
+        date: row.d,
+        clockIn: row.t,
+        clockOut: row.t,
+        scanCount: 1,
+        deviceName: row.device_name ?? null,
+      });
     } else {
       if (row.t < existing.clockIn) existing.clockIn = row.t;
       if (row.t > existing.clockOut) existing.clockOut = row.t;
+      existing.scanCount += 1;
     }
   }
 
@@ -167,19 +193,23 @@ export async function syncAttendance(opts: SyncOptions = {}): Promise<SyncResult
       else branchUnmatched++;
       // clock_in always present here → status 'present'.
       const status = a.clockIn ? "present" : "no record";
-      const b = j * 6;
-      values.push(`($${b + 1}, $${b + 2}, $${b + 3}::date, $${b + 4}::time, $${b + 5}::time, $${b + 6})`);
-      p.push(a.employeeId, branchId, a.date, a.clockIn, a.clockOut, status);
+      const b = j * 8;
+      values.push(
+        `($${b + 1}, $${b + 2}, $${b + 3}::date, $${b + 4}::time, $${b + 5}::time, $${b + 6}, $${b + 7}, $${b + 8})`,
+      );
+      p.push(a.employeeId, branchId, a.date, a.clockIn, a.clockOut, status, a.scanCount, a.deviceName);
     });
     await tgt.query(
       `INSERT INTO attendance_all
-         (employee_id, branch_id, date, clock_in_time, clock_out_time, status)
+         (employee_id, branch_id, date, clock_in_time, clock_out_time, status, scan_count, device_name)
        VALUES ${values.join(", ")}
        ON CONFLICT (employee_id, date) DO UPDATE SET
          branch_id      = EXCLUDED.branch_id,
          clock_in_time  = EXCLUDED.clock_in_time,
          clock_out_time = EXCLUDED.clock_out_time,
          status         = EXCLUDED.status,
+         scan_count     = EXCLUDED.scan_count,
+         device_name    = EXCLUDED.device_name,
          synced_at      = now()`,
       p,
     );

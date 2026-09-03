@@ -17,6 +17,7 @@ import {
   requireEditableSchedule,
   resolveSlotSync,
   roleForColumn,
+  slotTaskTitle,
 } from "../manpower-helpers";
 import { native, requireUserByEmail } from "./core";
 
@@ -60,6 +61,7 @@ async function loadGrid(branch: string, date: string) {
         slotId: s.id,
         startTime: s.startTime,
         endTime: s.endTime,
+        rowLabel: s.rowLabel,
         roleColumn: s.roleColumn,
         assignedStaffId: s.assignedStaffId,
         assignedStaffName: s.assignedStaffId ? (nameById.get(s.assignedStaffId) ?? null) : null,
@@ -120,6 +122,9 @@ export function addScheduleRow(
   scheduleId: string,
   startTime: string,
   endTime: string,
+  /** Optional row label ("Opening", "6:00 PM Class", ...) — drives synced
+   *  task titles; empty = auto-format from startTime (slotTaskTitle). */
+  label?: string,
 ): Promise<{ ok: true }> {
   return native(async () => {
     const body = z
@@ -127,8 +132,9 @@ export function addScheduleRow(
         scheduleId: z.string().min(1),
         startTime: z.string().regex(TIME_RE),
         endTime: z.string().regex(TIME_RE),
+        label: z.string().trim().max(60).optional(),
       })
-      .parse({ scheduleId, startTime, endTime });
+      .parse({ scheduleId, startTime, endTime, label });
     assertOrder(body.startTime, body.endTime);
     const actor = await requireUserByEmail(email);
     await requireEditableSchedule(actor, body.scheduleId);
@@ -146,6 +152,7 @@ export function addScheduleRow(
         scheduleId: body.scheduleId,
         startTime: body.startTime,
         endTime: body.endTime,
+        rowLabel: body.label || null,
         roleColumn: c.roleColumn,
       })),
     });
@@ -160,6 +167,9 @@ export function renameScheduleRow(
   oldEndTime: string,
   newStartTime: string,
   newEndTime: string,
+  /** New row label; empty string clears it (auto-format takes over);
+   *  undefined leaves the existing label untouched. */
+  newLabel?: string,
 ): Promise<{ ok: true }> {
   return native(async () => {
     const body = z
@@ -169,8 +179,9 @@ export function renameScheduleRow(
         oldEndTime: z.string().regex(TIME_RE),
         newStartTime: z.string().regex(TIME_RE),
         newEndTime: z.string().regex(TIME_RE),
+        newLabel: z.string().trim().max(60).optional(),
       })
-      .parse({ scheduleId, oldStartTime, oldEndTime, newStartTime, newEndTime });
+      .parse({ scheduleId, oldStartTime, oldEndTime, newStartTime, newEndTime, newLabel });
     assertOrder(body.newStartTime, body.newEndTime);
     const actor = await requireUserByEmail(email);
     const schedule = await requireEditableSchedule(actor, body.scheduleId);
@@ -181,13 +192,15 @@ export function renameScheduleRow(
     if (slots.length === 0) throw new ApiHttpError(404, "Row not found");
 
     for (const slot of slots) {
+      const rowLabel = body.newLabel === undefined ? slot.rowLabel : body.newLabel || null;
       await prisma.scheduleSlot.update({
         where: { id: slot.id },
-        data: { startTime: body.newStartTime, endTime: body.newEndTime },
+        data: { startTime: body.newStartTime, endTime: body.newEndTime, rowLabel },
       });
-      // Update the linked task in place — same slot, same assignee, new time.
+      // Update the linked task in place — same slot, same assignee, new
+      // time/label (title tracks the ClickUp-style naming).
       if (slot.runBlockId) {
-        const blockTitle = `${slot.roleColumn} shift (${body.newStartTime}–${body.newEndTime})`;
+        const blockTitle = slotTaskTitle(rowLabel, body.newStartTime);
         const d = parseLocalDate(schedule.date);
         const [endHour, endMinute] = body.newEndTime.split(":").map(Number);
         const dueAt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), endHour, endMinute);
@@ -361,6 +374,7 @@ export function assignScheduleCell(
         runBlockId = await createSlotRun(adhoc, {
           slotId: slot.id,
           roleColumn: slot.roleColumn,
+          rowLabel: slot.rowLabel,
           startTime: slot.startTime,
           endTime: slot.endTime,
           date: schedule.date,
@@ -415,6 +429,7 @@ export function publishSchedule(
         const runBlockId = await createSlotRun(adhoc, {
           slotId: slot.id,
           roleColumn: slot.roleColumn,
+          rowLabel: slot.rowLabel,
           startTime: slot.startTime,
           endTime: slot.endTime,
           date: schedule.date,

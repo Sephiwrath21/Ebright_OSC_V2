@@ -11,17 +11,76 @@
 // Submits through the same POST /api/internal/assign route.
 
 import * as React from "react";
-import type { AssignActionResult, FlowAssignInput, FlowStaffMember } from "./types";
+import type {
+  AssignActionResult,
+  CreateCategoryResult,
+  FlowAssignInput,
+  FlowCategoryOption,
+  FlowGroup,
+  FlowStaffMember,
+  FlowTemplateControl,
+} from "./types";
 import { AssignTaskForm } from "./assign-task-form";
+import {
+  TemplateArchivePanel,
+  TemplateEditPanel,
+  TemplateReassignPanel,
+  TemplateRemovePanel,
+} from "./template-panels";
+
+/** + Task hub tabs (2026-07-31): Assign stays the default; the others are
+ *  template-scoped bulk operations, shown only when templates exist —
+ *  except Archive, which also lists/restores already-archived items (so
+ *  it must stay reachable even when every template is archived). */
+const HUB_TABS = [
+  { key: "assign", label: "Assign" },
+  { key: "edit", label: "Edit" },
+  { key: "remove", label: "Remove" },
+  { key: "reassign", label: "Reassign" },
+  { key: "archive", label: "Archive" },
+] as const;
+type HubTab = (typeof HUB_TABS)[number]["key"];
 
 export function AddTaskButton({
   staff,
   action,
+  templates,
+  categories,
+  onCreateCategory,
+  recipientGroup,
+  quickSelfId,
+  hideCadence,
 }: {
   staff: FlowStaffMember[];
   action: (input: FlowAssignInput) => Promise<AssignActionResult>;
+  /** Task Templates (2026-07-31) — saved list + load/rename/delete
+   *  actions, passed straight through to the form. */
+  templates?: FlowTemplateControl;
+  /** Task Categories (2026-08-12) — active-category list, passed straight
+   *  through to AssignTaskForm's Category dropdown. */
+  categories?: FlowCategoryOption[];
+  /** Inline "+ Add new type" (2026-08-12) — passed straight through to
+   *  AssignTaskForm; omitted entirely for viewers who can't manage
+   *  categories (the caller decides, via canManageTaskTemplateGroups). */
+  onCreateCategory?: (name: string) => Promise<CreateCategoryResult>;
+  /** Restrict the recipient picker to one group (2026-08-01: the CEO
+   *  assigns to HODs only) — passed straight through to AssignTaskForm;
+   *  the server re-enforces regardless. */
+  recipientGroup?: FlowGroup;
+  /** CEO quick-pick (2026-08-01): the caller's own user id — passed
+   *  straight through to AssignTaskForm's "Myself" chip. */
+  quickSelfId?: string;
+  /** CEO-only (2026-08-01): hides the Cadence picker — passed straight
+   *  through to AssignTaskForm. */
+  hideCadence?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [tab, setTab] = React.useState<HubTab>("assign");
+  // Tabs appear once templates are in play. `templates.list` only carries
+  // ACTIVE templates, so the Archive tab (which restores archived ones)
+  // must not disappear when everything is archived — any templates prop
+  // at all keeps the tab bar once the user has used templates.
+  const showTabs = Boolean(templates);
 
   return (
     <>
@@ -42,18 +101,60 @@ export function AddTaskButton({
             className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex shrink-0 items-center justify-between border-b border-gray-100 pb-3 dark:border-slate-800">
-              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Add Task</p>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-              >
-                ✕
-              </button>
+            <div className="mb-4 shrink-0 border-b border-gray-100 pb-3 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Tasks</p>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                >
+                  ✕
+                </button>
+              </div>
+              {showTabs && (
+                <div role="tablist" className="mt-3 flex flex-wrap gap-1.5">
+                  {HUB_TABS.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === t.key}
+                      onClick={() => setTab(t.key)}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${
+                        tab === t.key
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <AssignTaskForm staff={staff} action={action} bare />
+            {(!showTabs || tab === "assign") && (
+              <AssignTaskForm
+                staff={staff}
+                action={action}
+                templates={templates}
+                categories={categories}
+                onCreateCategory={onCreateCategory}
+                recipientGroup={recipientGroup}
+                quickSelfId={quickSelfId}
+                hideCadence={hideCadence}
+                bare
+              />
+            )}
+            {showTabs && templates && tab !== "assign" && (
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {tab === "edit" && <TemplateEditPanel templates={templates} />}
+                {tab === "remove" && <TemplateRemovePanel templates={templates} />}
+                {tab === "reassign" && <TemplateReassignPanel templates={templates} staff={staff} />}
+                {tab === "archive" && <TemplateArchivePanel templates={templates} />}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,0 +1,30 @@
+cd "c:/Users/PC/Desktop/y2/Internship/ebright/V2/Ebright_OSC_V2" && npx tsc --noEmit -p tsconfig.json 2>&1 | grep -iE "clickup-api" || echo "(no tsc errors in clickup-api)"; cat > scratch_cu.mjs <<'EOF'
+import "dotenv/config";
+const TOKEN = process.env.CLICKUP_API_TOKEN;
+const H = { Authorization: TOKEN };
+const get = async (u) => { const r = await fetch(u,{headers:H}); if(!r.ok) throw new Error(r.status+" "+await r.text()); return r.json(); };
+const SPACE="38626302";
+
+async function pages(u){let all=[];for(let p=0;p<50;p++){const d=await get(u+`page=${p}`);all.push(...(d.tasks||[]));if(d.last_page||(d.tasks||[]).length===0)break;}return all;}
+async function fetchAllTasks(listId){
+  const byId=new Map(); let viewOk=false;
+  try { for(const t of await pages(`https://api.clickup.com/api/v2/view/6-${listId}-1/task?`)) byId.set(t.id,t); viewOk=true; } catch {}
+  const lt = await pages(`https://api.clickup.com/api/v2/list/${listId}/task?include_closed=true&`);
+  if(!viewOk){ for(const t of lt) byId.set(t.id,t); }
+  else { for(const t of lt){const s=(t.status?.status||"").toLowerCase(); if((s==="complete"||s==="completed")&&!byId.has(t.id)) byId.set(t.id,t);} }
+  return [...byId.values()];
+}
+const folders = await get(`https://api.clickup.com/api/v2/space/${SPACE}/folder?archived=false`);
+const fol = folders.folders.find(f=>/3\.2/.test(f.name));
+const lists = await get(`https://api.clickup.com/api/v2/folder/${fol.id}/list?archived=false`);
+let wk={complete:0,pending:0,na:0};
+for(const l of lists.lists){
+  const t=await fetchAllTasks(l.id);
+  let c=0,p=0,n=0;
+  for(const x of t){const s=(x.status?.status||"").toLowerCase(); if(s==="complete"||s==="completed")c++; else if(s==="pending")p++; else if(["not applicable","n/a","na"].includes(s))n++;}
+  wk.complete+=c;wk.pending+=p;wk.na+=n;
+  console.log(l.name.padEnd(12),`complete:${c}  pending:${p}  not-applicable:${n}   (UI sidebar=${l.task_count}, pending+NA=${p+n})`);
+}
+console.log("\nMaizatul WEEKLY:", wk);
+EOF
+node scratch_cu.mjs; rm -f scratch_cu.mjs

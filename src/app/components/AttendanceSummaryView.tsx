@@ -248,7 +248,10 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
               </h1>
             </div>
           </div>
-          {!isAllBranches && <ScannerStatusChip online={data.scannerOnline} />}
+          <div className="flex items-center gap-2">
+            {data.lastSyncedIso && <SyncedChip iso={data.lastSyncedIso} />}
+            {!isAllBranches && <ScannerStatusChip online={data.scannerOnline} />}
+          </div>
         </header>
 
         {/* Filter row */}
@@ -556,6 +559,30 @@ function StatCard({
         </div>
       </div>
     </button>
+  );
+}
+
+function relativeSince(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const sec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (sec < 60) return "just now";
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.round(hr / 24)}d ago`;
+}
+
+function SyncedChip({ iso }: { iso: string }) {
+  return (
+    <span
+      title={`Data pulled from the scanner log at ${new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur" })}`}
+      className="inline-flex items-center gap-1.5 h-10 px-3 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-500 dark:text-slate-400"
+    >
+      <RefreshCw className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+      <span suppressHydrationWarning>Synced {relativeSince(iso)}</span>
+    </span>
   );
 }
 

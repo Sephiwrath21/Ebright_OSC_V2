@@ -8,6 +8,26 @@ export type FlowPeriod = "daily" | "monthly";
  *  Next.js masks thrown action error messages in production. */
 export type ActionResult = { ok: true } | { ok: false; message: string };
 export type AssignActionResult = { ok: true; created: number } | { ok: false; message: string };
+/** The assign form's inline "+ Add new type" action (2026-08-12) — the ONLY
+ *  way to create a category (2026-08-15: the standalone admin page was
+ *  removed). Returns the newly created category's real id/name so the form
+ *  can select it immediately without a placeholder id. */
+export type CreateCategoryResult =
+  | { ok: true; id: string; name: string }
+  | { ok: false; message: string };
+/** The Proof column's upload action (2026-07-30): returns the (possibly
+ *  new) Proof id so the row can show the 📎 immediately, without waiting
+ *  for the server payload to refresh. */
+export type ProofUploadResult = { ok: true; proofId: string } | { ok: false; message: string };
+export type ProofUploadHandler = (
+  runBlockId: string,
+  image: { mime: string; dataBase64: string },
+) => Promise<ProofUploadResult>;
+/** The Proof gallery's per-thumbnail remove action (2026-08-08, multi-photo)
+ *  — identifies the photo by its own Proof id, not the task's runBlockId,
+ *  since a task can now have several. */
+export type ProofRemoveResult = { ok: true } | { ok: false; message: string };
+export type ProofRemoveHandler = (proofId: string) => Promise<ProofRemoveResult>;
 
 export type FlowRole =
   | "ADMIN"
@@ -26,6 +46,48 @@ export interface FlowBucketTotals {
   na: number;
 }
 
+/** One person on the "No Claim/Incentive" list (2026-08-18, month filter
+ *  added same day) — Finance (finance@ebright.my) and CEO only, a company-
+ *  wide compliance check before approving a claim/incentive payment: anyone
+ *  with at least one open (Pending/Active/Overdue/Escalated — i.e. not
+ *  DONE/SKIPPED) Task Manager task due in the selected month, any cadence.
+ *  See getNoClaimIncentivePayload (task-manager/analytics/_payloads.ts) for
+ *  how openCount and the month scope are computed. */
+export interface NoClaimPerson {
+  userId: string;
+  name: string;
+  openCount: number;
+}
+
+/** One Department or Branch's worth of NoClaimPerson entries, pre-sorted by
+ *  name — the "No Claim/Incentive" list's grouping unit. */
+export interface NoClaimGroup {
+  name: string;
+  people: NoClaimPerson[];
+}
+
+/** NoClaimIncentiveMenu's data shape — every department-side person under
+ *  `departments`, every branch-side person under `branches` (the app's
+ *  existing department/branch split — see resolveViewRole's own comment on
+ *  why a person is never both). Both arrays pre-sorted by group name. */
+export interface NoClaimIncentivePayload {
+  departments: NoClaimGroup[];
+  branches: NoClaimGroup[];
+}
+
+/** One scheduled slot from Manpower Scheduling's ACTUAL roster (2026-08-18)
+ *  — the root HRFS database's manpower_schedule table ("System A"), a
+ *  completely separate system from the fromSchedule/ManpowerSchedule fields
+ *  below (Task Manager's own "System B"). Read-only display data for the My
+ *  Week weekday sidebar, Coach/Branch Full Time Exec only — see
+ *  getMyManpowerSchedule (task-manager/data/manpower-actual.ts) for the
+ *  cross-database chain that produces it. */
+export interface MyManpowerActualSlot {
+  label: string; // e.g. "Coach 1" (branch_position.position_label)
+  start: string; // e.g. "6:00 PM"
+  end: string; // e.g. "7:15 PM"
+}
+
 export interface FlowTaskRow {
   runBlockId: string;
   runId: string;
@@ -35,9 +97,48 @@ export interface FlowTaskRow {
   assigneeId: string;
   dueAt: string | null; // ISO
   status: "PENDING" | "ACTIVE" | "OVERDUE" | "ESCALATED" | "DONE" | "SKIPPED";
+  /** Explicit Daily/Monthly/Ad hoc tag (2026-08-05: drives the past-day
+   *  completion/proof lock — DAILY + a past dueAt means locked). null for
+   *  untagged legacy rows, which the lock never applies to. */
+  cadence?: "DAILY" | "MONTHLY" | "ADHOC" | null;
   /** True when this task was created by a Manpower Schedule slot sync
    *  (vs. a manual/ad hoc assignment) — drives the "Scheduled" badge. */
   fromSchedule: boolean;
+  /** Assigner-attached SOP reference (2026-07-30) — drives the 📎 icon +
+   *  viewer; image served by /api/task-manager/guideline-image/[id]. */
+  guideline?: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  categoryId: string | null;
+  categoryName: string | null;
+  /** Who assigned the task — the "Assigned by" column in the personal My
+   *  Tasks lists (2026-07-30). Resolved only by the personal payloads;
+   *  undefined elsewhere (column shows a dash). */
+  assignerName?: string | null;
+  /** Who the task is assigned TO — optional here on the base type (widened
+   *  2026-08-19 so TaskRowLine's `assigneeSource="assignee"` mode can read
+   *  it) because most FlowTaskRow-typed lists never populate it; always
+   *  populated where it matters (FlowDrillTask below re-declares it
+   *  required — the entity drill-down's "by who" — and getMePayload's
+   *  delegatedAll rows, "Tasks I Assigned"/"CEO Assigned Task", set it to
+   *  the recipient's name for the exact same reason). */
+  assigneeName?: string | null;
+  /** The assigner's role (2026-08-19) — drives isDueDayLockExemptRole (HOD/
+   *  CEO-assigned tasks skip the Daily due-day lock everywhere they appear).
+   *  Resolved wherever assignerName also is; undefined elsewhere means "not
+   *  exempt" (isLockedDueDay's usual cadence/date check still applies). */
+  assignerRole?: string | null;
+  /** Assignee-uploaded completion evidence (2026-07-30, multi-photo
+   *  2026-08-08) — drives the "Proof" column's gallery. Empty array is the
+   *  "no proof" case now (no undefined/null/[] three-way ambiguity); each
+   *  image is served by /api/task-manager/proof-image/[id]. */
+  proofIds: string[];
+  /** Main Task ↔ Subtask link (2026-07-30): the parent task's runBlockId,
+   *  or null/undefined for a top-level task. ResizableTaskList groups rows
+   *  by this into the chevron/indent tree. */
+  parentId?: string | null;
+  /** Checklist-builder position within the parent (2026-07-31) — the tree
+   *  sorts siblings by this, falling back to id (creation) order. */
+  subtaskOrder?: number | null;
   /** Structural eligibility ONLY for the "click the status dot to
    *  complete" action (not viewer-aware — the caller must ALSO check
    *  `assigneeId` against the viewer's own id before treating a dot as
@@ -73,7 +174,7 @@ export interface FlowPersonal {
   streams: FlowTaskStream[];
   /** Delegated rows carry the assignee's name (unlike `tasks`/`streams`,
    *  where the assignee is always `me`) — the CEO's task table's "PIC"
-   *  column, and HOD's "Tasks I Assigned" card, both need to show who. */
+   *  column, and HOD's "Task Assignment" card, both need to show who. */
   delegated: { totals: FlowBucketTotals; tasks: FlowDrillTask[] } | null;
   /** ALL-TIME variants — the un-periodized overview cards ("CEO Tasks",
    *  "HOD assigned tasks": not daily or monthly). */
@@ -226,8 +327,21 @@ export const FLOW_BRANCH_REGIONS = [
 
 export const FLOW_STAFF_ROLES = ["Manager", "Branch Exec", "Coach"] as const;
 export const FLOW_DAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+/** Monthly's own equivalent of FLOW_DAYS (2026-08-25, user request) — the
+ *  SAME 4 day-range chunks the Monthly viewing surfaces already show
+ *  (monthDayChunks/MonthRangeDropdown), reused here for the "+ Task"/
+ *  Template assign forms' Monthly-cadence "Range" picker. "22-31" is a
+ *  fixed label — the server resolves the real end-of-month day
+ *  (nextMonthlyOccurrence, tasks-internal.ts) when computing the actual
+ *  due date, same as monthDayChunks' own daysInMonth clamp. No "Full
+ *  month" option here (unlike the viewing dropdown) — assignment needs a
+ *  real due date, and "Full month" has no single day to resolve to. */
+export const FLOW_MONTH_RANGES = ["1-7", "8-14", "15-21", "22-31"] as const;
 export const FLOW_DEPARTMENTS = [
-  "Operation",
+  // Renamed from "Operation" 2026-07-25 (user spelling correction). The
+  // SOURCE systems (portal hrfs department table, HRFS markers) still say
+  // "Operation" — hrfs-map.ts's normalizeSourceDepartment shims imports.
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",
@@ -250,6 +364,41 @@ export interface FlowAssignInput {
    *  see assign/route.ts. They're independent, separately-completable
    *  instances that happen to share a title, not one recurring task. */
   days?: (typeof FLOW_DAYS)[number][];
+  /** Monthly's own equivalent of `days` above (2026-08-25) — multi-select,
+   *  each selected range becomes its OWN separate RunBlock per recipient,
+   *  due on that range's last day (nextMonthlyOccurrence, tasks-internal.ts)
+   *  — same independent-instances reasoning as `days`, just week-of-month
+   *  instead of day-of-week. Only meaningful alongside Monthly cadence
+   *  (mirrors `days` being Daily-only); ignored if `dueDate` is also set
+   *  (dueDate always wins, same precedence `days` already has). */
+  monthRanges?: (typeof FLOW_MONTH_RANGES)[number][];
+  /** RETIRED (2026-07-25 final decision): every Daily task auto-recurs
+   *  weekly, system-wide — nothing sends this anymore; the server accepts
+   *  and ignores it for API stability. */
+  repeatWeekly?: boolean;
+  /** Optional Guideline (2026-07-30): SOP link and/or reference image
+   *  (png/jpeg/webp, ≤ 2 MB, base64) — both optional, never block
+   *  submission. */
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string };
+  /** Optional Subtasks (2026-07-30): each becomes a FULL task row of its
+   *  own (own status/proof/due, completion independent of the parent) for
+   *  every recipient × day, linked under the main task via parentId. */
+  subtasks?: string[];
+  /** Optional "Save as Template" (2026-07-31): also store this
+   *  assignment's structure as a reusable template under `name` — a
+   *  same-name save overwrites (the edit path). */
+  saveAsTemplate?: { name: string };
+  /** Set when the form was pre-filled via "Start from a template" — links
+   *  the created tasks to that template (template deletion cancels its
+   *  still-pending assignments). */
+  fromTemplateId?: string;
+  /** Task Category ("Type", 2026-08-12) — set ONCE at assignment time,
+   *  never editable afterward. Omit/undefined = Uncategorized. Every
+   *  RunBlock this assignment creates (all recipients × days, and every
+   *  subtask) gets this SAME categoryId — same fan-out shape as
+   *  guidelineId. */
+  categoryId?: string;
   /** Department form: the exact members to assign ("who"). */
   userIds?: string[];
   dueDate?: string; // YYYY-MM-DD
@@ -261,7 +410,253 @@ export interface FlowAssignInput {
   cadence: CadenceOption;
 }
 
+/** Assign form's flat Category picker option (2026-08-12) — active
+ *  categories only, see data/task-categories.ts's listActiveTaskCategories. */
+export interface FlowCategoryOption {
+  id: string;
+  name: string;
+}
+
 export type CadenceOption = FlowPeriod | "adhoc";
+
+// ---- Task Templates (2026-07-31) ----------------------------------------
+
+export interface FlowTemplateSummary {
+  id: string;
+  name: string;
+  title: string;
+  subtaskCount: number;
+  hasGuidelineUrl: boolean;
+  hasGuidelineImage: boolean;
+  updatedAt: string; // ISO
+}
+
+/** Full template for form prefill — guidelineImage uses the SAME shape the
+ *  assign input submits, so prefill is a straight state assignment. */
+export interface FlowTemplateDetail {
+  id: string;
+  name: string;
+  title: string;
+  subtasks: string[];
+  cadence: CadenceOption | null;
+  categoryId: string | null;
+  guidelineUrl: string | null;
+  guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+
+export type TemplateLoadResult =
+  | { ok: true; template: FlowTemplateDetail }
+  | { ok: false; message: string };
+
+export type TemplateImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
+export interface FlowTemplateAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateAssigneesResult =
+  | { ok: true; assignees: FlowTemplateAssignee[] }
+  | { ok: false; message: string };
+
+/** "Edit Task" input — the template's new structure, propagated to every
+ *  pending instance (completed records untouched). */
+export interface FlowTemplateEditInput {
+  title: string;
+  subtasks: string[];
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+export type TemplateEditResult =
+  | { ok: true; updatedTasks: number; employees: number }
+  | { ok: false; message: string };
+
+// Archive (2026-07-31): reversible hide — see data/templates.ts.
+export interface FlowArchivedTemplate {
+  id: string;
+  name: string;
+  title: string;
+  archivedTasks: number;
+  archivedAt: string; // ISO
+}
+export interface FlowArchivedInstance {
+  templateId: string;
+  templateName: string;
+  userId: string;
+  userName: string;
+  archivedTasks: number;
+}
+export type ArchivedItemsResult =
+  | { ok: true; templates: FlowArchivedTemplate[]; instances: FlowArchivedInstance[] }
+  | { ok: false; message: string };
+
+/** Everything the "+ Task" form needs for templates, bundled as ONE
+ *  optional prop: the saved list plus load/impact/rename/delete server
+ *  actions. `impact` feeds the pre-deletion confirmation ("removes N
+ *  pending tasks from M employees; completed records kept"); `remove`
+ *  then cancels those pending assignments and deletes the template. */
+export interface FlowTemplateControl {
+  list: FlowTemplateSummary[];
+  load: (templateId: string) => Promise<TemplateLoadResult>;
+  impact: (templateId: string) => Promise<TemplateImpactResult>;
+  rename: (templateId: string, name: string) => Promise<ActionResult>;
+  remove: (templateId: string) => Promise<ActionResult>;
+  // + Task hub (2026-07-31): Edit / Remove-in-bulk / Reassign
+  assignees: (templateId: string) => Promise<TemplateAssigneesResult>;
+  edit: (templateId: string, input: FlowTemplateEditInput) => Promise<TemplateEditResult>;
+  removeAssignments: (templateId: string, alsoDeleteTemplate: boolean) => Promise<ActionResult>;
+  reassignAll: (templateId: string, fromUserId: string, toUserId: string) => Promise<ActionResult>;
+  // Archive / Unarchive (2026-07-31): userId omitted = whole template.
+  archive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  unarchive: (templateId: string, userId?: string) => Promise<ActionResult>;
+  archived: () => Promise<ArchivedItemsResult>;
+}
+
+// ---- Task Template Groups (2026-08-06) — the /task-manager/template
+// page's multi-task "Template" concept, distinct from the single-task
+// FlowTemplateControl above. Each group task IS a TaskTemplate row under
+// the hood (see data/template-groups.ts) — these types are the group-level
+// wrapper the dashboard/modals actually work with.
+
+export interface FlowTemplateGroupSummary {
+  id: string;
+  name: string;
+  taskCount: number;
+  previewTitles: string[];
+  /** EVERY member task title — search-only, see data/template-groups.ts's
+   *  TemplateGroupSummary doc comment for why this is separate from
+   *  previewTitles. */
+  allTaskTitles: string[];
+  updatedAt: string; // ISO
+}
+
+export interface FlowTemplateGroupTask {
+  id: string;
+  title: string;
+  subtasks: string[];
+  /** Per-task Guideline (2026-08-20) — SOP link and/or reference image,
+   *  same shape/meaning as the single-task template's own guideline
+   *  (FlowTemplateDetail above); each member task in a group gets its own,
+   *  independent of the other tasks in the same group. */
+  guidelineUrl: string | null;
+  guidelineImage: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+
+export interface FlowTemplateGroupDetail {
+  id: string;
+  name: string;
+  tasks: FlowTemplateGroupTask[];
+  /** Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+   *  the group (a sibling of `name`, not a per-task field) — distinct from
+   *  TaskTemplate.categoryId, which is per-task and only used by the
+   *  single-task "+ Task" form's own Type dropdown. null = uncategorized. */
+  categoryId: string | null;
+}
+
+/** Task shape submitted from the Create/Edit form — `id` present only for
+ *  an existing member being kept (feeds the edit reconciliation). */
+export interface FlowTemplateGroupTaskInput {
+  id?: string;
+  title: string;
+  subtasks: string[];
+  /** Per-task Guideline (2026-08-20) — see FlowTemplateGroupTask's own doc
+   *  comment. `guidelineImage: null` explicitly clears a previously-saved
+   *  image on edit (undefined = leave whatever's already there — same
+   *  optional-vs-null convention FlowTemplateEditInput already uses). */
+  guidelineUrl?: string;
+  guidelineImage?: { mime: "image/png" | "image/jpeg" | "image/webp"; dataBase64: string } | null;
+}
+
+export type TemplateGroupLoadResult =
+  | { ok: true; group: FlowTemplateGroupDetail }
+  | { ok: false; message: string };
+
+export type TemplateGroupSaveResult = { ok: true; id: string } | { ok: false; message: string };
+
+export type TemplateGroupEditResult =
+  | {
+      ok: true;
+      updatedTasks: number;
+      createdTasks: number;
+      removedTasks: number;
+      employees: number;
+      /** New-member-task fan-out (2026-08-07): existing group assignees a
+       *  brand-new member task was auto-created for (schedule replicated
+       *  from their other pending member-task instances), and how many
+       *  were skipped for having nothing pending to copy a schedule from —
+       *  see data/template-groups.ts's editTemplateGroup. */
+      newTaskAssignedTo: number;
+      newTaskSkipped: number;
+    }
+  | { ok: false; message: string };
+
+export type TemplateGroupImpactResult =
+  | { ok: true; pendingTasks: number; pendingEmployees: number; completedKept: number }
+  | { ok: false; message: string };
+
+export type TemplateGroupDeleteResult =
+  | { ok: true; removedTasks: number; keptRecords: number }
+  | { ok: false; message: string };
+
+/** "Assign" input — one recipient/day/due-date/cadence choice applied to
+ *  every task in the group (see applyTemplateGroup). */
+export interface FlowTemplateGroupApplyInput {
+  userIds: string[];
+  days?: (typeof FLOW_DAYS)[number][];
+  /** Monthly's own equivalent of `days` above (2026-08-25) — see
+   *  FlowAssignInput.monthRanges' own doc comment for the full explanation. */
+  monthRanges?: (typeof FLOW_MONTH_RANGES)[number][];
+  dueDate?: string;
+  cadence: CadenceOption;
+}
+export type TemplateGroupApplyResult = { ok: true; created: number } | { ok: false; message: string };
+
+export interface FlowTemplateGroupAssignee {
+  userId: string;
+  name: string;
+  pendingTasks: number;
+}
+export type TemplateGroupAssigneesResult =
+  | { ok: true; assignees: FlowTemplateGroupAssignee[] }
+  | { ok: false; message: string };
+/** Remove Assignee (2026-08-22 rule — corrected to same-day cutoff) —
+ *  cancels only today's instance (cancelledToday); anything dated before
+ *  today stays untouched (pendingKept, purely informational). See
+ *  data/templates-internal.ts's removeTemplateAssigneeCore doc comment
+ *  for the full rule. */
+export type TemplateGroupRemoveAssigneeResult =
+  | { ok: true; excluded: true; cancelledToday: number; pendingKept: number }
+  | { ok: false; message: string };
+
+/** Everything the /task-manager/template dashboard needs, bundled as one
+ *  prop — mirrors FlowTemplateControl's shape for the single-task feature. */
+export interface FlowTemplateGroupControl {
+  list: FlowTemplateGroupSummary[];
+  load: (groupId: string) => Promise<TemplateGroupLoadResult>;
+  create: (input: {
+    name: string;
+    categoryId?: string;
+    tasks: Omit<FlowTemplateGroupTaskInput, "id">[];
+  }) => Promise<TemplateGroupSaveResult>;
+  edit: (
+    groupId: string,
+    input: { name: string; categoryId?: string; tasks: FlowTemplateGroupTaskInput[] },
+  ) => Promise<TemplateGroupEditResult>;
+  /** Pre-DELETE preview — every pending block regardless of due date (the
+   *  Remove-template confirm dialog). */
+  impact: (groupId: string) => Promise<TemplateGroupImpactResult>;
+  /** Pre-EDIT preview (2026-08-22) — narrower than `impact` above: parent
+   *  blocks only, excluding past-due instances, matching what Save is
+   *  actually about to update (see getTemplateEditImpactCore's own doc
+   *  comment for why this needs its own count instead of reusing `impact`). */
+  editImpact: (groupId: string) => Promise<TemplateGroupImpactResult>;
+  remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
+  apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
+  assignees: (groupId: string) => Promise<TemplateGroupAssigneesResult>;
+  removeAssignee: (groupId: string, userId: string) => Promise<TemplateGroupRemoveAssigneeResult>;
+}
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the
  *  currently-selected recipient(s) — Branch Manager keeps all 3 (the one
@@ -302,6 +697,9 @@ export interface FlowScheduleCell {
   slotId: string;
   startTime: string; // HH:mm
   endTime: string; // HH:mm
+  /** Optional row label ("Opening", "6:00 PM Class") — drives synced task
+   *  titles; null = auto-format from startTime (2026-08-01). */
+  rowLabel: string | null;
   roleColumn: string; // "Manager" | "Coach 1" | "Exec 1" | ...
   assignedStaffId: string | null;
   assignedStaffName: string | null;
@@ -328,12 +726,19 @@ export interface FlowManpowerScheduleResponse {
 /** Preset title-color palette for a board column — a curated key, never a
  *  raw hex/CSS value, so the picker UI and validation both stay closed-set. */
 export const HOD_KANBAN_COLORS = [
+  "red",
+  "orange",
+  "amber",
+  "lime",
+  "emerald",
+  "teal",
+  "cyan",
   "blue",
   "indigo",
   "violet",
+  "purple",
+  "fuchsia",
   "pink",
-  "orange",
-  "teal",
   "rose",
 ] as const;
 
@@ -490,6 +895,62 @@ export function flowBucketize<T extends FlowTaskRow>(
   return out;
 }
 
+/** Wraps the viewer's own totals/tasks into a synthetic one-member
+ *  FlowEntityDetail, for roles/sections with no owned department or
+ *  branch entity (OPS, CEO, every self-scoped Monthly section, and
+ *  Home's personal Daily/Monthly/third-card sections). `done`/`notDone`
+ *  on the synthetic member are unused placeholders — no current consumer
+ *  (groupTasksByPerson, entity-card-overview.tsx) reads a single-member
+ *  roster's per-member counts; `totals` above is what drives the card. */
+export function toSelfEntityDetail(
+  me: { userId: string; name: string },
+  personal: { totals: FlowBucketTotals; tasks: FlowDrillTask[] },
+): FlowEntityDetail {
+  return {
+    name: me.name,
+    totals: personal.totals,
+    tasks: flowBucketize(personal.tasks),
+    members: [
+      { userId: me.userId, name: me.name, employmentType: null, department: null, branch: null, done: 0, notDone: 0 },
+    ],
+  };
+}
+
+/** The month's range chunks — FOUR, per the 2026-07-30 confirmation
+ *  (matching the ClickUp reference): 1-7 · 8-14 · 15-21 · 22-{last day}
+ *  (22-31 / 22-30 / 22-28 depending on the month's actual length). Moved
+ *  here from entity-picker.tsx (2026-08-15) so it can be called as a plain
+ *  function from a Server Component — entity-picker.tsx has "use client",
+ *  which turns every one of its exports into a client-reference proxy when
+ *  imported server-side; calling such a proxy as ordinary logic (not
+ *  rendering it as JSX) throws at runtime. */
+export function monthDayChunks(year: number, month: number): { from: number; to: number }[] {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return [
+    { from: 1, to: 7 },
+    { from: 8, to: 14 },
+    { from: 15, to: 21 },
+    { from: 22, to: daysInMonth },
+  ];
+}
+
+export const chunkLabel = (c: { from: number; to: number }) =>
+  c.from === c.to ? `${c.from}` : `${c.from}–${c.to}`;
+
+/** My Month's default tab (2026-08-22) when no ?mrange= is in the URL —
+ *  the week-range chunk that CONTAINS today's date, not "Full month".
+ *  Only applies when the anchor month being viewed is the real current
+ *  month; viewing a past/future month falls back to "Full month" ("")
+ *  since today isn't inside that month at all. `now` is a parameter (not
+ *  read internally) so a Server Component call site controls determinism
+ *  the same way todayStart()/advanceRecurringBlocks() do. */
+export function defaultMonthRange(anchorYear: number, anchorMonth: number, now: Date): string {
+  if (now.getFullYear() !== anchorYear || now.getMonth() + 1 !== anchorMonth) return "";
+  const today = now.getDate();
+  const chunk = monthDayChunks(anchorYear, anchorMonth).find((c) => today >= c.from && today <= c.to);
+  return chunk ? `${chunk.from}-${chunk.to}` : "";
+}
+
 /** Human label for an assigner stream ("CEO assigned tasks" per the mockups). */
 export function flowStreamLabel(key: FlowRole | "self"): string {
   if (key === "self") return "Started by me";
@@ -535,20 +996,86 @@ export interface DueDateDisplay {
   className: string;
 }
 
-/** Relative, human-readable due-date label (ClickUp-style): "5 days ago" /
- *  "Yesterday" (red, overdue), "Today" (amber), a short weekday name for the
- *  next 6 days (neutral gray), or a plain "Jul 30" date beyond that (also
- *  neutral gray). Calendar-day difference, not a raw ms delta — a dueAt of
- *  17:00 today still reads as "Today" regardless of the current time of day.
- *  Returns null for no due date — callers keep rendering their own "—". */
+/** Due-date label (2026-08-05: split TODAY off from Overdue): "D/M Due"
+ *  (blue — this app's existing today/current convention, e.g. the weekday
+ *  sidebar's active-day highlight) for TODAY specifically, "D/M Overdue"
+ *  (red) for anything STRICTLY earlier, "2/8 Due Soon" (amber) for
+ *  TOMORROW, a short weekday for 2–6 days out ("3/8 Mon", neutral gray, no
+ *  status label), or the bare "15/8" date beyond a week (also neutral
+ *  gray). Calendar-day difference, not a raw ms delta — a dueAt of 17:00
+ *  today still counts as today regardless of the current time. Returns
+ *  null for no due date — callers keep rendering their own "—". */
 export function formatDueDate(due: Date | null): DueDateDisplay | null {
   if (!due) return null;
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  const dm = `${due.getDate()}/${due.getMonth() + 1}`;
 
-  if (diffDays < -1) return { text: `${-diffDays} days ago`, className: "text-red-500 font-medium" };
-  if (diffDays === -1) return { text: "Yesterday", className: "text-red-500 font-medium" };
-  if (diffDays === 0) return { text: "Today", className: "text-amber-600 font-medium" };
-  if (diffDays <= 6) return { text: due.toLocaleDateString(undefined, { weekday: "short" }), className: "text-gray-400" };
-  return { text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }), className: "text-gray-400" };
+  if (diffDays === 0) return { text: `${dm} Due`, className: "text-blue-600 font-medium" };
+  if (diffDays < 0) return { text: `${dm} Overdue`, className: "text-red-500 font-medium" };
+  if (diffDays === 1) return { text: `${dm} Due Soon`, className: "text-amber-600 font-medium" };
+  if (diffDays <= 6)
+    return {
+      text: `${dm} ${due.toLocaleDateString(undefined, { weekday: "short" })}`,
+      className: "text-gray-400",
+    };
+  return { text: dm, className: "text-gray-400" };
+}
+
+/** Locked-past-day check (2026-08-05: Daily tasks can no longer be marked
+ *  complete, or have proof attached/replaced, once their day has passed) —
+ *  STRICTLY before today (diffDays < 0). Today must stay completable per
+ *  the product spec's own example ("if today is 5 Aug, tasks dated 4
+ *  Aug... should be locked" — 5 Aug itself is not locked). Same
+ *  calendar-day (not raw ms delta) boundary as formatDueDate's own
+ *  diffDays === 0 "Due" / diffDays < 0 "Overdue" split above, so the two
+ *  never disagree about which day a dueAt falls on. Accepts an ISO string
+ *  (the client-facing FlowTaskRow.dueAt shape) or a Date (server-side
+ *  RunBlock.dueAt) so both layers — the server-authoritative guard in
+ *  engine/run.ts's completeBlock/skipBlock/reopenBlock and data/tasks.ts's
+ *  uploadFlowTaskProof, and the client UX guard in bits.tsx — share the
+ *  exact same definition of "past". */
+export function isPastDueDay(due: string | Date | null): boolean {
+  if (!due) return false;
+  const d = typeof due === "string" ? new Date(due) : due;
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  return diffDays < 0;
+}
+
+/** Locked-future-day check (2026-08-11) — the symmetric counterpart to
+ *  isPastDueDay above: a Daily task's day hasn't arrived yet (diffDays >
+ *  0) can't be marked complete/N-A, have proof attached/removed, or be
+ *  reopened either — same reasoning as the past-day lock, just the other
+ *  temporal direction (a task shouldn't be actionable before its own due
+ *  day arrives, same as it shouldn't be actionable after that day has
+ *  passed). Today stays actionable (diffDays === 0, unchanged) — this and
+ *  isPastDueDay are deliberately two separate functions rather than one
+ *  "outside today" check, so each call site can still tell WHICH
+ *  direction locked it and surface a direction-appropriate message
+ *  ("hasn't arrived yet" vs. "has passed") rather than one generic
+ *  string. Same dual-layer sharing as isPastDueDay: engine/run.ts's
+ *  completeBlock/skipBlock/reopenBlock, data/tasks.ts's
+ *  uploadFlowTaskProof/removeFlowTaskProof, and bits.tsx's client UX
+ *  guard all call this same function so the definition of "future" can
+ *  never drift between them. */
+export function isFutureDueDay(due: string | Date | null): boolean {
+  if (!due) return false;
+  const d = typeof due === "string" ? new Date(due) : due;
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+  return diffDays > 0;
+}
+
+/** Due-day-lock exemption by assigner role (2026-08-19): a task an HOD or
+ *  CEO deliberately assigned is a directive, not a routine recurring daily
+ *  item — it should stay completable any day, never locked to exactly its
+ *  due date, in EVERY section it appears in (not just "HOD/CEO Assigned
+ *  Task" — the server can't tell which section a request came from, so the
+ *  exemption has to be a real property of the task itself: who assigned it,
+ *  not which page is showing it). Same dual-layer sharing as isPastDueDay/
+ *  isFutureDueDay above — engine/run.ts, data/tasks.ts, and bits.tsx all
+ *  call this exact function so the definition of "exempt" can't drift. */
+export function isDueDayLockExemptRole(role: string | null | undefined): boolean {
+  return role === "HOD" || role === "CEO";
 }

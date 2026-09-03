@@ -3,15 +3,20 @@ import { auth } from "@/auth";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { canReviewClaims } from "@/app/claim/roles";
+import { buildAccess } from "@/lib/access/engine";
 import { uploadToDrive } from "@/lib/drive";
 import {
   type ClaimType,
   isClaimType,
   canAccessClaimType,
+  isTaskGatedClaimType,
   MAX_CLAIM_DOCS,
   requiresAttachment,
 } from "@/app/claim/claim-types";
+import {
+  type ClaimTaskGate,
+  getOpenTasksForClaim,
+} from "@/task-manager/data/claim-gate";
 import path from "node:path";
 
 const TRANSPORT_RATE = 0.7;
@@ -47,6 +52,23 @@ function s(formData: FormData, key: string): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+/** Names up to three blocking tasks, then "and N more" for the rest. */
+function openTaskError(gate: ClaimTaskGate): string {
+  const parts = gate.sample.map((t) => `“${t.title}”`);
+  const hidden = gate.openCount - gate.sample.length;
+  if (hidden > 0) parts.push(`${hidden} more`);
+  const list =
+    parts.length > 1
+      ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
+      : (parts[0] ?? "");
+  const one = gate.openCount === 1;
+  return (
+    `You still have ${gate.openCount} incomplete Task Manager ${one ? "task" : "tasks"} ` +
+    `for this month: ${list}. Complete ${one ? "it" : "them"} in Task Manager ` +
+    `before submitting this claim.`
+  );
+}
+
 async function saveAttachment(
   file: File,
   claimType: ClaimType,
@@ -62,6 +84,7 @@ async function saveAttachment(
   const { id } = await uploadToDrive(file, {
     prefix: claimType,
     folderPath: driveFolderForClaim(claimDate),
+    folderEnvVar: "GOOGLE_DRIVE_CLAIM_FOLDER_ID",
   });
   return id;
 }
@@ -131,6 +154,23 @@ export async function submitClaim(
   }
   if (dateStr > monthEndStr) {
     return { ok: false, error: "Claim date must be within the current month." };
+  }
+
+  // Task Manager gate (2026-09-03): refuse the claim while the claimant still
+  // has an open (not DONE/SKIPPED) task in the month being claimed for — the
+  // automatic form of the Finance/CEO "No Claim/Incentive" list this rule has
+  // existed as since 2026-08-18. Placed after the date checks (it needs the
+  // month) and before any Drive upload, so a blocked claim uploads nothing.
+  // getOpenTasksForClaim FAILS OPEN: no Task Manager account, no
+  // TASK_MANAGER_DATABASE_URL in this environment, or a database error all
+  // resolve to "not blocked" — claim submission never depends on Task Manager
+  // being reachable. See src/task-manager/data/claim-gate.ts.
+  if (isTaskGatedClaimType(claimType)) {
+    const gate = await getOpenTasksForClaim(
+      { email: session.user.email, hrfsUserId: user.user_id },
+      claimDate,
+    );
+    if (gate.blocked) return { ok: false, error: openTaskError(gate) };
   }
 
   let amount: number;
@@ -228,24 +268,9 @@ export async function reviewClaim(
   const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
 
-  const reviewer = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (
-    !reviewer ||
-    !canReviewClaims({
-      role_id: reviewer.role_id,
-      email: reviewer.email,
-      role_type: reviewer.role?.role_type ?? null,
-    })
-  ) {
-    return { ok: false, error: "Only finance or superadmin can review claims." };
+  const access = await buildAccess(session.user.email);
+  if (!access || !access.can("claim", "update")) {
+    return { ok: false, error: "You don't have permission to review claims." };
   }
 
   const claimId = parseInt(s(formData, "claim_id"), 10);
@@ -303,16 +328,8 @@ export async function advanceClaim(
   const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not authenticated." };
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (!me) return { ok: false, error: "User record not found." };
+  const access = await buildAccess(session.user.email);
+  if (!access) return { ok: false, error: "User record not found." };
 
   const claimId = parseInt(s(formData, "claim_id"), 10);
   if (Number.isNaN(claimId)) return { ok: false, error: "Invalid claim id." };
@@ -328,20 +345,14 @@ export async function advanceClaim(
   });
   if (!existing) return { ok: false, error: "Claim not found." };
 
-  // Disbursement is a finance action; confirming receipt belongs to the
+  // Disbursement is a review action; confirming receipt belongs to the
   // employee who requested the claim.
   if (action === "disburse") {
-    if (
-      !canReviewClaims({
-        role_id: me.role_id,
-        email: me.email,
-        role_type: me.role?.role_type ?? null,
-      })
-    ) {
-      return { ok: false, error: "Only finance or superadmin can disburse claims." };
+    if (!access.can("claim", "update")) {
+      return { ok: false, error: "You don't have permission to disburse claims." };
     }
   } else {
-    if (existing.user_id !== me.user_id) {
+    if (existing.user_id !== access.actor.userId) {
       return { ok: false, error: "Only the claim requester can confirm receipt." };
     }
   }

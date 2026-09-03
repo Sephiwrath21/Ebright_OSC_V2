@@ -27,10 +27,19 @@ const nextConfig: NextConfig = {
     // iframe (src/app/dashboards/sms/cep) can embed it without cross-origin
     // issues. CEP_APP_ORIGIN lets prod point at wherever that process is deployed.
     const cepOrigin = process.env.CEP_APP_ORIGIN ?? "http://localhost:3010";
+    // Flowghan (apps/doomtracker) is a React+Vite+Express app running as its own
+    // isolated process on its own Postgres. Same pattern as CEP: proxy its whole
+    // subpath same-origin so the /flowghan iframe embeds it (SPA + /api) without
+    // cross-origin issues. FLOWGHAN_APP_ORIGIN points at wherever it's deployed.
+    const flowghanOrigin = process.env.FLOWGHAN_APP_ORIGIN ?? "http://localhost:3020";
     return [
       {
         source: "/cep-embed/:path*",
         destination: `${cepOrigin}/cep-embed/:path*`,
+      },
+      {
+        source: "/flowghan-embed/:path*",
+        destination: `${flowghanOrigin}/flowghan-embed/:path*`,
       },
     ];
   },

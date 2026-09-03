@@ -51,16 +51,18 @@ model bank_details {
 }
 
 model branch {
-  branch_id              Int                      @id @default(autoincrement())
-  branch_name            String                   @db.VarChar(100)
-  location               String?                  @db.VarChar(255)
-  branch_code            String?                  @unique @db.VarChar(10)
-  region                 String?                  @db.VarChar(10)
-  branch_duty_position   branch_duty_position[]
-  branch_operating_day   branch_operating_day[]
-  devices                devices[]
-  employment             employment[]
-  schedule_period_status schedule_period_status[]
+  branch_id                    Int                            @id @default(autoincrement())
+  branch_name                  String                         @db.VarChar(100)
+  location                     String?                        @db.VarChar(255)
+  branch_code                  String?                        @unique @db.VarChar(10)
+  region                       String?                        @db.VarChar(10)
+  branch_position              branch_position[]
+  branch_operating_day         branch_operating_day[]
+  devices                      devices[]
+  employment                   employment[]
+  schedule_period_status       schedule_period_status[]
+  manpower_schedule_attendance manpower_schedule_attendance[]
+  manpower_attendance_day_lock manpower_attendance_day_lock[]
 }
 
 model department {
@@ -89,28 +91,622 @@ model emergency_contact {
   name        String  @db.VarChar(255)
   phone       String? @db.VarChar(30)
   relation    String? @db.VarChar(50)
+  email       String? @db.VarChar(255)
+  address     String?
   users       users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_contract_user")
 }
 
-model employment {
-  employment_id      Int                           @id @default(autoincrement())
+model resume {
+  resume_id      Int     @id @default(autoincrement())
+  user_id        Int     @unique
+  resume_file_id String? @db.VarChar(128)
+  cv_file_id     String? @db.VarChar(128)
+  users          users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resume_user")
+}
+
+model interview_assessment {
+  interview_assessment_id Int       @id @default(autoincrement())
+  user_id                 Int       @unique
+  int_date                DateTime? @db.Date
+  overall_rate            Int?
+  recommendation          String?   @db.VarChar(20)
+  strength                String?
+  weakness                String?
+  hiring_note             String?
+  users                   users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_interview_assessment_user")
+}
+
+model reference_check {
+  reference_check_id Int     @id @default(autoincrement())
+  user_id            Int     @unique
+  ref_name           String? @db.VarChar(255)
+  company            String? @db.VarChar(200)
+  relationship       String? @db.VarChar(50)
+  position           String? @db.VarChar(100)
+  contact_number     String? @db.VarChar(30)
+  email              String? @db.VarChar(255)
+  users              users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reference_check_user")
+}
+
+model medical_check {
+  medical_check_id       Int     @id @default(autoincrement())
+  user_id                Int     @unique
+  medical_report_file_id String? @db.VarChar(128)
+  result                 String? @db.VarChar(30)
+  users                  users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_medical_check_user")
+}
+
+model probation {
+  probation_id                Int       @id @default(autoincrement())
+  user_id                     Int       @unique
+  probation_status            String?   @db.VarChar(20)
+  start_date                  DateTime? @db.Date
+  end_date                    DateTime? @db.Date
+  confirm_date                DateTime? @db.Date
+  ext_end_date                DateTime? @db.Date
+  confirmation_letter_file_id String?   @db.VarChar(128)
+  extension_letter_file_id    String?   @db.VarChar(128)
+  // Audit trail for the HR Confirm/Extend/Stop decision (see
+  // decideProbationOutcome in employeeRecordActions.ts) — the one write path
+  // this feature introduces; everything else it reads is read-only from
+  // ebright_hrfs. Nullable: rows written by the older updateProbationInfo
+  // form flow (before this feature existed) have neither.
+  decided_by                  Int?
+  decided_at                  DateTime? @db.Timestamptz(6)
+  // HR-editable Feedback, but ONLY meaningful/shown for someone with no
+  // career_applications match at all (see conversation) — for a matched
+  // person, the Probation panel's Feedback field stays exactly what it
+  // already was: read-only, sourced from career_applications.feedback2.
+  // Deliberately a separate column rather than overloading feedback2's
+  // display slot, since the two have entirely different write paths (one
+  // external/read-only, one local/HR-editable) and mixing them would lose
+  // track of which source is authoritative for a given person. Written by
+  // decideProbationOutcome alongside the Confirm/Stop decision itself (see
+  // conversation — folded in so there's no "did they save the form first"
+  // ordering question against the same action's own Feedback-required check).
+  local_feedback              String?
+  users                       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_probation_user")
+  decided_by_user             users?    @relation("probation_decided_byTousers", fields: [decided_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_probation_decided_by")
+}
+
+// Live tables found on the shared hrfs database that were never declared
+// here (schema drift — added directly against the DB by something outside
+// this repo, not by anything in this codebase). Declared now, matching
+// their real live structure exactly (columns/nullability/defaults/indexes
+// confirmed via information_schema/pg_constraint), purely so `prisma db
+// push` stops treating them as extra tables to drop — this doesn't change
+// either table's actual data or structure, just makes the schema admit
+// they exist. Neither is used anywhere in this app's own code (no FK
+// constraints tie them to anything else in this schema either).
+model attendance_all {
+  id             Int       @id @default(autoincrement())
+  employee_id    String    @db.VarChar(50)
+  branch_id      Int?
+  date           DateTime  @db.Date
+  clock_in_time  DateTime? @db.Time
+  clock_out_time DateTime? @db.Time
+  status         String    @default("no record") @db.VarChar(20)
+  synced_at      DateTime  @default(now()) @db.Timestamptz(6)
+  scan_count     Int       @default(0)
+  device_name    String?
+
+  @@unique([employee_id, date], map: "uq_attendance_all_emp_date")
+  @@index([date], map: "idx_attendance_all_date")
+  @@index([branch_id], map: "idx_attendance_all_branch")
+}
+
+model od_tickets {
+  id    Int    @id @default(autoincrement())
+  name  String @unique @db.VarChar(50)
+  count Int    @default(0)
+  total Int    @default(10)
+}
+
+model documents {
+  documents_id                Int     @id @default(autoincrement())
+  user_id                     Int     @unique
+  employment_contract_file_id String? @db.VarChar(128)
+  employee_handbook_file_id   String? @db.VarChar(128)
+  users                       users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_documents_user")
+}
+
+// pcb_form is constrained to TP1/TP2/TP3 by a DB-level CHECK constraint
+// (chk_payroll_pcb_form, prisma/manual-sql/add_payroll.sql) not modeled
+// here — Prisma has no native CHECK-constraint mapping in this schema's
+// current preview features, so it's enforced purely at the Postgres level.
+model payroll {
+  payroll_id             Int     @id @default(autoincrement())
+  user_id                Int     @unique
+  epf_number             String? @db.VarChar(30)
+  socso_number           String? @db.VarChar(30)
+  eis_number             String? @db.VarChar(30)
+  tax_number             String? @db.VarChar(30)
+  pcb_form               String? @db.VarChar(3)
+  pcb_attachment_file_id String? @db.VarChar(128)
+  users                  users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payroll_user")
+}
+
+// Repeatable — an employee can have many achievements over their tenure —
+// so this follows leave_request/employee_rate_history's convention (own
+// serial PK, user_id NOT unique) rather than resume/medical_check's 1:1
+// pattern.
+model achievement {
+  achievement_id     Int       @id @default(autoincrement())
   user_id            Int
-  employee_id        String?                       @unique @db.VarChar(50)
-  branch_id          Int?
-  department_id      Int?
-  position           String?                       @db.VarChar(100)
-  start_date         DateTime?                     @db.Date
-  end_date           DateTime?                     @db.Date
-  employment_type    String?                       @db.VarChar(50)
-  status             String?                       @default("active") @db.VarChar(50)
-  probation          Boolean                       @default(false)
-  rate               String?                       @db.VarChar(100)
-  working_hours      String?                       @db.VarChar(50)
-  working_hours_json Json?
-  branch             branch?                       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
-  department         department?                   @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
-  users              users                         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employment_user")
-  schedule_versions  employment_schedule_version[]
+  name               String?   @db.VarChar(255)
+  date               DateTime? @db.Date
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_achievement_user")
+
+  @@index([user_id], map: "idx_achievement_user")
+}
+
+// Repeatable, same convention as achievement. Separate table from
+// employee_rate_history per explicit decision — see add_salary_revision.sql.
+model salary_revision {
+  salary_revision_id Int       @id @default(autoincrement())
+  user_id            Int
+  issued_date        DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  current_salary     Decimal?  @db.Decimal(10, 2)
+  new_salary         Decimal?  @db.Decimal(10, 2)
+  reason             String?
+  salary_adjustment  Decimal?  @db.Decimal(6, 2)
+  approved_by        String?   @db.VarChar(100)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_salary_revision_user")
+
+  @@index([user_id], map: "idx_salary_revision_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision.
+model promotion {
+  promotion_id       Int       @id @default(autoincrement())
+  user_id            Int
+  promotion_date     DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  current_position   String?   @db.VarChar(100)
+  new_position       String?   @db.VarChar(100)
+  reason             String?
+  approved_by        String?   @db.VarChar(100)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_promotion_user")
+
+  @@index([user_id], map: "idx_promotion_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision/promotion.
+// from_location/to_location store text (branch/department/role) per
+// explicit decision — see add_transfer.sql.
+model transfer {
+  transfer_id        Int       @id @default(autoincrement())
+  user_id            Int
+  type               String?   @db.VarChar(50)
+  effective_date     DateTime? @db.Date
+  from_location      String?   @db.VarChar(100)
+  to_location        String?   @db.VarChar(100)
+  reason             String?
+  attachment_file_id String?   @db.VarChar(128)
+  // Temporary Transfer only — the date this transfer should auto-revert the
+  // employee's Branch/Department back to from_location, and when the
+  // scheduled sweep (src/lib/transferAutomation.ts) actually did so. NULL
+  // for every other transfer type.
+  end_date           DateTime? @db.Date
+  reverted_at        DateTime? @db.Timestamptz(6)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_transfer_user")
+
+  @@index([user_id], map: "idx_transfer_user")
+}
+
+// Repeatable, same convention as achievement/salary_revision/promotion/
+// transfer. status is free-text — no canonical option list exists anywhere
+// in the mock for this field.
+model training {
+  training_id Int       @id @default(autoincrement())
+  user_id     Int
+  name        String?   @db.VarChar(255)
+  date        DateTime? @db.Date
+  status      String?   @db.VarChar(30)
+  users       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_training_user")
+
+  @@index([user_id], map: "idx_training_user")
+}
+
+// Singleton — one row per user_id, confirmed via the mock's single-form-only
+// rendering (no history list, unlike the repeatable tables above). status is
+// constrained to Active/Expired/Pending by a DB-level CHECK constraint
+// (chk_nda_status, add_nda.sql) not modeled here — same convention as
+// payroll.pcb_form.
+model nda {
+  nda_id             Int       @id @default(autoincrement())
+  user_id            Int       @unique
+  sign_date          DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  status             String?   @db.VarChar(20)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_nda_user")
+}
+
+// Singleton — one row per user_id, same convention as nda. duration is
+// free-text (e.g. "12 months") — no structured interval type used.
+model non_compete {
+  non_compete_id     Int       @id @default(autoincrement())
+  user_id            Int       @unique
+  sign_date          DateTime? @db.Date
+  expiry_date        DateTime? @db.Date
+  duration           String?   @db.VarChar(50)
+  attachment_file_id String?   @db.VarChar(128)
+  users              users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_non_compete_user")
+}
+
+// ─── Disciplinary (4 repeatable tables, same convention as
+// achievement/promotion/etc) — field configs match
+// js/disciplinary-record.js's CONFIGS map (domestic-inquiry/suspension-
+// letter/showcause-letter/pip), confirmed via the pre-existing
+// DisciplinarySection placeholder's own "+Add a record" modal pattern for
+// each. Single-line "text" fields (panel/decision/type/issued_by/status/
+// supervisor) map to varchar; "textarea" fields (case_summary/reason/
+// emp_response/improvement_goal/remark/review_result) map to text. PIP has
+// no attachment field — not in the mock's own PIP config. ───
+
+model domestic_inquiry {
+  domestic_inquiry_id Int       @id @default(autoincrement())
+  user_id             Int
+  date                DateTime? @db.Date
+  panel               String?   @db.VarChar(255)
+  case_summary        String?
+  decision            String?
+  attachment_file_id  String?   @db.VarChar(128)
+  users               users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_domestic_inquiry_user")
+
+  @@index([user_id], map: "idx_domestic_inquiry_user")
+}
+
+model suspension_letter {
+  suspension_letter_id Int       @id @default(autoincrement())
+  user_id              Int
+  start_date           DateTime? @db.Date
+  end_date             DateTime? @db.Date
+  type                 String?   @db.VarChar(100)
+  reason               String?
+  issued_by            String?   @db.VarChar(100)
+  attachment_file_id   String?   @db.VarChar(128)
+  users                users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_suspension_letter_user")
+
+  @@index([user_id], map: "idx_suspension_letter_user")
+}
+
+model showcause_warning_letter {
+  showcause_warning_letter_id Int       @id @default(autoincrement())
+  user_id                     Int
+  type                        String?   @db.VarChar(100)
+  date                        DateTime? @db.Date
+  issued_by                   String?   @db.VarChar(100)
+  status                      String?   @db.VarChar(50)
+  reason                      String?
+  emp_response                String?
+  attachment_file_id          String?   @db.VarChar(128)
+  users                       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_showcause_warning_letter_user")
+
+  @@index([user_id], map: "idx_showcause_warning_letter_user")
+}
+
+model pip {
+  pip_id           Int       @id @default(autoincrement())
+  user_id          Int
+  start_date       DateTime? @db.Date
+  end_date         DateTime? @db.Date
+  supervisor       String?   @db.VarChar(100)
+  review_result    String?
+  improvement_goal String?
+  remark           String?
+  users            users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pip_user")
+
+  @@index([user_id], map: "idx_pip_user")
+}
+
+// ─── Exit (3 singleton tables, same convention as resume/medical_check/
+// probation) — confirmed via the mock's single-form-only rendering for each
+// (no "+Add"/history list anywhere for Resignation/Reference Letter/Exit
+// Interview Notes). ───
+
+// exit_type is constrained by a DB-level CHECK constraint
+// (chk_resignation_exit_type, alter_resignation_add_exit_type.sql) not
+// modeled here — same convention as payslip.type/nda.status.
+model resignation {
+  resignation_id        Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  submission_date       DateTime? @db.Date
+  last_working_date     DateTime? @db.Date
+  reason                String?
+  resign_letter_file_id String?   @db.VarChar(128)
+  accept_letter_file_id String?   @db.VarChar(128)
+  exit_type             String?   @db.VarChar(30)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resignation_user")
+}
+
+// type is constrained to employment/reference/service by a DB-level CHECK
+// constraint (chk_reference_letter_type, add_reference_letter.sql) not
+// modeled here — same convention as nda.status.
+model reference_letter {
+  reference_letter_id   Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  request_date          DateTime? @db.Date
+  type                  String?   @db.VarChar(20)
+  issued_date           DateTime? @db.Date
+  issued_by             String?   @db.VarChar(100)
+  remark                String?
+  issued_letter_file_id String?   @db.VarChar(128)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reference_letter_user")
+}
+
+// No attachment field — not in the mock's own Exit Interview Notes panel.
+// reason is constrained to career/compensation/relocation/personal/other by
+// a DB-level CHECK constraint (chk_exit_interview_note_reason,
+// add_exit_interview_note.sql) not modeled here — same convention as
+// nda.status.
+model exit_interview_note {
+  exit_interview_note_id Int       @id @default(autoincrement())
+  user_id                Int       @unique
+  date                   DateTime? @db.Date
+  interviewer            String?   @db.VarChar(100)
+  reason                 String?   @db.VarChar(20)
+  // Free-text "please specify" answer, only meaningful when reason="other" —
+  // kept as its own column rather than reused from reason itself (unlike
+  // Showcause's Case Type/Training's Status, which merge free text back into
+  // their own single column) so `reason` stays a clean, always-one-of-5-
+  // values field for reporting/filtering (2026-08-13, see conversation).
+  reason_other            String?   @db.VarChar(255)
+  note                   String?
+  users                  users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exit_interview_note_user")
+}
+
+// ─── Exit > Clearance (Knowledge Transfer/Asset Recovery/System Revocation
+// checklists + Financial Settlement form) — per explicit design (see
+// conversation). Each checklist is a pair of tables rather than one shared
+// polymorphic table, matching this schema's existing convention of separate
+// near-identical tables per feature (domestic_inquiry/suspension_letter/
+// showcause_warning_letter/pip are the same shape for the same reason).
+//
+// "*_item" is a merged master-list + per-employee-addition table: user_id
+// NULL = a global item visible on every employee's checklist; user_id set =
+// a custom item added for that one employee only. "Apply to all" (the HR/
+// Superadmin add-item flow's own choice, see conversation) inserts with
+// user_id NULL; "Only this employee" inserts with the viewed employee's
+// user_id. Either way needs no backfill — see "*_state" below.
+//
+// "*_state" is the per-employee checked/unchecked state, one row per
+// (user_id, item_id) — deliberately NOT pre-populated for every employee ×
+// every global item; a missing row simply means unchecked. This is what
+// lets "Apply to all" reach employees who already have a checklist without
+// a migration: a brand-new global item instantly joins into everyone's
+// checklist unchecked, since there's no row to backfill in the first place.
+model exit_knowledge_transfer_item {
+  id            Int                             @id @default(autoincrement())
+  user_id       Int?
+  label         String
+  sort_order    Int                             @default(0)
+  created_by_id Int?
+  created_at    DateTime                        @default(now()) @db.Timestamptz(6)
+  user          users?                          @relation("KTItemUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_kt_item_user")
+  created_by    users?                          @relation("KTItemCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_kt_item_created_by")
+  states        exit_knowledge_transfer_state[]
+
+  @@index([user_id], map: "idx_kt_item_user")
+}
+
+model exit_knowledge_transfer_state {
+  id            Int                          @id @default(autoincrement())
+  user_id       Int
+  item_id       Int
+  checked       Boolean                      @default(false)
+  checked_at    DateTime?                    @db.Timestamptz(6)
+  checked_by_id Int?
+  user          users                        @relation("KTStateUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_kt_state_user")
+  item          exit_knowledge_transfer_item @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_kt_state_item")
+  checked_by    users?                       @relation("KTStateCheckedBy", fields: [checked_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_kt_state_checked_by")
+
+  @@unique([user_id, item_id], map: "uq_kt_state_user_item")
+  @@index([user_id], map: "idx_kt_state_user")
+}
+
+model exit_asset_recovery_item {
+  id            Int                         @id @default(autoincrement())
+  user_id       Int?
+  label         String
+  sort_order    Int                         @default(0)
+  created_by_id Int?
+  created_at    DateTime                    @default(now()) @db.Timestamptz(6)
+  user          users?                      @relation("ARItemUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ar_item_user")
+  created_by    users?                      @relation("ARItemCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ar_item_created_by")
+  states        exit_asset_recovery_state[]
+
+  @@index([user_id], map: "idx_ar_item_user")
+}
+
+model exit_asset_recovery_state {
+  id            Int                      @id @default(autoincrement())
+  user_id       Int
+  item_id       Int
+  checked       Boolean                  @default(false)
+  checked_at    DateTime?                @db.Timestamptz(6)
+  checked_by_id Int?
+  user          users                    @relation("ARStateUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ar_state_user")
+  item          exit_asset_recovery_item @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ar_state_item")
+  checked_by    users?                   @relation("ARStateCheckedBy", fields: [checked_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ar_state_checked_by")
+
+  @@unique([user_id, item_id], map: "uq_ar_state_user_item")
+  @@index([user_id], map: "idx_ar_state_user")
+}
+
+model exit_system_revocation_item {
+  id            Int                            @id @default(autoincrement())
+  user_id       Int?
+  label         String
+  sort_order    Int                            @default(0)
+  created_by_id Int?
+  created_at    DateTime                       @default(now()) @db.Timestamptz(6)
+  user          users?                         @relation("SRItemUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sr_item_user")
+  created_by    users?                         @relation("SRItemCreatedBy", fields: [created_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_item_created_by")
+  states        exit_system_revocation_state[]
+
+  @@index([user_id], map: "idx_sr_item_user")
+}
+
+model exit_system_revocation_state {
+  id            Int                         @id @default(autoincrement())
+  user_id       Int
+  item_id       Int
+  checked       Boolean                     @default(false)
+  checked_at    DateTime?                   @db.Timestamptz(6)
+  checked_by_id Int?
+  user          users                       @relation("SRStateUser", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sr_state_user")
+  item          exit_system_revocation_item @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sr_state_item")
+  checked_by    users?                      @relation("SRStateCheckedBy", fields: [checked_by_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_state_checked_by")
+
+  @@unique([user_id, item_id], map: "uq_sr_state_user_item")
+  @@index([user_id], map: "idx_sr_state_user")
+}
+
+// Form, not a checklist — singleton per employee, same convention as nda/
+// non_compete/payroll. Amount fields all nullable, matching those tables'
+// own gradually-filled-form convention (confirmed, see conversation).
+model exit_financial_settlement {
+  id                        Int       @id @default(autoincrement())
+  user_id                   Int       @unique
+  final_pay_date            DateTime? @db.Date
+  outstanding_leave_payout  Decimal?  @db.Decimal(10, 2)
+  outstanding_claims        Decimal?  @db.Decimal(10, 2)
+  loan_advance_deduction    Decimal?  @db.Decimal(10, 2)
+  notes                     String?
+  settlement_letter_file_id String?   @db.VarChar(128)
+  users                     users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exit_financial_settlement_user")
+}
+
+// ─── Employee Record singleton tables (same convention as resume/
+// medical_check/probation) ───
+
+// Repeatable — confirmed via the mock's own real "Add Another" button
+// (pinfo_guardianInfo.html, id="add-guardian-btn") — same convention as
+// achievement/salary_revision (own serial PK, user_id NOT unique, indexed).
+model guardian_info {
+  guardian_info_id Int     @id @default(autoincrement())
+  user_id          Int
+  name             String? @db.VarChar(255)
+  relationship     String? @db.VarChar(50)
+  gender           String? @db.VarChar(20)
+  email            String? @db.VarChar(255)
+  phone            String? @db.VarChar(30)
+  address          String?
+  users            users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_guardian_info_user")
+
+  @@index([user_id], map: "idx_guardian_info_user")
+}
+
+// payment_method/payment_frequency are constrained by DB-level CHECK
+// constraints (chk_payment_info_method/chk_payment_info_frequency,
+// add_payment_info.sql) not modeled here — same convention as
+// nda.status/payroll.pcb_form. Deliberately separate from bank_details,
+// which backs the same Payment & Bank Info page's "Bank Details" subsection.
+model payment_info {
+  payment_info_id   Int       @id @default(autoincrement())
+  user_id           Int       @unique
+  payment_method    String?   @db.VarChar(20)
+  payment_frequency String?   @db.VarChar(20)
+  pay_date          DateTime? @db.Date
+  remark            String?
+  users             users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payment_info_user")
+}
+
+// overall_rating is constrained by a DB-level CHECK constraint
+// (chk_performance_review_rating, add_performance_review.sql) not modeled
+// here — same convention as nda.status.
+// Repeatable — one row per review (newest first), same shape as
+// salary_revision — Active Employment's "Performance Review" form shows the
+// latest row, with all rows listed in the "Performance Review History"
+// table below.
+model performance_review {
+  performance_review_id Int       @id @default(autoincrement())
+  user_id               Int
+  period                String?   @db.VarChar(50)
+  review_date           DateTime? @db.Date
+  reviewer              String?   @db.VarChar(100)
+  overall_rating        String?   @db.VarChar(30)
+  comment               String?
+  attachment_file_id    String?   @db.VarChar(128)
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_performance_review_user")
+
+  @@index([user_id], map: "idx_performance_review_user")
+}
+
+// Deliberately separate from the existing payroll model (EPF/SOCSO/EIS/Tax/
+// PCB) — backs a different subsection (Basic Pay/Payslip) of a different
+// tab (Finance > Payroll/Payslip vs. Onboarding's own Payroll/Finance > Tax
+// Info). type is constrained by a DB-level CHECK constraint
+// (chk_payslip_type, add_payslip.sql) not modeled here — same convention as
+// nda.status.
+// attachment_file_id is retired, per explicit decision (see conversation)
+// — the single-upload Payslip widget it backed is replaced by the
+// payslip_history table below (many rows per user, one per month). Left in
+// place rather than dropped (no code writes to it anymore, and it was
+// already null for every real employee — confirmed 0 real uploads existed
+// at retirement time), same "leave old columns in place" convention as
+// payroll/nda elsewhere in this schema. basic_pay/type are UNCHANGED —
+// still this table's own fields, still backing Finance > Payroll/Payslip's
+// "Basic Pay" subsection exactly as before.
+model payslip {
+  payslip_id         Int      @id @default(autoincrement())
+  user_id            Int      @unique
+  basic_pay          Decimal? @db.Decimal(10, 2)
+  type               String?  @db.VarChar(20)
+  attachment_file_id String?  @db.VarChar(128)
+  users              users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payslip_user")
+}
+
+// Payslip History — Finance > Payroll/Payslip's "Payslip" subsection,
+// replacing the old single-upload attachment_file_id above (see its own
+// comment) — repeatable (many rows per user, one per month), following the
+// same shape as achievement/training (own serial PK, user_id NOT unique).
+// month is "YYYY-MM" text (e.g. "2026-08"), not a DATE column — a payslip
+// covers a whole calendar month, not a specific day, and this stays
+// trivially sortable/comparable as plain text without needing a synthetic
+// day-of-month. upload_date is set once at creation (server-side
+// new Date(), not user-entered) and never updated after — add + delete
+// only (same as Training), no in-place edit action exists for it (see
+// addPayslipHistory/deletePayslipHistory in employeeRecordActions.ts).
+model payslip_history {
+  payslip_history_id Int      @id @default(autoincrement())
+  user_id            Int
+  month              String   @db.VarChar(7)
+  attachment_file_id String   @db.VarChar(128)
+  upload_date        DateTime @default(now()) @db.Date
+  users              users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payslip_history_user")
+
+  @@index([user_id], map: "idx_payslip_history_user")
+}
+
+model employment {
+  employment_id        Int                           @id @default(autoincrement())
+  user_id              Int
+  employee_id          String?                       @unique @db.VarChar(50)
+  branch_id            Int?
+  department_id        Int?
+  position             String?                       @db.VarChar(100)
+  start_date           DateTime?                     @db.Date
+  end_date             DateTime?                     @db.Date
+  employment_type      String?                       @db.VarChar(50)
+  status               String?                       @default("active") @db.VarChar(50)
+  probation            Boolean                       @default(false)
+  rate                 String?                       @db.VarChar(100)
+  working_hours        String?                       @db.VarChar(50)
+  working_hours_json   Json?
+  // Pre stage's Personal Info "Signed Offer Letter" upload — real Google
+  // Drive file id, same convention as resume.resume_file_id.
+  offer_letter_file_id String?                       @db.VarChar(128)
+  branch               branch?                       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_branch")
+  department           department?                   @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employment_department")
+  users                users                         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employment_user")
+  schedule_versions    employment_schedule_version[]
 }
 
 model employment_schedule_version {
@@ -188,70 +784,141 @@ model password_reset_token {
 }
 
 model role {
-  role_id   Int     @id @default(autoincrement())
-  role_type String  @unique @db.VarChar(50)
-  users     users[]
+  role_id         Int               @id @default(autoincrement())
+  role_type       String            @unique @db.VarChar(50)
+  users           users[]
+  role_permission role_permission[]
+}
+
+/// DB-editable RBAC matrix: capability + scope per (role, subtype, feature, action).
+/// subtype = "" applies to the whole role; else a department_code (department role)
+/// or a position (staff role). Seeded by scripts/access-rbac-phase1.sql.
+model role_permission {
+  id          Int      @id @default(autoincrement())
+  role_id     Int
+  subtype     String   @default("") @db.VarChar(30)
+  feature_key String   @db.VarChar(40)
+  action      String   @db.VarChar(10)
+  allowed     Boolean  @default(false)
+  scope       String   @default("own") @db.VarChar(10)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  role        role     @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_role_permission_role")
+
+  @@unique([role_id, subtype, feature_key, action], map: "uq_role_permission")
+  @@index([role_id, subtype], map: "idx_role_permission_lookup")
 }
 
 model user_profile {
-  profile_id        Int                 @id @default(autoincrement())
-  user_id           Int                 @unique
-  full_name         String              @db.VarChar(255)
-  nick_name         String?             @db.VarChar(255)
-  gender            String?             @db.VarChar(20)
-  dob               DateTime?           @db.Date
-  phone             String?             @db.VarChar(30)
-  nationality       String?             @db.VarChar(100)
-  nric              String?             @unique @db.VarChar(30)
-  home_address      String?
-  manpower_schedule manpower_schedule[]
-  users             users               @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profile_user")
+  profile_id                   Int                            @id @default(autoincrement())
+  user_id                      Int                            @unique
+  full_name                    String                         @db.VarChar(255)
+  nick_name                    String?                        @db.VarChar(255)
+  gender                       String?                        @db.VarChar(20)
+  dob                          DateTime?                      @db.Date
+  phone                        String?                        @db.VarChar(30)
+  nationality                  String?                        @db.VarChar(100)
+  nric                         String?                        @unique @db.VarChar(30)
+  home_address                 String?
+  university                   String?                        @db.VarChar(255)
+  programme                    String?                        @db.VarChar(255)
+  qualification                String?                        @db.VarChar(255)
+  manpower_schedule            manpower_schedule[]
+  manpower_schedule_attendance manpower_schedule_attendance[]
+  users                        users                          @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profile_user")
 }
 
 model users {
-  user_id                                        Int                          @id @default(autoincrement())
-  email                                          String                       @unique @db.VarChar(255)
-  password                                       String?                      @db.VarChar(255)
+  user_id                                        Int                             @id @default(autoincrement())
+  email                                          String                          @unique @db.VarChar(255)
+  password                                       String?                         @db.VarChar(255)
   role_id                                        Int
-  status                                         String?                      @default("active") @db.VarChar(50)
-  last_login                                     DateTime?                    @db.Timestamptz(6)
-  created_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
-  updated_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
-  deleted_at                                     DateTime?                    @db.Timestamptz(6)
+  status                                         String?                         @default("active") @db.VarChar(50)
+  // Per-account override for the Employee Overview/Record department/branch
+  // scope rule (see add_users_is_full_access.sql) — lets a specific account
+  // (e.g. hr@ebright.my, whose role_type is "department" rather than "hr" for
+  // unrelated historical reasons — ~30 other places already key off that
+  // exact role_type string, so changing it risked side effects elsewhere)
+  // see every employee without altering role_type. role_type "hr"/"superadmin"
+  // already imply full access on their own; this is only for exceptions.
+  is_full_access                                 Boolean                         @default(false)
+  last_login                                     DateTime?                       @db.Timestamptz(6)
+  created_at                                     DateTime                        @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime                        @default(now()) @db.Timestamptz(6)
+  deleted_at                                     DateTime?                       @db.Timestamptz(6)
+  achievement                                    achievement[]
   attendance                                     attendance[]
-  attendance_justifications_authored             attendance_justification[]   @relation("justification_by")
-  attendance_justifications_for_user             attendance_justification[]   @relation("justification_for_user")
+  attendance_justifications_authored             attendance_justification[]      @relation("justification_by")
+  attendance_justifications_for_user             attendance_justification[]      @relation("justification_for_user")
   attendance_log                                 attendance_log[]
   bank_details                                   bank_details?
   claim                                          claim[]
+  documents                                      documents?
+  domestic_inquiry                               domestic_inquiry[]
   emergency_contact                              emergency_contact[]
   employee_rate_history                          employee_rate_history[]
   employment                                     employment[]
-  induction_buddy_for                            induction_profile[]          @relation("inductionBuddy")
-  induction_created                              induction_profile[]          @relation("inductionCreatedBy")
-  induction_profile                              induction_profile?           @relation("inductionProfile")
-  induction_request_triggered_by                 induction_request[]          @relation("induction_request_triggered_by")
-  induction_request_user                         induction_request?           @relation("induction_request_user")
-  induction_completed                            induction_step[]             @relation("inductionCompletedBy")
-  induction_responsible                          induction_step[]             @relation("inductionResponsible")
-  leave_request_leave_request_approved_byTousers leave_request[]              @relation("leave_request_approved_byTousers")
-  leave_request_leave_request_user_idTousers     leave_request[]              @relation("leave_request_user_idTousers")
+  induction_buddy_for                            induction_profile[]             @relation("inductionBuddy")
+  induction_created                              induction_profile[]             @relation("inductionCreatedBy")
+  induction_profile                              induction_profile?              @relation("inductionProfile")
+  induction_request_triggered_by                 induction_request[]             @relation("induction_request_triggered_by")
+  induction_request_user                         induction_request?              @relation("induction_request_user")
+  induction_completed                            induction_step[]                @relation("inductionCompletedBy")
+  induction_responsible                          induction_step[]                @relation("inductionResponsible")
+  interview_assessment                           interview_assessment?
+  leave_request_leave_request_approved_byTousers leave_request[]                 @relation("leave_request_approved_byTousers")
+  leave_request_leave_request_user_idTousers     leave_request[]                 @relation("leave_request_user_idTousers")
   manpower_cost_report                           manpower_cost_report[]
+  medical_check                                  medical_check?
+  nda                                            nda?
+  non_compete                                    non_compete?
   offboarding_audit_actor                        offboarding_audit_log[]
-  offboarding_case_assigned_hr                   offboarding_case[]           @relation("OffboardingCaseAssignedHR")
-  offboarding_case_created                       offboarding_case[]           @relation("OffboardingCaseCreatedBy")
-  offboarding_case_finance_processed             offboarding_case[]           @relation("OffboardingCaseFinanceProcessor")
-  offboarding_case_supervisor                    offboarding_case[]           @relation("OffboardingCaseSupervisor")
-  offboarding_case_user                          offboarding_case[]           @relation("OffboardingCaseUser")
+  offboarding_case_assigned_hr                   offboarding_case[]              @relation("OffboardingCaseAssignedHR")
+  offboarding_case_created                       offboarding_case[]              @relation("OffboardingCaseCreatedBy")
+  offboarding_case_finance_processed             offboarding_case[]              @relation("OffboardingCaseFinanceProcessor")
+  offboarding_case_supervisor                    offboarding_case[]              @relation("OffboardingCaseSupervisor")
+  offboarding_case_user                          offboarding_case[]              @relation("OffboardingCaseUser")
   offboarding_checklist_completed                offboarding_checklist_item[]
   password_reset_token                           password_reset_token[]
-  assigned_recommendations                       recommendation[]             @relation("recommendation_assigned_to")
+  payroll                                        payroll?
+  pip                                            pip[]
+  probation_record                               probation?
+  probation_decisions_made                       probation[]                     @relation("probation_decided_byTousers")
+  promotion                                      promotion[]
+  assigned_recommendations                       recommendation[]                @relation("recommendation_assigned_to")
+  reference_check                                reference_check?
+  resume                                         resume?
+  salary_revision                                salary_revision[]
+  showcause_warning_letter                       showcause_warning_letter[]
+  suspension_letter                              suspension_letter[]
+  training                                       training[]
+  transfer                                       transfer[]
   user_profile                                   user_profile?
-  role                                           role                         @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_role")
-  workflow_assignments_by                        workflow_assignment[]        @relation("WorkflowAssignmentAssignedBy")
-  workflow_assignments_user                      workflow_assignment[]        @relation("WorkflowAssignmentUser")
+  role                                           role                            @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_role")
+  workflow_assignments_by                        workflow_assignment[]           @relation("WorkflowAssignmentAssignedBy")
+  workflow_assignments_user                      workflow_assignment[]           @relation("WorkflowAssignmentUser")
   workflow_assignment_steps_completed            workflow_assignment_step[]
-  workflow_templates_created                     workflow_template[]          @relation("WorkflowTemplateCreatedBy")
+  workflow_templates_created                     workflow_template[]             @relation("WorkflowTemplateCreatedBy")
+  resignation                                    resignation?
+  reference_letter                               reference_letter?
+  exit_interview_note                            exit_interview_note?
+  guardian_info                                  guardian_info[]
+  payment_info                                   payment_info?
+  performance_review                             performance_review[]
+  payslip                                        payslip?
+  payslip_history                                payslip_history[]
+  exit_knowledge_transfer_items_owned            exit_knowledge_transfer_item[]  @relation("KTItemUser")
+  exit_knowledge_transfer_items_created          exit_knowledge_transfer_item[]  @relation("KTItemCreatedBy")
+  exit_knowledge_transfer_states                 exit_knowledge_transfer_state[] @relation("KTStateUser")
+  exit_knowledge_transfer_states_checked         exit_knowledge_transfer_state[] @relation("KTStateCheckedBy")
+  exit_asset_recovery_items_owned                exit_asset_recovery_item[]      @relation("ARItemUser")
+  exit_asset_recovery_items_created              exit_asset_recovery_item[]      @relation("ARItemCreatedBy")
+  exit_asset_recovery_states                     exit_asset_recovery_state[]     @relation("ARStateUser")
+  exit_asset_recovery_states_checked             exit_asset_recovery_state[]     @relation("ARStateCheckedBy")
+  exit_system_revocation_items_owned             exit_system_revocation_item[]   @relation("SRItemUser")
+  exit_system_revocation_items_created           exit_system_revocation_item[]   @relation("SRItemCreatedBy")
+  exit_system_revocation_states                  exit_system_revocation_state[]  @relation("SRStateUser")
+  exit_system_revocation_states_checked          exit_system_revocation_state[]  @relation("SRStateCheckedBy")
+  exit_financial_settlement                      exit_financial_settlement?
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -483,21 +1150,66 @@ model annual_leave_record {
 }
 
 model manpower_schedule {
-  mp_schedule_id       Int                  @id @default(autoincrement())
-  date                 DateTime             @db.Date
-  slot_id              Int
-  position_id          Int
-  profile_id           Int
-  schedule_type        String               @default("planning") @db.VarChar(10)
-  updated_at           DateTime             @default(now()) @updatedAt @db.Timestamp(6)
-  branch_duty_position branch_duty_position @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_position")
-  user_profile         user_profile         @relation(fields: [profile_id], references: [profile_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_profile")
-  slot                 slot                 @relation(fields: [slot_id], references: [slot_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_slot")
+  mp_schedule_id  Int             @id @default(autoincrement())
+  date            DateTime        @db.Date
+  slot_id         Int
+  position_id     Int
+  profile_id      Int
+  schedule_type   String          @default("planning") @db.VarChar(10)
+  updated_at      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+  branch_position branch_position @relation(fields: [position_id], references: [branch_position_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_position")
+  user_profile    user_profile    @relation(fields: [profile_id], references: [profile_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_profile")
+  slot            slot            @relation(fields: [slot_id], references: [slot_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mps_slot")
 
   @@unique([date, slot_id, position_id, schedule_type], map: "uq_mps_date_slot_position_type")
   @@index([date], map: "idx_mps_date")
   @@index([profile_id], map: "idx_mps_profile")
   @@index([schedule_type], map: "idx_mps_schedule_type")
+}
+
+// Per-slot remark for a manpower schedule. A remark belongs to a whole
+// (date, slot, schedule_type) — NOT to any one staff assignment — so it is
+// stored separately from manpower_schedule (which is per date+slot+position).
+// This lets a slot carry a remark even when nobody is assigned to it.
+model manpower_schedule_note {
+  note_id       Int      @id @default(autoincrement())
+  date          DateTime @db.Date
+  slot_id       Int
+  schedule_type String   @default("planning") @db.VarChar(10)
+  remark        String
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  slot          slot     @relation(fields: [slot_id], references: [slot_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_msn_slot")
+
+  @@unique([date, slot_id, schedule_type], map: "uq_msn_date_slot_type")
+  @@index([date], map: "idx_msn_date")
+}
+
+model manpower_schedule_attendance {
+  attendance_id Int          @id @default(autoincrement())
+  date          DateTime     @db.Date
+  profile_id    Int
+  branch_id     Int
+  status        String       @db.VarChar(10)
+  locked        Boolean      @default(false)
+  updated_at    DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+  user_profile  user_profile @relation(fields: [profile_id], references: [profile_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_msa_profile")
+  branch        branch       @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_msa_branch")
+
+  @@unique([date, profile_id], map: "uq_msa_date_profile")
+  @@index([date], map: "idx_msa_date")
+  @@index([branch_id], map: "idx_msa_branch")
+}
+
+model manpower_attendance_day_lock {
+  day_lock_id Int      @id @default(autoincrement())
+  branch_id   Int
+  date        DateTime @db.Date
+  locked      Boolean  @default(true)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  branch      branch   @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_madl_branch")
+
+  @@unique([branch_id, date], map: "uq_madl_branch_date")
+  @@index([date], map: "idx_madl_date")
 }
 
 model schedule_period_status {
@@ -681,19 +1393,37 @@ model announcement {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model branch_duty_position {
-  position_id       Int                 @id @default(autoincrement())
-  branch_id         Int
-  week_start_date   DateTime            @db.Date
-  position_label    String              @db.VarChar(50)
-  position_type     String              @db.VarChar(20)
-  display_order     Int                 @default(0)
-  is_active         Boolean             @default(true)
-  branch            branch              @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_bdp_branch")
-  manpower_schedule manpower_schedule[]
+// A branch's duty-position DEFINITIONS — stable, one row per seat per branch
+// (e.g. "Coach 1" for branch 7 exists once, forever). position_type is the
+// authoritative category; seat_number is the ordinal within that type.
+model branch_position {
+  branch_position_id Int                   @id @default(autoincrement())
+  branch_id          Int
+  position_type      String                @db.VarChar(20)
+  seat_number        Int
+  position_label     String                @db.VarChar(50)
+  display_order      Int                   @default(0)
+  branch             branch                @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_bp_branch")
+  manpower_schedule  manpower_schedule[]
+  days               branch_position_day[]
 
-  @@unique([branch_id, week_start_date, position_label], map: "uq_bdp_label")
-  @@index([branch_id, week_start_date], map: "idx_bdp_branch_week")
+  @@unique([branch_id, position_type, seat_number], map: "uq_bp_branch_type_seat")
+  @@index([branch_id], map: "idx_bp_branch")
+}
+
+// Per-DAY activation of a branch_position — lets seat COUNTS vary per calendar
+// date (activate Coach 1-3 on Mon, Coach 1-4 on Sat) without duplicating the
+// position definitions. Absence of a row for a date means that date hasn't been
+// set up yet (seed by cloning the same weekday of the previous week).
+model branch_position_day {
+  branch_position_day_id Int             @id @default(autoincrement())
+  branch_position_id     Int
+  date                   DateTime        @db.Date
+  is_active              Boolean         @default(true)
+  branch_position        branch_position @relation(fields: [branch_position_id], references: [branch_position_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bpd_position")
+
+  @@unique([branch_position_id, date], map: "uq_bpd_position_date")
+  @@index([date], map: "idx_bpd_date")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -758,14 +1488,15 @@ model manpower_cost_report {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model slot {
-  slot_id                 Int                  @id @default(autoincrement())
+  slot_id                 Int                      @id @default(autoincrement())
   branch_operating_day_id Int
-  slot_start              DateTime             @db.Time(6)
-  slot_end                DateTime             @db.Time(6)
-  slot_type               String               @db.VarChar(20)
+  slot_start              DateTime                 @db.Time(6)
+  slot_end                DateTime                 @db.Time(6)
+  slot_type               String                   @db.VarChar(20)
   sequence_no             Int
   manpower_schedule       manpower_schedule[]
-  branch_operating_day    branch_operating_day @relation(fields: [branch_operating_day_id], references: [branch_operating_day_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_slot_bod")
+  manpower_schedule_note  manpower_schedule_note[]
+  branch_operating_day    branch_operating_day     @relation(fields: [branch_operating_day_id], references: [branch_operating_day_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_slot_bod")
 
   @@index([branch_operating_day_id], map: "idx_slot_bod")
 }

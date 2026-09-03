@@ -5,9 +5,11 @@
 
 import { getUsersByIds } from "@/task-manager/lib/users";
 import { prisma } from "@/task-manager/prisma";
+import type { NoClaimGroup, NoClaimIncentivePayload, NoClaimPerson } from "../ui/types";
 import {
   BRANCH_STAFF_ROLES,
   bucketOf,
+  clampWindowToMonthDays,
   countBuckets,
   fetchPeriodBlocks,
   formatLocalDate,
@@ -15,6 +17,7 @@ import {
   groupBranchesByRegion,
   groupByAssignerRole,
   groupByDimension,
+  memberSortRank,
   withAllDepartments,
   resolveWindow,
   sortTaskRows,
@@ -24,6 +27,7 @@ import {
   type BucketCounts,
   type EntityCounts,
   type Period,
+  type PeriodWindow,
   type TaskRow,
 } from "./_lib";
 
@@ -74,7 +78,7 @@ export interface MePayload {
   streams: TaskStreamPayload[];
   /** Delegated rows carry the ASSIGNEE's name (unlike `tasks`/`streams`,
    *  where the assignee is always `me`) — the CEO's task table's "PIC"
-   *  column, and HOD's "Tasks I Assigned" card, both need to show who. */
+   *  column, and HOD's "Task Assignment" card, both need to show who. */
   delegated: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
   /** Same as streams/delegated but ALL-TIME — the un-periodized overview
    *  cards ("CEO Tasks", "HOD assigned tasks": not daily or monthly). */
@@ -90,16 +94,29 @@ export interface MePayload {
   adhocAll: { totals: BucketCounts; tasks: DrillTaskRow[] } | null;
 }
 
-/** Personal overview: my blocks, split by assigner role, plus delegated work. */
+/** Personal overview: my blocks, split by assigner role, plus delegated work.
+ *
+ *  `strictWindow` (2026-07-28, the personal view's date filters): the
+ *  periodized `mine`/`delegated` sets must belong to the SELECTED day/month
+ *  (dueAt-else-startedAt), not to every day — same rule as the entity/org
+ *  payloads. The all-time sets (`streamsAll`/`delegatedAll`/`adhocAll`) are
+ *  never windowed either way. Off = the original wide semantics (all
+ *  same-cadence blocks) — kept for the CEO's combined list and the Home
+ *  dashboard's personal progress card. */
 export async function getMePayload(
   user: MeUser,
   period: Period,
   date?: string,
+  opts: { strictWindow?: boolean; monthDays?: { from: number; to: number } } = {},
 ): Promise<MePayload> {
-  const window = resolveWindow(period, date);
+  let window = resolveWindow(period, date);
+  if (opts.monthDays) {
+    window = clampWindowToMonthDays(window, opts.monthDays.from, opts.monthDays.to);
+  }
+  const strictWindow = opts.strictWindow ?? false;
   const [mine, delegatedBlocks, mineAll, delegatedAllBlocks] = await Promise.all([
-    fetchPeriodBlocks(window, { assigneeId: user.id }),
-    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id }),
+    fetchPeriodBlocks(window, { assigneeId: user.id, strictWindow }),
+    fetchPeriodBlocks(window, { startedById: user.id, excludeAssigneeId: user.id, strictWindow }),
     fetchPeriodBlocks(null, { assigneeId: user.id }),
     fetchPeriodBlocks(null, { startedById: user.id, excludeAssigneeId: user.id }),
   ]);
@@ -108,9 +125,19 @@ export async function getMePayload(
     getUsersByIds(mineAll.map((b) => b.run.startedById)),
     getAssigneeMap([...delegatedBlocks, ...delegatedAllBlocks]),
   ]);
-  // `mine`/`mineAll` are always assigned to `user` — no lookup needed.
+  // `mine`/`mineAll` are always assigned to `user` — no lookup needed for
+  // the assignee; the ASSIGNER's name (the "Assigned by" column,
+  // 2026-07-30) resolves via the starters map (built from mineAll, a
+  // superset of every windowed subset).
   const toMine = (blocks: typeof mine): DrillTaskRow[] =>
-    sortTaskRows(blocks.map(toTaskRow)).map((t) => ({ ...t, assigneeName: user.name }));
+    sortTaskRows(
+      blocks.map((b) => ({
+        ...toTaskRow(b),
+        assigneeName: user.name,
+        assignerName: starters.get(b.run.startedById)?.name ?? null,
+        assignerRole: starters.get(b.run.startedById)?.role ?? null,
+      })),
+    );
   const toStreams = (blocks: typeof mine) =>
     groupByAssignerRole(blocks, user.id, (id) => starters.get(id)?.role).map((s) => ({
       key: s.key,
@@ -124,6 +151,10 @@ export async function getMePayload(
           tasks: sortTaskRows(blocks.map(toTaskRow)).map((t) => ({
             ...t,
             assigneeName: delegatedAssignees.get(t.assigneeId)?.name ?? t.assigneeId,
+            // These rows are always started by `user` themselves (delegatedAll
+            // is filtered to startedById: user.id) — no lookup needed, unlike
+            // toMine/buildEntityPayload above.
+            assignerRole: user.role,
           })),
         }
       : null;
@@ -131,6 +162,19 @@ export async function getMePayload(
     const adhoc = blocks.filter((b) => b.cadence === "ADHOC");
     return adhoc.length > 0 ? { totals: countBuckets(adhoc), tasks: toMine(adhoc) } : null;
   };
+  // HOD/CEO-assigned tasks belong exclusively to their own personal "HOD/CEO
+  // Assigned Task" card (2026-08-19) — the streams/streamsAll breakdown
+  // below (built from the UNFILTERED mine/mineAll) is what actually powers
+  // that card (see personalStreamEntity, page.tsx), so only the plain
+  // Daily/Monthly totals/tasks here are filtered, not streams — filtering
+  // both would empty out the HOD/CEO Assigned card this is meant to keep,
+  // not just deduplicate the Daily one.
+  const excludeHodCeoStarted = (blocks: typeof mine) =>
+    blocks.filter((b) => {
+      const r = starters.get(b.run.startedById)?.role;
+      return r !== "HOD" && r !== "CEO";
+    });
+  const mineForDaily = excludeHodCeoStarted(mine);
 
   return {
     me: {
@@ -141,8 +185,8 @@ export async function getMePayload(
       branch: user.branch,
       employmentType: user.employmentType,
     },
-    totals: countBuckets(mine),
-    tasks: toMine(mine),
+    totals: countBuckets(mineForDaily),
+    tasks: toMine(mineForDaily),
     streams: toStreams(mine),
     delegated: toDelegated(delegatedBlocks),
     streamsAll: toStreams(mineAll),
@@ -159,30 +203,111 @@ export interface EntityPayload {
   members: MemberRollup[];
 }
 
-/** Entity detail: per-bucket task lists + member rollups for one branch/department. */
-export async function getEntityPayload(
+/** Shared core: entity-scoped task list + roster-first member rollups, for
+ *  ANY window (a real Daily/Monthly date window, or `null` for all-time —
+ *  see getEntityHodAssignedPayload below). `assignerRole`, when given,
+ *  further restricts to blocks whose run was started by a user with that
+ *  exact role (2026-08-12, powers the "HOD Assigned Task" filter) — applied
+ *  AFTER entity-membership scoping, via the same getUsersByIds lookup
+ *  pattern getMePayload's delegated sets already use for assigner info. */
+/** Branch Exec/Coach are Daily-ONLY roles app-wide (2026-07-29 final spec —
+ *  see role-views.ts's BRANCH_MEMBER/COACH weekdayRange) — they never have
+ *  Monthly or Ad hoc obligations, by design. `excludeDailyOnlyBranchRoles`
+ *  (2026-08-18) keeps them out of the Monthly/Ad hoc ROSTER too (branch
+ *  type only), so the manager's own Branch Overview grid doesn't show an
+ *  always-empty "No tasks this period" card for a role that structurally
+ *  can't have any there — Daily is unaffected, they still appear there. */
+const DAILY_ONLY_BRANCH_EMPLOYMENT_TYPES = ["Branch Exec", "Coach"] as const;
+
+async function buildEntityPayload(
   type: "branch" | "department",
   name: string,
-  period: Period,
-  date?: string,
+  window: PeriodWindow | null,
+  opts: {
+    strictWindow?: boolean;
+    assignerRole?: string;
+    adhocOnly?: boolean;
+    excludeDailyOnlyBranchRoles?: boolean;
+    /** Narrow the roster to exactly this role (2026-08-18, "CEO Assigned
+     *  Task" — CEO only ever assigns to HOD, so no other department member
+     *  is ever a valid recipient; showing the whole roster zero-filled for
+     *  everyone else was confusing clutter, not a real "no tasks" state).
+     *  Overrides the default DEPT_SITE/BRANCH_SITE-exclusion role filter
+     *  entirely rather than combining with it. */
+    restrictRosterToRole?: import("@/generated/task-manager-client").Role;
+    /** Exclude HOD/CEO-started blocks (2026-08-19, getEntityPayload's Daily/
+     *  Monthly only) — those tasks belong EXCLUSIVELY to their own "HOD/CEO
+     *  Assigned Task" section (getEntityHodAssignedPayload/
+     *  getEntityCeoAssignedPayload's assignerRole filter), not duplicated
+     *  into the recipient's regular Daily/Monthly list too. Never set by the
+     *  all-time assigned-task/ad-hoc callers — they WANT HOD/CEO-started
+     *  blocks, this option would be self-defeating there. */
+    excludeHodCeoAssigned?: boolean;
+  } = {},
 ): Promise<EntityPayload> {
-  const window = resolveWindow(period, date);
-  // strictWindow: this payload feeds the date-filterable entity overviews —
-  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
-  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
-  const all = await fetchPeriodBlocks(window, { strictWindow: true });
+  const excludeDailyOnly = type === "branch" && opts.excludeDailyOnlyBranchRoles;
+  const roleFilter: {
+    role:
+      | import("@/generated/task-manager-client").Role
+      | { notIn: import("@/generated/task-manager-client").Role[] };
+  } = opts.restrictRosterToRole
+    ? { role: opts.restrictRosterToRole }
+    : { role: { notIn: ["DEPT_SITE", "BRANCH_SITE"] } };
+  let assigneeIdIn: string[] | undefined;
+  if (window === null) {
+    const rosterIds = await prisma.user.findMany({
+      where: {
+        ...(type === "branch"
+          ? { branch: name === UNASSIGNED ? null : name }
+          : { department: name === UNASSIGNED ? null : name }),
+        ...roleFilter,
+        ...(excludeDailyOnly ? { employmentType: { notIn: [...DAILY_ONLY_BRANCH_EMPLOYMENT_TYPES] } } : {}),
+      },
+      select: { id: true },
+    });
+    assigneeIdIn = rosterIds.map((u) => u.id);
+  }
+  const all = await fetchPeriodBlocks(window, { strictWindow: opts.strictWindow ?? false, assigneeIdIn });
   const users = await getAssigneeMap(all);
 
   // Scope to this entity via the assignee's branch/department (null → Unassigned).
-  const blocks = all.filter(
-    (b) => (users.get(b.assigneeId)?.[type] || UNASSIGNED) === name,
-  );
+  let blocks = all.filter((b) => (users.get(b.assigneeId)?.[type] || UNASSIGNED) === name);
+
+  // Starters (assigner) lookup — hoisted unconditionally (2026-08-19, was
+  // only fetched conditionally for the assignerRole/adhocOnly filters below)
+  // so every row can carry assignerRole for isDueDayLockExemptRole, not just
+  // the two filtered call shapes.
+  const starters = await getUsersByIds(blocks.map((b) => b.run.startedById));
+  if (opts.assignerRole) {
+    blocks = blocks.filter((b) => starters.get(b.run.startedById)?.role === opts.assignerRole);
+  }
+  if (opts.excludeHodCeoAssigned) {
+    blocks = blocks.filter((b) => {
+      const r = starters.get(b.run.startedById)?.role;
+      return r !== "HOD" && r !== "CEO";
+    });
+  }
+  // Same OR-based criteria as getAdhocPayload below (started by a Branch
+  // Manager, OR explicitly cadence-tagged ADHOC) — applied after entity-
+  // membership scoping, same layering as the assignerRole filter above.
+  if (opts.adhocOnly) {
+    blocks = blocks.filter((b) => starters.get(b.run.startedById)?.role === "BRANCH" || b.cadence === "ADHOC");
+  }
+  // Real (non-null) windows skip the assigneeIdIn pre-filter above (it's
+  // only computed for window === null), so Monthly needs its own pass here.
+  if (excludeDailyOnly && window !== null) {
+    blocks = blocks.filter((b) => {
+      const et = users.get(b.assigneeId)?.employmentType;
+      return et !== "Branch Exec" && et !== "Coach";
+    });
+  }
 
   const tasks: Record<Bucket, DrillTaskRow[]> = { completed: [], pending: [], na: [] };
   for (const b of blocks) {
     tasks[bucketOf(b.status)].push({
       ...toTaskRow(b),
       assigneeName: users.get(b.assigneeId)?.name ?? b.assigneeId,
+      assignerRole: starters.get(b.run.startedById)?.role ?? null,
     });
   }
   tasks.completed = sortTaskRows(tasks.completed);
@@ -203,7 +328,8 @@ export async function getEntityPayload(
       ...(type === "branch"
         ? { branch: name === UNASSIGNED ? null : name }
         : { department: name === UNASSIGNED ? null : name }),
-      role: { notIn: ["DEPT_SITE", "BRANCH_SITE"] },
+      ...roleFilter,
+      ...(excludeDailyOnly ? { employmentType: { notIn: [...DAILY_ONLY_BRANCH_EMPLOYMENT_TYPES] } } : {}),
     },
   });
   const rosterById = new Map(roster.map((u) => [u.id, u]));
@@ -225,13 +351,96 @@ export async function getEntityPayload(
         employmentType: u?.employmentType ?? null,
         department: u?.department ?? null,
         branch: u?.branch ?? null,
+        // Not emitted on the wire — sort key only (see the sort below).
+        _rank: memberSortRank(u?.employmentType, u?.coachSchedule),
         done: tally.done,
         notDone: tally.notDone,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Role priority first (HOD → HQ Exec → Full Time → Part Time → Intern;
+    // Manager → Branch Exec → FT Coach → PT Coach), then name — the
+    // 2026-07-25 roster-ordering decision. memberSortRank in _lib.ts.
+    .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
+    .map(({ _rank, ...member }) => member);
 
   return { totals: countBuckets(blocks), tasks, members };
+}
+
+/** Entity detail: per-bucket task lists + member rollups for one branch/
+ *  department, for a real Daily/Monthly date window. */
+export async function getEntityPayload(
+  type: "branch" | "department",
+  name: string,
+  period: Period,
+  date?: string,
+  monthDays?: { from: number; to: number },
+): Promise<EntityPayload> {
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
+  // strictWindow: this payload feeds the date-filterable entity overviews —
+  // a DAILY-tagged task must belong to the SELECTED day (dueAt, else
+  // startedAt), not to every day; see PeriodBlockFilter.strictWindow.
+  return buildEntityPayload(type, name, window, {
+    strictWindow: true,
+    // Branch Exec/Coach are Daily-only app-wide (2026-08-18) — every
+    // Branch Monthly view (not just Branch Manager's own) drops them from
+    // the roster; Daily is unaffected, they still appear there.
+    excludeDailyOnlyBranchRoles: period === "monthly",
+    // HOD/CEO-assigned tasks belong exclusively to their own "HOD/CEO
+    // Assigned Task" section (2026-08-19) — never duplicated into the
+    // regular Daily/Monthly list too.
+    excludeHodCeoAssigned: true,
+  });
+}
+
+/** "HOD Assigned Task" filter mode (2026-08-12): every task in this entity
+ *  whose assigner is an HOD, ALL-TIME — same "all-time, no date filter"
+ *  convention as the existing "Task Assignment"/delegatedAll view
+ *  (getMePayload), not a real Daily/Monthly window. */
+export async function getEntityHodAssignedPayload(
+  type: "branch" | "department",
+  name: string,
+): Promise<EntityPayload> {
+  return buildEntityPayload(type, name, null, { assignerRole: "HOD" });
+}
+
+/** "CEO Assigned Task" section (2026-08-12 stacked-sections redesign):
+ *  every task in this entity whose assigner is the CEO, ALL-TIME — same
+ *  shape and convention as getEntityHodAssignedPayload above, just a
+ *  different assignerRole. restrictRosterToRole: "HOD" (2026-08-18) — CEO
+ *  only ever assigns to the HOD, so the roster shows just that one member
+ *  instead of the whole department zero-filled around them. */
+export async function getEntityCeoAssignedPayload(
+  type: "branch" | "department",
+  name: string,
+): Promise<EntityPayload> {
+  return buildEntityPayload(type, name, null, { assignerRole: "CEO", restrictRosterToRole: "HOD" });
+}
+
+/** Roster-shaped "Ad hoc" section for Branch Overview (2026-08-18,
+ *  Branch Manager's own Task Manager page only — replaces HOD/CEO Assigned
+ *  there): every task in this branch matching the SAME ad hoc criteria as
+ *  getAdhocPayload below (started by a Branch Manager, OR explicitly
+ *  cadence-tagged ADHOC), ALL-TIME, broken down per member — same roster-
+ *  first shape as getEntityHodAssignedPayload/getEntityCeoAssignedPayload,
+ *  just a different (OR-based) filter instead of a single assignerRole.
+ *  Branch-only — Department has no ad hoc concept in this app (ad hoc
+ *  tasks are fundamentally Branch Manager/branch-context work). Branch
+ *  Exec/Coach are excluded from the roster (2026-08-18) — Daily-only roles
+ *  app-wide, they never have ad hoc obligations either.
+ *  restrictRosterToRole: "BRANCH" (2026-08-22) — ad hoc tasks are
+ *  fundamentally the Branch Manager's own work (see this function's own
+ *  "started by a Branch Manager" filter above); the roster used to
+ *  zero-fill around every non-site-login branch member instead of just
+ *  them, which was clutter every OTHER role can never have real data in —
+ *  same fix getEntityCeoAssignedPayload's own restrictRosterToRole already
+ *  applied for its single-recipient (HOD) case. */
+export async function getEntityAdhocAssignedPayload(branch: string): Promise<EntityPayload> {
+  return buildEntityPayload("branch", branch, null, {
+    adhocOnly: true,
+    excludeDailyOnlyBranchRoles: true,
+    restrictRosterToRole: "BRANCH",
+  });
 }
 
 /**
@@ -329,9 +538,16 @@ export interface AdhocRegionsPayload {
  * mentType "Manager" — allowedCadenceOptions in assign/route.ts), so every
  * tagged block already satisfies it; Coach/Branch Exec assignees never see
  * the Ad hoc Cadence option at all. Grouped by branch then Region A/B/C.
- * All-time, not period-windowed.
+ *
+ * `date` (YYYY-MM-DD, 2026-07-28): window to that single day by the
+ * dueAt-else-startedAt rule — the Home overview's Ad hoc date filter.
+ * Omitted = ALL-TIME (the original semantics; the /task-manager payloads
+ * still use this). The ADHOC cadence tag never binds a block to a period,
+ * so the day window is applied here in JS, not via fetchPeriodBlocks'
+ * tag-aware window query.
  */
-export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
+export async function getAdhocRegionsPayload(date?: string): Promise<AdhocRegionsPayload> {
+  const window = date ? resolveWindow("daily", date) : null;
   const all = await fetchPeriodBlocks(null);
   const [users, starters] = await Promise.all([
     getAssigneeMap(all),
@@ -340,6 +556,10 @@ export async function getAdhocRegionsPayload(): Promise<AdhocRegionsPayload> {
   const blocks = all.filter((b) => {
     const isAdhoc = starters.get(b.run.startedById)?.role === "BRANCH" || b.cadence === "ADHOC";
     if (!isAdhoc) return false;
+    if (window) {
+      const ts = b.dueAt ?? b.startedAt;
+      if (!ts || ts < window.start || ts >= window.end) return false;
+    }
     return users.get(b.assigneeId)?.employmentType === "Manager";
   });
   const branches = attachEntityTasks(
@@ -370,9 +590,27 @@ export interface OrgPayload {
 
 /** Org overview: totals + per-branch and per-department bucket counts, each
  *  entity carrying its per-bucket task lists (mini-donut drill-downs). */
-export async function getOrgPayload(period: Period, date?: string): Promise<OrgPayload> {
-  const window = resolveWindow(period, date);
-  const blocks = await fetchPeriodBlocks(window);
+export async function getOrgPayload(
+  period: Period,
+  date?: string,
+  monthDays?: { from: number; to: number },
+): Promise<OrgPayload> {
+  let window = resolveWindow(period, date);
+  if (monthDays) window = clampWindowToMonthDays(window, monthDays.from, monthDays.to);
+  // strictWindow: the org grids are date-filterable (Home overview's Daily/
+  // Monthly pickers, 2026-07-28) — same rule as getEntityPayload, otherwise
+  // cadence-tagged tasks appear identically on every selected date.
+  const allBlocks = await fetchPeriodBlocks(window, { strictWindow: true });
+  // HOD/CEO-assigned tasks belong exclusively to their own "HOD/CEO
+  // Assigned Task" section (2026-08-19), not duplicated into the org-wide
+  // Daily/Monthly grids too — same rule as getEntityPayload's own
+  // excludeHodCeoAssigned, applied here directly since these grids build
+  // their own blocks set instead of going through buildEntityPayload.
+  const starters = await getUsersByIds(allBlocks.map((b) => b.run.startedById));
+  const blocks = allBlocks.filter((b) => {
+    const r = starters.get(b.run.startedById)?.role;
+    return r !== "HOD" && r !== "CEO";
+  });
   const users = await getAssigneeMap(blocks);
   const branches = attachEntityTasks(
     groupByDimension(blocks, (id) => users.get(id)?.branch),
@@ -407,5 +645,68 @@ export async function getOrgPayload(period: Period, date?: string): Promise<OrgP
         ),
       };
     }),
+  };
+}
+
+/** "No Claim/Incentive" list (2026-08-18, month filter added same day): a
+ *  company-wide roster of everyone with at least one open task, grouped by
+ *  Department or Branch. `month` (YYYY-MM-DD anchor, any day-of-month) scopes
+ *  this to one calendar month — matched against `dueAt`, falling back to
+ *  `startedAt` for undated tasks (same fallback getAdhocRegionsPayload above
+ *  already uses), NOT the cadence-aware Monthly-period rule fetchPeriodBlocks'
+ *  own `window` param would apply — this list deliberately keeps "every task
+ *  type, any not-done status" (Daily/Monthly/Ad hoc/HOD/CEO Assigned alike)
+ *  regardless of month, so a real Daily task due in the selected month still
+ *  counts. Omitting `month` keeps the original all-time behavior. Authorization
+ *  (Finance/CEO only) is the caller's job (queries.ts) — this builder itself
+ *  has no scope restriction, mirroring getOrgPayload above. */
+export async function getNoClaimIncentivePayload(month?: string): Promise<NoClaimIncentivePayload> {
+  const window = month ? resolveWindow("monthly", month) : null;
+  const all = await fetchPeriodBlocks(null);
+  const openBlocks = all
+    .filter((b) => bucketOf(b.status) === "pending")
+    .filter((b) => {
+      if (!window) return true;
+      const ts = b.dueAt ?? b.startedAt;
+      return ts !== null && ts >= window.start && ts < window.end;
+    });
+  const users = await getAssigneeMap(openBlocks);
+
+  const openCounts = new Map<string, number>();
+  for (const b of openBlocks) {
+    openCounts.set(b.assigneeId, (openCounts.get(b.assigneeId) ?? 0) + 1);
+  }
+
+  const byDepartment = new Map<string, NoClaimPerson[]>();
+  const byBranch = new Map<string, NoClaimPerson[]>();
+  for (const [userId, openCount] of openCounts) {
+    const user = users.get(userId);
+    if (!user) continue;
+    const person: NoClaimPerson = { userId, name: user.name, openCount };
+    // department/branch are mutually exclusive per resolveViewRole's own
+    // convention (department-side vs branch-side staff) — a person lands in
+    // exactly one map, never both.
+    if (user.department) {
+      const list = byDepartment.get(user.department) ?? [];
+      list.push(person);
+      byDepartment.set(user.department, list);
+    } else if (user.branch) {
+      const list = byBranch.get(user.branch) ?? [];
+      list.push(person);
+      byBranch.set(user.branch, list);
+    }
+  }
+
+  const toSortedGroups = (groups: Map<string, NoClaimPerson[]>): NoClaimGroup[] =>
+    [...groups.entries()]
+      .map(([name, people]) => ({
+        name,
+        people: [...people].sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    departments: toSortedGroups(byDepartment),
+    branches: toSortedGroups(byBranch),
   };
 }

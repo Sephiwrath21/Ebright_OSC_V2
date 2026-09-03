@@ -19,6 +19,14 @@ export default function ProfileOrgUnit({
 }) {
   const [state, formAction, pending] = useActionState<UpdateOrgUnitResult | null, FormData>(updateOrgUnit, null);
 
+  // HQ is a branch row in the database (every Department sits under it), but
+  // it isn't a centre like Ampang or Klang and it isn't a department either,
+  // so it is offered in neither group: HQ staff pick the department they
+  // actually work in — Academy, Finance, HR — which is what the Departments
+  // group is labelled to say. listBranches() itself is untouched, since
+  // Transfer's dropdown and the Add-employee form still need HQ in.
+  const realBranches = branches.filter((b) => b.code !== "HQ");
+
   return (
     <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
       <header className="flex items-start gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
@@ -63,17 +71,17 @@ export default function ProfileOrgUnit({
             >
               <option value="" disabled>{onlyBranches ? "Select branch" : "Select branch or department"}</option>
               {onlyBranches ? (
-                branches.map((b) => (
+                realBranches.map((b) => (
                   <option key={`b-${b.id}`} value={`branch:${b.id}`}>{b.code} — {b.name}</option>
                 ))
               ) : (
                 <>
                   <optgroup label="Branches">
-                    {branches.map((b) => (
+                    {realBranches.map((b) => (
                       <option key={`b-${b.id}`} value={`branch:${b.id}`}>{b.code} — {b.name}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="Departments">
+                  <optgroup label="Departments (only applicable to HQ staff)">
                     {departments.map((d) => (
                       <option key={`d-${d.id}`} value={`dept:${d.id}`}>{d.code} — {d.name}</option>
                     ))}

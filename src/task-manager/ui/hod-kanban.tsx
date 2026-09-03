@@ -60,22 +60,36 @@ export interface HodKanbanActions {
 /** Column title color treatment — text-only per the design (the column
  *  body/background stays neutral, just the label picks up the accent). */
 const COLUMN_TITLE_COLOR: Record<FlowKanbanColumnColor, string> = {
+  red: "text-red-600 dark:text-red-400",
+  orange: "text-orange-600 dark:text-orange-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  lime: "text-lime-600 dark:text-lime-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  teal: "text-teal-600 dark:text-teal-400",
+  cyan: "text-cyan-600 dark:text-cyan-400",
   blue: "text-blue-600 dark:text-blue-400",
   indigo: "text-indigo-600 dark:text-indigo-400",
   violet: "text-violet-600 dark:text-violet-400",
+  purple: "text-purple-600 dark:text-purple-400",
+  fuchsia: "text-fuchsia-600 dark:text-fuchsia-400",
   pink: "text-pink-600 dark:text-pink-400",
-  orange: "text-orange-600 dark:text-orange-400",
-  teal: "text-teal-600 dark:text-teal-400",
   rose: "text-rose-600 dark:text-rose-400",
 };
 
 const COLUMN_SWATCH_DOT: Record<FlowKanbanColumnColor, string> = {
+  red: "bg-red-500",
+  orange: "bg-orange-500",
+  amber: "bg-amber-500",
+  lime: "bg-lime-500",
+  emerald: "bg-emerald-500",
+  teal: "bg-teal-500",
+  cyan: "bg-cyan-500",
   blue: "bg-blue-500",
   indigo: "bg-indigo-500",
   violet: "bg-violet-500",
+  purple: "bg-purple-500",
+  fuchsia: "bg-fuchsia-500",
   pink: "bg-pink-500",
-  orange: "bg-orange-500",
-  teal: "bg-teal-500",
   rose: "bg-rose-500",
 };
 
@@ -648,7 +662,10 @@ export function HodKanban({
           </p>
         )}
       </div>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      {/* Stable id: dnd-kit otherwise numbers its aria-describedby ids with
+          a module counter ("DndDescribedBy-N"), and the server's count can
+          differ from the client's → React hydration-mismatch error. */}
+      <DndContext id="hod-kanban" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
           <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
             {orderedColumns.map((column) => (

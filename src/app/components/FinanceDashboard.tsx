@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -75,6 +75,12 @@ const TYPE_COLORS: Record<string, string> = {
   referral: "#16A34A",
 };
 
+// bg/text use theme-aware CSS vars (globals.css) so the badge flips with
+// dark mode; `dot` colours are the fixed pending/approved/rejected/disbursed
+// series-identity colours (kept literal, matching STATUS_META/DonutChart).
+// "disbursed" has no exact off-table match for its pale violet tint — mapped
+// to the nearest --status-violet-* pair (reported: not byte-identical to the
+// original #FAF5FF/#6B21A8, but same hue family).
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
   approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
@@ -92,9 +98,12 @@ const typeLabel = (t: string) =>
 export default function FinanceDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
 }) {
   const greetName =
     userName?.split(" ")[0] ||
@@ -492,6 +501,11 @@ export default function FinanceDashboard({
             )}
           </section>
         </div>
+
+        {/* Task Manager — own-department status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

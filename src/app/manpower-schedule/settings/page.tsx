@@ -16,7 +16,6 @@ import {
   Save, 
   Undo,
   Calendar,
-  Building,
   AlertCircle,
   Copy,
   Clipboard
@@ -615,7 +614,9 @@ function ScheduleSettingsContent() {
   return (
     <div className="min-h-full bg-slate-50 dark:bg-slate-950 relative pb-16">
 
-      {/* Toast Notification — intentionally a permanently-dark surface in both themes */}
+      {/* Toast Notification — bg-slate-900/text-white is already a dark surface
+          in light mode and reads identically once dark mode is active, so it's
+          intentionally left invariant (same treatment as elsewhere in this area). */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-300">
           <Check className="w-5 h-5 text-emerald-500" />
@@ -652,66 +653,60 @@ function ScheduleSettingsContent() {
           <span className="text-slate-900 dark:text-slate-100 font-medium">Schedule Settings</span>
         </nav>
 
-        {/* Page Header */}
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Schedule Settings</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Configure active hours and recurring timetables for Ebright branches.
-          </p>
-        </header>
+        {/* Page Header: title (left) + day tabs & branch dropdown on one line (right) */}
+        <header className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Schedule Settings</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Configure active hours and recurring timetables for Ebright branches.
+            </p>
+          </div>
 
-        {/* Combined Branch & Day Selector Row */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Left: Branch selector */}
-          <div className="flex items-center gap-2.5 flex-1 max-w-md">
-            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 shrink-0">
-              <Building className="w-5 h-5 text-slate-400" />
-              <span className="font-semibold text-sm">Branch:</span>
+          {/* Right: day tabs + branch dropdown side by side */}
+          <div className="flex items-end gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map(day => {
+                const isSelected = selectedDay === day;
+                const isOpenOnDay = schedules[`${selectedBranch}-${day}`]?.isOpen;
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() => setSelectedDay(day)}
+                    className={`
+                      px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all duration-200 shrink-0
+                      ${isSelected
+                        ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : isOpenOnDay
+                          ? "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-300 dark:text-slate-600 border-dashed hover:text-slate-400"
+                      }
+                    `}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
             </div>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
-            >
-              {ALL_BRANCHES.map(branch => (
-                <option key={branch} value={branch}>
-                  {branch}
-                </option>
-              ))}
-            </select>
+
+            <div className="w-40 sm:w-56 shrink-0">
+              <label className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                Branch
+              </label>
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 dark:text-slate-100 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                {ALL_BRANCHES.map(branch => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-
-          {/* Right: Days selector */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-            {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map(day => {
-              const isSelected = selectedDay === day;
-              // Check if open on this day
-              const isOpenOnDay = schedules[`${selectedBranch}-${day}`]?.isOpen;
-
-              return (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={`
-                    px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 shrink-0
-                    ${isSelected
-                      ? "border-blue-500 bg-blue-50/50 text-blue-600 shadow-sm dark:bg-blue-900/50 dark:text-blue-400"
-                      : isOpenOnDay
-                        ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800"
-                        : "border-slate-100 bg-white text-slate-300 border-dashed hover:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600 dark:hover:text-slate-400"
-                    }
-                  `}
-                >
-                  {day}
-                </button>
-              );
-            })}
-
-            <button className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shrink-0 dark:hover:text-slate-300 dark:hover:bg-slate-800">
-              <span className="text-xl leading-none font-bold">···</span>
-            </button>
-          </div>
-        </div>
+        </header>
 
         {/* Main Configuration Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden mb-6">
@@ -866,7 +861,8 @@ function ScheduleSettingsContent() {
                             </select>
                           </div>
 
-                          {/* Duration Badge — colour-coded per slot type, kept mutually distinct in dark */}
+                          {/* Duration Badge — Opening/Class/Closing keep distinct
+                              blue/emerald/amber hues in dark via -900 fills. */}
                           <div className="shrink-0 flex items-center">
                             <span className={`
                               px-3 py-1 rounded-full text-xs font-semibold shadow-xs

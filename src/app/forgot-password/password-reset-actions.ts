@@ -41,6 +41,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const requestEmailLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 3 }); // max 3 per hour
 const requestIpLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 10 }); // max 10 per hour
 
+// How long a reset link stays usable. A reset link is a bearer credential —
+// whoever holds it can take over the account — and it travels by email, where
+// it can linger in a shared inbox, a forwarded thread, or a mail scanner's
+// link prefetch. The window only has to cover switching to the mail app and
+// clicking, so keep it short.
+//
+// The label is derived from the same source as the expiry so the two cannot
+// drift: this file states the lifetime to the user twice (plain text and
+// HTML), and a link that claims one lifetime and enforces another reads as a
+// broken system.
+const RESET_TOKEN_TTL_MS = 5 * 60 * 1000;
+const RESET_TOKEN_TTL_LABEL = `${RESET_TOKEN_TTL_MS / 60_000} minutes`;
+
 async function clientIp(): Promise<string> {
   try {
     const h = await headers();
@@ -147,7 +160,7 @@ export async function requestPasswordReset(
   // Generate secure reset token
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
   // Store in database
   await prisma.password_reset_token.create({
@@ -173,7 +186,7 @@ export async function requestPasswordReset(
     "Open this link to set a new password:",
     resetUrl,
     "",
-    "This link is valid for 1 hour and can only be used once.",
+    `This link is valid for ${RESET_TOKEN_TTL_LABEL} and can only be used once.`,
     "",
     "If you didn't request a password reset, you can safely ignore this email —",
     "your password stays unchanged.",
@@ -200,7 +213,7 @@ export async function requestPasswordReset(
         <a href="${resetUrl}">${resetUrl}</a>
       </p>
       <p style="font-size:13px;color:#6b7280;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:16px;">
-        This link is valid for 1 hour. If you didn't request a password reset, you can safely ignore this email.
+        This link is valid for ${RESET_TOKEN_TTL_LABEL}. If you didn't request a password reset, you can safely ignore this email.
       </p>
     </div>
   `;

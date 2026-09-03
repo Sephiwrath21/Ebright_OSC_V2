@@ -24,12 +24,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 7.7.0
- * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+ * Prisma Client JS version: 7.9.1
+ * Query Engine version: e922089b7d7502aff4249d5da3420f6fa55fc6ad
  */
 Prisma.prismaVersion = {
-  client: "7.7.0",
-  engine: "75cbdc1eb7150937890ad5465d861175c6624711"
+  client: "7.9.1",
+  engine: "e922089b7d7502aff4249d5da3420f6fa55fc6ad"
 }
 
 Prisma.PrismaClientKnownRequestError = () => {
@@ -128,6 +128,7 @@ exports.Prisma.UserScalarFieldEnum = {
   department: 'department',
   branch: 'branch',
   employmentType: 'employmentType',
+  hrfsUserId: 'hrfsUserId',
   coachSchedule: 'coachSchedule',
   createdAt: 'createdAt'
 };
@@ -225,6 +226,7 @@ exports.Prisma.FlowRunScalarFieldEnum = {
   startedById: 'startedById',
   triggerType: 'triggerType',
   status: 'status',
+  archivedAt: 'archivedAt',
   startedAt: 'startedAt',
   completedAt: 'completedAt'
 };
@@ -243,7 +245,86 @@ exports.Prisma.RunBlockScalarFieldEnum = {
   startedAt: 'startedAt',
   completedAt: 'completedAt',
   scheduleSlotId: 'scheduleSlotId',
-  cadence: 'cadence'
+  cadence: 'cadence',
+  repeatWeekly: 'repeatWeekly',
+  recurrenceOfId: 'recurrenceOfId',
+  guidelineId: 'guidelineId',
+  parentId: 'parentId',
+  subtaskOrder: 'subtaskOrder',
+  templateId: 'templateId',
+  categoryId: 'categoryId'
+};
+
+exports.Prisma.GuidelineScalarFieldEnum = {
+  id: 'id',
+  url: 'url',
+  imageMime: 'imageMime',
+  imageData: 'imageData',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.TaskCategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  order: 'order',
+  archivedAt: 'archivedAt',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TaskTemplateGroupScalarFieldEnum = {
+  id: 'id',
+  createdById: 'createdById',
+  name: 'name',
+  scope: 'scope',
+  archivedAt: 'archivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  categoryId: 'categoryId'
+};
+
+exports.Prisma.BranchPackageScheduleScalarFieldEnum = {
+  id: 'id',
+  branch: 'branch',
+  weekday: 'weekday',
+  packageGroupId: 'packageGroupId',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  assignedAt: 'assignedAt'
+};
+
+exports.Prisma.TaskTemplateScalarFieldEnum = {
+  id: 'id',
+  createdById: 'createdById',
+  name: 'name',
+  title: 'title',
+  subtasks: 'subtasks',
+  cadence: 'cadence',
+  guidelineUrl: 'guidelineUrl',
+  guidelineMime: 'guidelineMime',
+  guidelineImage: 'guidelineImage',
+  archivedAt: 'archivedAt',
+  templateGroupId: 'templateGroupId',
+  groupPosition: 'groupPosition',
+  categoryId: 'categoryId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TaskTemplateExcludedAssigneeScalarFieldEnum = {
+  id: 'id',
+  templateId: 'templateId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ProofScalarFieldEnum = {
+  id: 'id',
+  runBlockId: 'runBlockId',
+  driveFileId: 'driveFileId',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.RunItemScalarFieldEnum = {
@@ -313,6 +394,7 @@ exports.Prisma.ScheduleSlotScalarFieldEnum = {
   scheduleId: 'scheduleId',
   startTime: 'startTime',
   endTime: 'endTime',
+  rowLabel: 'rowLabel',
   roleColumn: 'roleColumn',
   assignedStaffId: 'assignedStaffId',
   runBlockId: 'runBlockId',
@@ -407,6 +489,19 @@ exports.Cadence = exports.$Enums.Cadence = {
   ADHOC: 'ADHOC'
 };
 
+exports.TemplateGroupScope = exports.$Enums.TemplateGroupScope = {
+  TEMPLATE: 'TEMPLATE',
+  PACKAGE: 'PACKAGE'
+};
+
+exports.PackageScheduleWeekday = exports.$Enums.PackageScheduleWeekday = {
+  WED: 'WED',
+  THU: 'THU',
+  FRI: 'FRI',
+  SAT: 'SAT',
+  SUN: 'SUN'
+};
+
 exports.ViewType = exports.$Enums.ViewType = {
   TABLE: 'TABLE',
   BOARD: 'BOARD',
@@ -430,6 +525,13 @@ exports.Prisma.ModelName = {
   DecisionNode: 'DecisionNode',
   FlowRun: 'FlowRun',
   RunBlock: 'RunBlock',
+  Guideline: 'Guideline',
+  TaskCategory: 'TaskCategory',
+  TaskTemplateGroup: 'TaskTemplateGroup',
+  BranchPackageSchedule: 'BranchPackageSchedule',
+  TaskTemplate: 'TaskTemplate',
+  TaskTemplateExcludedAssignee: 'TaskTemplateExcludedAssignee',
+  Proof: 'Proof',
   RunItem: 'RunItem',
   NotificationLog: 'NotificationLog',
   AuditLog: 'AuditLog',

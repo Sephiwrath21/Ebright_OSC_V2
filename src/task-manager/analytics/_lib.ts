@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { BlockStatus, Cadence, ItemType, Role, RunStatus } from "@/generated/task-manager-client";
 import { prisma } from "@/task-manager/prisma";
 import { getUsersByIds } from "@/task-manager/lib/users";
+import { isElevatedDeptSite } from "../role-views";
 
 // ---------- query validation ----------
 
@@ -92,6 +93,25 @@ export function resolveWindow(period: Period, date?: string, now: Date = new Dat
     start: new Date(anchor.getFullYear(), anchor.getMonth(), 1),
     end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1),
     period,
+  };
+}
+
+/** Clamp a MONTHLY window to a day-of-month range — the Monthly 7-day range
+ *  dropdown (2026-07-29): "1-7" → [1st, 8th), "29-31" → [29th, next month).
+ *  No-op for daily windows. Out-of-range values can only shrink the window
+ *  (never widen it), so an invalid range yields an empty result, not a leak. */
+export function clampWindowToMonthDays(
+  window: PeriodWindow,
+  fromDay: number,
+  toDay: number,
+): PeriodWindow {
+  if (window.period !== "monthly") return window;
+  const start = new Date(window.start.getFullYear(), window.start.getMonth(), fromDay);
+  const end = new Date(window.start.getFullYear(), window.start.getMonth(), toDay + 1);
+  return {
+    period: window.period,
+    start: start < window.start ? window.start : start,
+    end: end > window.end ? window.end : end,
   };
 }
 
@@ -186,34 +206,23 @@ export function canViewOrg(role: Role): boolean {
   return role === "ADMIN" || role === "CEO" || role === "OPS";
 }
 
-/** Department-site accounts with org-wide DEPARTMENT visibility (still no
- *  branch data) AND the unrestricted "+ Task" assign form (data/tasks.ts):
- *  Operation (whose donor-era special case was assign-only) and Optimisation
- *  — per the 2026-07-24 product decision. Every other DEPT_SITE stays locked
- *  to its own department. */
-export const ELEVATED_DEPT_SITE_DEPARTMENTS = ["Operation", "Optimisation"] as const;
-
-export function isElevatedDeptSite(user: {
-  role: string;
-  department: string | null;
-}): boolean {
-  return (
-    user.role === "DEPT_SITE" &&
-    user.department !== null &&
-    (ELEVATED_DEPT_SITE_DEPARTMENTS as readonly string[]).includes(user.department)
-  );
-}
+// Elevated-department-site rule: MOVED to role-views.ts (the pure, client-
+// safe role-config module — 2026-07-29 centralization) and re-exported here
+// so the data layer's authorization checks and existing imports keep
+// working unchanged.
+export { ELEVATED_DEPT_SITE_DEPARTMENTS, isElevatedDeptSite } from "../role-views";
 
 /**
  * Entity detail: org roles see any; HOD/DEPT_SITE only their own department
- * — EXCEPT the elevated department sites (Operation/Optimisation), which see
- * ANY department (never branches); BRANCH/BRANCH_SITE only their own branch;
- * MEMBER none. DEPT_SITE and BRANCH_SITE are the view-only department/branch
- * logins (see Role enum comment in schema.prisma) — this is the ONLY
- * authorization boundary for them (unlike the donor, which additionally
- * gated everything behind a shared internal secret), so they must resolve
- * their own entity here exactly like HOD/BRANCH rather than falling through
- * to deny.
+ * — EXCEPT the elevated department sites (Operations/Optimisation), which
+ * see ANY department AND ANY branch (superadmin-equivalent visibility per
+ * the 2026-07-29 final role spec, reversing the earlier departments-only
+ * rule); BRANCH/BRANCH_SITE only their own branch; MEMBER none. DEPT_SITE
+ * and BRANCH_SITE are the view-only department/branch logins (see Role enum
+ * comment in schema.prisma) — this is the ONLY authorization boundary for
+ * them (unlike the donor, which additionally gated everything behind a
+ * shared internal secret), so they must resolve their own entity here
+ * exactly like HOD/BRANCH rather than falling through to deny.
  */
 export function canViewEntity(
   user: ScopeUser,
@@ -225,8 +234,8 @@ export function canViewEntity(
     return type === "department" && name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "DEPT_SITE") {
-    if (type !== "department") return false;
-    return isElevatedDeptSite(user) || name === (user.department ?? UNASSIGNED);
+    if (isElevatedDeptSite(user)) return true;
+    return type === "department" && name === (user.department ?? UNASSIGNED);
   }
   if (user.role === "BRANCH") {
     return type === "branch" && name === (user.branch ?? UNASSIGNED);
@@ -265,6 +274,44 @@ export function canViewMember(
     return (member.branch ?? UNASSIGNED) === (user.branch ?? UNASSIGNED);
   }
   return false;
+}
+
+// ---------- member roster ordering (2026-07-25 user decision) ----------
+
+/**
+ * Role-priority rank for member rosters — the primary sort key of every
+ * department/branch Members list (names alphabetical within a group).
+ * Department side: HOD → HQ Exec → Full Time → Part Time → Intern.
+ * Branch side: Manager → Branch Exec → Full Time Coach → Part Time Coach.
+ * One combined ranking serves both (the two pools' types never mix in one
+ * roster); anything unrecognized sorts last.
+ */
+export function memberSortRank(
+  employmentType: string | null | undefined,
+  coachSchedule: string | null | undefined,
+): number {
+  switch (employmentType) {
+    case "HOD":
+      return 0;
+    case "Manager":
+      return 1;
+    case "HQ Exec":
+      return 2;
+    case "Branch Exec":
+      return 3;
+    case "Full Time":
+      return 4;
+    case "Coach":
+      return coachSchedule === "Full Time" ? 5 : 6;
+    case "Part Time":
+      return 7;
+    case "Intern":
+      return 8;
+    case "Regional Manager":
+      return 9;
+    default:
+      return 99;
+  }
 }
 
 // ---------- assigner streams (brief §Task streams) ----------
@@ -318,9 +365,11 @@ export function groupByAssignerRole<B extends { run: { startedById: string } }>(
 
 // ---------- org reference data: departments ----------
 
-/** The official department list — org overviews always show all six. */
+/** The official department list — org overviews always show all six.
+ *  ("Operations" since the 2026-07-25 rename; mirrors ui/types.ts's
+ *  FLOW_DEPARTMENTS.) */
 export const DEPARTMENTS = [
-  "Operation",
+  "Operations",
   "Academy",
   "Marketing",
   "Optimisation",
@@ -445,6 +494,35 @@ export interface TaskRow {
   // happens explicitly here instead — see data/core.ts's file-header comment.)
   status: BlockStatus;
   fromSchedule: boolean;
+  /** Explicit Daily/Monthly/Ad hoc tag (2026-08-05: drives the past-day
+   *  completion/proof lock, mirrored on FlowTaskRow for the client). */
+  cadence: Cadence | null;
+  /** Assigner-attached SOP reference (2026-07-30) — null when none. The
+   *  image itself is served by /api/task-manager/guideline-image/[id]. */
+  guideline: { id: string; url: string | null; hasImage: boolean } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  categoryId: string | null;
+  categoryName: string | null;
+  /** Who assigned the task (the run's starter) — id always present;
+   *  the display NAME is resolved only by the personal payloads
+   *  (getMePayload), which drive the "Assigned by" column (2026-07-30). */
+  assignerId: string;
+  assignerName?: string | null;
+  /** The assigner's role (2026-08-19) — mirrored on FlowTaskRow for the
+   *  client, drives isDueDayLockExemptRole. Resolved wherever assignerName
+   *  also is. */
+  assignerRole?: string | null;
+  /** Assignee-uploaded completion evidence (2026-07-30, the "Proof"
+   *  column; multi-photo 2026-08-08) — empty array until any are uploaded,
+   *  oldest-first. Each image is served by
+   *  /api/task-manager/proof-image/[id]. */
+  proofIds: string[];
+  /** Main Task ↔ Subtask link (2026-07-30) — the parent RunBlock's id, or
+   *  null for a top-level task. Drives the My Tasks tree display. */
+  parentId: string | null;
+  /** Checklist-builder position within the parent (2026-07-31) — null on
+   *  parents and pre-column rows (UI falls back to id order). */
+  subtaskOrder: number | null;
   /** Structural eligibility ONLY (not viewer-aware) — true when this block
    *  isn't already closed and has exactly one required item, a CHECKBOX.
    *  Anything else (multiple required items, or a non-checkbox required
@@ -472,7 +550,17 @@ export function toTaskRow(b: PeriodBlock): TaskRow {
     assigneeId: b.assigneeId,
     dueAt: b.dueAt ? b.dueAt.toISOString() : null,
     status: b.status,
+    cadence: b.cadence,
     fromSchedule: b.scheduleSlotId !== null,
+    guideline: b.guideline
+      ? { id: b.guideline.id, url: b.guideline.url, hasImage: b.guideline.imageMime !== null }
+      : null,
+    categoryId: b.category?.id ?? null,
+    categoryName: b.category?.name ?? null,
+    assignerId: b.run.startedById,
+    proofIds: b.proofs.map((p) => p.id),
+    parentId: b.parentId,
+    subtaskOrder: b.subtaskOrder,
     quickCompletable: isQuickCompletable(b),
   };
 }
@@ -502,6 +590,17 @@ export interface PeriodBlock {
   startedAt: Date | null;
   scheduleSlotId: string | null;
   cadence: Cadence | null;
+  /** Assigner-attached SOP reference (2026-07-30) — url/mime only, the
+   *  image BYTES are never selected here (served by their own route). */
+  guideline: { id: string; url: string | null; imageMime: string | null } | null;
+  /** Task Category ("Type", 2026-08-12) — null = Uncategorized. */
+  category: { id: string; name: string } | null;
+  /** Assignee-uploaded proofs (2026-08-08: multi-photo) — id only, oldest
+   *  first, bytes served by their own route. */
+  proofs: { id: string }[];
+  /** Parent RunBlock id for subtasks, null for top-level tasks. */
+  parentId: string | null;
+  subtaskOrder: number | null;
   /** Minimal shape — just enough to compute quick-complete eligibility,
    *  not the full item (label/config/value aren't needed here). */
   runItems: { required: boolean; type: ItemType }[];
@@ -522,6 +621,10 @@ export interface PeriodBlockFilter {
   startedById?: string;
   /** Drop blocks assigned to this user (delegated view excludes self-work). */
   excludeAssigneeId?: string;
+  /** Scope to a SET of assignees (entity-roster bound for the all-time
+   *  HOD-Assigned payload, 2026-08-12) — distinct from the single-id
+   *  `assigneeId` above. */
+  assigneeIdIn?: string[];
   /** Cadence-TAGGED blocks normally belong to their period UNCONDITIONALLY
    *  (the personal "My Tasks — Daily" weekday tabs need the whole week's
    *  DAILY tasks at once). Date-filtered surfaces (the entity overviews'
@@ -549,8 +652,12 @@ export async function fetchPeriodBlocks(
     where: {
       ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
       ...(filter.excludeAssigneeId ? { assigneeId: { not: filter.excludeAssigneeId } } : {}),
+      ...(filter.assigneeIdIn ? { assigneeId: { in: filter.assigneeIdIn } } : {}),
       run: {
         status: { not: "CANCELLED" },
+        // Archived runs (2026-07-31) are hidden from EVERY active view —
+        // this is the one gate all lists/donuts/counts read through.
+        archivedAt: null,
         ...(filter.startedById ? { startedById: filter.startedById } : {}),
       },
       ...(window
@@ -582,6 +689,11 @@ export async function fetchPeriodBlocks(
       startedAt: true,
       scheduleSlotId: true,
       cadence: true,
+      guideline: { select: { id: true, url: true, imageMime: true } },
+      category: { select: { id: true, name: true } },
+      proofs: { select: { id: true }, orderBy: { createdAt: "asc" } },
+      parentId: true,
+      subtaskOrder: true,
       runItems: { select: { required: true, type: true } },
       run: {
         select: {

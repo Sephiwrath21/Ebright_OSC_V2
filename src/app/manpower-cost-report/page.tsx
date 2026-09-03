@@ -51,9 +51,10 @@ interface StaffRow {
   coachHrs: number;
   execHrs: number;
   totalHrs: number;
+  classes: number;
   rate: number | null;
   totalPay: number;
-  days: { date: string; day: string; coachHrs: number; execHrs: number; totalHrs: number; scheduleBranch?: string }[];
+  days: { date: string; day: string; coachHrs: number; execHrs: number; totalHrs: number; classes: number; scheduleBranch?: string }[];
 }
 
 interface ApiTotals {
@@ -108,6 +109,7 @@ function makeEmptyRow(viewer: Viewer | null): StaffRow {
     coachHrs: 0,
     execHrs: 0,
     totalHrs: 0,
+    classes: 0,
     rate: viewer?.rate ?? null,
     totalPay: 0,
     days: [],
@@ -188,11 +190,12 @@ function ManpowerCostReportContent() {
         const days = s.days.filter(d => d.date >= weekStart && d.date <= weekEnd);
         const coachHrs = days.reduce((a, d) => a + d.coachHrs, 0);
         const execHrs  = days.reduce((a, d) => a + d.execHrs, 0);
+        const classes  = days.reduce((a, d) => a + (d.classes ?? 0), 0);
         const totalHrs = coachHrs + execHrs;
         const hasRate = s.rate !== null && s.rate > 0;
         const coachPay = s.isPT && hasRate ? coachHrs * (s.rate ?? 0) : 0;
         const execPay  = s.isPT && hasRate ? execHrs * execRate : 0;
-        return { ...s, coachHrs, execHrs, totalHrs, totalPay: coachPay + execPay, days };
+        return { ...s, coachHrs, execHrs, classes, totalHrs, totalPay: coachPay + execPay, days };
       })
       .filter(s => {
         if (weekFilter && s.totalHrs === 0) return false;
@@ -220,8 +223,9 @@ function ManpowerCostReportContent() {
     const totalCoachHrs = filteredStaff.reduce((a, s) => a + s.coachHrs, 0);
     const totalExecHrs  = filteredStaff.reduce((a, s) => a + s.execHrs, 0);
     const totalHrs      = totalCoachHrs + totalExecHrs;
+    const totalClasses  = filteredStaff.reduce((a, s) => a + (s.classes ?? 0), 0);
     const totalPay      = filteredStaff.reduce((a, s) => a + s.totalPay, 0);
-    return { totalStaff, ptCount, ftCount, totalCoachHrs, totalExecHrs, totalHrs, totalPay };
+    return { totalStaff, ptCount, ftCount, totalCoachHrs, totalExecHrs, totalHrs, totalClasses, totalPay };
   }, [filteredStaff]);
 
   const monthLabel = AVAILABLE_MONTHS.find(m => m.value === selectedMonth)?.label ?? selectedMonth;
@@ -244,24 +248,37 @@ function ManpowerCostReportContent() {
   // or print from the browser's PDF viewer. Branches between the employee
   // view (single profile + daily breakdown) and the finance view (summary
   // + multi-staff table). Ported from the v1 project.
-  async function generatePDF() {
+  async function generatePDF(targetStaff?: StaffRow) {
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
 
-    // Try to load logo
+    // Load the logo through an Image + canvas so it's re-encoded to a clean PNG
+    // jsPDF accepts, and so we can read its true aspect ratio and render it
+    // undistorted instead of forcing it into a fixed box.
     let logoImg: string | null = null;
+    let logoAspect = 3; // sensible fallback
     try {
-      const resp = await fetch("/ebright-font.png");
-      if (resp.ok) {
-        const blob = await resp.blob();
-        logoImg = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      }
-    } catch { /* no logo available */ }
+      logoImg = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            if (img.naturalHeight > 0) logoAspect = img.naturalWidth / img.naturalHeight;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return reject(new Error("no 2d context"));
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/png"));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error("logo load failed"));
+        img.src = "/ebright-logo.png";
+      });
+    } catch { logoImg = null; }
 
     // Header bar
     doc.setFillColor(30, 41, 59); // slate-800
@@ -269,11 +286,15 @@ function ManpowerCostReportContent() {
 
     let headerX = 14;
     if (logoImg) {
-      // ebright-font.png is 2172x724 (~3:1) — width derived from that ratio
-      // so the mark isn't stretched; 3mm top/bottom margin centers it in the
-      // 28mm header bar.
-      doc.addImage(logoImg, "PNG", 14, 3, 66, 22);
-      headerX = 88;
+      try {
+        // Fixed height, width from the logo's true aspect ratio so it never
+        // looks stretched, vertically centered in the 28mm header bar.
+        const logoH = 15;
+        const logoW = logoH * logoAspect;
+        const logoY = (28 - logoH) / 2;
+        doc.addImage(logoImg, "PNG", 14, logoY, logoW, logoH);
+        headerX = 14 + logoW + 8;
+      } catch { /* fall back to text-only header */ }
     }
 
     doc.setTextColor(255, 255, 255);
@@ -291,17 +312,21 @@ function ManpowerCostReportContent() {
     if (viewTab !== "all") filterLabels.push(`Type: ${viewTab.toUpperCase()}`);
     doc.text(filterLabels.join("  |  "), headerX, 21);
 
-    // Generated date on right
+    // Generated date + time on right
     doc.setFontSize(8);
-    doc.text(`Generated: ${new Date().toLocaleDateString("en-MY")}`, pageW - 14, 21, { align: "right" });
+    const generatedAt = new Date().toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" });
+    doc.text(`Generated: ${generatedAt}`, pageW - 14, 21, { align: "right" });
 
     let y = 36;
 
-    if (isEmployeeView) {
-      // Employee PDF: profile info + daily breakdown.
-      // Use the synthesized empty row when no schedules exist so the export
-      // still produces a complete, recognisable document.
-      const s = filteredStaff[0] ?? makeEmptyRow(viewer);
+    // Individual report: an explicitly chosen coach (per-row / modal PDF) or,
+    // for an employee self-view, the single row the server returned. Falls back
+    // to a synthesized empty row so the export is still complete.
+    const indivStaff = targetStaff ?? (isEmployeeView ? (filteredStaff[0] ?? makeEmptyRow(viewer)) : null);
+
+    if (indivStaff) {
+      // Employee/individual PDF: profile info + daily breakdown.
+      const s = indivStaff;
       const eRate = execRate;
       const isPT = s.isPT;
 
@@ -332,18 +357,20 @@ function ManpowerCostReportContent() {
       s.days.forEach(d => { wMap[d.date] = d; });
 
       const dHead = isPT
-        ? [["No.", "Day", "Date", "Coach Hr", "Rate", "Total", "Exec Hr", "Rate", "Total", "Total Hr", "Total Pay"]]
-        : [["No.", "Day", "Date", "Coach Hr", "Exec Hr", "Total Hr"]];
+        ? [["No.", "Day", "Date", "Coach Hr", "Class", "Rate", "Total", "Exec Hr", "Rate", "Total", "Total Hr", "Total Pay"]]
+        : [["No.", "Day", "Date", "Coach Hr", "Class", "Exec Hr", "Total Hr"]];
 
       const dBody: string[][] = showDays.map(row => {
         const e = wMap[row.date];
         const worked = !!e;
+        const cls = worked ? (e.classes ?? 0) : 0;
         if (isPT) {
           const cp = worked ? e.coachHrs * (s.rate || 0) : 0;
           const ep = worked ? e.execHrs * eRate : 0;
           return [
             String(row.dayNum), row.day.slice(0, 3), row.date,
             worked ? fmtHrs(e.coachHrs) : "-",
+            worked && cls > 0 ? String(cls) : "-",
             worked && e.coachHrs > 0 ? `RM${s.rate}` : "-",
             worked && cp > 0 ? `RM ${cp.toFixed(2)}` : "-",
             worked ? fmtHrs(e.execHrs) : "-",
@@ -356,6 +383,7 @@ function ManpowerCostReportContent() {
         return [
           String(row.dayNum), row.day.slice(0, 3), row.date,
           worked ? fmtHrs(e.coachHrs) : "-",
+          worked && cls > 0 ? String(cls) : "-",
           worked ? fmtHrs(e.execHrs) : "-",
           worked ? fmtHrs(e.totalHrs) : "-",
         ];
@@ -363,14 +391,15 @@ function ManpowerCostReportContent() {
 
       const coachPay = isPT && s.rate ? s.coachHrs * s.rate : 0;
       const execPay = isPT ? s.execHrs * eRate : 0;
+      const totalClasses = s.classes ?? 0;
       const dFooter: string[] = isPT
         ? [
             "Total", "", `${s.days.length} days`,
-            fmtHrs(s.coachHrs), "", `RM ${coachPay.toFixed(2)}`,
+            fmtHrs(s.coachHrs), String(totalClasses), "", `RM ${coachPay.toFixed(2)}`,
             fmtHrs(s.execHrs), "", `RM ${execPay.toFixed(2)}`,
             fmtHrs(s.totalHrs), `RM ${s.totalPay.toFixed(2)}`,
           ]
-        : ["Total", "", `${s.days.length} days`, fmtHrs(s.coachHrs), fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
+        : ["Total", "", `${s.days.length} days`, fmtHrs(s.coachHrs), String(totalClasses), fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
       dBody.push(dFooter);
 
       autoTable(doc, {
@@ -413,8 +442,7 @@ function ManpowerCostReportContent() {
         : [["Name", "Branch", "Type", "Coach Hrs", "Class", "Exec Hrs", "Total Hrs", "Rate", "Total Pay"]];
 
       const tableBody: string[][] = filteredStaff.map(s => {
-        const classes = Math.round(s.coachHrs / 1.25);
-        const row = [s.name, s.branch, s.isPT ? "PT" : "FT", fmtHrs(s.coachHrs), classes > 0 ? `${classes} class${classes !== 1 ? "es" : ""}` : "-", fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
+        const row = [s.name, s.branch, s.isPT ? "PT" : "FT", fmtHrs(s.coachHrs), String(s.classes ?? 0), fmtHrs(s.execHrs), fmtHrs(s.totalHrs)];
         if (viewTab !== "ft") {
           row.push(s.isPT && s.rate ? `RM${s.rate}` : "-");
           row.push(s.isPT ? `RM ${s.totalPay.toFixed(2)}` : "-");
@@ -424,7 +452,7 @@ function ManpowerCostReportContent() {
 
       const footerRow: string[] = [
         `Total (${totals.totalStaff})`, "", "",
-        fmtHrs(totals.totalCoachHrs), "", fmtHrs(totals.totalExecHrs), fmtHrs(totals.totalHrs),
+        fmtHrs(totals.totalCoachHrs), String(totals.totalClasses ?? 0), fmtHrs(totals.totalExecHrs), fmtHrs(totals.totalHrs),
       ];
       if (viewTab !== "ft") {
         footerRow.push("");
@@ -458,9 +486,39 @@ function ManpowerCostReportContent() {
       doc.text(`Page ${i} of ${totalPages}`, pageW - 14, pageH - 6, { align: "right" });
     }
 
+    // Auto-named file:
+    //   "<Period> Manpower Cost Report.pdf"                 (finance summary)
+    //   "<Period> <Full Name> Manpower Cost Report.pdf"     (individual)
+    // where <Period> is the month label, or "start to end" when a week is
+    // filtered. "|" \ / : * ? " < > are illegal in Windows filenames, so they
+    // are stripped.
+    const sanitize = (v: string) => v.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+    const periodPart = weekFilter ? `${weekStart} to ${weekEnd}` : monthLabel;
+    const fileName = indivStaff
+      ? `${sanitize(periodPart)} ${sanitize(indivStaff.name)} Manpower Cost Report.pdf`
+      : `${sanitize(periodPart)} Manpower Cost Report.pdf`;
+
+    // Open a preview tab whose Download button saves under the proper name —
+    // the browser's own PDF-viewer download names the file after the blob's
+    // random URL id, so we wrap it in a tiny page that carries the filename.
     const pdfBlob = doc.output("blob");
     const url = URL.createObjectURL(pdfBlob);
-    window.open(url, "_blank");
+    const w = window.open("", "_blank");
+    if (!w) {
+      // Popup blocked — fall back to a direct named download.
+      doc.save(fileName);
+      return;
+    }
+    const safeName = fileName.replace(/</g, "&lt;");
+    w.document.write(`<!DOCTYPE html><html><head><title>${safeName}</title>
+<style>body{margin:0;display:flex;flex-direction:column;height:100vh;font-family:system-ui,sans-serif}
+.bar{display:flex;align-items:center;gap:12px;padding:8px 14px;background:#1e293b;color:#fff}
+.bar span{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar a{margin-left:auto;background:#dc2626;color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:6px 14px;border-radius:8px}
+.bar a:hover{background:#b91c1c}iframe{flex:1;border:0}</style></head>
+<body><div class="bar"><span>${safeName}</span><a href="${url}" download="${fileName.replace(/"/g, "&quot;")}">Download</a></div>
+<iframe src="${url}"></iframe></body></html>`);
+    w.document.close();
   }
 
   return (
@@ -520,7 +578,7 @@ function ManpowerCostReportContent() {
               weekEnd={weekEnd}
               execRate={execRate}
               availableWeeks={availableWeeks}
-              onPdf={generatePDF}
+              onPdf={() => generatePDF()}
             />
           )
         ) : (
@@ -571,7 +629,7 @@ function ManpowerCostReportContent() {
           </p>
           <button
             type="button"
-            onClick={generatePDF}
+            onClick={() => generatePDF()}
             className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-all flex items-center gap-1.5 shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
@@ -663,45 +721,46 @@ function ManpowerCostReportContent() {
           </div>
         )}
 
-        {/* Staff table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
-          <div className="overflow-x-auto">
+        {/* Staff table. The inner div is the scroll container (max-h + overflow),
+            so the sticky header stays pinned as the body scrolls. */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Name</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Branch</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center dark:text-slate-400">Type</th>
-                  <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center dark:text-orange-400">Coach Hrs</th>
-                  <th className="px-5 py-4 text-xs font-bold text-pink-500 uppercase tracking-wider text-center dark:text-pink-400">Class</th>
-                  <th className="px-5 py-4 text-xs font-bold text-indigo-500 uppercase tracking-wider text-center dark:text-indigo-400">Exec Hrs</th>
-                  <th className="px-5 py-4 text-xs font-bold text-blue-500 uppercase tracking-wider text-center dark:text-blue-400">Total Hrs</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Type</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wider text-center">Coach Hrs</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-pink-500 dark:text-pink-400 uppercase tracking-wider text-center">Class</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider text-center">Exec Hrs</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider text-center">Total Hrs</th>
                   {viewTab !== "ft" && (
                     <>
-                      <th className="px-5 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-center dark:text-orange-400">Rate</th>
-                      <th className="px-5 py-4 text-xs font-bold text-green-600 uppercase tracking-wider text-right dark:text-green-400">Total Pay</th>
+                      <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wider text-center">Rate</th>
+                      <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wider text-right">Total Pay</th>
                     </>
                   )}
-                  <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-12 dark:text-slate-400" />
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center w-12" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center">
+                    <td colSpan={10} className="px-5 py-12 text-center">
                       <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                       <p className="text-slate-500 dark:text-slate-400 font-medium">Loading manpower cost data...</p>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center">
+                    <td colSpan={10} className="px-5 py-12 text-center">
                       <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
                     </td>
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center">
+                    <td colSpan={10} className="px-5 py-12 text-center">
                       <p className="text-slate-400 font-medium">No staff data found for {monthLabel}.</p>
                       <p className="text-slate-300 dark:text-slate-600 text-sm mt-1">Make sure schedules are finalized for this month.</p>
                     </td>
@@ -721,19 +780,49 @@ function ManpowerCostReportContent() {
                   })
                 )}
               </tbody>
+              {!loading && !error && filteredStaff.length > 0 && (
+                <tfoot>
+                  <tr className="bg-slate-900 text-white">
+                    <td colSpan={3} className="px-5 py-4 text-sm font-black uppercase tracking-wider">
+                      Total ({totals.totalStaff} staff)
+                    </td>
+                    <td className="px-5 py-4 text-center text-sm font-bold text-orange-300">{fmtHrs(totals.totalCoachHrs)}</td>
+                    <td className="px-5 py-4 text-center text-sm font-bold text-pink-300">{totals.totalClasses ?? 0}</td>
+                    <td className="px-5 py-4 text-center text-sm font-bold text-indigo-300">{fmtHrs(totals.totalExecHrs)}</td>
+                    <td className="px-5 py-4 text-center text-sm font-bold text-blue-300">{fmtHrs(totals.totalHrs)}</td>
+                    {viewTab !== "ft" && (
+                      <>
+                        <td className="px-5 py-4" />
+                        <td className="px-5 py-4 text-right text-lg font-black text-green-400">
+                          RM {totals.totalPay.toFixed(2)}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-5 py-4" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
 
         {/* Daily Breakdown Modal */}
-        {expandedRow && (
-          <DailyBreakdownModal
-            s={filteredStaff.find(st => `${st.name}:::${st.branch}` === expandedRow)!}
-            monthLabel={monthLabel}
-            execRate={totals?.executiveRate || 0}
-            onClose={() => setExpandedRow(null)}
-          />
-        )}
+        {expandedRow && (() => {
+          const modalStaff = filteredStaff.find(st => `${st.name}:::${st.branch}` === expandedRow);
+          if (!modalStaff) return null;
+          return (
+            <DailyBreakdownModal
+              s={modalStaff}
+              selectedMonth={selectedMonth}
+              weekFilter={weekFilter}
+              weekStart={weekStart}
+              weekEnd={weekEnd}
+              execRate={execRate}
+              onClose={() => setExpandedRow(null)}
+              onDownloadPdf={() => generatePDF(modalStaff)}
+            />
+          );
+        })()}
           </>
         )}
       </div>
@@ -780,7 +869,7 @@ function EmployeeBreakdown({
   const displayDays = weekFilter
     ? allDaysRaw.filter(d => d.date >= weekStart && d.date <= weekEnd)
     : allDaysRaw;
-  const workedMap: Record<string, { coachHrs: number; execHrs: number; totalHrs: number; scheduleBranch?: string }> = {};
+  const workedMap: Record<string, { coachHrs: number; execHrs: number; totalHrs: number; classes: number; scheduleBranch?: string }> = {};
   s.days.forEach(d => { workedMap[d.date] = d; });
 
   const initials = s.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
@@ -1019,6 +1108,10 @@ function EmployeeBreakdown({
                 );
               })}
             </tbody>
+            {/* bg-slate-900/text-white total rows are already a dark surface in
+                light mode and read identically once dark mode is active —
+                intentionally invariant, left as-is (same as the fixed navy bars
+                in the grid). */}
             <tfoot>
               {s.isPT ? (
                 <tr className="bg-slate-900 text-white">
@@ -1096,15 +1189,7 @@ function Row({
           </span>
         </td>
         <td className="px-5 py-4 text-center text-sm font-bold text-orange-600 dark:text-orange-400">{fmtHrs(s.coachHrs)}</td>
-        <td className="px-5 py-4 text-center">
-          {s.coachHrs > 0 ? (
-            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-50 text-pink-600 border border-pink-200 dark:bg-pink-900 dark:text-pink-300 dark:border-pink-700">
-              {Math.round(s.coachHrs / 1.25)}
-            </span>
-          ) : (
-            <span className="text-slate-300 dark:text-slate-600">—</span>
-          )}
-        </td>
+        <td className="px-5 py-4 text-center text-sm font-bold text-pink-600 dark:text-pink-400">{s.classes ?? 0}</td>
         <td className="px-5 py-4 text-center text-sm font-bold text-indigo-600 dark:text-indigo-400">{fmtHrs(s.execHrs)}</td>
         <td className="px-5 py-4 text-center text-sm font-black text-blue-600 dark:text-blue-400">{fmtHrs(s.totalHrs)}</td>
         {showPay && (
@@ -1202,162 +1287,149 @@ export default function ManpowerCostReportPage() {
 
 function DailyBreakdownModal({
   s,
-  monthLabel,
+  selectedMonth,
+  weekFilter,
+  weekStart,
+  weekEnd,
   execRate,
   onClose,
+  onDownloadPdf,
 }: {
   s: StaffRow;
-  monthLabel: string;
+  selectedMonth: string;
+  weekFilter: string;
+  weekStart: string;
+  weekEnd: string;
   execRate: number;
   onClose: () => void;
+  onDownloadPdf: () => void;
 }) {
-  const [yr, mn] = monthLabel ? [new Date(monthLabel).getFullYear(), new Date(monthLabel).getMonth() + 1] : [new Date().getFullYear(), new Date().getMonth() + 1];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const [yr, mn] = selectedMonth.split("-").map(Number);
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const numDays = new Date(yr, mn, 0).getDate();
-  const allDays = Array.from({ length: numDays }, (_, i) => {
+  const allDaysRaw = Array.from({ length: numDays }, (_, i) => {
     const d = i + 1;
     const dateStr = `${yr}-${String(mn).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const dayName = daysOfWeek[new Date(yr, mn - 1, d).getDay()];
     return { dayNum: d, date: dateStr, day: dayName };
   });
-  
-  const workedMap: Record<string, { coachHrs: number; execHrs: number; totalHrs: number; scheduleBranch?: string }> = {};
+  const allDaysInMonth = weekFilter
+    ? allDaysRaw.filter(d => d.date >= weekStart && d.date <= weekEnd)
+    : allDaysRaw;
+  const workedMap: Record<string, StaffRow["days"][number]> = {};
   s.days.forEach(d => { workedMap[d.date] = d; });
 
-  const handlePdf = () => {
-    const doc = new jsPDF();
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text(`Daily Breakdown: ${s.name}`, 14, 20);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Month: ${monthLabel} | Branch: ${s.branch}`, 14, 27);
-    
-    const tableData = allDays.map(row => {
-      const entry = workedMap[row.date];
-      if (!entry) return [row.dayNum.toString(), row.day.slice(0, 3), row.date, "-", "-", "-", "-", "-"];
-      const classes = Math.round(entry.coachHrs / 1.25);
-      const coachPayDay = entry.coachHrs * (s.rate || 0);
-      const execPayDay = entry.execHrs * execRate;
-      return [
-        row.dayNum.toString(),
-        row.day.slice(0, 3),
-        row.date,
-        fmtHrs(entry.coachHrs),
-        classes > 0 ? classes.toString() : "-",
-        fmtHrs(entry.execHrs),
-        fmtHrs(entry.totalHrs),
-        s.isPT ? `RM ${(coachPayDay + execPayDay).toFixed(2)}` : "-",
-      ];
-    });
-
-    autoTable(doc, {
-      startY: 35,
-      head: [["NO.", "DAY", "DATE", "COACH HR", "CLASS", "EXEC HR", "TOTAL HR", "PAY (RM)"]],
-      body: tableData,
-      theme: "grid",
-      headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 3 },
-      columnStyles: {
-        3: { halign: "center", textColor: [234, 88, 12] },
-        4: { halign: "center", textColor: [249, 115, 22] },
-        5: { halign: "center", textColor: [79, 70, 229] },
-        6: { halign: "center", textColor: [37, 99, 235] },
-        7: { halign: "right", fontStyle: "bold" },
-      }
-    });
-
-    doc.save(`daily_breakdown_${s.name.replace(/\s+/g, "_")}_${monthLabel}.pdf`);
-  };
+  const showPay = s.isPT;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
-        <div className="flex items-start justify-between p-5 border-b border-slate-200 gap-4 shrink-0 dark:border-slate-800">
-          <div>
-            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              Daily Breakdown: <span className="text-blue-600 dark:text-blue-400 uppercase">{s.name}</span>
-              <span className="text-slate-400 font-normal ml-2 text-xs">
-                ({s.branch} | Coach {s.isPT && s.rate ? `RM${s.rate}/hr` : "N/A"}, Exec RM{execRate}/hr)
-              </span>
-            </h2>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-              {s.days.length} day{s.days.length === 1 ? "" : "s"} worked
-            </p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 flex items-center justify-between bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+            Daily Breakdown: <span className="text-blue-600 dark:text-blue-400">{s.name}</span>
+            <span className="text-slate-400 font-normal ml-2">
+              ({s.branch}{s.isPT && s.rate ? ` | Coach RM${s.rate}/hr, Exec RM${execRate}/hr` : ""})
+            </span>
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{s.days.length} day{s.days.length !== 1 ? "s" : ""} worked</span>
             <button
-              onClick={handlePdf}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+              onClick={onDownloadPdf}
+              title="Download PDF"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-all"
             >
-              <FileDown className="w-4 h-4" /> PDF
+              <FileDown className="w-3.5 h-3.5" /> PDF
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors dark:hover:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Close"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
-
-        <div className="overflow-y-auto p-0">
-          <table className="w-full text-xs border-collapse">
-            <thead className="bg-white sticky top-0 shadow-sm z-10 border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800">
-              <tr>
-                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">No.</th>
-                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Day</th>
-                <th className="px-4 py-3 text-left font-bold text-slate-400 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-center font-bold text-orange-500 uppercase tracking-wider dark:text-orange-400">Coach Hr</th>
-                <th className="px-4 py-3 text-center font-bold text-pink-500 uppercase tracking-wider dark:text-pink-400">Class</th>
-                <th className="px-4 py-3 text-center font-bold text-indigo-400 uppercase tracking-wider dark:text-indigo-300">Exec Hr</th>
-                <th className="px-4 py-3 text-center font-bold text-blue-500 uppercase tracking-wider dark:text-blue-400">Total Hr</th>
-                <th className="px-4 py-3 text-right font-bold text-green-600 uppercase tracking-wider dark:text-green-400">Pay (RM)</th>
+        <div className="overflow-auto">
+          <table className="w-full text-left">
+            <thead className="sticky top-0">
+              <tr className="text-xs font-bold uppercase tracking-wider bg-slate-50 dark:bg-slate-800">
+                <th className="px-4 py-2 text-slate-400 w-12 bg-slate-50 dark:bg-slate-800">No.</th>
+                <th className="px-4 py-2 text-slate-400 bg-slate-50 dark:bg-slate-800">Day</th>
+                <th className="px-4 py-2 text-slate-400 bg-slate-50 dark:bg-slate-800">Date</th>
+                <th className="px-4 py-2 text-orange-400 text-center bg-slate-50 dark:bg-slate-800">Coach Hr</th>
+                <th className="px-4 py-2 text-pink-400 text-center bg-slate-50 dark:bg-slate-800">Class</th>
+                <th className="px-4 py-2 text-indigo-400 text-center bg-slate-50 dark:bg-slate-800">Exec Hr</th>
+                <th className="px-4 py-2 text-blue-400 text-center bg-slate-50 dark:bg-slate-800">Total Hr</th>
+                {showPay && <th className="px-4 py-2 text-green-500 dark:text-green-400 text-right bg-slate-50 dark:bg-slate-800">Pay (RM)</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-              {allDays.map(row => {
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {allDaysInMonth.map(row => {
                 const entry = workedMap[row.date];
                 const isWeekend = row.day === "Saturday" || row.day === "Sunday";
                 const worked = !!entry;
                 const coachPayDay = worked ? entry.coachHrs * (s.rate || 0) : 0;
                 const execPayDay = worked ? entry.execHrs * execRate : 0;
                 const dayPay = coachPayDay + execPayDay;
-                const classes = worked ? Math.round(entry.coachHrs / 1.25) : 0;
+                const isReplacement = worked && entry.scheduleBranch;
 
                 return (
-                  <tr key={row.date} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${!worked ? "text-slate-300 dark:text-slate-600" : ""}`}>
-                    <td className="px-4 py-2 font-medium text-slate-400">{row.dayNum}</td>
-                    <td className={`px-4 py-2 font-bold ${!worked ? "text-slate-300 dark:text-slate-600" : isWeekend ? "text-blue-500 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"}`}>
-                      {row.day.slice(0, 3)}
+                  <tr key={row.date} className={`transition-colors ${
+                    !worked ? "bg-slate-50/50 dark:bg-slate-800/40 text-slate-300 dark:text-slate-600" :
+                    isReplacement ? "bg-amber-50/50 dark:bg-amber-900/30 hover:bg-amber-50/80 dark:hover:bg-amber-900/50" :
+                    isWeekend ? "bg-blue-50/30 dark:bg-blue-900/20 hover:bg-blue-50/50 dark:hover:bg-blue-900/40" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                  }`}>
+                    <td className="px-4 py-1.5 text-xs font-medium text-slate-400">{row.dayNum}</td>
+                    <td className="px-4 py-1.5">
+                      <span className={`text-xs font-bold ${!worked ? "text-slate-300 dark:text-slate-600" : isWeekend ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-300"}`}>
+                        {row.day.slice(0, 3)}
+                      </span>
                     </td>
-                    <td className={`px-4 py-2 ${!worked ? "text-slate-300 dark:text-slate-600" : "text-slate-600 dark:text-slate-300"}`}>
+                    <td className="px-4 py-1.5 text-xs text-slate-500 dark:text-slate-400">
                       {row.date}
-                      {worked && entry.scheduleBranch && (
-                        <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider dark:text-amber-300 dark:bg-amber-900 dark:border-amber-700">
-                          Training / Replacement
-                        </span>
+                      {isReplacement && (
+                        <span className="ml-1 text-[9px] font-bold text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded">@ {entry.scheduleBranch}</span>
                       )}
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-orange-500 dark:text-orange-400" : "text-slate-200 dark:text-slate-700"}`}>
-                      {worked ? fmtHrs(entry.coachHrs) : "-"}
+                    <td className="px-4 py-1.5 text-center text-xs font-bold">
+                      <span className={worked ? "text-orange-600 dark:text-orange-400" : "text-slate-300 dark:text-slate-600"}>{worked ? fmtHrs(entry.coachHrs) : "-"}</span>
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked && classes > 0 ? "text-pink-500 dark:text-pink-400" : "text-slate-200 dark:text-slate-700"}`}>
-                      {worked && classes > 0 ? classes : "-"}
+                    <td className="px-4 py-1.5 text-center text-xs font-bold">
+                      <span className={worked && (entry.classes ?? 0) > 0 ? "text-pink-600 dark:text-pink-400" : "text-slate-300 dark:text-slate-600"}>{worked && (entry.classes ?? 0) > 0 ? entry.classes : "-"}</span>
                     </td>
-                    <td className={`px-4 py-2 text-center font-bold ${worked ? "text-indigo-500 dark:text-indigo-400" : "text-slate-200 dark:text-slate-700"}`}>
-                      {worked ? fmtHrs(entry.execHrs) : "-"}
+                    <td className="px-4 py-1.5 text-center text-xs font-bold">
+                      <span className={worked ? "text-indigo-600 dark:text-indigo-400" : "text-slate-300 dark:text-slate-600"}>{worked ? fmtHrs(entry.execHrs) : "-"}</span>
                     </td>
-                    <td className={`px-4 py-2 text-center font-black ${worked ? "text-blue-600 dark:text-blue-400" : "text-slate-200 dark:text-slate-700"}`}>
-                      {worked ? fmtHrs(entry.totalHrs) : "-"}
+                    <td className="px-4 py-1.5 text-center text-xs font-black">
+                      <span className={worked ? "text-blue-600 dark:text-blue-400" : "text-slate-300 dark:text-slate-600"}>{worked ? fmtHrs(entry.totalHrs) : "-"}</span>
                     </td>
-                    <td className={`px-4 py-2 text-right font-black ${worked && dayPay > 0 ? "text-green-600 dark:text-green-400" : "text-slate-200 dark:text-slate-700"}`}>
-                      {worked && s.isPT ? `RM ${dayPay.toFixed(2)}` : "-"}
-                    </td>
+                    {showPay && (
+                      <td className="px-4 py-1.5 text-right text-xs font-black">
+                        <span className={worked ? "text-green-600 dark:text-green-400" : "text-slate-300 dark:text-slate-600"}>{worked ? `RM ${dayPay.toFixed(2)}` : "-"}</span>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
             </tbody>
+            {/* bg-slate-900/text-white total row is already a dark surface —
+                intentionally invariant across themes, same as elsewhere in this file. */}
+            <tfoot>
+              <tr className="bg-slate-900 text-white">
+                <td colSpan={3} className="px-4 py-3 text-xs font-black uppercase">Monthly Total ({s.days.length} day{s.days.length !== 1 ? "s" : ""} worked)</td>
+                <td className="px-4 py-3 text-center text-xs font-black text-orange-300">{fmtHrs(s.coachHrs)}</td>
+                <td className="px-4 py-3 text-center text-xs font-black text-pink-300">{s.classes ?? 0}</td>
+                <td className="px-4 py-3 text-center text-xs font-black text-indigo-300">{fmtHrs(s.execHrs)}</td>
+                <td className="px-4 py-3 text-center text-xs font-black text-blue-300">{fmtHrs(s.totalHrs)}</td>
+                {showPay && <td className="px-4 py-3 text-right text-sm font-black text-green-400">RM {s.totalPay.toFixed(2)}</td>}
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

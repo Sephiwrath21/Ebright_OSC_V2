@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles,
   Workflow,
+  FolderOpen,
 } from "lucide-react";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -30,7 +31,10 @@ interface HrmsModule {
   Icon: IconComponent;
   accent: string;
   accentHover: string;
+  /** Coarse role gate (induction-type tiles). */
   requiredRoles?: ReadonlySet<string>;
+  /** Access-Management feature this tile requires `view` on. */
+  feature?: string;
 }
 
 const modules: HrmsModule[] = [
@@ -42,6 +46,7 @@ const modules: HrmsModule[] = [
     Icon: LayoutDashboard,
     accent: "bg-blue-600",
     accentHover: "group-hover:bg-blue-700",
+    feature: "employee_dashboard",
   },
   {
     id: "manpower-planning",
@@ -51,6 +56,7 @@ const modules: HrmsModule[] = [
     Icon: CalendarRange,
     accent: "bg-violet-600",
     accentHover: "group-hover:bg-violet-700",
+    feature: "manpower_plan",
   },
   {
     id: "claims",
@@ -60,6 +66,7 @@ const modules: HrmsModule[] = [
     Icon: Receipt,
     accent: "bg-emerald-600",
     accentHover: "group-hover:bg-emerald-700",
+    feature: "claim",
   },
   {
     id: "attendance",
@@ -69,6 +76,7 @@ const modules: HrmsModule[] = [
     Icon: CalendarCheck,
     accent: "bg-amber-600",
     accentHover: "group-hover:bg-amber-700",
+    feature: "attendance_overview",
   },
   {
     id: "hr-dashboard",
@@ -88,6 +96,7 @@ const modules: HrmsModule[] = [
     Icon: PiggyBank,
     accent: "bg-teal-600",
     accentHover: "group-hover:bg-teal-700",
+    feature: "manpower_cost",
   },
   // Induction Control Centre tile removed in Phase D — induction management
   // is now done directly from the Onboarding tile (HR onboarding dashboard).
@@ -139,18 +148,45 @@ const modules: HrmsModule[] = [
     Icon: Users,
     accent: "bg-indigo-600",
     accentHover: "group-hover:bg-indigo-700",
+    feature: "staff_directory",
+  },
+  // No `feature` gate — see Sidebar.tsx's matching Employee Folder entry
+  // for why (its real access control is employeeScope.ts, not the
+  // role_permission matrix this tile's feature key checks against).
+  {
+    id: "employee-folder",
+    title: "Employee Folder",
+    description: "Access individual employee records and documents",
+    href: "/employee-folder",
+    Icon: FolderOpen,
+    accent: "bg-cyan-600",
+    accentHover: "group-hover:bg-cyan-700",
   },
 ];
 
 interface HrmsDashboardProps {
   role?: string | null;
+  /** Access-Management features the viewer has `view` on. */
+  features?: string[];
+  /** superadmin/ceo — sees every tile. */
+  privileged?: boolean;
 }
 
-export default function HrmsDashboard({ role }: HrmsDashboardProps = {}) {
+export default function HrmsDashboard({
+  role,
+  features = [],
+  privileged = false,
+}: HrmsDashboardProps = {}) {
   const normalizedRole = (role ?? "").toLowerCase();
-  const visibleModules = modules.filter(
-    (m) => !m.requiredRoles || m.requiredRoles.has(normalizedRole),
-  );
+  const granted = new Set(features);
+  const visibleModules = modules.filter((m) => {
+    if (privileged) return true;
+    // Coarse role-gated tiles (onboarding/offboarding/etc.) keep their role check.
+    if (m.requiredRoles) return m.requiredRoles.has(normalizedRole);
+    // Feature-gated tiles must have the Access-Management grant.
+    if (m.feature) return granted.has(m.feature);
+    return true;
+  });
 
   return (
     <div className="min-h-full bg-slate-50 dark:bg-slate-950">

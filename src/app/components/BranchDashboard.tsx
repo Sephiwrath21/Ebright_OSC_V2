@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
 import { Compass, UserCheck, UserX, Activity, Calendar, Megaphone, Bell, Trash2, Plus } from "lucide-react";
 
@@ -8,6 +8,8 @@ interface BranchDashboardProps {
   userName?: string | null;
   userEmail?: string | null;
   branchName?: string | null;
+  /** Server-rendered Task Manager overview (scoped, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 interface EventItem {
@@ -135,6 +137,7 @@ function MetricRow({
           >
             {m.key}
           </div>
+          {/* Brand blue accent (off-table, kept literal). */}
           <div style={{ fontSize: 22, fontWeight: 700, color: "#185FA5", lineHeight: 1.2 }}>
             {m.value}
           </div>
@@ -218,6 +221,7 @@ export default function BranchDashboard({
   userName,
   userEmail,
   branchName: sessionBranchName,
+  taskOverview,
 }: BranchDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [currentBranchName, setCurrentBranchName] = useState(sessionBranchName || "Klang");
@@ -242,7 +246,8 @@ export default function BranchDashboard({
   ]);
   const [revenueRanking, setRevenueRanking] = useState<{ rank: number; name: string; code: string; revenue: number }[]>([]);
 
-  // Clickup status distribution
+  // Clickup status distribution — donut data-series colours, kept FIXED
+  // across themes so each status keeps its identity; not tokenised.
   const clickupData = [
     { label: "Complete", value: 24, color: "#0F6E56" },
     { label: "In Progress", value: 11, color: "#185FA5" },
@@ -453,6 +458,11 @@ export default function BranchDashboard({
               }}
             >
               {attendance.map((a) => {
+                // Default/Annual Leave uses a blue tint with no matching
+                // "accent-blue-strong" token in the palette — tokenising the
+                // bg without a paired strong-blue label would break dark-mode
+                // contrast (light text-on-navy), so this branch is left
+                // fully literal (bg+border+iconBg+labelColor together).
                 let bg = "var(--tint-blue)";
                 let border = "1px solid var(--status-blue-bg)";
                 let iconBg = "var(--accent-blue)";
@@ -462,23 +472,25 @@ export default function BranchDashboard({
 
                 if (a.label === "Present") {
                   bg = "var(--tint-green)";
-                  border = "1px solid var(--status-green-bg)";
-                  iconBg = "var(--accent-green)";
+                  border = "1px solid #D1FAE5"; // off-table green-200, no token — left literal
+                  iconBg = "#10B981"; // solid icon-circle fill — theme-invariant, left literal
                   labelColor = "var(--accent-green-strong)";
                   IconComponent = UserCheck;
                 } else if (a.label === "Absent") {
                   bg = "var(--tint-red)";
                   border = "1px solid var(--tint-red-strong)";
-                  iconBg = "var(--accent-red)";
-                  labelColor = "var(--accent-red-strong)";
+                  iconBg = "#EF4444"; // solid icon-circle fill — theme-invariant, left literal
+                  labelColor = "var(--accent-red-strong)"; // nearest (#B91C1C -> #991B1B), reported
                   IconComponent = UserX;
                 } else if (a.label === "MC") {
                   bg = "var(--tint-amber)";
-                  border = "1px solid var(--status-amber-bg-strong)";
-                  iconBg = "var(--accent-amber)";
-                  labelColor = "var(--accent-amber-strong)";
+                  border = "1px solid #FDE68A"; // off-table amber-300, no token — left literal
+                  iconBg = "#F59E0B"; // solid icon-circle fill — theme-invariant, left literal
+                  labelColor = "var(--accent-amber-strong)"; // nearest (#B45309 -> #92400E), reported
                   IconComponent = Activity;
                 } else if (a.label === "Annual Leave") {
+                  // Same blue-tint case as the pre-loop default above — left
+                  // fully literal for the same dark-mode contrast reason.
                   bg = "var(--tint-blue)";
                   border = "1px solid var(--status-blue-bg)";
                   iconBg = "var(--accent-blue)";
@@ -568,7 +580,8 @@ export default function BranchDashboard({
 
               return (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                  {/* Above the medal: Revenue label */}
+                  {/* Above the medal: Revenue label — brand blue accent
+                      (off-table, kept literal). */}
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#185FA5", textAlign: "center" }}>
                     Rev. {formatRM(revVal)}
                   </div>
@@ -586,7 +599,14 @@ export default function BranchDashboard({
                       {currentBranchCode.toUpperCase()}
                     </span>
 
-                    {/* Medal Graphic for Top 10, otherwise Rank Text */}
+                    {/* Medal Graphic for Top 10, otherwise Rank Text.
+                        Decorative gold-medal illustration — a fixed
+                        achievement badge that stays recognisable in both
+                        themes, so its fills (ribbon/body) are left literal.
+                        The rank number inside is pinned to the medal's own
+                        fixed gold circle, so it also stays literal (a
+                        theme-flipping token here would go light-on-light
+                        against the unchanging medal). */}
                     {isTop10 ? (
                       <div style={{ position: "relative", width: 50, height: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
@@ -687,6 +707,8 @@ export default function BranchDashboard({
                   outline: "none",
                 }}
               />
+              {/* Solid brand-blue fill with white text — theme-invariant,
+                  left literal. */}
               <button
                 type="submit"
                 style={{
@@ -719,6 +741,7 @@ export default function BranchDashboard({
                     type="checkbox"
                     checked={t.done}
                     onChange={() => toggleTask(t.id)}
+                    // Brand blue accent-color (off-table, kept literal).
                     style={{ width: 14, height: 14, accentColor: "#185FA5", flexShrink: 0 }}
                   />
                   <span
@@ -778,7 +801,7 @@ export default function BranchDashboard({
               >
                 EVENT TRACKER
               </div>
-              
+
               {/* Event Add Form */}
               <form onSubmit={addEvent} style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 <input
@@ -811,6 +834,8 @@ export default function BranchDashboard({
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
                 </select>
+                {/* Solid brand-blue fill with white text — theme-invariant,
+                    left literal. */}
                 <button
                   type="submit"
                   style={{
@@ -836,12 +861,18 @@ export default function BranchDashboard({
                 {(["upcoming", "ongoing", "completed"] as const).map((col) => {
                   const filtered = events.filter((ev) => ev.status === col);
                   const title = col === "upcoming" ? "Upcoming" : col === "ongoing" ? "Ongoing" : "Completed";
-                  const borderCol = col === "upcoming" ? "0.5px solid var(--border-subtle)" : col === "ongoing" ? "0.5px solid var(--status-amber-bg-strong)" : "0.5px solid var(--status-green-bg)";
+                  // "ongoing"/"completed" border colours (amber-300/emerald-200)
+                  // are off-table with no close token — left literal.
+                  const borderCol = col === "upcoming" ? "0.5px solid var(--border-subtle)" : col === "ongoing" ? "0.5px solid #FDE68A" : "0.5px solid #A7F3D0";
                   const bgCol = col === "upcoming" ? "var(--surface-sunken)" : col === "ongoing" ? "var(--tint-amber)" : "var(--tint-green)";
                   const textCol = col === "upcoming" ? "var(--status-neutral-fg-strong)" : col === "ongoing" ? "var(--accent-amber-strong)" : "var(--accent-green-strong)";
 
                   return (
                     <div key={col} style={{ border: borderCol, background: bgCol, borderRadius: 10, padding: 8 }}>
+                      {/* Divider sits on a bg that now flips dark (tint-amber/
+                          tint-green) — the 5%-black hairline may read very
+                          faint there; left as-is per the opacity-overlay
+                          rule (theme-invariant on coloured surfaces). */}
                       <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", borderBottom: "0.5px solid rgba(0,0,0,0.05)", paddingBottom: 4, color: textCol }}>
                         {title}
                       </p>
@@ -887,6 +918,10 @@ export default function BranchDashboard({
               >
                 ANNOUNCEMENTS
               </div>
+              {/* Blue-tint card: no "accent-blue-strong" token exists to pair
+                  with a tokenised tint-blue bg without breaking dark-mode
+                  contrast (see the Annual Leave attendance card above for the
+                  same reasoning) — left fully literal. */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto", paddingRight: 2 }}>
                 {DEFAULT_ANNOUNCEMENTS.map((a) => (
                   <div
@@ -911,6 +946,11 @@ export default function BranchDashboard({
             </div>
           </div>
         </Panel>
+
+        {/* Task Manager — own-branch status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );

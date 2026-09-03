@@ -24,12 +24,14 @@ import {
   diffUserFields,
   EXTRA_USERS,
   mapHrfsUser,
+  mapPortalEmployee,
   OVERRIDES,
   ROLE_MAP,
   UNRESOLVED_BRANCH_CODES,
   validateHandEditedConfig,
   type DiffableUserFields,
   type HrfsUserRow,
+  type PortalEmployeeRow,
 } from "./hrfs-map";
 
 function row(overrides: Partial<HrfsUserRow> = {}): HrfsUserRow {
@@ -484,7 +486,7 @@ describe("FLOW_STAFF_ROLES / BRANCH_STAFF_ROLES equivalence", () => {
 describe("diffUserFields", () => {
   const base: DiffableUserFields = {
     role: "MEMBER",
-    department: "Operation",
+    department: "Operations",
     branch: null,
     employmentType: "Full Time",
     coachSchedule: null,
@@ -503,7 +505,7 @@ describe("diffUserFields", () => {
     const next: DiffableUserFields = { ...base, department: null, branch: "Klang" };
     expect(diffUserFields(existing, next)).toEqual([
       "role HOD→MEMBER",
-      "department Operation→(none)",
+      "department Operations→(none)",
       "branch (none)→Klang",
     ]);
   });
@@ -515,5 +517,91 @@ describe("diffUserFields", () => {
     expect(diffUserFields({ ...base, coachSchedule: "Full Time" }, { ...base, coachSchedule: null })).toEqual([
       "coachSchedule Full Time→(none)",
     ]);
+  });
+});
+
+// ---------- portal second source (2026-07-25) ----------
+
+describe("mapPortalEmployee", () => {
+  const emp = (overrides: Partial<PortalEmployeeRow> = {}): PortalEmployeeRow => ({
+    email: "portal@example.invalid",
+    name: "Portal Person",
+    position: "INTERN",
+    department: null,
+    branch: null,
+    ...overrides,
+  });
+
+  it("INTERN -> department-side member, department from the employment record", () => {
+    const r = mapPortalEmployee(emp({ position: "INTERN", department: "Academy", branch: "HQ" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.user.role).toBe("MEMBER");
+      expect(r.user.employmentType).toBe("Intern");
+      expect(r.user.department).toBe("Academy");
+      // "HQ" is an org marker, and interns are dept-side anyway — no branch.
+      expect(r.user.branch).toBeNull();
+    }
+  });
+
+  it("PT COACH requires a resolvable branch — real portal branch names pass", () => {
+    const ok = mapPortalEmployee(emp({ position: "PT COACH", branch: "Putrajaya" }));
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.user.employmentType).toBe("Coach");
+      expect(ok.user.coachSchedule).toBe("Part Time");
+      expect(ok.user.branch).toBe("Putrajaya");
+    }
+    const bad = mapPortalEmployee(emp({ position: "PT COACH", branch: "HQ" }));
+    expect(bad.ok).toBe(false);
+  });
+
+  it('the portal\'s "Kajang TTDI Grove" spelling resolves via the alias', () => {
+    const r = mapPortalEmployee(emp({ position: "BM", branch: "Kajang TTDI Grove" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.user.role).toBe("BRANCH");
+      expect(r.user.branch).toBe("Kajang TTDI Groove");
+    }
+  });
+
+  it("FT HOD -> full HOD with the employment record's department; skips without one", () => {
+    const ok = mapPortalEmployee(emp({ position: "FT HOD", department: "Marketing" }));
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.user.role).toBe("HOD");
+      expect(ok.user.department).toBe("Marketing");
+    }
+    const noDept = mapPortalEmployee(emp({ position: "FT HOD", department: null }));
+    expect(noDept.ok).toBe(false);
+    // Non-Task-Manager units (e.g. "IOP") don't count as a department.
+    const iop = mapPortalEmployee(emp({ position: "FT HOD", department: "IOP" }));
+    expect(iop.ok).toBe(false);
+  });
+
+  it("unknown or missing positions skip loudly", () => {
+    expect(mapPortalEmployee(emp({ position: null })).ok).toBe(false);
+    expect(mapPortalEmployee(emp({ position: "WIZARD" })).ok).toBe(false);
+  });
+
+  it("EXECUTIVE and FT EXEC both read as HQ Exec", () => {
+    for (const position of ["EXECUTIVE", "FT EXEC"]) {
+      const r = mapPortalEmployee(emp({ position, department: "Finance" }));
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.user.employmentType).toBe("HQ Exec");
+    }
+  });
+
+  it("OVERRIDES win over the portal mapping, same as the primary source", () => {
+    OVERRIDES["portal-override@example.invalid"] = { department: "Finance" };
+    try {
+      const r = mapPortalEmployee(
+        emp({ email: "portal-override@example.invalid", position: "INTERN", department: "Academy" }),
+      );
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.user.department).toBe("Finance");
+    } finally {
+      delete OVERRIDES["portal-override@example.invalid"];
+    }
   });
 });

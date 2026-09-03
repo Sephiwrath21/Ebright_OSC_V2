@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { redirect, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -11,6 +11,8 @@ import {
   Home,
   Building2,
   CalendarDays,
+  Search,
+  Check,
 } from "lucide-react";
 import AppShell from "@/app/components/AppShell";
 
@@ -284,7 +286,6 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   const [branchesLoading, setBranchesLoading] = useState(true);
   const [branchesError, setBranchesError] = useState<string | null>(null);
 
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [selectedMonday, setSelectedMonday] = useState<Date | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -296,13 +297,6 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
     ? new Date(selectedMonday.getTime() + 6 * 86_400_000)
     : null;
 
-  const OTHER_REGION = "Other";
-  const regions = Array.from(
-    new Set(branches.map(b => b.region?.trim() || OTHER_REGION))
-  ).sort();
-  const filteredBranches = selectedRegion
-    ? branches.filter(b => (b.region?.trim() || OTHER_REGION) === selectedRegion)
-    : [];
 
   // Load branches
   useEffect(() => {
@@ -313,13 +307,11 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (cancelled) return;
-        
+
         if (json.success && Array.isArray(json.branches)) {
           setBranches(json.branches);
           if (!isAdmin && json.branches.length > 0) {
-            const first = json.branches[0];
-            setSelectedRegion(first.region?.trim() || OTHER_REGION);
-            setSelectedBranch(first);
+            setSelectedBranch(json.branches[0]);
           }
         } else {
           throw new Error(json.error || "Failed to load branches");
@@ -357,16 +349,7 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
     return () => { cancelled = true; };
   }, [selectedBranch]);
 
-  function handleRegionChange(value: string) {
-    setSelectedRegion(value);
-    setSelectedBranch(null);
-    setSelectedMonday(null);
-    setConfirmed(false);
-  }
-
-  function handleBranchChange(value: string) {
-    const id = Number(value);
-    const branch = branches.find(b => b.branch_id === id) ?? null;
+  function handleBranchChange(branch: Branch | null) {
     setSelectedBranch(branch);
     setSelectedMonday(null);
     setConfirmed(false);
@@ -392,18 +375,6 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
   }
 
   const selectedWeekStatus = selectedMonday ? scheduledWeeks[toLocalISO(selectedMonday)] : null;
-
-  const selectCls =
-    "w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-white " +
-    "focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors " +
-    "appearance-none disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 " +
-    "dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900 dark:disabled:text-slate-600";
-  const selectStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat" as const,
-    backgroundPosition: "right 10px center" as const,
-    paddingRight: "32px",
-  };
 
   return (
     <div className="min-h-full bg-slate-50 dark:bg-slate-950">
@@ -447,33 +418,13 @@ function PlanNewWeekContent({ userRole }: PlanNewWeekContentProps) {
             </div>
 
             <div className="p-5 space-y-2.5">
-              <select
-                value={selectedRegion}
-                onChange={e => handleRegionChange(e.target.value)}
-                disabled={branchesLoading || !!branchesError}
-                className={selectCls}
-                style={selectStyle}
-              >
-                <option value="">
-                  {branchesLoading ? "Loading…" : branchesError ? "Failed to load" : "Region"}
-                </option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-
-              <select
-                value={selectedBranch?.branch_id ?? ""}
-                onChange={e => handleBranchChange(e.target.value)}
-                disabled={branchesLoading || !!branchesError || !selectedRegion}
-                className={selectCls}
-                style={selectStyle}
-              >
-                <option value="">{selectedRegion ? "Branch" : "Pick region first"}</option>
-                {filteredBranches.map(b => (
-                  <option key={b.branch_id} value={b.branch_id}>
-                    {b.branch_name}{b.location ? ` — ${b.location}` : ""}
-                  </option>
-                ))}
-              </select>
+              <BranchCombobox
+                branches={branches}
+                selected={selectedBranch}
+                onSelect={handleBranchChange}
+                loading={branchesLoading}
+                error={!!branchesError}
+              />
 
               {branchesError && <p className="text-xs text-rose-600 dark:text-rose-400">{branchesError}</p>}
 
@@ -622,5 +573,123 @@ export default function PlanNewWeekPage() {
     <AppShell email={userEmail} role={userRole} name={userName}>
       <PlanNewWeekContent userRole={userRole} />
     </AppShell>
+  );
+}
+
+// ─── Searchable branch dropdown ───────────────────────────────────────────────
+// Type-to-filter combobox over the branch list (branch_name / location / region).
+// `onSelect` receives the full Branch (or null when cleared).
+function BranchCombobox({
+  branches,
+  selected,
+  onSelect,
+  loading,
+  error,
+}: {
+  branches: Branch[];
+  selected: Branch | null;
+  onSelect: (b: Branch | null) => void;
+  loading: boolean;
+  error: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? branches.filter(b =>
+        [b.branch_name, b.location ?? "", b.region ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : branches;
+
+  const disabled = loading || error;
+  const buttonLabel = loading
+    ? "Loading…"
+    : error
+    ? "Failed to load"
+    : selected
+    ? selected.branch_name
+    : "Select branch";
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => { if (!disabled) { setOpen(o => !o); setQuery(""); } }}
+        className={
+          "w-full flex items-center justify-between gap-2 text-sm border rounded-xl px-3 py-2 bg-white dark:bg-slate-950 transition-colors " +
+          "focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 " +
+          "disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-400 " +
+          (open ? "border-indigo-400 ring-2 ring-indigo-400" : "border-slate-200 dark:border-slate-500")
+        }
+      >
+        <span className={selected ? "text-slate-700 dark:text-slate-300 truncate" : "text-slate-400 truncate"}>
+          {buttonLabel}
+        </span>
+        <ChevronRight className="w-4 h-4 text-slate-400 rotate-90 shrink-0" aria-hidden="true" />
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+            <Search className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search branch…"
+              className="w-full text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 outline-none bg-transparent"
+            />
+          </div>
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-slate-400">No branches match “{query}”.</li>
+            ) : (
+              filtered.map(b => {
+                const isSel = selected?.branch_id === b.branch_id;
+                return (
+                  <li key={b.branch_id}>
+                    <button
+                      type="button"
+                      onClick={() => { onSelect(b); setOpen(false); setQuery(""); }}
+                      className={
+                        "w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors " +
+                        (isSel ? "bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800")
+                      }
+                    >
+                      <Check
+                        className={"w-4 h-4 shrink-0 " + (isSel ? "text-indigo-600" : "text-transparent")}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">
+                        <span className="font-medium">{b.branch_name}</span>
+                        {b.location ? <span className="text-slate-400"> — {b.location}</span> : null}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

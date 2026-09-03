@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import GreetingHeader from "./GreetingHeader";
+import SelfJustificationModal, {
+  type SelfJustificationTarget,
+} from "./SelfJustificationModal";
 import {
   Check,
   ChevronRight,
@@ -17,11 +20,22 @@ import {
 } from "lucide-react";
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
+// Theme-aware CSS vars (globals.css --status-*-fg) — light values are
+// byte-identical to the original literals, dark values swap automatically.
+// Used for text/fill paired with a matching tinted background.
 const C = {
   green: "var(--status-green-fg)",
   amber: "var(--status-amber-fg)",
   blue:  "var(--status-blue-fg)",
   red:   "var(--status-red-fg)",
+};
+
+// Fixed (non-theme-aware) literals for solid colour fills carrying WHITE
+// text/icons on top (avatar circle, "Profile complete" badge, checked
+// to-do circle) — swapping these to the lighter dark-mode --status-*-fg
+// tone would drop white-on-fill contrast, so they stay literal.
+const SOLID = {
+  green: "var(--status-green-fg)",
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +54,7 @@ interface WeekDay {
   state:   "ontime" | "late" | "today" | "absent" | "upcoming" | "holiday";
   label:   string;
   minutesLate?: number;
+  justification?: { reason: string | null; status: string };
 }
 
 interface DashboardData {
@@ -80,6 +95,8 @@ interface DashboardData {
 interface Props {
   userName?:  string | null;
   userEmail?: string;
+  /** Server-rendered Task Manager overview (personal, with date filters). */
+  taskOverview?: ReactNode;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,26 +140,40 @@ function formatWeekRange(startIso: string, endIso: string): string {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Props) {
+export default function EmployeeSelfServiceDashboard({ userName, userEmail, taskOverview }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [justifyTarget, setJustifyTarget] = useState<SelfJustificationTarget | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employee-dashboard", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.success) setData(json);
+    } catch {
+      // leave data null; UI shows fallback values
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      try {
-        const res = await fetch("/api/employee-dashboard");
-        const json = await res.json();
-        if (!cancelled && res.ok && json.success) setData(json);
-      } catch {
-        // leave data null; UI shows fallback values
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await load();
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [load]);
+
+  const openJustify = (w: WeekDay) => {
+    if (w.state !== "absent" && w.state !== "late") return;
+    setJustifyTarget({
+      date: w.dateIso,
+      state: w.state,
+      existingReason: w.justification?.reason ?? null,
+      existingStatus: w.justification?.status ?? null,
+    });
+  };
 
   const v = data?.viewer;
   const greetName = v?.nickName || v?.fullName?.split(" ")[0] || userName?.split(" ")[0] || "";
@@ -238,7 +269,18 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
                   </p>
                 )}
                 {weekDays.map(w => (
-                  <WeekRow key={w.dateIso} day={w.day} state={w.state} label={w.label} />
+                  <WeekRow
+                    key={w.dateIso}
+                    day={w.day}
+                    state={w.state}
+                    label={w.label}
+                    justification={w.justification}
+                    onJustify={
+                      w.state === "absent" || w.state === "late"
+                        ? () => openJustify(w)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -270,7 +312,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
             <div className="flex items-start gap-4 mb-4">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-base font-black text-white shrink-0"
-                style={{ background: C.green }}
+                style={{ background: SOLID.green }}
               >
                 {profileInitials}
               </div>
@@ -281,7 +323,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
                   </h3>
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                    style={{ background: C.green }}
+                    style={{ background: SOLID.green }}
                   >
                     <Check className="w-3 h-3" strokeWidth={3} />
                     Profile complete
@@ -352,7 +394,18 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail }: Pr
             </ul>
           </Card>
         </div>
+
+        {/* Task Manager — personal status (server-rendered slot).
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview && <div className="mt-6">{taskOverview}</div>}
       </div>
+
+      <SelfJustificationModal
+        target={justifyTarget}
+        onClose={() => setJustifyTarget(null)}
+        onSaved={load}
+      />
     </div>
   );
 }
@@ -429,10 +482,12 @@ function Donut({ percent }: { percent: number }) {
   );
 }
 
-function WeekRow({ day, state, label }: {
+function WeekRow({ day, state, label, justification, onJustify }: {
   day: string;
   state: "ontime" | "late" | "today" | "absent" | "upcoming" | "holiday";
   label: string;
+  justification?: { reason: string | null; status: string };
+  onJustify?: () => void;
 }) {
   const tone =
     state === "ontime"    ? { bg: "var(--status-green-bg)",       fg: C.green,                     w: "85%"  }
@@ -444,8 +499,19 @@ function WeekRow({ day, state, label }: {
   const labelColor =
     state === "today" || state === "upcoming" ? "var(--status-neutral-fg)" : tone.fg;
 
-  return (
-    <div className="flex items-center gap-3">
+  // Small pill on the right of the bar reflecting justification status, or a
+  // "Justify" affordance when the day is absent/late and not yet handled.
+  const badge = (() => {
+    const s = justification?.status;
+    if (s === "approved") return { text: "Justified", bg: "var(--status-green-bg)", fg: C.green };
+    if (s === "pending")  return { text: "Pending",   bg: "var(--status-amber-bg)", fg: C.amber };
+    if (s === "rejected") return { text: "Rejected",  bg: "var(--status-red-bg)", fg: C.red };
+    if (onJustify)        return { text: "Justify",   bg: "var(--status-blue-bg)", fg: C.blue };
+    return null;
+  })();
+
+  const rowInner = (
+    <>
       <span className="w-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">{day}</span>
       <div className="flex-1 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
         <div className="h-full rounded-lg transition-all" style={{ width: tone.w, background: tone.bg }} />
@@ -456,8 +522,31 @@ function WeekRow({ day, state, label }: {
           {label}
         </span>
       </div>
-    </div>
+      {badge && (
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+          style={{ background: badge.bg, color: badge.fg }}
+        >
+          {badge.text}
+        </span>
+      )}
+    </>
   );
+
+  if (onJustify) {
+    return (
+      <button
+        type="button"
+        onClick={onJustify}
+        className="w-full flex items-center gap-3 text-left rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        title="Justify this day"
+      >
+        {rowInner}
+      </button>
+    );
+  }
+
+  return <div className="flex items-center gap-3">{rowInner}</div>;
 }
 
 function WeekStat({ label, value, tone }: {
@@ -500,8 +589,8 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
         <span
           className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
           style={{
-            background:  t.done ? C.green : "transparent",
-            borderColor: t.done ? C.green : "var(--status-border-idle)",
+            background:  t.done ? SOLID.green : "transparent",
+            borderColor: t.done ? SOLID.green : "var(--status-border-idle)",
           }}
         >
           {t.done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}

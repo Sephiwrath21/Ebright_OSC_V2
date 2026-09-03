@@ -7,41 +7,54 @@ import ClaimsView, {
   type StatusCounts,
   type OrgOption,
 } from "@/app/components/ClaimsView";
-import { canReviewClaims } from "@/app/claim/roles";
+import { buildAccess } from "@/lib/access/engine";
+import { claimListWhere } from "@/lib/access/claimScope";
+import ClaimBlockedNotice from "@/app/claim/ClaimBlockedNotice";
+import { claimTaskBlock } from "@/app/claim/task-gate";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClaimsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; view?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
-  const { status: initialStatus } = await searchParams;
+  const { status: initialStatus, view } = await searchParams;
 
-  const me = await prisma.users.findUnique({
-    where: { email: session.user.email },
-    select: {
-      user_id: true,
-      role_id: true,
-      email: true,
-      role: { select: { role_type: true } },
-    },
-  });
-  if (!me) redirect("/login");
+  const access = await buildAccess(session.user.email);
+  if (!access) redirect("/login");
 
-  const isFinance = canReviewClaims({
-    role_id: me.role_id,
-    email: me.email,
-    role_type: me.role?.role_type ?? null,
-  });
-  const isSuperadmin = me.role?.role_type?.toLowerCase() === "superadmin";
+  // Task Manager gate (2026-09-03): the claim pages do not open while the
+  // viewer still has an unfinished task this month. Checked before the claim
+  // queries below, so a blocked visit does no work. Reviewers are exempt —
+  // see claim/task-gate.ts for why.
+  const taskBlock = await claimTaskBlock(session.user.email, access);
+  if (taskBlock) {
+    return (
+      <AppShell
+        email={session.user.email}
+        role={(session.user as { role?: string } | undefined)?.role ?? ""}
+        name={session.user?.name ?? null}
+      >
+        <ClaimBlockedNotice gate={taskBlock} />
+      </AppShell>
+    );
+  }
+
+  const viewScope = access.scope("claim", "view"); // global | team | own | null
+  const canReviewAll = viewScope === "global"; // finance/HR/superadmin (+ceo view)
+  const isTeamScope = viewScope === "team"; // HOD / branch manager
+  const teamView = isTeamScope && view === "team";
+  // Show the employee/branch columns whenever the actor sees others' claims.
+  const showOwnerColumns = canReviewAll || teamView;
+  const isSuperadmin = access.actor.roleType === "superadmin";
 
   const [claims, branches, departments] = await Promise.all([
     prisma.claim.findMany({
-      where: isFinance ? {} : { user_id: me.user_id },
+      where: claimListWhere(access, teamView),
       orderBy: { submitted_on: "desc" },
       include: {
         users: {
@@ -61,13 +74,13 @@ export default async function ClaimsPage({
         },
       },
     }),
-    isFinance
+    canReviewAll
       ? prisma.branch.findMany({
           select: { branch_id: true, branch_code: true, branch_name: true },
           orderBy: { branch_name: "asc" },
         })
       : Promise.resolve([]),
-    isFinance
+    canReviewAll
       ? prisma.department.findMany({
           select: { department_id: true, department_code: true, department_name: true },
           orderBy: { department_name: "asc" },
@@ -133,8 +146,10 @@ export default async function ClaimsPage({
       <ClaimsView
         claims={rows}
         counts={counts}
-        isFinance={isFinance}
+        isFinance={canReviewAll}
         isSuperadmin={isSuperadmin}
+        showOwnerColumns={showOwnerColumns}
+        teamToggle={isTeamScope ? { active: teamView } : null}
         orgOptions={orgOptions}
         initialStatus={initialStatus ?? ""}
       />

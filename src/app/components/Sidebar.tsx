@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useGuardNavigate } from "./NavigationBlocker";
 import type { ComponentType, SVGProps } from "react";
 import {
   Home,
@@ -21,11 +22,14 @@ import {
   ChevronRight,
   Award,
   ClipboardList,
+  Workflow,
 } from "lucide-react";
+import type { NavAccess } from "./navAccess.types";
+import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-interface NavItem {
+export interface NavItem {
   name: string;
   /** Leaf items navigate; items with `children` toggle instead. */
   href?: string;
@@ -35,38 +39,65 @@ interface NavItem {
   external?: boolean;
   /** Match the active route exactly instead of by prefix (for "Overview" links whose siblings share the prefix). */
   exact?: boolean;
+  /** Optional hover tooltip (native `title` attribute) shown on the expanded/flyout row. */
+  tooltip?: string;
+  /** Access-management feature key that gates this item (and its subtree).
+   *  Hidden unless the signed-in user can `view` it. Unset = always shown. */
+  feature?: string;
+  /** Superadmin / CEO only (e.g. Account Management). */
+  privileged?: boolean;
+  /** Task Manager-specific visibility key (2026-08-07) — checked against a
+   *  SEPARATE TaskManagerNavAccess prop, not the portal's `feature`/
+   *  `privileged` NavAccess system (Task Manager's role granularity —
+   *  Branch Manager, Coach, etc. — doesn't exist in that system). Omit for
+   *  items that don't need Task-Manager-specific gating (e.g. "Overview",
+   *  which stays unconditionally visible). */
+  taskManagerKey?: "template" | "package" | "packageTable";
   children?: NavItem[];
 }
 
-const primaryNav: NavItem[] = [
+export const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
+  { name: "ClickUp Task", href: "/clickup-task", Icon: ClipboardList },
   {
     name: "HRMS",
     href: "/dashboards/hrms",
     Icon: Users,
     children: [
       { name: "Overview", href: "/dashboards/hrms" },
-      { name: "Employee Dashboard", href: "/dashboard-employee-management" },
-      { name: "Manpower Planning", href: "/manpower-schedule" },
-      { name: "Claims", href: "/claim" },
+      { name: "Employee Dashboard", href: "/dashboard-employee-management", feature: "employee_dashboard" },
+      { name: "Manpower Planning", href: "/manpower-schedule", feature: "manpower_plan" },
+      { name: "Claims", href: "/claim", feature: "claim" },
       {
         name: "Attendance",
         children: [
-          { name: "Overview", href: "/attendance", exact: true },
-          { name: "Leave", href: "/attendance/leave" },
-          { name: "Report", href: "/attendance/report" },
-          { name: "Summary", href: "/attendance/summary" },
+          { name: "Overview", href: "/attendance", exact: true, feature: "attendance_overview" },
+          { name: "Leave", href: "/attendance/leave", feature: "leave" },
+          { name: "Report", href: "/attendance/report", feature: "attendance_report" },
+          { name: "Summary", href: "/attendance/summary", feature: "attendance_summary" },
+          { name: "Justifications", href: "/attendance/justifications", feature: "attendance_justifications" },
         ],
       },
-      { name: "HR Dashboard", href: "/induction/hr-dashboard" },
-      { name: "Manpower Cost Report", href: "/manpower-cost-report" },
-      { name: "Staff Directory", href: "/staff-directory" },
+      { name: "HR Dashboard", href: "/induction/hr-dashboard", feature: "hr_dashboard" },
+      { name: "Manpower Cost Report", href: "/manpower-cost-report", feature: "manpower_cost" },
+      { name: "Staff Directory", href: "/staff-directory", feature: "staff_directory" },
+      // No `feature` gate — Employee Folder's real access control is
+      // employeeScope.ts (department/branch/own-record scoping), not the
+      // access-management role_permission matrix; that matrix currently has
+      // no grant configured for any role but department/HR, which was
+      // hiding this link for every branch/department/staff account even
+      // though their own /employee-folder route works fine and is properly
+      // scoped. Per explicit decision (see conversation) — visibility
+      // should follow the same rule the route itself enforces, not a
+      // separate, out-of-sync permission table.
+      { name: "Employee Folder", href: "/employee-folder" },
     ],
   },
   {
     name: "CNS",
-    href: "/dashboards/crm",
+    href: "/crm/dashboard",
     Icon: Newspaper,
+    feature: "cns_dashboard",
     children: [
       {
         name: "Lead",
@@ -85,24 +116,20 @@ const primaryNav: NavItem[] = [
       {
         name: "Ticket",
         children: [
-          { name: "Dashboard", href: "/crm/ticket/dashboard", exact: true },
-          { name: "Opportunities", href: "/crm/ticket/opportunities" },
-          { name: "My Tickets", href: "/crm/ticket/my-tickets" },
-          { name: "New Ticket", href: "/crm/ticket/new" },
-          { name: "Platforms", href: "/crm/ticket/platforms" },
+          { name: "Dashboard", href: "/crm/tickets/dashboard", exact: true },
+          { name: "Kanban", href: "/crm/tickets/kanban" },
+          { name: "My Tickets", href: "/crm/tickets" },
+          { name: "New Ticket", href: "/crm/tickets/new" },
+          { name: "Platforms", href: "/crm/tkt-platforms" },
         ],
       },
     ],
   },
   {
     name: "SMS",
-    href: "/dashboards/sms",
+    href: "https://staging-sms.ebright.my/",
     Icon: BookUser,
-    children: [
-      { name: "Student", href: "/dashboards/sms/student" },
-      { name: "Package", href: "/dashboards/sms/package" },
-      { name: "Age Group", href: "/dashboards/sms/age-group" },
-    ],
+    external: true,
   },
   {
     name: "Inventory",
@@ -115,6 +142,7 @@ const primaryNav: NavItem[] = [
     name: "FA System",
     href: "/dashboards/fa",
     Icon: Award,
+    feature: "fa_dashboard",
     children: [
       { name: "Events", href: "/dashboards/fa/events" },
       { name: "Inventory", href: "/dashboards/fa/inventory" },
@@ -128,6 +156,7 @@ const primaryNav: NavItem[] = [
     name: "PCM System",
     href: "/dashboards/pcm",
     Icon: ClipboardList,
+    feature: "pcm_dashboard",
     children: [
       { name: "Events", href: "/dashboards/pcm/events" },
       { name: "Student List", href: "/dashboards/pcm/student-list" },
@@ -137,12 +166,25 @@ const primaryNav: NavItem[] = [
       { name: "Dashboard", href: "/dashboards/pcm", exact: true },
     ],
   },
-  { name: "Task Manager", href: "/task-manager", Icon: ListChecks },
+  {
+    name: "Task Manager",
+    href: "/task-manager",
+    Icon: ListChecks,
+    children: [
+      { name: "Overview", href: "/task-manager", exact: true, tooltip: "A PLACE TO LET YOU BE A BUSYBODY" },
+      { name: "Template", href: "/task-manager/template", taskManagerKey: "template" },
+      { name: "Package", href: "/task-manager/package", taskManagerKey: "package" },
+      { name: "Package Table", href: "/task-manager/package-table", taskManagerKey: "packageTable" },
+    ],
+  },
+  // Opens in a new tab: Flowghan is its own full-page app (no portal sidebar/topbar,
+  // see src/app/flowghan/page.tsx) so it shouldn't replace the current portal tab.
+  { name: "Flowghan", href: "/flowghan", Icon: Workflow, feature: "flowghan", external: true },
 ];
 
-const secondaryNav: NavItem[] = [
-  { name: "Attendance", href: "/attendance", Icon: CalendarCheck },
-  { name: "Account Management", href: "/account-management", Icon: ShieldCheck },
+export const secondaryNav: NavItem[] = [
+  { name: "Attendance", href: "/attendance", Icon: CalendarCheck, feature: "attendance_overview" },
+  { name: "Account Management", href: "/account-management", Icon: ShieldCheck, privileged: true },
   {
     name: "Internal Dashboard",
     href: "https://dashboard.ebright.my",
@@ -158,6 +200,42 @@ const secondaryNav: NavItem[] = [
     external: true,
   },
 ];
+
+/**
+ * Drop nav items the signed-in user can't reach: feature-gated items whose key
+ * isn't granted, and privileged-only items for non-privileged users. A parent
+ * whose children all get filtered out disappears too. `null` access (still
+ * loading) leaves the menu untouched so nothing flickers for privileged users.
+ * `taskManagerAccess` is a SEPARATE, independent access object (Task
+ * Manager's own role system, see nav-access.actions.ts) checked alongside
+ * the portal's `access`, not merged with it — same null-leaves-visible
+ * semantics while it's still loading.
+ */
+function filterNav(
+  items: NavItem[],
+  access: NavAccess | null,
+  taskManagerAccess: TaskManagerNavAccess | null,
+): NavItem[] {
+  if (!access) return items;
+  const out: NavItem[] = [];
+  for (const item of items) {
+    if (item.privileged && !access.privileged) continue;
+    if (item.feature && !access.features.includes(item.feature)) continue;
+    if (item.taskManagerKey) {
+      // null (still loading) leaves it shown, matching the existing
+      // "null access leaves the menu untouched" behavior for navAccess.
+      if (taskManagerAccess && !taskManagerAccess[item.taskManagerKey]) continue;
+    }
+    if (item.children?.length) {
+      const kids = filterNav(item.children, access, taskManagerAccess);
+      if (kids.length === 0) continue;
+      out.push({ ...item, children: kids });
+    } else {
+      out.push(item);
+    }
+  }
+  return out;
+}
 
 function isItemActive(item: NavItem, pathname: string | null): boolean {
   if (!item.href || item.external || !pathname) return false;
@@ -190,8 +268,19 @@ function firstHref(item: NavItem): string {
   return "#";
 }
 
-export default function Sidebar({ collapsed }: { collapsed: boolean }) {
+export default function Sidebar({
+  collapsed,
+  navAccess = null,
+  taskManagerNavAccess = null,
+}: {
+  collapsed: boolean;
+  navAccess?: NavAccess | null;
+  taskManagerNavAccess?: TaskManagerNavAccess | null;
+}) {
   const pathname = usePathname();
+  const primaryItems = filterNav(primaryNav, navAccess, taskManagerNavAccess);
+  const secondaryItems = filterNav(secondaryNav, navAccess, taskManagerNavAccess);
+  const guardNavigate = useGuardNavigate();
 
   return (
     <aside
@@ -205,6 +294,9 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
         className={`flex items-center h-16 border-b border-slate-200 dark:border-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
           collapsed ? "justify-center px-0" : "px-5"
         }`}
+        onNavigate={(e) => {
+          if (guardNavigate("/home")) e.preventDefault();
+        }}
       >
         {collapsed ? (
           <img
@@ -222,9 +314,13 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
       </Link>
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
-        <NavSection label="Workspace" items={primaryNav} pathname={pathname} collapsed={collapsed} />
-        <div className="my-3 mx-3 border-t border-slate-100 dark:border-slate-800" />
-        <NavSection label="Quick Access" items={secondaryNav} pathname={pathname} collapsed={collapsed} />
+        <NavSection label="Workspace" items={primaryItems} pathname={pathname} collapsed={collapsed} />
+        {secondaryItems.length > 0 && (
+          <>
+            <div className="my-3 mx-3 border-t border-slate-100 dark:border-slate-800" />
+            <NavSection label="Quick Access" items={secondaryItems} pathname={pathname} collapsed={collapsed} />
+          </>
+        )}
       </nav>
     </aside>
   );
@@ -280,11 +376,15 @@ function NavNode({
   isFlyoutOpen?: boolean;
   onToggleFlyout?: (open: boolean) => void;
 }) {
-  const { name, href, Icon, iconSrc, external, children } = item;
+  const { name, href, Icon, iconSrc, external, children, tooltip } = item;
   const hasChildren = !!children?.length;
   const isActive = isItemActive(item, pathname);
   const hasActiveDescendant = hasChildren && containsActive(children, pathname);
   const [open, setOpen] = useState(hasActiveDescendant);
+  // Guards clicks against a page-registered unsaved-changes block (e.g.
+  // Package Table) — a no-op returning false for every other page, since
+  // nothing is registered there. See NavigationBlocker.tsx.
+  const guardNavigate = useGuardNavigate();
 
   // Auto-expand the branch containing the current page; never auto-collapse
   // so other sections the user opened stay open.
@@ -445,7 +545,15 @@ function NavNode({
             {icon}
           </a>
         ) : (
-          <Link href={target} title={name} aria-current={isActive ? "page" : undefined} className={iconButtonClass}>
+          <Link
+            href={target}
+            title={name}
+            aria-current={isActive ? "page" : undefined}
+            className={iconButtonClass}
+            onNavigate={(e) => {
+              if (guardNavigate(target)) e.preventDefault();
+            }}
+          >
             {icon}
           </Link>
         )}
@@ -577,6 +685,7 @@ function NavNode({
           href={href}
           target="_blank"
           rel="noopener noreferrer"
+          title={tooltip}
           className={rowClass}
           style={indent}
           onClick={onNavigate}
@@ -587,9 +696,13 @@ function NavNode({
         <Link
           href={href ?? "#"}
           aria-current={isActive ? "page" : undefined}
+          title={tooltip}
           className={rowClass}
           style={indent}
           onClick={onNavigate}
+          onNavigate={(e) => {
+            if (guardNavigate(href ?? "#")) e.preventDefault();
+          }}
         >
           {inner}
         </Link>

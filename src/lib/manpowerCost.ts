@@ -9,11 +9,11 @@ export async function calculateManpowerCost(branchId: number, startDateStr: stri
     where: {
       schedule_type: "actual",
       date: { gte: startDate, lte: endDate },
-      branch_duty_position: { branch_id: branchId }
+      branch_position: { branch_id: branchId }
     },
     include: {
       slot: true,
-      branch_duty_position: true,
+      branch_position: true,
       user_profile: true
     }
   });
@@ -56,26 +56,24 @@ export async function calculateManpowerCost(branchId: number, startDateStr: stri
     // Safety check in case times are not perfectly parsed
     if (hours < 0) hours = 0;
 
-    const posType = s.branch_duty_position.position_type;
-    const posLabel = s.branch_duty_position.position_label.toLowerCase();
-
-    // Map the position to the correct category
-    // Note: The schema only allows position_type in ('manager','coach','exec','training','star_coach')
-    if (posType === "coach" || posLabel.startsWith("coach")) {
-      // Check if it's actually training or star coach by label if type is just "coach"
-      if (posLabel.startsWith("training")) dailyCosts[key].training_hrs += hours;
-      else if (posLabel.startsWith("star coach")) dailyCosts[key].star_coach_hrs += hours;
-      else dailyCosts[key].coach_hrs += hours;
-    } else if (posType === "exec" || posLabel.startsWith("exec")) {
-      dailyCosts[key].exec_hrs += hours;
-    } else if (posType === "training") {
-      dailyCosts[key].training_hrs += hours;
-    } else if (posType === "star_coach") {
-      dailyCosts[key].star_coach_hrs += hours;
-    } else {
-      // E.g., manager — typically salaried, but if they get coach/exec hours they might have specific logic.
-      // Assuming manager on duty hours are counted as coach hours based on previous setups.
-      dailyCosts[key].coach_hrs += hours;
+    // Categorize by the authoritative position_type
+    // (one of: manager | coach | exec | training | star_coach).
+    // Manager-on-duty hours are counted as coach hours, per prior behaviour.
+    switch (s.branch_position.position_type) {
+      case "exec":
+        dailyCosts[key].exec_hrs += hours;
+        break;
+      case "training":
+        dailyCosts[key].training_hrs += hours;
+        break;
+      case "star_coach":
+        dailyCosts[key].star_coach_hrs += hours;
+        break;
+      case "coach":
+      case "manager":
+      default:
+        dailyCosts[key].coach_hrs += hours;
+        break;
     }
   }
 

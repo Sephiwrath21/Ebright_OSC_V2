@@ -35,48 +35,48 @@ describe("formatDueDate", () => {
     expect(formatDueDate(null)).toBeNull();
   });
 
-  it("is time-of-day independent — due later today is still 'Today'", () => {
+  it("TODAY is 'D/M Due' (blue), time-of-day independent (2026-08-05 rules)", () => {
     expect(formatDueDate(daysFromToday(0, 23))).toEqual({
-      text: "Today",
-      className: "text-amber-600 font-medium",
+      text: "15/1 Due",
+      className: "text-blue-600 font-medium",
     });
     expect(formatDueDate(daysFromToday(0, 0))).toEqual({
-      text: "Today",
-      className: "text-amber-600 font-medium",
+      text: "15/1 Due",
+      className: "text-blue-600 font-medium",
     });
   });
 
-  it("labels yesterday distinctly from older overdue dates", () => {
+  it("every past date is 'Overdue' (red)", () => {
     expect(formatDueDate(daysFromToday(-1))).toEqual({
-      text: "Yesterday",
-      className: "text-red-500 font-medium",
-    });
-  });
-
-  it("shows 'N days ago' for anything more than 1 day overdue", () => {
-    expect(formatDueDate(daysFromToday(-2))).toEqual({
-      text: "2 days ago",
+      text: "14/1 Overdue",
       className: "text-red-500 font-medium",
     });
     expect(formatDueDate(daysFromToday(-10))).toEqual({
-      text: "10 days ago",
+      text: "5/1 Overdue",
       className: "text-red-500 font-medium",
     });
   });
 
-  it("uses a short weekday name for the next 6 days, staying neutral gray", () => {
-    for (const offset of [1, 6]) {
+  it("TOMORROW is 'Due Soon' (amber)", () => {
+    expect(formatDueDate(daysFromToday(1))).toEqual({
+      text: "16/1 Due Soon",
+      className: "text-amber-600 font-medium",
+    });
+  });
+
+  it("uses 'D/M + short weekday' for 2-6 days out, neutral gray, no status label", () => {
+    for (const offset of [2, 6]) {
       const result = formatDueDate(daysFromToday(offset));
       expect(result?.className).toBe("text-gray-400");
-      expect(result?.text).toMatch(/^[A-Za-z]{2,3}$/);
+      expect(result?.text).toMatch(/^\d{1,2}\/\d{1,2} [A-Za-z]{2,3}$/);
     }
   });
 
-  it("falls back to 'day month' once 7+ days out", () => {
-    const result = formatDueDate(daysFromToday(7));
-    expect(result?.className).toBe("text-gray-400");
-    // e.g. "Jan 22" — not a bare weekday abbreviation.
-    expect(result?.text).toMatch(/^[A-Za-z]+\s+\d{1,2}$/);
+  it("falls back to the bare 'D/M' date once 7+ days out", () => {
+    expect(formatDueDate(daysFromToday(7))).toEqual({
+      text: "22/1",
+      className: "text-gray-400",
+    });
   });
 });
 
@@ -116,7 +116,7 @@ describe("flowGroupMembers — Intern department drill-down (2026-07-25)", () =>
     coachSchedule: null,
   });
   const staff: FlowStaffMember[] = [
-    intern("op-intern", "Operation"),
+    intern("op-intern", "Operations"),
     intern("mkt-intern", "Marketing"),
     intern("no-dept-intern", null),
   ];
@@ -135,7 +135,7 @@ describe("flowGroupMembers — Intern department drill-down (2026-07-25)", () =>
   });
 
   it("a department sub-value narrows to that department's interns only", () => {
-    expect(flowGroupMembers(staff, "Intern", "Operation").map((s) => s.id)).toEqual([
+    expect(flowGroupMembers(staff, "Intern", "Operations").map((s) => s.id)).toEqual([
       "op-intern",
     ]);
   });

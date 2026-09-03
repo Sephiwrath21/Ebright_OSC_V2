@@ -15,6 +15,7 @@ import { prisma } from "../prisma";
 import { getReminderQueue, reminderJobId } from "../lib/queues";
 import type { RunItemValue, SnapshotBlock, TemplateSnapshot } from "../lib/types";
 import { getUsersByIds } from "../lib/users";
+import { isDueDayLockExemptRole, isPastDueDay, isFutureDueDay } from "../ui/types";
 import { evaluateConditions } from "./conditions";
 import { buildTemplateSnapshot } from "./snapshot";
 
@@ -27,6 +28,18 @@ async function getActor(actorId: string): Promise<User | null> {
 
 function isElevated(user: User | null): boolean {
   return user?.role === "ADMIN" || user?.role === "HOD";
+}
+
+/** Due-day lock exemption (2026-08-19) — the server-authoritative
+ *  counterpart to bits.tsx's isLockedDueDay/isDueDayLockExemptRole check: a
+ *  task started by an HOD or CEO is exempt from the Daily due-day lock,
+ *  regardless of which UI section requested the action (the server has no
+ *  notion of "section" — only the task's own data). Exported for
+ *  data/tasks.ts's uploadFlowTaskProof/removeFlowTaskProof, which enforce
+ *  the same lock outside this file. */
+export async function isDueDayLockExempt(startedById: string): Promise<boolean> {
+  const starter = await getActor(startedById);
+  return isDueDayLockExemptRole(starter?.role);
 }
 
 /**
@@ -439,6 +452,23 @@ export async function completeBlock(input: CompleteBlockInput): Promise<Complete
   if (run.status !== "ACTIVE") throw new ApiHttpError(400, "Run is not active");
   if (runBlock.status === "DONE") throw new ApiHttpError(400, "This step is already completed");
   if (runBlock.status === "SKIPPED") throw new ApiHttpError(400, "This step was skipped");
+  // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
+  // exempted 2026-08-19 for HOD/CEO-assigned tasks — see
+  // isDueDayLockExempt): a Daily task is only completable on its OWN due
+  // day — not once its dueAt is strictly before today (completion closes
+  // for good), and not before its dueAt has arrived either
+  // (server-authoritative; bits.tsx mirrors both for the disabled UI, but
+  // this is the check that actually can't be bypassed). Two separate
+  // checks, not one combined boolean, so each direction gets its own
+  // accurate message instead of a generic one.
+  if (!(await isDueDayLockExempt(run.startedById))) {
+    if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task's day has passed and can no longer be marked complete");
+    }
+    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't be marked complete until its day arrives");
+    }
+  }
 
   const actor = await getActor(actorId);
   if (runBlock.assigneeId !== actorId && !isElevated(actor)) {
@@ -517,8 +547,12 @@ export async function completeBlock(input: CompleteBlockInput): Promise<Complete
         if (!next) continue;
         created.push(
           await tx.runBlock.create({
+            // `run: { connect }` (not scalar runId): runBlockCreateData returns
+            // the CHECKED create shape, and since the recurrence self-relation
+            // was added (2026-07-25) mixing it with an unchecked scalar FK no
+            // longer satisfies either arm of Prisma's create-input union.
             data: {
-              runId,
+              run: { connect: { id: runId } },
               ...runBlockCreateData(next, nextAssignees.get(nodeId) ?? run.startedById, now),
             },
           }),
@@ -672,6 +706,19 @@ export async function skipBlock(input: SkipBlockInput): Promise<SkipBlockResult>
   if (run.status !== "ACTIVE") throw new ApiHttpError(400, "Run is not active");
   if (runBlock.status === "DONE") throw new ApiHttpError(400, "This step is already completed");
   if (runBlock.status === "SKIPPED") throw new ApiHttpError(400, "This step is already marked N/A");
+  // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
+  // exempted 2026-08-19 for HOD/CEO-assigned tasks — see
+  // isDueDayLockExempt — the "Mark N/A" half of the same status control as
+  // completeBlock's own guard above): server-authoritative, bits.tsx mirrors
+  // both for the disabled UI.
+  if (!(await isDueDayLockExempt(run.startedById))) {
+    if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task's day has passed and can no longer be marked N/A");
+    }
+    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't be marked N/A until its day arrives");
+    }
+  }
 
   const actor = await getActor(actorId);
   if (runBlock.assigneeId !== actorId && !isElevated(actor)) {
@@ -795,6 +842,24 @@ export async function reopenBlock(input: ReopenBlockInput): Promise<ReopenBlockR
 
   if (runBlock.status !== "DONE" && runBlock.status !== "SKIPPED") {
     throw new ApiHttpError(400, "This step is already open");
+  }
+  // Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
+  // exempted 2026-08-19 for HOD/CEO-assigned tasks — see
+  // isDueDayLockExempt): "no status change action is available anymore,
+  // full stop" — a past-day Daily task can't be reopened either, same as it
+  // can't be completed or marked N/A in the first place. The future-day
+  // half is effectively unreachable here in practice (a future-dated task
+  // can never have REACHED DONE/SKIPPED in the first place, since
+  // completeBlock/skipBlock's own future-day guards above now block
+  // that) — kept for defense-in-depth/consistency, not because a live
+  // path currently exercises it.
+  if (!(await isDueDayLockExempt(run.startedById))) {
+    if (runBlock.cadence === "DAILY" && isPastDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task's day has passed and can no longer be reopened");
+    }
+    if (runBlock.cadence === "DAILY" && isFutureDueDay(runBlock.dueAt)) {
+      throw new ApiHttpError(400, "This task isn't due yet and can't be reopened until its day arrives");
+    }
   }
 
   const actor = await getActor(actorId);

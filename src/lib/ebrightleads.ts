@@ -8,6 +8,7 @@ const globalForPool = globalThis as unknown as {
 
 function configSignature(): string {
   return [
+    process.env.LEADS_DB_URL ?? "",
     process.env.EBRIGHTLEADS_HOST ?? "",
     process.env.EBRIGHTLEADS_PORT ?? "",
     process.env.EBRIGHTLEADS_USER ?? "",
@@ -17,11 +18,21 @@ function configSignature(): string {
 }
 
 function makePool(): Pool {
+  // Prefer a single connection string (LEADS_DB_URL); fall back to EBRIGHTLEADS_* parts.
+  const url = process.env.LEADS_DB_URL;
+  if (url) {
+    return new Pool({
+      connectionString: url,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+  }
   const host = process.env.EBRIGHTLEADS_HOST;
   const database = process.env.EBRIGHTLEADS_DATABASE;
   if (!host || !database) {
     throw new Error(
-      `EBRIGHTLEADS_* env vars missing (host=${host ?? "undefined"}, database=${database ?? "undefined"}). Restart dev server after editing .env.`,
+      `Leads DB not configured: set LEADS_DB_URL (or EBRIGHTLEADS_HOST/DATABASE). Restart dev server after editing .env.`,
     );
   }
   return new Pool({
@@ -34,6 +45,17 @@ function makePool(): Pool {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
+}
+
+/** Whether the leads DB connection has been set up at all in this
+ *  environment — checked BEFORE calling queryEbrightLeads so an
+ *  unconfigured dev/local environment degrades to an empty result
+ *  (2026-08-22) instead of throwing + logging a noisy console.error on
+ *  every request. Once genuinely configured, a real query failure
+ *  (bad SQL, connection refused, etc.) still throws/logs normally —
+ *  this only short-circuits the "never set up" case. */
+export function isLeadsDbConfigured(): boolean {
+  return Boolean(process.env.LEADS_DB_URL || (process.env.EBRIGHTLEADS_HOST && process.env.EBRIGHTLEADS_DATABASE));
 }
 
 function getPool(): Pool {
@@ -83,6 +105,7 @@ export interface StaffMovementRow {
 export async function getStaffMovements(filters?: {
   type?: StaffMovementFilter;
 }): Promise<StaffMovementRow[]> {
+  if (!isLeadsDbConfigured()) return [];
   let sql =
     "SELECT id, name, position, department_branch, start_date, end_date FROM hr_staff_movements WHERE 1=1";
 
@@ -101,6 +124,66 @@ export async function getStaffMovements(filters?: {
 
   const result = await queryEbrightLeads<StaffMovementRow>(sql);
   return result.rows;
+}
+
+// ── Events (public.events in the leads DB) ───────────────────────────────────
+export type EventStatus = "upcoming" | "ongoing" | "completed";
+
+export interface DeptEvent {
+  id: string;
+  title: string;
+  venue: string;
+  date: string; // "DD Mon"
+  tone: string;
+  status: EventStatus;
+}
+
+const EVENT_TONE: Record<EventStatus, string> = {
+  upcoming: "#185FA5",
+  ongoing: "#0F6E56",
+  completed: "#64748B",
+};
+
+/** All events from public.events, with status computed by date (DB CURRENT_DATE). */
+export async function getEvents(): Promise<DeptEvent[]> {
+  if (!isLeadsDbConfigured()) return [];
+  const { rows } = await queryEbrightLeads<{
+    id: string;
+    event_name: string;
+    location: string | null;
+    date_label: string;
+    status: EventStatus;
+  }>(`
+    SELECT
+      id,
+      event_name,
+      location,
+      to_char(date_from, 'DD Mon') AS date_label,
+      CASE
+        WHEN date_to   < CURRENT_DATE THEN 'completed'
+        WHEN date_from > CURRENT_DATE THEN 'upcoming'
+        ELSE 'ongoing'
+      END AS status
+    FROM public.events
+    ORDER BY
+      CASE
+        WHEN date_to   < CURRENT_DATE THEN 2  -- completed group
+        WHEN date_from > CURRENT_DATE THEN 0  -- upcoming group
+        ELSE 1                                -- ongoing group
+      END,
+      -- completed: most recent first (nearest day); others: soonest first
+      CASE WHEN date_to < CURRENT_DATE THEN date_from END DESC NULLS LAST,
+      date_from ASC
+  `);
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.event_name,
+    venue: r.location ?? "—",
+    date: r.date_label.trim(),
+    tone: EVENT_TONE[r.status],
+    status: r.status,
+  }));
 }
 
 export async function closePool(): Promise<void> {

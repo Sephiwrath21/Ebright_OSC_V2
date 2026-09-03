@@ -115,6 +115,9 @@ export const ROLE_MAP: Record<string, RoleMapEntry> = {
   // identified one (MKT -> Marketing, OD -> Optimisation); the HQ-marked
   // rows import department-less until someone assigns one.
   "FT EXEC": { role: "MEMBER", employmentType: "HQ Exec", coachSchedule: null },
+  // Appeared in live ebright_hrfs data 2026-07-25 (1 ACTIVE row) — same
+  // HQ-exec reading as FT EXEC per the standing decision.
+  EXECUTIVE: { role: "MEMBER", employmentType: "HQ Exec", coachSchedule: null },
 
   REGIONAL_MANAGER: { role: "MEMBER", employmentType: "Regional Manager", coachSchedule: null },
 
@@ -256,6 +259,9 @@ const SHORT_CODE_BRANCH_MAP: Record<string, string> = {
   SP: "Sri Petaling",
   ST: "Subang Taipan",
   TSG: "Taman Sri Gombak",
+  // Spelling drift observed in the PORTAL's branch table (2026-07-25):
+  // "Grove" for the canonical "Groove". An alias, not a code.
+  "Kajang TTDI Grove": "Kajang TTDI Groove",
 };
 
 export const BRANCH_MAP: Record<string, string> = {
@@ -314,6 +320,10 @@ export interface MappedUser {
   branch: string | null;
   employmentType: string | null;
   coachSchedule: string | null;
+  /** ebright_hrfs."User"."id" (2026-07-31) — the direct cross-database
+   *  link. Only the HRFS primary source can supply it; portal-only
+   *  employees and EXTRA_USERS have none (optional, treated as null). */
+  hrfsUserId?: number | null;
 }
 
 /** Keyed by LOWERCASED email. Empty by default — fill these in before
@@ -359,8 +369,14 @@ export const OVERRIDES: Record<string, Partial<MappedUser>> = {
   // Manager department (FLOW_DEPARTMENTS has no Sales), so: plain member.
   "finance@ebright.my": { role: "DEPT_SITE", department: "Finance", employmentType: null },
   "marketing@ebright.my": { role: "DEPT_SITE", department: "Marketing", employmentType: null },
-  "operation@ebright.my": { role: "DEPT_SITE", department: "Operation", employmentType: null },
+  "operation@ebright.my": { role: "DEPT_SITE", department: "Operations", employmentType: null },
   "sales@ebright.my": { role: "MEMBER", employmentType: null },
+
+  // od@ebright.my is the Optimisation Department's own superadmin login —
+  // recording its department (no authorization effect for ADMIN) makes the
+  // Task Manager department dropdown default to Optimisation for it
+  // (2026-07-25 user decision).
+  "od@ebright.my": { department: "Optimisation" },
 };
 
 // ---------------------------------------------------------------------------
@@ -416,9 +432,9 @@ export const EXTRA_USERS: MappedUser[] = [
   // (all-departments view + assign — see isElevatedDeptSite).
   {
     email: "operations@ebright.my",
-    name: "Operation Department",
+    name: "Operations Department",
     role: "DEPT_SITE",
-    department: "Operation",
+    department: "Operations",
     branch: null,
     employmentType: null,
     coachSchedule: null,
@@ -469,6 +485,75 @@ export const EXTRA_USERS: MappedUser[] = [
     branch: "Online",
     employmentType: null,
     coachSchedule: null,
+  },
+
+  // ---- TEST accounts (2026-07-29, user-requested role-view testing) ----
+  // Deliberately named TEST-* so they're unmistakable next to real staff.
+  // Listed here so tm:bootstrap keeps them; matching hrfs login rows were
+  // created directly (role hod/staff/Branch Manager, temp password).
+  // Remove this block (and the hrfs rows) when role testing is done.
+  {
+    email: "test-ceo@ebright.my",
+    name: "TEST CEO",
+    role: "CEO",
+    department: null,
+    branch: null,
+    employmentType: "CEO",
+    coachSchedule: null,
+  },
+  {
+    email: "test-hod-optimisation@ebright.my",
+    name: "TEST HOD Optimisation",
+    role: "HOD",
+    department: "Optimisation",
+    branch: null,
+    employmentType: "HOD",
+    coachSchedule: null,
+  },
+  {
+    email: "test-hod-finance@ebright.my",
+    name: "TEST HOD Finance",
+    role: "HOD",
+    department: "Finance",
+    branch: null,
+    employmentType: "HOD",
+    coachSchedule: null,
+  },
+  {
+    email: "test-hq-fulltime@ebright.my",
+    name: "TEST HQ Full Time",
+    role: "MEMBER",
+    department: "Marketing",
+    branch: null,
+    employmentType: "Full Time",
+    coachSchedule: null,
+  },
+  {
+    email: "test-branch-manager@ebright.my",
+    name: "TEST Branch Manager",
+    role: "BRANCH",
+    department: null,
+    branch: "Klang",
+    employmentType: "Manager",
+    coachSchedule: null,
+  },
+  {
+    email: "test-branch-exec@ebright.my",
+    name: "TEST Branch Exec",
+    role: "MEMBER",
+    department: null,
+    branch: "Klang",
+    employmentType: "Branch Exec",
+    coachSchedule: null,
+  },
+  {
+    email: "test-coach@ebright.my",
+    name: "TEST Coach",
+    role: "MEMBER",
+    department: null,
+    branch: "Klang",
+    employmentType: "Coach",
+    coachSchedule: "Full Time",
   },
 ];
 
@@ -527,6 +612,9 @@ validateHandEditedConfig(OVERRIDES, EXTRA_USERS);
 // ---------------------------------------------------------------------------
 
 export interface HrfsUserRow {
+  /** ebright_hrfs."User"."id" — optional so older tests/fixtures without
+   *  it keep compiling; when absent, hrfsUserId simply stays null. */
+  id?: number | null;
   email: string;
   name: string | null;
   role: string;
@@ -583,6 +671,7 @@ export function mapHrfsUser(row: HrfsUserRow): MapResult {
     branch,
     employmentType: entry.employmentType,
     coachSchedule: entry.coachSchedule,
+    hrfsUserId: row.id ?? null,
   };
 
   // ---- overrides: merged LAST, can rewrite anything (including role) ----
@@ -604,6 +693,137 @@ export function mapHrfsUser(row: HrfsUserRow): MapResult {
   }
   if (bPolicy === "optional" && !user.branch) {
     warnings.push(`${email}: unresolved branch code ${JSON.stringify(row.branchName)} — imported without a branch`);
+  }
+
+  return { ok: true, user, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Portal-source mapping (2026-07-25) — the SECOND bootstrap source. 63 of
+// the Employee Management page's active staff had no ebright_hrfs row at
+// all (roster drift between the two HR databases), so bootstrap.ts also
+// imports active portal employees (hrfs db: users -> employment ->
+// department/branch) that ebright_hrfs doesn't cover. Positions are the
+// portal's free-text employment.position values; departments and branches
+// arrive as REAL names (validated against FLOW_DEPARTMENTS / resolved via
+// BRANCH_MAP's identity entries + aliases). ebright_hrfs stays
+// authoritative: bootstrap only consults this mapper for emails the
+// primary source didn't already map.
+// ---------------------------------------------------------------------------
+
+/** Task Manager renamed "Operation" -> "Operations" (2026-07-25 user
+ *  spelling fix) but the SOURCE systems (portal hrfs department table, HRFS
+ *  markers) still say "Operation" — normalize on the way in so imports and
+ *  enrichment keep matching. */
+export const SOURCE_DEPARTMENT_RENAMES: Record<string, string> = {
+  Operation: "Operations",
+};
+
+export function normalizeSourceDepartment(name: string | null): string | null {
+  if (!name) return null;
+  return SOURCE_DEPARTMENT_RENAMES[name] ?? name;
+}
+
+export interface PortalEmployeeRow {
+  email: string;
+  name: string | null;
+  /** employment.position — free text, normalized before lookup. */
+  position: string | null;
+  /** department.department_name via the active employment (or null). */
+  department: string | null;
+  /** branch.branch_name via the active employment (or null). */
+  branch: string | null;
+}
+
+/** Normalized-position -> mapping. Keys are UPPERCASED, whitespace-collapsed
+ *  position strings as observed live on 2026-07-25 (INTERN x28, PT COACH
+ *  x15, FT EXEC x4, Part-Time x3, FT COACH x2, Full-Time Coach x1, BM x2,
+ *  FT HOD x2) plus obvious close variants. Same role/employmentType
+ *  vocabulary as ROLE_MAP. */
+export const PORTAL_POSITION_MAP: Record<string, RoleMapEntry> = {
+  INTERN: { role: "MEMBER", employmentType: "Intern", coachSchedule: null },
+  "PT COACH": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Part Time" },
+  "PART-TIME COACH": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Part Time" },
+  "FT COACH": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Full Time" },
+  "FULL-TIME COACH": { role: "MEMBER", employmentType: "Coach", coachSchedule: "Full Time" },
+  "FT EXEC": { role: "MEMBER", employmentType: "HQ Exec", coachSchedule: null },
+  EXECUTIVE: { role: "MEMBER", employmentType: "HQ Exec", coachSchedule: null },
+  "PART-TIME": { role: "MEMBER", employmentType: "Part Time", coachSchedule: null },
+  "FULL-TIME": { role: "MEMBER", employmentType: "Full Time", coachSchedule: null },
+  BM: { role: "BRANCH", employmentType: "Manager", coachSchedule: null },
+  "BRANCH MANAGER": { role: "BRANCH", employmentType: "Manager", coachSchedule: null },
+  // 2026-07-25 user decision: portal FT HODs import as FULL HODs, with the
+  // department taken from their employment record (required — see below).
+  "FT HOD": { role: "HOD", employmentType: "HOD", coachSchedule: null },
+  HOD: { role: "HOD", employmentType: "HOD", coachSchedule: null },
+};
+
+/** Pure: portal employee row in, mapped-or-skipped result out. Mirrors
+ *  mapHrfsUser's order and conventions: unknown position -> branch
+ *  resolution -> required-branch skip -> OVERRIDES merge (last, wins) ->
+ *  HOD-needs-department check (post-overrides) -> warnings from the final
+ *  state. Departments must be real FLOW_DEPARTMENTS values (the portal also
+ *  carries non-Task-Manager units like "IOP" — treated as no-department);
+ *  branch-pool staff never carry one (mutual exclusivity). */
+export function mapPortalEmployee(row: PortalEmployeeRow): MapResult {
+  const email = (row.email ?? "").trim().toLowerCase();
+
+  const positionKey = row.position ? row.position.trim().replace(/\s+/g, " ").toUpperCase() : "";
+  const entry = positionKey ? PORTAL_POSITION_MAP[positionKey] : undefined;
+  if (!entry) {
+    return { ok: false, reason: `${email}: unknown portal position: ${row.position ?? "(no active employment)"}` };
+  }
+
+  // ---- branch: the portal sends REAL branch names — resolveBranch covers
+  // the identity map + aliases ("Kajang TTDI Grove"). "HQ" is an org
+  // marker, not a branch — unresolved like any unknown value. ----
+  const bPolicy = branchPolicy(entry);
+  let branch: string | null = null;
+  if (bPolicy !== "none") {
+    branch = resolveBranch(row.branch);
+    if (!branch && bPolicy === "required") {
+      return {
+        ok: false,
+        reason: `${email}: unresolved branch ${JSON.stringify(row.branch)} (portal position ${row.position} requires a branch)`,
+      };
+    }
+  }
+
+  const sourceDept = normalizeSourceDepartment(row.department);
+  const department =
+    bPolicy === "none" &&
+    sourceDept &&
+    (FLOW_DEPARTMENTS as readonly string[]).includes(sourceDept)
+      ? sourceDept
+      : null;
+
+  const name = row.name && row.name.trim() ? row.name.trim() : emailLocalPart(email);
+
+  let user: MappedUser = {
+    email,
+    name,
+    role: entry.role,
+    department,
+    branch,
+    employmentType: entry.employmentType,
+    coachSchedule: entry.coachSchedule,
+  };
+
+  // ---- overrides: merged LAST, can rewrite anything (including role) ----
+  const override = OVERRIDES[email];
+  if (override) {
+    user = { ...user, ...override };
+  }
+
+  // ---- HOD needs a department — evaluated POST-overrides (rescuable) ----
+  if (user.role === "HOD" && !user.department) {
+    return { ok: false, reason: `${email}: HOD needs a department (none on the portal employment record)` };
+  }
+
+  // ---- warnings, computed from the final (post-override) state ----
+  const warnings: string[] = [];
+  if (departmentPolicy(user) === "optional-override" && !user.department) {
+    warnings.push(`${email}: no department on the portal employment record — imported with department = null`);
   }
 
   return { ok: true, user, warnings };

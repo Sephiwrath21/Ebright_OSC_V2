@@ -33,6 +33,7 @@ export function getAvatarInitials(nameOrEmail: string | null | undefined): strin
   return base.slice(0, 2).toUpperCase();
 }
 
+/** @deprecated Superadmin now uses its real profile name; kept for reference. */
 export const SUPERADMIN_DEPARTMENT_NAME = "Optimisation Department";
 
 export function displayNameFor(
@@ -40,7 +41,7 @@ export function displayNameFor(
   name: string | null | undefined,
   email: string | null | undefined,
 ): string {
-  if (role === "superadmin") return SUPERADMIN_DEPARTMENT_NAME;
+  void role; // all roles (incl. superadmin) resolve to their real name
   const trimmed = (name ?? "").trim();
   if (trimmed) return trimmed;
   if (email) return email.split("@")[0];

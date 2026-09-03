@@ -27,6 +27,10 @@
 # task-manager generated prisma client
 /src/generated/
 
+# local working artifacts (CRM port)
+/.legacy-v2-crm/
+/.*.log
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -40,6 +44,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# git worktrees (superpowers:using-git-worktrees)
+/.worktrees/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Brainstorming skill's visual companion scratch output
+.superpowers/

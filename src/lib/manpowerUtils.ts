@@ -58,22 +58,28 @@ export function getEmployeeColor(name: string): string {
   return COLOR_PALETTE[colorIndex];
 }
 
-// Pale -50 tints would render as bright patches on the dark planning grid, so
-// each carries a -900 fill / -200 text / -700 border companion. Twelve distinct
-// hues, so staff stay tellable apart in either theme.
-const SOFT_STAFF_PALETTE = [
-  "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700",
-  "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
-  "bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700",
-  "bg-pink-50 text-pink-800 border-pink-200 dark:bg-pink-900 dark:text-pink-200 dark:border-pink-700",
-  "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700",
-  "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-900 dark:text-rose-200 dark:border-rose-700",
-  "bg-cyan-50 text-cyan-800 border-cyan-200 dark:bg-cyan-900 dark:text-cyan-200 dark:border-cyan-700",
-  "bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:border-teal-700",
-  "bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-900 dark:text-violet-200 dark:border-violet-700",
-  "bg-orange-50 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700",
-  "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-700",
-  "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-900 dark:text-fuchsia-200 dark:border-fuchsia-700",
+// Brighter, more saturated pills so staff are easy to tell apart at a glance.
+// Stronger 200-level background + 400 border, with dark 900 text for contrast.
+// Ordered so adjacent hues differ; assigned by stable index for distinctness.
+export const SOFT_STAFF_PALETTE = [
+  "bg-blue-200 text-blue-900 border-blue-400",
+  "bg-orange-200 text-orange-900 border-orange-400",
+  "bg-emerald-200 text-emerald-900 border-emerald-400",
+  "bg-pink-200 text-pink-900 border-pink-400",
+  "bg-violet-200 text-violet-900 border-violet-400",
+  "bg-amber-200 text-amber-900 border-amber-400",
+  "bg-cyan-200 text-cyan-900 border-cyan-400",
+  "bg-rose-200 text-rose-900 border-rose-400",
+  "bg-lime-200 text-lime-900 border-lime-400",
+  "bg-purple-200 text-purple-900 border-purple-400",
+  "bg-teal-200 text-teal-900 border-teal-400",
+  "bg-red-200 text-red-900 border-red-400",
+  "bg-sky-200 text-sky-900 border-sky-400",
+  "bg-fuchsia-200 text-fuchsia-900 border-fuchsia-400",
+  "bg-yellow-200 text-yellow-900 border-yellow-400",
+  "bg-indigo-200 text-indigo-900 border-indigo-400",
+  "bg-green-200 text-green-900 border-green-400",
+  "bg-stone-200 text-stone-900 border-stone-400",
 ];
 
 export function getSoftStaffColor(name: string): string {

@@ -38,6 +38,12 @@ model User {
   department       String?
   branch           String? // org location dimension (e.g. "Subang Taipan") — analytics
   employmentType   String? // HOD | Full Time | Part Time | Intern — display label, analytics
+  // Direct link to ebright_hrfs."User"."id" (integer, 2026-07-31) — the
+  // durable cross-database key, so joins no longer depend on emails
+  // matching. Set by bootstrap from the HRFS source row; null for accounts
+  // with no ebright_hrfs row (portal-only staff, site logins, TEST
+  // accounts) or unresolved email mismatches.
+  hrfsUserId       Int?
   coachSchedule    String? // Full Time | Part Time — sub-split of employmentType "Coach" only;
   // used by the assign-task recipient picker's "By Group" filter, NOT by the
   // Branch Status by Region analytics (which still matches employmentType "Coach").
@@ -46,6 +52,8 @@ model User {
   hodKanbanColumns HodKanbanColumn[] // DEPT_SITE/BRANCH_SITE view-only site logins for
   // "Department accounts"/"Branch site accounts" (one department/branch's Status
   // view, no personal tasks) — see role usage below.
+
+  @@index([hrfsUserId])
 }
 
 enum Role {
@@ -233,6 +241,11 @@ model FlowRun {
   startedById      String
   triggerType      TriggerType
   status           RunStatus   @default(ACTIVE)
+  // Archive (2026-07-31): non-null = hidden from every active view
+  // (fetchPeriodBlocks filters it) but fully retrievable/restorable —
+  // unlike CANCELLED this is a first-class reversible state, cleared by
+  // Unarchive. Orthogonal to `status` so completion history survives.
+  archivedAt       DateTime?
   startedAt        DateTime    @default(now())
   completedAt      DateTime?
   runBlocks        RunBlock[]
@@ -278,11 +291,312 @@ model RunBlock {
   // slot sync, engine flow runs) leaves this at its default (null) and is
   // completely unaffected.
   cadence        Cadence?
+  // Weekly auto-recurrence — "recurring series" model: when a DAILY block's
+  // due day has passed, engine/recurrence.ts (hourly in-server sweep +
+  // lazy catch-up on read) creates NEXT week's occurrence and links it back
+  // via recurrenceOfId. The finished block is never touched, so per-day
+  // history (the Daily date filter) keeps showing what actually happened.
+  // recurrenceOfId is UNIQUE — at most ONE successor per block — making
+  // concurrent catch-ups idempotent. Manpower-Schedule tasks
+  // (scheduleSlotId set, cadence ADHOC) never qualify.
+  //
+  // repeatWeekly is RETIRED (2026-07-25 final decision: recurrence is
+  // UNIVERSAL for Daily tasks — no opt-in). Column kept to avoid a
+  // pointless destructive migration; nothing reads or writes it anymore.
+  repeatWeekly   Boolean     @default(false)
+  recurrenceOfId String?     @unique
+  recurrenceOf   RunBlock?   @relation("BlockRecurrence", fields: [recurrenceOfId], references: [id])
+  successor      RunBlock?   @relation("BlockRecurrence")
+
+  // Optional SOP/reference material attached by the assigner (2026-07-30,
+  // the "+ Task" Guideline section). ONE Guideline row is shared by every
+  // block the assignment created (all recipients × days) and by weekly-
+  // recurrence successors — the image bytes are stored once.
+  guidelineId String?
+  guideline   Guideline? @relation(fields: [guidelineId], references: [id])
+
+  // Optional assignee-uploaded completion evidence (2026-07-30, the My
+  // Tasks "Proof" column). Unlike guideline (shared, assigner-attached),
+  // proof is strictly per-block and NEVER inherited by recurrence
+  // successors — it's evidence for THIS occurrence only. One-to-many as of
+  // 2026-08-08 (up to 5 photos per task, see Proof's own comment) —
+  // formerly a single nullable Proof (runBlockId @unique).
+  proofs Proof[]
+
+  // Main Task ↔ Subtask link (2026-07-30): a subtask is a FULL RunBlock in
+  // its own run (own status/proof/due — completion fully independent of
+  // the parent, per the confirmed spec), created by the "+ Task" Subtasks
+  // builder with parentId = the parent's block. Weekly recurrence advances
+  // PARENTS only (engine/recurrence.ts skips parentId ≠ null) and clones
+  // subtasks under the new parent. SET NULL on parent delete — an orphaned
+  // subtask degrades to a normal top-level task.
+  parentId     String?
+  parent       RunBlock?  @relation("BlockSubtasks", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  subtasks     RunBlock[] @relation("BlockSubtasks")
+  // Explicit checklist-builder sequence for SUBTASKS (2026-07-31, spec
+  // delta B): 0-based position within the parent; copied by edit
+  // propagation and weekly recurrence. Null on parents and on pre-column
+  // subtasks — the UI falls back to creation (id) order for those.
+  subtaskOrder Int?
+
+  // Which TaskTemplate this block was created from (2026-07-31): set on
+  // every block of an assignment that used "Start from a template" OR
+  // "Save as Template" (the originating assignment). Plain string, no FK —
+  // same loose coupling as user ids — so template deletion can cancel the
+  // template's PENDING assignments (see deleteTaskTemplate) while
+  // completed history keeps its (now dangling) reference untouched.
+  templateId String?
+
+  // Task Category ("Type", 2026-08-12): set ONCE at assignment time, never
+  // edited afterward — the source of truth for which category this task
+  // instance shows under. Optional on TaskTemplate too (an assign-form
+  // pre-fill default only, never authoritative — see that model). SetNull
+  // on category delete: an archived/deleted category never blocks or
+  // orphans a task, it just falls back to "Uncategorized".
+  categoryId String?
+  category   TaskCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([runId, nodeId])
   @@index([assigneeId, status])
   @@index([status, dueAt])
   @@index([runId])
+  @@index([repeatWeekly, dueAt])
+  @@index([parentId])
+  @@index([templateId])
+  @@index([categoryId])
+}
+
+/// Optional assigner-attached reference material for a task (link and/or
+/// image, both optional — but a row only exists when at least one is set).
+/// Image bytes live here in the DB (capped at 2 MB by the assign action)
+/// so dev/staging/prod share them and Docker redeploys can't lose them;
+/// served via /api/task-manager/guideline-image/[id] (session-gated).
+model Guideline {
+  id        String     @id @default(cuid())
+  url       String?
+  imageMime String? // image/png | image/jpeg | image/webp
+  imageData Bytes?
+  createdAt DateTime   @default(now())
+  blocks    RunBlock[]
+}
+
+/// Task Categories ("Type", 2026-08-12): admin-managed, extensible task
+/// grouping (Flowghan/CNS/SMS/Inventory/HRMS/Email Marketing, etc — no
+/// fixed list, org-defined). Mirrors TaskTemplateGroup's shape (named,
+/// ordered, reversibly archivable). Chosen ONCE at task-assignment time
+/// (see RunBlock.categoryId below) — never edited on an existing task.
+model TaskCategory {
+  id          String    @id @default(cuid())
+  name        String
+  order       Int       @default(0)
+  archivedAt  DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  runBlocks      RunBlock[]
+  templates      TaskTemplate[]
+  templateGroups TaskTemplateGroup[]
+
+  @@index([createdById])
+}
+
+enum TemplateGroupScope {
+  TEMPLATE
+  PACKAGE
+}
+
+/// Grouping layer for "Template Groups" (2026-08-06, /task-manager/template):
+/// a named collection of several TaskTemplate rows, created/edited/deleted/
+/// applied together. Each member task is an ORDINARY TaskTemplate row
+/// (templateGroupId set below) — this model adds nothing but the name and
+/// owner; all cascade-safety (pending-assignment cancellation, edit
+/// propagation) is delegated to the existing per-task functions in
+/// data/templates.ts. Distinct from the single-task TaskTemplate flow
+/// ("+ Task → Start from a template"), which never sees grouped rows —
+/// listTaskTemplates excludes templateGroupId != null.
+model TaskTemplateGroup {
+  id          String             @id @default(cuid())
+  createdById String
+  name        String
+  scope       TemplateGroupScope @default(TEMPLATE)
+  archivedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  // Task Category ("Type", 2026-08-15) — ONE value shared by every task in
+  // this group (unlike TaskTemplate.categoryId, which is per-task and used
+  // only by the single-task "+ Task" flow's own Type dropdown). Set on
+  // create/edit; applyTemplateGroup passes this SAME categoryId to every
+  // fanned-out assignment. SetNull on category delete, same as every other
+  // categoryId relation — an archived/deleted category never blocks or
+  // orphans a template/package, it just falls back to "Uncategorized".
+  categoryId  String?
+  category    TaskCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  templates       TaskTemplate[]
+  branchSchedules BranchPackageSchedule[]
+
+  @@index([createdById])
+  @@index([scope])
+  @@index([categoryId])
+}
+
+enum PackageScheduleWeekday {
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+/// Branch Package Schedule (2026-08-07, multi-package cells 2026-08-08):
+/// one durable config row per (branch, weekday, packageGroupId) — a branch
+/// can now have MULTIPLE Packages (each a PACKAGE-scope TaskTemplateGroup)
+/// running the same weekday, so a given (branch, weekday) cell may be
+/// backed by more than one row, one per configured package. Together
+/// these rows are the standing source of truth the grid reads/writes.
+/// Setting a cell creates this config row; the real recurring
+/// cadence:"daily" assignment per package via the existing engine
+/// (src/task-manager/data/branch-package-schedule.ts) is a SEPARATE step
+/// as of 2026-08-11 (Save/Assign split, see assignedAt below) — Save no
+/// longer creates it automatically for additions, only the explicit
+/// "Assign" action does (removals are the one exception and still cancel
+/// immediately). This row is the durable "what's configured" record, separate from the
+/// FlowRun/RunBlock rows the recurrence engine perpetuates weekly (those
+/// get replaced/cloned forward every week, this row does not). Note:
+/// PackageScheduleWeekday (WED/THU/FRI/SAT/SUN, 5 values) is NOT the same
+/// day-set as the TS FLOW_DAYS union (src/task-manager/ui/types.ts,
+/// Tue/Wed/Thu/Fri/Sat/Sun, 6 values, used by the regular Task assign
+/// flow's day picker) — FLOW_DAYS additionally includes Tuesday; don't
+/// conflate the two or copy-paste one where the other belongs.
+model BranchPackageSchedule {
+  id             String                 @id @default(cuid())
+  branch         String
+  weekday        PackageScheduleWeekday
+  packageGroupId String
+  packageGroup   TaskTemplateGroup      @relation(fields: [packageGroupId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  createdById    String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  /// null = configured (via Save) but not yet processed into a real
+  /// recurring task assignment; non-null = the "Assign" action has already
+  /// created the real assignment for this row (2026-08-11 Save/Assign
+  /// split — see branch-package-schedule.ts's file header, added in the
+  /// same split's data-layer step). Intended lifecycle (established by
+  /// that step's code, not by this column alone): reset to null only by
+  /// deleting and recreating the row (i.e. removing then re-adding the
+  /// same package via Save) — never mutated back to null in place.
+  assignedAt     DateTime?
+
+  @@unique([branch, weekday, packageGroupId])
+  @@index([branch, weekday])
+  @@index([packageGroupId])
+}
+
+/// Reusable "+ Task" template (2026-07-31): captures the STRUCTURE of an
+/// assignment — task title, subtasks, cadence, guideline link/image — but
+/// deliberately NOT recipients, days, due date, or any completion state
+/// (those reset per use). Owned by its creator (createdById, TM user id);
+/// each assigner manages their own set. Saving with an existing name
+/// OVERWRITES that template (that's the "edit" path). Using a template
+/// only pre-fills the form — assignment then flows through the normal
+/// pipeline (fresh Guideline row per assignment), never mutating this row.
+model TaskTemplate {
+  id                String                         @id @default(cuid())
+  createdById       String
+  name              String
+  title             String
+  subtasks          Json                           @default("[]") // string[]
+  cadence           Cadence?
+  guidelineUrl      String?
+  guidelineMime     String? // image/png | image/jpeg | image/webp
+  guidelineImage    Bytes?
+  // Archive (2026-07-31): archived templates leave the assign picker and
+  // every hub tab except Archive (where Unarchive restores them + their
+  // archived instances). Reversible counterpart to deletion.
+  archivedAt        DateTime?
+  // Template Groups (2026-08-06): set when this task is a member of a
+  // TaskTemplateGroup — null for standalone single-task templates (all
+  // pre-existing rows, and every row created outside the group flow).
+  // groupPosition is the 0-based display order within the group.
+  templateGroupId   String?
+  groupPosition     Int?
+  group             TaskTemplateGroup?             @relation(fields: [templateGroupId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // Task Category pre-fill default (2026-08-12): only used to pre-fill the
+  // assign form's Category dropdown when this template is picked — the
+  // REAL, authoritative value is set per-assignment on RunBlock.categoryId
+  // above and can diverge from this at any time without updating the
+  // template.
+  categoryId        String?
+  category          TaskCategory?                  @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  // Assignee exclusions (2026-08-22) — see TaskTemplateExcludedAssignee's
+  // own doc comment below.
+  excludedAssignees TaskTemplateExcludedAssignee[]
+
+  @@index([createdById])
+  @@index([templateGroupId])
+}
+
+/// "Remove Assignee" persistence (2026-08-22): the View Assignees modal's
+/// Remove button no longer cancels any FlowRun/RunBlock at all — see
+/// removeTemplateAssigneeCore's doc comment in data/templates-internal.ts
+/// for the full rule. A row here means (templateId, userId) should stop
+/// receiving NEW recurring instances of this template from here on, while
+/// every already-created instance (pending, overdue, completed, including
+/// today's) is left completely untouched. advanceRecurringBlocks
+/// (engine/recurrence.ts) consults this before generating a successor;
+/// getTemplateAssigneesCore filters excluded people out of the "currently
+/// assigned" list even while their last pending instance is still
+/// naturally running its course. Cascade-deleted with the template.
+model TaskTemplateExcludedAssignee {
+  id         String       @id @default(cuid())
+  templateId String
+  template   TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  // Plain string, no FK to User — same loose coupling as
+  // RunBlock.assigneeId/TaskTemplate.createdById elsewhere in this schema.
+  userId     String
+  createdAt  DateTime     @default(now())
+
+  @@unique([templateId, userId])
+  @@index([templateId])
+}
+
+/// Assignee-uploaded completion evidence for a RunBlock (a screenshot —
+/// image only, capped at 2 MB by the upload action). Optional: uploading
+/// proof never gates completion. One-to-many as of 2026-08-08 — up to 5
+/// rows per RunBlock (app-enforced cap, not a DB constraint; runBlockId is
+/// deliberately NOT unique, see @@index below). Each upload APPENDS a new
+/// row rather than replacing one; removing a single photo is a separate
+/// explicit action that deletes just that row and trashes just that row's
+/// Drive file. Deleting the block cascades all of its proof rows away.
+/// Images live in Google Drive (2026-08-04 storage decision — high upload
+/// volume made in-DB bytes impractical) — driveFileId is the sole
+/// reference for every upload; served via
+/// /api/task-manager/proof-image/[id] (session-gated), which proxies from
+/// Drive and needs no changes for the multi-row shape since it's already
+/// keyed on this model's own id, not runBlockId. The original in-DB-bytes
+/// columns (imageMime/imageData) were dropped 2026-08-04 after their only
+/// 7 rows (pre-dating the Drive cutover, all test data) were deleted —
+/// every surviving/future row goes through Drive.
+///
+/// NOTE for readers auditing this commit in isolation: the schema/relation
+/// change here (runBlockId losing @unique, RunBlock.proof -> proofs) is
+/// step 1 of 3 on this feature branch. The application code that reads/
+/// writes this relation (src/task-manager/data/tasks.ts's upload path,
+/// src/task-manager/analytics/_lib.ts's query + DTO shape, and the UI)
+/// still assumes the old 1:1 shape as of this commit and does not yet
+/// compile clean — that's intentional, fixed by the next two commits on
+/// this same branch, not an accidental break.
+model Proof {
+  id          String   @id @default(cuid())
+  runBlockId  String
+  runBlock    RunBlock @relation(fields: [runBlockId], references: [id], onDelete: Cascade)
+  driveFileId String? // Google Drive file id — set by every upload
+  createdAt   DateTime @default(now())
+
+  @@index([runBlockId])
 }
 
 enum BlockStatus {
@@ -340,7 +654,7 @@ model AuditLog {
   runId      String?
   runBlockId String?
   actorId    String // user id, or "system" for engine/worker actions
-  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | REMINDER_SENT
+  action     String // RUN_STARTED | RUN_COMPLETED | RUN_CANCELLED | ITEM_COMPLETED | ITEM_CLEARED | BLOCK_STATUS_CHANGED | BLOCK_ESCALATED | BLOCK_REASSIGNED | BLOCK_RECURRED | BLOCK_DUE_DATE_CHANGED | BLOCK_AUTO_REFRESH (historical only) | REMINDER_SENT
   detail     Json?
   createdAt  DateTime @default(now())
 
@@ -414,6 +728,12 @@ model ScheduleSlot {
   schedule        ManpowerSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   startTime       String // HH:mm
   endTime         String // HH:mm
+  // Optional row label (2026-08-01, ClickUp-style slot naming): "Opening",
+  // "6:00 PM Class", "Closing" — typed by the Branch Manager per TIME ROW
+  // (stored on every cell of that row, kept uniform by the row actions).
+  // Synced task titles use it; rows without one fall back to
+  // "{h:mm AM/PM} Class" auto-formatted from startTime (slotTaskTitle).
+  rowLabel        String?
   roleColumn      String // "Manager" | "Coach 1" | "Exec 1" | ...
   assignedStaffId String?
   runBlockId      String?

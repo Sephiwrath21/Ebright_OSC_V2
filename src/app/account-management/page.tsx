@@ -85,7 +85,7 @@ export default async function AccountManagementPage() {
       orderBy: [{ user_id: "asc" }],
     }),
     prisma.branch.findMany({
-      select: { branch_id: true, branch_name: true },
+      select: { branch_id: true, branch_name: true, region: true },
       orderBy: { branch_name: "asc" },
     }),
     prisma.department.findMany({

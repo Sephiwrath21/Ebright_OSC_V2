@@ -33,7 +33,13 @@ function getPool(): Pool {
   if (cached) cached.pool.end().catch(() => {});
   const pool = new Pool({
     connectionString: signature,
-    max: 20,
+    // Bumped from 20 to 30 (2026-08-11) alongside the other two app pools
+    // (prisma.ts, ebright-hrfs.ts) — not directly implicated in the
+    // TooManyConnections incident that prompted the other two bumps, but
+    // raised for consistent headroom since it shares the same underlying
+    // Postgres server (confirmed max_connections=200, ~110 in use at time
+    // of writing).
+    max: 30,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 15_000,
     keepAlive: true,

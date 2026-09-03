@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import GreetingHeader from "@/app/components/GreetingHeader";
-import ClickUpPieChart from "@/app/components/ClickUpPieChart";
 import {
   Compass,
   Calendar,
@@ -11,8 +10,6 @@ import {
   UserMinus,
   FileText,
   Sparkles,
-  ListTodo,
-  ArrowLeft,
   User,
   MapPin,
   Clock,
@@ -74,25 +71,13 @@ function formatTime(isoString: string): string {
 export default function AcademyDashboard({
   userName,
   userEmail,
+  taskOverview,
 }: {
   userName?: string | null;
   userEmail?: string | null;
+  /** Server-rendered department Task Manager overview (real data slot). */
+  taskOverview?: ReactNode;
 }) {
-  const dummyDistribution = {
-    PENDING: 184,
-    COMPLETE: 492,
-    "NOT APPLICABLE": 1,
-    "N/A": 5,
-  };
-
-  const dummyDailyTasks = [
-    { id: "86d3g0op1", name: "Review academy tutorial syllabus updates", status: "PENDING", listName: "Academy Core", url: "#" },
-    { id: "86d3g0op2", name: "Audit SMS student registrations list", status: "PENDING", listName: "SMS Sync", url: "#" },
-    { id: "86d3g0op3", name: "Prepare syllabus outline for Q3 intakes", status: "PENDING", listName: "Syllabus", url: "#" },
-    { id: "86d3g0op4", name: "Verify class scheduling allocations", status: "COMPLETE", listName: "Schedules", url: "#" },
-    { id: "86d3g0op5", name: "Prepare academy weekly coordinators sync", status: "COMPLETE", listName: "Academy Core", url: "#" },
-  ];
-
   const greetName =
     userName?.split(" ")[0] ||
     userEmail?.split("@")[0] ||
@@ -107,7 +92,6 @@ export default function AcademyDashboard({
   });
   const [students, setStudents] = useState<SMSStudent[]>([]);
   const [braindump, setBraindump] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   // Load backend stats & SMS students
   const loadBackend = useCallback(() => {
@@ -158,10 +142,10 @@ export default function AcademyDashboard({
 
         {/* --- MAIN GRID SECTION --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* Left Column (Width 7/12) */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* 1. Attendance Tracker */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
@@ -276,73 +260,6 @@ export default function AcademyDashboard({
 
           {/* Right Column (Width 5/12) */}
           <div className="lg:col-span-5 space-y-6">
-            
-            {/* 3. ClickUp Optimization Progress */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between text-slate-800 dark:text-slate-200">
-              <div>
-                {selectedStatus === null ? (
-                  <>
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <ListTodo className="w-5 h-5 text-teal-500" />
-                        Daily | Tue - Sat
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded uppercase tracking-wide font-mono">
-                        Demo Mode
-                      </span>
-                    </h2>
-
-                    <div className="flex justify-center items-center py-1">
-                      <ClickUpPieChart
-                        distribution={dummyDistribution}
-                        onSliceClick={setSelectedStatus}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                      <button
-                        onClick={() => setSelectedStatus(null)}
-                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1 text-xs font-bold"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Chart
-                      </button>
-                      <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        {selectedStatus} ({dummyDailyTasks.filter((t) => t.status === selectedStatus).length})
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                      {dummyDailyTasks.filter((t) => t.status === selectedStatus).length === 0 ? (
-                        <p className="text-xs text-slate-400 text-center py-12">No tasks found for this status.</p>
-                      ) : (
-                        dummyDailyTasks
-                          .filter((t) => t.status === selectedStatus)
-                          .map((t) => (
-                            <a
-                              key={t.id}
-                              href={t.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-start gap-2.5 p-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs transition-all duration-200"
-                            >
-                              <span className="font-mono text-[10px] text-slate-400 font-bold">#{t.id}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-slate-700 dark:text-slate-300 leading-tight hover:underline">{t.name}</p>
-                                <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-                                  List: {t.listName}
-                                </p>
-                              </div>
-                            </a>
-                          ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
 
             {/* 4. Braindump Section */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
@@ -372,6 +289,11 @@ export default function AcademyDashboard({
           </div>
 
         </div>
+
+        {/* Real department Task Manager status (server-rendered slot) —
+            ALWAYS the LAST section on Home, for every account type
+            (2026-07-28 placement decision). */}
+        {taskOverview}
       </div>
     </div>
   );
