@@ -171,7 +171,7 @@ function UpdateScheduleContent() {
           </div>
         ) : error ? (
           <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-2xl p-6 text-center">
-            <p className="text-red-600 dark:text-red-300 font-medium">{error}</p>
+            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
           </div>
         ) : drillYear !== null && drillMonth !== null ? (
           <div>
@@ -200,20 +200,20 @@ function UpdateScheduleContent() {
                           <button
                             key={record.id}
                             onClick={() => openRecord(record)}
-                            className="text-left bg-orange-50 dark:bg-orange-900 hover:bg-orange-100 dark:hover:bg-orange-800 border border-orange-200 dark:border-orange-700 hover:border-orange-300 dark:hover:border-orange-600 rounded-xl px-4 py-3 transition-colors min-w-[160px]"
+                            className="text-left bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 rounded-xl px-4 py-3 transition-colors min-w-[160px] dark:bg-orange-900 dark:hover:bg-orange-800 dark:border-orange-700 dark:hover:border-orange-600"
                           >
                             <div className="font-black text-sm text-orange-800 dark:text-orange-200 uppercase tracking-wide">
                               {record.branch}
                             </div>
-                            <div className="text-xs text-orange-500 dark:text-orange-300 font-bold mt-0.5">
+                            <div className="text-xs text-orange-500 dark:text-orange-400 font-bold mt-0.5">
                               {format(parseISO(record.startDate), "dd MMM")} –{" "}
                               {format(parseISO(record.endDate), "dd MMM")}
                             </div>
                             <span
                               className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${
                                 record.status === "Updated"
-                                  ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-                                  : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                  : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
                               }`}
                             >
                               {record.status}
@@ -307,7 +307,7 @@ export default function UpdateSchedulePage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-blue-600 dark:text-blue-400 font-semibold text-lg">
           Loading...
         </div>
       </AppShell>

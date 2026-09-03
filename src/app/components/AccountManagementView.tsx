@@ -252,13 +252,13 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
         >
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200"
+            className="flex items-center gap-1 hover:text-slate-900 transition-all duration-200 dark:hover:text-slate-100"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 dark:text-slate-100 font-medium">Account Management</span>
+          <span className="text-slate-900 font-medium dark:text-slate-100">Account Management</span>
         </nav>
 
         {/* Header — compact inline title with section tabs at the right */}
@@ -345,7 +345,7 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-100 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <tr className="bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <th className="text-left px-6 py-3 font-semibold">Account</th>
                   <th className="text-left px-6 py-3 font-semibold">Role</th>
                   <th className="text-center px-6 py-3 font-semibold">
@@ -389,9 +389,9 @@ export default function AccountManagementView({ data }: { data: AccountData }) {
             </table>
           </div>
 
-          <div className="flex items-center gap-2 px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+          <div className="flex items-center gap-2 px-6 py-3 border-t border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50">
             <KeyRound
-              className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0"
+              className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0 dark:text-indigo-400"
               aria-hidden="true"
             />
             <span className="text-xs text-slate-600 dark:text-slate-300">
@@ -442,12 +442,12 @@ function DropdownFilter({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200">
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 bg-white px-3 gap-2 text-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all duration-200 dark:border-slate-500 dark:bg-slate-950 dark:focus-within:border-indigo-500 dark:focus-within:ring-indigo-900">
       {icon}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none pr-1 max-w-[180px]"
+        className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none pr-1 max-w-[180px] dark:text-slate-200"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -475,18 +475,18 @@ function UserRow({
   const rowBg = zebra ? "bg-slate-50/50 dark:bg-slate-800/50" : "bg-white dark:bg-slate-900";
   return (
     <tr
-      className={`${rowBg} hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 border-b border-slate-100 dark:border-slate-800 last:border-b-0`}
+      className={`${rowBg} hover:bg-slate-100 transition-colors duration-200 border-b border-slate-100 last:border-b-0 dark:hover:bg-slate-800 dark:border-slate-800`}
     >
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="rounded-full w-9 h-9 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-semibold text-sm flex items-center justify-center shrink-0">
+          <div className="rounded-full w-9 h-9 bg-indigo-100 text-indigo-700 font-semibold text-sm flex items-center justify-center shrink-0 dark:bg-indigo-900 dark:text-indigo-200">
             {initials(user.full_name, user.email)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+            <div className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
               {user.full_name ?? "—"}
             </div>
-            <div className="text-[12px] text-slate-500 dark:text-slate-400 truncate">{user.email}</div>
+            <div className="text-[12px] text-slate-500 truncate dark:text-slate-400">{user.email}</div>
           </div>
         </div>
       </td>
@@ -627,7 +627,7 @@ function BranchDeptCell({
   return (
     <div className="text-sm">
       {branchName && (
-        <div className="font-semibold text-slate-800 dark:text-slate-200">{branchName}</div>
+        <div className="font-semibold text-slate-800 dark:text-slate-100">{branchName}</div>
       )}
       {deptLine && (
         <div className="text-[12px] font-medium text-slate-500 dark:text-slate-400">{deptLine}</div>
@@ -640,7 +640,7 @@ function StatusPill({ status }: { status: string }) {
   const lower = status.toLowerCase();
   if (lower === "active") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
         Active
       </span>
@@ -648,14 +648,14 @@ function StatusPill({ status }: { status: string }) {
   }
   if (lower === "inactive" || lower === "disabled") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" aria-hidden="true" />
         Inactive
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
       {prettyRole(status)}
     </span>
   );

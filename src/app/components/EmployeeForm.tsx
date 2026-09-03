@@ -242,7 +242,7 @@ export default function EmployeeForm({
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{ background: "rgba(0, 0, 0, 0.45)" }}
       >
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 dark:ring-1 dark:ring-white/10 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
           <CredentialScreen
             data={{
               ...state.credentials,
@@ -585,7 +585,7 @@ export default function EmployeeForm({
               </div>
             </Field>
             <Field label="Probation">
-              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900">
+              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
                 <input name="probation" type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-500 text-blue-600 focus:ring-blue-500" defaultChecked={employee?.probation ?? false} />
                 <span className="text-slate-700 dark:text-slate-300">Currently on probation</span>
               </label>
@@ -614,7 +614,7 @@ export default function EmployeeForm({
                 </div>
 
                 {assignOnboarding && (
-                  <div className="rounded-lg border border-blue-100 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/30 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-blue-100 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/20 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Workflow Template" required>
                       <div className="relative">
                         <select
@@ -775,7 +775,7 @@ function TabNav({ active, onChange }: { active: TabKey; onChange: (key: TabKey) 
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(t.key)}
-            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 ${
+            className={`h-9 px-5 rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
               isActive
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -911,7 +911,7 @@ function Section({
     <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
       <header className="flex items-center gap-3 px-6 py-5 border-b border-slate-100 dark:border-slate-800">
         <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-300" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
@@ -943,7 +943,7 @@ function Field({
     <label className={`block ${span === 2 ? "md:col-span-2" : ""}`}>
       <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
         {label}
-        {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
+        {required && <span className="text-red-500 dark:text-red-400 ml-0.5" aria-hidden="true">*</span>}
       </span>
       {children}
       {hint && <span className="block mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</span>}

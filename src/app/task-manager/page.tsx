@@ -195,7 +195,7 @@ const ALL_BRANCH_BOLD_VALUES = [ALL_REGIONS_VALUE, ...FLOW_BRANCH_REGIONS.map((r
 function ModeTabs({ active, date }: { active: "department" | "branch"; date?: string }) {
   const base = "rounded-lg px-4 py-1.5 text-sm font-semibold border border-transparent";
   const on = "bg-white text-gray-900 border-gray-300 shadow dark:bg-slate-700 dark:text-slate-100 dark:border-slate-500";
-  const off = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300";
+  const off = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200";
   const suffix = date ? `&date=${date}` : "";
   return (
     <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-800">

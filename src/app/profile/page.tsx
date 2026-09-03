@@ -141,7 +141,7 @@ export default async function ProfilePage({
                 <div className="mt-1 flex items-center gap-2 flex-wrap min-w-0">
                   <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{me.email}</span>
                   {roleType !== "staff" && (
-                    <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-blue-50 dark:bg-blue-900 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200 dark:ring-blue-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-blue-50 dark:bg-blue-900 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200 dark:ring-blue-800 uppercase tracking-wider">
                       <Shield className="w-3 h-3" aria-hidden="true" />
                       {roleLabel}
                     </span>
@@ -161,7 +161,7 @@ export default async function ProfilePage({
               )}
               <Link
                 href="/profile/change-password"
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <KeyRound className="w-4 h-4" aria-hidden="true" />
                 Change Password
@@ -220,7 +220,7 @@ export default async function ProfilePage({
                         const name = m.fullName ?? m.email.split("@")[0];
                         return (
                           <li key={m.id} className="flex items-center gap-3 px-4 py-3">
-                            <span className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center shrink-0">
+                            <span className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center shrink-0">
                               {initials}
                             </span>
                             <div className="min-w-0 flex-1">
@@ -229,12 +229,12 @@ export default async function ProfilePage({
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {m.position && (
-                                <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300 ring-1 ring-inset ring-slate-200 dark:ring-slate-700 whitespace-nowrap">
+                                <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200 ring-1 ring-inset ring-slate-200 dark:ring-slate-700 whitespace-nowrap">
                                   {m.position}
                                 </span>
                               )}
                               {m.status && (
-                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.status === "active" ? "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-500/30" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20 dark:ring-slate-500/30"}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.status === "active" ? "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20"}`}>
                                   <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-emerald-500" : "bg-slate-400"}`} aria-hidden="true" />
                                   {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
                                 </span>

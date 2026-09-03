@@ -222,7 +222,7 @@ export default function NotificationBell({ role }: { role?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={totalCount > 0 ? `Notifications: ${totalCount} pending` : "Notifications"}
-        className={`relative inline-flex items-center justify-center w-10 h-10 rounded-full transition-all text-slate-800 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+        className={`relative inline-flex items-center justify-center w-10 h-10 rounded-full text-slate-800 dark:text-slate-300 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
           open ? "bg-slate-100 dark:bg-slate-800" : "hover:bg-slate-100 dark:hover:bg-slate-800"
         }`}
       >
@@ -268,7 +268,7 @@ export default function NotificationBell({ role }: { role?: string }) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close notifications"
-              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -288,7 +288,7 @@ export default function NotificationBell({ role }: { role?: string }) {
                 <div className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900 flex items-center justify-center shrink-0 ring-1 ring-inset ring-amber-200 dark:ring-amber-700">
-                      <Hourglass className="w-5 h-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                      <Hourglass className="w-5 h-5 text-amber-600 dark:text-amber-300" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">Account approval</p>
@@ -315,7 +315,7 @@ export default function NotificationBell({ role }: { role?: string }) {
                 <div className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900 flex items-center justify-center shrink-0 ring-1 ring-inset ring-amber-200 dark:ring-amber-700">
-                      <Hourglass className="w-5 h-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                      <Hourglass className="w-5 h-5 text-amber-600 dark:text-amber-300" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">

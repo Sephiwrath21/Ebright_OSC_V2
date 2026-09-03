@@ -34,8 +34,8 @@ export default async function AccountManagementPage() {
   if (!ALLOWED_ROLE_TYPES.has(roleType)) {
     return (
       <AppShell email={userEmail} role={userRoleHeader} name={userName}>
-        <div className="min-h-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-8">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center dark:bg-slate-900 dark:border-slate-800 dark:ring-1 dark:ring-white/10">
+        <div className="min-h-full bg-slate-50 flex items-center justify-center p-8 dark:bg-slate-950">
+          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center dark:bg-slate-900 dark:border-slate-800">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-5 dark:bg-rose-900">
               <ShieldAlert
                 className="w-7 h-7 text-rose-600 dark:text-rose-300"
