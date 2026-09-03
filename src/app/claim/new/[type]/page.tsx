@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import AppShell from "@/app/components/AppShell";
 import ClaimFormView from "@/app/components/ClaimFormView";
 import { type ClaimType, isClaimType, canAccessClaimType } from "@/app/claim/claim-types";
+import ClaimBlockedNotice from "@/app/claim/ClaimBlockedNotice";
+import { claimTaskBlock } from "@/app/claim/task-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,21 @@ export default async function NewClaimTypePage({
   department = me?.employment?.[0]?.department?.department_name ?? null;
 
   if (!canAccessClaimType(type, { position, roleType, email, department })) notFound();
+
+  // Task Manager gate (2026-09-03) — see claim/task-gate.ts. Also enforced in
+  // submitClaim, which is what actually stops a hand-rolled POST.
+  const taskBlock = await claimTaskBlock(email);
+  if (taskBlock) {
+    return (
+      <AppShell
+        email={email}
+        role={(session.user as { role?: string } | undefined)?.role ?? ""}
+        name={session.user?.name ?? null}
+      >
+        <ClaimBlockedNotice gate={taskBlock} />
+      </AppShell>
+    );
+  }
 
   let healthUsed = 0;
   if (type === "health") {
