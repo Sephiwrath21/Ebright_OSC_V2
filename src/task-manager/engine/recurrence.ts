@@ -36,6 +36,21 @@ import { Prisma } from "@/generated/task-manager-client";
 import { todayStart } from "@/task-manager/lib/dates";
 import { prisma } from "@/task-manager/prisma";
 
+// JS Date.getDay() -> FLOW_DAYS weekday name — local mirror of
+// tasks-internal.ts's own DAY_INDEX (reversed), same precedent as
+// template-groups.ts's/templates-internal.ts's own copies of this exact
+// map (each file keeps its own rather than importing one shared export —
+// see either of those files' own doc comment for why). Monday (1)
+// deliberately absent — a "daily"-cadence RunBlock can never land there.
+const JS_DAY_TO_FLOW_DAY: Partial<Record<number, string>> = {
+  0: "Sun",
+  2: "Tue",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+};
+
 /** Pure: the next occurrence of dueAt's weekday (same time-of-day) that is
  *  >= boundary. Already-current dates return unchanged. */
 export function nextWeeklyDueAt(dueAt: Date, boundary: Date): Date {
@@ -168,24 +183,32 @@ export async function advanceRecurringBlocks(now: Date = new Date()): Promise<nu
   const boundary = todayStart(now);
 
   // Excluded template assignees (2026-08-22, "Remove Assignee" rule
-  // change — see data/templates-internal.ts's removeTemplateAssigneeCore
-  // doc comment): a (templateId, userId) pair recorded here must stop
-  // spawning NEW recurring successors from here on, while every already-
+  // change; made PER-WEEKDAY 2026-08-29 — see data/templates-internal.ts's
+  // removeTemplateAssigneeCore doc comment): a (templateId, userId,
+  // weekday) triple recorded here must stop spawning NEW recurring
+  // successors DUE ON THAT WEEKDAY from here on — the same person's OTHER
+  // weekdays of the same template are unaffected — while every already-
   // created FlowRun/RunBlock (past and pending, including today's) is left
-  // completely untouched — so this is a post-fetch JS filter on
-  // (RunBlock.templateId, RunBlock.assigneeId) below, NOT a change to any
-  // FlowRun/RunBlock row, and NOT a DB-level `notIn` filter (Prisma's
-  // `notIn` on a nullable column risks excluding NULL rows too, which
-  // would wrongly stop non-template tasks from recurring). templateId
-  // itself is a plain string with no FK (see RunBlock's schema comment) —
-  // this mirrors that same loose-coupling, application-level-join pattern.
-  const excludedPairs = new Set(
-    (await prisma.taskTemplateExcludedAssignee.findMany({ select: { templateId: true, userId: true } })).map(
-      (e) => `${e.templateId}::${e.userId}`,
-    ),
+  // completely untouched. A predecessor's own `dueAt` weekday IS its
+  // successor's weekday too (nextWeeklyDueAt only ever jumps by whole
+  // 7-day multiples), so this is a post-fetch JS filter on
+  // (RunBlock.templateId, RunBlock.assigneeId, dueAt-derived weekday)
+  // below, NOT a change to any FlowRun/RunBlock row, and NOT a DB-level
+  // `notIn` filter (Prisma's `notIn` on a nullable column risks excluding
+  // NULL rows too, which would wrongly stop non-template tasks from
+  // recurring). templateId itself is a plain string with no FK (see
+  // RunBlock's schema comment) — this mirrors that same loose-coupling,
+  // application-level-join pattern.
+  const excludedTriples = new Set(
+    (
+      await prisma.taskTemplateExcludedAssignee.findMany({ select: { templateId: true, userId: true, weekday: true } })
+    ).map((e) => `${e.templateId}::${e.userId}::${e.weekday}`),
   );
-  const notExcluded = (b: { templateId: string | null; assigneeId: string }) =>
-    !b.templateId || !excludedPairs.has(`${b.templateId}::${b.assigneeId}`);
+  const notExcluded = (b: { templateId: string | null; assigneeId: string; dueAt: Date | null }) => {
+    if (!b.templateId || !b.dueAt) return true;
+    const day = JS_DAY_TO_FLOW_DAY[b.dueAt.getDay()];
+    return !day || !excludedTriples.has(`${b.templateId}::${b.assigneeId}::${day}`);
+  };
 
   // UNIVERSAL: every DAILY task with a due day recurs — no flag (the
   // repeatWeekly column is retired; see its schema comment). Manpower

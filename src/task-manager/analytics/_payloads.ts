@@ -336,6 +336,11 @@ async function buildEntityPayload(
   const byMember = new Map<string, { done: number; notDone: number }>();
   for (const u of roster) byMember.set(u.id, { done: 0, notDone: 0 });
   for (const b of blocks) {
+    // Subtasks don't count separately (2026-08-29) — see countBuckets' own
+    // doc comment in _lib.ts for why (this loop predates that shared
+    // helper and tallies done/notDone by hand, so it needs the same guard
+    // repeated here rather than inheriting it for free).
+    if (b.parentId != null) continue;
     const tally = byMember.get(b.assigneeId) ?? { done: 0, notDone: 0 };
     const bucket = bucketOf(b.status);
     if (bucket === "completed") tally.done += 1;
@@ -648,20 +653,28 @@ export async function getOrgPayload(
   };
 }
 
-/** "No Claim/Incentive" list (2026-08-18, month filter added same day): a
- *  company-wide roster of everyone with at least one open task, grouped by
- *  Department or Branch. `month` (YYYY-MM-DD anchor, any day-of-month) scopes
- *  this to one calendar month — matched against `dueAt`, falling back to
+/** "No Claim/Incentive" list (2026-08-18, month filter added same day; day
+ *  granularity added 2026-08-26 for the /employee-folder "Not Clicked Task"
+ *  card — see getScopedNoClaimIncentiveList): a company-wide roster of
+ *  everyone with at least one open task, grouped by Department or Branch.
+ *  `date` (YYYY-MM-DD) scopes this to one calendar month or one single day
+ *  depending on `period` — matched against `dueAt`, falling back to
  *  `startedAt` for undated tasks (same fallback getAdhocRegionsPayload above
  *  already uses), NOT the cadence-aware Monthly-period rule fetchPeriodBlocks'
  *  own `window` param would apply — this list deliberately keeps "every task
  *  type, any not-done status" (Daily/Monthly/Ad hoc/HOD/CEO Assigned alike)
- *  regardless of month, so a real Daily task due in the selected month still
- *  counts. Omitting `month` keeps the original all-time behavior. Authorization
- *  (Finance/CEO only) is the caller's job (queries.ts) — this builder itself
- *  has no scope restriction, mirroring getOrgPayload above. */
-export async function getNoClaimIncentivePayload(month?: string): Promise<NoClaimIncentivePayload> {
-  const window = month ? resolveWindow("monthly", month) : null;
+ *  regardless of period, so e.g. a real Daily task due that day still counts
+ *  under a monthly window too. Omitting `date` keeps the original all-time
+ *  behavior; `period` defaults to "monthly" — the original CEO/Finance ⋮ menu
+ *  never passes it explicitly, so its own month-by-month behavior is
+ *  unchanged. Authorization (Finance/CEO only) is the caller's job
+ *  (queries.ts) — this builder itself has no scope restriction, mirroring
+ *  getOrgPayload above. */
+export async function getNoClaimIncentivePayload(
+  date?: string,
+  period: Period = "monthly",
+): Promise<NoClaimIncentivePayload> {
+  const window = date ? resolveWindow(period, date) : null;
   const all = await fetchPeriodBlocks(null);
   const openBlocks = all
     .filter((b) => bucketOf(b.status) === "pending")

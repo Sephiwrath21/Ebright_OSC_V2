@@ -13,6 +13,8 @@ import type {
 } from "../ui/types";
 import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
+import { prisma as hrfsPrisma } from "@/lib/prisma";
+import type { EmployeeScope } from "@/lib/employeeScope";
 import { FINANCE_EMAIL } from "../role-views";
 import {
   analyticsQuerySchema,
@@ -506,4 +508,73 @@ export function getNoClaimIncentiveList(email: string, month?: string): Promise<
     }
     return getNoClaimIncentivePayload(month);
   }, "getNoClaimIncentiveList");
+}
+
+// Task Manager's own per-user department/branch strings occasionally differ
+// from hrfs's (2026-08-26, checked exhaustively against live data): every
+// other name matches exactly. "Puncak Jalil" (a real Task Manager branch
+// value) has no hrfs branch at all — deliberately left unmapped below, so it
+// only ever surfaces to full-access viewers (see getScopedNoClaimIncentiveList)
+// rather than silently attributing it to the wrong branch-scoped viewer.
+const DEPARTMENT_NAME_TO_TASK_MANAGER: Record<string, string> = {
+  Operation: "Operations",
+};
+const BRANCH_NAME_TO_TASK_MANAGER: Record<string, string> = {
+  Rimbayu: "Bandar Rimbayu",
+  "Kajang TTDI Grove": "Kajang TTDI Groove",
+};
+
+/** hrfs's department/branch tables only carry the code on EmployeeScope —
+ *  resolve the matching Task Manager group *name* via the display name plus
+ *  the reconciliation maps above. null when the scope has neither (ownUserId
+ *  or a fully-empty scope) or its department/branch code doesn't resolve. */
+async function resolveTaskManagerGroupName(scope: EmployeeScope): Promise<string | null> {
+  if (scope.departmentCode) {
+    const dept = await hrfsPrisma.department.findUnique({
+      where: { department_code: scope.departmentCode },
+      select: { department_name: true },
+    });
+    if (!dept) return null;
+    return DEPARTMENT_NAME_TO_TASK_MANAGER[dept.department_name] ?? dept.department_name;
+  }
+  if (scope.branchCode) {
+    const branch = await hrfsPrisma.branch.findUnique({
+      where: { branch_code: scope.branchCode },
+      select: { branch_name: true },
+    });
+    if (!branch) return null;
+    return BRANCH_NAME_TO_TASK_MANAGER[branch.branch_name] ?? branch.branch_name;
+  }
+  return null;
+}
+
+/** /employee-folder's "Not Clicked Task" card + modal (2026-08-26, see
+ *  conversation) — same underlying data as getNoClaimIncentiveList above
+ *  (getNoClaimIncentivePayload, including its run.status !== "CANCELLED"
+ *  filter), but gated by the general hrfs access-scope concept
+ *  (src/lib/employeeScope.ts) instead of this file's CEO/Finance-only check:
+ *  fullAccess sees every department/branch group unchanged; anyone else sees
+ *  only the one group matching their own department/branch (empty payload if
+ *  it can't be resolved — e.g. ownUserId scope, or a code with no matching
+ *  Task Manager group at all). Deliberately does NOT call requireUserByEmail/
+ *  the CEO-or-FINANCE_EMAIL check above — the caller
+ *  (src/app/employee-folder/page.tsx) has already authenticated the session
+ *  and resolved its own scope. `date` filters to that single DAY (2026-08-26,
+ *  see conversation — this card navigates day-by-day, defaulting to today,
+ *  unlike the original menu's month-by-month picker), not a whole month. */
+export async function getScopedNoClaimIncentiveList(
+  scope: EmployeeScope,
+  date?: string,
+): Promise<NoClaimIncentivePayload> {
+  return native(async () => {
+    const payload = await getNoClaimIncentivePayload(date, "daily");
+    if (scope.fullAccess) return payload;
+
+    const groupName = await resolveTaskManagerGroupName(scope);
+    if (!groupName) return { departments: [], branches: [] };
+    return {
+      departments: payload.departments.filter((g) => g.name === groupName),
+      branches: payload.branches.filter((g) => g.name === groupName),
+    };
+  }, "getScopedNoClaimIncentiveList");
 }

@@ -53,6 +53,7 @@ import {
   SetupPendingCard,
   TaskManagerErrorCard,
 } from "@/task-manager/ui/status-cards";
+import { FLOW_DAYS } from "@/task-manager/ui/types";
 import type {
   FlowTemplateGroupApplyInput,
   FlowTemplateGroupTaskInput,
@@ -232,12 +233,13 @@ export default async function TaskManagerPackagePage() {
   async function removeAssignee(
     groupId: string,
     userId: string,
+    weekdays: (typeof FLOW_DAYS)[number][],
   ): Promise<TemplateGroupRemoveAssigneeResult> {
     "use server";
     const stale = await requireLiveSession(email);
     if (stale) return stale;
     try {
-      const result = await removeGroupAssignee(email, groupId, SCOPE, userId);
+      const result = await removeGroupAssignee(email, groupId, SCOPE, userId, weekdays);
       revalidatePath("/task-manager");
       return { ok: true, ...result };
     } catch (err) {

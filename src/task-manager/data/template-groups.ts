@@ -104,7 +104,11 @@ const groupTaskSchema = z.object({
   /** Present = an existing member being kept (edit reconciliation); absent
    *  = a new task to create. */
   id: z.string().min(1).optional(),
-  title: z.string().trim().min(1).max(200),
+  // No max() on title (2026-08-28, user request) — was capped at 200
+  // characters; TaskTemplate.title/RunBlock.title are both plain Prisma
+  // String columns (Postgres TEXT, unbounded), so nothing downstream
+  // needed a migration to lift this. min(1) (non-blank) is unchanged.
+  title: z.string().trim().min(1),
   subtasks: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
   // Per-task Guideline (2026-08-20) — same shape/limits as the single-task
   // template's own editTemplateSchema (templates-internal.ts), duplicated
@@ -758,6 +762,12 @@ export interface TemplateGroupAssignee {
   userId: string;
   name: string;
   pendingTasks: number;
+  /** Union of every member task's own `days` for this person (2026-08-26)
+   *  — see getTemplateAssigneesCore's own doc comment for how a single
+   *  task's days are derived. Sorted in FLOW_DAYS order, deduped across
+   *  member tasks (a person covering Tue on one member task and Wed on
+   *  another shows both). */
+  days: (typeof FLOW_DAYS)[number][];
 }
 
 /** Everyone currently holding a pending instance of ANY task in this
@@ -778,54 +788,67 @@ export function getGroupAssignees(
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
-    const merged = new Map<string, { name: string; pendingTasks: number }>();
+    const merged = new Map<string, { name: string; pendingTasks: number; days: Set<(typeof FLOW_DAYS)[number]> }>();
     for (const t of group.templates) {
       const assignees = await getTemplateAssigneesCore(user, t.id);
       for (const a of assignees) {
         const existing = merged.get(a.userId);
+        const days = existing?.days ?? new Set();
+        for (const d of a.days) days.add(d);
         merged.set(a.userId, {
           name: a.name,
           pendingTasks: (existing?.pendingTasks ?? 0) + a.pendingTasks,
+          days,
         });
       }
     }
     return [...merged.entries()]
-      .map(([userId, v]) => ({ userId, name: v.name, pendingTasks: v.pendingTasks }))
+      .map(([userId, v]) => ({
+        userId,
+        name: v.name,
+        pendingTasks: v.pendingTasks,
+        days: FLOW_DAYS.filter((d) => v.days.has(d)),
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, "getGroupAssignees");
 }
 
 /** "Remove" for one assignee (View Assignees modal, 2026-08-22 rule —
- *  corrected same day): cancels ONLY today's instance of each member task
- *  — see removeTemplateAssigneeCore's doc comment in templates-internal.ts
- *  for the full rule. Records a TaskTemplateExcludedAssignee row per
- *  member task, so this person stops receiving new recurring instances of
- *  EVERY task in the group going forward, while every instance dated
- *  before today (pending, overdue, or completed) stays exactly as it is.
- *  Other assignees and the group/template itself are untouched. */
+ *  corrected same day; 2026-08-27 fix; made PER-WEEKDAY 2026-08-29 — see
+ *  removeTemplateAssigneeCore's own doc comment for all three): cancels
+ *  every instance of each member task, due on one of the given `weekdays`,
+ *  TODAY OR LATER — not just today's, and not the person's other weekdays
+ *  of the same group. Records one TaskTemplateExcludedAssignee row per
+ *  (member task, given weekday), so this person stops receiving new
+ *  recurring instances of EVERY task in the group ON THOSE DAYS going
+ *  forward, while every instance dated before today (pending, overdue, or
+ *  completed), on ANY weekday, stays exactly as it is. Other assignees and
+ *  the group/template itself are untouched. */
 export function removeGroupAssignee(
   email: string,
   groupId: string,
   scope: TemplateGroupScope,
   userId: string,
-): Promise<{ excluded: true; cancelledToday: number; pendingKept: number }> {
+  weekdays: (typeof FLOW_DAYS)[number][],
+): Promise<{ excluded: true; cancelledPending: number; pendingKept: number }> {
   return native(async () => {
     const user = await requireGroupEditAccess(email, scope);
     const id = z.string().min(1).parse(groupId);
     const targetUserId = z.string().min(1).parse(userId);
+    const targetWeekdays = z.array(z.enum(FLOW_DAYS)).min(1).parse(weekdays);
     const group = await prisma.taskTemplateGroup.findFirst({
       where: { id, scope }, // global as of 2026-08-11 — see listTemplateGroups's doc comment
       include: { templates: { select: { id: true } } },
     });
     if (!group) throw new ApiHttpError(404, NOT_FOUND_MESSAGE[scope]);
 
-    let cancelledToday = 0;
+    let cancelledPending = 0;
     let pendingKept = 0;
     for (const t of group.templates) {
-      const result = await removeTemplateAssigneeCore(user, t.id, targetUserId);
-      cancelledToday += result.cancelledToday;
+      const result = await removeTemplateAssigneeCore(user, t.id, targetUserId, targetWeekdays);
+      cancelledPending += result.cancelledPending;
       pendingKept += result.pendingKept;
     }
-    return { excluded: true, cancelledToday, pendingKept };
+    return { excluded: true, cancelledPending, pendingKept };
   }, "removeGroupAssignee");
 }

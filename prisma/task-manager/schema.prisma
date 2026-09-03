@@ -537,17 +537,28 @@ model TaskTemplate {
   @@index([templateGroupId])
 }
 
-/// "Remove Assignee" persistence (2026-08-22): the View Assignees modal's
-/// Remove button no longer cancels any FlowRun/RunBlock at all — see
-/// removeTemplateAssigneeCore's doc comment in data/templates-internal.ts
-/// for the full rule. A row here means (templateId, userId) should stop
-/// receiving NEW recurring instances of this template from here on, while
-/// every already-created instance (pending, overdue, completed, including
-/// today's) is left completely untouched. advanceRecurringBlocks
-/// (engine/recurrence.ts) consults this before generating a successor;
-/// getTemplateAssigneesCore filters excluded people out of the "currently
-/// assigned" list even while their last pending instance is still
-/// naturally running its course. Cascade-deleted with the template.
+/// "Remove Assignee" persistence (2026-08-22, cancellation window widened
+/// 2026-08-27, made PER-WEEKDAY 2026-08-29) — see removeTemplateAssigneeCore's
+/// doc comment in data/templates-internal.ts for the full rule. A row here
+/// means (templateId, userId, weekday) should stop receiving NEW recurring
+/// instances due on that ONE weekday from here on — the person's other
+/// weekdays of the same template are unaffected — while every instance
+/// dated BEFORE today (pending, overdue, or completed) is left completely
+/// untouched; today's and every later already-created instance ON THAT
+/// WEEKDAY gets cancelled at removal time. "Remove all days" (the original
+/// 2026-08-22 behavior) is now just one row per FLOW_DAYS the person
+/// currently holds, not a separate blanket mode — see the View Assignees
+/// modal's own doc comment for the day-picker this feeds.
+/// advanceRecurringBlocks (engine/recurrence.ts) consults this before
+/// generating a successor (matched against the successor's OWN due
+/// weekday); getTemplateAssigneesCore filters a person's `days` down to
+/// only their non-excluded weekdays rather than hiding them outright.
+/// NOT permanent (2026-08-28 fix): assignFlowTaskCore clears the row(s)
+/// for whichever weekday(s) are being (re-)assigned the moment someone is
+/// explicitly re-assigned this template's task on that day again — before
+/// that fix, a removed-then-re-assigned person's fresh task would itself
+/// silently never auto-recur, forcing whoever assigned it to keep
+/// re-creating it by hand indefinitely. Cascade-deleted with the template.
 model TaskTemplateExcludedAssignee {
   id         String       @id @default(cuid())
   templateId String
@@ -555,9 +566,15 @@ model TaskTemplateExcludedAssignee {
   // Plain string, no FK to User — same loose coupling as
   // RunBlock.assigneeId/TaskTemplate.createdById elsewhere in this schema.
   userId     String
+  // One of FLOW_DAYS (ui/types.ts) — Tue/Wed/Thu/Fri/Sat/Sun, no Monday
+  // (same set Daily-cadence due dates are always drawn from). Plain
+  // String, validated at the application layer — NOT PackageScheduleWeekday
+  // above, which is a different 5-value (Wed-Sun) set for a different
+  // feature (see that enum's own doc comment).
+  weekday    String
   createdAt  DateTime @default(now())
 
-  @@unique([templateId, userId])
+  @@unique([templateId, userId, weekday])
   @@index([templateId])
 }
 

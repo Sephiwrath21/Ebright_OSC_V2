@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
+import OverdueDot from "@/app/components/OverdueDot";
 import { EMPLOYEE_RECORD_CATEGORIES, type RecordCategory } from "@/lib/employeeRecordConfig";
 import { STAGE_LABELS, type EmployeeStage } from "@/lib/employeeStages";
 import {
@@ -25,10 +26,19 @@ import {
   TransferPanel,
   TrainingPanel,
   NdaNcPanel,
+  OfferLetterPanel,
+  ProbationPanel,
   DomesticInquiryPanel,
   SuspensionPanel,
   ShowcausePanel,
   PipPanel,
+  ResignationPanel,
+  ReferenceLetterPanel,
+  ExitInterviewNotesPanel,
+  KnowledgeTransferPanel,
+  AssetRecoveryPanel,
+  SystemRevocationPanel,
+  FinancialSettlementPanel,
   RealAttachmentLink,
   RecordAddModal,
   LEAVE_DETAIL_FIELDS,
@@ -43,9 +53,9 @@ import {
   PerformanceReviewPanel,
   TaskPendingPanel,
   TaskOverduePanel,
-  OfferLetterPanel,
 } from "@/app/components/EmployeeRecordPanels";
 import { updateBankDetails, updateEmergencyContact, updatePaymentInfo } from "@/lib/employeeRecordActions";
+import type { ProbationDisplayInfo } from "@/lib/probationDecision";
 import type {
   EmployeeDetailFull,
   BranchOpt,
@@ -55,6 +65,7 @@ import type {
   InterviewAssessmentInfo,
   ReferenceCheckInfo,
   MedicalCheckInfo,
+  ProbationInfo,
   DocumentsInfo,
   PayrollInfo,
   AchievementEntry,
@@ -74,6 +85,11 @@ import type {
   PayslipInfo,
   PayslipHistoryEntry,
   EmployeeTasksSummary,
+  ResignationInfo,
+  ReferenceLetterInfo,
+  ExitInterviewNoteInfo,
+  ExitChecklistItem,
+  FinancialSettlementInfo,
 } from "@/lib/employeeQueries";
 
 // Vertical sub-nav rail — green, from category_shared.css (shared by every
@@ -90,16 +106,94 @@ import type {
 // sync by hand if either ever changes.
 const RAIL_BASE = "bg-[#b0ffbfa8] dark:bg-slate-800 border-[#0a6e03] dark:border-emerald-700 text-[#4b4949d6] dark:text-slate-300";
 const RAIL_CURRENT = "bg-[#0a6e03] border-[#063f02] text-white";
+// Offboarding's "Clearance" group children (2026-08-27, see conversation) —
+// exact same amber literals as stageProfileConfig.ts's own Exit
+// navRail.clearanceBase/clearanceCurrent, so the nested group looks
+// identical to what Exit's old StageProfileView UI already rendered, not a
+// green-tinted reinterpretation.
+const RAIL_CLEARANCE_BASE = "bg-[#ffe29aa8] border-[#e8a93c] text-[#4b4949d6] dark:bg-transparent dark:border-amber-700 dark:text-amber-300";
+const RAIL_CLEARANCE_CURRENT = "bg-[#e8a93c] border-[#8a5a06] text-white dark:bg-amber-600 dark:border-amber-600";
 
 // PageEditProvider rollout (2026-08-13, see conversation) — categories
 // whose sub-sections switch via client-side state instead of route
 // navigation, so a single page-level Edit/Save can span all of them. Grows
 // one entry per rollout batch (Personal Info was the pilot, then HR Info,
-// Finance, and Active Employment). Disciplinary is deliberately excluded —
-// all 4 of its sections are RepeatableRecordSection panels (see the
-// excluded-8 list in ActiveProfilePanels.tsx), so wrapping it would add a
-// page-level Edit/Save button with nothing real to register.
-const CLIENT_TAB_CATEGORIES = new Set(["personal-info", "hr-info", "finance", "active-employment"]);
+// Finance, and Active Employment). This Set only ever controls the sub-tab
+// nav mechanism (button+state vs real Link, see below) and which of
+// clientSection/sectionKey currentSection derives from — it does NOT by
+// itself wrap a category in PageEditProvider (each category's own render
+// block below does that explicitly, or doesn't). Disciplinary is included
+// (2026-08-26, see conversation) purely so its sub-tabs work at all under
+// Active stage's embedded usage (categoryNavigationMode="client", single
+// URL, no real .../disciplinary/[section] route to Link to there) — its 4
+// sections stay un-wrapped, direct-return panels, same as before; only the
+// nav mechanism changed, and on the real /employee-record/[id] page this is
+// simply the same rollout every other category here already got (sub-tabs
+// switch without a real navigation; the URL stays on the category's own
+// first section, and /employee-record/[id]/disciplinary/[section]/page.tsx
+// remains reachable directly, just no longer clicked into from here). Task
+// is included for the identical reason (2026-08-27, see conversation) — its
+// Pending/Overdue toggle has the same broken-link problem under Active
+// stage's embedded usage; also un-wrapped, direct-return panels, unaffected
+// otherwise. Offboarding is included both for the broken-link reason AND
+// because it's individually EditableSection-wrapped like HR Info/Finance
+// (its own render block below DOES wrap it in a PageEditProvider) — same
+// reasoning either way, this Set doesn't distinguish.
+const CLIENT_TAB_CATEGORIES = new Set([
+  "personal-info",
+  "hr-info",
+  "finance",
+  "active-employment",
+  "disciplinary",
+  "task",
+  "offboarding",
+]);
+
+// Desktop cat-tabs sizing — ONE fixed size for every stage/tab count
+// (2026-08-27, see conversation — replaces an earlier per-count shrink-to-fit
+// table; the user wants the tabs to look identical everywhere, not scaled
+// down as more tabs appear). These exact values (px-2.5 py-1.5, text-sm,
+// gap-1) are the reference screenshot's own proportions — the Active stage's
+// 6-tab bar (Personal Info/HR Info/Finance/Active Employment/Disciplinary/
+// Task), confirmed comfortable and evenly spaced with no overflow.
+//
+// Exit's fit at this fixed size (7 tabs — Active's 6 plus Offboarding; NOT
+// 8, see conversation) was flagged rather than assumed: rough character-
+// width arithmetic at this padding/font puts the row at roughly 700-720px
+// wide (longest label "Active Employment" ~140px, the other 6 combined
+// ~580px, plus 6 gaps), which is within a typical desktop card width at
+// this app's own max-w-5xl cap (~1024px minus the 210px rail minus outer
+// padding, ~750-780px) but with only modest margin — no rendered-browser
+// measurement backs this, so it should be visually confirmed at Exit before
+// relying on it. If it turns out too tight, the options are the card's own
+// internal p-4 sm:p-6 padding (reduce it specifically on this row) or a
+// slightly smaller CAT_TAB_SIZE applied everywhere (keeping the "one size
+// for every stage" rule) — not a return to per-count shrinking.
+const CAT_TAB_SIZE = { pad: "px-2.5 py-1.5", text: "text-sm", gap: "gap-1" };
+
+// Corner "not filled in yet" badge — TOP-LEVEL CAT-TABS ONLY (2026-08-27,
+// see conversation — initially applied everywhere, then narrowed back to
+// just the top-level tab bar; every sub-tab/rail dot — the mobile sub-tab
+// row's leaf/group pills, and the desktop rail's leaf/group/group-children
+// pills — stays inline next to its label, unchanged from before any of
+// this). Replaces OverdueDot's default inline-with-the-label placement with
+// a notification-badge look: absolutely positioned at the pill's own
+// top-right corner, half overlapping the edge. The caller is responsible
+// for making the pill itself `relative` (its own button/Link className) so
+// this has the right positioning context, and for rendering this as a
+// direct sibling of the pill's label text — not nested inside an inner
+// flex/span wrapper, which would anchor the badge to that inner wrapper's
+// corner instead of the whole pill's. Reuses OverdueDot unmodified (still
+// rendered inline everywhere else — every sub-tab site here, plus namelist
+// rows elsewhere) — only this wrapper is new.
+function cornerDot(show: boolean) {
+  if (!show) return null;
+  return (
+    <span className="absolute -top-1.5 -right-1.5">
+      <OverdueDot count={1} label="Not filled in yet" />
+    </span>
+  );
+}
 
 interface Props {
   employeeId: number;
@@ -130,6 +224,18 @@ interface Props {
   referenceCheck?: ReferenceCheckInfo | null;
   /** Real medical_check table data — only fetched for HR Info > Medical Check. */
   medicalCheck?: MedicalCheckInfo | null;
+  /** Real probation table data — only fetched for HR Info > Probation
+   *  (2026-08-26, see conversation) — same ProbationPanel/data as the
+   *  Probation stage-flow's own tab. */
+  probationInfo?: ProbationInfo | null;
+  /** BranchStaff/career_applications-derived Start Date/End Date/Feedback/
+   *  display status (see probationDecision.ts) — undefined only when HR
+   *  Info's Probation sub-tab isn't visible/fetched. */
+  probationDisplay?: ProbationDisplayInfo;
+  /** HR/Superadmin only, per explicit decision (see conversation) — gates
+   *  the Confirm/Extend/Stop buttons; decideProbationOutcome re-checks this
+   *  server-side regardless. */
+  canDecideProbation?: boolean;
   /** Real documents table data — only fetched for HR Info > Handbook. */
   documentsInfo?: DocumentsInfo | null;
   /** Real payroll table data — only fetched for Finance > Tax Info. */
@@ -167,10 +273,67 @@ interface Props {
   departments?: DepartmentOpt[];
   /** Real Task Manager data (separate database) — only fetched for the Task category. */
   tasks?: EmployeeTasksSummary;
+  /** Exit's own 7 tabs (2026-08-27, see conversation) — only fetched for the
+   *  Offboarding category. Knowledge Transfer/Asset Recovery/System
+   *  Revocation are the 3 checklists nested under Offboarding's "Clearance"
+   *  group (see employeeRecordConfig.ts's own RecordSection.group). */
+  resignationInfo?: ResignationInfo | null;
+  referenceLetterInfo?: ReferenceLetterInfo | null;
+  exitInterviewNoteInfo?: ExitInterviewNoteInfo | null;
+  knowledgeTransferChecklist?: ExitChecklistItem[];
+  assetRecoveryChecklist?: ExitChecklistItem[];
+  systemRevocationChecklist?: ExitChecklistItem[];
+  financialSettlement?: FinancialSettlementInfo | null;
+  /** HR/Superadmin only — gates the "+ Add Item" affordance on Offboarding's
+   *  3 Clearance checklists, same role check as canDecideProbation above. */
+  canAddChecklistItem?: boolean;
   /** false hides every panel's Edit/Save toggle (view-only) — e.g. a CEO viewing
    *  someone else's record, where the server-side guard already blocks the save.
    *  Defaults true so this stays a no-op unless a caller opts in. */
   canEdit?: boolean;
+  /** Restricts which categories/sections render (2026-08-26, see
+   *  conversation) — e.g. Pre stage's embedded usage, which only shows
+   *  Personal Info (Personal Info + Guardian Info) and HR Info (Resume/
+   *  Offer Letter/Hiring Notes/Reference/Medical Check, no NDA-NC/Handbook).
+   *  Keyed by category key: a category key present here is visible, filtered
+   *  down to just the section keys listed (empty array = every section of
+   *  that category stays visible); a category key absent entirely is hidden.
+   *  undefined (default) shows every category/section unfiltered — the real
+   *  /employee-record/[id] page's exact current behavior, unaffected. */
+  visibleSectionKeys?: Record<string, string[]>;
+  /** "route" (default) — current behavior: category tabs are real
+   *  navigation Links to `${basePath}/${cat.key}`. "client" — for embedded
+   *  usage on a single URL (Pre stage, 2026-08-26): category switching
+   *  becomes local state instead, the same mechanism CLIENT_TAB_CATEGORIES'
+   *  own sub-tabs already use. */
+  categoryNavigationMode?: "route" | "client";
+  /** Base path for category/section `<Link>`s when categoryNavigationMode
+   *  is "route" (defaults to `/employee-record/${employeeId}`, today's exact
+   *  literal) — unused in "client" mode. */
+  basePath?: string;
+  /** Final breadcrumb crumb's text (defaults to "Employee Record", today's
+   *  exact copy) — e.g. "Pre" for the embedded Pre-stage usage, since
+   *  someone in Pre isn't a confirmed "Employee Record" yet. */
+  breadcrumbLabel?: string;
+  /** Section keys to show a small red dot next to (2026-08-26, see
+   *  conversation) — the caller's own "newly introduced at this stage AND
+   *  still empty" computation; this component stays agnostic to what
+   *  "empty" means for any given section. A category tab shows the same dot
+   *  whenever any of its own sections is in this set. undefined (default)
+   *  shows no dots — the real /employee-record/[id] page's exact current
+   *  behavior, unaffected. */
+  dotSectionKeys?: Set<string>;
+  /** Category keys where the red dot shows ONLY on the top-level tab, never
+   *  repeated on any of that category's individual sub-tabs (2026-08-27, see
+   *  conversation) — for a category that's entirely new at this stage
+   *  (e.g. Active Employment/Disciplinary at Active), as opposed to an
+   *  existing category that merely gained one new sub-tab (HR Info's
+   *  "nda-nc"), where the sub-tab-level dot should still show. The top-level
+   *  tab's own dot is unaffected either way — still derived from
+   *  dotSectionKeys the same way regardless of this prop. undefined
+   *  (default) suppresses nothing — real /employee-record/[id] page's exact
+   *  current behavior, unaffected. */
+  dotCategoryOnlyKeys?: Set<string>;
 }
 
 export default function EmployeeRecordView({
@@ -189,6 +352,9 @@ export default function EmployeeRecordView({
   interviewAssessment,
   referenceCheck,
   medicalCheck,
+  probationInfo,
+  probationDisplay,
+  canDecideProbation,
   documentsInfo,
   payrollInfo,
   achievements,
@@ -210,7 +376,21 @@ export default function EmployeeRecordView({
   branches,
   departments,
   tasks,
+  resignationInfo,
+  referenceLetterInfo,
+  exitInterviewNoteInfo,
+  knowledgeTransferChecklist,
+  assetRecoveryChecklist,
+  systemRevocationChecklist,
+  financialSettlement,
+  canAddChecklistItem,
   canEdit = true,
+  visibleSectionKeys,
+  categoryNavigationMode = "route",
+  basePath = `/employee-record/${employeeId}`,
+  breadcrumbLabel = "Employee Record",
+  dotSectionKeys,
+  dotCategoryOnlyKeys,
 }: Props) {
   // Rollout categories (2026-08-13, see conversation) — each one's
   // sub-sections switch via this client-side state instead of navigating,
@@ -222,11 +402,50 @@ export default function EmployeeRecordView({
   // in later batches — see conversation for the confirmed order). Every
   // OTHER category is unaffected — still real route navigation between
   // sections, one panel mounted at a time, same as before this rollout.
-  const isClientTabCategory = CLIENT_TAB_CATEGORIES.has(category.key);
+  //
+  // visibleSectionKeys/categoryNavigationMode (2026-08-26, see conversation)
+  // — visibleCategories filters both which top-tabs show and each one's own
+  // sections; undefined visibleSectionKeys reproduces EMPLOYEE_RECORD_CATEGORIES
+  // unfiltered, so /employee-record/[id]'s own real usage is byte-for-byte
+  // unchanged. activeCategoryKey only matters in "client" mode (Pre) — in
+  // "route" mode currentCategory is always derived from the category prop
+  // instead, exactly as before this existed.
+  const visibleCategories = visibleSectionKeys
+    ? EMPLOYEE_RECORD_CATEGORIES.filter((c) => c.key in visibleSectionKeys).map((c) => {
+        const allowed = visibleSectionKeys[c.key];
+        return allowed.length > 0 ? { ...c, sections: c.sections.filter((s) => allowed.includes(s.key)) } : c;
+      })
+    : EMPLOYEE_RECORD_CATEGORIES;
+  const tabSize = CAT_TAB_SIZE;
+  const [activeCategoryKey, setActiveCategoryKey] = useState(category.key);
+  const currentCategory =
+    categoryNavigationMode === "client"
+      ? (visibleCategories.find((c) => c.key === activeCategoryKey) ?? visibleCategories[0])
+      : (visibleCategories.find((c) => c.key === category.key) ?? category);
+  const isClientTabCategory = CLIENT_TAB_CATEGORIES.has(currentCategory.key);
   const [clientSection, setClientSection] = useState(sectionKey);
   const currentSection = isClientTabCategory
-    ? (category.sections.find((s) => s.key === clientSection) ?? category.sections[0])
-    : (category.sections.find((s) => s.key === sectionKey) ?? category.sections[0]);
+    ? (currentCategory.sections.find((s) => s.key === clientSection) ?? currentCategory.sections[0])
+    : (currentCategory.sections.find((s) => s.key === sectionKey) ?? currentCategory.sections[0]);
+
+  // Nested groups (2026-08-27, see conversation) — same concept as
+  // StageProfileView.tsx's own topLevel/groups split (ported from there,
+  // see RecordSection.group's own comment in employeeRecordConfig.ts). Only
+  // Offboarding's "Clearance" uses this today; every other category has no
+  // grouped sections, so topLevelSections === currentCategory.sections and
+  // sectionGroups is empty — byte-for-byte the same nav as before this
+  // existed. Recomputed every render off currentCategory (not memoized,
+  // same as currentSection above) since it's cheap and currentCategory
+  // itself already changes on every category switch.
+  const topLevelSections = currentCategory.sections.filter((s) => !s.group);
+  const sectionGroups = Array.from(new Set(currentCategory.sections.filter((s) => s.group).map((s) => s.group as string)));
+  // Lazy initializer only, same as StageProfileView.tsx's own openGroup —
+  // seeded from the initial sectionKey prop so a caller that opens straight
+  // on a grouped section (e.g. firstNewSection landing on "knowledge-transfer")
+  // starts with that section's own group already expanded, not collapsed.
+  const [openGroup, setOpenGroup] = useState<string | null>(
+    () => sectionGroups.find((g) => currentCategory.sections.some((s) => s.group === g && s.key === sectionKey)) ?? null,
+  );
 
   return (
     <div className="min-h-full bg-slate-50 dark:bg-slate-950">
@@ -246,7 +465,7 @@ export default function EmployeeRecordView({
             Employee Overview
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-900 dark:text-slate-100 font-medium">Employee Record</span>
+          <span className="text-slate-900 dark:text-slate-100 font-medium">{breadcrumbLabel}</span>
         </nav>
 
         <div className="flex items-start gap-4 mb-4">
@@ -290,28 +509,107 @@ export default function EmployeeRecordView({
             was truncating labels like "Finance" by reserving space for a
             sidebar that's hidden on touch anyway). Tabs that still don't
             fit are simply not visible until scrolled to (nowrap +
-            overflow-x-auto), never wrapped to a second row, either way. */}
-        <nav
-          aria-label="Employee record categories"
-          className="flex flex-nowrap items-center gap-1 mb-0 ml-4 sm:ml-6 overflow-x-auto w-auto [@media(hover:none)]:w-full [@media(hover:none)]:ml-0 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1"
-        >
-          {EMPLOYEE_RECORD_CATEGORIES.map((cat) => {
-            const isActive = cat.key === category.key;
+            overflow-x-auto on touch), never wrapped to a second row, either
+            way. On desktop specifically, NO scroll (2026-08-27, see
+            conversation — the user wants every tab the same fixed size
+            everywhere, CAT_TAB_SIZE above, not scaled by tab count); see
+            CAT_TAB_SIZE's own comment for the fit check at Exit's 7-tab
+            count, the largest this app has today.
+
+            No overflow-hidden here anymore (2026-08-27, see conversation —
+            corner-badge fix) — it was added as a defensive clip against a
+            row that doesn't fit, but `overflow: hidden` clips BOTH axes,
+            and cornerDot's badges poke a few px above each pill's top edge
+            by design; with overflow-hidden still set, every one of those
+            badges would render fully or partially cut off, the moment the
+            nav's own box (not just an individual pill) starts right at the
+            tab row's top edge with no padding to spare. Left as the CSS
+            default (visible) instead — if the row genuinely doesn't fit at
+            some tab count, the tabs now visibly overflow rather than
+            silently clip, which is what was actually wanted in the first
+            place (see CAT_TAB_SIZE's own comment: "flag me... rather than
+            silently shrinking"). This also fixes a touch-specific version
+            of the same clipping bug that would otherwise still exist:
+            [@media(hover:none)]:overflow-x-auto only ever overrode
+            overflow-x, so with the base overflow-hidden still setting
+            overflow-y, touch's own badges would have stayed clipped too
+            even after this fix's own [@media(hover:none)]:overflow-x-auto
+            override — removing overflow-hidden entirely fixes both at once.
+
+            No more ml-4 sm:ml-6 (2026-08-27, see conversation — the user
+            wanted the first tab nudged closer to the card's left edge) —
+            every sibling at this level (the breadcrumb above, the avatar
+            row above that, and this grid's own left edge) already starts
+            flush at the container's own left padding with no extra margin;
+            this nav's old ml-4/ml-6 was the one exception, indenting
+            "Personal Info" further right than everything around it for no
+            documented reason. Removing it makes the tabs consistent with
+            every other element on this page, not just "a bit to the left."
+
+            Wrapped in the SAME grid-cols-[minmax(0,1fr)_210px] template the
+            card+rail row below uses (2026-08-27, see conversation — bug fix)
+            — without this, the nav (a plain block sibling of that grid, not
+            itself grid-constrained) was free to grow to its own content's
+            width, which happened to stay under the white card's width with
+            6 or fewer tabs but visibly overran it once Offboarding became
+            the 7th, spilling into the rail's own column space above the
+            rail. Reusing the identical template string (not a separately-
+            computed width) means the tabs row can never drift out of sync
+            with the card's real width again, however many tabs get added
+            later. The nav is the grid's only child — auto-placement puts it
+            in column 1 (the card's own column), leaving column 2 (the
+            rail's width) as blank space, exactly where the rail already
+            sits in the row below. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_210px] [@media(hover:none)]:grid-cols-1">
+          <nav
+            aria-label="Employee record categories"
+            className={`flex flex-nowrap items-center ${tabSize.gap} mb-0 [@media(hover:none)]:overflow-x-auto min-w-0 w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1`}
+          >
+            {visibleCategories.map((cat) => {
+            const isActive = cat.key === currentCategory.key;
+            const className = `relative shrink-0 flex items-center gap-1.5 ${tabSize.pad} ${tabSize.text} font-medium transition-colors rounded-t-[10px] border-2 border-b-0 [@media(hover:none)]:rounded-full [@media(hover:none)]:border-0 ${
+              isActive
+                ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] dark:[@media(hover:none)]:bg-slate-600 [@media(hover:none)]:text-[#004386c9] dark:[@media(hover:none)]:text-slate-100"
+                : "bg-[#68d4ffa8] dark:bg-slate-800 border-[#49a2c6] dark:border-slate-600 text-black dark:text-slate-200 hover:bg-[#68d4ff] dark:hover:bg-slate-700 [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 dark:[@media(hover:none)]:text-slate-400 [@media(hover:none)]:hover:bg-[#dde8f7] dark:[@media(hover:none)]:hover:bg-slate-700"
+            }`;
+            // A category-level dot (2026-08-26, see conversation) whenever
+            // any of its own sections is in dotSectionKeys — no separate
+            // per-category prop, derived straight from the same set the
+            // rail/sub-tabs below already check. Corner badge, not inline
+            // (2026-08-27, see conversation — see cornerDot's own comment).
+            const hasDot = Boolean(dotSectionKeys && cat.sections.some((s) => dotSectionKeys.has(s.key)));
+            // "client" mode (Pre, 2026-08-26, see conversation) — no real
+            // navigation, this page's only URL. Resets clientSection to the
+            // new category's own first (visible) section, same as a real
+            // navigation's fresh sectionKey would — otherwise a stale
+            // sub-tab key from the PREVIOUS category (e.g. "guardian-info")
+            // would silently mismatch every section in the new one.
+            if (categoryNavigationMode === "client") {
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveCategoryKey(cat.key);
+                    setClientSection(cat.sections[0]?.key ?? "");
+                    setOpenGroup(null);
+                  }}
+                  className={className}
+                >
+                  {cat.label}
+                  {cornerDot(hasDot)}
+                </button>
+              );
+            }
             return (
-              <Link
-                key={cat.key}
-                href={`/employee-record/${employeeId}/${cat.key}`}
-                className={`shrink-0 flex items-center px-4 py-2 text-sm font-medium transition-colors rounded-t-[10px] border-2 border-b-0 [@media(hover:none)]:rounded-full [@media(hover:none)]:border-0 ${
-                  isActive
-                    ? "bg-[#22b8d1] border-[#0e6577] text-white [@media(hover:none)]:bg-[#a9d3f7bd] dark:[@media(hover:none)]:bg-slate-600 [@media(hover:none)]:text-[#004386c9] dark:[@media(hover:none)]:text-slate-100"
-                    : "bg-[#68d4ffa8] dark:bg-slate-800 border-[#49a2c6] dark:border-slate-600 text-black dark:text-slate-200 hover:bg-[#68d4ff] dark:hover:bg-slate-700 [@media(hover:none)]:bg-transparent [@media(hover:none)]:text-black/65 dark:[@media(hover:none)]:text-slate-400 [@media(hover:none)]:hover:bg-[#dde8f7] dark:[@media(hover:none)]:hover:bg-slate-700"
-                }`}
-              >
+              <Link key={cat.key} href={`${basePath}/${cat.key}`} className={className}>
                 {cat.label}
+                {cornerDot(hasDot)}
               </Link>
             );
           })}
-        </nav>
+          </nav>
+        </div>
 
         {/* Touch-only sub-tab row ([@media(hover:none)] — see the cat-tabs
             bar's own comment above for why hover:none rather than a lg:
@@ -329,16 +627,34 @@ export default function EmployeeRecordView({
             only when the selected main tab has sub-sections") — always true
             today (every category has 2+), kept as a real check rather than
             assumed. */}
-        {category.sections.length > 1 && (
-          <nav
-            aria-label={`${category.label} sections`}
-            className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] dark:bg-slate-800 rounded-full p-1"
-          >
-            {category.sections.map((section) => {
+        {currentCategory.sections.length > 1 &&
+          (() => {
+            // Renders one leaf pill — shared by the flat top-level sections
+            // below AND a group's own children once expanded, so both use
+            // identical markup/behavior (2026-08-27, see conversation —
+            // ported from StageProfileView.tsx's own mobileRowTwoTopLevel,
+            // adapted to this page's dot/clientSection mechanics).
+            function leafPill(section: (typeof currentCategory.sections)[number], amber: boolean) {
               const isActive = section.key === currentSection.key;
-              const className = `shrink-0 flex items-center rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                isActive ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100" : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
+              const className = `shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                amber
+                  ? isActive
+                    ? "bg-[#e8a93c] text-white dark:bg-amber-600"
+                    : "bg-[#ffe29aa8] text-[#4b4949d6] dark:bg-transparent dark:text-amber-300 hover:brightness-95"
+                  : isActive
+                    ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100"
+                    : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
               }`;
+              // dotCategoryOnlyKeys (2026-08-27, see conversation) — an
+              // entirely-new-this-stage category's dot stays on its
+              // top-level tab only, not repeated on every sub-tab beneath it.
+              // Inline, not a corner badge (2026-08-27, see conversation —
+              // the corner-badge style is top-level-tabs only; every
+              // sub-tab/rail dot, this one included, stays inline next to
+              // its label, same as before that change).
+              const dot =
+                dotSectionKeys?.has(section.key) &&
+                !dotCategoryOnlyKeys?.has(currentCategory.key) && <OverdueDot count={1} label="Not filled in yet" />;
               // Rollout categories — client-side tab state, not navigation
               // (see clientSection above); every other category keeps the
               // original route-Link behavior unchanged.
@@ -346,17 +662,60 @@ export default function EmployeeRecordView({
                 return (
                   <button key={section.key} type="button" onClick={() => setClientSection(section.key)} className={className}>
                     {section.label}
+                    {dot}
                   </button>
                 );
               }
               return (
-                <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
+                <Link key={section.key} href={`${basePath}/${currentCategory.key}/${section.key}`} className={className}>
                   {section.label}
+                  {dot}
                 </Link>
               );
-            })}
-          </nav>
-        )}
+            }
+
+            const pills: ReactNode[] = topLevelSections.map((section) => leafPill(section, false));
+            for (const group of sectionGroups) {
+              const groupSections = currentCategory.sections.filter((s) => s.group === group);
+              const isGroupActive = groupSections.some((s) => s.key === currentSection.key);
+              const isOpen = openGroup === group;
+              const groupDot =
+                dotSectionKeys &&
+                groupSections.some((s) => dotSectionKeys.has(s.key)) &&
+                !dotCategoryOnlyKeys?.has(currentCategory.key) && <OverdueDot count={1} label="Not filled in yet" />;
+              pills.push(
+                <button
+                  key={group}
+                  type="button"
+                  onClick={() => setOpenGroup((g) => (g === group ? null : group))}
+                  aria-expanded={isOpen}
+                  className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                    isGroupActive
+                      ? "bg-[#a9d3f7bd] dark:bg-slate-600 text-[#004386c9] dark:text-slate-100"
+                      : "text-black/65 dark:text-slate-400 hover:bg-[#dde8f7] dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {group}
+                  {groupDot}
+                  <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>,
+              );
+              // Splice this group's own children in right here — immediately
+              // after its toggle pill, in the same flat row — only while open.
+              if (isOpen) {
+                for (const section of groupSections) pills.push(leafPill(section, true));
+              }
+            }
+
+            return (
+              <nav
+                aria-label={`${currentCategory.label} sections`}
+                className="hidden [@media(hover:none)]:flex flex-nowrap items-center gap-1 mt-2 mb-3 overflow-x-auto bg-[#eef3fb] dark:bg-slate-800 rounded-full p-1"
+              >
+                {pills}
+              </nav>
+            );
+          })()}
 
         {/* Card + vertical sub-nav rail as grid siblings, docked under the
             cat-tabs bar — same side-by-side structure as desktop at every
@@ -381,158 +740,219 @@ export default function EmployeeRecordView({
             style={{ border: "0.5px solid var(--border-neutral)" }}
           >
             {(() => {
-              const lookupKey = `${category.key}/${sectionKey}`;
+              const lookupKey = `${currentCategory.key}/${sectionKey}`;
               const StaticPanel = EMPLOYEE_RECORD_STATIC_PANELS[lookupKey];
-              // Personal Info pilot — all 4 sub-panels render together,
-              // wrapped in one PageEditProvider (see PageEditMode.tsx), each
-              // hidden via CSS rather than unmounted so an edit in progress
-              // on one survives switching to another (clientSection above).
-              // Guardian Info has no equivalent on the stage-profile flow,
-              // but PersonalInfoPanel/EmergencyContactPanel are shared with
-              // it (e.g. Pre stage's own Personal Info tab) — those render
+              // Personal Info pilot — all 4 sub-panels render together (only
+              // the ones currentCategory.sections actually lists, 2026-08-26,
+              // see conversation — visibleSectionKeys already filtered this
+              // for embedded usage like Pre), wrapped in one PageEditProvider
+              // (see PageEditMode.tsx), each hidden via CSS rather than
+              // unmounted so an edit in progress on one survives switching to
+              // another (clientSection above). Guardian Info has no
+              // equivalent on the stage-profile flow, but
+              // PersonalInfoPanel/EmergencyContactPanel are shared with it
+              // (e.g. Pre stage's own Personal Info tab) — those render
               // standalone there, with no PageEditProvider above them, so
               // this pilot doesn't affect that usage at all.
-              if (category.key === "personal-info" && employeeDetail && guardianInfo !== undefined && paymentInfo !== undefined) {
-                return (
-                  <PageEditProvider>
-                    <PageEditMessageDialog />
-                    <div className="mb-4 flex justify-end">
-                      <PageEditToggleButton />
-                    </div>
-                    <div className={clientSection === "personal-info" ? "" : "hidden"}>
-                      <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "guardian-info" ? "" : "hidden"}>
-                      <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "payment" ? "" : "hidden"}>
-                      <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "emergency-contact" ? "" : "hidden"}>
-                      <EmergencyContactPanel
-                        employee={employeeDetail}
-                        onSave={(data) => updateEmergencyContact(employeeId, data)}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  </PageEditProvider>
-                );
+              if (currentCategory.key === "personal-info" && employeeDetail) {
+                const piSections = new Set(currentCategory.sections.map((s) => s.key));
+                if (
+                  (!piSections.has("guardian-info") || guardianInfo !== undefined) &&
+                  (!piSections.has("payment") || paymentInfo !== undefined)
+                ) {
+                  return (
+                    <PageEditProvider>
+                      <PageEditMessageDialog />
+                      <div className="mb-4 flex justify-end">
+                        <PageEditToggleButton />
+                      </div>
+                      {piSections.has("personal-info") && (
+                        <div className={currentSection.key === "personal-info" ? "" : "hidden"}>
+                          <PersonalInfoPanel employee={employeeDetail} employeeId={employeeId} canEdit={canEdit} />
+                        </div>
+                      )}
+                      {piSections.has("guardian-info") && guardianInfo !== undefined && (
+                        <div className={currentSection.key === "guardian-info" ? "" : "hidden"}>
+                          <GuardianInfoPanel userId={employeeId} data={guardianInfo} canEdit={canEdit} />
+                        </div>
+                      )}
+                      {piSections.has("payment") && paymentInfo !== undefined && (
+                        <div className={currentSection.key === "payment" ? "" : "hidden"}>
+                          <PaymentInfoPanel employee={employeeDetail} employeeId={employeeId} data={paymentInfo} canEdit={canEdit} />
+                        </div>
+                      )}
+                      {piSections.has("emergency-contact") && (
+                        <div className={currentSection.key === "emergency-contact" ? "" : "hidden"}>
+                          <EmergencyContactPanel
+                            employee={employeeDetail}
+                            onSave={(data) => updateEmergencyContact(employeeId, data)}
+                            canEdit={canEdit}
+                          />
+                        </div>
+                      )}
+                    </PageEditProvider>
+                  );
+                }
               }
               // HR Info rollout Batch 2 (2026-08-13, see conversation) — same
-              // shape as Personal Info above: all 7 sub-panels render
-              // together under one PageEditProvider, hidden via CSS. Offer
-              // Letter (OfferLetterPanel) deliberately has no sectionLabel
-              // passed through — it has no real DB backing at all
-              // (hasRealBacking={false}, mock fields only), so it simply
-              // doesn't register with the provider; a page-level Save skips
-              // it entirely, same as before (its own individual Save
-              // previously no-opped with a "not persisted" notice — that
-              // per-section notice no longer shows once wrapped in a
-              // page-level provider, since EditableSection's own notice is
-              // standalone-only; the page-level Save's aggregated message
-              // doesn't mention it either, since it never registered in the
-              // first place). Hiring Notes now shares InterviewAssessmentPanel
-              // with Pre stage's own Interview Assessment tab (fixed
-              // 2026-08-13, see conversation — was a disconnected mock with
-              // no real backing at all, so Pre-stage-entered data never
-              // showed up here) — real sectionLabel="Hiring Notes",
-              // registers and saves like any other real panel now. Resume/CV,
-              // Reference, Medical Check are shared with the Pre stage flow
-              // (see ActiveProfilePanels.tsx) and already got sectionLabel
-              // there in Batch 1 — reused as-is here.
-              if (
-                category.key === "hr-info" &&
-                resumeInfo !== undefined &&
-                interviewAssessment !== undefined &&
-                referenceCheck !== undefined &&
-                medicalCheck !== undefined &&
-                documentsInfo !== undefined &&
-                ndaInfo !== undefined &&
-                nonCompeteInfo !== undefined
-              ) {
-                return (
+              // shape as Personal Info above: only the sub-panels
+              // currentCategory.sections actually lists render together
+              // (2026-08-26, see conversation — full 7 for the real
+              // /employee-record/[id] page, a narrower set for embedded usage
+              // like Pre's HR Info), under one PageEditProvider, hidden via
+              // CSS. Offer Letter (OfferLetterPanel) is real now too
+              // (2026-08-26, see conversation — previously
+              // hasRealBacking={false}, mock fields only) — same
+              // employment.offer_letter_file_id/RealFileField convention as
+              // Resume/CV, own sectionLabel="Offer Letter", registers and
+              // saves like every other real panel here now. Hiring Notes
+              // shares InterviewAssessmentPanel with Pre stage's own
+              // Interview Assessment tab (fixed 2026-08-13, see conversation
+              // — was a disconnected mock with no real backing at all, so
+              // Pre-stage-entered data never showed up here) — real
+              // sectionLabel="Hiring Notes", registers and saves like any
+              // other real panel now. Resume/CV, Reference, Medical Check are
+              // shared with the Pre stage flow (see ActiveProfilePanels.tsx)
+              // and already got sectionLabel there in Batch 1 — reused as-is
+              // here.
+              if (currentCategory.key === "hr-info" && employeeDetail) {
+                const hrSections = new Set(currentCategory.sections.map((s) => s.key));
+                if (
+                  (!hrSections.has("resume") || resumeInfo !== undefined) &&
+                  (!hrSections.has("hiring-notes") || interviewAssessment !== undefined) &&
+                  (!hrSections.has("reference") || referenceCheck !== undefined) &&
+                  (!hrSections.has("medical-check") || medicalCheck !== undefined) &&
+                  (!hrSections.has("probation") || (probationInfo !== undefined && probationDisplay)) &&
+                  (!hrSections.has("nda-nc") || (ndaInfo !== undefined && nonCompeteInfo !== undefined)) &&
+                  (!hrSections.has("handbook") || documentsInfo !== undefined)
+                ) {
+                  return (
                   <PageEditProvider>
                     <PageEditMessageDialog />
                     <div className="mb-4 flex justify-end">
                       <PageEditToggleButton />
                     </div>
-                    <div className={clientSection === "resume" ? "" : "hidden"}>
-                      <ResumePanel
-                        userId={employeeId}
-                        resumeFileId={resumeInfo?.resumeFileId ?? null}
-                        cvFileId={resumeInfo?.cvFileId ?? null}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                    <div className={clientSection === "offer-letter" ? "" : "hidden"}>
-                      <OfferLetterPanel canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "hiring-notes" ? "" : "hidden"}>
-                      <InterviewAssessmentPanel
-                        userId={employeeId}
-                        data={interviewAssessment}
-                        heading="Hiring Notes"
-                        canEdit={canEdit}
-                      />
-                    </div>
-                    <div className={clientSection === "reference" ? "" : "hidden"}>
-                      <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "medical-check" ? "" : "hidden"}>
-                      <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "nda-nc" ? "" : "hidden"}>
-                      <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
-                    </div>
-                    <div className={clientSection === "handbook" ? "" : "hidden"}>
-                      <DocumentsPanel
-                        userId={employeeId}
-                        data={documentsInfo}
-                        showEmploymentContract={false}
-                        canEdit={canEdit}
-                      />
-                    </div>
+                    {hrSections.has("resume") && (
+                      <div className={currentSection.key === "resume" ? "" : "hidden"}>
+                        <ResumePanel
+                          userId={employeeId}
+                          resumeFileId={resumeInfo?.resumeFileId ?? null}
+                          cvFileId={resumeInfo?.cvFileId ?? null}
+                          canEdit={canEdit}
+                        />
+                      </div>
+                    )}
+                    {hrSections.has("offer-letter") && (
+                      <div className={currentSection.key === "offer-letter" ? "" : "hidden"}>
+                        <OfferLetterPanel employeeId={employeeId} offerLetterFileId={employeeDetail.offerLetterFileId} canEdit={canEdit} />
+                      </div>
+                    )}
+                    {hrSections.has("hiring-notes") && interviewAssessment !== undefined && (
+                      <div className={currentSection.key === "hiring-notes" ? "" : "hidden"}>
+                        <InterviewAssessmentPanel
+                          userId={employeeId}
+                          data={interviewAssessment}
+                          heading="Hiring Notes"
+                          canEdit={canEdit}
+                        />
+                      </div>
+                    )}
+                    {hrSections.has("reference") && referenceCheck !== undefined && (
+                      <div className={currentSection.key === "reference" ? "" : "hidden"}>
+                        <ReferenceCheckPanel userId={employeeId} data={referenceCheck} canEdit={canEdit} />
+                      </div>
+                    )}
+                    {hrSections.has("medical-check") && medicalCheck !== undefined && (
+                      <div className={currentSection.key === "medical-check" ? "" : "hidden"}>
+                        <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />
+                      </div>
+                    )}
+                    {hrSections.has("probation") && probationInfo !== undefined && probationDisplay && (
+                      <div className={currentSection.key === "probation" ? "" : "hidden"}>
+                        <ProbationPanel
+                          userId={employeeId}
+                          data={probationInfo}
+                          display={probationDisplay}
+                          canDecide={canDecideProbation ?? false}
+                          canEdit={canEdit}
+                        />
+                      </div>
+                    )}
+                    {hrSections.has("nda-nc") && ndaInfo !== undefined && nonCompeteInfo !== undefined && (
+                      <div className={currentSection.key === "nda-nc" ? "" : "hidden"}>
+                        <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                      </div>
+                    )}
+                    {hrSections.has("handbook") && documentsInfo !== undefined && (
+                      <div className={currentSection.key === "handbook" ? "" : "hidden"}>
+                        {/* showEmploymentContract omitted (defaults true,
+                            2026-08-26, see conversation) — this tab now shows
+                            both Employment Contract and Employee Handbook
+                            Acknowledge, same as Onboarding's own "Documents"
+                            tab already does (StageProfileView.tsx never
+                            passed showEmploymentContract=false), under the
+                            "Documents" heading DocumentsPanel already shows
+                            whenever this prop is true. */}
+                        <DocumentsPanel
+                          userId={employeeId}
+                          data={documentsInfo}
+                          canEdit={canEdit}
+                        />
+                      </div>
+                    )}
                   </PageEditProvider>
-                );
+                  );
+                }
               }
               // Finance rollout Batch 3 (2026-08-13, see conversation) — same
-              // shape as Personal Info/HR Info above: both sub-panels render
-              // together under one PageEditProvider, hidden via CSS.
-              if (
-                category.key === "finance" &&
-                salaryRevisions !== undefined &&
-                payslip !== undefined &&
-                payslipHistory !== undefined &&
-                payrollInfo !== undefined &&
-                employeeDetail
-              ) {
-                return (
-                  <PageEditProvider>
-                    <PageEditMessageDialog />
-                    <div className="mb-4 flex justify-end">
-                      <PageEditToggleButton />
-                    </div>
-                    <div className={clientSection === "payroll" ? "" : "hidden"}>
-                      <PayrollPanel
-                        employeeId={employeeId}
-                        salaryRevisions={salaryRevisions}
-                        payslip={payslip}
-                        payslipHistory={payslipHistory}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                    <div className={clientSection === "tax-info" ? "" : "hidden"}>
-                      <OnboardingPayrollPanel
-                        userId={employeeId}
-                        data={payrollInfo}
-                        employeeDetail={employeeDetail}
-                        heading="Tax Info"
-                        showBankDetails={false}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  </PageEditProvider>
-                );
+              // shape as Personal Info/HR Info above: only the sub-panels
+              // currentCategory.sections actually lists render together
+              // (2026-08-26, see conversation — full 2 for the real
+              // /employee-record/[id] page, just Tax Info for Onboarding's
+              // embedded usage, which has no salary_revision/payslip data
+              // yet), under one PageEditProvider, hidden via CSS.
+              if (currentCategory.key === "finance" && employeeDetail) {
+                const financeSections = new Set(currentCategory.sections.map((s) => s.key));
+                if (
+                  (!financeSections.has("payroll") ||
+                    (salaryRevisions !== undefined && payslip !== undefined && payslipHistory !== undefined)) &&
+                  (!financeSections.has("tax-info") || payrollInfo !== undefined)
+                ) {
+                  return (
+                    <PageEditProvider>
+                      <PageEditMessageDialog />
+                      <div className="mb-4 flex justify-end">
+                        <PageEditToggleButton />
+                      </div>
+                      {financeSections.has("payroll") &&
+                        salaryRevisions !== undefined &&
+                        payslip !== undefined &&
+                        payslipHistory !== undefined && (
+                          <div className={currentSection.key === "payroll" ? "" : "hidden"}>
+                            <PayrollPanel
+                              employeeId={employeeId}
+                              salaryRevisions={salaryRevisions}
+                              payslip={payslip}
+                              payslipHistory={payslipHistory}
+                              canEdit={canEdit}
+                            />
+                          </div>
+                        )}
+                      {financeSections.has("tax-info") && payrollInfo !== undefined && (
+                        <div className={currentSection.key === "tax-info" ? "" : "hidden"}>
+                          <OnboardingPayrollPanel
+                            userId={employeeId}
+                            data={payrollInfo}
+                            employeeDetail={employeeDetail}
+                            heading="Tax Info"
+                            showBankDetails={false}
+                            canEdit={canEdit}
+                          />
+                        </div>
+                      )}
+                    </PageEditProvider>
+                  );
+                }
               }
               // Active Employment rollout Batch 7 (2026-08-13, see
               // conversation) — same shape as Finance above, but only
@@ -550,7 +970,7 @@ export default function EmployeeRecordView({
               // commit. Disciplinary is deliberately NOT wrapped this way —
               // see CLIENT_TAB_CATEGORIES' own comment.
               if (
-                category.key === "active-employment" &&
+                currentCategory.key === "active-employment" &&
                 leaveHistory !== undefined &&
                 performanceReview !== undefined &&
                 trainings !== undefined &&
@@ -569,19 +989,19 @@ export default function EmployeeRecordView({
                         <PageEditToggleButton />
                       </div>
                     )}
-                    <div className={clientSection === "leave" ? "" : "hidden"}>
+                    <div className={currentSection.key === "leave" ? "" : "hidden"}>
                       <LeavePanel rows={leaveHistory} />
                     </div>
-                    <div className={clientSection === "performance-review" ? "" : "hidden"}>
+                    <div className={currentSection.key === "performance-review" ? "" : "hidden"}>
                       <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />
                     </div>
-                    <div className={clientSection === "training" ? "" : "hidden"}>
+                    <div className={currentSection.key === "training" ? "" : "hidden"}>
                       <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />
                     </div>
-                    <div className={clientSection === "promotion" ? "" : "hidden"}>
+                    <div className={currentSection.key === "promotion" ? "" : "hidden"}>
                       <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
                     </div>
-                    <div className={clientSection === "transfer" ? "" : "hidden"}>
+                    <div className={currentSection.key === "transfer" ? "" : "hidden"}>
                       <TransferPanel
                         userId={employeeId}
                         data={transfers}
@@ -591,29 +1011,101 @@ export default function EmployeeRecordView({
                         canEdit={canEdit}
                       />
                     </div>
-                    <div className={clientSection === "cert" ? "" : "hidden"}>
+                    <div className={currentSection.key === "cert" ? "" : "hidden"}>
                       <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />
                     </div>
                   </PageEditProvider>
                 );
               }
-              if (category.key === "disciplinary" && sectionKey === "domestic-inquiry" && domesticInquiries !== undefined)
+              // Offboarding (2026-08-27, see conversation) — Exit's own 7
+              // tabs, same shape as HR Info/Finance/Active Employment above:
+              // all 7 render together under one PageEditProvider (every one
+              // of Resignation/Reference Letter/Exit Interview Notes/the 3
+              // Clearance checklists/Financial Settlement is individually
+              // EditableSection-wrapped in ActiveProfilePanels.tsx, unlike
+              // Disciplinary/Task's un-wrapped panels below), hidden via CSS.
+              // No employeeDetail gate needed — none of these 7 panels read it.
+              if (
+                currentCategory.key === "offboarding" &&
+                resignationInfo !== undefined &&
+                referenceLetterInfo !== undefined &&
+                exitInterviewNoteInfo !== undefined &&
+                knowledgeTransferChecklist !== undefined &&
+                assetRecoveryChecklist !== undefined &&
+                systemRevocationChecklist !== undefined &&
+                financialSettlement !== undefined
+              ) {
+                return (
+                  <PageEditProvider>
+                    <PageEditMessageDialog />
+                    <div className="mb-4 flex justify-end">
+                      <PageEditToggleButton />
+                    </div>
+                    <div className={currentSection.key === "resignation" ? "" : "hidden"}>
+                      <ResignationPanel userId={employeeId} data={resignationInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={currentSection.key === "reference-letter" ? "" : "hidden"}>
+                      <ReferenceLetterPanel userId={employeeId} data={referenceLetterInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={currentSection.key === "exit-interview-notes" ? "" : "hidden"}>
+                      <ExitInterviewNotesPanel userId={employeeId} data={exitInterviewNoteInfo} canEdit={canEdit} />
+                    </div>
+                    <div className={currentSection.key === "knowledge-transfer" ? "" : "hidden"}>
+                      <KnowledgeTransferPanel
+                        userId={employeeId}
+                        items={knowledgeTransferChecklist}
+                        canAddItem={canAddChecklistItem ?? false}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={currentSection.key === "asset-recovery" ? "" : "hidden"}>
+                      <AssetRecoveryPanel
+                        userId={employeeId}
+                        items={assetRecoveryChecklist}
+                        canAddItem={canAddChecklistItem ?? false}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={currentSection.key === "system-revocation" ? "" : "hidden"}>
+                      <SystemRevocationPanel
+                        userId={employeeId}
+                        items={systemRevocationChecklist}
+                        canAddItem={canAddChecklistItem ?? false}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                    <div className={currentSection.key === "financial-settlement" ? "" : "hidden"}>
+                      <FinancialSettlementPanel userId={employeeId} data={financialSettlement} canEdit={canEdit} />
+                    </div>
+                  </PageEditProvider>
+                );
+              }
+              // currentSection.key, not the raw sectionKey prop — disciplinary
+              // is now a CLIENT_TAB_CATEGORIES member (2026-08-26, see
+              // conversation), so its current sub-tab is tracked by
+              // clientSection state, not a fresh sectionKey per navigation;
+              // currentSection.key already resolves to whichever of the two
+              // applies (see its own derivation above).
+              if (currentCategory.key === "disciplinary" && currentSection.key === "domestic-inquiry" && domesticInquiries !== undefined)
                 return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={canEdit} />;
-              if (category.key === "disciplinary" && sectionKey === "suspension" && suspensionLetters !== undefined)
+              if (currentCategory.key === "disciplinary" && currentSection.key === "suspension" && suspensionLetters !== undefined)
                 return <SuspensionPanel userId={employeeId} data={suspensionLetters} canEdit={canEdit} />;
-              if (category.key === "disciplinary" && sectionKey === "showcause" && showcauseWarningLetters !== undefined)
+              if (currentCategory.key === "disciplinary" && currentSection.key === "showcause" && showcauseWarningLetters !== undefined)
                 return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} canEdit={canEdit} />;
-              if (category.key === "disciplinary" && sectionKey === "pip" && pips !== undefined)
+              if (currentCategory.key === "disciplinary" && currentSection.key === "pip" && pips !== undefined)
                 return <PipPanel userId={employeeId} data={pips} canEdit={canEdit} />;
-              if (category.key === "task" && sectionKey === "pending" && tasks !== undefined)
+              // currentSection.key, not the raw sectionKey prop — same
+              // reasoning as Disciplinary's own identical fix above (Task is
+              // now a CLIENT_TAB_CATEGORIES member too).
+              if (currentCategory.key === "task" && currentSection.key === "pending" && tasks !== undefined)
                 return <TaskPendingPanel tasks={tasks.pending} />;
-              if (category.key === "task" && sectionKey === "overdue" && tasks !== undefined)
+              if (currentCategory.key === "task" && currentSection.key === "overdue" && tasks !== undefined)
                 return <TaskOverduePanel tasks={tasks.overdue} />;
               if (StaticPanel) return <StaticPanel canEdit={canEdit} />;
               return (
                 <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-6 py-10 text-center">
                   <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
-                    {category.label} — {currentSection.label}
+                    {currentCategory.label} — {currentSection.label}
                   </p>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                     This section&apos;s fields aren&apos;t wired up yet. Navigation and layout match the reference; the form content
@@ -641,11 +1133,11 @@ export default function EmployeeRecordView({
               it back to the column's actual size so every pill wraps within
               a consistent width instead of stretching the rail. */}
           <nav
-            aria-label={`${category.label} sections`}
+            aria-label={`${currentCategory.label} sections`}
             className="flex flex-col min-w-0 mt-4 sm:mt-6 [@media(hover:none)]:hidden"
             style={{ gap: RAIL_GAP_PX }}
           >
-            {category.sections.map((section) => {
+            {topLevelSections.map((section) => {
               const isActive = section.key === currentSection.key;
               // Same size as StageProfileView.tsx's own rail pills (shared
               // RAIL_PILL_PADDING_CLASS/RAIL_PILL_FONT_SIZE_CLASS constants,
@@ -653,18 +1145,94 @@ export default function EmployeeRecordView({
               const className = `w-full text-left box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${RAIL_PILL_PADDING_CLASS} ${RAIL_PILL_FONT_SIZE_CLASS} ${
                 isActive ? RAIL_CURRENT : `${RAIL_BASE} hover:brightness-95`
               }`;
+              // Inline, not a corner badge (2026-08-27, see conversation —
+              // the corner-badge style is top-level-tabs only; this rail's
+              // dot stays inline next to its label, same as before).
+              const label = (
+                <span className="inline-flex items-center gap-1.5">
+                  {section.label}
+                  {dotSectionKeys?.has(section.key) &&
+                    !dotCategoryOnlyKeys?.has(currentCategory.key) && <OverdueDot count={1} label="Not filled in yet" />}
+                </span>
+              );
               // Rollout categories — see the mobile nav's own comment above.
               if (isClientTabCategory) {
                 return (
                   <button key={section.key} type="button" onClick={() => setClientSection(section.key)} className={className}>
-                    {section.label}
+                    {label}
                   </button>
                 );
               }
               return (
-                <Link key={section.key} href={`/employee-record/${employeeId}/${category.key}/${section.key}`} className={className}>
-                  {section.label}
+                <Link key={section.key} href={`${basePath}/${currentCategory.key}/${section.key}`} className={className}>
+                  {label}
                 </Link>
+              );
+            })}
+
+            {/* Nested groups (2026-08-27, see conversation) — ported from
+                StageProfileView.tsx's own navSections group-toggle-pill
+                renderer (same one-toggle-pill-per-group shape, RAIL_CLEARANCE_
+                BASE/CURRENT matching its exact Exit navRail.clearanceBase/
+                clearanceCurrent literals). Only Offboarding's "Clearance"
+                uses this today; sectionGroups is empty for every other
+                category, so this renders nothing there. */}
+            {sectionGroups.map((group) => {
+              const groupSections = currentCategory.sections.filter((s) => s.group === group);
+              const isGroupActive = groupSections.some((s) => s.key === currentSection.key);
+              const isOpen = openGroup === group || isGroupActive;
+              // Inline, not a corner badge (2026-08-27, see conversation —
+              // corner badges are top-level-tabs only).
+              const groupDot =
+                dotSectionKeys &&
+                groupSections.some((s) => dotSectionKeys.has(s.key)) &&
+                !dotCategoryOnlyKeys?.has(currentCategory.key) && <OverdueDot count={1} label="Not filled in yet" />;
+              return (
+                <div key={group} className="flex flex-col" style={{ gap: RAIL_GAP_PX }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup((g) => (g === group ? null : group))}
+                    aria-expanded={isOpen}
+                    className={`w-full flex items-center justify-between box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${RAIL_PILL_PADDING_CLASS} ${RAIL_PILL_FONT_SIZE_CLASS} ${
+                      isGroupActive ? RAIL_CURRENT : `${RAIL_BASE} hover:brightness-95`
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {group}
+                      {groupDot}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                  {isOpen && (
+                    <div className="flex flex-col" style={{ gap: RAIL_GAP_PX }}>
+                      {groupSections.map((section) => {
+                        const isCurrent = section.key === currentSection.key;
+                        const className = `w-full box-border rounded-r-[20px] border-2 font-semibold leading-tight transition-colors ${RAIL_PILL_PADDING_CLASS} ${RAIL_PILL_FONT_SIZE_CLASS} ${
+                          isCurrent ? RAIL_CLEARANCE_CURRENT : `${RAIL_CLEARANCE_BASE} hover:brightness-95`
+                        }`;
+                        const label = (
+                          <span className="inline-flex items-center gap-1.5">
+                            {section.label}
+                            {dotSectionKeys?.has(section.key) &&
+                              !dotCategoryOnlyKeys?.has(currentCategory.key) && <OverdueDot count={1} label="Not filled in yet" />}
+                          </span>
+                        );
+                        if (isClientTabCategory) {
+                          return (
+                            <button key={section.key} type="button" onClick={() => setClientSection(section.key)} className={className}>
+                              {label}
+                            </button>
+                          );
+                        }
+                        return (
+                          <Link key={section.key} href={`${basePath}/${currentCategory.key}/${section.key}`} className={className}>
+                            {label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>

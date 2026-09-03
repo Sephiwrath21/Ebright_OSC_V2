@@ -670,35 +670,6 @@ export async function HomeScopedOverviewSection({
       <div className="flex flex-col gap-5">
         {grid(
           <>
-            {/* CEO (2026-08-01): ONE combined "My Tasks" card — no
-                Daily/Monthly split — with the shared ?date= filter
-                windowing it by DUE date (undated tasks always show). */}
-            {shows(view, "home", "ceoCombinedList") &&
-              (() => {
-                const win = resolveWindow("daily", dailyDate ?? formatLocalDate(new Date()));
-                const windowed = daily.me.tasks.filter((t) => {
-                  if (!t.dueAt) return true;
-                  const due = new Date(t.dueAt);
-                  return due >= win.start && due < win.end;
-                });
-                const buckets = flowBucketize(windowed);
-                return (
-                  <StatusOverviewCard
-                    key="ceo-own-tasks"
-                    title="My Tasks"
-                    totals={{
-                      completed: buckets.completed.length,
-                      pending: buckets.pending.length,
-                      na: buckets.na.length,
-                    }}
-                    tasks={buckets}
-                    action={dailyPicker}
-                    actionPlacement="row"
-                    hideChart
-                    {...completeProps}
-                  />
-                );
-              })()}
             {shows(view, "home", "assignerStreams") && otherStreamCards}
           </>,
         )}
@@ -707,6 +678,10 @@ export async function HomeScopedOverviewSection({
             entityName=""
             categories={categories}
             myUserId={daily.me.me.userId}
+            // CEO's own section reads "My Tasks" (2026-08-26), matching
+            // the ceoCombinedList card's title it replaced — every other
+            // isPersonalRole role keeps the plain "Daily" label.
+            dailyLabel={view === "CEO" ? "My Tasks" : undefined}
             daily={
               personalDailyEntity && {
                 entity: personalDailyEntity,

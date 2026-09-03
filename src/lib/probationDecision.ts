@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { titleCaseName } from "@/lib/text";
+import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
 import { lookupCareerApplicationsByName, lookupBranchStaffPositionGroupByName, normalizeName } from "@/lib/careerApplicationSync";
 import {
   buildBranchStaffMatchIndex,
@@ -28,7 +29,7 @@ import type { CareerApplicationLookupEntry } from "@/lib/careerApplicationSync";
 //     ONE write path this whole feature introduces), which always takes
 //     priority over the external signal once made.
 
-export type ProbationDisplayStatus = "Confirm" | "Stop" | "In Progress" | "Extended";
+export type ProbationDisplayStatus = "Confirmed" | "Stopped" | "In Progress" | "Extended";
 
 export interface ProbationDisplayInfo {
   startDate: string | null;
@@ -46,11 +47,25 @@ export interface ProbationDisplayInfo {
    *  isEffectivelyConfirmed's own comment). */
   effectivelyConfirmed: boolean;
   /** True when status2/local decision says Stop — stays in Probation, but
-   *  the profile shows "Stop" rather than "In Progress". */
+   *  the profile shows "Stopped" rather than "In Progress". */
   effectivelyStopped: boolean;
   localProbationStatus: string | null;
   decidedByName: string | null;
   decidedAt: string | null;
+  /** Fully computed, read-only display value (2026-08-28, see conversation)
+   *  — only ever set when displayStatus === "Confirmed". Priority: (1) the
+   *  local hrfs.probation.confirm_date, when set — this is decideProbationOutcome's
+   *  own auto-stamp (employeeRecordActions.ts) for anyone HR confirmed
+   *  directly in-app, checked first so those people get a real date even
+   *  with no career_applications match at all; (2) ebright_hrfs.hrms_audit_log's
+   *  TrialProbation/STATUS_CHANGE entry's created_at, for anyone whose
+   *  confirmation was logged there (this logging only started firing
+   *  recently — currently just Ayu Novitasari has a matching entry); (3)
+   *  career_applications.updated_at as a last-resort fallback for
+   *  confirmations that predate that audit logging (a whole-row timestamp,
+   *  not status2-specific — an approximation, not a guaranteed-accurate
+   *  confirmation moment). Never a manual HR input. */
+  confirmationDate: string | null;
 }
 
 // HR's local decision, once made, always wins over the external
@@ -63,10 +78,16 @@ export function computeProbationDisplayStatus(
   status2: string | null,
 ): ProbationDisplayStatus {
   if (localProbationStatus === "Extended") return "Extended";
-  if (localProbationStatus === "Confirmed") return "Confirm";
-  if (localProbationStatus === "Stopped") return "Stop";
-  if (status2 === "Accept") return "Confirm";
-  if (status2 === "Rejected") return "Stop";
+  if (localProbationStatus === "Confirmed") return "Confirmed";
+  if (localProbationStatus === "Stopped") return "Stopped";
+  // Case-insensitive/trimmed, matching the fix isEffectivelyConfirmed already
+  // got (2026-08-12, see its own comment below) — the live distinct values in
+  // ebright_hrfs.career_applications.status2 are lowercase ('accept'/
+  // 'reject'); the previous `=== "Accept"`/`=== "Rejected"` checks never
+  // matched anything in real data.
+  const normalizedStatus2 = status2?.trim().toLowerCase() ?? "";
+  if (normalizedStatus2 === "accept") return "Confirmed";
+  if (normalizedStatus2 === "reject") return "Stopped";
   return "In Progress";
 }
 
@@ -353,6 +374,30 @@ export async function computeProbationReminderCandidates<
   return result;
 }
 
+// Confirmation Date's 3-tier resolution (2026-08-28, see conversation and
+// ProbationDisplayInfo.confirmationDate's own doc comment for the full
+// rationale). Only called when displayStatus === "Confirmed" — every other
+// status (Stopped/Extended/In Progress) has no Confirmation Date at all, and
+// skipping the call otherwise avoids an unnecessary hrms_audit_log round
+// trip for the common non-Confirmed case.
+async function resolveConfirmationDate(
+  localConfirmDate: Date | null,
+  applicationId: number | null,
+  careerApplicationUpdatedAt: Date | null,
+): Promise<string | null> {
+  if (localConfirmDate) return localConfirmDate.toISOString().slice(0, 10);
+  if (applicationId !== null) {
+    const { rows } = await queryEbrightHrfs<{ created_at: Date }>(
+      `SELECT created_at FROM public.hrms_audit_log
+        WHERE entity = 'TrialProbation' AND entity_id = $1 AND action = 'STATUS_CHANGE'
+        ORDER BY created_at DESC LIMIT 1`,
+      [String(applicationId)],
+    );
+    if (rows[0]?.created_at) return rows[0].created_at.toISOString().slice(0, 10);
+  }
+  return careerApplicationUpdatedAt ? careerApplicationUpdatedAt.toISOString().slice(0, 10) : null;
+}
+
 export async function getProbationDisplayInfo(userId: number, fullName: string): Promise<ProbationDisplayInfo> {
   const [localRow, careerApplications, branches, departments, bsIndex, emp] = await Promise.all([
     prisma.probation.findUnique({ where: { user_id: userId }, include: { decided_by_user: { include: { user_profile: true } } } }),
@@ -401,13 +446,18 @@ export async function getProbationDisplayInfo(userId: number, fullName: string):
   logAmbiguousBranchStaffMatches(ambiguous);
 
   const localProbationStatus = localRow?.probation_status ?? null;
+  const displayStatus = computeProbationDisplayStatus(localProbationStatus, status2);
+  const confirmationDate =
+    displayStatus === "Confirmed"
+      ? await resolveConfirmationDate(localRow?.confirm_date ?? null, careerMatch?.applicationId ?? null, careerMatch?.updatedAt ?? null)
+      : null;
 
   return {
     startDate,
     endDate,
     feedback2,
     hasCareerApplicationMatch: careerMatch != null,
-    displayStatus: computeProbationDisplayStatus(localProbationStatus, status2),
+    displayStatus,
     effectivelyConfirmed: isEffectivelyConfirmed(localProbationStatus, status2, feedback2),
     effectivelyStopped: isEffectivelyStopped(localProbationStatus, status2),
     localProbationStatus,
@@ -415,5 +465,6 @@ export async function getProbationDisplayInfo(userId: number, fullName: string):
       ? titleCaseName(localRow.decided_by_user.user_profile.full_name)
       : null,
     decidedAt: localRow?.decided_at ? localRow.decided_at.toISOString() : null,
+    confirmationDate,
   };
 }

@@ -54,10 +54,12 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     }
   });
 
-  it("the THREE weekday ranges: dept Tue–Sat, Manager/Exec Tue–Sun, Coach Wed–Sun", () => {
+  it("the FOUR weekday ranges: dept Tue–Sat, Branch Exec Tue–Sun, Branch Manager/Coach Wed–Sun", () => {
     expect(weekdayRangeOf("DEPT_MEMBER")).toBe("tue-sat");
     expect(weekdayRangeOf("HOD")).toBe("tue-sat");
-    expect(weekdayRangeOf("BRANCH_MANAGER")).toBe("tue-sun");
+    // Wed-Sun (2026-08-26, user request — dropped Tuesday for Branch
+    // Manager specifically; Branch Exec/BRANCH_MEMBER is unchanged).
+    expect(weekdayRangeOf("BRANCH_MANAGER")).toBe("wed-sun");
     expect(weekdayRangeOf("BRANCH_MEMBER")).toBe("tue-sun");
     expect(weekdayRangeOf("COACH")).toBe("wed-sun");
   });
@@ -98,10 +100,11 @@ describe("ROLE_VIEWS — 2026-07-29 FINAL role spec", () => {
     ]);
   });
 
-  it("CEO's Home is just My Tasks (2026-08-19: ceoKanban/branchRegionOverview dropped entirely)", () => {
-    expect(ROLE_VIEWS.CEO.home).toEqual(["ceoCombinedList"]);
+  it("CEO's Home is just My Tasks (2026-08-19: ceoKanban/branchRegionOverview dropped entirely; 2026-08-26: ceoCombinedList swapped for personalDaily, matching every other role's weekday-table Home view)", () => {
+    expect(ROLE_VIEWS.CEO.home).toEqual(["personalDaily"]);
     expect(shows("CEO", "home", "ceoKanban")).toBe(false);
     expect(shows("CEO", "home", "branchRegionOverview")).toBe(false);
+    expect(shows("CEO", "home", "personalMonthly")).toBe(false);
   });
 
   it("DEPT_MEMBER gets the HOD Assigned card on Home only (2026-08-12: Task Manager's myOverview replaced it with whole-department Daily visibility instead)", () => {

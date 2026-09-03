@@ -132,9 +132,25 @@ export function bucketOf(status: BlockStatus): Bucket {
   return "pending";
 }
 
-export function countBuckets(blocks: { status: BlockStatus }[]): BucketCounts {
+/** SUBTASKS DON'T COUNT SEPARATELY (2026-08-29, user request — matches
+ *  ClickUp: a parent task with 5 subtasks is ONE unit toward a donut's
+ *  total/percentage, not 6). A subtask (parentId set) is filtered out
+ *  before tallying; its own completion still gates the parent via the
+ *  unresolved-subtasks warning (bits.tsx), it just isn't a separate line
+ *  item in any Completed/Pending/N-A/Total count. `parentId` is optional
+ *  on the param type so existing callers/tests that never carry it (every
+ *  block is implicitly top-level) keep counting exactly as before —
+ *  `undefined` and `null` are treated identically. Task LIST-building
+ *  (e.g. attachEntityTasks' per-bucket task arrays, feeding a drill
+ *  modal) is a different concern and is NOT filtered here — subtasks stay
+ *  fully visible/interactive there, same as ClickUp's own expandable
+ *  checklist. */
+export function countBuckets(blocks: { status: BlockStatus; parentId?: string | null }[]): BucketCounts {
   const totals: BucketCounts = { completed: 0, pending: 0, na: 0 };
-  for (const b of blocks) totals[bucketOf(b.status)] += 1;
+  for (const b of blocks) {
+    if (b.parentId != null) continue;
+    totals[bucketOf(b.status)] += 1;
+  }
   return totals;
 }
 
@@ -175,11 +191,14 @@ export interface EntityCounts extends BucketCounts {
  * only the per-entity breakdown omits them.
  */
 export function groupByDimension(
-  blocks: { assigneeId: string; status: BlockStatus }[],
+  blocks: { assigneeId: string; status: BlockStatus; parentId?: string | null }[],
   dimensionOf: (assigneeId: string) => string | null | undefined,
 ): EntityCounts[] {
   const groups = new Map<string, EntityCounts>();
   for (const b of blocks) {
+    // Subtasks don't count separately (2026-08-29) — see countBuckets' own
+    // doc comment for why.
+    if (b.parentId != null) continue;
     const name = dimensionOf(b.assigneeId);
     if (!name) continue;
     let group = groups.get(name);

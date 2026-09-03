@@ -280,7 +280,7 @@ function MultiPackageCell({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((o) => !o)}
-          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-white dark:hover:bg-slate-700 dark:hover:text-slate-300"
         >
           {selected.length === 0 ? "+ Add" : "+"}
         </button>

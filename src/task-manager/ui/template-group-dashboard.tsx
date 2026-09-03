@@ -47,6 +47,7 @@ function GroupActions({
   onAssign,
   onViewAssignees,
   onEdit,
+  onDuplicate,
   onRemove,
 }: {
   group: FlowTemplateGroupSummary;
@@ -55,6 +56,11 @@ function GroupActions({
   onAssign: () => void;
   onViewAssignees: () => void;
   onEdit: () => void;
+  /** "Duplicate" (2026-08-26, user request — "different template but
+   *  similar task, just a few tasks different") — opens the Create modal
+   *  prefilled from this group; see TemplateGroupFormModal's own
+   *  duplicateFromId doc comment. */
+  onDuplicate: () => void;
   onRemove: () => void;
 }) {
   if (!canEdit) return null;
@@ -80,6 +86,13 @@ function GroupActions({
         className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
       >
         Edit
+      </button>
+      <button
+        type="button"
+        onClick={onDuplicate}
+        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-400"
+      >
+        Duplicate
       </button>
       <button
         type="button"
@@ -127,6 +140,7 @@ export function TemplateGroupDashboard({
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editGroupId, setEditGroupId] = React.useState<string | null>(null);
+  const [duplicateGroupId, setDuplicateGroupId] = React.useState<string | null>(null);
   const [assignGroupId, setAssignGroupId] = React.useState<string | null>(null);
   const [assigneesGroupId, setAssigneesGroupId] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -288,6 +302,7 @@ export function TemplateGroupDashboard({
                     onAssign={() => setAssignGroupId(g.id)}
                     onViewAssignees={() => setAssigneesGroupId(g.id)}
                     onEdit={() => setEditGroupId(g.id)}
+                    onDuplicate={() => setDuplicateGroupId(g.id)}
                     onRemove={() => remove(g.id, g.name)}
                   />
                 </div>
@@ -322,6 +337,7 @@ export function TemplateGroupDashboard({
                           onAssign={() => setAssignGroupId(g.id)}
                           onViewAssignees={() => setAssigneesGroupId(g.id)}
                           onEdit={() => setEditGroupId(g.id)}
+                          onDuplicate={() => setDuplicateGroupId(g.id)}
                           onRemove={() => remove(g.id, g.name)}
                         />
                       </div>
@@ -348,6 +364,17 @@ export function TemplateGroupDashboard({
           control={control}
           groupId={editGroupId}
           onClose={() => setEditGroupId(null)}
+          label={label}
+          categories={categories}
+          onCreateCategory={onCreateCategory}
+        />
+      )}
+      {duplicateGroupId && (
+        <TemplateGroupFormModal
+          key={duplicateGroupId}
+          control={control}
+          duplicateFromId={duplicateGroupId}
+          onClose={() => setDuplicateGroupId(null)}
           label={label}
           categories={categories}
           onCreateCategory={onCreateCategory}

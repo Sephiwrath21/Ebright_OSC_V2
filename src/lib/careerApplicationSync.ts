@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeName } from "@/lib/normalizeName";
 import { prisma } from "@/lib/prisma";
 import { queryEbrightHrfs } from "@/lib/ebright-hrfs";
 import {
@@ -10,11 +11,14 @@ import {
   listDepartments,
   internActiveFromDate,
   partTimeActiveFromDate,
+  countEmployeeStages,
+  getOverdueTaskCounts,
   type EmployeeOverviewRow,
   type EmployeeDetailFull,
   type BranchOpt,
   type DepartmentOpt,
 } from "@/lib/employeeQueries";
+import { getCurrentEmployeeScope, filterRowsByScope, type EmployeeScope } from "@/lib/employeeScope";
 import { positionGroup, type EmployeeStage, type PositionGroup } from "@/lib/employeeStages";
 import { titleCaseNameOrNull } from "@/lib/text";
 import { BOARD_STAGE_TO_OUR_STAGE } from "@/lib/boardStageMapping";
@@ -152,29 +156,7 @@ export type SyncAction =
     }
   | { type: "skip"; reason: CareerApplicationSyncGap["reason"] };
 
-export function normalizeName(name: string): string {
-  return name
-    .toUpperCase()
-    // Some ebright_hrfs.BranchStaff.name values contain literal embedded
-    // \r/\n (e.g. "CHE\r\nKU ELMI SHAZWAL..."). Without this, the
-    // [^A-Z0-9 ] strip below deletes them outright instead of treating them
-    // as a word boundary, gluing the two halves into "CHEKU ELMI..." and
-    // silently breaking the match against a normally-spaced name — found via
-    // the 2026-08-22 BranchStaff/employment reconciliation audit (7 of 363
-    // BranchStaff rows affected). Must run BEFORE the punctuation strip.
-    .replace(/[\r\n\t]+/g, " ")
-    // Malaysian/Indian relational honorifics ("daughter of"/"son of") are
-    // written inconsistently across systems — e.g. real user "Ramitha
-    // Moghan" vs onboarding_candidate's "Ramitha A/P Moghan" for the exact
-    // same person (confirmed via matching email), which silently produced
-    // TWO separate Pre-list rows for her before this fix. Stripped as whole
-    // tokens BEFORE punctuation removal, so they're dropped entirely rather
-    // than collapsing into "AP"/"AL" and staying part of the compared name.
-    .replace(/\bA\/P\b|\bA\/L\b|\bS\/O\b|\bD\/O\b/g, "")
-    .replace(/[^A-Z0-9 ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { normalizeName };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -198,8 +180,16 @@ export interface CareerApplicationLookupEntry {
   // hiringNote above already uses for a different, pre-existing UI element.
   feedback2: string | null;
   // Probation stage's own Confirm/Stop/In Progress display status (see
-  // probationDecision.ts) — "Accept"/"Rejected"/empty, read-only.
+  // probationDecision.ts) — "accept"/"reject"/empty, read-only.
   status2: string | null;
+  // Whole-row last-modified timestamp (2026-08-27, see conversation) —
+  // Confirmation Date's fallback source in probationDecision.ts, only used
+  // when there's no matching hrms_audit_log STATUS_CHANGE entry for this
+  // application (the common case for anyone confirmed before that logging
+  // started firing, ~2026-08-27). NOT a dedicated "status2 changed"
+  // timestamp — this moves whenever ANY column on the row changes — so it's
+  // an approximation, not a guaranteed-accurate confirmation moment.
+  updatedAt: Date | null;
 }
 
 // Live name-matched lookup into career_applications AND rec_recruit/
@@ -220,7 +210,8 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
       feedback1: string | null;
       feedback2: string | null;
       status2: string | null;
-    }>(`select id, name, board_stage, feedback1, feedback2, status2 from public.career_applications`),
+      updated_at: Date | null;
+    }>(`select id, name, board_stage, feedback1, feedback2, status2, updated_at from public.career_applications`),
     queryEbrightHrfs<{ name: string; stageId: string | null }>(`select name, "stageId" from public.rec_recruit`),
     queryEbrightHrfs<{ id: string; name: string }>(`select id, name from public.rec_stage`),
   ]);
@@ -244,6 +235,7 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
       recStage: recStageByName.get(key) ?? null,
       feedback2: r.feedback2?.trim() || null,
       status2: r.status2?.trim() || null,
+      updatedAt: r.updated_at,
     });
   }
   // A rec_recruit row with no matching career_applications row (e.g.
@@ -253,7 +245,7 @@ export async function lookupCareerApplicationsByName(): Promise<Map<string, Care
   // never be OR-matched into the Probation list at all.
   for (const [key, recStage] of recStageByName) {
     if (!map.has(key))
-      map.set(key, { applicationId: null, boardStage: null, hiringNote: null, recStage, feedback2: null, status2: null });
+      map.set(key, { applicationId: null, boardStage: null, hiringNote: null, recStage, feedback2: null, status2: null, updatedAt: null });
   }
   return map;
 }
@@ -1444,4 +1436,133 @@ export async function computePreStartDatePassedRows(
         readyForRealAccount,
       };
     });
+}
+
+export interface EmployeeOverviewData {
+  scope: EmployeeScope | null;
+  rows: EmployeeOverviewRow[];
+  counts: Record<EmployeeStage, number>;
+  overdueTaskCounts: Record<number, number>;
+  probationReminders: { fullName: string; endDate: string }[];
+}
+
+/** Everything /employee-folder needs to render its 5 stage cards + Employee
+ *  Records table (2026-08-26, see conversation — extracted verbatim from
+ *  EmployeeFolderPage's own body, which called all of this inline) — pulled
+ *  out here so the /home dashboard's new "Employee Overview" section can
+ *  reuse the exact same rows/counts computation instead of a second,
+ *  independently-maintained copy. Callers that need to skip this entirely
+ *  for an ownUserId-scoped viewer (staff logins) should check
+ *  getCurrentEmployeeScope() themselves BEFORE calling this — it always runs
+ *  the full computation, same cost either way. */
+export async function getEmployeeOverviewData(): Promise<EmployeeOverviewData> {
+  const scope = await getCurrentEmployeeScope();
+  const rowsRaw = await listEmployeeOverviewRows();
+  // Same live BranchStaff fallback the Probation/Onboarding pages use — the
+  // "Employee Records" table shows this same Branch/Department column, so it
+  // needs the same read-only fallback for rows whose own employment record
+  // has neither set yet. Fills in display only, never writes back.
+  const [branches, departments] = await Promise.all([listBranches(), listDepartments()]);
+  const enrichedRows = await enrichRowsWithBranchStaffLocation(rowsRaw, branches, departments);
+
+  // careerApplications is still fetched here — computeRealAccountLifecycle
+  // Overrides' Confirm check (via isEffectivelyConfirmed) still reads
+  // status2, and the Probation reminder card further down still needs it.
+  // branchStaffPositionGroups is fetched once here and threaded through
+  // every call below that needs it.
+  const [careerApplications, branchStaffPositionGroups] = await Promise.all([
+    lookupCareerApplicationsByName(),
+    lookupBranchStaffPositionGroupByName(),
+  ]);
+
+  // Correct Pre-stage membership to match computePreStageRows() — the same
+  // definition the dedicated Pre list and its own summary card use.
+  const [correctedPreRows, prePassedRows] = await Promise.all([
+    computePreStageRows(branchStaffPositionGroups),
+    computePreStartDatePassedRows(branchStaffPositionGroups, careerApplications),
+  ]);
+  // computePreStageRows()/computePreStartDatePassedRows() return unscoped
+  // rows (see their own comments) — these never passed through
+  // listEmployeeOverviewRows()'s own internal scoping, so they need their
+  // own explicit filterRowsByScope call; skipping this would leak candidates
+  // outside a department/branch-scoped viewer's own scope.
+  const correctedPreCandidates = scope ? filterRowsByScope(scope, correctedPreRows.filter((r) => r.isCandidate)) : [];
+  const passedPreCandidates = scope ? filterRowsByScope(scope, prePassedRows.filter((r) => r.isCandidate)) : [];
+  const correctedPreById = new Map(correctedPreRows.filter((r) => !r.isCandidate).map((r) => [r.id, r]));
+  const prePassedById = new Map(prePassedRows.map((r) => [r.id, r]));
+
+  // Real-account Probation/Onboarding/Active membership — see
+  // computeRealAccountLifecycleOverrides's own comment above. Candidate-only
+  // rows (passedPreCandidates) are untouched by this, unrelated feature —
+  // counted separately below.
+  const overrides = await computeRealAccountLifecycleOverrides(enrichedRows, careerApplications, branchStaffPositionGroups);
+
+  let probationCount = 0;
+  let onboardingDualListedCount = 0;
+  for (const o of overrides.values()) {
+    if (o.stage === "probation") probationCount += 1;
+    if (o.extraStages?.includes("onboarding")) onboardingDualListedCount += 1;
+  }
+  // Candidate-only rows whose start_date has passed and resolve Full Time
+  // (see passedPreCandidates above) count toward Probation too — they never
+  // pass through overrides above since they have no real users/employment
+  // row to be in enrichedRows with.
+  for (const c of passedPreCandidates) {
+    if (c.extraStages?.includes("probation")) probationCount += 1;
+  }
+
+  const rows = enrichedRows
+    .filter((r) => r.stage !== "pre" || correctedPreById.has(r.id) || prePassedById.has(r.id))
+    .map((r) => {
+      // Real stage says something other than Pre but the corrected Pre
+      // definition — including its own narrow, id-keyed exceptions — says
+      // they belong on Pre instead. Must be checked even when r.stage !==
+      // "pre", not just when it is.
+      const corrected = correctedPreById.get(r.id);
+      const passed = prePassedById.get(r.id);
+      const base = corrected
+        ? { ...r, stage: "pre" as const, date: corrected.date }
+        : passed
+          ? { ...r, stage: passed.stage, date: passed.date }
+          : r;
+      // Real-account Probation/Onboarding/Active override — genuinely Active
+      // now, Probation+Onboarding dual-listed, or Onboarding-only, whatever
+      // the raw base stage said.
+      const override = overrides.get(r.id);
+      if (!override) return base;
+      return { ...base, stage: override.stage, extraStages: override.extraStages };
+    })
+    .concat(correctedPreCandidates)
+    .concat(passedPreCandidates);
+
+  const counts = countEmployeeStages(rows);
+  // `rows` above already includes the scope-filtered candidates, so this
+  // recomputes the same number countEmployeeStages(rows) just derived —
+  // kept explicit (rather than relied on implicitly) so this card's count
+  // stays correct even if a future change to `rows` above narrows what the
+  // table itself displays.
+  counts.pre = scope ? filterRowsByScope(scope, correctedPreRows).length : 0;
+  counts.probation = probationCount;
+  counts.onboarding += onboardingDualListedCount;
+  const overdueTaskCounts = await getOverdueTaskCounts(rows.map((r) => r.id));
+
+  // Red dot on the Probation card — same reminder rule as the notification
+  // bell (see probationDecision.ts's computeProbationReminderCandidates),
+  // fed by the same real-account Probation population computeRealAccount
+  // LifecycleOverrides above just resolved (Full Time, not yet Confirmed).
+  const { computeProbationReminderCandidates } = await import("@/lib/probationDecision");
+  const probationBadgedCandidates = enrichedRows.filter((r) => overrides.get(r.id)?.stage === "probation");
+  const probationReminders = await computeProbationReminderCandidates(
+    probationBadgedCandidates,
+    careerApplications,
+    branchStaffPositionGroups,
+  );
+
+  return {
+    scope,
+    rows,
+    counts,
+    overdueTaskCounts,
+    probationReminders: probationReminders.map((r) => ({ fullName: r.fullName, endDate: r.endDate })),
+  };
 }

@@ -64,70 +64,69 @@ function InlineActionError({ text }: { text: string }) {
 }
 
 export const BUCKET_META = [
-  // `fill` (the pie wedge) is now theme-aware and matches BUCKET_TINT's own
-  // stat-chip/accordion-row colors exactly, shade for shade (2026-08-22,
-  // user request — the chart's wedges and the row list below it were two
-  // different, unrelated color choices before: fill was a single fixed
-  // shade regardless of theme, BUCKET_TINT was a light tint in light mode
-  // and a solid dark shade in dark mode). `dot` stays its own fixed
-  // (non-theme-varying) shade — used for small legend/rollup dots
+  // `fill` (the pie wedge) is now the SAME shade in both themes for
+  // Completed/Pending (2026-08-26, user feedback — a big solid dark:*-700
+  // wedge read as too vivid/harsh against the dark page background,
+  // compared to the soft pastel look in light mode; the user wanted the
+  // wedge itself to look identical either way). This deliberately diverges
+  // from BUCKET_TINT below (which still darkens the stat-chip/accordion-row
+  // backgrounds in dark mode) — the wedge is the single largest, most
+  // visually dominant element on the card, so its own theme-independence
+  // was asked for specifically, not the whole card's. `dot` stays its own
+  // fixed (non-theme-varying) shade — used for small legend/rollup dots
   // elsewhere that were never part of this donut-card color mismatch.
-  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-300 dark:fill-emerald-900", stroke: "stroke-emerald-500" },
-  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-300 dark:fill-red-900", stroke: "stroke-red-400" },
-  // fill stays PALE in dark mode too (2026-08-25, user feedback: the N/A
-  // wedge/chip read as orange/brown, not yellow) — see BUCKET_TINT's own
-  // doc comment for why yellow specifically can't just follow Completed/
-  // Pending's solid-900 pattern.
-  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-300 dark:fill-yellow-200", stroke: "stroke-yellow-400" },
+  { key: "completed", label: "Completed", dot: "bg-emerald-500", fill: "fill-emerald-300", stroke: "stroke-emerald-500" },
+  { key: "pending", label: "Pending", dot: "bg-red-400", fill: "fill-red-300", stroke: "stroke-red-400" },
+  // Already the same shade in both modes (2026-08-25, user feedback: the
+  // N/A wedge/chip read as orange/brown, not yellow, when darkened) — see
+  // BUCKET_TINT's own doc comment for why yellow specifically can't just
+  // follow Completed/Pending's dark treatment.
+  { key: "na", label: "N/A", dot: "bg-yellow-400", fill: "fill-yellow-300", stroke: "stroke-yellow-400" },
 ] as const;
 
 export type BucketKey = (typeof BUCKET_META)[number]["key"];
+
+/** Row order for the donut cards' collapsible accordion (Department/Branch
+ *  and Person cards) — Pending first (2026-08-26, user request: the thing
+ *  needing attention should lead), Completed second, N/A last. Deliberately
+ *  separate from BUCKET_META's own array order, which stays
+ *  Completed/Pending/N/A and still drives the stat-chip row above the
+ *  accordion (untouched by this request) plus the pie wedges/legend. */
+export const ACCORDION_BUCKET_ORDER: BucketKey[] = ["pending", "completed", "na"];
 
 /** Background tint per bucket for donut cards' stat chips/accordion rows
  *  (PersonDonutCard, DepartmentDonutCard) — same 3-color convention as
  *  BUCKET_META's dot/stroke/fill classes, just as a soft background instead
  *  of a solid fill. Shared here (2026-08-22) so every donut-style card
  *  stays visually identical instead of drifting via separate copies.
- *  Light mode is *-300 (2026-08-25, user feedback: the original *-100 wash
- *  read as washed-out/too light, especially on the pie wedges) — bumped up
- *  from the ClickUp Task page's own *-100 member-card tokens
- *  (DepartmentMembers.tsx's StatChip/Accordion bg) this used to match
- *  exactly; that page is unaffected, only this donut-card copy changed.
- *  Dark mode is SOLID (bg-*-900, no opacity fraction — 2026-08-22, user
- *  feedback: the original *-950/40 wash was too close to the page's own
- *  dark background to tell the three buckets apart at a glance). Matches
- *  DepartmentMembers.tsx's own dark tint tokens (--tint-green/--tint-red
- *  resolve to emerald-900/red-900) exactly.
- *  N/A is the one exception (2026-08-25, user feedback: bg-yellow-900 read
- *  as orange/brown, not yellow) — dark yellow only reads as a distinct
- *  color at high lightness (unlike red/emerald, which stay recognizable
- *  when darkened), so N/A keeps a PALE fill in dark mode too, with dark
- *  text instead of light (BUCKET_TEXT.na below) for contrast. */
+ *  SAME shade in both themes now (2026-08-26, user feedback — after the
+ *  pie wedge itself went theme-independent, the chips/rows sitting right
+ *  below it still visibly darkened in dark mode, which read as
+ *  inconsistent once the wedge no longer did; this went through several
+ *  dark-mode-only iterations first — *-100 wash, then solid *-900, then
+ *  *-700 — before landing on "just match light mode," same resolution the
+ *  wedge itself reached one prompt earlier). N/A was already unified for
+ *  its own separate reason (2026-08-25: a darkened yellow reads as
+ *  orange/brown, not yellow, at any lightness low enough to look "dark
+ *  mode" — see BUCKET_TEXT.na below for the paired dark-text fix that
+ *  makes THIS true in light mode too, not just dark). */
 export const BUCKET_TINT: Record<BucketKey, string> = {
-  completed: "bg-emerald-300 dark:bg-emerald-900",
-  pending: "bg-red-300 dark:bg-red-900",
-  na: "bg-yellow-300 dark:bg-yellow-200",
+  completed: "bg-emerald-300",
+  pending: "bg-red-300",
+  na: "bg-yellow-300",
 };
 /** Colored text/icon per bucket — a stat chip's number, an accordion row's
  *  chevron — matching DepartmentMembers.tsx's colored `color` token (label
  *  text stays neutral either way — only the value/icon carries the bucket
- *  color). Plain black in light mode / white in dark mode for
- *  Completed/Pending (2026-08-25, user feedback, two rounds: first that the
- *  tinted emerald-300/red-300 numbers were hard to read against their own
- *  now-solid dark-900 chip backgrounds in dark mode, then that the tinted
- *  emerald-700/red-600 numbers should go plain black in light mode too, for
- *  the same high-contrast-over-color reason). N/A is still the one
- *  exception, needing dark, NEUTRAL (not yellow — see below) text in BOTH
- *  modes to pair with BUCKET_TINT.na's pale fill above (white text there
- *  would be unreadable). NEUTRAL gray, not a dark yellow shade (2026-08-25
- *  — user feedback: yellow-800/900 TEXT reads exactly as brown/muddy as
- *  yellow-900 BACKGROUNDS did, same colorimetric limit, just moved from the
- *  fill to the text) — plain gray-900 gives the same contrast against the
- *  pale yellow fill without carrying a hue at all; happens to be the exact
- *  same value Completed/Pending's own light-mode black now uses too. */
+ *  color). Plain black in BOTH modes now (2026-08-26) — since BUCKET_TINT
+ *  above is the same pale shade in both modes too, white text (the old
+ *  dark-mode treatment, from when the chip itself was dark) would now be
+ *  unreadable against it; black is simply BUCKET_TINT.na's own existing
+ *  treatment extended to every bucket, since every bucket's background is
+ *  now exactly as pale as N/A's always was. */
 export const BUCKET_TEXT: Record<BucketKey, string> = {
-  completed: "text-gray-900 dark:text-white",
-  pending: "text-gray-900 dark:text-white",
+  completed: "text-gray-900",
+  pending: "text-gray-900",
   na: "text-gray-900",
 };
 export const BUCKET_SOLID: Record<BucketKey, string> = {
@@ -135,13 +134,11 @@ export const BUCKET_SOLID: Record<BucketKey, string> = {
   pending: "bg-red-400",
   na: "bg-yellow-400",
 };
-/** Total's own tint/text — purple. Solid dark-mode background (violet-900),
- *  same reasoning as BUCKET_TINT above; light mode bumped to violet-300
- *  alongside it (2026-08-25, same "too light" feedback). Text is plain
- *  black in light mode / white in dark mode (2026-08-25), same readability
- *  fix as BUCKET_TEXT's completed/pending above. */
-export const TOTAL_TINT = "bg-violet-300 dark:bg-violet-900";
-export const TOTAL_TEXT = "text-gray-900 dark:text-white";
+/** Total's own tint/text — purple. Same shade in both themes (2026-08-26),
+ *  same reasoning as BUCKET_TINT above; text stays plain black in both
+ *  modes too, same reasoning as BUCKET_TEXT above. */
+export const TOTAL_TINT = "bg-violet-300";
+export const TOTAL_TEXT = "text-gray-900";
 
 /** Small calendar glyph — pairs with a date wherever a task shows one. */
 export function CalendarIcon({ className = "size-3" }: { className?: string }) {
@@ -2313,20 +2310,33 @@ function BulkActionsButton({
   const [busy, setBusy] = React.useState(false);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !(menuRef.current && menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -2362,37 +2372,62 @@ function BulkActionsButton({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Bulk actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
         disabled={busy || disabled}
         onClick={() => {
           setErrorText(null);
-          setOpen((o) => !o);
+          setOpen((o) => {
+            const next = !o;
+            if (next && triggerRef.current) {
+              // Portal to <body> with a computed fixed position (2026-08-26
+              // fix) — same rationale as RowActionsMenu's own menu just
+              // above: this button can sit inside a scrolling/clipped card
+              // body (ResizableTaskList's hideCompleted groups, the
+              // SectionCard wrapper around "CEO Assigned Task"/"Tasks I
+              // Assigned"), which clipped/mispositioned the old plain
+              // `absolute` dropdown instead of floating it over the row.
+              const rect = triggerRef.current.getBoundingClientRect();
+              const MENU_HEIGHT_ESTIMATE = actions.length * 32 + 12;
+              const fitsBelow = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight;
+              const top = fitsBelow ? rect.bottom + 4 : Math.max(8, rect.top - MENU_HEIGHT_ESTIMATE - 4);
+              setMenuPos({ top, left: rect.right - 176 });
+            }
+            return next;
+          });
         }}
         className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
         {busy ? "Updating…" : `(${count}) ▾`}
       </button>
       {errorText && <InlineActionError text={errorText} />}
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
-        >
-          {actions.map((a) => (
-            <button
-              key={a.key}
-              type="button"
-              role="menuitem"
-              onClick={() => run(a.onRun)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {a.icon}
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+          >
+            {actions.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                role="menuitem"
+                onClick={() => run(a.onRun)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {a.icon}
+                {a.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -2499,10 +2534,15 @@ export function ResizableTaskList({
   reassignAnyOwner?: boolean;
   /** Starting Task-column width before any drag (2026-08-15) — defaults to
    *  RESIZABLE_TASK_NAME_DEFAULT (the original "My Tasks" page behavior,
-   *  unchanged) when omitted. Callers with a wider available row (no
-   *  Assignee/Due columns eating space, e.g. EntityCardOverview's own-card
-   *  myWeek/myMonth tab body) can start the divider further right instead
-   *  of always opening at the same narrow default. Still fully draggable
+   *  unchanged) when omitted. Callers with a wider available row (e.g. no
+   *  Assignee column, EntityCardOverview's own-card myWeek/myMonth tab
+   *  body) can start the divider further right instead of always opening
+   *  at the same narrow default — but keep in mind blankDueDate does NOT
+   *  free up its column's width, only its displayed value (the
+   *  DUE_COL_WIDTH spacer stays reserved either way, for row alignment);
+   *  a caller combining blankDueDate with a wide defaultNameWidth can still
+   *  overflow a narrower viewport (2026-08-26 fix: myWeek/myMonth's own
+   *  400 did exactly this, trimmed to 260). Still fully draggable
    *  afterward within RESIZABLE_TASK_NAME_MIN/MAX either way. */
   defaultNameWidth?: number;
 }) {
@@ -3403,6 +3443,43 @@ export function EntityDrillModal({
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [reassignRow, setReassignRow] = React.useState<string | null>(null);
 
+  // Main task <-> subtask tree (2026-08-29, user request — subtasks were
+  // rendered as their own flat, same-level rows here, unlike every OTHER
+  // task list in the app (ResizableTaskList's own tree), so a task with
+  // several subtasks looked like several unrelated tasks). `tasks[bucketKey]`
+  // is already filtered to ONE status bucket, and a subtask's status is
+  // independent of its parent's — so a subtask only nests here when its
+  // PARENT happens to land in this SAME bucket too (both share this
+  // bucket's status); otherwise there's no parent row in this list to nest
+  // under, and it stays a plain top-level row, same as before. EXPANDED by
+  // default (collapsedParentIds tracks the exceptions) — same convention
+  // ResizableTaskList's own parent/child tree already uses, so a task with
+  // subtasks doesn't visually shrink when this feature first landed.
+  const [collapsedParentIds, setCollapsedParentIds] = React.useState<Set<string>>(new Set());
+  const toggleParentExpand = (id: string) =>
+    setCollapsedParentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const { topLevelRows, childrenOf } = React.useMemo(() => {
+    const allIds = new Set(rows.map((r) => r.runBlockId));
+    const children = new Map<string, FlowDrillTask[]>();
+    for (const r of rows) {
+      if (r.parentId && allIds.has(r.parentId)) {
+        const kids = children.get(r.parentId);
+        if (kids) kids.push(r);
+        else children.set(r.parentId, [r]);
+      }
+    }
+    for (const kids of children.values()) {
+      kids.sort((a, b) => (a.subtaskOrder ?? Number.MAX_SAFE_INTEGER) - (b.subtaskOrder ?? Number.MAX_SAFE_INTEGER));
+    }
+    const top = rows.filter((r) => !r.parentId || !allIds.has(r.parentId));
+    return { topLevelRows: top, childrenOf: children };
+  }, [rows]);
+
   const ownedRows = rows.filter((t) => myUserId && t.assigneeId === myUserId);
   const allOwnedSelected = ownedRows.length > 0 && ownedRows.every((t) => selectedIds.has(t.runBlockId));
   const toggleSelect = (id: string) => {
@@ -3488,6 +3565,122 @@ export function EntityDrillModal({
   const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
   const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedDueDay);
 
+  /** One row — a main task (optionally with an expand/collapse chevron +
+   *  subtask count when `tree.kind === "parent"`) or an indented subtask
+   *  (`tree.kind === "child"`). Same row content/actions either way; only
+   *  the leading chevron-or-indent differs. */
+  const renderDrillRow = (
+    t: FlowDrillTask,
+    opts: { tree?: { kind: "parent"; count: number; expanded: boolean; onToggle: () => void } | { kind: "child" } },
+  ) => {
+    const due = t.dueAt ? new Date(t.dueAt) : null;
+    const dueDisplay = formatDueDate(due);
+    const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
+    const canReassign = bucketKey === "pending" && Boolean(reassign);
+    return (
+      <div
+        key={t.runBlockId}
+        className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
+      >
+        <div className="flex items-center gap-2.5">
+          {opts.tree?.kind === "parent" ? (
+            <button
+              type="button"
+              onClick={opts.tree.onToggle}
+              aria-expanded={opts.tree.expanded}
+              aria-label={opts.tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
+              className="flex shrink-0 items-center gap-0.5 text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
+            >
+              <ChevronIcon expanded={opts.tree.expanded} className="size-3.5" />
+              <span className="text-[10px] font-semibold">{opts.tree.count}</span>
+            </button>
+          ) : (
+            opts.tree?.kind === "child" && <span className="w-4 shrink-0" aria-hidden />
+          )}
+          {isOwned && (
+            <input
+              type="checkbox"
+              checked={selectedIds.has(t.runBlockId)}
+              onChange={() => toggleSelect(t.runBlockId)}
+              aria-label={`Select ${t.blockTitle}`}
+              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
+            />
+          )}
+          <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate text-sm font-semibold ${
+                t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
+              }`}
+            >
+              {t.blockTitle}
+            </p>
+            {!isOwned && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
+            )}
+            {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
+                show who assigned them (assigner cards / personal
+                donut drills); rows about other people keep the
+                assignee line above instead. */}
+            {isOwned && t.assignerName && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">
+                Assigned by {t.assignerName}
+              </p>
+            )}
+          </div>
+          {/* Assignee avatar (2026-08-22, ClickUp-style reference)
+              — initials on a per-person color, same InitialAvatar
+              every other assignee chip in the app already uses
+              (no photo data exists to show a real picture). Shown
+              on every row, own or not, matching the reference's
+              per-row avatar regardless of ownership. */}
+          <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
+          {/* Proof (2026-07-30): ＋ upload on the viewer's own
+              rows, 📎 view for anyone once uploaded. Only takes
+              space when actionable/present — the modal is too
+              narrow for a dash placeholder column. */}
+          {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
+            <ProofCell
+              task={t}
+              isOwned={isOwned}
+              onUploadProof={onUploadProof}
+              onRemoveProof={onRemoveProof}
+            />
+          )}
+          {dueDisplay && (
+            <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+          )}
+          {canReassign && (
+            <button
+              type="button"
+              onClick={() =>
+                setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
+              }
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                reassignRow === t.runBlockId
+                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                  : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-900"
+              }`}
+            >
+              Assign to Others
+            </button>
+          )}
+        </div>
+        {canReassign && reassign && reassignRow === t.runBlockId && (
+          <ReassignPicker
+            staff={reassign.staff}
+            currentAssigneeId={t.assigneeId}
+            onPick={async (userId) => {
+              const r = await reassign.action(t.runBlockId, userId);
+              if (r.ok) setReassignRow(null);
+              return r;
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
@@ -3541,98 +3734,21 @@ export function EntityDrillModal({
               <span>Due date</span>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-slate-800">
-            {rows.map((t) => {
-              const due = t.dueAt ? new Date(t.dueAt) : null;
-              const dueDisplay = formatDueDate(due);
-              const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
-              const canReassign = bucketKey === "pending" && Boolean(reassign);
+            {topLevelRows.map((t) => {
+              const kids = childrenOf.get(t.runBlockId) ?? [];
+              const expanded = !collapsedParentIds.has(t.runBlockId);
               return (
-                <div
-                  key={t.runBlockId}
-                  className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
-                >
-                  <div className="flex items-center gap-2.5">
-                    {isOwned && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(t.runBlockId)}
-                        onChange={() => toggleSelect(t.runBlockId)}
-                        aria-label={`Select ${t.blockTitle}`}
-                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
-                      />
-                    )}
-                    <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-semibold ${
-                          t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
-                        }`}
-                      >
-                        {t.blockTitle}
-                      </p>
-                      {!isOwned && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
-                      )}
-                      {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
-                          show who assigned them (assigner cards / personal
-                          donut drills); rows about other people keep the
-                          assignee line above instead. */}
-                      {isOwned && t.assignerName && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">
-                          Assigned by {t.assignerName}
-                        </p>
-                      )}
-                    </div>
-                    {/* Assignee avatar (2026-08-22, ClickUp-style reference)
-                        — initials on a per-person color, same InitialAvatar
-                        every other assignee chip in the app already uses
-                        (no photo data exists to show a real picture). Shown
-                        on every row, own or not, matching the reference's
-                        per-row avatar regardless of ownership. */}
-                    <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
-                    {/* Proof (2026-07-30): ＋ upload on the viewer's own
-                        rows, 📎 view for anyone once uploaded. Only takes
-                        space when actionable/present — the modal is too
-                        narrow for a dash placeholder column. */}
-                    {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
-                      <ProofCell
-                        task={t}
-                        isOwned={isOwned}
-                        onUploadProof={onUploadProof}
-                        onRemoveProof={onRemoveProof}
-                      />
-                    )}
-                    {dueDisplay && (
-                      <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
-                    )}
-                    {canReassign && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
-                        }
-                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                          reassignRow === t.runBlockId
-                            ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300"
-                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-900"
-                        }`}
-                      >
-                        Assign to Others
-                      </button>
-                    )}
-                  </div>
-                  {canReassign && reassign && reassignRow === t.runBlockId && (
-                    <ReassignPicker
-                      staff={reassign.staff}
-                      currentAssigneeId={t.assigneeId}
-                      onPick={async (userId) => {
-                        const r = await reassign.action(t.runBlockId, userId);
-                        if (r.ok) setReassignRow(null);
-                        return r;
-                      }}
-                    />
-                  )}
-                </div>
+                <React.Fragment key={t.runBlockId}>
+                  {renderDrillRow(t, {
+                    tree:
+                      kids.length > 0
+                        ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleParentExpand(t.runBlockId) }
+                        : undefined,
+                  })}
+                  {kids.length > 0 &&
+                    expanded &&
+                    kids.map((k) => renderDrillRow(k, { tree: { kind: "child" } }))}
+                </React.Fragment>
               );
             })}
             </div>

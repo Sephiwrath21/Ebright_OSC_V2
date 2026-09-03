@@ -287,6 +287,15 @@ export function MonthRangeDropdown({
   );
 }
 
+/** Last-selection persistence (2026-08-26, user request) — same per-user
+ *  localStorage convention CardModeProvider/EntityCardOverview's "Only Me"
+ *  toggle already use (keyed by userId, restored on the next visit, not
+ *  synced across devices/browsers). Keyed by `param` too (department vs
+ *  branch are independent pickers, each remembers its own last pick). */
+function entityPickerStorageKey(param: string, userId: string): string {
+  return `tm-entitypicker-${param}-${userId}`;
+}
+
 export function EntityPicker({
   label,
   value,
@@ -295,6 +304,8 @@ export function EntityPicker({
   basePath,
   extraParams = {},
   boldValues,
+  userId,
+  hasExplicitValue,
 }: {
   label: string;
   value: string;
@@ -310,12 +321,46 @@ export function EntityPicker({
    *  they're mixed in among. Plain <option> font-weight — supported
    *  cross-browser (unlike most other <option> styling). */
   boldValues?: readonly string[];
+  /** The viewer's own user id — last-selection persistence's storage key.
+   *  Omit to opt this picker instance out of persistence entirely (falls
+   *  back to the original stateless behavior). */
+  userId?: string;
+  /** Whether `value` came from an explicit, still-valid ?department=/
+   *  ?branch= in the URL, as opposed to the page's own "account's own
+   *  department"/"first branch" fallback default (2026-08-26). Only an
+   *  EXPLICIT value gets written to storage — writing the server's own
+   *  fallback default on every mount would immediately clobber whatever
+   *  the viewer had previously picked, defeating the whole feature. When
+   *  false (no explicit URL value) and a stored pick exists, this picker
+   *  redirects to it once on mount — that redirect then arrives as an
+   *  explicit value on the next render, closing the loop. */
+  hasExplicitValue?: boolean;
 }) {
   const router = useRouter();
   const navigate = (v: string) => {
+    if (userId) window.localStorage.setItem(entityPickerStorageKey(param, userId), v);
     const qs = new URLSearchParams({ ...extraParams, [param]: v });
     router.push(`${basePath}?${qs.toString()}`);
   };
+  React.useEffect(() => {
+    if (!userId) return;
+    if (hasExplicitValue) {
+      // A real URL selection — this is the freshest "last pick", persist it
+      // (covers a bookmarked/shared link too, not just picking from the
+      // dropdown itself).
+      window.localStorage.setItem(entityPickerStorageKey(param, userId), value);
+      return;
+    }
+    // No explicit URL value — the page fell back to its own default.
+    // Restore the viewer's remembered pick instead, once, if it's still a
+    // valid option.
+    const stored = window.localStorage.getItem(entityPickerStorageKey(param, userId));
+    const isValidOption = stored != null && groups.some((g) => g.options.includes(stored));
+    if (isValidOption && stored !== value) navigate(stored);
+    // Mount-only: re-running on every value change would fight the
+    // viewer's own subsequent picks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const optionStyle = (o: string): React.CSSProperties | undefined =>
     boldValues?.includes(o) ? { fontWeight: 700 } : undefined;
 

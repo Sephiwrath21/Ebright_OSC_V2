@@ -57,6 +57,7 @@ import {
   type PersonCard,
 } from "./entity-card-grouping";
 import {
+  ACCORDION_BUCKET_ORDER,
   BUCKET_META,
   BUCKET_SOLID,
   BUCKET_TEXT,
@@ -90,8 +91,18 @@ type SortMode = "person" | "type";
  *  width for a card even when there's only 1-2 cards to show (e.g. "Only
  *  Me") — starving the card's task titles of width they don't need to
  *  share with anyone (2026-08-15). Literal class strings (not a template
- *  string) so Tailwind's static scanner can still find them. */
-function cardGridClass(count: number): string {
+ *  string) so Tailwind's static scanner can still find them.
+ *  `pie` (2026-08-26, user feedback — image comparison: "Only Me" in Pie
+ *  mode stretched to full width, while a multi-card Pie grid's cards stay
+ *  compact) overrides the count-based sizing entirely: Pie cards ALWAYS
+ *  use the same responsive column template regardless of count, so a lone
+ *  one sizes exactly like one column of a multi-card grid instead of
+ *  stretching. List mode keeps its own per-count sizing unchanged — that
+ *  full-width-when-alone behavior was a deliberate, separate, already-
+ *  requested feature for List's wide task-title rows, which Pie cards
+ *  don't have. */
+function cardGridClass(count: number, pie: boolean): string {
+  if (pie) return "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3";
   if (count <= 1) return "grid grid-cols-1 gap-4";
   if (count === 2) return "grid grid-cols-1 gap-4 sm:grid-cols-2";
   return "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3";
@@ -134,17 +145,24 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
   const [drill, setDrill] = React.useState<BucketKey | null>(null);
 
   const { totals, byBucket } = React.useMemo(() => {
+    // byBucket keeps EVERY task, including subtasks — the drill modal
+    // still lists/lets you complete them individually, same as ClickUp's
+    // own expandable checklist. totals is the donut/percentage's own
+    // count and does NOT count subtasks separately (2026-08-29, user
+    // report — a parent with 5 subtasks was inflating this card's total
+    // from 9 to 14, dragging 89% down to 57%): only top-level tasks
+    // (parentId null/undefined) are tallied, matching the same rule
+    // countBuckets/groupByDimension/buildEntityPayload already apply
+    // server-side for every OTHER donut in the app — this is the one card
+    // that computed its own totals client-side instead of receiving them
+    // pre-computed, so it needed the identical guard added by hand.
     const buckets: Record<BucketKey, FlowDrillTask[]> = { completed: [], pending: [], na: [] };
+    const bucketTotals: FlowBucketTotals = { completed: 0, pending: 0, na: 0 };
     for (const t of card.tasks) {
-      if (t.status === "DONE") buckets.completed.push(t);
-      else if (t.status === "SKIPPED") buckets.na.push(t);
-      else buckets.pending.push(t);
+      const key: BucketKey = t.status === "DONE" ? "completed" : t.status === "SKIPPED" ? "na" : "pending";
+      buckets[key].push(t);
+      if (t.parentId == null) bucketTotals[key] += 1;
     }
-    const bucketTotals: FlowBucketTotals = {
-      completed: buckets.completed.length,
-      pending: buckets.pending.length,
-      na: buckets.na.length,
-    };
     return { totals: bucketTotals, byBucket: buckets };
   }, [card.tasks]);
 
@@ -158,46 +176,55 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
       </StatusDonut>
 
       <div className="grid w-full grid-cols-4 gap-1.5">
-        {BUCKET_META.map((b) => (
-          <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
-            <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
-            {/* N/A's fill stays pale in both modes (BUCKET_TINT's own doc
-                comment) — its label needs dark, NEUTRAL (not yellow — same
-                brown-reading problem as a dark yellow fill, see
-                BUCKET_TEXT.na's doc comment) text in both modes too,
-                instead of the other buckets' light-in-dark-mode slate. */}
-            <div className={`text-[10px] font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}>
-              {b.label}
+        {ACCORDION_BUCKET_ORDER.map((key) => {
+          const b = BUCKET_META.find((m) => m.key === key)!;
+          return (
+            <div key={b.key} className={`rounded-lg px-1 py-1.5 text-center ${BUCKET_TINT[b.key]}`}>
+              <div className={`text-sm font-bold ${BUCKET_TEXT[b.key]}`}>{totals[b.key]}</div>
+              {/* BUCKET_TINT is the same pale shade in both modes for every
+                  bucket now (2026-08-26) — the label text is just plain
+                  black, unconditionally, no dark: override needed. */}
+              <div className="text-[10px] font-medium text-gray-900">{b.label}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div className={`rounded-lg px-1 py-1.5 text-center ${TOTAL_TINT}`}>
           <div className={`text-sm font-bold ${TOTAL_TEXT}`}>{total}</div>
-          <div className="text-[10px] font-medium text-gray-900 dark:text-white">Total</div>
+          <div className="text-[10px] font-medium text-gray-900">Total</div>
         </div>
       </div>
 
       <div className="flex w-full flex-col gap-1.5">
-        {BUCKET_META.map((b) => (
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => setDrill(b.key)}
-            className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left ${BUCKET_TINT[b.key]}`}
-          >
-            <span
-              className={`flex items-center gap-2 text-sm font-medium text-gray-900 ${b.key === "na" ? "" : "dark:text-white"}`}
+        {ACCORDION_BUCKET_ORDER.map((key) => {
+          const b = BUCKET_META.find((m) => m.key === key)!;
+          return (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setDrill(b.key)}
+              className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left ${BUCKET_TINT[b.key]}`}
             >
-              <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
-              {b.label}
-            </span>
-            <span
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
-            >
-              {byBucket[b.key].length}
-            </span>
-          </button>
-        ))}
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                <ChevronIcon expanded={false} className={`size-3.5 ${BUCKET_TEXT[b.key]}`} />
+                {b.label}
+              </span>
+              <span
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-gray-900 ${BUCKET_SOLID[b.key]}`}
+              >
+                {/* totals[b.key], NOT byBucket[b.key].length (2026-08-29
+                    fix) — byBucket keeps subtasks for the drill modal's own
+                    list (clicking still opens it via setDrill below,
+                    unchanged), but the badge itself must match the top
+                    stat-chip row, which already excludes them. This was
+                    the second of two spots in this card with the same
+                    stale-count bug — the stat chips read `totals` and were
+                    already correct; this badge still read the raw
+                    (subtask-inclusive) array length. */}
+                {totals[b.key]}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {drill && (
@@ -560,6 +587,7 @@ export function EntityCardOverview({
       className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
             {/* Empty entityName (2026-08-15, myOverview's own sections) omits
                 the "X — " prefix entirely — printing just "Daily"/"Monthly"
@@ -573,8 +601,11 @@ export function EntityCardOverview({
                 plain heading now, same as every other section. */}
             {entityName ? `${entityName} — ${sectionLabel}` : sectionLabel}
           </h2>
-        <div className="flex flex-wrap items-center gap-2">
+          {/* Moved here from the right-side controls (2026-08-26, user
+              feedback) — sits right after the heading now, on the left. */}
           {dateControl}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
@@ -639,7 +670,7 @@ export function EntityCardOverview({
       </div>
 
       {(sortMode === "person" ? (
-        <div className={cardGridClass(personCards.length)}>
+        <div className={cardGridClass(personCards.length, cardMode === "donut")}>
           {personCards.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">No one to show.</p>
           ) : (
@@ -740,7 +771,19 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
-                            defaultNameWidth={400}
+                            // Trimmed from 400 (2026-08-26, user report — some
+                            // viewers saw an unwanted horizontal scrollbar just
+                            // to complete a task). 400 was sized on the
+                            // (mistaken) assumption that blankDueDate frees up
+                            // its column's width — it doesn't, the DUE_COL_WIDTH
+                            // spacer stays reserved (empty) for row alignment,
+                            // so the real total (checkbox + status + 400 Task +
+                            // Proof 96 + blank Due 120 + Reassign 112 + gaps) ran
+                            // past the available width on anything narrower than
+                            // a wide desktop monitor, alongside this tab list's
+                            // own 128px sidebar. Still fully draggable up to
+                            // RESIZABLE_TASK_NAME_MAX afterward.
+                            defaultNameWidth={260}
                           />
                         )}
                       </div>
@@ -797,7 +840,19 @@ export function EntityCardOverview({
                             hideAssignee
                             blankDueDate
                             reassign={reassign}
-                            defaultNameWidth={400}
+                            // Trimmed from 400 (2026-08-26, user report — some
+                            // viewers saw an unwanted horizontal scrollbar just
+                            // to complete a task). 400 was sized on the
+                            // (mistaken) assumption that blankDueDate frees up
+                            // its column's width — it doesn't, the DUE_COL_WIDTH
+                            // spacer stays reserved (empty) for row alignment,
+                            // so the real total (checkbox + status + 400 Task +
+                            // Proof 96 + blank Due 120 + Reassign 112 + gaps) ran
+                            // past the available width on anything narrower than
+                            // a wide desktop monitor, alongside this tab list's
+                            // own 128px sidebar. Still fully draggable up to
+                            // RESIZABLE_TASK_NAME_MAX afterward.
+                            defaultNameWidth={260}
                           />
                         )}
                       </div>
@@ -995,7 +1050,7 @@ export function EntityCardOverview({
           )}
         </div>
       ) : (
-        <div ref={typeGridRef} className={cardGridClass(categoryCards.length)}>
+        <div ref={typeGridRef} className={cardGridClass(categoryCards.length, false)}>
           {categoryCards.map((card) => {
             // groupByStatus (2026-08-19): pending-first, Completed/N-A
             // hidden unless the section's own "Show Completed" master

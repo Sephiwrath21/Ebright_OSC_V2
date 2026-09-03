@@ -291,6 +291,34 @@ export async function assignFlowTaskCore(
   }
   const templateId = body.fromTemplateId ?? savedTemplateId ?? null;
 
+  // Un-exclude on re-assign (2026-08-28, user decision — made PER-WEEKDAY
+  // 2026-08-29 alongside removeTemplateAssigneeCore itself — see that
+  // function's own doc comment for the bug this closes the loop on): a
+  // TaskTemplateExcludedAssignee row never cleared itself once written, so
+  // a manager who removed someone and later explicitly re-assigned them
+  // the SAME template's task on the SAME weekday was fighting a silent,
+  // permanent block — the fresh task would itself never auto-recur past
+  // its own due date, forcing them to keep manually re-assigning it every
+  // few days forever (this is exactly what was happening to Teh Yee
+  // Qian's "OD - INT YQ" task from 22/8 onward). An explicit "Assign"
+  // action is a deliberate decision to put this person back on this task
+  // on the day(s) being assigned, so it now clears any stale exclusion for
+  // (templateId, each target, each of body.days) BEFORE creating the new
+  // blocks — the person shows up in "View Assignees" again and future
+  // occurrences of THAT weekday resume auto-recurring normally; an
+  // exclusion on some OTHER weekday of the same template (not part of this
+  // assignment) is left alone. Every assignment path funnels through here
+  // (the "+ Task" quick form, Template/Package Group Assign via
+  // applyTemplateGroup, Branch Package Schedule), so this one place covers
+  // all of them. A no-op when there's no template link (templateId null)
+  // or this assignment has no weekday concept (body.days empty — a
+  // one-off dueDate/monthRanges/undated assignment) — nothing to un-exclude.
+  if (templateId && body.days.length > 0) {
+    await prisma.taskTemplateExcludedAssignee.deleteMany({
+      where: { templateId, userId: { in: targets.map((t) => t.id) }, weekday: { in: body.days } },
+    });
+  }
+
   // Pairs touch disjoint rows — no shared transaction ties them together
   // (each create was already its own implicit transaction in the donor's
   // loop form), so they run concurrently on purpose. Do not "fix" into a
