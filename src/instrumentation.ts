@@ -23,6 +23,9 @@ const STAGE_TRANSITION_SWEEP_MS = 60 * 60 * 1000; // hourly — same reasoning a
 // whatever time the container last restarted.
 const SMS_STAFF_SYNC_TICK_MS = 60 * 60 * 1000;
 const SMS_STAFF_SYNC_HOUR_KL = 2;
+// Students follow the staff sweep an hour later, so the two never contend for
+// the same ebrightsms instance and their log lines stay easy to tell apart.
+const SMS_STUDENT_SYNC_HOUR_KL = 3;
 
 // Disabled per explicit decision — Onboarding -> Active and Probation ->
 // next-stage should only happen via the manual "Next" button for now, not
@@ -285,6 +288,69 @@ export async function register(): Promise<void> {
     );
     setInterval(() => {
       void smsStaffSyncSweep();
+    }, SMS_STAFF_SYNC_TICK_MS);
+  }
+
+  // ebrightsms student sync — pushes children enrolled in CNS into the student
+  // management system (see smsStudentSync.ts). Same shape as the staff sweep
+  // above, and off entirely unless configured.
+  //
+  // SMS_STUDENT_SYNC_SINCE is required and has no default on purpose: the CRM
+  // report holds enrolments back to May 2026, and some of those children were
+  // already loaded into ebrightsms from the leads database in September, so
+  // there is no safe "everything" starting point. Set it to the moment this
+  // sync goes live and only later records are ever offered.
+  let smsStudentSyncLastDay: string | null = boot.hour >= SMS_STUDENT_SYNC_HOUR_KL ? boot.day : null;
+
+  const smsStudentSyncSweep = async () => {
+    const { day, hour } = klNow();
+    if (day === smsStudentSyncLastDay || hour < SMS_STUDENT_SYNC_HOUR_KL) return;
+    smsStudentSyncLastDay = day;
+
+    try {
+      const { runSmsStudentSync } = await import("@/lib/smsStudentSync");
+      const { records, skipped, outcome } = await runSmsStudentSync({
+        apply: true,
+        since: new Date(process.env.SMS_STUDENT_SYNC_SINCE as string),
+      });
+      console.log(
+        `[sms-student-sync] ${records.length} sent — created ${outcome?.created ?? 0}, ` +
+          `already linked ${outcome?.updated ?? 0}, failed ${outcome?.failures.length ?? 0}; ${skipped.length} skipped`,
+      );
+      // Every failure here is a record a human has to look at — most often a
+      // child whose name already exists at that branch, which the receiver
+      // refuses rather than duplicating.
+      for (const failure of outcome?.failures ?? []) {
+        console.warn(`[sms-student-sync] rejected ${failure.externalId}: ${failure.error}`);
+      }
+      for (const student of skipped) {
+        console.warn(`[sms-student-sync] needs fixing in CNS: ${student.externalId} (${student.stage}) — ${student.reason}`);
+      }
+    } catch (err) {
+      console.warn(
+        `[sms-student-sync] sweep failed (will retry tomorrow): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  };
+
+  const studentSyncSince = process.env.SMS_STUDENT_SYNC_SINCE;
+  const studentSyncSinceValid =
+    Boolean(studentSyncSince) && !Number.isNaN(new Date(studentSyncSince as string).getTime());
+
+  if (!process.env.SMS_BASE_URL || !process.env.SMS_STUDENT_SYNC_API_KEY || !studentSyncSinceValid) {
+    console.log(
+      "[sms-student-sync] SMS_BASE_URL / SMS_STUDENT_SYNC_API_KEY / SMS_STUDENT_SYNC_SINCE not all set" +
+        `${studentSyncSince && !studentSyncSinceValid ? " (SMS_STUDENT_SYNC_SINCE is not a valid date)" : ""}` +
+        " — nightly student sync disabled",
+    );
+  } else {
+    console.log(
+      `[sms-student-sync] nightly sweep armed for ` +
+        `${String(SMS_STUDENT_SYNC_HOUR_KL).padStart(2, "0")}:00 Asia/Kuala_Lumpur, ` +
+        `taking records verified after ${new Date(studentSyncSince as string).toISOString()}`,
+    );
+    setInterval(() => {
+      void smsStudentSyncSweep();
     }, SMS_STAFF_SYNC_TICK_MS);
   }
 }
