@@ -2,11 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
 import OverdueDot from "@/app/components/OverdueDot";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { EMPLOYEE_RECORD_CATEGORIES, type RecordCategory } from "@/lib/employeeRecordConfig";
 import { STAGE_LABELS, type EmployeeStage } from "@/lib/employeeStages";
+import { profileUrlForStage } from "@/lib/stageProfileConfig";
+import { proceedFromPreStage, proceedFromOnboarding, proceedFromActive } from "@/lib/employeeRecordActions";
 import {
   PanelHeading,
   Subsection,
@@ -313,8 +317,20 @@ interface Props {
   basePath?: string;
   /** Final breadcrumb crumb's text (defaults to "Employee Record", today's
    *  exact copy) — e.g. "Pre" for the embedded Pre-stage usage, since
-   *  someone in Pre isn't a confirmed "Employee Record" yet. */
+   *  someone in Pre isn't a confirmed "Employee Record" yet. As of
+   *  2026-08-28 (see conversation) this is usually the employee's own name
+   *  instead — breadcrumbMiddle below carries the stage/location crumbs
+   *  that used to be implied by this being a stage word. */
   breadcrumbLabel?: string;
+  /** Linked crumbs between "Home" and the final breadcrumbLabel crumb
+   *  (2026-08-28, see conversation) — reflects the actual navigation
+   *  structure a viewer would take to reach this profile (Employee Overview
+   *  → stage → branch/department), not a fixed label. Defaults to the
+   *  single "Employee Overview" crumb, today's exact prior behavior, for any
+   *  caller that doesn't override it (e.g. the generic /employee-record/[id]
+   *  route for most viewers, which was never reached via that drill-down in
+   *  the first place). */
+  breadcrumbMiddle?: { label: string; href: string }[];
   /** Section keys to show a small red dot next to (2026-08-26, see
    *  conversation) — the caller's own "newly introduced at this stage AND
    *  still empty" computation; this component stays agnostic to what
@@ -334,6 +350,17 @@ interface Props {
    *  (default) suppresses nothing — real /employee-record/[id] page's exact
    *  current behavior, unaffected. */
   dotCategoryOnlyKeys?: Set<string>;
+  /** "Proceed"/"Next"/"Exit" advance-to-next-stage button (2026-08-28, see
+   *  conversation) — ported from StageProfileView.tsx's original
+   *  implementation for the 3 stages (Pre/Onboarding/Active) this page now
+   *  handles in place of that one. Probation has its own Confirm/Extend/Stop
+   *  decision instead (see canDecideProbation) and Exit is terminal — both
+   *  omit this prop entirely, same as a dual-listed Onboarding+Probation
+   *  Full Time person (the caller's own showProceedButton-equivalent check).
+   *  undefined (default) shows nothing — the real /employee-record/[id] page
+   *  never passes this, since progressing through stages isn't a concept
+   *  there. */
+  proceedButton?: { label: string; targetStage: EmployeeStage };
 }
 
 export default function EmployeeRecordView({
@@ -389,9 +416,15 @@ export default function EmployeeRecordView({
   categoryNavigationMode = "route",
   basePath = `/employee-record/${employeeId}`,
   breadcrumbLabel = "Employee Record",
+  breadcrumbMiddle = [{ label: "Employee Overview", href: "/employee-folder" }],
   dotSectionKeys,
   dotCategoryOnlyKeys,
+  proceedButton,
 }: Props) {
+  const router = useRouter();
+  const [confirmingProceed, setConfirmingProceed] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
+  const [proceedNotice, setProceedNotice] = useState<string | null>(null);
   // Rollout categories (2026-08-13, see conversation) — each one's
   // sub-sections switch via this client-side state instead of navigating,
   // so an edit in progress on one survives visiting the others. Seeded from
@@ -460,27 +493,58 @@ export default function EmployeeRecordView({
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
           </Link>
-          <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <Link href="/employee-folder" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
-            Employee Overview
-          </Link>
+          {breadcrumbMiddle.map((crumb) => (
+            <span key={crumb.href} className="flex items-center gap-2">
+              <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
+              <Link href={crumb.href} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                {crumb.label}
+              </Link>
+            </span>
+          ))}
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <span className="text-slate-900 dark:text-slate-100 font-medium">{breadcrumbLabel}</span>
         </nav>
 
-        <div className="flex items-start gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-semibold text-lg flex items-center justify-center shrink-0">
-            {initialsFromName(employeeName)}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{employeeName}</h1>
-            {stage && stage !== "pre" && employeeCode && (
-              <span className="block text-xs text-slate-500 dark:text-slate-400">ID: {employeeCode}</span>
+        {/* Same grid-cols-[minmax(0,1fr)_210px] template the cat-tabs bar and
+            the card+rail row below both use (2026-08-28, see conversation —
+            the proceed button now aligns with the "Edit" button's own column,
+            not the far edge of the rail's 210px column). The avatar/name/
+            info/button row is the grid's only child, auto-placed into column
+            1 — its own ml-auto right-aligns the button to that column's
+            right edge, the same edge "Edit" sits on inside the card below. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_210px] [@media(hover:none)]:grid-cols-1 mb-4">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-semibold text-lg flex items-center justify-center shrink-0">
+              {initialsFromName(employeeName)}
+            </div>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{employeeName}</h1>
+              {stage && stage !== "pre" && employeeCode && (
+                <span className="block text-xs text-slate-500 dark:text-slate-400">ID: {employeeCode}</span>
+              )}
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                {departmentName ?? branchName ?? "--"} · {position || "--"}
+              </span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">{stage ? STAGE_LABELS[stage] : "--"}</span>
+            </div>
+
+            {proceedButton && (
+              <div className="ml-auto mr-8 mt-6 shrink-0 self-center">
+                <button
+                  type="button"
+                  disabled={proceeding}
+                  onClick={() => setConfirmingProceed(true)}
+                  className="min-h-9 rounded-[10px] px-4 text-sm font-semibold text-[#78350f] bg-[rgba(251,191,36,0.3)] border border-[rgba(251,191,36,0.5)] hover:bg-[rgba(251,191,36,0.45)] hover:border-[rgba(251,191,36,0.7)] transition-colors disabled:opacity-60"
+                >
+                  {proceeding ? "Proceeding…" : proceedButton.label}
+                </button>
+                {proceedNotice && (
+                  <div role="status" className="mt-2 max-w-[220px] rounded-lg border border-slate-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-600 shadow-sm">
+                    {proceedNotice}
+                  </div>
+                )}
+              </div>
             )}
-            <span className="block text-xs text-slate-500 dark:text-slate-400">
-              {departmentName ?? branchName ?? "--"} · {position || "--"}
-            </span>
-            <span className="block text-xs text-slate-500 dark:text-slate-400">{stage ? STAGE_LABELS[stage] : "--"}</span>
           </div>
         </div>
 
@@ -761,7 +825,7 @@ export default function EmployeeRecordView({
                   (!piSections.has("payment") || paymentInfo !== undefined)
                 ) {
                   return (
-                    <PageEditProvider>
+                    <PageEditProvider canEdit={canEdit}>
                       <PageEditMessageDialog />
                       <div className="mb-4 flex justify-end">
                         <PageEditToggleButton />
@@ -827,7 +891,7 @@ export default function EmployeeRecordView({
                   (!hrSections.has("handbook") || documentsInfo !== undefined)
                 ) {
                   return (
-                  <PageEditProvider>
+                  <PageEditProvider canEdit={canEdit}>
                     <PageEditMessageDialog />
                     <div className="mb-4 flex justify-end">
                       <PageEditToggleButton />
@@ -919,7 +983,7 @@ export default function EmployeeRecordView({
                   (!financeSections.has("tax-info") || payrollInfo !== undefined)
                 ) {
                   return (
-                    <PageEditProvider>
+                    <PageEditProvider canEdit={canEdit}>
                       <PageEditMessageDialog />
                       <div className="mb-4 flex justify-end">
                         <PageEditToggleButton />
@@ -979,7 +1043,7 @@ export default function EmployeeRecordView({
                 achievements !== undefined
               ) {
                 return (
-                  <PageEditProvider>
+                  <PageEditProvider canEdit={canEdit}>
                     <PageEditMessageDialog />
                     {/* Leave has no Edit/Save concept at all (see conversation)
                         -- hide the shared toggle while that sub-tab is showing,
@@ -1036,7 +1100,7 @@ export default function EmployeeRecordView({
                 financialSettlement !== undefined
               ) {
                 return (
-                  <PageEditProvider>
+                  <PageEditProvider canEdit={canEdit}>
                     <PageEditMessageDialog />
                     <div className="mb-4 flex justify-end">
                       <PageEditToggleButton />
@@ -1238,6 +1302,39 @@ export default function EmployeeRecordView({
           </nav>
         </div>
       </div>
+
+      {confirmingProceed && proceedButton && (
+        <ConfirmDialog
+          message={`Proceed ${employeeName || "this employee"} to ${STAGE_LABELS[proceedButton.targetStage]}?`}
+          onCancel={() => setConfirmingProceed(false)}
+          onConfirm={async () => {
+            setProceeding(true);
+            // Same 3-action mapping as StageProfileView.tsx's own original
+            // implementation — Probation and Exit never reach here at all
+            // (neither passes a proceedButton prop), so there's no branch
+            // for either.
+            const result =
+              stage === "pre"
+                ? await proceedFromPreStage(employeeId)
+                : stage === "onboarding"
+                  ? await proceedFromOnboarding(employeeId)
+                  : await proceedFromActive(employeeId);
+            setProceeding(false);
+            setConfirmingProceed(false);
+            if (!result.ok) {
+              setProceedNotice(result.error ?? "Failed to proceed.");
+              setTimeout(() => setProceedNotice(null), 5000);
+              return;
+            }
+            // Deliberately no router.refresh() here — this navigates to a
+            // DIFFERENT route (the employee's new stage), which already
+            // fetches fresh server data on its own (see StageProfileView.tsx's
+            // own identical comment, ported verbatim — this is the same
+            // race/stuck-page bug refresh() would reintroduce here).
+            router.push(profileUrlForStage(proceedButton.targetStage, employeeId));
+          }}
+        />
+      )}
     </div>
   );
 }

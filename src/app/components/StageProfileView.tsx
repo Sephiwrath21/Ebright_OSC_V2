@@ -687,7 +687,7 @@ export default function StageProfileView({
                     type="button"
                     disabled={proceeding}
                     onClick={() => setConfirmingProceed(true)}
-                    className="w-full min-h-11 rounded-[10px] bg-[#63f4aea8] text-[15px] font-bold text-[#17643c] hover:bg-[#63f4ae] transition-colors disabled:opacity-60"
+                    className="w-full min-h-11 rounded-[10px] text-[15px] font-bold text-[#78350f] bg-[rgba(251,191,36,0.3)] border border-[rgba(251,191,36,0.5)] hover:bg-[rgba(251,191,36,0.45)] hover:border-[rgba(251,191,36,0.7)] transition-colors disabled:opacity-60"
                   >
                     {proceeding ? "Proceeding…" : proceedButton.label}
                   </button>
@@ -724,7 +724,7 @@ export default function StageProfileView({
                 // sections. Guardian Info and the now-real Offer Letter
                 // panels added; Interview Assessment relabeled "Hiring Notes"
                 // (same component/data, no separate entry).
-                <PageEditProvider>
+                <PageEditProvider canEdit={canEdit}>
                   <PageEditMessageDialog />
                   <div className="mb-4 flex justify-end">
                     <PageEditToggleButton />
@@ -779,7 +779,7 @@ export default function StageProfileView({
                 // block is only Onboarding's OWN current tabs; a Pre/
                 // Probation history tab selected from this same page still
                 // falls through to resolvePanel below, unaffected.
-                <PageEditProvider>
+                <PageEditProvider canEdit={canEdit}>
                   <PageEditMessageDialog />
                   <div className="mb-4 flex justify-end">
                     <PageEditToggleButton />
@@ -825,7 +825,7 @@ export default function StageProfileView({
                 // Probation/Onboarding/Active history tile selected from this
                 // same page still falls through to resolvePanel below,
                 // unaffected.
-                <PageEditProvider>
+                <PageEditProvider canEdit={canEdit}>
                   <PageEditMessageDialog />
                   <div className="mb-4 flex justify-end">
                     <PageEditToggleButton />
@@ -908,7 +908,7 @@ export default function StageProfileView({
                 // Active's OWN current tabs; a Pre/Probation/Onboarding
                 // history tile selected from this same page still falls
                 // through to resolvePanel below, unaffected.
-                <PageEditProvider>
+                <PageEditProvider canEdit={canEdit}>
                   <PageEditMessageDialog />
                   {/* MC/Leave has no Edit/Save concept at all (see conversation)
                       -- hide the shared toggle while that sub-tab is showing,
@@ -1186,7 +1186,7 @@ function resolvePanel({
   // read/write permission is identical to before this wrapping.
   if (section.key === "personal-info" && employeeDetail) {
     return (
-      <PageEditProvider>
+      <PageEditProvider canEdit={canEdit}>
         <PageEditMessageDialog />
         <div className="mb-4 flex justify-end">
           <PageEditToggleButton />

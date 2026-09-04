@@ -18,8 +18,17 @@ const inputClass =
 // third options list.
 const BRANCH_POSITION_VALUES = ["PT COACH", "FT COACH", "INTERN", "BM"];
 const DEPARTMENT_POSITION_VALUES = ["FT EXEC", "FT HOD", "INTERN"];
+// Academy (department_code "ACD") breaks the branch/department split above —
+// it's a department that also has real Part Time Coaches (2026-09-04, see
+// conversation: Chow Chin Hui), unlike every other department, which is
+// genuinely HQ-side exec/HOD only. Adding "PT COACH" just for this one
+// department code rather than widening DEPARTMENT_POSITION_VALUES itself,
+// so every other department's own options stay exactly as they are.
+const ACADEMY_DEPARTMENT_CODE = "ACD";
+const ACADEMY_POSITION_VALUES = [...DEPARTMENT_POSITION_VALUES, "PT COACH"];
 const BRANCH_POSITION_OPTIONS = POSITION_OPTIONS.filter((o) => BRANCH_POSITION_VALUES.includes(o.value));
 const DEPARTMENT_POSITION_OPTIONS = POSITION_OPTIONS.filter((o) => DEPARTMENT_POSITION_VALUES.includes(o.value));
+const ACADEMY_POSITION_OPTIONS = POSITION_OPTIONS.filter((o) => ACADEMY_POSITION_VALUES.includes(o.value));
 
 interface Props {
   branches: BranchOpt[];
@@ -42,13 +51,16 @@ export default function AddPreStageEmployeeModal({ branches, departments }: Prop
   const [error, setError] = useState<string | null>(null);
 
   const isCeoDepartment = departmentCode === "CEO";
+  const isAcademyDepartment = departmentCode === ACADEMY_DEPARTMENT_CODE;
   const positionOptions = isCeoDepartment
     ? POSITION_OPTIONS.filter((o) => o.value === "CEO")
     : branchCode
       ? BRANCH_POSITION_OPTIONS
-      : departmentCode
-        ? DEPARTMENT_POSITION_OPTIONS
-        : [];
+      : isAcademyDepartment
+        ? ACADEMY_POSITION_OPTIONS
+        : departmentCode
+          ? DEPARTMENT_POSITION_OPTIONS
+          : [];
 
   function reset() {
     setFullName("");

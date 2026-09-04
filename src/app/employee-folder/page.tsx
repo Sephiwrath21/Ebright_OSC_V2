@@ -4,6 +4,7 @@ import AppShell from "@/app/components/AppShell";
 import EmployeeOverviewView from "@/app/components/EmployeeOverviewView";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 import { getEmployeeOverviewData } from "@/lib/careerApplicationSync";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,19 @@ export default async function EmployeeFolderPage() {
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
 
+  // CEO-only "view my own profile" shortcut (2026-08-28, see conversation) —
+  // fresh DB lookup, not session.user.role, same reasoning as canEditProfile
+  // (a session issued before this account's role existed would otherwise
+  // silently carry an empty role). CEO's own scope is fullAccess with
+  // ownUserId: null (see employeeScope.ts), so unlike a plain staff login
+  // they never redirect straight to their own record above — this gives
+  // them a way to jump there anyway while still browsing everyone else.
+  const me = await prisma.users.findUnique({
+    where: { email: userEmail },
+    select: { user_id: true, role: { select: { role_type: true } } },
+  });
+  const ceoOwnUserId = me?.role?.role_type?.toLowerCase() === "ceo" ? me.user_id : null;
+
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <EmployeeOverviewView
@@ -44,6 +58,7 @@ export default async function EmployeeFolderPage() {
         userName={userName}
         overdueTaskCounts={overdueTaskCounts}
         probationReminderNames={probationReminders.map((r) => ({ name: r.fullName, endDate: r.endDate }))}
+        ceoOwnUserId={ceoOwnUserId}
       />
     </AppShell>
   );

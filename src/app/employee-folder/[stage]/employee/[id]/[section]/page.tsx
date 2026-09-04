@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import StageProfileView from "@/app/components/StageProfileView";
+import { canEditProfile } from "@/lib/employeeRecordActions";
 import {
   isEmployeeStage,
   getEmployeeOverviewRowById,
@@ -203,8 +204,11 @@ export default async function EmployeeFolderProfileSectionPage({ params, searchP
   // server-side in employeeRecordActions.ts via requireNotCeoUnlessOwnProfile
   // (see requireEmployeeInScope). This is the cosmetic mirror: hide every
   // panel's Edit/Save toggle when a CEO is looking at someone else's
-  // profile, so they don't see a button that would only ever 403.
-  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
+  // profile, so they don't see a button that would only ever 403. Fresh DB
+  // lookup (2026-08-28, see conversation), not session.user.role/id — those
+  // are only as fresh as the JWT was at login time, so a session issued
+  // before this account's role existed would silently fail open.
+  const canEdit = await canEditProfile(employee.id);
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>

@@ -39,6 +39,7 @@ interface PageEditContextValue {
   isEditing: boolean;
   saving: boolean;
   message: string | null;
+  canEdit: boolean;
   register: (key: string, reg: PageEditRegistration) => void;
   unregister: (key: string) => void;
   toggle: () => void;
@@ -58,7 +59,17 @@ export function usePageEditContext(): PageEditContextValue | null {
   return useContext(PageEditContext);
 }
 
-export function PageEditProvider({ children }: { children: ReactNode }) {
+// canEdit (2026-08-28, see conversation) — a real bug fix, not a new
+// feature: this provider's own toggle() previously had NO gate at all, so a
+// CEO viewing someone else's profile (canEdit=false, passed all the way down
+// to every EditableSection inside) could still click the single shared
+// Edit/Save button (PageEditToggleButton never checked it either) and put
+// every section in this batch into a fully editable state — the server-side
+// save would still correctly reject it, but the UI let them see and type
+// into editable fields it should never have shown at all. Defaults true so
+// every existing caller (none of which passed this before) keeps its exact
+// current behavior unless it opts in.
+export function PageEditProvider({ children, canEdit = true }: { children: ReactNode; canEdit?: boolean }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,6 +87,11 @@ export function PageEditProvider({ children }: { children: ReactNode }) {
   }
 
   async function toggle() {
+    // Hard gate, not just a hidden button — see this provider's own canEdit
+    // comment above. Even if something manages to call toggle() without
+    // going through the (canEdit-gated) PageEditToggleButton, this can never
+    // flip isEditing to true for a viewer who isn't allowed to edit.
+    if (!canEdit) return;
     if (!isEditing) {
       setIsEditing(true);
       setMessage(null);
@@ -131,21 +147,24 @@ export function PageEditProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PageEditContext.Provider value={{ isEditing, saving, message, register, unregister, toggle, dismissMessage }}>
+    <PageEditContext.Provider value={{ isEditing, saving, message, canEdit, register, unregister, toggle, dismissMessage }}>
       {children}
     </PageEditContext.Provider>
   );
 }
 
 /** The single page-level Edit/Save button — render once, anywhere inside a
- *  PageEditProvider. Renders nothing outside one. The validation/save
- *  message renders separately (see PageEditMessageDialog below) as a
- *  centered modal rather than living here, since it needs to render at the
- *  page root to overlay everything, not wherever this button happens to sit
- *  in the layout. */
+ *  PageEditProvider. Renders nothing outside one, and nothing when the
+ *  provider's own canEdit is false (2026-08-28, see conversation — this used
+ *  to render unconditionally regardless of canEdit, the actual bug: a viewer
+ *  who can't edit could still see and click this to enter edit mode across
+ *  every section in the batch). The validation/save message renders
+ *  separately (see PageEditMessageDialog below) as a centered modal rather
+ *  than living here, since it needs to render at the page root to overlay
+ *  everything, not wherever this button happens to sit in the layout. */
 export function PageEditToggleButton() {
   const ctx = usePageEditContext();
-  if (!ctx) return null;
+  if (!ctx || !ctx.canEdit) return null;
   return (
     <button
       type="button"

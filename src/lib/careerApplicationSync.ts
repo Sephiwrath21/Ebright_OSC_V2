@@ -544,6 +544,42 @@ export async function computeRealAccountLifecycleOverrides<
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
+  // Shadowed-board_stage safeguard (2026-09-04, see conversation) — a Full
+  // Time account whose career_applications match exists but whose
+  // board_stage is neither "Probation" nor null (e.g. "Document
+  // Submission") used to be excluded from Probation outright below,
+  // trusting that board_stage as the final word. That trust breaks when a
+  // separate, later, unrelated career_applications row for the same person
+  // silently shadows their real "Probation" entry in the shared lookup map
+  // (lookupCareerApplicationsByName has no de-dup rule for same-name rows —
+  // confirmed live for 2 real people this way) — deliberately NOT fixed
+  // there (shared, cross-cutting logic used elsewhere); this is a
+  // same-effect safeguard scoped entirely to this function instead. A
+  // non-"Probation" board_stage is now only trusted as genuinely "done with
+  // probation" when the person's OWN status2/feedback2/probation end date
+  // independently confirm it — otherwise they stay Probation regardless of
+  // what board_stage says, matching the pipeline-matched population's own
+  // "no date-based escape hatch without genuine confirmation" rule below,
+  // just with the date check added on top (see the effectivelyDone
+  // override further down for why: the shared isEffectivelyConfirmed this
+  // function otherwise defers to for that decision doesn't check the date
+  // at all, so it can't be reused as-is for this specific population
+  // without the same date bypass this whole safeguard exists to close).
+  const shadowedBoardStageCandidates = eligible.filter((r) => {
+    if (resolvePositionGroup(r) !== "Full Time") return false;
+    const match = careerApplications.get(normalizeName(r.fullName));
+    return match?.boardStage != null && match.boardStage !== "Probation";
+  });
+  const shadowedProbationEndDates = await computeProbationEndDates(shadowedBoardStageCandidates);
+  function shadowedRowGenuinelyDone(r: T): boolean {
+    const match = careerApplications.get(normalizeName(r.fullName));
+    const status2 = match?.status2?.trim().toLowerCase() ?? null;
+    const hasFeedback2 = Boolean(match?.feedback2?.trim());
+    const endDate = shadowedProbationEndDates.get(r.id) ?? null;
+    return status2 === "accept" && hasFeedback2 && endDate != null && endDate <= todayIso;
+  }
+  const shadowedBoardStageIds = new Set(shadowedBoardStageCandidates.map((r) => r.id));
+
   const probationMatched = eligible.filter((r) => {
     if (resolvePositionGroup(r) !== "Full Time") return false;
     const match = careerApplications.get(normalizeName(r.fullName));
@@ -570,7 +606,7 @@ export async function computeRealAccountLifecycleOverrides<
     // two test accounts (user_id 2256, 2260) that should have qualified via
     // this fallback path but silently got neither Probation membership nor
     // this loop's own dual-listing, 404ing their own Probation profile page.
-    if (match?.boardStage != null) return false;
+    if (match?.boardStage != null) return !shadowedRowGenuinelyDone(r);
     const emp = empByUserId.get(r.id);
     return Boolean(emp?.start_date && emp.start_date.toISOString().slice(0, 10) <= todayIso);
   });
@@ -621,7 +657,21 @@ export async function computeRealAccountLifecycleOverrides<
     // the start_date gate below, which only applies to the Part Time/
     // Intern day-count branch that genuinely needs a date to count from.
     if (probationMatchedIds.has(row.id)) {
-      const effectivelyDone = confirmedIds.has(row.id) || (!hasBoardStageMatch(row) && pastEndDateIds.has(row.id));
+      // Shadowed-board_stage rows (see shadowedRowGenuinelyDone above) never
+      // consult the shared confirmedIds here — isEffectivelyConfirmed (which
+      // confirmedIds is built from) doesn't check the probation end date at
+      // all, so reusing it for this population would let someone with
+      // status2="accept"+feedback2 set but an unexpired date get marked done
+      // immediately, silently defeating the date condition this whole
+      // safeguard exists to enforce. Re-evaluating shadowedRowGenuinelyDone
+      // here is always false by construction (the probationMatched filter
+      // above only lets a shadowed row through when it was already false) —
+      // kept explicit rather than hardcoded, so this stays correct on its
+      // own if that filter's own logic ever changes, instead of silently
+      // relying on an invariant the reader has to trace back to see.
+      const effectivelyDone = shadowedBoardStageIds.has(row.id)
+        ? shadowedRowGenuinelyDone(row)
+        : confirmedIds.has(row.id) || (!hasBoardStageMatch(row) && pastEndDateIds.has(row.id));
       result.set(row.id, effectivelyDone ? { stage: "active" } : { stage: "probation", extraStages: ["onboarding"] });
       continue;
     }
