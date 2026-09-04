@@ -127,3 +127,17 @@ const ATTACHMENT_REQUIRED_TYPES: readonly string[] = [
 export function requiresAttachment(type: string): boolean {
   return ATTACHMENT_REQUIRED_TYPES.includes(type);
 }
+
+// ---------------------------------------------------------------------------
+// Task Manager gate (2026-09-03). Every claim type is gated on the claimant
+// having no open Task Manager task in the claim's month — see
+// getOpenTasksForClaim (src/task-manager/data/claim-gate.ts) and the guard in
+// submitClaim. This list is the single exemption point: adding a type here
+// (e.g. "health"/"transport", which reimburse money the employee has already
+// spent rather than paying out a reward) removes it from the gate.
+// ---------------------------------------------------------------------------
+export const TASK_GATE_EXEMPT_CLAIM_TYPES: readonly ClaimType[] = [];
+
+export function isTaskGatedClaimType(type: ClaimType): boolean {
+  return !TASK_GATE_EXEMPT_CLAIM_TYPES.includes(type);
+}

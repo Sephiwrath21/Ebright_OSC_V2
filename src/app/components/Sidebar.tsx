@@ -391,7 +391,7 @@ function NavSection({
   return (
     <div className="px-3">
       {!collapsed && (
-        <p className="px-3 mb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <p className="px-3 mb-2 text-[11px] font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
           {label}
         </p>
       )}
@@ -517,7 +517,9 @@ function NavNode({
   ) : Icon ? (
     <Icon
       className={`w-5 h-5 shrink-0 ${
-        isActive || hasActiveDescendant ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+        isActive || hasActiveDescendant
+          ? "text-blue-600 dark:text-blue-400"
+          : "text-slate-500 dark:text-slate-400"
       }`}
       aria-hidden="true"
     />
@@ -529,8 +531,8 @@ function NavNode({
 
     const iconButtonClass = `relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
       isActive || hasActiveDescendant || flyoutOpen
-        ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+        ? "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+        : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
     }`;
 
     // Parents with children: clicking the icon opens a flyout listing them.
@@ -555,9 +557,9 @@ function NavNode({
                 ref={popoverRef}
                 data-nav-flyout
                 style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
-                className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:ring-1 dark:ring-white/10 py-2 shadow-lg"
+                className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-2 shadow-lg dark:ring-1 dark:ring-white/10"
               >
-                <p className="px-3 pb-2 mb-1 border-b border-slate-100 dark:border-slate-700 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                <p className="px-3 pb-2 mb-1 border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   {name}
                 </p>
                 <ul className="px-1 space-y-0.5">
@@ -614,10 +616,10 @@ function NavNode({
     depth === 0 ? "py-2.5" : "py-2"
   } ${
     isActive
-      ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+      ? "bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
       : hasActiveDescendant
-        ? "text-blue-700 dark:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-        : `${depth === 0 ? "text-slate-700" : "text-slate-600"} dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800`
+        ? "text-blue-700 hover:bg-slate-100 dark:text-blue-300 dark:hover:bg-slate-800"
+        : `${depth === 0 ? "text-slate-700 dark:text-slate-300" : "text-slate-600 dark:text-slate-400"} hover:bg-slate-100 dark:hover:bg-slate-800`
   }`;
 
   // Inside a flyout popover: a nested group cascades into its own side
@@ -636,7 +638,7 @@ function NavNode({
         >
           {icon}
           <span className="flex-1 text-left whitespace-nowrap">{name}</span>
-          <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
+          <ChevronRight className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-400" aria-hidden="true" />
         </button>
         {flyoutOpen &&
           typeof document !== "undefined" &&
@@ -645,7 +647,7 @@ function NavNode({
               ref={popoverRef}
               data-nav-flyout
               style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left }}
-              className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:ring-1 dark:ring-white/10 py-2 shadow-lg"
+              className="z-50 min-w-56 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-2 shadow-lg dark:ring-1 dark:ring-white/10"
             >
               <ul className="px-1 space-y-0.5">
                 {children.map((child) => (

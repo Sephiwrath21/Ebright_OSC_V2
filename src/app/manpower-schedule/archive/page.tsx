@@ -171,7 +171,7 @@ function ArchiveOverviewContent() {
           </div>
         ) : error ? (
           <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-2xl p-6 text-center">
-            <p className="text-red-600 dark:text-red-300 font-medium">{error}</p>
+            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
           </div>
         ) : drillYear !== null && drillMonth !== null ? (
           <div>
@@ -200,20 +200,20 @@ function ArchiveOverviewContent() {
                           <button
                             key={record.id}
                             onClick={() => openRecord(record)}
-                            className="text-left bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 border border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl px-4 py-3 transition-colors min-w-[160px]"
+                            className="text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 rounded-xl px-4 py-3 transition-colors min-w-[160px] dark:bg-blue-900 dark:hover:bg-blue-800 dark:border-blue-700 dark:hover:border-blue-600"
                           >
                             <div className="font-black text-sm text-blue-800 dark:text-blue-200 uppercase tracking-wide">
                               {record.branch}
                             </div>
-                            <div className="text-xs text-blue-500 dark:text-blue-300 font-bold mt-0.5">
+                            <div className="text-xs text-blue-500 dark:text-blue-400 font-bold mt-0.5">
                               {format(parseISO(record.startDate), "dd MMM")} –{" "}
                               {format(parseISO(record.endDate), "dd MMM")}
                             </div>
                             <span
                               className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${
                                 record.status === "Finalized"
-                                  ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-                                  : "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
                               }`}
                             >
                               {record.status}
@@ -307,7 +307,7 @@ export default function ArchiveOverviewPage() {
   if (status === "loading") {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-lg">
+        <div className="flex items-center justify-center h-full text-blue-600 dark:text-blue-400 font-semibold text-lg">
           Loading...
         </div>
       </AppShell>

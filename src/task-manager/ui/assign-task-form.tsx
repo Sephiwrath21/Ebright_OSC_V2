@@ -354,7 +354,7 @@ export function AssignTaskForm({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Type here..."
-            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
+            className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400"
           />
         </label>
 
@@ -424,13 +424,13 @@ export function AssignTaskForm({
               ))}
             </div>
             {days.length > 0 && (
-              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-800 dark:bg-slate-800">
                 <div className="mb-1.5 flex items-center justify-between">
                   <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Selected ({days.length})</p>
                   <button
                     type="button"
                     onClick={() => setDays([])}
-                    className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300"
                   >
                     Clear all
                   </button>

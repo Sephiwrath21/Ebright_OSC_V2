@@ -57,7 +57,7 @@ import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
  *  by the caller so it never disturbs row/flex layout. */
 function InlineActionError({ text }: { text: string }) {
   return (
-    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-900 dark:bg-slate-800">
+    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:ring-1 dark:ring-white/10">
       {text}
     </p>
   );
@@ -435,7 +435,7 @@ export function CompletionMeter({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700 ${className}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-800 ${className}`}>
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
         style={{ width: `${pct}%` }}
@@ -445,12 +445,12 @@ export function CompletionMeter({
 }
 
 const STATUS_CHIP: Record<FlowTaskRow["status"], { label: string; className: string }> = {
-  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300" },
-  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
-  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
-  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" },
-  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-slate-700 dark:text-slate-400" },
+  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
+  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300" },
+  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300" },
+  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300" },
+  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-300" },
 };
 
 export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
@@ -469,7 +469,7 @@ export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
 function statusCircleClasses(status: FlowTaskRow["status"]): string {
   if (status === "DONE") return "bg-emerald-500";
   if (status === "SKIPPED") return "bg-amber-400";
-  return "border-2 border-red-400 bg-white";
+  return "border-2 border-red-400 bg-white dark:bg-slate-900";
 }
 
 /** Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
@@ -665,12 +665,12 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canReopen}
             onClick={() => run(onReopen)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
+            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />
             Pending
           </button>
-          <div className="my-1 border-t border-gray-100 dark:border-slate-700" />
+          <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">Closed</p>
           <button
             type="button"
@@ -682,7 +682,7 @@ function StatusDropdown({
                 : undefined
             }
             onClick={() => run(onComplete)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="flex size-2.5 shrink-0 items-center justify-center text-[10px] font-bold text-emerald-500">
               ✓
@@ -694,7 +694,7 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canMarkNA}
             onClick={() => run(onSkip)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
@@ -763,7 +763,7 @@ function CompleteButton({
         disabled={completing}
         onClick={complete}
         className={`flex size-3 items-center justify-center rounded-full border-2 border-emerald-500 transition-colors hover:bg-emerald-500 disabled:opacity-50 ${
-          completing ? "bg-emerald-500" : "bg-white"
+          completing ? "bg-emerald-500" : "bg-white dark:bg-slate-900"
         }`}
       />
       {errorText && <InlineActionError text={errorText} />}
@@ -1983,7 +1983,7 @@ export function TaskRowLine({
       ) : canComplete ? (
         <CompleteButton task={task} onComplete={onComplete!} />
       ) : (
-        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white" />
+        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white dark:bg-slate-900" />
       )}
       <div
         className={`relative min-w-0 ${effectiveNameWidth === undefined ? "flex-1" : "shrink-0"}`}
@@ -1992,7 +1992,7 @@ export function TaskRowLine({
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
             className={`min-w-0 text-sm font-semibold ${
-              task.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
+              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
             }`}
           >
             {task.blockTitle}
@@ -2003,7 +2003,7 @@ export function TaskRowLine({
             </span>
           )}
           {task.fromSchedule && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900 dark:text-violet-300">
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
@@ -2411,7 +2411,7 @@ function BulkActionsButton({
             ref={menuRef}
             role="menu"
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
+            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
           >
             {actions.map((a) => (
               <button
@@ -2419,7 +2419,7 @@ function BulkActionsButton({
                 type="button"
                 role="menuitem"
                 onClick={() => run(a.onRun)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 {a.icon}
                 {a.label}
@@ -3366,7 +3366,7 @@ export function ReassignPicker({
         placeholder="Search staff by name…"
         className={`mb-1.5 ${pickerSearchClass}`}
       />
-      {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mb-1 text-xs text-red-600 dark:text-red-300">{error}</p>}
       <SinglePersonPickList
         members={candidates}
         disabled={busy}
@@ -3556,7 +3556,7 @@ export function EntityDrillModal({
     bulkActions.push({
       key: "reopen",
       label: "Mark Pending",
-      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
+      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />,
       onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedDueDay(t)),
     });
   }
@@ -3603,14 +3603,14 @@ export function EntityDrillModal({
               checked={selectedIds.has(t.runBlockId)}
               onChange={() => toggleSelect(t.runBlockId)}
               aria-label={`Select ${t.blockTitle}`}
-              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
             />
           )}
           <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
           <div className="min-w-0 flex-1">
             <p
               className={`truncate text-sm font-semibold ${
-                t.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
+                t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
               }`}
             >
               {t.blockTitle}
@@ -3658,8 +3658,8 @@ export function EntityDrillModal({
               }
               className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                 reassignRow === t.runBlockId
-                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
-                  : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                  : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-900"
               }`}
             >
               Assign to Others
@@ -3687,7 +3687,7 @@ export function EntityDrillModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
+        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3 dark:border-slate-800">
@@ -3700,7 +3700,7 @@ export function EntityDrillModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             ✕
           </button>
@@ -3712,7 +3712,7 @@ export function EntityDrillModal({
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
               />
               Select all
             </label>
