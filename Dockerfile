@@ -12,7 +12,21 @@ ENV TZ=Asia/Kuala_Lumpur
 # legacy-peer-deps=true — without it npm ci fails on packages whose peer
 # ranges predate React 19 (e.g. next-themes 0.3).
 COPY package*.json .npmrc ./
-RUN npm ci
+# Retry the install: on the deploy host a single registry ECONNRESET
+# aborts `npm ci` outright, which fails the build and leaves prod on the
+# previous image (that is what sank the PR #126 main deploy). .npmrc
+# stretches npm's own per-request retries; this rides out a whole failed
+# install. Still exits 1 after 3 attempts, so a real dependency error
+# fails loudly instead of shipping a half-built image.
+RUN set -e; \
+    for attempt in 1 2 3; do \
+      echo "npm ci attempt $attempt/3"; \
+      npm ci && exit 0; \
+      echo "npm ci failed on attempt $attempt; retrying in 15s"; \
+      sleep 15; \
+    done; \
+    echo 'npm ci failed after 3 attempts'; \
+    exit 1
 
 # Generate Prisma clients against the Linux target (host generates against Windows)
 COPY prisma ./prisma/
