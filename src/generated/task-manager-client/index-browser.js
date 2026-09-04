@@ -317,6 +317,7 @@ exports.Prisma.TaskTemplateExcludedAssigneeScalarFieldEnum = {
   id: 'id',
   templateId: 'templateId',
   userId: 'userId',
+  weekday: 'weekday',
   createdAt: 'createdAt'
 };
 

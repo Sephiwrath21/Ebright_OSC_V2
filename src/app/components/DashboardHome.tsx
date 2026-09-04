@@ -148,7 +148,7 @@ export default function DashboardHome({
                 {...(!isDisabled && isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               >
                 <div className={`p-3 rounded-lg flex items-center justify-center gap-3 aspect-square transition-all duration-300
-                  ${isDisabled ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 opacity-60 grayscale" : `${dashboard.color} text-white hover:shadow-lg hover:scale-105`}
+                  ${isDisabled ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 opacity-60 grayscale" : `${dashboard.color} text-white hover:shadow-lg hover:scale-105`}
                 `}>
                   <div className="text-center">
                     <span className="text-2xl block mb-1">{dashboard.icon}</span>

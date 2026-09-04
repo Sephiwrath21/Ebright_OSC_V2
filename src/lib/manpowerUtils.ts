@@ -53,7 +53,7 @@ function hashName(name: string): number {
 }
 
 export function getEmployeeColor(name: string): string {
-  if (!name || name === "None" || name === "-- Select --") return "bg-white text-slate-400 border border-slate-200";
+  if (!name || name === "None" || name === "-- Select --") return "bg-white dark:bg-slate-900 text-slate-400 border border-slate-200 dark:border-slate-700";
   const colorIndex = hashName(name) % COLOR_PALETTE.length;
   return COLOR_PALETTE[colorIndex];
 }
@@ -108,7 +108,7 @@ export const STAFF_COLORS = [
 ];
 
 export function getStaffColorByIndex(name: string, staffList: string[]): string {
-  if (!name || name === "None") return "bg-white border border-slate-200 text-slate-400";
+  if (!name || name === "None") return "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400";
   const idx = staffList.indexOf(name);
   if (idx >= 0) return STAFF_COLORS[idx % STAFF_COLORS.length];
   return getEmployeeColor(name);

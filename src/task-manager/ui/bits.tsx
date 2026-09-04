@@ -57,7 +57,7 @@ import { pickerSearchClass, SinglePersonPickList } from "./recipient-picker";
  *  by the caller so it never disturbs row/flex layout. */
 function InlineActionError({ text }: { text: string }) {
   return (
-    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-900 dark:bg-slate-800">
+    <p className="absolute left-0 top-5 z-20 w-44 whitespace-normal rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal normal-case text-red-600 shadow-md dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:ring-1 dark:ring-white/10">
       {text}
     </p>
   );
@@ -435,7 +435,7 @@ export function CompletionMeter({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700 ${className}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-800 ${className}`}>
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
         style={{ width: `${pct}%` }}
@@ -445,12 +445,12 @@ export function CompletionMeter({
 }
 
 const STATUS_CHIP: Record<FlowTaskRow["status"], { label: string; className: string }> = {
-  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300" },
-  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
-  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
-  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" },
-  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-slate-700 dark:text-slate-400" },
+  DONE: { label: "Completed", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
+  PENDING: { label: "Pending", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  ACTIVE: { label: "In progress", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300" },
+  OVERDUE: { label: "Overdue", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300" },
+  ESCALATED: { label: "Escalated", className: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300" },
+  SKIPPED: { label: "N/A", className: "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-300" },
 };
 
 export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
@@ -469,7 +469,7 @@ export function StatusChip({ status }: { status: FlowTaskRow["status"] }) {
 function statusCircleClasses(status: FlowTaskRow["status"]): string {
   if (status === "DONE") return "bg-emerald-500";
   if (status === "SKIPPED") return "bg-amber-400";
-  return "border-2 border-red-400 bg-white";
+  return "border-2 border-red-400 bg-white dark:bg-slate-900";
 }
 
 /** Due-day lock (2026-08-05 past-day, extended 2026-08-11 to future-day,
@@ -665,12 +665,12 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canReopen}
             onClick={() => run(onReopen)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />
+            <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />
             Pending
           </button>
-          <div className="my-1 border-t border-gray-100 dark:border-slate-700" />
+          <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">Closed</p>
           <button
             type="button"
@@ -682,7 +682,7 @@ function StatusDropdown({
                 : undefined
             }
             onClick={() => run(onComplete)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="flex size-2.5 shrink-0 items-center justify-center text-[10px] font-bold text-emerald-500">
               ✓
@@ -694,7 +694,7 @@ function StatusDropdown({
             role="menuitem"
             disabled={!canMarkNA}
             onClick={() => run(onSkip)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="size-2.5 shrink-0 rounded-full bg-amber-400" />
             N/A
@@ -763,7 +763,7 @@ function CompleteButton({
         disabled={completing}
         onClick={complete}
         className={`flex size-3 items-center justify-center rounded-full border-2 border-emerald-500 transition-colors hover:bg-emerald-500 disabled:opacity-50 ${
-          completing ? "bg-emerald-500" : "bg-white"
+          completing ? "bg-emerald-500" : "bg-white dark:bg-slate-900"
         }`}
       />
       {errorText && <InlineActionError text={errorText} />}
@@ -1983,7 +1983,7 @@ export function TaskRowLine({
       ) : canComplete ? (
         <CompleteButton task={task} onComplete={onComplete!} />
       ) : (
-        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white" />
+        <span className="size-3 shrink-0 rounded-full border-2 border-red-300 bg-white dark:bg-slate-900" />
       )}
       <div
         className={`relative min-w-0 ${effectiveNameWidth === undefined ? "flex-1" : "shrink-0"}`}
@@ -1992,7 +1992,7 @@ export function TaskRowLine({
         <div className="flex min-w-0 items-center gap-1.5 pr-2">
           <p
             className={`min-w-0 text-sm font-semibold ${
-              task.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
+              task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
             }`}
           >
             {task.blockTitle}
@@ -2003,7 +2003,7 @@ export function TaskRowLine({
             </span>
           )}
           {task.fromSchedule && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900 dark:text-violet-300">
               <span className="size-1 rounded-full bg-violet-500" />
               Scheduled
             </span>
@@ -2411,7 +2411,7 @@ function BulkActionsButton({
             ref={menuRef}
             role="menu"
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
+            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
           >
             {actions.map((a) => (
               <button
@@ -2419,7 +2419,7 @@ function BulkActionsButton({
                 type="button"
                 role="menuitem"
                 onClick={() => run(a.onRun)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 {a.icon}
                 {a.label}
@@ -3366,7 +3366,7 @@ export function ReassignPicker({
         placeholder="Search staff by name…"
         className={`mb-1.5 ${pickerSearchClass}`}
       />
-      {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mb-1 text-xs text-red-600 dark:text-red-300">{error}</p>}
       <SinglePersonPickList
         members={candidates}
         disabled={busy}
@@ -3442,6 +3442,43 @@ export function EntityDrillModal({
   const rows = tasks[bucketKey];
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [reassignRow, setReassignRow] = React.useState<string | null>(null);
+
+  // Main task <-> subtask tree (2026-08-29, user request — subtasks were
+  // rendered as their own flat, same-level rows here, unlike every OTHER
+  // task list in the app (ResizableTaskList's own tree), so a task with
+  // several subtasks looked like several unrelated tasks). `tasks[bucketKey]`
+  // is already filtered to ONE status bucket, and a subtask's status is
+  // independent of its parent's — so a subtask only nests here when its
+  // PARENT happens to land in this SAME bucket too (both share this
+  // bucket's status); otherwise there's no parent row in this list to nest
+  // under, and it stays a plain top-level row, same as before. EXPANDED by
+  // default (collapsedParentIds tracks the exceptions) — same convention
+  // ResizableTaskList's own parent/child tree already uses, so a task with
+  // subtasks doesn't visually shrink when this feature first landed.
+  const [collapsedParentIds, setCollapsedParentIds] = React.useState<Set<string>>(new Set());
+  const toggleParentExpand = (id: string) =>
+    setCollapsedParentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const { topLevelRows, childrenOf } = React.useMemo(() => {
+    const allIds = new Set(rows.map((r) => r.runBlockId));
+    const children = new Map<string, FlowDrillTask[]>();
+    for (const r of rows) {
+      if (r.parentId && allIds.has(r.parentId)) {
+        const kids = children.get(r.parentId);
+        if (kids) kids.push(r);
+        else children.set(r.parentId, [r]);
+      }
+    }
+    for (const kids of children.values()) {
+      kids.sort((a, b) => (a.subtaskOrder ?? Number.MAX_SAFE_INTEGER) - (b.subtaskOrder ?? Number.MAX_SAFE_INTEGER));
+    }
+    const top = rows.filter((r) => !r.parentId || !allIds.has(r.parentId));
+    return { topLevelRows: top, childrenOf: children };
+  }, [rows]);
 
   const ownedRows = rows.filter((t) => myUserId && t.assigneeId === myUserId);
   const allOwnedSelected = ownedRows.length > 0 && ownedRows.every((t) => selectedIds.has(t.runBlockId));
@@ -3519,7 +3556,7 @@ export function EntityDrillModal({
     bulkActions.push({
       key: "reopen",
       label: "Mark Pending",
-      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white" />,
+      icon: <span className="size-2.5 shrink-0 rounded-full border-2 border-red-400 bg-white dark:bg-slate-900" />,
       onRun: () => runBulk(onReopen, (t) => t.assigneeId === myUserId && !isLockedDueDay(t)),
     });
   }
@@ -3528,13 +3565,129 @@ export function EntityDrillModal({
   const selectedBulkRows = rows.filter((t) => selectedIds.has(t.runBlockId));
   const allSelectedLocked = selectedBulkRows.length > 0 && selectedBulkRows.every(isLockedDueDay);
 
+  /** One row — a main task (optionally with an expand/collapse chevron +
+   *  subtask count when `tree.kind === "parent"`) or an indented subtask
+   *  (`tree.kind === "child"`). Same row content/actions either way; only
+   *  the leading chevron-or-indent differs. */
+  const renderDrillRow = (
+    t: FlowDrillTask,
+    opts: { tree?: { kind: "parent"; count: number; expanded: boolean; onToggle: () => void } | { kind: "child" } },
+  ) => {
+    const due = t.dueAt ? new Date(t.dueAt) : null;
+    const dueDisplay = formatDueDate(due);
+    const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
+    const canReassign = bucketKey === "pending" && Boolean(reassign);
+    return (
+      <div
+        key={t.runBlockId}
+        className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
+      >
+        <div className="flex items-center gap-2.5">
+          {opts.tree?.kind === "parent" ? (
+            <button
+              type="button"
+              onClick={opts.tree.onToggle}
+              aria-expanded={opts.tree.expanded}
+              aria-label={opts.tree.expanded ? "Collapse subtasks" : "Expand subtasks"}
+              className="flex shrink-0 items-center gap-0.5 text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
+            >
+              <ChevronIcon expanded={opts.tree.expanded} className="size-3.5" />
+              <span className="text-[10px] font-semibold">{opts.tree.count}</span>
+            </button>
+          ) : (
+            opts.tree?.kind === "child" && <span className="w-4 shrink-0" aria-hidden />
+          )}
+          {isOwned && (
+            <input
+              type="checkbox"
+              checked={selectedIds.has(t.runBlockId)}
+              onChange={() => toggleSelect(t.runBlockId)}
+              aria-label={`Select ${t.blockTitle}`}
+              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
+            />
+          )}
+          <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate text-sm font-semibold ${
+                t.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900 dark:text-slate-100"
+              }`}
+            >
+              {t.blockTitle}
+            </p>
+            {!isOwned && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
+            )}
+            {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
+                show who assigned them (assigner cards / personal
+                donut drills); rows about other people keep the
+                assignee line above instead. */}
+            {isOwned && t.assignerName && (
+              <p className="truncate text-xs text-gray-500 dark:text-slate-400">
+                Assigned by {t.assignerName}
+              </p>
+            )}
+          </div>
+          {/* Assignee avatar (2026-08-22, ClickUp-style reference)
+              — initials on a per-person color, same InitialAvatar
+              every other assignee chip in the app already uses
+              (no photo data exists to show a real picture). Shown
+              on every row, own or not, matching the reference's
+              per-row avatar regardless of ownership. */}
+          <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
+          {/* Proof (2026-07-30): ＋ upload on the viewer's own
+              rows, 📎 view for anyone once uploaded. Only takes
+              space when actionable/present — the modal is too
+              narrow for a dash placeholder column. */}
+          {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
+            <ProofCell
+              task={t}
+              isOwned={isOwned}
+              onUploadProof={onUploadProof}
+              onRemoveProof={onRemoveProof}
+            />
+          )}
+          {dueDisplay && (
+            <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
+          )}
+          {canReassign && (
+            <button
+              type="button"
+              onClick={() =>
+                setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
+              }
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                reassignRow === t.runBlockId
+                  ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                  : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-900"
+              }`}
+            >
+              Assign to Others
+            </button>
+          )}
+        </div>
+        {canReassign && reassign && reassignRow === t.runBlockId && (
+          <ReassignPicker
+            staff={reassign.staff}
+            currentAssigneeId={t.assigneeId}
+            onPick={async (userId) => {
+              const r = await reassign.action(t.runBlockId, userId);
+              if (r.ok) setReassignRow(null);
+              return r;
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
       onClick={onClose}
     >
       <div
-        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 dark:ring-1 dark:ring-white/10"
+        className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-3 dark:border-slate-800">
@@ -3547,7 +3700,7 @@ export function EntityDrillModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             ✕
           </button>
@@ -3559,7 +3712,7 @@ export function EntityDrillModal({
                 type="checkbox"
                 checked={allOwnedSelected}
                 onChange={toggleSelectAll}
-                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
+                className="size-4 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
               />
               Select all
             </label>
@@ -3581,98 +3734,21 @@ export function EntityDrillModal({
               <span>Due date</span>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-slate-800">
-            {rows.map((t) => {
-              const due = t.dueAt ? new Date(t.dueAt) : null;
-              const dueDisplay = formatDueDate(due);
-              const isOwned = Boolean(myUserId) && t.assigneeId === myUserId;
-              const canReassign = bucketKey === "pending" && Boolean(reassign);
+            {topLevelRows.map((t) => {
+              const kids = childrenOf.get(t.runBlockId) ?? [];
+              const expanded = !collapsedParentIds.has(t.runBlockId);
               return (
-                <div
-                  key={t.runBlockId}
-                  className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
-                >
-                  <div className="flex items-center gap-2.5">
-                    {isOwned && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(t.runBlockId)}
-                        onChange={() => toggleSelect(t.runBlockId)}
-                        aria-label={`Select ${t.blockTitle}`}
-                        className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-600"
-                      />
-                    )}
-                    <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-semibold ${
-                          t.status === "DONE" ? "text-gray-400 line-through dark:text-slate-500" : "text-gray-900 dark:text-slate-100"
-                        }`}
-                      >
-                        {t.blockTitle}
-                      </p>
-                      {!isOwned && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">by {t.assigneeName}</p>
-                      )}
-                      {/* "Assigned by" (2026-07-30) — the viewer's OWN rows
-                          show who assigned them (assigner cards / personal
-                          donut drills); rows about other people keep the
-                          assignee line above instead. */}
-                      {isOwned && t.assignerName && (
-                        <p className="truncate text-xs text-gray-500 dark:text-slate-400">
-                          Assigned by {t.assignerName}
-                        </p>
-                      )}
-                    </div>
-                    {/* Assignee avatar (2026-08-22, ClickUp-style reference)
-                        — initials on a per-person color, same InitialAvatar
-                        every other assignee chip in the app already uses
-                        (no photo data exists to show a real picture). Shown
-                        on every row, own or not, matching the reference's
-                        per-row avatar regardless of ownership. */}
-                    <InitialAvatar name={t.assigneeName} id={t.assigneeId} className="size-6 shrink-0 text-[10px]" />
-                    {/* Proof (2026-07-30): ＋ upload on the viewer's own
-                        rows, 📎 view for anyone once uploaded. Only takes
-                        space when actionable/present — the modal is too
-                        narrow for a dash placeholder column. */}
-                    {(t.proofIds.length > 0 || (isOwned && onUploadProof)) && (
-                      <ProofCell
-                        task={t}
-                        isOwned={isOwned}
-                        onUploadProof={onUploadProof}
-                        onRemoveProof={onRemoveProof}
-                      />
-                    )}
-                    {dueDisplay && (
-                      <span className={`shrink-0 text-xs ${dueDisplay.className}`}>{dueDisplay.text}</span>
-                    )}
-                    {canReassign && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setReassignRow(reassignRow === t.runBlockId ? null : t.runBlockId)
-                        }
-                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                          reassignRow === t.runBlockId
-                            ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/40 dark:text-blue-300"
-                            : "border-gray-200 text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900/40"
-                        }`}
-                      >
-                        Assign to Others
-                      </button>
-                    )}
-                  </div>
-                  {canReassign && reassign && reassignRow === t.runBlockId && (
-                    <ReassignPicker
-                      staff={reassign.staff}
-                      currentAssigneeId={t.assigneeId}
-                      onPick={async (userId) => {
-                        const r = await reassign.action(t.runBlockId, userId);
-                        if (r.ok) setReassignRow(null);
-                        return r;
-                      }}
-                    />
-                  )}
-                </div>
+                <React.Fragment key={t.runBlockId}>
+                  {renderDrillRow(t, {
+                    tree:
+                      kids.length > 0
+                        ? { kind: "parent", count: kids.length, expanded, onToggle: () => toggleParentExpand(t.runBlockId) }
+                        : undefined,
+                  })}
+                  {kids.length > 0 &&
+                    expanded &&
+                    kids.map((k) => renderDrillRow(k, { tree: { kind: "child" } }))}
+                </React.Fragment>
               );
             })}
             </div>

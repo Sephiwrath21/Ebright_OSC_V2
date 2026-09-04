@@ -34,8 +34,8 @@ export default function HodPendingAlert({ position }: { position?: string | null
 
   return (
     <div className="px-6 pt-4">
-      <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        <Hourglass className="w-4 h-4 shrink-0 text-amber-600" aria-hidden="true" />
+      <div className="flex items-center gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+        <Hourglass className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
         <span className="flex-1">
           {count === 1
             ? "There is 1 pending leave request awaiting your approval."

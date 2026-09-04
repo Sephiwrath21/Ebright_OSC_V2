@@ -627,11 +627,12 @@ export type TemplateGroupAssigneesResult =
   | { ok: true; assignees: FlowTemplateGroupAssignee[] }
   | { ok: false; message: string };
 /** Remove Assignee (2026-08-22 rule — corrected to same-day cutoff;
- *  2026-08-27 fix — the cutoff now has no upper bound) — cancels every
- *  instance due today or later (cancelledPending); anything dated before
- *  today stays untouched (pendingKept, purely informational). See
- *  data/templates-internal.ts's removeTemplateAssigneeCore doc comment
- *  for the full rule. */
+ *  2026-08-27 fix — the cutoff now has no upper bound; 2026-08-29 — scoped
+ *  to the caller's chosen weekdays, not all-or-nothing) — cancels every
+ *  instance on the given weekdays due today or later (cancelledPending);
+ *  anything dated before today, or on a different weekday, stays untouched
+ *  (pendingKept counts only the former). See data/templates-internal.ts's
+ *  removeTemplateAssigneeCore doc comment for the full rule. */
 export type TemplateGroupRemoveAssigneeResult =
   | { ok: true; excluded: true; cancelledPending: number; pendingKept: number }
   | { ok: false; message: string };
@@ -661,7 +662,14 @@ export interface FlowTemplateGroupControl {
   remove: (groupId: string) => Promise<TemplateGroupDeleteResult>;
   apply: (groupId: string, input: FlowTemplateGroupApplyInput) => Promise<TemplateGroupApplyResult>;
   assignees: (groupId: string) => Promise<TemplateGroupAssigneesResult>;
-  removeAssignee: (groupId: string, userId: string) => Promise<TemplateGroupRemoveAssigneeResult>;
+  /** `weekdays` (2026-08-29): which of the person's FLOW_DAYS to remove
+   *  them from — their other days of this same group are untouched. See
+   *  TemplateGroupRemoveAssigneeResult's own doc comment. */
+  removeAssignee: (
+    groupId: string,
+    userId: string,
+    weekdays: (typeof FLOW_DAYS)[number][],
+  ) => Promise<TemplateGroupRemoveAssigneeResult>;
 }
 
 /** Which Cadence pills the "+ Add Task" form should offer, given the

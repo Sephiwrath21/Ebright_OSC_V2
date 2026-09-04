@@ -13,17 +13,17 @@ interface HrPersonalizedDashboardProps {
 type PaletteKey = "blue" | "green" | "amber" | "red" | "purple" | "gray";
 
 const palette: Record<PaletteKey, { dark: string; light: string }> = {
-  blue: { dark: "#185FA5", light: "#E6F1FB" },
-  green: { dark: "#0F6E56", light: "#E1F5EE" },
-  amber: { dark: "#854F0B", light: "#FAEEDA" },
-  red: { dark: "#A32D2D", light: "#FCEBEB" },
-  purple: { dark: "#3C3489", light: "#EEEDFE" },
-  gray: { dark: "#444441", light: "#F1EFE8" },
+  blue: { dark: "var(--cat-blue-fg)", light: "var(--cat-blue-bg)" },
+  green: { dark: "var(--cat-green-fg)", light: "var(--cat-green-bg)" },
+  amber: { dark: "var(--cat-amber-fg)", light: "var(--cat-amber-bg)" },
+  red: { dark: "var(--cat-red-fg)", light: "var(--cat-red-bg)" },
+  purple: { dark: "var(--cat-purple-fg)", light: "var(--cat-purple-bg)" },
+  gray: { dark: "var(--cat-gray-fg)", light: "var(--cat-gray-bg)" },
 };
 
 const card: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "0.5px solid #E5E7EB",
+  background: "var(--surface)",
+  border: "0.5px solid var(--status-track)",
   borderRadius: 12,
 };
 
@@ -80,7 +80,7 @@ function MetricCard({
         style={{
           fontSize: 28,
           fontWeight: 600,
-          color: "#111827",
+          color: "var(--text-primary)",
           lineHeight: 1.1,
         }}
       >
@@ -89,7 +89,7 @@ function MetricCard({
       <div
         style={{
           fontSize: 13,
-          color: "#6B7280",
+          color: "var(--text-muted-strong)",
           marginTop: 4,
         }}
       >
@@ -141,7 +141,7 @@ function StatBar({
           marginBottom: 6,
         }}
       >
-        <span style={{ fontSize: 12, color: "#6B7280" }}>
+        <span style={{ fontSize: 12, color: "var(--text-muted-strong)" }}>
           {label}
           {shortLabel ? (
             <span
@@ -166,7 +166,7 @@ function StatBar({
       <div
         style={{
           height: 4,
-          background: "#F3F4F6",
+          background: "var(--status-neutral-bg)",
           borderRadius: 999,
           overflow: "hidden",
         }}
@@ -491,6 +491,10 @@ const tasks: Record<
 
 function shadeOfBlue(t: number): string {
   // Mix #E6F1FB (light) -> #185FA5 (dark) by t in [0,1]
+  // Intentionally kept as literal hex: this does numeric channel
+  // interpolation, which a `var(--cat-blue-*)` string cannot support
+  // (its resolved value isn't available for arithmetic at build/run time).
+  // These literals equal the light-mode palette.blue values by design.
   const a = { r: 0xe6, g: 0xf1, b: 0xfb };
   const b = { r: 0x18, g: 0x5f, b: 0xa5 };
   const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
@@ -514,9 +518,9 @@ export default function HrPersonalizedDashboard({
     <div
       style={{
         minHeight: "100%",
-        background: "#F3F4F6",
+        background: "var(--status-neutral-bg)",
         fontFamily: fontStack,
-        color: "#111827",
+        color: "var(--text-primary)",
       }}
     >
       <div
@@ -591,7 +595,7 @@ export default function HrPersonalizedDashboard({
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#111827",
+                  color: "var(--text-primary)",
                   marginBottom: 12,
                 }}
               >
@@ -611,7 +615,7 @@ export default function HrPersonalizedDashboard({
             <div
               style={{
                 height: 0.5,
-                background: "#E5E7EB",
+                background: "var(--status-track)",
                 margin: "14px 0",
               }}
             />
@@ -620,7 +624,7 @@ export default function HrPersonalizedDashboard({
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#111827",
+                  color: "var(--text-primary)",
                   marginBottom: 12,
                 }}
               >
@@ -652,7 +656,7 @@ export default function HrPersonalizedDashboard({
               style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#111827",
+                color: "var(--text-primary)",
                 marginBottom: 14,
               }}
             >
@@ -674,7 +678,7 @@ export default function HrPersonalizedDashboard({
                       style={{
                         fontSize: 13,
                         fontWeight: 500,
-                        color: "#111827",
+                        color: "var(--text-primary)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -682,7 +686,7 @@ export default function HrPersonalizedDashboard({
                     >
                       {b.name}
                     </div>
-                    <div style={{ fontSize: 11, color: "#6B7280" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted-strong)" }}>
                       {b.dept} · {b.date}
                     </div>
                   </div>
@@ -710,7 +714,7 @@ export default function HrPersonalizedDashboard({
               style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#111827",
+                color: "var(--text-primary)",
                 marginBottom: 16,
               }}
             >
@@ -740,12 +744,12 @@ export default function HrPersonalizedDashboard({
                       justifyContent: "flex-end",
                     }}
                   >
-                    <div style={{ fontSize: 11, color: "#6B7280" }}>{p.stage}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted-strong)" }}>{p.stage}</div>
                     <div
                       style={{
                         fontSize: 16,
                         fontWeight: 600,
-                        color: "#111827",
+                        color: "var(--text-primary)",
                       }}
                     >
                       {p.count}
@@ -764,7 +768,7 @@ export default function HrPersonalizedDashboard({
             </div>
             <div
               style={{
-                borderTop: "0.5px solid #E5E7EB",
+                borderTop: "0.5px solid var(--status-track)",
                 paddingTop: 14,
                 display: "grid",
                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -772,7 +776,7 @@ export default function HrPersonalizedDashboard({
               }}
             >
               <div>
-                <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted-strong)", marginBottom: 4 }}>
                   Conversion rate
                 </div>
                 <div
@@ -786,15 +790,15 @@ export default function HrPersonalizedDashboard({
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted-strong)", marginBottom: 4 }}>
                   Avg. time to hire
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#111827" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
                   18 days
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted-strong)", marginBottom: 4 }}>
                   Hires this quarter
                 </div>
                 <div
@@ -817,7 +821,7 @@ export default function HrPersonalizedDashboard({
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#111827",
+                  color: "var(--text-primary)",
                   marginBottom: 12,
                 }}
               >
@@ -835,12 +839,12 @@ export default function HrPersonalizedDashboard({
                         style={{
                           fontSize: 13,
                           fontWeight: 500,
-                          color: "#111827",
+                          color: "var(--text-primary)",
                         }}
                       >
                         {p.name}
                       </div>
-                      <div style={{ fontSize: 11, color: "#6B7280" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted-strong)" }}>
                         {p.dept} · {p.days}
                       </div>
                     </div>
@@ -855,7 +859,7 @@ export default function HrPersonalizedDashboard({
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#111827",
+                  color: "var(--text-primary)",
                   marginBottom: 12,
                 }}
               >
@@ -873,12 +877,12 @@ export default function HrPersonalizedDashboard({
                         style={{
                           fontSize: 13,
                           fontWeight: 500,
-                          color: "#111827",
+                          color: "var(--text-primary)",
                         }}
                       >
                         {p.name}
                       </div>
-                      <div style={{ fontSize: 11, color: "#6B7280" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted-strong)" }}>
                         {p.dept} · last day {p.lastDay}
                       </div>
                     </div>
@@ -899,7 +903,7 @@ export default function HrPersonalizedDashboard({
               justifyContent: "space-between",
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
               Task board
             </div>
             <button
@@ -909,10 +913,10 @@ export default function HrPersonalizedDashboard({
                 alignItems: "center",
                 gap: 6,
                 padding: "7px 12px",
-                border: "0.5px solid #E5E7EB",
+                border: "0.5px solid var(--status-track)",
                 borderRadius: 8,
-                background: "#FFFFFF",
-                color: "#111827",
+                background: "var(--surface)",
+                color: "var(--text-primary)",
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: "pointer",
@@ -1020,8 +1024,8 @@ function KanbanColumn({
         <div
           key={`${title}-${idx}`}
           style={{
-            background: "#FFFFFF",
-            border: "0.5px solid #E5E7EB",
+            background: "var(--surface)",
+            border: "0.5px solid var(--status-track)",
             borderRadius: 10,
             padding: 12,
             display: "flex",
@@ -1034,13 +1038,13 @@ function KanbanColumn({
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: "#111827",
+                color: "var(--text-primary)",
                 lineHeight: 1.3,
               }}
             >
               {t.title}
             </div>
-            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted-strong)", marginTop: 2 }}>
               {t.subtitle}
             </div>
           </div>
@@ -1059,7 +1063,7 @@ function KanbanColumn({
               <div
                 style={{
                   fontSize: 11,
-                  color: "#6B7280",
+                  color: "var(--text-muted-strong)",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,

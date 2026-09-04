@@ -42,6 +42,17 @@ const JS_DAY_TO_FLOW_DAY: Partial<Record<number, (typeof FLOW_DAYS)[number]>> = 
   5: "Fri",
   6: "Sat",
 };
+// Reverse of the above — needed by removeTemplateAssigneeCore to turn its
+// caller-selected FLOW_DAYS weekday list into cancelPendingTemplateRuns'
+// own JS-Date.getDay() dueWeekday filter (2026-08-29, per-weekday removal).
+const FLOW_DAY_TO_JS_DAY: Record<(typeof FLOW_DAYS)[number], number> = {
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+  Sun: 0,
+};
 
 /** "Still pending" for the deletion cascade = any non-terminal status —
  *  DONE and SKIPPED (N/A) both count as resolved history and are KEPT.
@@ -136,17 +147,15 @@ export async function getTemplateEditImpactCore(
  *  removeTemplateAssignments (bulk "Remove Task") can reuse it without
  *  duplicating the logic.
  *
- *  `dueWeekday` (2026-08-07, added for Branch Package Schedule): optional
- *  JS `Date.getDay()` filter (0=Sun..6=Sat, matching tasks-internal.ts's
- *  DAY_INDEX) applied AFTER the DB fetch. Without it, cancelling one
- *  (templateId, assigneeId) pair cancels EVERY pending block for that pair
- *  regardless of which day it's due — fine for the existing callers (they
- *  mean "cancel this person's entire pending run of this template"), but
- *  wrong for Branch Package Schedule, where clearing/changing ONE grid cell
- *  (branch, weekday) must cancel only that weekday's recurring assignment
- *  and leave the same manager's OTHER-weekday assignment of the same
- *  package/template untouched. Both existing call sites omit it and keep
- *  their unfiltered (all-weekdays) behavior unchanged.
+ *  `dueWeekday` (2026-08-07, added for Branch Package Schedule; accepts an
+ *  array too as of 2026-08-29 for removeTemplateAssigneeCore's per-weekday
+ *  removal): optional JS `Date.getDay()` filter (0=Sun..6=Sat, matching
+ *  tasks-internal.ts's DAY_INDEX) applied AFTER the DB fetch. Without it,
+ *  cancelling one (templateId, assigneeId) pair cancels EVERY pending block
+ *  for that pair regardless of which day it's due — fine for callers that
+ *  mean "cancel this person's entire pending run of this template", but
+ *  wrong for Branch Package Schedule (ONE grid cell, ONE weekday) and for
+ *  Remove Assignee (now also scoped to the selected weekday(s) only).
  *
  *  `dueDateRange` (2026-08-22, added for removeTemplateAssigneeCore's
  *  same-day-onward rule; `to` made optional 2026-08-27 — see that
@@ -160,9 +169,10 @@ export async function cancelPendingTemplateRuns(
   templateId: string,
   reason: string,
   assigneeId?: string,
-  dueWeekday?: number,
+  dueWeekday?: number | number[],
   dueDateRange?: { from: Date; to?: Date },
 ) {
+  const dueWeekdays = dueWeekday === undefined ? undefined : Array.isArray(dueWeekday) ? dueWeekday : [dueWeekday];
   const blocks = await prisma.runBlock.findMany({
     where: {
       templateId,
@@ -174,13 +184,13 @@ export async function cancelPendingTemplateRuns(
     },
     select: { runId: true, status: true, dueAt: true },
   });
-  // `b.dueAt?.getDay()` is `undefined` for a null dueAt, which never equals
-  // a numeric dueWeekday — a block with no due date is silently excluded
-  // whenever a weekday filter is applied. Harmless today: every current
-  // dueWeekday caller (Branch Package Schedule) always creates its blocks
-  // via assignFlowTaskCore with `days: [weekday]`, which always sets dueAt.
+  // `b.dueAt?.getDay()` is `undefined` for a null dueAt, which is never
+  // `.includes()`d in dueWeekdays — a block with no due date is silently
+  // excluded whenever a weekday filter is applied. Harmless today: every
+  // current dueWeekday caller creates its blocks via assignFlowTaskCore
+  // with `days: [...]`, which always sets dueAt.
   const matchingBlocks =
-    dueWeekday === undefined ? blocks : blocks.filter((b) => b.dueAt?.getDay() === dueWeekday);
+    dueWeekdays === undefined ? blocks : blocks.filter((b) => b.dueAt !== null && dueWeekdays.includes(b.dueAt.getDay()));
   const pendingRunIds = [
     ...new Set(
       matchingBlocks
@@ -202,7 +212,7 @@ export async function cancelPendingTemplateRuns(
           templateId,
           cancelledRuns: pendingRunIds.length,
           ...(assigneeId ? { assigneeId } : {}),
-          ...(dueWeekday !== undefined ? { dueWeekday } : {}),
+          ...(dueWeekdays !== undefined ? { dueWeekdays } : {}),
         },
       },
     });
@@ -434,14 +444,18 @@ export interface TemplateAssignee {
   days: (typeof FLOW_DAYS)[number][];
 }
 
-/** Who currently holds a PENDING instance of this template AND hasn't been
- *  excluded (removeTemplateAssigneeCore) — Core version with NO
+/** Who currently holds a PENDING instance of this template on at least one
+ *  NON-excluded weekday (removeTemplateAssigneeCore) — Core version with NO
  *  templateGroupId filter (unlike ./templates's own getTemplateAssignees),
  *  so data/template-groups.ts can call this on group-member rows to
- *  aggregate a group's assignees. An excluded person's still-pending
- *  instance is real and untouched (see removeTemplateAssigneeCore's doc
- *  comment) but they no longer count as "currently assigned" here — the
- *  whole point of exclusion is that they've been removed going forward. */
+ *  aggregate a group's assignees. Exclusion is now PER-WEEKDAY (2026-08-29):
+ *  a person excluded on only some of their days still shows here, just with
+ *  `days`/`pendingTasks` narrowed down to the days that aren't excluded —
+ *  only a person excluded on EVERY day they'd otherwise appear on drops out
+ *  entirely. Their still-pending instances on an excluded day are real and
+ *  untouched (see removeTemplateAssigneeCore's doc comment) but don't count
+ *  as "currently assigned" here — the whole point of exclusion is that
+ *  they've been removed from that day going forward. */
 export async function getTemplateAssigneesCore(
   user: { id: string },
   templateId: string,
@@ -463,15 +477,18 @@ export async function getTemplateAssigneesCore(
       },
       select: { assigneeId: true, dueAt: true },
     }),
-    prisma.taskTemplateExcludedAssignee.findMany({ where: { templateId: id }, select: { userId: true } }),
+    prisma.taskTemplateExcludedAssignee.findMany({ where: { templateId: id }, select: { userId: true, weekday: true } }),
   ]);
-  const excludedIds = new Set(excluded.map((e) => e.userId));
+  const excludedDays = new Set(excluded.map((e) => `${e.userId}::${e.weekday}`));
   const counts = new Map<string, number>();
   const days = new Map<string, Set<(typeof FLOW_DAYS)[number]>>();
   for (const p of parents) {
-    if (excludedIds.has(p.assigneeId)) continue;
-    counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
     const day = p.dueAt ? JS_DAY_TO_FLOW_DAY[p.dueAt.getDay()] : undefined;
+    // An undated block (no day to exclude by) always counts; a dated one
+    // is skipped only if THIS SPECIFIC (assignee, weekday) is excluded —
+    // their other days of the same template are unaffected.
+    if (day && excludedDays.has(`${p.assigneeId}::${day}`)) continue;
+    counts.set(p.assigneeId, (counts.get(p.assigneeId) ?? 0) + 1);
     if (day) {
       const set = days.get(p.assigneeId) ?? new Set();
       set.add(day);
@@ -490,90 +507,121 @@ export async function getTemplateAssigneesCore(
 }
 
 /** "Remove Assignee" (View Assignees modal, 2026-08-22 rule — corrected
- *  same day; 2026-08-27 fix — see below): cancels every instance due TODAY
- *  OR LATER (per the module's todayStart() day-boundary convention, same
- *  one engine/recurrence.ts uses — respects TM_RESET_HOUR, not naive
- *  midnight) — this person is no longer expected to complete any of them.
- *  Anything due BEFORE today is left completely untouched regardless of
- *  status (pending, overdue, completed). It also records a
- *  TaskTemplateExcludedAssignee row, which:
- *   1) drops this person out of getTemplateAssigneesCore's "currently
- *      assigned" list (above) even while a past-dated pending instance is
- *      still naturally running its course, and
+ *  same day; 2026-08-27 fix; made PER-WEEKDAY 2026-08-29 — see below for
+ *  both): for each of the given `weekdays`, cancels every instance due on
+ *  that weekday, TODAY OR LATER (per the module's todayStart() day-boundary
+ *  convention, same one engine/recurrence.ts uses — respects TM_RESET_HOUR,
+ *  not naive midnight) — this person is no longer expected to complete any
+ *  of them. The person's OTHER weekdays of this same template (not in
+ *  `weekdays`) are entirely untouched, and anything due BEFORE today is
+ *  left completely untouched regardless of status (pending, overdue,
+ *  completed), on ANY weekday. It also records one TaskTemplateExcludedAssignee
+ *  row per given weekday, which:
+ *   1) narrows this person's `days`/`pendingTasks` in
+ *      getTemplateAssigneesCore's "currently assigned" list (above) down to
+ *      their non-excluded weekdays, even while a past-dated pending
+ *      instance on an excluded day is still naturally running its course,
+ *      and
  *   2) makes engine/recurrence.ts's advanceRecurringBlocks stop generating
- *      NEW successors for this (template, assignee) pair from here on —
- *      NOT permanently, though: assignFlowTaskCore (data/tasks-internal.ts,
- *      the shared fan-out every assign path funnels through) clears this
- *      exact row the moment someone explicitly re-assigns this template's
- *      task to this person again (2026-08-28 fix) — an explicit re-assign
- *      is a deliberate "put them back on this" decision, so it un-does the
- *      exclusion rather than leaving the fresh task to silently never
- *      auto-recur past its own due date.
+ *      NEW successors due on that weekday for this (template, assignee)
+ *      pair from here on — NOT permanently, though: assignFlowTaskCore
+ *      (data/tasks-internal.ts, the shared fan-out every assign path
+ *      funnels through) clears the row for whichever weekday(s) are being
+ *      (re-)assigned the moment someone explicitly re-assigns this
+ *      template's task to this person on that day again (2026-08-28 fix)
+ *      — an explicit re-assign is a deliberate "put them back on this"
+ *      decision, so it un-does the exclusion rather than leaving the fresh
+ *      task to silently never auto-recur past its own due date.
  *
- *  2026-08-27 bug fix: this used to cancel ONLY today's instance (a
- *  `dueAt` window of exactly [today, tomorrow)), on the assumption that at
- *  most one pending instance could exist at a time. That's false for a
- *  template assigned across several weekdays at once (e.g. "Tue-Sat" —
- *  assignFlowTaskCore's `days` fan-out creates one block PER selected day
- *  in a single call, all up front) — this week's later-weekday blocks
- *  (e.g. Thu/Fri/Sat, already created days earlier alongside Tuesday's)
- *  are due AFTER today but are NOT new recurrence successors the
- *  exclusion row would have blocked; they already existed, so they kept
- *  showing up on the removed person's list for days after removal. Now
- *  cancelling everything from today onward (dueDateRange has no `to`
- *  bound) closes that gap while the documented "before today" exception
- *  (overdue work already in progress) is unchanged.
+ *  2026-08-27 bug fix (the cancellation window): this used to cancel ONLY
+ *  today's instance (a `dueAt` window of exactly [today, tomorrow)), on the
+ *  assumption that at most one pending instance could exist at a time.
+ *  That's false for a template assigned across several weekdays at once
+ *  (e.g. "Tue-Sat" — assignFlowTaskCore's `days` fan-out creates one block
+ *  PER selected day in a single call, all up front) — this week's
+ *  later-weekday blocks (e.g. Thu/Fri/Sat, already created days earlier
+ *  alongside Tuesday's) are due AFTER today but are NOT new recurrence
+ *  successors the exclusion row would have blocked; they already existed,
+ *  so they kept showing up on the removed person's list for days after
+ *  removal. Now cancelling everything from today onward (dueDateRange has
+ *  no `to` bound) closes that gap while the documented "before today"
+ *  exception (overdue work already in progress) is unchanged.
  *
- *  Idempotent (upsert on the unique (templateId, userId) pair). No
- *  templateGroupId filter — same reasoning as getTemplateAssigneesCore,
- *  meant to be usable on group members via data/template-groups.ts.
- *  pendingKept is purely informational: how many past-dated instances are
- *  still open and will keep running exactly as before. */
+ *  2026-08-29: made per-weekday (was all-or-nothing per (templateId,
+ *  userId)) — a person on a template spanning several days can now be
+ *  removed from just some of them, per the View Assignees modal's own
+ *  day-picker (shown whenever a person holds more than one day).
+ *
+ *  Idempotent (upsert on the unique (templateId, userId, weekday) triple
+ *  per given weekday). No templateGroupId filter — same reasoning as
+ *  getTemplateAssigneesCore, meant to be usable on group members via
+ *  data/template-groups.ts. pendingKept is purely informational: how many
+ *  of the SELECTED weekdays' past-dated instances are still open and will
+ *  keep running exactly as before. */
 export async function removeTemplateAssigneeCore(
   user: { id: string },
   templateId: string,
   assigneeId: string,
+  weekdays: (typeof FLOW_DAYS)[number][],
 ): Promise<{ excluded: true; cancelledPending: number; pendingKept: number }> {
   const id = z.string().min(1).parse(templateId);
   const targetAssigneeId = z.string().min(1).parse(assigneeId);
+  const targetWeekdays = z.array(z.enum(FLOW_DAYS)).min(1).parse(weekdays);
   const template = await prisma.taskTemplate.findFirst({
     where: { id, createdById: user.id },
     select: { id: true },
   });
   if (!template) throw new ApiHttpError(404, "Template not found");
 
-  const totalPendingBefore = await prisma.runBlock.count({
+  const jsWeekdays = targetWeekdays.map((d) => FLOW_DAY_TO_JS_DAY[d]);
+  const pendingBefore = await prisma.runBlock.findMany({
     where: {
       templateId: id,
       assigneeId: targetAssigneeId,
       status: { in: [...PENDING_STATUSES] },
       run: { status: { not: "CANCELLED" }, archivedAt: null },
     },
+    select: { dueAt: true },
   });
+  const totalPendingBefore = pendingBefore.filter(
+    (b) => b.dueAt !== null && jsWeekdays.includes(b.dueAt.getDay()),
+  ).length;
 
   // Today OR LATER (no `to` bound) — 2026-08-27 fix, see this function's
   // own doc comment for why an upper bound left later-this-week instances
   // (already created ahead of time by a multi-day fan-out) uncancelled.
+  // Scoped to jsWeekdays only — 2026-08-29 fix, the other weekdays of this
+  // same template stay completely untouched.
   const todayBoundary = todayStart();
   const { removedTasks: cancelledPending } = await cancelPendingTemplateRuns(
     user.id,
     id,
     "template-assignee-removed",
     targetAssigneeId,
-    undefined,
+    jsWeekdays,
     { from: todayBoundary },
   );
 
-  await prisma.taskTemplateExcludedAssignee.upsert({
-    where: { templateId_userId: { templateId: id, userId: targetAssigneeId } },
-    create: { templateId: id, userId: targetAssigneeId },
-    update: {},
-  });
+  await Promise.all(
+    targetWeekdays.map((weekday) =>
+      prisma.taskTemplateExcludedAssignee.upsert({
+        where: { templateId_userId_weekday: { templateId: id, userId: targetAssigneeId, weekday } },
+        create: { templateId: id, userId: targetAssigneeId, weekday },
+        update: {},
+      }),
+    ),
+  );
   await prisma.auditLog.create({
     data: {
       actorId: user.id,
       action: "TEMPLATE_ASSIGNEE_EXCLUDED",
-      detail: { templateId: id, assigneeId: targetAssigneeId, cancelledPending, pendingKept: totalPendingBefore - cancelledPending },
+      detail: {
+        templateId: id,
+        assigneeId: targetAssigneeId,
+        weekdays: targetWeekdays,
+        cancelledPending,
+        pendingKept: totalPendingBefore - cancelledPending,
+      },
     },
   });
   return { excluded: true, cancelledPending, pendingKept: totalPendingBefore - cancelledPending };

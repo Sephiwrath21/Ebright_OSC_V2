@@ -137,17 +137,28 @@ export type BranchPackageSchedule = $Result.DefaultSelection<Prisma.$BranchPacka
 export type TaskTemplate = $Result.DefaultSelection<Prisma.$TaskTemplatePayload>
 /**
  * Model TaskTemplateExcludedAssignee
- * "Remove Assignee" persistence (2026-08-22): the View Assignees modal's
- * Remove button no longer cancels any FlowRun/RunBlock at all — see
- * removeTemplateAssigneeCore's doc comment in data/templates-internal.ts
- * for the full rule. A row here means (templateId, userId) should stop
- * receiving NEW recurring instances of this template from here on, while
- * every already-created instance (pending, overdue, completed, including
- * today's) is left completely untouched. advanceRecurringBlocks
- * (engine/recurrence.ts) consults this before generating a successor;
- * getTemplateAssigneesCore filters excluded people out of the "currently
- * assigned" list even while their last pending instance is still
- * naturally running its course. Cascade-deleted with the template.
+ * "Remove Assignee" persistence (2026-08-22, cancellation window widened
+ * 2026-08-27, made PER-WEEKDAY 2026-08-29) — see removeTemplateAssigneeCore's
+ * doc comment in data/templates-internal.ts for the full rule. A row here
+ * means (templateId, userId, weekday) should stop receiving NEW recurring
+ * instances due on that ONE weekday from here on — the person's other
+ * weekdays of the same template are unaffected — while every instance
+ * dated BEFORE today (pending, overdue, or completed) is left completely
+ * untouched; today's and every later already-created instance ON THAT
+ * WEEKDAY gets cancelled at removal time. "Remove all days" (the original
+ * 2026-08-22 behavior) is now just one row per FLOW_DAYS the person
+ * currently holds, not a separate blanket mode — see the View Assignees
+ * modal's own doc comment for the day-picker this feeds.
+ * advanceRecurringBlocks (engine/recurrence.ts) consults this before
+ * generating a successor (matched against the successor's OWN due
+ * weekday); getTemplateAssigneesCore filters a person's `days` down to
+ * only their non-excluded weekdays rather than hiding them outright.
+ * NOT permanent (2026-08-28 fix): assignFlowTaskCore clears the row(s)
+ * for whichever weekday(s) are being (re-)assigned the moment someone is
+ * explicitly re-assigned this template's task on that day again — before
+ * that fix, a removed-then-re-assigned person's fresh task would itself
+ * silently never auto-recur, forcing whoever assigned it to keep
+ * re-creating it by hand indefinitely. Cascade-deleted with the template.
  */
 export type TaskTemplateExcludedAssignee = $Result.DefaultSelection<Prisma.$TaskTemplateExcludedAssigneePayload>
 /**
@@ -22755,6 +22766,7 @@ export namespace Prisma {
     id: string | null
     templateId: string | null
     userId: string | null
+    weekday: string | null
     createdAt: Date | null
   }
 
@@ -22762,6 +22774,7 @@ export namespace Prisma {
     id: string | null
     templateId: string | null
     userId: string | null
+    weekday: string | null
     createdAt: Date | null
   }
 
@@ -22769,6 +22782,7 @@ export namespace Prisma {
     id: number
     templateId: number
     userId: number
+    weekday: number
     createdAt: number
     _all: number
   }
@@ -22778,6 +22792,7 @@ export namespace Prisma {
     id?: true
     templateId?: true
     userId?: true
+    weekday?: true
     createdAt?: true
   }
 
@@ -22785,6 +22800,7 @@ export namespace Prisma {
     id?: true
     templateId?: true
     userId?: true
+    weekday?: true
     createdAt?: true
   }
 
@@ -22792,6 +22808,7 @@ export namespace Prisma {
     id?: true
     templateId?: true
     userId?: true
+    weekday?: true
     createdAt?: true
     _all?: true
   }
@@ -22872,6 +22889,7 @@ export namespace Prisma {
     id: string
     templateId: string
     userId: string
+    weekday: string
     createdAt: Date
     _count: TaskTemplateExcludedAssigneeCountAggregateOutputType | null
     _min: TaskTemplateExcludedAssigneeMinAggregateOutputType | null
@@ -22896,6 +22914,7 @@ export namespace Prisma {
     id?: boolean
     templateId?: boolean
     userId?: boolean
+    weekday?: boolean
     createdAt?: boolean
     template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
@@ -22904,6 +22923,7 @@ export namespace Prisma {
     id?: boolean
     templateId?: boolean
     userId?: boolean
+    weekday?: boolean
     createdAt?: boolean
     template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
@@ -22912,6 +22932,7 @@ export namespace Prisma {
     id?: boolean
     templateId?: boolean
     userId?: boolean
+    weekday?: boolean
     createdAt?: boolean
     template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
@@ -22920,10 +22941,11 @@ export namespace Prisma {
     id?: boolean
     templateId?: boolean
     userId?: boolean
+    weekday?: boolean
     createdAt?: boolean
   }
 
-  export type TaskTemplateExcludedAssigneeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "templateId" | "userId" | "createdAt", ExtArgs["result"]["taskTemplateExcludedAssignee"]>
+  export type TaskTemplateExcludedAssigneeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "templateId" | "userId" | "weekday" | "createdAt", ExtArgs["result"]["taskTemplateExcludedAssignee"]>
   export type TaskTemplateExcludedAssigneeInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     template?: boolean | TaskTemplateDefaultArgs<ExtArgs>
   }
@@ -22943,6 +22965,7 @@ export namespace Prisma {
       id: string
       templateId: string
       userId: string
+      weekday: string
       createdAt: Date
     }, ExtArgs["result"]["taskTemplateExcludedAssignee"]>
     composites: {}
@@ -23371,6 +23394,7 @@ export namespace Prisma {
     readonly id: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
     readonly templateId: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
     readonly userId: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
+    readonly weekday: FieldRef<"TaskTemplateExcludedAssignee", 'String'>
     readonly createdAt: FieldRef<"TaskTemplateExcludedAssignee", 'DateTime'>
   }
     
@@ -33608,6 +33632,7 @@ export namespace Prisma {
     id: 'id',
     templateId: 'templateId',
     userId: 'userId',
+    weekday: 'weekday',
     createdAt: 'createdAt'
   };
 
@@ -35321,6 +35346,7 @@ export namespace Prisma {
     id?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    weekday?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
     template?: XOR<TaskTemplateScalarRelationFilter, TaskTemplateWhereInput>
   }
@@ -35329,26 +35355,29 @@ export namespace Prisma {
     id?: SortOrder
     templateId?: SortOrder
     userId?: SortOrder
+    weekday?: SortOrder
     createdAt?: SortOrder
     template?: TaskTemplateOrderByWithRelationInput
   }
 
   export type TaskTemplateExcludedAssigneeWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    templateId_userId?: TaskTemplateExcludedAssigneeTemplateIdUserIdCompoundUniqueInput
+    templateId_userId_weekday?: TaskTemplateExcludedAssigneeTemplateIdUserIdWeekdayCompoundUniqueInput
     AND?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
     OR?: TaskTemplateExcludedAssigneeWhereInput[]
     NOT?: TaskTemplateExcludedAssigneeWhereInput | TaskTemplateExcludedAssigneeWhereInput[]
     templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    weekday?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
     template?: XOR<TaskTemplateScalarRelationFilter, TaskTemplateWhereInput>
-  }, "id" | "templateId_userId">
+  }, "id" | "templateId_userId_weekday">
 
   export type TaskTemplateExcludedAssigneeOrderByWithAggregationInput = {
     id?: SortOrder
     templateId?: SortOrder
     userId?: SortOrder
+    weekday?: SortOrder
     createdAt?: SortOrder
     _count?: TaskTemplateExcludedAssigneeCountOrderByAggregateInput
     _max?: TaskTemplateExcludedAssigneeMaxOrderByAggregateInput
@@ -35362,6 +35391,7 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
     templateId?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
     userId?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
+    weekday?: StringWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | string
     createdAt?: DateTimeWithAggregatesFilter<"TaskTemplateExcludedAssignee"> | Date | string
   }
 
@@ -37359,6 +37389,7 @@ export namespace Prisma {
   export type TaskTemplateExcludedAssigneeCreateInput = {
     id?: string
     userId: string
+    weekday: string
     createdAt?: Date | string
     template: TaskTemplateCreateNestedOneWithoutExcludedAssigneesInput
   }
@@ -37367,12 +37398,14 @@ export namespace Prisma {
     id?: string
     templateId: string
     userId: string
+    weekday: string
     createdAt?: Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     template?: TaskTemplateUpdateOneRequiredWithoutExcludedAssigneesNestedInput
   }
@@ -37381,6 +37414,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     templateId?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -37388,12 +37422,14 @@ export namespace Prisma {
     id?: string
     templateId: string
     userId: string
+    weekday: string
     createdAt?: Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -37401,6 +37437,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     templateId?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -39334,15 +39371,17 @@ export namespace Prisma {
     isNot?: TaskTemplateWhereInput
   }
 
-  export type TaskTemplateExcludedAssigneeTemplateIdUserIdCompoundUniqueInput = {
+  export type TaskTemplateExcludedAssigneeTemplateIdUserIdWeekdayCompoundUniqueInput = {
     templateId: string
     userId: string
+    weekday: string
   }
 
   export type TaskTemplateExcludedAssigneeCountOrderByAggregateInput = {
     id?: SortOrder
     templateId?: SortOrder
     userId?: SortOrder
+    weekday?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -39350,6 +39389,7 @@ export namespace Prisma {
     id?: SortOrder
     templateId?: SortOrder
     userId?: SortOrder
+    weekday?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -39357,6 +39397,7 @@ export namespace Prisma {
     id?: SortOrder
     templateId?: SortOrder
     userId?: SortOrder
+    weekday?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -44195,12 +44236,14 @@ export namespace Prisma {
   export type TaskTemplateExcludedAssigneeCreateWithoutTemplateInput = {
     id?: string
     userId: string
+    weekday: string
     createdAt?: Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUncheckedCreateWithoutTemplateInput = {
     id?: string
     userId: string
+    weekday: string
     createdAt?: Date | string
   }
 
@@ -44307,6 +44350,7 @@ export namespace Prisma {
     id?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     templateId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     userId?: StringFilter<"TaskTemplateExcludedAssignee"> | string
+    weekday?: StringFilter<"TaskTemplateExcludedAssignee"> | string
     createdAt?: DateTimeFilter<"TaskTemplateExcludedAssignee"> | Date | string
   }
 
@@ -45906,24 +45950,28 @@ export namespace Prisma {
   export type TaskTemplateExcludedAssigneeCreateManyTemplateInput = {
     id?: string
     userId: string
+    weekday: string
     createdAt?: Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUpdateWithoutTemplateInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUncheckedUpdateWithoutTemplateInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type TaskTemplateExcludedAssigneeUncheckedUpdateManyWithoutTemplateInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    weekday?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
