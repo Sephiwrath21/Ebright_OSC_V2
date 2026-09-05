@@ -18,6 +18,7 @@
     "crm:generate": "prisma generate --config prisma.crm.config.ts",
     "crm:validate": "prisma validate --config prisma.crm.config.ts",
     "sync:sms-staff": "tsx scripts/sync-staff-to-sms.ts",
+    "sync:sms-students": "tsx scripts/sync-students-to-sms.ts",
     "link:recruitment-drive": "tsx scripts/link-recruitment-drive-files.ts"
   },
   "dependencies": {
