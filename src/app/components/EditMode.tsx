@@ -63,7 +63,14 @@ export function EditableSection({ onSave, hasRealBacking = true, canEdit = true,
     return () => pageEdit.unregister(sectionLabel);
   });
 
-  const editing = pageEdit ? pageEdit.isEditing : localEditing;
+  // canEdit is a hard gate here too (2026-08-28, see conversation), not just
+  // the standalone button's own condition below — inside a PageEditProvider,
+  // `editing` used to come from pageEdit.isEditing alone, so a viewer who
+  // can't edit but somehow ended up in a page-level editing session (the
+  // actual bug: PageEditToggleButton never checked canEdit at all) would
+  // still see this section render fully editable, regardless of its own
+  // canEdit prop.
+  const editing = canEdit && (pageEdit ? pageEdit.isEditing : localEditing);
   const saving = pageEdit ? pageEdit.saving : localSaving;
 
   // Standalone mode only — inside a PageEditProvider, PageEditToggleButton
