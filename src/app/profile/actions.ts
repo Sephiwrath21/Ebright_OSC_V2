@@ -306,6 +306,19 @@ export async function updateOrgUnit(
     return { ok: false, error: "Please select a branch or department." };
   }
 
+  // A department only ever sits under HQ, so picking one implies the branch:
+  // look HQ up by code and attach it, instead of leaving branch empty and
+  // making every "which branch is this person at?" query treat HQ staff as
+  // unassigned. If the HQ row is missing the save still goes through with no
+  // branch, exactly as before.
+  if (departmentId !== null) {
+    const hq = await prisma.branch.findFirst({
+      where: { branch_code: "HQ" },
+      select: { branch_id: true },
+    });
+    if (hq) branchId = hq.branch_id;
+  }
+
   const existingEmployment = user.employment[0];
   const branchRel = branchId !== null
     ? { connect: { branch_id: branchId } }
