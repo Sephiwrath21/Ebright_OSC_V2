@@ -40,7 +40,7 @@ function crmPool(): Pool {
   return globalForPool.__smsStudentSyncPool;
 }
 
-/** The stages a child is handed over at, and nothing else.
+/** The stages that hand a child over.
  *
  * A child goes to SMS when their trial is BOOKED — the coach needs them on the
  * register before they walk in — and again if they enroll. Everything
@@ -48,7 +48,18 @@ function crmPool(): Pool {
  * record SMS already holds: 584 of the 601 enrolled leads carry a trial date.
  * The stages that never reached a trial at all (cold, unresponsive, do not
  * disturb, follow-ups) are not students and stay in CNS. */
-const HANDOVER_STAGES = ["CT", "CTB", "RSD", "ENR", "DEP"] as const;
+const HANDOVER_STAGES = ["CT", "CTB", "ENR", "DEP"] as const;
+
+/** Read, but never a reason to start a queue row.
+ *
+ * Reschedule sits BEFORE Trial Buffer and Confirmed-for-Trial in the CNS
+ * funnel, and only 63 of its 194 leads have a trial date at all — it is a
+ * trial being moved or not yet pinned down, not a trial being booked. So it is
+ * news about a child SMS may already hold: worth taking, because it carries
+ * the new date, and not worth putting in front of a branch manager on its own. */
+const UPDATE_ONLY_STAGES = ["RSD"] as const;
+
+const READ_STAGES = [...HANDOVER_STAGES, ...UPDATE_ONLY_STAGES];
 
 interface ReportRow {
   branch_code: string | null;
@@ -74,6 +85,8 @@ export interface SmsEnrollmentRequest {
   externalStageCode: string;
   externalTrialDate?: string;
   note: string;
+  /** True for a stage that may update a request but must never start one. */
+  updateOnly?: boolean;
   parents: {
     guardianEmail?: string;
     guardianFullName: string;
@@ -174,7 +187,7 @@ function kualaLumpurDate(value: Date | null): string | undefined {
 
 export async function collectLeadsForSms(options: CollectOptions): Promise<CollectResult> {
   const { rows } = await crmPool().query<ReportRow>(CHANGED_SINCE, [
-    [...HANDOVER_STAGES],
+    READ_STAGES,
     options.since,
   ]);
 
@@ -215,6 +228,9 @@ export async function collectLeadsForSms(options: CollectOptions): Promise<Colle
       externalStageCode: stage,
       externalTrialDate: kualaLumpurDate(row.trial_date),
       note: `From CNS — ${text(row.current_stage) ?? stage}.`,
+      ...((UPDATE_ONLY_STAGES as readonly string[]).includes(stage)
+        ? { updateOnly: true }
+        : {}),
       parents: [
         {
           guardianEmail: email,
@@ -242,6 +258,8 @@ export interface PushOutcome {
   failures: { error: string; externalId: string }[];
   /** Already approved or declined, and nothing about it moved. */
   left: number;
+  /** Update-only news about a lead SMS was never given. */
+  skipped: number;
   /** A request already in the queue, brought up to date. */
   refreshed: number;
   /** An approved trial, or a declined lead, back in the queue having enrolled. */
@@ -260,7 +278,14 @@ export async function pushLeadsToSms(records: SmsEnrollmentRequest[]): Promise<P
   }
 
   const endpoint = `${baseUrl.replace(/\/+$/, "")}/api/v1/enrollments/submissions`;
-  const outcome: PushOutcome = { created: 0, failures: [], left: 0, refreshed: 0, reopened: 0 };
+  const outcome: PushOutcome = {
+    created: 0,
+    failures: [],
+    left: 0,
+    refreshed: 0,
+    reopened: 0,
+    skipped: 0,
+  };
 
   for (const record of records) {
     const response = await fetch(endpoint, {
@@ -293,6 +318,9 @@ export async function pushLeadsToSms(records: SmsEnrollmentRequest[]): Promise<P
         break;
       case "REOPEN":
         outcome.reopened++;
+        break;
+      case "SKIPPED":
+        outcome.skipped++;
         break;
       default:
         outcome.left++;

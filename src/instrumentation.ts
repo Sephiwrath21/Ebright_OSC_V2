@@ -319,7 +319,8 @@ export async function register(): Promise<void> {
       console.log(
         `[sms-student-sync] ${records.length} sent — new ${outcome?.created ?? 0}, ` +
           `refreshed ${outcome?.refreshed ?? 0}, reopened ${outcome?.reopened ?? 0}, ` +
-          `left alone ${outcome?.left ?? 0}, failed ${outcome?.failures.length ?? 0}; ` +
+          `left alone ${outcome?.left ?? 0}, nothing to update ${outcome?.skipped ?? 0}, ` +
+          `failed ${outcome?.failures.length ?? 0}; ` +
           `${skipped.length} skipped`,
       );
       // Every failure here is a lead a human has to look at.

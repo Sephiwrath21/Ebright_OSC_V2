@@ -68,7 +68,7 @@ function countBy<T>(items: T[], key: (item: T) => string): Record<string, number
   if (records.length > 0) {
     console.table(countBy(records, (r) => r.branchCode));
     console.log(
-      `stage: ${JSON.stringify(countBy(records, (r) => r.externalStageCode))}` +
+      `stage: ${JSON.stringify(countBy(records, (r) => r.externalStageCode + (r.updateOnly ? " (update only)" : "")))}` +
         `\nchild named: ${records.filter((r) => r.student.studentFullName).length}` +
         ` · date of birth: ${records.filter((r) => r.student.studentDateOfBirth).length}` +
         ` · gender: ${records.filter((r) => r.student.studentGender).length}` +
@@ -96,7 +96,7 @@ function countBy<T>(items: T[], key: (item: T) => string): Record<string, number
   console.log(
     `\nnew requests: ${outcome.created} · refreshed: ${outcome.refreshed}` +
       ` · reopened: ${outcome.reopened} · left alone: ${outcome.left}` +
-      ` · failed: ${outcome.failures.length}`,
+      ` · nothing to update: ${outcome.skipped} · failed: ${outcome.failures.length}`,
   );
   for (const failure of outcome.failures) {
     console.log(`  FAILED ${failure.externalId}: ${failure.error}`);
