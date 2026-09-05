@@ -18,7 +18,18 @@ function getDriveClient(): drive_v3.Drive {
   const auth = new google.auth.JWT({
     email,
     key: rawKey.trim().replace(/^"|"$/g, "").trim().replace(/\\n/g, "\n"),
-    scopes: ["https://www.googleapis.com/auth/drive.file"],
+    // drive.readonly added 2026-09-04 (see conversation) alongside the
+    // original drive.file — additive, not a replacement: drive.file still
+    // covers every existing upload/delete (uploadToDrive/deleteFromDrive
+    // only ever touch files this same service account created itself, which
+    // drive.file already grants full access to on its own). drive.readonly
+    // is what getDriveMeta/streamFromDrive actually need for "View file" to
+    // work on a file this account didn't create but was merely shared into —
+    // confirmed live: drive.file alone returned "File not found" for a real
+    // folder inside GOOGLE_DRIVE_RECRUITMENT_HIRED_ID (shared by the
+    // recruitment team, not created by this app), while drive.readonly (or
+    // this combined scope set) can see it.
+    scopes: ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.readonly"],
   });
 
   cachedClient = google.drive({ version: "v3", auth });
