@@ -1,17 +1,24 @@
 import { Pool } from "pg";
 
-// Pushes students from CNS (the CRM) into ebrightsms, which cannot pull: it
-// holds no CRM credentials and has no route to that database. Mirrors
-// smsStaffSync.ts — POST /api/v1/students/sync/bulk, authenticated with an
-// ebrightsms API key carrying the students:sync scope.
+// Hands CNS leads to the ebrightsms enrollment queue, which cannot pull them:
+// it holds no CRM credentials and has no route to that database. Mirrors
+// smsStaffSync.ts — POST /api/v1/enrollments/submissions, authenticated with an
+// ebrightsms API key carrying the students:create scope.
+//
+// Nothing here creates a student. A lead lands in the same review queue staff
+// already work for the public enrollment form, and a branch manager completes
+// it and approves it. That is the whole point of the handover: CNS records the
+// parent and the phone, and names the child in about one lead in eight, so the
+// details have to be finished by someone who can pick up a phone.
 //
 // Deliberately self-contained (its own pg pool, NO `import "server-only"`) so
 // it runs both inside Next and from a plain CLI (npm run sync:sms-students),
 // following smsStaffSync.ts.
 //
-// SOURCE: crm.crm_trial_enrolment_report, a report table CNS refreshes. Its
-// primary key (opportunity_id) is what ebrightsms remembers, so a record is
-// only ever taken once.
+// SOURCE: crm.crm_trial_enrolment_report, a report table CNS refreshes.
+// opportunity_id is its primary key and is what ebrightsms remembers, so the
+// same lead arriving again updates the request it already has rather than
+// making a second one.
 
 const globalForPool = globalThis as unknown as { __smsStudentSyncPool?: Pool };
 
@@ -33,86 +40,100 @@ function crmPool(): Pool {
   return globalForPool.__smsStudentSyncPool;
 }
 
+/** The stages a child is handed over at, and nothing else.
+ *
+ * A child goes to SMS when their trial is BOOKED — the coach needs them on the
+ * register before they walk in — and again if they enroll. Everything
+ * downstream (showed up, no-showed, showed up and didn't enroll) happens to a
+ * record SMS already holds: 584 of the 601 enrolled leads carry a trial date.
+ * The stages that never reached a trial at all (cold, unresponsive, do not
+ * disturb, follow-ups) are not students and stay in CNS. */
+const HANDOVER_STAGES = ["CT", "CTB", "RSD", "ENR", "DEP"] as const;
+
 interface ReportRow {
   branch_code: string | null;
   child_dob: string | null;
   child_gender: string | null;
   child_name: string | null;
+  current_stage: string | null;
   current_stage_code: string | null;
-  details_verified_at: Date | null;
   email: string | null;
-  enrolled_at: Date | null;
   opportunity_id: string;
   parent_full_name: string | null;
   parent_gender: string | null;
   parent_name: string | null;
   phone: string | null;
   relationship: string | null;
-  student_id: string | null;
+  trial_date: Date | null;
 }
 
-/** The payload shape of ebrightsms's StudentSyncSchema (lib/student-sync.ts). */
-export interface SmsStudentRecord {
+/** The payload shape of ebrightsms's CnsSubmissionSchema. */
+export interface SmsEnrollmentRequest {
   branchCode: string;
-  enrolledAt?: string;
-  externalCode?: string;
-  externalId: string;
-  externalStage?: string;
-  guardian?: {
-    email?: string;
-    fullName: string;
-    gender?: string;
-    phoneNo?: string;
-    relationship?: string;
-  };
+  externalSourceId: string;
+  externalStageCode: string;
+  externalTrialDate?: string;
+  note: string;
+  parents: {
+    guardianEmail?: string;
+    guardianFullName: string;
+    guardianGender?: string;
+    guardianPhone?: string;
+    guardianRelationship?: string;
+  }[];
   student: {
-    dateOfBirth?: string;
-    fullName: string;
-    gender?: string;
+    studentDateOfBirth?: string;
+    studentFullName?: string;
+    studentGender?: string;
   };
-  verifiedAt?: string;
 }
 
-export interface SkippedStudent {
+export interface SkippedLead {
   externalId: string;
   reason: string;
   stage: string;
 }
 
 export interface CollectOptions {
-  /** Only records verified strictly after this moment. REQUIRED — there is no
-   * "everything" mode on purpose: the report holds enrolments going back to
-   * May 2026, and 38 of its named children already exist in ebrightsms from the
-   * September leads-database import. A blind first run would offer all of them
-   * at once and lean entirely on the receiver's duplicate guard. */
+  /** Only leads that have moved since this moment. REQUIRED — there is no
+   * "everything" mode on purpose: the report holds leads back to May, and a
+   * blind first run would drop the whole back catalogue on one branch's queue
+   * at once. Deciding to load history is a separate, deliberate act. */
   since: Date;
   /** Cap the batch — a cautious first live run. */
   limit?: number;
 }
 
 export interface CollectResult {
-  records: SmsStudentRecord[];
-  skipped: SkippedStudent[];
+  records: SmsEnrollmentRequest[];
+  skipped: SkippedLead[];
 }
 
-// `details_verified_at` is the gate, and it is not configurable.
+// What has moved since `since`.
 //
-// It is the only field in the report that predicts whether the child's details
-// are actually there: of the rows carrying it, 100% have a name, a date of
-// birth AND a gender; of the rows without it, 5% have a name and 0.5% a date of
-// birth (measured 2026-09-04 over 2,451 rows). Stage is deliberately NOT
-// filtered — today only enrolments are ever verified, so only enrolments flow;
-// the day someone verifies a record at trial stage, that trial syncs by itself
-// with no code change. That is how trials switch on.
-const VERIFIED_ONLY = `
-  SELECT opportunity_id, current_stage_code, details_verified_at, enrolled_at,
+// refreshed_at is no use here: CNS stamps every row with the same value each
+// time it rebuilds the report, so it says when the table was written, not when
+// a lead changed. These three are per-row and between them cover everything
+// worth sending again — a new lead, a stage move (which is how an enrollment
+// reaches SMS: as a second push of a child sent earlier as a trial), and the
+// moment somebody finally filled the child's details in.
+const CHANGED_SINCE = `
+  SELECT opportunity_id, current_stage, current_stage_code, trial_date,
          child_name, child_dob, child_gender,
          parent_name, parent_full_name, parent_gender, relationship, email, phone,
-         branch_code, student_id
+         branch_code
     FROM crm.crm_trial_enrolment_report
-   WHERE details_verified_at IS NOT NULL
-     AND details_verified_at > $1
-   ORDER BY details_verified_at ASC
+   WHERE current_stage_code = ANY($1)
+     AND greatest(
+           coalesce(last_stage_change_at, 'epoch'::timestamptz),
+           coalesce(details_verified_at,  'epoch'::timestamptz),
+           coalesce(lead_created_at,      'epoch'::timestamptz)
+         ) > $2
+   ORDER BY greatest(
+              coalesce(last_stage_change_at, 'epoch'::timestamptz),
+              coalesce(details_verified_at,  'epoch'::timestamptz),
+              coalesce(lead_created_at,      'epoch'::timestamptz)
+            ) ASC
 `;
 
 /** The CRM writes '' rather than NULL for most absent text. */
@@ -122,8 +143,7 @@ function text(value: string | null): string | undefined {
 }
 
 /** child_dob is free text in the CRM. Only an unambiguous date is passed on —
- * a guess here would be indistinguishable from a real date of birth, and the
- * receiver's duplicate check uses it to tell two children apart. */
+ * a guess here would be indistinguishable from a real date of birth. */
 function isoDate(value: string | null): string | undefined {
   const raw = text(value);
   if (!raw) return undefined;
@@ -136,59 +156,79 @@ function isoDate(value: string | null): string | undefined {
   return parsed.toISOString().slice(0, 10);
 }
 
-export async function collectStudentsForSms(options: CollectOptions): Promise<CollectResult> {
-  const { rows } = await crmPool().query<ReportRow>(VERIFIED_ONLY, [options.since]);
+/** The calendar day a timestamp falls on in Malaysia.
+ *
+ * toISOString() would answer in UTC, and a trial at 9am on the 24th is
+ * 2026-09-24T01:00Z — fine — while one at 8am is 2026-09-24T00:00Z and one at
+ * 7am is the 23rd. Branch staff read this as the day of the trial, so it has
+ * to be the day where the trial happens. */
+function kualaLumpurDate(value: Date | null): string | undefined {
+  if (!value || Number.isNaN(value.getTime())) return undefined;
+  return new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+  }).format(value);
+}
 
-  const records: SmsStudentRecord[] = [];
-  const skipped: SkippedStudent[] = [];
+export async function collectLeadsForSms(options: CollectOptions): Promise<CollectResult> {
+  const { rows } = await crmPool().query<ReportRow>(CHANGED_SINCE, [
+    [...HANDOVER_STAGES],
+    options.since,
+  ]);
+
+  const records: SmsEnrollmentRequest[] = [];
+  const skipped: SkippedLead[] = [];
 
   for (const row of rows) {
     const stage = text(row.current_stage_code) ?? "(none)";
-    const childName = text(row.child_name);
     const branchCode = text(row.branch_code)?.toUpperCase();
 
-    // Both are hard requirements of the receiver. A verified row has always had
-    // them so far; skipping rather than throwing keeps one bad row from
-    // stopping the sweep.
-    if (!childName) {
-      skipped.push({ externalId: row.opportunity_id, reason: "no child name", stage });
-      continue;
-    }
+    // parent_full_name is the parent proper; parent_name falls back to the
+    // contact's own first/last name, which for a contact with no parentFullName
+    // is the SAME string the child's name is derived from. Preferring the
+    // explicit column keeps a parent from being filed under their child's name.
+    const guardianName = text(row.parent_full_name) ?? text(row.parent_name);
+    const email = text(row.email);
+    const phone = text(row.phone);
+
+    // The receiver's floor, checked here so a lead that cannot be worked never
+    // becomes a row in somebody's queue. A missing child name is NOT a reason
+    // to skip — that is the ordinary case, and filling it in is the job.
     if (!branchCode) {
       skipped.push({ externalId: row.opportunity_id, reason: "no branch code", stage });
       continue;
     }
-
-    // parent_full_name is the parent proper; parent_name falls back to the
-    // contact's own first/last name, which for a contact with no
-    // parentFullName is the SAME string the child's name is derived from.
-    // Preferring the explicit column keeps a parent from being filed under
-    // their child's name.
-    const guardianName = text(row.parent_full_name) ?? text(row.parent_name);
+    if (!guardianName) {
+      skipped.push({ externalId: row.opportunity_id, reason: "no parent name", stage });
+      continue;
+    }
+    if (!email && !phone) {
+      skipped.push({ externalId: row.opportunity_id, reason: "no phone or email", stage });
+      continue;
+    }
 
     records.push({
       branchCode,
-      enrolledAt: row.enrolled_at?.toISOString(),
-      externalCode: text(row.student_id),
-      externalId: row.opportunity_id,
-      externalStage: text(row.current_stage_code),
-      ...(guardianName
-        ? {
-            guardian: {
-              email: text(row.email),
-              fullName: guardianName,
-              gender: text(row.parent_gender),
-              phoneNo: text(row.phone),
-              relationship: text(row.relationship),
-            },
-          }
-        : {}),
+      externalSourceId: row.opportunity_id,
+      externalStageCode: stage,
+      externalTrialDate: kualaLumpurDate(row.trial_date),
+      note: `From CNS — ${text(row.current_stage) ?? stage}.`,
+      parents: [
+        {
+          guardianEmail: email,
+          guardianFullName: guardianName,
+          guardianGender: text(row.parent_gender),
+          guardianPhone: phone,
+          guardianRelationship: text(row.relationship),
+        },
+      ],
       student: {
-        dateOfBirth: isoDate(row.child_dob),
-        fullName: childName,
-        gender: text(row.child_gender),
+        studentDateOfBirth: isoDate(row.child_dob),
+        studentFullName: text(row.child_name),
+        studentGender: text(row.child_gender),
       },
-      verifiedAt: row.details_verified_at?.toISOString(),
     });
 
     if (options.limit && records.length >= options.limit) break;
@@ -200,46 +240,62 @@ export async function collectStudentsForSms(options: CollectOptions): Promise<Co
 export interface PushOutcome {
   created: number;
   failures: { error: string; externalId: string }[];
-  updated: number;
+  /** Already approved or declined, and nothing about it moved. */
+  left: number;
+  /** A request already in the queue, brought up to date. */
+  refreshed: number;
+  /** An approved trial, or a declined lead, back in the queue having enrolled. */
+  reopened: number;
 }
 
-// Matches BulkStudentSyncSchema's cap in ebrightsms.
-const BATCH_SIZE = 500;
-
-export async function pushStudentsToSms(records: SmsStudentRecord[]): Promise<PushOutcome> {
+/** One request per lead. The endpoint takes a single submission, and a night's
+ * work is a handful of leads — 364 moved in the whole of the last 30 days. */
+export async function pushLeadsToSms(records: SmsEnrollmentRequest[]): Promise<PushOutcome> {
   const baseUrl = process.env.SMS_BASE_URL;
   const apiKey = process.env.SMS_STUDENT_SYNC_API_KEY;
   if (!baseUrl || !apiKey) {
     throw new Error(
-      "SMS_BASE_URL and SMS_STUDENT_SYNC_API_KEY must both be set to push students to ebrightsms.",
+      "SMS_BASE_URL and SMS_STUDENT_SYNC_API_KEY must both be set to push leads to ebrightsms.",
     );
   }
 
-  const outcome: PushOutcome = { created: 0, failures: [], updated: 0 };
+  const endpoint = `${baseUrl.replace(/\/+$/, "")}/api/v1/enrollments/submissions`;
+  const outcome: PushOutcome = { created: 0, failures: [], left: 0, refreshed: 0, reopened: 0 };
 
-  for (let start = 0; start < records.length; start += BATCH_SIZE) {
-    const batch = records.slice(start, start + BATCH_SIZE);
-    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/v1/students/sync/bulk`, {
-      body: JSON.stringify({ students: batch }),
+  for (const record of records) {
+    const response = await fetch(endpoint, {
+      body: JSON.stringify(record),
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       method: "POST",
     });
 
     const body = (await response.json().catch(() => null)) as
-      | { results?: { ok: boolean; created?: boolean; error?: string; externalId: string }[]; message?: string }
+      | { action?: string; fieldErrors?: Record<string, string[]>; message?: string; ok?: boolean }
       | null;
 
-    if (!response.ok) {
-      throw new Error(
-        `ebrightsms rejected the batch (HTTP ${response.status}): ${body?.message ?? "no message"}`,
-      );
+    if (!response.ok || !body?.ok) {
+      const detail = Object.entries(body?.fieldErrors ?? {})
+        .map(([field, errors]) => `${field}: ${errors.join(", ")}`)
+        .join("; ");
+      outcome.failures.push({
+        error: `HTTP ${response.status} — ${body?.message ?? "no message"}${detail ? ` (${detail})` : ""}`,
+        externalId: record.externalSourceId,
+      });
+      continue;
     }
 
-    for (const result of body?.results ?? []) {
-      if (!result.ok) {
-        outcome.failures.push({ error: result.error ?? "unknown error", externalId: result.externalId });
-      } else if (result.created) outcome.created++;
-      else outcome.updated++;
+    switch (body.action) {
+      case "CREATED":
+        outcome.created++;
+        break;
+      case "REFRESH":
+        outcome.refreshed++;
+        break;
+      case "REOPEN":
+        outcome.reopened++;
+        break;
+      default:
+        outcome.left++;
     }
   }
 
@@ -251,12 +307,12 @@ export interface SyncSummary extends CollectResult {
 }
 
 /** One sweep. Collects, and pushes only when `apply` is true — every caller
- * defaults to a dry run so the record set can be read before any child is
- * created in ebrightsms. */
+ * defaults to a dry run so the leads can be read before any of them lands in
+ * a branch's queue. */
 export async function runSmsStudentSync(
   options: CollectOptions & { apply?: boolean },
 ): Promise<SyncSummary> {
-  const collected = await collectStudentsForSms(options);
+  const collected = await collectLeadsForSms(options);
   if (!options.apply) return { ...collected, outcome: null };
-  return { ...collected, outcome: await pushStudentsToSms(collected.records) };
+  return { ...collected, outcome: await pushLeadsToSms(collected.records) };
 }

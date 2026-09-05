@@ -291,15 +291,18 @@ export async function register(): Promise<void> {
     }, SMS_STAFF_SYNC_TICK_MS);
   }
 
-  // ebrightsms student sync — pushes children enrolled in CNS into the student
-  // management system (see smsStudentSync.ts). Same shape as the staff sweep
-  // above, and off entirely unless configured.
+  // ebrightsms student sync — hands CNS leads to the enrollment review queue
+  // in the student management system (see smsStudentSync.ts). Same shape as the
+  // staff sweep above, and off entirely unless configured.
+  //
+  // Nothing here creates a student: a lead becomes a request that a branch
+  // manager completes and approves.
   //
   // SMS_STUDENT_SYNC_SINCE is required and has no default on purpose: the CRM
-  // report holds enrolments back to May 2026, and some of those children were
-  // already loaded into ebrightsms from the leads database in September, so
-  // there is no safe "everything" starting point. Set it to the moment this
-  // sync goes live and only later records are ever offered.
+  // report holds leads back to May 2026, and emptying that back catalogue into
+  // a branch's queue is a deliberate act, not something a sweep should do on
+  // first boot. Set it to the moment this sync goes live; only leads that have
+  // moved since then are ever offered.
   let smsStudentSyncLastDay: string | null = boot.hour >= SMS_STUDENT_SYNC_HOUR_KL ? boot.day : null;
 
   const smsStudentSyncSweep = async () => {
@@ -314,17 +317,17 @@ export async function register(): Promise<void> {
         since: new Date(process.env.SMS_STUDENT_SYNC_SINCE as string),
       });
       console.log(
-        `[sms-student-sync] ${records.length} sent — created ${outcome?.created ?? 0}, ` +
-          `already linked ${outcome?.updated ?? 0}, failed ${outcome?.failures.length ?? 0}; ${skipped.length} skipped`,
+        `[sms-student-sync] ${records.length} sent — new ${outcome?.created ?? 0}, ` +
+          `refreshed ${outcome?.refreshed ?? 0}, reopened ${outcome?.reopened ?? 0}, ` +
+          `left alone ${outcome?.left ?? 0}, failed ${outcome?.failures.length ?? 0}; ` +
+          `${skipped.length} skipped`,
       );
-      // Every failure here is a record a human has to look at — most often a
-      // child whose name already exists at that branch, which the receiver
-      // refuses rather than duplicating.
+      // Every failure here is a lead a human has to look at.
       for (const failure of outcome?.failures ?? []) {
         console.warn(`[sms-student-sync] rejected ${failure.externalId}: ${failure.error}`);
       }
-      for (const student of skipped) {
-        console.warn(`[sms-student-sync] needs fixing in CNS: ${student.externalId} (${student.stage}) — ${student.reason}`);
+      for (const lead of skipped) {
+        console.warn(`[sms-student-sync] needs fixing in CNS: ${lead.externalId} (${lead.stage}) — ${lead.reason}`);
       }
     } catch (err) {
       console.warn(
