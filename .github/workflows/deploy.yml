@@ -97,7 +97,17 @@ jobs:
           # 2026-08-11: raised 20m -> 40m — production's FIRST build of the
           # CRM-era image (new deps + 3 prisma generates + bigger next build)
           # has no layer cache and exceeded 20m ("Run Command Timeout").
-          command_timeout: 40m
+          # 2026-09-05: raised 40m -> 60m. PR #130's prod deploy went red on
+          # "Run Command Timeout" at exactly 40m 3s, but the build was still
+          # running: it finished at 23:36Z and the container came up at
+          # 23:39Z, ~10 min AFTER GitHub had declared the job failed. The
+          # timeout is enforced client-side by drone-ssh, so it abandons the
+          # connection without signalling the remote shell — the EXIT trap
+          # below never fires and the deploy completes unreported. ~47 min of
+          # real build time was needed, partly because the v1 prod deploy was
+          # building on this SAME box 31 seconds earlier. Two Next.js builds
+          # on 2 vCPUs is the worst case this has to survive.
+          command_timeout: 60m
           script_stop: true
           script: |
             set -euo pipefail
@@ -380,6 +390,21 @@ jobs:
             # CI (~10min). If a deploy fails to pick up new code, SSH in and
             # run `docker compose build --no-cache osc` manually, then
             # `docker compose up -d --force-recreate`.
+            # Keep the outgoing image reachable under a stable tag so a bad
+            # deploy can be rolled back in one command:
+            #   docker tag ebright-osc-v2:previous ebright-osc-v2:latest
+            #   docker compose up -d --force-recreate
+            # Without this the outgoing image is left dangling — and the v1
+            # prod deploy, which runs on this SAME .174 box, opens with
+            # `docker system prune -f`, which deletes dangling images. So the
+            # only rollback target was being destroyed by the other repo.
+            if docker image inspect ebright-osc-v2:latest >/dev/null 2>&1; then
+              docker tag ebright-osc-v2:latest ebright-osc-v2:previous >> ~/deploy.log 2>&1
+              echo "Tagged outgoing image as ebright-osc-v2:previous (rollback point)" >> ~/deploy.log 2>&1
+            else
+              echo "No existing ebright-osc-v2:latest to tag as :previous (first deploy?)" >> ~/deploy.log 2>&1
+            fi
+
             echo "--- Starting Docker Build ---" >> ~/deploy.log 2>&1
             docker build --build-arg BUILD_DATE=$(date +%s) -t ebright-osc-v2:latest . >> ~/deploy.log 2>&1
 
@@ -399,3 +424,41 @@ jobs:
             docker compose ps >> ~/deploy.log 2>&1
             echo "=== TAIL LOGS ===" >> ~/deploy.log
             docker compose logs --tail 100 osc >> ~/deploy.log 2>&1
+
+            # ── Post-deploy health check ─────────────────────────────────
+            # Everything above only DUMPS state and asserts nothing, so a
+            # build that succeeded but booted into a crash loop reported
+            # SUCCESS. That is how portal2's authenticated /home stayed
+            # broken on 2026-09-02 with TASK_MANAGER_DATABASE_URL unset
+            # while CI stayed green. Build failures are already
+            # non-destructive here (the build runs before `docker rm -f`);
+            # this closes the *boot* failure case by making the job's
+            # colour mean something.
+            echo "--- Health check ---" >> ~/deploy.log 2>&1
+            if ! docker inspect --format='{{.State.Running}}' ebright-osc-v2 2>/dev/null | grep -q true; then
+              echo "FATAL: ebright-osc-v2 is not running after deploy." >> ~/deploy.log 2>&1
+              exit 1
+            fi
+
+            # Ask docker for the published port rather than hardcoding it,
+            # so this keeps working if the compose mapping ever changes.
+            HEALTH_PORT="$(docker port ebright-osc-v2 3000/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+            [ -n "$HEALTH_PORT" ] || HEALTH_PORT=3004
+
+            # `restart: unless-stopped` means a crash-looping container can
+            # still report Running between restarts, so the HTTP probe is
+            # the real check. Any non-5xx answer counts as healthy: the app
+            # redirects at /, so 307/308 is the normal success case, not 200.
+            HEALTH_OK=""
+            for _ in $(seq 1 30); do
+              HEALTH_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$HEALTH_PORT/" || echo 000)"
+              case "$HEALTH_CODE" in
+                000|502|503|504) sleep 10 ;;
+                *) HEALTH_OK="$HEALTH_CODE"; break ;;
+              esac
+            done
+            if [ -z "$HEALTH_OK" ]; then
+              echo "FATAL: no non-5xx response on :$HEALTH_PORT within 5 minutes. The container is up but the app is not serving — see the container logs above. Roll back with: docker tag ebright-osc-v2:previous ebright-osc-v2:latest && docker compose up -d --force-recreate" >> ~/deploy.log 2>&1
+              exit 1
+            fi
+            echo "Health check OK — HTTP $HEALTH_OK on :$HEALTH_PORT" >> ~/deploy.log 2>&1
