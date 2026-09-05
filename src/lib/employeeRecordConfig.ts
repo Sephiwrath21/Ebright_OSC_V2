@@ -95,9 +95,12 @@ export const EMPLOYEE_RECORD_CATEGORIES: RecordCategory[] = [
   // Exit-specific rendering already used (ResignationPanel/
   // ReferenceLetterPanel/ExitInterviewNotesPanel/the 3 Clearance checklist
   // panels/FinancialSettlementPanel, all in ActiveProfilePanels.tsx).
-  // Knowledge Transfer/Asset Recovery/System Revocation stay grouped under
-  // "Clearance" (a real expandable group, not flattened) — same group
-  // mechanism stageProfileConfig.ts's own Exit config already used.
+  // Knowledge Transfer/Asset Recovery/System Revocation/Financial Settlement
+  // stay grouped under "Clearance" (a real expandable group, not flattened)
+  // — same group mechanism stageProfileConfig.ts's own Exit config already
+  // used (2026-09-05: Financial Settlement was missing `group: "Clearance"`
+  // here, unlike stageProfileConfig.ts, so it rendered as a top-level
+  // sibling instead of nested under Clearance — see conversation).
   {
     key: "offboarding",
     label: "Offboarding",
@@ -108,7 +111,7 @@ export const EMPLOYEE_RECORD_CATEGORIES: RecordCategory[] = [
       { key: "knowledge-transfer", label: "Knowledge Transfer", group: "Clearance" },
       { key: "asset-recovery", label: "Asset Recovery", group: "Clearance" },
       { key: "system-revocation", label: "System Revocation", group: "Clearance" },
-      { key: "financial-settlement", label: "Financial Settlement" },
+      { key: "financial-settlement", label: "Financial Settlement", group: "Clearance" },
     ],
   },
 ];
