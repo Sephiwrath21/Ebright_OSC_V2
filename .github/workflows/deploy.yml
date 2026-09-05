@@ -449,8 +449,19 @@ jobs:
 
             # `restart: unless-stopped` means a crash-looping container can
             # still report Running between restarts, so the HTTP probe is
-            # the real check. Any non-5xx answer counts as healthy: the app
-            # redirects at /, so 307/308 is the normal success case, not 200.
+            # the real check.
+            #
+            # Healthy is an ALLOWLIST (2xx/3xx/4xx), not "anything that is
+            # not 000/502/503/504". The denylist version passed vacuously on
+            # its first attempt: `curl -w '%{http_code}'` prints 000 AND
+            # exits non-zero when the connection is refused, so the old
+            # `|| echo 000` appended a SECOND 000 and the captured value was
+            # "000000" — which is not equal to "000", so the check declared
+            # the app healthy while nothing was listening. Observed live on
+            # 2026-09-05: "Health check OK — HTTP 000000 on :3004", one
+            # second after the container started. `|| true` keeps curl's own
+            # "000" intact, and 2??|3??|4?? only matches a real 3-digit code.
+            # The app redirects at /, so 307/308 is the success case, not 200.
             #
             # The poll is deliberately ONE line. `script_stop: true` makes
             # drone-ssh dispatch this script line by line, inserting its own
@@ -459,14 +470,16 @@ jobs:
             # harmless inside if/fi and function bodies — which is why the
             # rest of this script is shaped that way — but inside a `case`
             # block the parser expects a pattern, not a command, so it is a
-            # hard syntax error. A multi-line `case` here is exactly what
+            # hard syntax error. The `case` below is safe ONLY because it
+            # sits entirely on one line — do NOT reformat it across lines.
+            # A multi-line `case` here is exactly what
             # broke the 2026-09-05 staging deploy:
             #   bash: -c: line 651: syntax error near unexpected token `;'
             # The deploy itself had already succeeded; only this check blew
             # up, turning a good deploy red. Keep it on one line — no line
             # breaks means no glue, and nothing to corrupt. `|| true` keeps
             # the loop's own exit status from tripping the glue as well.
-            HEALTH_OK=""; HEALTH_TRIES=0; while [ "$HEALTH_TRIES" -lt 30 ] && [ -z "$HEALTH_OK" ]; do HEALTH_TRIES=$((HEALTH_TRIES+1)); HEALTH_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$HEALTH_PORT/" || echo 000)"; if [ "$HEALTH_CODE" != "000" ] && [ "$HEALTH_CODE" != "502" ] && [ "$HEALTH_CODE" != "503" ] && [ "$HEALTH_CODE" != "504" ]; then HEALTH_OK="$HEALTH_CODE"; else sleep 10; fi; done || true
+            HEALTH_OK=""; HEALTH_TRIES=0; while [ "$HEALTH_TRIES" -lt 30 ] && [ -z "$HEALTH_OK" ]; do HEALTH_TRIES=$((HEALTH_TRIES+1)); HEALTH_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$HEALTH_PORT/" || true)"; case "$HEALTH_CODE" in 2??|3??|4??) HEALTH_OK="$HEALTH_CODE" ;; *) sleep 10 ;; esac; done || true
             if [ -z "$HEALTH_OK" ]; then
               echo "FATAL: no non-5xx response on :$HEALTH_PORT within 5 minutes. The container is up but the app is not serving — see the container logs above. Roll back with: docker tag ebright-osc-v2:previous ebright-osc-v2:latest && docker compose up -d --force-recreate" >> ~/deploy.log 2>&1
               exit 1
