@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { uploadToDrive, deleteFromDrive } from "@/lib/drive";
+import { uploadToDrive, deleteFromDrive, resolveEmployeeFolderId } from "@/lib/drive";
 import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
 import { STAFF_ROLE_ID, getEmployeeOverviewRowById, listBranches, listDepartments, resolveDepartmentBranch } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
@@ -203,7 +203,10 @@ export async function updateOfferLetter(userId: number, data: UpdateOfferLetterI
 
     let offerLetterFileId = data.offerLetterFileId;
     if (data.offerLetterFile) {
-      const uploaded = await uploadToDrive(data.offerLetterFile, { prefix: "offer-letter", folderEnvVar: "GOOGLE_DRIVE_OFFER_LETTER_ID" });
+      const uploaded = await uploadToDrive(data.offerLetterFile, {
+        prefix: "offer-letter",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "OFFER_LETTER"),
+      });
       offerLetterFileId = uploaded.id;
     }
     if (currentEmployment.offer_letter_file_id && currentEmployment.offer_letter_file_id !== offerLetterFileId) {
@@ -311,7 +314,10 @@ export async function updateResume(userId: number, input: UpdateResumeInput): Pr
 
     let resumeFileId = input.resumeFileId;
     if (input.resumeFile) {
-      const uploaded = await uploadToDrive(input.resumeFile, { prefix: "resume", folderEnvVar: "GOOGLE_DRIVE_RESUME_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.resumeFile, {
+        prefix: "resume",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "RESUME"),
+      });
       resumeFileId = uploaded.id;
     }
     if (existing?.resume_file_id && existing.resume_file_id !== resumeFileId) {
@@ -320,7 +326,10 @@ export async function updateResume(userId: number, input: UpdateResumeInput): Pr
 
     let cvFileId = input.cvFileId;
     if (input.cvFile) {
-      const uploaded = await uploadToDrive(input.cvFile, { prefix: "cv", folderEnvVar: "GOOGLE_DRIVE_RESUME_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.cvFile, {
+        prefix: "cv",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "CV"),
+      });
       cvFileId = uploaded.id;
     }
     if (existing?.cv_file_id && existing.cv_file_id !== cvFileId) {
@@ -451,7 +460,7 @@ export async function updateMedicalCheck(userId: number, input: UpdateMedicalChe
     if (input.medicalReportFile) {
       const uploaded = await uploadToDrive(input.medicalReportFile, {
         prefix: "medical-report",
-        folderEnvVar: "GOOGLE_DRIVE_MEDICAL_REPORT_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "MEDICAL_CHECK"),
       });
       medicalReportFileId = uploaded.id;
     }
@@ -506,7 +515,7 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     if (input.confirmationLetterFile) {
       const uploaded = await uploadToDrive(input.confirmationLetterFile, {
         prefix: "confirmation-letter",
-        folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "CONFIRMATION_LETTER"),
       });
       confirmationLetterFileId = uploaded.id;
     }
@@ -518,7 +527,7 @@ export async function updateProbationInfo(userId: number, input: UpdateProbation
     if (input.extensionLetterFile) {
       const uploaded = await uploadToDrive(input.extensionLetterFile, {
         prefix: "extension-letter",
-        folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "EXTENSION_LETTER"),
       });
       extensionLetterFileId = uploaded.id;
     }
@@ -675,7 +684,7 @@ export async function updateDocuments(userId: number, input: UpdateDocumentsInpu
     if (input.employmentContractFile) {
       const uploaded = await uploadToDrive(input.employmentContractFile, {
         prefix: "employment-contract",
-        folderEnvVar: "GOOGLE_DRIVE_EMP_CONTRACT_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "EMP_CONTRACT"),
       });
       employmentContractFileId = uploaded.id;
     }
@@ -687,7 +696,7 @@ export async function updateDocuments(userId: number, input: UpdateDocumentsInpu
     if (input.employeeHandbookFile) {
       const uploaded = await uploadToDrive(input.employeeHandbookFile, {
         prefix: "employee-handbook",
-        folderEnvVar: "GOOGLE_DRIVE_HANDBOOK_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "EMP_HANDBOOK"),
       });
       employeeHandbookFileId = uploaded.id;
     }
@@ -732,7 +741,10 @@ export async function updatePayroll(userId: number, input: UpdatePayrollInput): 
 
     let pcbAttachmentFileId = input.pcbAttachmentFileId;
     if (input.pcbAttachmentFile) {
-      const uploaded = await uploadToDrive(input.pcbAttachmentFile, { prefix: "pcb", folderEnvVar: "GOOGLE_DRIVE_PCB_ID" });
+      const uploaded = await uploadToDrive(input.pcbAttachmentFile, {
+        prefix: "pcb",
+        folderId: await resolveEmployeeFolderId("FINANCE", "PCB"),
+      });
       pcbAttachmentFileId = uploaded.id;
     }
     if (existing?.pcb_attachment_file_id && existing.pcb_attachment_file_id !== pcbAttachmentFileId) {
@@ -776,7 +788,10 @@ export async function addAchievement(userId: number, input: AddAchievementInput)
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "achievement", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "achievement",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "ACHIEVEMENT"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.achievement.create({
@@ -812,7 +827,10 @@ export async function addSalaryRevision(userId: number, input: AddSalaryRevision
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "salary-revision", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "salary-revision",
+        folderId: await resolveEmployeeFolderId("FINANCE", "SALARY_REVISION"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.salary_revision.create({
@@ -852,7 +870,10 @@ export async function addPromotion(userId: number, input: AddPromotionInput): Pr
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "promotion", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "promotion",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "PROMOTION"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.promotion.create({
@@ -916,7 +937,10 @@ export async function addTransfer(userId: number, input: AddTransferInput): Prom
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "transfer", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "transfer",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "TRANSFER"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.transfer.create({
@@ -1012,7 +1036,10 @@ export async function updateNda(userId: number, input: UpdateNdaInput): Promise<
 
     let attachmentFileId = input.attachmentFileId;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "nda", folderEnvVar: "GOOGLE_DRIVE_NDA_NC_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "nda",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "NDA/NC"),
+      });
       attachmentFileId = uploaded.id;
     }
     if (existing?.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
@@ -1050,7 +1077,10 @@ export async function updateNonCompete(userId: number, input: UpdateNonCompeteIn
 
     let attachmentFileId = input.attachmentFileId;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "non-compete", folderEnvVar: "GOOGLE_DRIVE_NDA_NC_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "non-compete",
+        folderId: await resolveEmployeeFolderId("HR_INFO", "NDA/NC"),
+      });
       attachmentFileId = uploaded.id;
     }
     if (existing?.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
@@ -1071,11 +1101,10 @@ export async function updateNonCompete(userId: number, input: UpdateNonCompeteIn
 }
 
 // ─── Exit (singleton, update-in-place like nda/non_compete). Resignation
-// Letter/Acceptance Letter/Issued Letter route to GOOGLE_DRIVE_LETTER_FOLDER_ID
-// — the same shared "letters" folder probation's confirmation/extension
-// letters and (per this task) suspension/showcause letters use, since these
-// are the same kind of document; not explicitly specified for these 3 fields,
-// flagged in the summary rather than silently assumed. ───
+// Letter/Acceptance Letter/Issued Letter each resolve their own dedicated
+// subfolder under GOOGLE_DRIVE_EMPLOYEE_FOLDER_ID's OFFBOARDING tab
+// (2026-09-05, see conversation) — GOOGLE_DRIVE_LETTER_FOLDER_ID is kept only
+// as the fallback until those subfolders exist on Drive. ───
 
 export interface UpdateResignationInput {
   submissionDate: string;
@@ -1098,7 +1127,10 @@ export async function updateResignation(userId: number, input: UpdateResignation
 
     let resignLetterFileId = input.resignLetterFileId;
     if (input.resignLetterFile) {
-      const uploaded = await uploadToDrive(input.resignLetterFile, { prefix: "resign-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.resignLetterFile, {
+        prefix: "resign-letter",
+        folderId: await resolveEmployeeFolderId("OFFBOARDING", "RESIGNATION_LETTER"),
+      });
       resignLetterFileId = uploaded.id;
     }
     if (existing?.resign_letter_file_id && existing.resign_letter_file_id !== resignLetterFileId) {
@@ -1107,7 +1139,10 @@ export async function updateResignation(userId: number, input: UpdateResignation
 
     let acceptLetterFileId = input.acceptLetterFileId;
     if (input.acceptLetterFile) {
-      const uploaded = await uploadToDrive(input.acceptLetterFile, { prefix: "accept-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.acceptLetterFile, {
+        prefix: "accept-letter",
+        folderId: await resolveEmployeeFolderId("OFFBOARDING", "ACCEPTANCE_LETTER"),
+      });
       acceptLetterFileId = uploaded.id;
     }
     if (existing?.accept_letter_file_id && existing.accept_letter_file_id !== acceptLetterFileId) {
@@ -1149,7 +1184,10 @@ export async function updateReferenceLetter(userId: number, input: UpdateReferen
 
     let issuedLetterFileId = input.issuedLetterFileId;
     if (input.issuedLetterFile) {
-      const uploaded = await uploadToDrive(input.issuedLetterFile, { prefix: "reference-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.issuedLetterFile, {
+        prefix: "reference-letter",
+        folderId: await resolveEmployeeFolderId("OFFBOARDING", "REFERENCE_LETTER"),
+      });
       issuedLetterFileId = uploaded.id;
     }
     if (existing?.issued_letter_file_id && existing.issued_letter_file_id !== issuedLetterFileId) {
@@ -1467,7 +1505,7 @@ export async function updateFinancialSettlement(userId: number, input: UpdateFin
     if (input.settlementLetterFile) {
       const uploaded = await uploadToDrive(input.settlementLetterFile, {
         prefix: "settlement-letter",
-        folderEnvVar: "GOOGLE_DRIVE_SETTLEMENT_LETTER_ID",
+        folderId: await resolveEmployeeFolderId("OFFBOARDING", "SETTLEMENT_LETTER"),
       });
       settlementLetterFileId = uploaded.id;
     }
@@ -1505,7 +1543,10 @@ export async function addDomesticInquiry(userId: number, input: AddDomesticInqui
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "domestic-inquiry", folderEnvVar: "GOOGLE_DRIVE_DISCIPLINARY_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "domestic-inquiry",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "DOMESTIC_INQUIRY"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.domestic_inquiry.create({
@@ -1541,7 +1582,10 @@ export async function addSuspensionLetter(userId: number, input: AddSuspensionLe
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "suspension-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "suspension-letter",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "SUSPENSION_LETTER"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.suspension_letter.create({
@@ -1579,7 +1623,10 @@ export async function addShowcauseWarningLetter(userId: number, input: AddShowca
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "showcause-warning-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "showcause-warning-letter",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "WARNING_LETTER"),
+      });
       attachmentFileId = uploaded.id;
     }
     await prisma.showcause_warning_letter.create({
@@ -1656,7 +1703,10 @@ export async function updateAchievement(userId: number, id: number, input: AddAc
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "achievement", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "achievement",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "ACHIEVEMENT"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -1682,7 +1732,10 @@ export async function updatePromotion(userId: number, id: number, input: AddProm
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "promotion", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "promotion",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "PROMOTION"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -1744,7 +1797,10 @@ export async function updateTransfer(userId: number, id: number, input: AddTrans
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "transfer", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "transfer",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "TRANSFER"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -1829,7 +1885,10 @@ export async function updateDomesticInquiry(userId: number, id: number, input: A
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "domestic-inquiry", folderEnvVar: "GOOGLE_DRIVE_DISCIPLINARY_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "domestic-inquiry",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "DOMESTIC_INQUIRY"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -1861,7 +1920,10 @@ export async function updateSuspensionLetter(userId: number, id: number, input: 
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "suspension-letter", folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "suspension-letter",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "SUSPENSION_LETTER"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -1900,7 +1962,7 @@ export async function updateShowcauseWarningLetter(
     if (input.attachmentFile) {
       const uploaded = await uploadToDrive(input.attachmentFile, {
         prefix: "showcause-warning-letter",
-        folderEnvVar: "GOOGLE_DRIVE_LETTER_FOLDER_ID",
+        folderId: await resolveEmployeeFolderId("DISCIPLINARY", "WARNING_LETTER"),
       });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
@@ -1966,7 +2028,10 @@ export async function updateSalaryRevision(userId: number, id: number, input: Ad
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
     let attachmentFileId = existing.attachment_file_id;
     if (input.attachmentFile) {
-      const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "salary-revision", folderEnvVar: "GOOGLE_DRIVE_ACTIVE_ATTACHMENT_ID" });
+      const uploaded = await uploadToDrive(input.attachmentFile, {
+        prefix: "salary-revision",
+        folderId: await resolveEmployeeFolderId("FINANCE", "SALARY_REVISION"),
+      });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
         await deleteFromDrive(existing.attachment_file_id);
@@ -2003,7 +2068,7 @@ export async function updatePerformanceReview(userId: number, id: number, input:
     if (input.attachmentFile) {
       const uploaded = await uploadToDrive(input.attachmentFile, {
         prefix: "performance-review",
-        folderEnvVar: "GOOGLE_DRIVE_PERFORMANCE_REVIEW_ID",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "PERFORMANCE_REVIEW"),
       });
       attachmentFileId = uploaded.id;
       if (existing.attachment_file_id && existing.attachment_file_id !== attachmentFileId) {
@@ -2300,7 +2365,7 @@ export async function addPerformanceReview(userId: number, input: AddPerformance
     if (input.attachmentFile) {
       const uploaded = await uploadToDrive(input.attachmentFile, {
         prefix: "performance-review",
-        folderEnvVar: "GOOGLE_DRIVE_PERFORMANCE_REVIEW_ID",
+        folderId: await resolveEmployeeFolderId("ACTIVE_EMP", "PERFORMANCE_REVIEW"),
       });
       attachmentFileId = uploaded.id;
     }
@@ -2387,7 +2452,10 @@ export async function addPayslipHistory(userId: number, input: AddPayslipHistory
   if (!input.month) return { ok: false, error: "Month is required." };
   if (!input.attachmentFile) return { ok: false, error: "Payslip file is required." };
   try {
-    const uploaded = await uploadToDrive(input.attachmentFile, { prefix: "payslip", folderEnvVar: "GOOGLE_DRIVE_PAYSLIP_ID" });
+    const uploaded = await uploadToDrive(input.attachmentFile, {
+      prefix: "payslip",
+      folderId: await resolveEmployeeFolderId("FINANCE", "PAYSLIP"),
+    });
     await prisma.payslip_history.create({
       data: { user_id: userId, month: input.month, attachment_file_id: uploaded.id },
     });

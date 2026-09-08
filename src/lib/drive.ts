@@ -67,6 +67,67 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 // same process don't re-list the parent every time.
 const folderIdCache = new Map<string, string>();
 
+// --- New single-root Drive layout (2026-09-05, see conversation) ---
+// The old layout was 16+ separate hardcoded env vars, one Drive folder ID per
+// document category. The new layout is ONE root folder
+// (GOOGLE_DRIVE_EMPLOYEE_FOLDER_ID) containing named tab/category subfolders,
+// each optionally containing named document-type subfolders one level deeper
+// (e.g. root -> "HR_INFO" -> "RESUME"). resolveDriveFolderId walks that path
+// by NAME (case-insensitive), read-only — it never creates a folder, so a
+// typo'd or not-yet-created name fails loudly instead of silently uploading
+// to the wrong place. Cached per level (`${parentId}/${lowercased name}`),
+// forever per process, same as folderIdCache above — a rename only needs a
+// redeploy to take effect, not a TTL.
+const resolvedFolderCache = new Map<string, string>();
+
+async function resolveOneFolderLevel(parentId: string, name: string): Promise<string> {
+  const cacheKey = `${parentId}/${name.toLowerCase()}`;
+  const cached = resolvedFolderCache.get(cacheKey);
+  if (cached) return cached;
+
+  const drive = getDriveClient();
+  const list = await drive.files.list({
+    q: `'${parentId}' in parents and mimeType = '${FOLDER_MIME}' and trashed = false`,
+    fields: "files(id, name)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    pageSize: 200,
+  });
+
+  const match = list.data.files?.find((f) => f.name?.toLowerCase() === name.toLowerCase());
+  if (!match?.id) {
+    throw new Error(`Drive subfolder "${name}" not found under parent folder ${parentId}.`);
+  }
+  resolvedFolderCache.set(cacheKey, match.id);
+  return match.id;
+}
+
+// Walks rootFolderId -> subfolderPath[0] -> subfolderPath[1] -> ... by name,
+// one Drive API list call per not-yet-cached level. Supports both the 1-level
+// (root -> "EMP_CONTRACT") and 2-level (root -> "HR_INFO" -> "RESUME") shapes
+// the new layout uses — pass however many path segments the category needs.
+export async function resolveDriveFolderId(rootFolderId: string, ...subfolderPath: string[]): Promise<string> {
+  let currentId = rootFolderId;
+  for (const name of subfolderPath) {
+    currentId = await resolveOneFolderLevel(currentId, name);
+  }
+  return currentId;
+}
+
+// Resolves a category's folder under the new single-root layout. No
+// fallback (2026-09-08, see conversation — migration is complete for every
+// category except Leave/Claim/Induction, which were deliberately never
+// migrated and still call getFolderId(folderEnvVar) directly): a missing
+// root or a not-yet-created subfolder throws loudly rather than silently
+// uploading to the wrong place.
+export async function resolveEmployeeFolderId(...subfolderPath: string[]): Promise<string> {
+  const rootId = process.env.GOOGLE_DRIVE_EMPLOYEE_FOLDER_ID?.trim().replace(/^"|"$/g, "").trim();
+  if (!rootId) {
+    throw new Error("GOOGLE_DRIVE_EMPLOYEE_FOLDER_ID is not configured.");
+  }
+  return resolveDriveFolderId(rootId, ...subfolderPath);
+}
+
 async function ensureFolder(
   drive: drive_v3.Drive,
   parentId: string,
@@ -104,10 +165,15 @@ async function ensureFolder(
 
 export async function uploadToDrive(
   file: File,
-  options: { prefix?: string; folderPath?: string[]; folderEnvVar?: string } = {},
+  options: { prefix?: string; folderPath?: string[]; folderEnvVar?: string; folderId?: string } = {},
 ): Promise<{ id: string; name: string }> {
   const drive = getDriveClient();
-  const rootId = getFolderId(options.folderEnvVar);
+  // folderId (pre-resolved, e.g. via resolveEmployeeFolderId) takes priority
+  // over folderEnvVar's old direct-env-var lookup — every category migrated
+  // to the new single-root layout passes folderId; Leave/Claim/Induction
+  // (2026-09-08, see conversation — deliberately staying on the old env
+  // vars, permanently, not "for now") keep passing folderEnvVar.
+  const rootId = options.folderId ?? getFolderId(options.folderEnvVar);
 
   let parentId = rootId;
   if (options.folderPath && options.folderPath.length > 0) {
